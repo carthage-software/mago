@@ -1,0 +1,17 @@
+[package]
+name = "fennec-inference"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fennec-reflection = { path = "../reflection" }
+fennec-span = { path = "../span" }
+fennec-semantics = { path = "../semantics" }
+fennec-names = { path = "../names" }
+fennec-interner = { path = "../interner" }
+fennec-ast = { path = "../ast" }

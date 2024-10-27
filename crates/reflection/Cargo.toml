@@ -12,6 +12,4 @@ workspace = true
 fennec-interner = { path = "../interner" }
 fennec-span = { path = "../span" }
 fennec-source = { path = "../source" }
-fennec-reporting = { path = "../reporting" }
-fennec-ast = { path = "../ast" }
-tracing = { workspace = true }
+serde = { workspace = true }

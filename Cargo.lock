@@ -705,6 +705,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fennec-inference"
+version = "0.0.0"
+dependencies = [
+ "fennec-ast",
+ "fennec-interner",
+ "fennec-names",
+ "fennec-reflection",
+ "fennec-semantics",
+ "fennec-span",
+]
+
+[[package]]
 name = "fennec-interner"
 version = "0.0.0"
 dependencies = [
@@ -797,12 +809,10 @@ dependencies = [
 name = "fennec-reflection"
 version = "0.0.0"
 dependencies = [
- "fennec-ast",
  "fennec-interner",
- "fennec-reporting",
  "fennec-source",
  "fennec-span",
- "tracing",
+ "serde",
 ]
 
 [[package]]
