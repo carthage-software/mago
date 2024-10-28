@@ -9,3 +9,11 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+fennec-interner = { path = "../interner" }
+fennec-span = { path = "../span" }
+fennec-ast = { path = "../ast" }
+fennec-walker = { path = "../walker" }
+fennec-source = { path = "../source" }
+fennec-inference = { path = "../inference" }
+fennec-reflection = { path = "../reflection" }
+serde = { workspace = true }

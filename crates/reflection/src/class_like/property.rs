@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use ahash::HashSet;
 
 use serde::Deserialize;
 use serde::Serialize;

@@ -12,4 +12,5 @@ workspace = true
 fennec-interner = { path = "../interner" }
 fennec-span = { path = "../span" }
 fennec-source = { path = "../source" }
+ahash = { workspace = true }
 serde = { workspace = true }

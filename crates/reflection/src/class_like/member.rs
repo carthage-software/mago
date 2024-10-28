@@ -1,22 +1,23 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::hash::Hash;
 
+use ahash::HashMap;
+use ahash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 
+use fennec_interner::StringIdentifier;
 use fennec_span::Span;
 
 use crate::identifier::ClassLikeIdentifier;
-use crate::identifier::ClassLikeMemberIdentifier;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MemeberCollection<T: Eq + PartialEq> {
-    members: HashMap<ClassLikeMemberIdentifier, T>,
-    declared_members: HashSet<ClassLikeMemberIdentifier>,
-    inherited_members: HashMap<ClassLikeMemberIdentifier, ClassLikeIdentifier>,
-    overriden_members: HashMap<ClassLikeMemberIdentifier, HashSet<ClassLikeIdentifier>>,
-    inheritable_members: HashSet<ClassLikeMemberIdentifier>,
+    pub members: HashMap<StringIdentifier, T>,
+    pub appering_members: HashSet<StringIdentifier>,
+    pub declared_members: HashSet<StringIdentifier>,
+    pub inherited_members: HashMap<StringIdentifier, ClassLikeIdentifier>,
+    pub overriden_members: HashMap<StringIdentifier, HashSet<ClassLikeIdentifier>>,
+    pub inheritable_members: HashSet<StringIdentifier>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]

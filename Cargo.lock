@@ -809,6 +809,7 @@ dependencies = [
 name = "fennec-reflection"
 version = "0.0.0"
 dependencies = [
+ "ahash",
  "fennec-interner",
  "fennec-source",
  "fennec-span",
@@ -818,6 +819,16 @@ dependencies = [
 [[package]]
 name = "fennec-reflector"
 version = "0.0.0"
+dependencies = [
+ "fennec-ast",
+ "fennec-inference",
+ "fennec-interner",
+ "fennec-reflection",
+ "fennec-source",
+ "fennec-span",
+ "fennec-walker",
+ "serde",
+]
 
 [[package]]
 name = "fennec-reporting"

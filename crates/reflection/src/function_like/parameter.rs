@@ -1,7 +1,8 @@
-use fennec_interner::StringIdentifier;
-use fennec_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
+
+use fennec_interner::StringIdentifier;
+use fennec_span::Span;
 
 use crate::attribute::AttributeReflection;
 use crate::r#type::TypeReflection;

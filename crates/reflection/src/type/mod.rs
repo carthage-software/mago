@@ -1,6 +1,7 @@
-use fennec_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
+
+use fennec_span::Span;
 
 use crate::r#type::kind::TypeKind;
 

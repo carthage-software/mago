@@ -1,6 +1,7 @@
-use fennec_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
+
+use fennec_span::Span;
 
 use crate::attribute::AttributeReflection;
 use crate::function_like::parameter::FunctionLikeParameterReflection;
@@ -12,7 +13,7 @@ pub mod r#return;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct FunctionLikeReflection {
-    pub name: FunctionLikeIdentifier,
+    pub identifier: FunctionLikeIdentifier,
     pub attribute_reflections: Vec<AttributeReflection>,
     pub parameter_reflections: Vec<FunctionLikeParameterReflection>,
     pub return_type_reflection: Option<FunctionLikeReturnTypeReflection>,

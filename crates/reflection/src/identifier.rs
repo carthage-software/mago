@@ -15,15 +15,15 @@ pub enum ClassLikeIdentifier {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ConstantIdentifier {
-    name: StringIdentifier,
-    span: Span,
+    pub name: StringIdentifier,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ClassLikeMemberIdentifier {
-    class_like: ClassLikeIdentifier,
-    name: StringIdentifier,
-    span: Span,
+    pub class_like: ClassLikeIdentifier,
+    pub name: StringIdentifier,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
