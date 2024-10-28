@@ -227,6 +227,48 @@ impl CodebaseReflection {
         })
     }
 
+    /// Returns the function-like reflection (function, closure, etc.) that encloses the given offset.
+    ///
+    /// This method iterates through the reflections in the codebase, filtering for function-like reflections
+    /// that contain the given offset in their definition range. It returns the reflection with the
+    /// largest starting offset, effectively finding the innermost function-like reflection containing
+    /// the offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset` - The offset to search for.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&FunctionLikeReflection>` - The enclosing function-like reflection, if found.
+    pub fn get_enclosing_function_like(&self, offset: usize) -> Option<&FunctionLikeReflection> {
+        self.function_like_reflections
+            .iter()
+            .filter(|function_like| function_like.span.has_offset(offset))
+            .max_by_key(|function_like| function_like.span.start.offset)
+    }
+
+    /// Returns the class-like reflection (class, trait, etc.) that encloses the given offset.
+    ///
+    /// This method iterates through the reflections in the codebase, filtering for class-like reflections
+    /// that contain the given offset in their definition range. It returns the reflection with the
+    /// largest starting offset, effectively finding the innermost class-like reflection containing
+    /// the offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset` - The offset to search for.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&ClassLikeReflection>` - The enclosing class-like reflection, if found.
+    pub fn get_enclosing_class_like(&self, offset: usize) -> Option<&ClassLikeReflection> {
+        self.class_like_reflections
+            .iter()
+            .filter(|reflection| reflection.span.has_offset(offset))
+            .max_by_key(|reflection| reflection.span.start.offset)
+    }
+
     pub fn merge(&mut self, other: Self) {
         self.constant_names.extend(other.constant_names);
         self.constant_reflections.extend(other.constant_reflections);
