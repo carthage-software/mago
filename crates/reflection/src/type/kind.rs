@@ -29,10 +29,8 @@ pub enum TypeKind {
 
 impl TypeKind {
     pub fn is_nullable(&self) -> bool {
-        match &self{
-            TypeKind::Union(kinds) => {
-                kinds.iter().any(|k| k.is_nullable())
-            }
+        match &self {
+            TypeKind::Union(kinds) => kinds.iter().any(|k| k.is_nullable()),
             TypeKind::Null => true,
             TypeKind::Mixed => true,
             _ => false,

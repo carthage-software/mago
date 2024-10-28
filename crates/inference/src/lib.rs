@@ -21,9 +21,7 @@ fn infere_kind<'i, 'ast>(
     expression: &'ast Expression,
 ) -> Option<TypeKind> {
     match &expression {
-        Expression::Parenthesized(parenthesized) => {
-            infere_kind(interner, semantics, &parenthesized.expression)
-        }
+        Expression::Parenthesized(parenthesized) => infere_kind(interner, semantics, &parenthesized.expression),
         Expression::Referenced(referenced) => infere_kind(interner, semantics, &referenced.expression),
         Expression::Suppressed(suppressed) => infere_kind(interner, semantics, &suppressed.expression),
         Expression::Literal(literal) => Some(match &literal {
@@ -59,18 +57,14 @@ fn infere_kind<'i, 'ast>(
                 match (lhs_kind, rhs_kind) {
                     (Some(TypeKind::Float), Some(TypeKind::Float))
                     | (Some(TypeKind::Float), Some(TypeKind::Integer))
-                    | (Some(TypeKind::Integer), Some(TypeKind::Float)) => {
-                        match &arithmetic_infix_operation.operator {
-                            ArithmeticInfixOperator::Modulo(_) => Some(TypeKind::Integer),
-                            _ => Some(TypeKind::Float),
-                        }
-                    }
-                    (Some(TypeKind::Integer), Some(TypeKind::Integer)) => {
-                        match &arithmetic_infix_operation.operator {
-                            ArithmeticInfixOperator::Modulo(_) => Some(TypeKind::Integer),
-                            _ => Some(TypeKind::Union(vec![TypeKind::Integer, TypeKind::Float])),
-                        }
-                    }
+                    | (Some(TypeKind::Integer), Some(TypeKind::Float)) => match &arithmetic_infix_operation.operator {
+                        ArithmeticInfixOperator::Modulo(_) => Some(TypeKind::Integer),
+                        _ => Some(TypeKind::Float),
+                    },
+                    (Some(TypeKind::Integer), Some(TypeKind::Integer)) => match &arithmetic_infix_operation.operator {
+                        ArithmeticInfixOperator::Modulo(_) => Some(TypeKind::Integer),
+                        _ => Some(TypeKind::Union(vec![TypeKind::Integer, TypeKind::Float])),
+                    },
                     _ => None,
                 }
             }
@@ -79,9 +73,7 @@ fn infere_kind<'i, 'ast>(
 
                 match value_kind {
                     Some(TypeKind::Float) => Some(TypeKind::Float),
-                    Some(TypeKind::Integer) => {
-                        Some(TypeKind::Union(vec![TypeKind::Integer, TypeKind::Float]))
-                    }
+                    Some(TypeKind::Integer) => Some(TypeKind::Union(vec![TypeKind::Integer, TypeKind::Float])),
                     _ => None,
                 }
             }
@@ -98,9 +90,7 @@ fn infere_kind<'i, 'ast>(
         Expression::CastOperation(cast_operation) => Some(match &cast_operation.operator {
             CastOperator::Array(_, _) => TypeKind::Array,
             CastOperator::Bool(_, _) | CastOperator::Boolean(_, _) => TypeKind::Bool,
-            CastOperator::Double(_, _) | CastOperator::Real(_, _) | CastOperator::Float(_, _) => {
-                TypeKind::Float
-            }
+            CastOperator::Double(_, _) | CastOperator::Real(_, _) | CastOperator::Float(_, _) => TypeKind::Float,
             CastOperator::Int(_, _) | CastOperator::Integer(_, _) => TypeKind::Integer,
             CastOperator::Object(_, _) => TypeKind::Object,
             CastOperator::Unset(_, _) => TypeKind::Null,

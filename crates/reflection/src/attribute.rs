@@ -21,14 +21,6 @@ pub struct AttributeArgumentListReflection {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum AttributeArgumentReflection {
-    Positional {
-        value_type_reflection: Option<TypeReflection>,
-        span: Span,
-    },
-    Named {
-        name: StringIdentifier,
-        value_type_reflection: Option<TypeReflection>,
-        name_span: Span,
-        span: Span,
-    },
+    Positional { value_type_reflection: Option<TypeReflection>, span: Span },
+    Named { name: StringIdentifier, value_type_reflection: Option<TypeReflection>, name_span: Span, span: Span },
 }
