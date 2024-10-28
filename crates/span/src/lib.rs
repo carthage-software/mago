@@ -97,6 +97,10 @@ impl Span {
         Span::new(self.start, other.end)
     }
 
+    pub fn contains(&self, position: &impl HasPosition) -> bool {
+        self.has_offset(position.offset())
+    }
+
     pub fn has_offset(&self, offset: usize) -> bool {
         self.start.offset <= offset && offset <= self.end.offset
     }
