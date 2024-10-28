@@ -1,20 +1,31 @@
 use fennec_ast::*;
+use fennec_interner::ThreadedInterner;
 use fennec_reflection::r#type::kind::TypeKind;
 use fennec_reflection::r#type::TypeReflection;
 use fennec_semantics::Semantics;
 use fennec_span::HasSpan;
 
-pub fn infere<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -> Option<TypeReflection> {
-    let kind = infere_kind(semantics, expression)?;
+pub fn infere<'i, 'ast>(
+    interner: &'i ThreadedInterner,
+    semantics: &'ast Semantics,
+    expression: &'ast Expression,
+) -> Option<TypeReflection> {
+    let kind = infere_kind(interner, semantics, expression)?;
 
     Some(TypeReflection { kind, inferred: true, span: expression.span() })
 }
 
-fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -> Option<TypeKind> {
+fn infere_kind<'i, 'ast>(
+    interner: &'i ThreadedInterner,
+    semantics: &'ast Semantics,
+    expression: &'ast Expression,
+) -> Option<TypeKind> {
     match &expression {
-        Expression::Parenthesized(parenthesized) => infere_kind(semantics, &parenthesized.expression),
-        Expression::Referenced(referenced) => infere_kind(semantics, &referenced.expression),
-        Expression::Suppressed(suppressed) => infere_kind(semantics, &suppressed.expression),
+        Expression::Parenthesized(parenthesized) => {
+            infere_kind(interner, semantics, &parenthesized.expression)
+        }
+        Expression::Referenced(referenced) => infere_kind(interner, semantics, &referenced.expression),
+        Expression::Suppressed(suppressed) => infere_kind(interner, semantics, &suppressed.expression),
         Expression::Literal(literal) => Some(match &literal {
             Literal::String(_) => TypeKind::String,
             Literal::Integer(_) => TypeKind::Integer,
@@ -26,7 +37,7 @@ fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -
         Expression::CompositeString(_) => Some(TypeKind::String),
         Expression::ArithmeticOperation(arithmetic_operation) => match arithmetic_operation.as_ref() {
             ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
-                let value_kind = infere_kind(semantics, &arithmetic_prefix_operation.value);
+                let value_kind = infere_kind(interner, semantics, &arithmetic_prefix_operation.value);
 
                 match value_kind {
                     Some(TypeKind::Float) => Some(TypeKind::Float),
@@ -42,8 +53,8 @@ fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -
                 }
             }
             ArithmeticOperation::Infix(arithmetic_infix_operation) => {
-                let lhs_kind = infere_kind(semantics, &arithmetic_infix_operation.lhs);
-                let rhs_kind = infere_kind(semantics, &arithmetic_infix_operation.rhs);
+                let lhs_kind = infere_kind(interner, semantics, &arithmetic_infix_operation.lhs);
+                let rhs_kind = infere_kind(interner, semantics, &arithmetic_infix_operation.rhs);
 
                 match (lhs_kind, rhs_kind) {
                     (Some(TypeKind::Float), Some(TypeKind::Float))
@@ -64,7 +75,7 @@ fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -
                 }
             }
             ArithmeticOperation::Postfix(arithmetic_postfix_operation) => {
-                let value_kind = infere_kind(semantics, &arithmetic_postfix_operation.value);
+                let value_kind = infere_kind(interner, semantics, &arithmetic_postfix_operation.value);
 
                 match value_kind {
                     Some(TypeKind::Float) => Some(TypeKind::Float),
@@ -76,7 +87,7 @@ fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -
             }
         },
         Expression::AssignmentOperation(assignment_operation) => {
-            infere_kind(semantics, &assignment_operation.rhs)
+            infere_kind(interner, semantics, &assignment_operation.rhs)
         }
         Expression::BitwiseOperation(_) => Some(TypeKind::Integer),
         Expression::ComparisonOperation(comparison_operation) => Some(match &comparison_operation.operator {
@@ -116,6 +127,37 @@ fn infere_kind<'ast>(semantics: &'ast Semantics, expression: &'ast Expression) -
             MagicConstant::Namespace(_) => TypeKind::String,
             MagicConstant::Class(_) => TypeKind::String,
         }),
+        Expression::Identifier(identifier) => {
+            let value = if semantics.names.is_imported(identifier) {
+                interner.lookup(semantics.names.get(identifier))
+            } else {
+                let name = interner.lookup(identifier.value());
+
+                if name.starts_with('\\') {
+                    &name[1..]
+                } else {
+                    name
+                }
+            };
+
+            Some(match value.to_ascii_uppercase().as_str() {
+                "INF" | "NAN" | "PHP_FLOAT_EPSILON " | "PHP_FLOAT_MIN" | "PHP_FLOAT_MAX" => TypeKind::Float,
+                "PHP_VERSION" | "PHP_OS" | "PHP_SAPI" | "PHP_EOL" | "PHP_EXTRA_VERSION" => TypeKind::String,
+                "PHP_ZTS"
+                | "PHP_DEBUG"
+                | "PHP_MAXPATHLEN"
+                | "PHP_INT_SIZE"
+                | "PHP_FLOAT_DIG"
+                | "PHP_INT_MIN"
+                | "PHP_INT_MAX"
+                | "PHP_MAJOR_VERSION"
+                | "PHP_MINOR_VERSION"
+                | "PHP_RELEASE_VERSION"
+                | "PHP_VERSION_ID" => TypeKind::Integer,
+                "ZEND_THREAD_SAFE" | "ZEND_DEBUG_BUILD" => TypeKind::Bool,
+                _ => return None,
+            })
+        }
         _ => None,
     }
 }
