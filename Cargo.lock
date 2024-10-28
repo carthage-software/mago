@@ -647,6 +647,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fennec-ast-utils"
+version = "0.0.0"
+dependencies = [
+ "fennec-ast",
+]
+
+[[package]]
 name = "fennec-casing"
 version = "0.0.0"
 dependencies = [
@@ -747,6 +754,7 @@ version = "0.0.0"
 dependencies = [
  "ahash",
  "fennec-ast",
+ "fennec-ast-utils",
  "fennec-casing",
  "fennec-docblock",
  "fennec-fixer",
@@ -820,10 +828,13 @@ dependencies = [
 name = "fennec-reflector"
 version = "0.0.0"
 dependencies = [
+ "ahash",
  "fennec-ast",
+ "fennec-ast-utils",
  "fennec-inference",
  "fennec-interner",
  "fennec-reflection",
+ "fennec-semantics",
  "fennec-source",
  "fennec-span",
  "fennec-walker",
@@ -847,6 +858,7 @@ name = "fennec-semantics"
 version = "0.0.0"
 dependencies = [
  "fennec-ast",
+ "fennec-ast-utils",
  "fennec-fixer",
  "fennec-interner",
  "fennec-names",

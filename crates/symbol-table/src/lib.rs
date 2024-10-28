@@ -18,7 +18,6 @@ pub mod table;
 ///
 /// - `interner`: The interner to use for string interning.
 /// - `program`: The program to construct the symbol table from.
-/// - `names`: The resolved names for the program.
 ///
 /// # Returns
 ///

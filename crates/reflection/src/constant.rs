@@ -10,5 +10,6 @@ use crate::r#type::TypeReflection;
 pub struct ConstantReflection {
     pub identifier: ConstantIdentifier,
     pub type_reflection: Option<TypeReflection>,
-    pub span: Span,
+    pub item_span: Span,
+    pub definition_span: Span,
 }

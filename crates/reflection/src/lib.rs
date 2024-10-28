@@ -38,40 +38,91 @@ impl CodebaseReflection {
     }
 
     /// Registers a new constant in the codebase.
-    pub fn register_constant(&mut self, constant: ConstantReflection) {
+    ///
+    /// If the constant already exists, it will not be added again.
+    ///
+    /// Returns `false` if the constant already exists.
+    pub fn register_constant(&mut self, constant: ConstantReflection) -> bool {
+        if self.constant_names.contains(&constant.identifier.name) {
+            return false;
+        }
+
         self.constant_names.insert(constant.identifier.name);
         self.constant_reflections.push(constant);
+
+        true
     }
 
     /// Registers a new function-like entity in the codebase.
-    pub fn register_function_like(&mut self, function_like: FunctionLikeReflection) {
+    ///
+    /// If the function-like entity already exists, it will not be added again.
+    ///
+    /// Returns `false` if the function-like entity already exists.
+    pub fn register_function_like(&mut self, function_like: FunctionLikeReflection) -> bool {
+        let mut exists = false;
         match function_like.identifier {
             FunctionLikeIdentifier::Function(name, _) => {
-                self.function_names.insert(name);
+                if self.function_names.contains(&name) {
+                    exists = true;
+                } else {
+                    self.function_names.insert(name);
+                }
             }
             _ => {}
         }
-        self.function_like_reflections.push(function_like);
+
+        if !exists {
+            self.function_like_reflections.push(function_like);
+        }
+
+        exists
     }
 
     /// Registers a new class-like entity (class, enum, interface, or trait) in the codebase.
-    pub fn register_class_like(&mut self, class_like: ClassLikeReflection) {
+    ///
+    /// If the class-like entity already exists, it will not be added again.
+    ///
+    /// Returns `false` if the class-like entity already exists.
+    pub fn register_class_like(&mut self, class_like: ClassLikeReflection) -> bool {
+        let mut exists = false;
+
         match class_like.identifier {
             ClassLikeIdentifier::Class(name, _) => {
-                self.class_names.insert(name);
+                if self.class_names.contains(&name) {
+                    exists = true;
+                } else {
+                    self.class_names.insert(name);
+                }
             }
             ClassLikeIdentifier::Enum(name, _) => {
-                self.enum_names.insert(name);
+                if self.enum_names.contains(&name) {
+                    exists = true;
+                } else {
+                    self.enum_names.insert(name);
+                }
             }
             ClassLikeIdentifier::Interface(name, _) => {
-                self.interface_names.insert(name);
+                if self.interface_names.contains(&name) {
+                    exists = true;
+                } else {
+                    self.interface_names.insert(name);
+                }
             }
             ClassLikeIdentifier::Trait(name, _) => {
-                self.trait_names.insert(name);
+                if self.trait_names.contains(&name) {
+                    exists = true;
+                } else {
+                    self.trait_names.insert(name);
+                }
             }
             _ => {}
         }
-        self.class_like_reflections.push(class_like);
+
+        if !exists {
+            self.class_like_reflections.push(class_like);
+        }
+
+        exists
     }
 
     /// Checks if a constant with the given name exists.
@@ -174,5 +225,17 @@ impl CodebaseReflection {
             ClassLikeIdentifier::Trait(trait_name, _) => trait_name == name,
             _ => false,
         })
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        self.constant_names.extend(other.constant_names);
+        self.constant_reflections.extend(other.constant_reflections);
+        self.function_names.extend(other.function_names);
+        self.function_like_reflections.extend(other.function_like_reflections);
+        self.class_names.extend(other.class_names);
+        self.enum_names.extend(other.enum_names);
+        self.interface_names.extend(other.interface_names);
+        self.trait_names.extend(other.trait_names);
+        self.class_like_reflections.extend(other.class_like_reflections);
     }
 }

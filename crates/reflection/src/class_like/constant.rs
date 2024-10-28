@@ -10,10 +10,12 @@ use crate::r#type::TypeReflection;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ClassLikeConstantReflection {
-    pub attribut_reflections: Vec<AttributeReflection>,
+    pub attribute_reflections: Vec<AttributeReflection>,
     pub visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
     pub identifier: ClassLikeMemberIdentifier,
     pub type_reflection: Option<TypeReflection>,
     pub inferred_type_reflection: Option<TypeReflection>,
-    pub span: Span,
+    pub is_final: bool,
+    pub item_span: Span,
+    pub definition_span: Span,
 }

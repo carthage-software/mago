@@ -29,8 +29,8 @@ pub struct ClassLikeMemberIdentifier {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum FunctionLikeIdentifier {
     Function(StringIdentifier, Span),
-    Method(StringIdentifier, StringIdentifier, Span),
-    PropertyHook(StringIdentifier, StringIdentifier, StringIdentifier, Span),
+    Method(ClassLikeIdentifier, StringIdentifier, Span),
+    PropertyHook(ClassLikeIdentifier, StringIdentifier, StringIdentifier, Span),
     Closure(Span),
     ArrowFunction(Span),
 }

@@ -16,6 +16,7 @@ fennec-docblock = { path = "../docblock" }
 fennec-interner = { path = "../interner" }
 fennec-span = { path = "../span" }
 fennec-ast = { path = "../ast" }
+fennec-ast-utils = { path = "../ast-utils" }
 fennec-names = { path = "../names" }
 fennec-source = { path = "../source" }
 fennec-symbol-table = { path = "../symbol-table" }

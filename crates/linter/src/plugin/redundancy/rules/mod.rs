@@ -1,5 +1,3 @@
-pub mod utils;
-
 pub mod redundant_block;
 pub mod redundant_closing_tag;
 pub mod redundant_final_method_modifier;

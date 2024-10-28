@@ -9,7 +9,7 @@ use crate::identifier::ClassLikeIdentifier;
 
 /// Represents the inheritance details of a class-like entity, including implemented interfaces,
 /// extended classes or interfaces, and any required inheritance constraints.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct InheritanceReflection {
     /// Interfaces directly implemented by the current class or enum.
     pub direct_implemented_interfaces: HashSet<StringIdentifier>,

@@ -14,7 +14,7 @@ use crate::identifier::ClassLikeIdentifier;
 ///
 /// This structure maintains the details of each member, such as their identifiers and inheritance information,
 /// allowing reflection on declared, inherited, overridden, and inheritable members.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct MemeberCollection<T: Eq + PartialEq> {
     /// All instances of the members, mapped by their unique identifiers.
     pub members: HashMap<StringIdentifier, T>,
@@ -30,12 +30,25 @@ pub struct MemeberCollection<T: Eq + PartialEq> {
     pub inherited_members: HashMap<StringIdentifier, ClassLikeIdentifier>,
 
     /// Identifiers of members overridden in the current class-like entity.
-    /// 
+    ///
     /// These are members that exist in both the current and a parent class-like entity.
     pub overriden_members: HashMap<StringIdentifier, HashSet<ClassLikeIdentifier>>,
 
     /// Identifiers of members that can be inherited by child class-like entities.
     pub inheritable_members: HashSet<StringIdentifier>,
+}
+
+impl<T: Eq + PartialEq> MemeberCollection<T> {
+    pub fn empty() -> Self {
+        Self {
+            members: Default::default(),
+            appering_members: Default::default(),
+            declared_members: Default::default(),
+            inherited_members: Default::default(),
+            overriden_members: Default::default(),
+            inheritable_members: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]

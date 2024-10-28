@@ -99,14 +99,26 @@ impl Sequence<Modifier> {
         self.iter().any(Modifier::is_visibility)
     }
 
+    pub fn get_public(&self) -> Option<&Modifier> {
+        self.iter().find(|modifier| matches!(modifier, Modifier::Public(..)))
+    }
+
     /// Returns `true` if the sequence contains a public visibility modifier.
     pub fn contains_public(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Public(..)))
     }
 
+    pub fn get_protected(&self) -> Option<&Modifier> {
+        self.iter().find(|modifier| matches!(modifier, Modifier::Protected(..)))
+    }
+
     /// Returns `true` if the sequence contains a protected visibility modifier.
     pub fn contains_protected(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Protected(..)))
+    }
+
+    pub fn get_private(&self) -> Option<&Modifier> {
+        self.iter().find(|modifier| matches!(modifier, Modifier::Private(..)))
     }
 
     /// Returns `true` if the sequence contains a private visibility modifier.

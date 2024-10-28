@@ -1,0 +1,12 @@
+[package]
+name = "fennec-ast-utils"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fennec-ast = { path = "../ast" }

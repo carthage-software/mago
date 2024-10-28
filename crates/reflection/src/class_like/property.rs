@@ -1,5 +1,6 @@
-use ahash::HashSet;
+use ahash::HashMap;
 
+use fennec_interner::StringIdentifier;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -20,14 +21,16 @@ pub struct PropertyDefaultValueReflection {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PropertyReflection {
     pub attribut_reflections: Vec<AttributeReflection>,
-    pub visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
+    pub read_visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
+    pub write_visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
     pub identifier: ClassLikeMemberIdentifier,
     pub type_reflection: Option<TypeReflection>,
     pub default_value_reflection: Option<PropertyDefaultValueReflection>,
-    pub hooks: HashSet<FunctionLikeReflection>,
+    pub hooks: HashMap<StringIdentifier, FunctionLikeReflection>,
     pub is_readonly: bool,
     pub is_final: bool,
     pub is_promoted: bool,
     pub is_static: bool,
-    pub span: Span,
+    pub item_span: Span,
+    pub definition_span: Span,
 }

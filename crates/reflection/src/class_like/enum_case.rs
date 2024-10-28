@@ -12,5 +12,6 @@ pub struct EnumCaseReflection {
     pub attribut_reflections: Vec<AttributeReflection>,
     pub identifier: ClassLikeMemberIdentifier,
     pub type_reflection: Option<TypeReflection>,
+    pub is_backed: bool,
     pub span: Span,
 }
