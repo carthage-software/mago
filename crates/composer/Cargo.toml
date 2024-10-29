@@ -1,0 +1,14 @@
+[package]
+name = "fennec-composer"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ahash = { workspace = true }
+
+[lints]
+workspace = true

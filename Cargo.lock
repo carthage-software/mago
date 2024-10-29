@@ -654,6 +654,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fennec-composer"
+version = "0.0.0"
+dependencies = [
+ "ahash",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "fennec-config"
 version = "0.0.0"
 dependencies = [
