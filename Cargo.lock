@@ -914,6 +914,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "fennec-type-checker"
+version = "0.0.0"
+
+[[package]]
 name = "fennec-walker"
 version = "0.0.0"
 dependencies = [
