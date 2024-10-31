@@ -8,7 +8,7 @@ use serde::Serialize;
 use fennec_interner::StringIdentifier;
 use fennec_span::Span;
 
-use crate::identifier::ClassLikeIdentifier;
+use crate::identifier::ClassLikeName;
 
 /// Represents a collection of members (e.g., properties, methods, constants) associated with a class-like entity.
 ///
@@ -16,26 +16,11 @@ use crate::identifier::ClassLikeIdentifier;
 /// allowing reflection on declared, inherited, overridden, and inheritable members.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct MemeberCollection<T: Eq + PartialEq> {
-    /// All instances of the members, mapped by their unique identifiers.
     pub members: HashMap<StringIdentifier, T>,
-
-    /// Identifiers of all members that appear in the current class-like entity,
-    /// regardless of whether they were declared or inherited.
-    pub appering_members: HashSet<StringIdentifier>,
-
-    /// Identifiers of members that were explicitly declared within the current class-like entity.
-    pub declared_members: HashSet<StringIdentifier>,
-
-    /// Identifiers of members inherited from parent class-like entities, mapped to the originating class-like entity.
-    pub inherited_members: HashMap<StringIdentifier, ClassLikeIdentifier>,
-
-    /// Identifiers of members overridden in the current class-like entity.
-    ///
-    /// These are members that exist in both the current and a parent class-like entity.
-    pub overriden_members: HashMap<StringIdentifier, HashSet<ClassLikeIdentifier>>,
-
-    /// Identifiers of members that can be inherited by child class-like entities.
-    pub inheritable_members: HashSet<StringIdentifier>,
+    pub appering_members: HashMap<StringIdentifier, ClassLikeName>,
+    pub declaring_members: HashMap<StringIdentifier, ClassLikeName>,
+    pub overriden_members: HashMap<StringIdentifier, HashSet<ClassLikeName>>,
+    pub inheritable_members: HashMap<StringIdentifier, ClassLikeName>,
 }
 
 impl<T: Eq + PartialEq> MemeberCollection<T> {
@@ -43,8 +28,7 @@ impl<T: Eq + PartialEq> MemeberCollection<T> {
         Self {
             members: Default::default(),
             appering_members: Default::default(),
-            declared_members: Default::default(),
-            inherited_members: Default::default(),
+            declaring_members: Default::default(),
             overriden_members: Default::default(),
             inheritable_members: Default::default(),
         }

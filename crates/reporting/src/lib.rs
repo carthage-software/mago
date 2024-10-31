@@ -1,5 +1,4 @@
 use std::iter::Once;
-use std::vec::IntoIter;
 
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::diagnostic::Label;
@@ -407,8 +406,14 @@ impl IssueCollection {
     pub fn iter(&self) -> impl Iterator<Item = &Issue> {
         self.issues.iter()
     }
+}
 
-    pub fn into_iter(self) -> impl Iterator<Item = Issue> {
+impl IntoIterator for IssueCollection {
+    type Item = Issue;
+
+    type IntoIter = std::vec::IntoIter<Issue>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.issues.into_iter()
     }
 }
@@ -488,11 +493,8 @@ impl IntoIterator for Issue {
     }
 }
 
-impl IntoIterator for IssueCollection {
-    type Item = Issue;
-    type IntoIter = IntoIter<Issue>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.issues.into_iter()
+impl FromIterator<Issue> for IssueCollection {
+    fn from_iter<T: IntoIterator<Item = Issue>>(iter: T) -> Self {
+        Self { issues: iter.into_iter().collect() }
     }
 }

@@ -1,17 +1,16 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use fennec_interner::StringIdentifier;
 use fennec_span::Span;
 
+use crate::identifier::Name;
 use crate::r#type::TypeReflection;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct AttributeReflection {
-    pub name: StringIdentifier,
+    pub name: Name,
     pub arguments: Option<AttributeArgumentListReflection>,
     pub span: Span,
-    pub name_span: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -22,5 +21,5 @@ pub struct AttributeArgumentListReflection {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum AttributeArgumentReflection {
     Positional { value_type_reflection: Option<TypeReflection>, span: Span },
-    Named { name: StringIdentifier, value_type_reflection: Option<TypeReflection>, name_span: Span, span: Span },
+    Named { name: Name, value_type_reflection: Option<TypeReflection>, span: Span },
 }

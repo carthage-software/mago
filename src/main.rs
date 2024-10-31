@@ -1,8 +1,6 @@
 use clap::arg;
 use clap::builder::styling::AnsiColor;
 use clap::builder::styling::Effects;
-use clap::builder::EnumValueParser;
-use clap::builder::NonEmptyStringValueParser;
 use clap::builder::Styles;
 use clap::Command;
 
@@ -14,8 +12,6 @@ use fennec_source::SourceManager;
 
 use crate::command::fix;
 use crate::command::lint;
-use crate::command::symbols;
-use crate::command::symbols::SymbolKindArgument;
 use crate::utils::error::bail;
 use crate::utils::runner::run_with_configuration;
 
@@ -52,7 +48,7 @@ pub fn main() {
         .styles(CLAP_STYLING)
         .subcommand_required(true)
         .long_about(LONG_ABOUT)
-        // fennec lint [-f --fixable] [-j --json]
+        // fennec lint [-f --fixable]
         .subcommand(
             Command::new("lint")
                 .about("Lint the project according to the `fennec.toml` configuration or default settings")
@@ -64,7 +60,6 @@ pub fn main() {
                     If `fennec.toml` is not found, the default configuration is used. The command outputs the issues found in the project."
                 "#)
                 .arg(arg!(-o --"only-fixable" "Only show fixable issues"))
-                .arg(arg!(-j --json "Output the results in JSON format"))
         )
         // fennec fix [-u --unsafe] [-p --potentially-unsafe] [-d --dry-run]
         .subcommand(
@@ -80,31 +75,11 @@ pub fn main() {
                 .arg(arg!(-d --"dry-run" "Run the command without writing any changes to disk"))
 
         )
-        // fennec symbols [--search <query>] [--kind <kind>] [-j --json] [--include-externals] [--sort]
-        .subcommand(
-            Command::new("symbols")
-                .about("List all symbols in the project")
-                .long_about(r#"
-                    List all symbols in the project.
-
-                    The symbols command lists all symbols in the project, such as classes, functions, and more.
-                "#)
-                .arg(arg!(-s --search [query] "Search for a specific symbol").value_parser(
-                    NonEmptyStringValueParser::new()
-                ))
-                .arg(arg!(-k --kind [kind] "Filter symbols by kind").value_parser(
-                    EnumValueParser::<SymbolKindArgument>::new()
-                ))
-                .arg(arg!(-j --json "Output the results in JSON format"))
-                .arg(arg!(-i --"include-externals" "Include external symbols in the search"))
-                .arg(arg!(-S --sort "Sort the results alphabetically"))
-        )
     ;
 
     match fennec.get_matches().subcommand() {
         Some(("lint", matches)) => {
             let only_fixable = matches.get_flag("only-fixable");
-            let json = matches.get_flag("json");
 
             run_with_configuration(|configuration: Configuration| async {
                 let interner = ThreadedInterner::new();
@@ -112,7 +87,7 @@ pub fn main() {
 
                 let reporter = Reporter::new(source_manager.clone());
 
-                lint::execute(configuration, interner, source_manager, reporter, only_fixable, json).await
+                lint::execute(configuration, interner, source_manager, reporter, only_fixable).await
             });
         }
         Some(("fix", matches)) => {
@@ -130,34 +105,6 @@ pub fn main() {
                 let source_manager = SourceManager::build(&interner, &configuration.source).await.unwrap_or_else(bail);
 
                 fix::execute(configuration, interner, source_manager, safety_classification, dry_run).await
-            });
-        }
-        Some(("symbols", matches)) => {
-            let include_externals = matches.get_flag("include-externals");
-            let query: Option<&String> = matches.get_one("search");
-            let kind = matches.get_one::<SymbolKindArgument>("kind").cloned().unwrap_or(SymbolKindArgument::All);
-
-            let json = matches.get_flag("json");
-            let sort = matches.get_flag("sort");
-
-            run_with_configuration(|configuration: Configuration| async {
-                let configuration = configuration;
-                let interner = ThreadedInterner::new();
-                let source_manager = SourceManager::build(&interner, &configuration.source).await.unwrap_or_else(bail);
-
-                let reporter = Reporter::new(source_manager.clone());
-
-                symbols::execute(
-                    interner,
-                    source_manager,
-                    reporter,
-                    include_externals,
-                    query.cloned(),
-                    kind,
-                    json,
-                    sort,
-                )
-                .await
             });
         }
         _ => unreachable!("clap should ensure we don't get here"),

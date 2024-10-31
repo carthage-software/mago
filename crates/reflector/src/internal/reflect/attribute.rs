@@ -2,6 +2,7 @@ use fennec_ast::*;
 use fennec_reflection::attribute::AttributeArgumentListReflection;
 use fennec_reflection::attribute::AttributeArgumentReflection;
 use fennec_reflection::attribute::AttributeReflection;
+use fennec_reflection::identifier::Name;
 use fennec_span::*;
 
 use crate::internal::context::Context;
@@ -15,10 +16,9 @@ pub fn reflect_attributes<'i, 'ast>(
     for attribute_list in attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
             let reflection = AttributeReflection {
-                name: context.semantics.names.get(&attribute.name),
+                name: Name { value: context.semantics.names.get(&attribute.name), span: attribute.name.span() },
                 arguments: reflect_attribute_arguments(&attribute.arguments, context),
                 span: attribute.span(),
-                name_span: attribute.name.span(),
             };
 
             reflections.push(reflection);
@@ -44,9 +44,8 @@ pub fn reflect_attribute_arguments<'i, 'ast>(
                 span: arg.span(),
             },
             Argument::Named(arg) => AttributeArgumentReflection::Named {
-                name: arg.name.value,
+                name: Name { value: arg.name.value, span: arg.name.span },
                 value_type_reflection: fennec_inference::infere(&context.interner, &context.semantics, &arg.value),
-                name_span: arg.name.span,
                 span: arg.span(),
             },
         });

@@ -15,7 +15,7 @@ It is inspired by the Rust programming language and its toolchain, and aims to p
 
 - [x] String Interning: [`crates/interner`](crates/interner)
 - [x] Lexer: [`crates/lexer`](crates/lexer) [`crates/token`](crates/token)
-- [x] AST: [`crates/node`](crates/node) [`crates/ast`](crates/ast)
+- [x] AST: [`crates/ast`](crates/ast)
 - [x] Parser: [`crates/parser`](crates/parser)
 - [x] Source Management: [`crates/source`](crates/source)
 - [x] AST Traversal / Walk: [`crates/traverser`](crates/traverser) [`crates/walker`](crates/walker)
@@ -27,6 +27,9 @@ It is inspired by the Rust programming language and its toolchain, and aims to p
 - [x] Linter: [`crates/linter`](crates/linter)
 - [x] Configuration: [`crates/config`](crates/config)
 - [x] String Case Conversion: [`crates/casing`](crates/casing)
+- [x] Reflections: [`crates/reflection`](crates/reflection)
+- [x] Reflector: [`crates/reflector`](crates/reflector), [`crates/scanner`](crates/scanner)
+- [x] Type Inference: [`crates/inference`](crates/inference)
 - [ ] Formatter
 - [ ] Static Analyzer
 - [ ] Refactoring

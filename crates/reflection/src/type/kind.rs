@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use fennec_interner::StringIdentifier;
 
-use crate::identifier::ClassLikeIdentifier;
+use crate::identifier::ClassLikeName;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum TypeKind {
@@ -15,9 +15,9 @@ pub enum TypeKind {
     False,
     Array,
     Callable,
-    Static(ClassLikeIdentifier),
-    Self_(ClassLikeIdentifier),
-    Parent(ClassLikeIdentifier),
+    Static(ClassLikeName),
+    Self_(ClassLikeName),
+    Parent(ClassLikeName),
     Void,
     Never,
     Float,
@@ -27,9 +27,7 @@ pub enum TypeKind {
     Object,
     Mixed,
     Iterable,
-    InvalidStatic,
-    InvalidSelf,
-    InvalidParent,
+    Unknown,
 }
 
 impl TypeKind {

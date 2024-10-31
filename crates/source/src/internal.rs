@@ -39,7 +39,6 @@ pub async fn build<'i>(
     let extensions: HashSet<&String> = extensions.iter().collect();
 
     let manager = SourceManager::new(interner);
-
     for (path, user_defined) in starting_paths.into_iter() {
         let mut entries = WalkDir::new(path)
             // filter out .git directories

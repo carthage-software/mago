@@ -4,9 +4,10 @@ use serde::Serialize;
 use fennec_span::Span;
 
 use crate::attribute::AttributeReflection;
+use crate::class_like::member::ClassLikeMemberVisibilityReflection;
 use crate::function_like::parameter::FunctionLikeParameterReflection;
 use crate::function_like::r#return::FunctionLikeReturnTypeReflection;
-use crate::identifier::FunctionLikeIdentifier;
+use crate::identifier::FunctionLikeName;
 
 pub mod parameter;
 pub mod r#return;
@@ -20,8 +21,11 @@ pub struct FunctionLikeReflection {
     /// Attributes associated with this function-like entity.
     pub attribute_reflections: Vec<AttributeReflection>,
 
+    /// Visibility information for this function-like if it is a class member.
+    pub visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
+
     /// The unique identifier for this function or method.
-    pub identifier: FunctionLikeIdentifier,
+    pub name: FunctionLikeName,
 
     /// The list of parameters accepted by this function or method, including their types and attributes.
     pub parameter_reflections: Vec<FunctionLikeParameterReflection>,
@@ -66,4 +70,7 @@ pub struct FunctionLikeReflection {
 
     /// The span in the source code where this function or method is defined.
     pub span: Span,
+
+    /// Indicate if this function-like entity is populated.
+    pub is_populated: bool,
 }

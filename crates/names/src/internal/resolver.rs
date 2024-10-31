@@ -136,6 +136,14 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
         self.resolved_names.insert_at(r#enum.name.span().start, classlike, false);
     }
 
+    fn walk_in_trait_use<'ast>(&mut self, trait_use: &'ast TraitUse, context: &mut NameContext<'a>) {
+        for trait_name in trait_use.trait_names.iter() {
+            let (trait_classlike, imported) = context.resolve_name(NameKind::Default, trait_name.value());
+
+            self.resolved_names.insert_at(trait_name.span().start, trait_classlike, imported);
+        }
+    }
+
     fn walk_in_extends<'ast>(&mut self, extends: &'ast Extends, context: &mut NameContext<'a>) {
         for parent in extends.types.iter() {
             let (parent_classlike, imported) = context.resolve_name(NameKind::Default, parent.value());

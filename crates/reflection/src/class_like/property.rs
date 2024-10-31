@@ -9,7 +9,7 @@ use fennec_span::Span;
 use crate::attribute::AttributeReflection;
 use crate::class_like::member::ClassLikeMemberVisibilityReflection;
 use crate::function_like::FunctionLikeReflection;
-use crate::identifier::ClassLikeMemberIdentifier;
+use crate::identifier::ClassLikeMemberName;
 use crate::r#type::TypeReflection;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -23,7 +23,7 @@ pub struct PropertyReflection {
     pub attribut_reflections: Vec<AttributeReflection>,
     pub read_visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
     pub write_visibility_reflection: Option<ClassLikeMemberVisibilityReflection>,
-    pub identifier: ClassLikeMemberIdentifier,
+    pub name: ClassLikeMemberName,
     pub type_reflection: Option<TypeReflection>,
     pub default_value_reflection: Option<PropertyDefaultValueReflection>,
     pub hooks: HashMap<StringIdentifier, FunctionLikeReflection>,

@@ -1,5 +1,5 @@
 [package]
-name = "fennec-reflector"
+name = "fennec-service"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,12 +10,13 @@ workspace = true
 
 [dependencies]
 fennec-interner = { path = "../interner" }
-fennec-span = { path = "../span" }
-fennec-ast = { path = "../ast" }
-fennec-ast-utils = { path = "../ast-utils" }
-fennec-walker = { path = "../walker" }
 fennec-source = { path = "../source" }
+fennec-reporting = { path = "../reporting" }
 fennec-semantics = { path = "../semantics" }
-fennec-inference = { path = "../inference" }
+fennec-linter = { path = "../linter" }
+fennec-config = { path = "../config" }
 fennec-reflection = { path = "../reflection" }
-ahash = { workspace = true }
+fennec-reflector = { path = "../reflector" }
+fennec-feedback = { path = "../feedback" }
+tokio = { workspace = true }
+serde = { workspace = true }

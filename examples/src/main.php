@@ -2,12 +2,18 @@
 
 declare(strict_types=10);
 
+class Example {
+    public static function getInstance(): self {
+        return new self();
+    }
+}
+
 /**
  * This function has an unclosed inline tag {@see Class
  */
 Function Main(): Never {
     global $var;
-    
+
     $files = `ls -la`;
 
     if ($bar = true) {
@@ -22,10 +28,10 @@ Function Main(): Never {
 
     {
         xdebug_var_dump(Example());
-        
+
         goto biz;
     };;;;
-    
+
     for (;true;) {
         break;
     }

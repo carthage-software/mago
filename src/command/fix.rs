@@ -3,16 +3,13 @@ use std::collections::hash_map::Entry;
 use ahash::HashMap;
 
 use fennec_config::Configuration;
-use fennec_feedback::create_progress_bar;
-use fennec_feedback::ProgressBarTheme;
 use fennec_fixer::FixPlan;
 use fennec_fixer::SafetyClassification;
 use fennec_interner::ThreadedInterner;
+use fennec_service::linter::LintService;
 use fennec_source::SourceIdentifier;
 use fennec_source::SourceManager;
 
-use crate::command::create_linter;
-use crate::command::process_and_lint_all;
 use crate::utils::error::bail;
 
 pub async fn execute(
@@ -22,19 +19,8 @@ pub async fn execute(
     safe_classification: SafetyClassification,
     dry_run: bool,
 ) -> i32 {
-    let linter = create_linter(&interner, configuration.linter);
-
-    let results = process_and_lint_all(&source_manager, &interner, &linter, linter.settings.external).await;
-
-    let mut issues = vec![];
-    for result in results {
-        let (semantics, lint_issues) = result.unwrap_or_else(bail);
-
-        issues.extend(semantics.issues);
-        issues.extend(lint_issues);
-    }
-
-    let progress_bar = create_progress_bar(issues.len(), "fixing issues", ProgressBarTheme::Red);
+    let service = LintService::new(configuration, interner.clone(), source_manager.clone());
+    let issues = service.run().await.unwrap_or_else(bail);
 
     let mut plans: HashMap<SourceIdentifier, Vec<FixPlan>> = HashMap::default();
     for issue in issues.into_iter() {
@@ -55,7 +41,6 @@ pub async fn execute(
         handles.push(tokio::spawn({
             let source_manager = source_manager.clone();
             let interner = interner.clone();
-            let progress_bar = progress_bar.clone();
 
             let source = source_plans.0;
             let plan = source_plans.1.drain(..).collect::<FixPlan>();
@@ -75,8 +60,6 @@ pub async fn execute(
                         required,
                         cuurent
                     );
-
-                    progress_bar.inc(1);
                 } else {
                     fennec_feedback::info!("fixing issue in `{}` ( {} fix operations )", source_name, plan.len());
 
@@ -85,14 +68,10 @@ pub async fn execute(
                     if dry_run {
                         // todo, print the diff in a pretty way
                         println!("TOO LAZY TO PRETTY PRINT: {:#?}", code);
-
-                        progress_bar.inc(1);
                     } else if let Some(path) = source.path {
                         std::fs::write(path, code.get_fixed())?;
 
                         fennec_feedback::info!("fixed issue in `{}`", source_name);
-
-                        progress_bar.inc(1);
                     } else {
                         unreachable!();
                     }
@@ -106,8 +85,6 @@ pub async fn execute(
     for handle in handles {
         handle.await.unwrap_or_else(bail).unwrap_or_else(bail);
     }
-
-    progress_bar.finish_and_clear();
 
     0
 }
