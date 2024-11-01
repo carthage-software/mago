@@ -410,7 +410,7 @@ fn infere_kind<'i, 'ast>(
             }
         },
         Expression::CastOperation(cast_operation) => Some(match &cast_operation.operator {
-            CastOperator::Array(_, _) => array_kind(array_key_kind(), mixed_kind()),
+            CastOperator::Array(_, _) => array_kind(array_key_kind(), mixed_kind(), None),
             CastOperator::Bool(_, _) | CastOperator::Boolean(_, _) => bool_kind(),
             CastOperator::Double(_, _) | CastOperator::Real(_, _) | CastOperator::Float(_, _) => float_kind(),
             CastOperator::Int(_, _) | CastOperator::Integer(_, _) => integer_kind(),

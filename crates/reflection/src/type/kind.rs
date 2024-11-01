@@ -91,9 +91,9 @@ pub enum ScalarTypeKind {
     Scalar,
 }
 
-/// Represents a property in an object type or an array shape type.
+/// Represents a property in an object type.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ObjectOrArrayShapeProperty {
+pub struct ObjectProperty {
     /// The name of the property.
     pub name: StringIdentifier,
 
@@ -112,15 +112,26 @@ pub enum ObjectTypeKind {
 
     /// A typed object with specified properties.
     /// For example, `object{ foo: string, bar: int }` defines an object with properties `foo` and `bar`.
-    TypedObject(Vec<ObjectOrArrayShapeProperty>),
+    TypedObject {
+        /// The properties of the object.
+        properties: Vec<ObjectProperty>,
+    },
 
     /// A named object with generic type parameters.
     /// For example, `Foo<T, U>` represents an instance of class `Foo` with type parameters `T` and `U`.
-    NamedObject(StringIdentifier, Vec<TypeKind>),
+    NamedObject {
+        /// The name of the object class.
+        name: StringIdentifier,
+
+        /// The type parameters of the object class.
+        type_parameters: Vec<TypeKind>,
+    },
 
     /// A generator type with specified key, value, send, and return types.
     /// For example, `Generator<T, U, V, W>`.
-    Generator(Box<TypeKind>, Box<TypeKind>, Box<TypeKind>, Box<TypeKind>),
+    ///
+    ///
+    Generator { key: Box<TypeKind>, value: Box<TypeKind>, send: Box<TypeKind>, r#return: Box<TypeKind> },
 
     /// The `static` type, representing the class of the called context.
     Static(ClassLikeName),
@@ -132,15 +143,35 @@ pub enum ObjectTypeKind {
     Self_(ClassLikeName),
 }
 
+/// Represents a key in an array shape property.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum ArrayShapePropertyKey {
+    String(StringIdentifier),
+    Integer(isize),
+}
+
+/// Represents a property in an array shape type.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct ArrayShapeProperty {
+    /// The key of the property.
+    pub key: ArrayShapePropertyKey,
+
+    /// The type of the property.
+    pub kind: TypeKind,
+
+    /// Indicates whether the property is optional.
+    pub optional: bool,
+}
+
 /// Represents an array shape type, which is an array with specified keys and types.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ArrayShape {
     /// The properties (key-value pairs) of the array shape.
-    properties: Vec<ObjectOrArrayShapeProperty>,
+    pub properties: Vec<ArrayShapeProperty>,
 
     /// Additional properties specified by key and value types.
     /// For example, `...array<array-key, mixed>` allows additional entries beyond the specified properties.
-    additional_properties: Option<(
+    pub additional_properties: Option<(
         Box<TypeKind>, // Key type
         Box<TypeKind>, // Value type
     )>,
@@ -151,19 +182,49 @@ pub struct ArrayShape {
 pub enum ArrayTypeKind {
     /// An array with specified key and value types.
     /// For example, `array<string, int>` represents an array with `string` keys and `int` values.
-    Array(Box<TypeKind>, Box<TypeKind>),
+    Array {
+        /// The type of the array keys.
+        key: Box<TypeKind>,
+
+        /// The type of the array values.
+        value: Box<TypeKind>,
+
+        /// The size of the array, if known.
+        known_size: Option<usize>,
+    },
 
     /// A non-empty array with specified key and value types.
     /// Ensures the array has at least one element.
-    NonEmptyArray(Box<TypeKind>, Box<TypeKind>),
+    NonEmptyArray {
+        /// The type of the array keys.
+        key: Box<TypeKind>,
+
+        /// The type of the array values.
+        value: Box<TypeKind>,
+
+        /// The size of the array, if known.
+        known_size: Option<usize>,
+    },
 
     /// A list (array with integer keys starting from zero) with a specified value type.
     /// For example, `list<string>` represents a list of strings.
-    List(Box<TypeKind>),
+    List {
+        /// The type of the list elements.
+        value: Box<TypeKind>,
+
+        /// The size of the list, if known.
+        known_size: Option<usize>,
+    },
 
     /// A non-empty list with a specified value type.
     /// Ensures the list has at least one element.
-    NonEmptyList(Box<TypeKind>),
+    NonEmptyList {
+        /// The type of the list elements.
+        value: Box<TypeKind>,
+
+        /// The size of the list, if known.
+        known_size: Option<usize>,
+    },
 
     /// A callable array, representing an array that can be called as a function.
     CallableArray,
@@ -207,7 +268,7 @@ pub enum CallableTypeKind {
 }
 
 /// Represents value types, including literal values and class constants.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum ValueTypeKind {
     /// A literal string value.
     /// For example, `'foo'`.
@@ -335,6 +396,9 @@ pub enum TypeKind {
 
     /// The `never` type, representing a type that never occurs (e.g., functions that always throw exceptions or exit).
     Never,
+
+    /// A generic parameter type, representing a type parameter with constraints.
+    GenericParameter { name: StringIdentifier, of: Box<TypeKind> },
 }
 
 impl TypeKind {
@@ -347,6 +411,26 @@ impl TypeKind {
             TypeKind::Mixed => true,
             _ => false,
         }
+    }
+
+    pub fn is_object(&self) -> bool {
+        match &self {
+            TypeKind::Union { kinds } => kinds.iter().all(|k| k.is_object()),
+            TypeKind::Intersection { kinds } => kinds.iter().any(|k| k.is_object()),
+            TypeKind::Conditional { then, otherwise, .. } => then.is_object() && otherwise.is_object(),
+            TypeKind::Callable(CallableTypeKind::Closure { .. } | CallableTypeKind::PureClosure { .. }) => true,
+            TypeKind::GenericParameter { of, .. } => of.is_object(),
+            TypeKind::Object(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_templated_as_object(&self) -> bool {
+        matches!(self, TypeKind::GenericParameter { of, .. } if of.is_object())
+    }
+
+    pub fn is_generator(&self) -> bool {
+        matches!(self, TypeKind::Object(ObjectTypeKind::Generator { .. }))
     }
 }
 
@@ -376,23 +460,41 @@ pub fn non_empty_string_kind() -> TypeKind {
 }
 
 /// Creates a `TypeKind` representing a list of the given type.
-pub fn list_kind(value_type: TypeKind) -> TypeKind {
-    TypeKind::Array(ArrayTypeKind::List(Box::new(value_type)))
+pub fn list_kind(value: TypeKind, known_size: Option<usize>) -> TypeKind {
+    TypeKind::Array(ArrayTypeKind::List { value: Box::new(value), known_size })
 }
 
 /// Creates a `TypeKind` representing an array with the given key and value types.
-pub fn array_kind(key_type: TypeKind, value_type: TypeKind) -> TypeKind {
-    TypeKind::Array(ArrayTypeKind::Array(Box::new(key_type), Box::new(value_type)))
+pub fn array_kind(key: TypeKind, value: TypeKind, known_size: Option<usize>) -> TypeKind {
+    TypeKind::Array(ArrayTypeKind::Array { key: Box::new(key), value: Box::new(value), known_size })
 }
 
 /// Creates a `TypeKind` representing a non-empty list of the given type.
-pub fn non_empty_list_kind(value_type: TypeKind) -> TypeKind {
-    TypeKind::Array(ArrayTypeKind::NonEmptyList(Box::new(value_type)))
+pub fn non_empty_list_kind(value: TypeKind, known_size: Option<usize>) -> TypeKind {
+    TypeKind::Array(ArrayTypeKind::NonEmptyList { value: Box::new(value), known_size })
 }
 
 /// Creates a `TypeKind` representing a non-empty array with the given key and value types.
-pub fn non_empty_array_kind(key_type: TypeKind, value_type: TypeKind) -> TypeKind {
-    TypeKind::Array(ArrayTypeKind::NonEmptyArray(Box::new(key_type), Box::new(value_type)))
+pub fn non_empty_array_kind(key: TypeKind, value: TypeKind, known_size: Option<usize>) -> TypeKind {
+    TypeKind::Array(ArrayTypeKind::NonEmptyArray { key: Box::new(key), value: Box::new(value), known_size })
+}
+
+pub fn string_shape_property(key: StringIdentifier, kind: TypeKind, optional: bool) -> ArrayShapeProperty {
+    ArrayShapeProperty { key: ArrayShapePropertyKey::String(key), kind, optional }
+}
+
+pub fn integer_shape_property(key: isize, kind: TypeKind, optional: bool) -> ArrayShapeProperty {
+    ArrayShapeProperty { key: ArrayShapePropertyKey::Integer(key), kind, optional }
+}
+
+pub fn array_shape_kind(
+    properties: Vec<ArrayShapeProperty>,
+    additional_properties: Option<(TypeKind, TypeKind)>,
+) -> TypeKind {
+    TypeKind::Array(ArrayTypeKind::Shape(ArrayShape {
+        properties,
+        additional_properties: additional_properties.map(|(k, v)| (Box::new(k), Box::new(v))),
+    }))
 }
 
 /// Creates a `TypeKind` representing the `mixed` type.
@@ -497,7 +599,7 @@ pub fn self_kind(class_name: ClassLikeName) -> TypeKind {
 
 /// Creates a `TypeKind` representing a named object with the given name and type parameters.
 pub fn named_object_kind(name: StringIdentifier, type_parameters: Vec<TypeKind>) -> TypeKind {
-    TypeKind::Object(ObjectTypeKind::NamedObject(name, type_parameters))
+    TypeKind::Object(ObjectTypeKind::NamedObject { name, type_parameters })
 }
 
 /// Creates a `TypeKind` representing the `void` type.
