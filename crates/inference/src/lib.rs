@@ -1,10 +1,11 @@
+use ordered_float::OrderedFloat;
+
 use fennec_ast::*;
 use fennec_interner::ThreadedInterner;
 use fennec_reflection::r#type::kind::*;
 use fennec_reflection::r#type::TypeReflection;
 use fennec_semantics::Semantics;
 use fennec_span::HasSpan;
-use ordered_float::OrderedFloat;
 
 pub fn infere<'i, 'ast>(
     interner: &'i ThreadedInterner,
@@ -249,39 +250,77 @@ fn infere_kind<'i, 'ast>(
 
             rhs_kind
         }
-        Expression::BitwiseOperation(bitwise_operation) => {
-            match bitwise_operation.as_ref() {
-                BitwiseOperation::Prefix(bitwise_prefix_operation) => {
-                    let value_kind = infere_kind(interner, semantics, &bitwise_prefix_operation.value);
+        Expression::BitwiseOperation(bitwise_operation) => match bitwise_operation.as_ref() {
+            BitwiseOperation::Prefix(bitwise_prefix_operation) => {
+                let value_kind = infere_kind(interner, semantics, &bitwise_prefix_operation.value);
 
-                    // If the operand is Never, the result is Never
-                    if matches!(value_kind, Some(TypeKind::Never)) {
-                        return Some(never_kind());
-                    }
-
-                    match value_kind {
-                        Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
-                            let result = !value;
-
-                            Some(value_integer_kind(result))
-                        }
-                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => Some(integer_kind()),
-                        _ => None,
-                    }
+                if matches!(value_kind, Some(TypeKind::Never)) {
+                    return Some(never_kind());
                 }
-                BitwiseOperation::Infix(bitwise_infix_operation) => {
-                    let lhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.lhs);
-                    let rhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.rhs);
 
-                    // If either operand is Never, the result is Never
-                    if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
-                        return Some(never_kind());
+                match value_kind {
+                    Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
+                        let result = !value;
+                        Some(value_integer_kind(result))
                     }
-
-                    Some(integer_kind())
+                    Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => Some(integer_kind()),
+                    _ => Some(integer_kind()),
                 }
             }
-        }
+            BitwiseOperation::Infix(bitwise_infix_operation) => {
+                let lhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.lhs);
+                let rhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.rhs);
+
+                match (lhs_kind, rhs_kind) {
+                    (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
+                    (Some(lhs_value_kind), Some(rhs_value_kind))
+                        if is_numeric_value_kind(&lhs_value_kind) && is_numeric_value_kind(&rhs_value_kind) =>
+                    {
+                        let Some(lhs_value) = extract_literal_value(&lhs_value_kind) else {
+                            return Some(integer_kind());
+                        };
+
+                        let Some(rhs_value) = extract_literal_value(&rhs_value_kind) else {
+                            return Some(integer_kind());
+                        };
+
+                        let lhs_value = lhs_value.trunc() as i64;
+                        let rhs_value = rhs_value.trunc() as i64;
+
+                        let result = match &bitwise_infix_operation.operator {
+                            BitwiseInfixOperator::And(_) => lhs_value & rhs_value,
+                            BitwiseInfixOperator::Or(_) => lhs_value | rhs_value,
+                            BitwiseInfixOperator::Xor(_) => lhs_value ^ rhs_value,
+                            BitwiseInfixOperator::LeftShift(_) => {
+                                if rhs_value < 0 {
+                                    return Some(never_kind());
+                                }
+
+                                if rhs_value > u32::MAX as i64 {
+                                    0i64
+                                } else {
+                                    lhs_value.wrapping_shl(rhs_value as u32)
+                                }
+                            }
+                            BitwiseInfixOperator::RightShift(_) => {
+                                if rhs_value < 0 {
+                                    return Some(never_kind());
+                                }
+
+                                if rhs_value > u32::MAX as i64 {
+                                    0i64
+                                } else {
+                                    lhs_value.wrapping_shr(rhs_value as u32)
+                                }
+                            }
+                        };
+
+                        Some(value_integer_kind(result))
+                    }
+                    _ => Some(integer_kind()),
+                }
+            }
+        },
         Expression::ComparisonOperation(comparison_operation) => {
             let lhs_kind = infere_kind(interner, semantics, &comparison_operation.lhs);
             let rhs_kind = infere_kind(interner, semantics, &comparison_operation.rhs);
@@ -291,36 +330,76 @@ fn infere_kind<'i, 'ast>(
                 return Some(never_kind());
             }
 
+            // Both operands are literals
+            if let (Some(lhs_value_kind), Some(rhs_value_kind)) = (&lhs_kind, &rhs_kind) {
+                if let Some(result) =
+                    compute_comparison_result(lhs_value_kind, rhs_value_kind, &comparison_operation.operator)
+                {
+                    return Some(result);
+                }
+            }
+
             Some(match &comparison_operation.operator {
                 ComparisonOperator::Spaceship(_) => integer_kind(),
                 _ => bool_kind(),
             })
         }
-        Expression::LogicalOperation(logical_operation) => {
-            match logical_operation.as_ref() {
-                LogicalOperation::Prefix(logical_prefix_operation) => {
-                    let value_kind = infere_kind(interner, semantics, &logical_prefix_operation.value);
+        Expression::LogicalOperation(logical_operation) => match logical_operation.as_ref() {
+            LogicalOperation::Prefix(logical_prefix_operation) => {
+                let value_kind = infere_kind(interner, semantics, &logical_prefix_operation.value);
 
-                    match value_kind {
-                        Some(TypeKind::Never) => Some(never_kind()),
-                        Some(TypeKind::Value(ValueTypeKind::True)) => Some(false_kind()),
-                        Some(TypeKind::Value(ValueTypeKind::False)) => Some(true_kind()),
-                        _ => Some(bool_kind()),
-                    }
-                }
-                LogicalOperation::Infix(logical_infix_operation) => {
-                    let lhs_kind = infere_kind(interner, semantics, &logical_infix_operation.lhs);
-                    let rhs_kind = infere_kind(interner, semantics, &logical_infix_operation.rhs);
-
-                    // If either operand is Never, the result is Never
-                    if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
-                        return Some(never_kind());
-                    }
-
-                    Some(bool_kind())
+                match value_kind {
+                    Some(TypeKind::Never) => Some(never_kind()),
+                    Some(TypeKind::Value(ValueTypeKind::True)) => Some(false_kind()),
+                    Some(TypeKind::Value(ValueTypeKind::False)) => Some(true_kind()),
+                    Some(TypeKind::Scalar(ScalarTypeKind::Bool)) => Some(bool_kind()),
+                    _ => Some(bool_kind()),
                 }
             }
-        }
+            LogicalOperation::Infix(logical_infix_operation) => {
+                let lhs_kind = infere_kind(interner, semantics, &logical_infix_operation.lhs);
+                let rhs_kind = infere_kind(interner, semantics, &logical_infix_operation.rhs);
+
+                match &logical_infix_operation.operator {
+                    LogicalInfixOperator::And(_) | LogicalInfixOperator::LowPrecedenceAnd(_) => {
+                        match (lhs_kind, rhs_kind) {
+                            (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
+                            (Some(TypeKind::Value(ValueTypeKind::False)), _)
+                            | (_, Some(TypeKind::Value(ValueTypeKind::False))) => Some(false_kind()),
+                            (
+                                Some(TypeKind::Value(ValueTypeKind::True)),
+                                Some(TypeKind::Value(ValueTypeKind::True)),
+                            ) => Some(true_kind()),
+                            (_, _) => Some(bool_kind()),
+                        }
+                    }
+                    LogicalInfixOperator::Or(_) | LogicalInfixOperator::LowPrecedenceOr(_) => {
+                        match (lhs_kind, rhs_kind) {
+                            (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
+                            (Some(TypeKind::Value(ValueTypeKind::True)), _)
+                            | (_, Some(TypeKind::Value(ValueTypeKind::True))) => Some(true_kind()),
+                            (
+                                Some(TypeKind::Value(ValueTypeKind::False)),
+                                Some(TypeKind::Value(ValueTypeKind::False)),
+                            ) => Some(false_kind()),
+                            (_, _) => Some(bool_kind()),
+                        }
+                    }
+                    LogicalInfixOperator::LowPrecedenceXor(_) => match (lhs_kind, rhs_kind) {
+                        (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
+                        (Some(TypeKind::Value(ValueTypeKind::True)), Some(TypeKind::Value(ValueTypeKind::True)))
+                        | (Some(TypeKind::Value(ValueTypeKind::False)), Some(TypeKind::Value(ValueTypeKind::False))) => {
+                            Some(false_kind())
+                        }
+                        (Some(TypeKind::Value(ValueTypeKind::True)), Some(TypeKind::Value(ValueTypeKind::False)))
+                        | (Some(TypeKind::Value(ValueTypeKind::False)), Some(TypeKind::Value(ValueTypeKind::True))) => {
+                            Some(true_kind())
+                        }
+                        (_, _) => Some(bool_kind()),
+                    },
+                }
+            }
+        },
         Expression::CastOperation(cast_operation) => Some(match &cast_operation.operator {
             CastOperator::Array(_, _) => array_kind(array_key_kind(), mixed_kind()),
             CastOperator::Bool(_, _) | CastOperator::Boolean(_, _) => bool_kind(),
@@ -394,6 +473,50 @@ fn infer_numeric_operation_type(
         }
         // If either operand is Never, the result is Never
         (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
+        _ => None,
+    }
+}
+
+// Compute the result of a logical operation when both operands are known
+fn compute_comparison_result(
+    lhs_kind: &TypeKind,
+    rhs_kind: &TypeKind,
+    operator: &ComparisonOperator,
+) -> Option<TypeKind> {
+    use ComparisonOperator::*;
+
+    let lhs_value = extract_literal_value(lhs_kind)?;
+    let rhs_value = extract_literal_value(rhs_kind)?;
+
+    let result = match operator {
+        Equal(_) => lhs_value == rhs_value,
+        NotEqual(_) | AngledNotEqual(_) => lhs_value != rhs_value,
+        Identical(_) => lhs_value == rhs_value,
+        NotIdentical(_) => lhs_value != rhs_value,
+        LessThan(_) => lhs_value < rhs_value,
+        GreaterThan(_) => lhs_value > rhs_value,
+        LessThanOrEqual(_) => lhs_value <= rhs_value,
+        GreaterThanOrEqual(_) => lhs_value >= rhs_value,
+        Spaceship(_) => {
+            let cmp_result = lhs_value.partial_cmp(&rhs_value).unwrap_or(std::cmp::Ordering::Equal);
+
+            return Some(value_integer_kind(match cmp_result {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            }));
+        }
+    };
+
+    Some(if result { true_kind() } else { false_kind() })
+}
+
+fn extract_literal_value(kind: &TypeKind) -> Option<OrderedFloat<f64>> {
+    match kind {
+        TypeKind::Value(ValueTypeKind::Integer { value }) => Some(OrderedFloat(*value as f64)),
+        TypeKind::Value(ValueTypeKind::Float { value }) => Some(*value),
+        TypeKind::Value(ValueTypeKind::True) => Some(OrderedFloat(1.0)),
+        TypeKind::Value(ValueTypeKind::False) => Some(OrderedFloat(0.0)),
         _ => None,
     }
 }
