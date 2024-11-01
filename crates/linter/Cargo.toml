@@ -21,7 +21,6 @@ fennec-names = { path = "../names" }
 fennec-source = { path = "../source" }
 fennec-symbol-table = { path = "../symbol-table" }
 fennec-walker = { path = "../walker" }
-fennec-parser = { path = "../parser" }
 fennec-casing = { path = "../casing" }
 ahash = { workspace = true }
 serde = { workspace = true }
