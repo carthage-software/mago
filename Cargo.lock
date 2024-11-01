@@ -737,7 +737,6 @@ dependencies = [
  "fennec-fixer",
  "fennec-interner",
  "fennec-names",
- "fennec-parser",
  "fennec-reporting",
  "fennec-semantics",
  "fennec-source",
@@ -914,10 +913,6 @@ version = "0.0.0"
 dependencies = [
  "fennec-ast",
 ]
-
-[[package]]
-name = "fennec-type-checker"
-version = "0.0.0"
 
 [[package]]
 name = "fennec-walker"
