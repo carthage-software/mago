@@ -697,6 +697,7 @@ dependencies = [
  "fennec-reflection",
  "fennec-semantics",
  "fennec-span",
+ "ordered-float",
 ]
 
 [[package]]
@@ -790,6 +791,7 @@ dependencies = [
  "fennec-interner",
  "fennec-source",
  "fennec-span",
+ "ordered-float",
  "serde",
 ]
 

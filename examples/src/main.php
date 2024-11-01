@@ -2,6 +2,8 @@
 
 declare(strict_types=10);
 
+const Example = ((((((((((2 + 3) * 4) - 5) / 6) ** 2) % 7) + 8) - 9) * 10) / 11);
+
 class Example {
     public static function getInstance(): self {
         return new self();

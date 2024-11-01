@@ -1,3 +1,4 @@
+use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -214,7 +215,11 @@ pub enum ValueTypeKind {
 
     /// A literal integer value.
     /// For example, `42`.
-    Integer { value: isize },
+    Integer { value: i64 },
+
+    /// A literal float value.
+    /// For example, `3.14`.
+    Float { value: OrderedFloat<f64> },
 
     /// The `null` value.
     Null,
@@ -441,8 +446,13 @@ pub fn value_string_kind(value: StringIdentifier) -> TypeKind {
 }
 
 /// Creates a `TypeKind` representing a value type for a literal integer.
-pub fn value_integer_kind(value: isize) -> TypeKind {
+pub fn value_integer_kind(value: i64) -> TypeKind {
     TypeKind::Value(ValueTypeKind::Integer { value })
+}
+
+/// Creates a `TypeKind` representing a value type for a literal float.
+pub fn value_float_kind(value: OrderedFloat<f64>) -> TypeKind {
+    TypeKind::Value(ValueTypeKind::Float { value })
 }
 
 /// Creates a `TypeKind` representing the `null` value.

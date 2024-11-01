@@ -4,6 +4,7 @@ use fennec_reflection::r#type::kind::*;
 use fennec_reflection::r#type::TypeReflection;
 use fennec_semantics::Semantics;
 use fennec_span::HasSpan;
+use ordered_float::OrderedFloat;
 
 pub fn infere<'i, 'ast>(
     interner: &'i ThreadedInterner,
@@ -32,11 +33,11 @@ fn infere_kind<'i, 'ast>(
             }
             Literal::Integer(integer) => {
                 if let Some(value) = integer.value {
-                    if value > isize::MAX as usize {
+                    if value > i64::MAX as u64 {
                         integer_kind()
                     } else {
-                        // we can safely cast `value` to an `isize`
-                        value_integer_kind(value as isize)
+                        // we can safely cast `value` to an `i64`
+                        value_integer_kind(value as i64)
                     }
                 } else {
                     integer_kind()
@@ -53,75 +54,174 @@ fn infere_kind<'i, 'ast>(
                 let value_kind = infere_kind(interner, semantics, &arithmetic_prefix_operation.value);
 
                 match value_kind {
-                    kind @ Some(TypeKind::Scalar(ScalarTypeKind::Float)) => kind,
+                    Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
+                        match &arithmetic_prefix_operation.operator {
+                            ArithmeticPrefixOperator::Increment(_) => {
+                                let new_value = value.wrapping_add(1);
+                                Some(value_integer_kind(new_value))
+                            }
+                            ArithmeticPrefixOperator::Decrement(_) => {
+                                let new_value = value.wrapping_sub(1);
+                                Some(value_integer_kind(new_value))
+                            }
+                            ArithmeticPrefixOperator::Plus(_) => Some(value_integer_kind(value)),
+                            ArithmeticPrefixOperator::Minus(_) => Some(value_integer_kind(-value)),
+                        }
+                    }
+                    Some(TypeKind::Value(ValueTypeKind::Float { value })) => {
+                        match &arithmetic_prefix_operation.operator {
+                            ArithmeticPrefixOperator::Increment(_) => {
+                                let new_value = value + 1.0;
+                                Some(value_float_kind(new_value))
+                            }
+                            ArithmeticPrefixOperator::Decrement(_) => {
+                                let new_value = value - 1.0;
+                                Some(value_float_kind(new_value))
+                            }
+                            ArithmeticPrefixOperator::Plus(_) => Some(value_float_kind(value)),
+                            ArithmeticPrefixOperator::Minus(_) => Some(value_float_kind(-value)),
+                        }
+                    }
                     Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => match &arithmetic_prefix_operation.operator {
                         ArithmeticPrefixOperator::Increment(_) | ArithmeticPrefixOperator::Decrement(_) => {
-                            Some(union_kind(vec![integer_kind(), float_kind()]))
+                            Some(integer_kind())
                         }
                         ArithmeticPrefixOperator::Plus(_) | ArithmeticPrefixOperator::Minus(_) => Some(integer_kind()),
                     },
-                    Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
-                        Some(match &arithmetic_prefix_operation.operator {
-                            ArithmeticPrefixOperator::Increment(_) => {
-                                if value == isize::MAX {
-                                    float_kind()
-                                } else {
-                                    value_integer_kind(value + 1)
-                                }
-                            }
-                            ArithmeticPrefixOperator::Decrement(_) => {
-                                if value == isize::MIN {
-                                    float_kind()
-                                } else {
-                                    value_integer_kind(value - 1)
-                                }
-                            }
-                            ArithmeticPrefixOperator::Plus(_) => value_integer_kind(value),
-                            ArithmeticPrefixOperator::Minus(_) => value_integer_kind(-value),
-                        })
-                    }
-                    _ => {
-                        // we can return `int|float` here, but some PHP extensions overload the operators
-                        // making it possible to return other types ( e.g `BCMath\Number`, and `GMP`)
-                        None
-                    }
+                    Some(TypeKind::Scalar(ScalarTypeKind::Float)) => Some(float_kind()),
+                    _ => None,
                 }
             }
             ArithmeticOperation::Infix(arithmetic_infix_operation) => {
                 let lhs_kind = infere_kind(interner, semantics, &arithmetic_infix_operation.lhs);
                 let rhs_kind = infere_kind(interner, semantics, &arithmetic_infix_operation.rhs);
 
-                match (lhs_kind, rhs_kind) {
-                    (Some(TypeKind::Scalar(ScalarTypeKind::Float)), Some(TypeKind::Scalar(ScalarTypeKind::Float)))
-                    | (
-                        Some(TypeKind::Scalar(ScalarTypeKind::Float)),
-                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)),
-                    )
-                    | (
-                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)),
-                        Some(TypeKind::Scalar(ScalarTypeKind::Float)),
-                    ) => match &arithmetic_infix_operation.operator {
-                        ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
-                        _ => Some(float_kind()),
-                    },
+                match (&lhs_kind, &rhs_kind) {
                     (
-                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)),
-                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)),
-                    ) => match &arithmetic_infix_operation.operator {
-                        ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
-                        _ => Some(union_kind(vec![integer_kind(), float_kind()])),
-                    },
-                    _ => None,
+                        Some(TypeKind::Value(ValueTypeKind::Integer { value: lhs_value })),
+                        Some(TypeKind::Value(ValueTypeKind::Integer { value: rhs_value })),
+                    ) => {
+                        match &arithmetic_infix_operation.operator {
+                            ArithmeticInfixOperator::Addition(_) => {
+                                let result = lhs_value.wrapping_add(*rhs_value);
+                                Some(value_integer_kind(result))
+                            }
+                            ArithmeticInfixOperator::Subtraction(_) => {
+                                let result = lhs_value.wrapping_sub(*rhs_value);
+                                Some(value_integer_kind(result))
+                            }
+                            ArithmeticInfixOperator::Multiplication(_) => {
+                                let result = lhs_value.wrapping_mul(*rhs_value);
+                                Some(value_integer_kind(result))
+                            }
+                            ArithmeticInfixOperator::Division(_) => {
+                                if *rhs_value != 0 {
+                                    if lhs_value % rhs_value == 0 {
+                                        // Division is exact, result is integer
+                                        let result = lhs_value / rhs_value;
+                                        Some(value_integer_kind(result))
+                                    } else {
+                                        // Division results in float
+                                        let result = (*lhs_value as f64) / (*rhs_value as f64);
+                                        Some(value_float_kind(OrderedFloat(result)))
+                                    }
+                                } else {
+                                    // Division by zero; in PHP, this throws, resulting in `never`
+                                    Some(never_kind())
+                                }
+                            }
+                            ArithmeticInfixOperator::Modulo(_) => {
+                                if *rhs_value != 0 {
+                                    let result = lhs_value % rhs_value;
+                                    Some(value_integer_kind(result))
+                                } else {
+                                    // Division by zero; in PHP, this throws, resulting in `never`
+                                    Some(never_kind())
+                                }
+                            }
+                            ArithmeticInfixOperator::Exponentiation(_) => {
+                                // Exponentiation of integers
+                                let base = *lhs_value as f64;
+                                let exponent = *rhs_value as f64;
+                                let result = base.powf(exponent);
+
+                                if result.fract() == 0.0 && result >= i64::MIN as f64 && result <= i64::MAX as f64 {
+                                    // Result is an integer
+                                    Some(value_integer_kind(result as i64))
+                                } else {
+                                    // Result is a float
+                                    Some(value_float_kind(OrderedFloat(result)))
+                                }
+                            }
+                        }
+                    }
+                    // Both operands are numeric literals (integer or float)
+                    (Some(lhs_value_kind), Some(rhs_value_kind))
+                        if is_numeric_value_kind(lhs_value_kind) && is_numeric_value_kind(rhs_value_kind) =>
+                    {
+                        let lhs_value = extract_numeric_value(lhs_value_kind);
+                        let rhs_value = extract_numeric_value(rhs_value_kind);
+
+                        match (lhs_value, rhs_value) {
+                            (Some(lhs_num), Some(rhs_num)) => {
+                                let result = match &arithmetic_infix_operation.operator {
+                                    ArithmeticInfixOperator::Addition(_) => lhs_num + rhs_num,
+                                    ArithmeticInfixOperator::Subtraction(_) => lhs_num - rhs_num,
+                                    ArithmeticInfixOperator::Multiplication(_) => lhs_num * rhs_num,
+                                    ArithmeticInfixOperator::Division(_) => {
+                                        if rhs_num != 0.0 {
+                                            lhs_num / rhs_num
+                                        } else {
+                                            return Some(never_kind()); // Division by zero
+                                        }
+                                    }
+                                    ArithmeticInfixOperator::Modulo(_) => {
+                                        if rhs_num != 0.0 {
+                                            lhs_num % rhs_num
+                                        } else {
+                                            return Some(never_kind()); // Division by zero
+                                        }
+                                    }
+                                    ArithmeticInfixOperator::Exponentiation(_) => OrderedFloat(lhs_num.powf(*rhs_num)),
+                                };
+
+                                Some(value_float_kind(result))
+                            }
+                            _ => Some(float_kind()),
+                        }
+                    }
+                    // One or both operands are not literals
+                    _ => infer_numeric_operation_type(
+                        lhs_kind.clone(),
+                        rhs_kind.clone(),
+                        &arithmetic_infix_operation.operator,
+                    ),
                 }
             }
             ArithmeticOperation::Postfix(arithmetic_postfix_operation) => {
                 let value_kind = infere_kind(interner, semantics, &arithmetic_postfix_operation.value);
 
                 match value_kind {
-                    Some(TypeKind::Scalar(ScalarTypeKind::Float)) => Some(float_kind()),
-                    Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => {
-                        Some(union_kind(vec![integer_kind(), float_kind()]))
+                    Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
+                        match &arithmetic_postfix_operation.operator {
+                            ArithmeticPostfixOperator::Increment(_) => {
+                                // Postfix increment: value is used before increment
+                                Some(value_integer_kind(value))
+                            }
+                            ArithmeticPostfixOperator::Decrement(_) => {
+                                // Postfix decrement: value is used before decrement
+                                Some(value_integer_kind(value))
+                            }
+                        }
                     }
+                    Some(TypeKind::Value(ValueTypeKind::Float { value })) => {
+                        match &arithmetic_postfix_operation.operator {
+                            ArithmeticPostfixOperator::Increment(_) => Some(value_float_kind(value)),
+                            ArithmeticPostfixOperator::Decrement(_) => Some(value_float_kind(value)),
+                        }
+                    }
+                    Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => Some(integer_kind()),
+                    Some(TypeKind::Scalar(ScalarTypeKind::Float)) => Some(float_kind()),
                     _ => None,
                 }
             }
@@ -202,6 +302,45 @@ fn infere_kind<'i, 'ast>(
                 "ZEND_THREAD_SAFE" | "ZEND_DEBUG_BUILD" => bool_kind(),
                 _ => return None,
             })
+        }
+        _ => None,
+    }
+}
+
+// Check if a TypeKind is a numeric value kind (integer or float literal)
+fn is_numeric_value_kind(kind: &TypeKind) -> bool {
+    matches!(kind, TypeKind::Value(ValueTypeKind::Integer { .. }) | TypeKind::Value(ValueTypeKind::Float { .. }))
+}
+
+// Extract the numeric value (as f64) from a TypeKind
+fn extract_numeric_value(kind: &TypeKind) -> Option<OrderedFloat<f64>> {
+    match kind {
+        TypeKind::Value(ValueTypeKind::Integer { value }) => Some(OrderedFloat(*value as f64)),
+        TypeKind::Value(ValueTypeKind::Float { value }) => Some(*value),
+        _ => None,
+    }
+}
+
+// Infer the resulting type of a numeric operation when operands are not literals
+fn infer_numeric_operation_type(
+    lhs_kind: Option<TypeKind>,
+    rhs_kind: Option<TypeKind>,
+    operator: &ArithmeticInfixOperator,
+) -> Option<TypeKind> {
+    match (lhs_kind, rhs_kind) {
+        (Some(TypeKind::Scalar(ScalarTypeKind::Integer)), Some(TypeKind::Scalar(ScalarTypeKind::Integer))) => {
+            match operator {
+                ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
+                _ => Some(union_kind(vec![integer_kind(), float_kind()])),
+            }
+        }
+        (Some(TypeKind::Scalar(ScalarTypeKind::Float)), Some(TypeKind::Scalar(ScalarTypeKind::Float)))
+        | (Some(TypeKind::Scalar(ScalarTypeKind::Integer)), Some(TypeKind::Scalar(ScalarTypeKind::Float)))
+        | (Some(TypeKind::Scalar(ScalarTypeKind::Float)), Some(TypeKind::Scalar(ScalarTypeKind::Integer))) => {
+            match operator {
+                ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
+                _ => Some(float_kind()),
+            }
         }
         _ => None,
     }
