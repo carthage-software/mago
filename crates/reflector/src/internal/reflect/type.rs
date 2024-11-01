@@ -1,8 +1,8 @@
 use fennec_ast::*;
 use fennec_reflection::class_like::ClassLikeReflection;
+use fennec_reflection::r#type::kind::*;
 use fennec_reflection::r#type::*;
 use fennec_span::*;
-use kind::TypeKind;
 
 use crate::internal::context::Context;
 
@@ -32,88 +32,70 @@ fn build_kind<'i, 'ast>(
     scope: Option<&ClassLikeReflection>,
 ) -> TypeKind {
     match &hint {
-        Hint::Identifier(identifier) => TypeKind::Identifier(context.semantics.names.get(identifier)),
+        Hint::Identifier(identifier) => named_object_kind(context.semantics.names.get(identifier), vec![]),
         Hint::Parenthesized(parenthesized_hint) => build_kind(parenthesized_hint.hint.as_ref(), context, scope),
         Hint::Nullable(nullable) => match build_kind(nullable.hint.as_ref(), context, scope) {
-            TypeKind::Union(mut inner) => {
-                inner.insert(0, TypeKind::Null);
+            TypeKind::Union { mut kinds } => {
+                kinds.insert(0, null_kind());
 
-                TypeKind::Union(inner)
+                TypeKind::Union { kinds }
             }
-            kind => TypeKind::Union(vec![TypeKind::Null, kind]),
+            kind => union_kind(vec![null_kind(), kind]),
         },
         Hint::Union(union_hint) => {
             let mut kinds = vec![];
 
             match build_kind(&union_hint.left.as_ref(), context, scope) {
-                TypeKind::Union(left_kinds) => kinds.extend(left_kinds),
+                TypeKind::Union { kinds: left_kinds } => kinds.extend(left_kinds),
                 kind => {
                     kinds.push(kind);
                 }
             }
 
             match build_kind(&union_hint.right.as_ref(), context, scope) {
-                TypeKind::Union(right_kinds) => kinds.extend(right_kinds),
+                TypeKind::Union { kinds: right_kinds } => kinds.extend(right_kinds),
                 kind => {
                     kinds.push(kind);
                 }
             }
 
-            TypeKind::Union(kinds)
+            union_kind(kinds)
         }
         Hint::Intersection(intersection_hint) => {
             let mut kinds = vec![];
 
             match build_kind(&intersection_hint.left.as_ref(), context, scope) {
-                TypeKind::Intersection(left_kinds) => kinds.extend(left_kinds),
+                TypeKind::Intersection { kinds: left_kinds } => kinds.extend(left_kinds),
                 kind => {
                     kinds.push(kind);
                 }
             }
 
             match build_kind(&intersection_hint.right.as_ref(), context, scope) {
-                TypeKind::Intersection(right_kinds) => kinds.extend(right_kinds),
+                TypeKind::Intersection { kinds: right_kinds } => kinds.extend(right_kinds),
                 kind => {
                     kinds.push(kind);
                 }
             }
 
-            TypeKind::Intersection(kinds)
+            intersection_kind(kinds)
         }
-        Hint::Null(_) => TypeKind::Null,
-        Hint::True(_) => TypeKind::True,
-        Hint::False(_) => TypeKind::False,
-        Hint::Array(_) => TypeKind::Array,
-        Hint::Callable(_) => TypeKind::Callable,
-        Hint::Void(_) => TypeKind::Void,
-        Hint::Never(_) => TypeKind::Never,
-        Hint::Float(_) => TypeKind::Float,
-        Hint::Bool(_) => TypeKind::Bool,
-        Hint::Integer(_) => TypeKind::Integer,
-        Hint::String(_) => TypeKind::String,
-        Hint::Object(_) => TypeKind::Object,
-        Hint::Mixed(_) => TypeKind::Mixed,
-        Hint::Iterable(_) => TypeKind::Iterable,
-        Hint::Static(_) => {
-            if let Some(scope) = scope {
-                TypeKind::Static(scope.name)
-            } else {
-                TypeKind::Unknown
-            }
-        }
-        Hint::Self_(_) => {
-            if let Some(scope) = scope {
-                TypeKind::Self_(scope.name)
-            } else {
-                TypeKind::Unknown
-            }
-        }
-        Hint::Parent(_) => {
-            if let Some(scope) = scope {
-                TypeKind::Parent(scope.name)
-            } else {
-                TypeKind::Unknown
-            }
-        }
+        Hint::Null(_) => null_kind(),
+        Hint::True(_) => true_kind(),
+        Hint::False(_) => false_kind(),
+        Hint::Array(_) => array_kind(array_key_kind(), mixed_kind()),
+        Hint::Callable(_) => callable_kind(vec![callable_parameter(mixed_kind(), false, true)], mixed_kind()),
+        Hint::Void(_) => void_kind(),
+        Hint::Never(_) => never_kind(),
+        Hint::Float(_) => float_kind(),
+        Hint::Bool(_) => bool_kind(),
+        Hint::Integer(_) => integer_kind(),
+        Hint::String(_) => string_kind(),
+        Hint::Object(_) => any_object_kind(),
+        Hint::Mixed(_) => mixed_kind(),
+        Hint::Iterable(_) => iterable_kind(mixed_kind(), mixed_kind()),
+        Hint::Static(_) => scope.map_or_else(|| mixed_kind(), |scope| static_kind(scope.name)),
+        Hint::Self_(_) => scope.map_or_else(|| mixed_kind(), |scope| self_kind(scope.name)),
+        Hint::Parent(_) => scope.map_or_else(|| mixed_kind(), |scope| parent_kind(scope.name)),
     }
 }

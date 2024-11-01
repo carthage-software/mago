@@ -57,14 +57,14 @@ fn parse_literal_float(value: &str, at: &Position) -> f64 {
     source.parse::<f64>().expect(&format!("failed to parse float `{}` at {}; this should never happen.", source, at))
 }
 
-fn parse_literal_integer(value: &str, at: &Position) -> Option<u64> {
+fn parse_literal_integer(value: &str, at: &Position) -> Option<usize> {
     let source = value.replace("_", "");
 
     Some(match source.as_bytes() {
-        [b'0', b'x' | b'X', ..] => u64::from_str_radix(&source.as_str()[2..], 16)
+        [b'0', b'x' | b'X', ..] => usize::from_str_radix(&source.as_str()[2..], 16)
             .expect(&format!("failed to parse hex integer `{}` at `{}`; this should never happen.", source, at)),
-        [b'0', b'o' | b'O', ..] => u64::from_str_radix(&source.as_str()[2..], 8)
+        [b'0', b'o' | b'O', ..] => usize::from_str_radix(&source.as_str()[2..], 8)
             .expect(&format!("failed to parse octal integer `{}` at `{}`; this should never happen.", source, at)),
-        _ => return source.parse::<u64>().ok(),
+        _ => return source.parse::<usize>().ok(),
     })
 }

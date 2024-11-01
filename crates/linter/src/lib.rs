@@ -4,12 +4,12 @@ use std::sync::RwLock;
 use fennec_interner::ThreadedInterner;
 use fennec_reporting::IssueCollection;
 use fennec_semantics::Semantics;
-use settings::RuleSettings;
 
 use crate::context::Context;
 use crate::plugin::Plugin;
 use crate::rule::ConfiguredRule;
 use crate::rule::Rule;
+use crate::settings::RuleSettings;
 use crate::settings::Settings;
 
 pub mod consts;
