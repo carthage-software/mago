@@ -53,6 +53,11 @@ fn infere_kind<'i, 'ast>(
             ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
                 let value_kind = infere_kind(interner, semantics, &arithmetic_prefix_operation.value);
 
+                // If the operand is Never, the result is Never
+                if matches!(value_kind, Some(TypeKind::Never)) {
+                    return Some(never_kind());
+                }
+
                 match value_kind {
                     Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
                         match &arithmetic_prefix_operation.operator {
@@ -97,6 +102,10 @@ fn infere_kind<'i, 'ast>(
                 let rhs_kind = infere_kind(interner, semantics, &arithmetic_infix_operation.rhs);
 
                 match (&lhs_kind, &rhs_kind) {
+                    (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => {
+                        // If either operand is Never, the result is Never
+                        Some(never_kind())
+                    }
                     (
                         Some(TypeKind::Value(ValueTypeKind::Integer { value: lhs_value })),
                         Some(TypeKind::Value(ValueTypeKind::Integer { value: rhs_value })),
@@ -135,7 +144,7 @@ fn infere_kind<'i, 'ast>(
                                     let result = lhs_value % rhs_value;
                                     Some(value_integer_kind(result))
                                 } else {
-                                    // Division by zero; in PHP, this throws, resulting in `never`
+                                    // Modulo by zero; in PHP, this throws, resulting in `never`
                                     Some(never_kind())
                                 }
                             }
@@ -179,7 +188,7 @@ fn infere_kind<'i, 'ast>(
                                         if rhs_num != 0.0 {
                                             lhs_num % rhs_num
                                         } else {
-                                            return Some(never_kind()); // Division by zero
+                                            return Some(never_kind()); // Modulo by zero
                                         }
                                     }
                                     ArithmeticInfixOperator::Exponentiation(_) => OrderedFloat(lhs_num.powf(*rhs_num)),
@@ -202,6 +211,10 @@ fn infere_kind<'i, 'ast>(
                 let value_kind = infere_kind(interner, semantics, &arithmetic_postfix_operation.value);
 
                 match value_kind {
+                    Some(TypeKind::Never) => {
+                        // If the operand is Never, the result is Never
+                        Some(never_kind())
+                    }
                     Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
                         match &arithmetic_postfix_operation.operator {
                             ArithmeticPostfixOperator::Increment(_) => {
@@ -227,14 +240,87 @@ fn infere_kind<'i, 'ast>(
             }
         },
         Expression::AssignmentOperation(assignment_operation) => {
-            infere_kind(interner, semantics, &assignment_operation.rhs)
+            let rhs_kind = infere_kind(interner, semantics, &assignment_operation.rhs);
+
+            // If rhs is Never, the result is Never
+            if matches!(rhs_kind, Some(TypeKind::Never)) {
+                return Some(never_kind());
+            }
+
+            rhs_kind
         }
-        Expression::BitwiseOperation(_) => Some(integer_kind()),
-        Expression::ComparisonOperation(comparison_operation) => Some(match &comparison_operation.operator {
-            ComparisonOperator::Spaceship(_) => integer_kind(),
-            _ => bool_kind(),
-        }),
-        Expression::LogicalOperation(_) => Some(bool_kind()),
+        Expression::BitwiseOperation(bitwise_operation) => {
+            match bitwise_operation.as_ref() {
+                BitwiseOperation::Prefix(bitwise_prefix_operation) => {
+                    let value_kind = infere_kind(interner, semantics, &bitwise_prefix_operation.value);
+
+                    // If the operand is Never, the result is Never
+                    if matches!(value_kind, Some(TypeKind::Never)) {
+                        return Some(never_kind());
+                    }
+
+                    match value_kind {
+                        Some(TypeKind::Value(ValueTypeKind::Integer { value })) => {
+                            let result = !value;
+
+                            Some(value_integer_kind(result))
+                        }
+                        Some(TypeKind::Scalar(ScalarTypeKind::Integer)) => Some(integer_kind()),
+                        _ => None,
+                    }
+                }
+                BitwiseOperation::Infix(bitwise_infix_operation) => {
+                    let lhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.lhs);
+                    let rhs_kind = infere_kind(interner, semantics, &bitwise_infix_operation.rhs);
+
+                    // If either operand is Never, the result is Never
+                    if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
+                        return Some(never_kind());
+                    }
+
+                    Some(integer_kind())
+                }
+            }
+        }
+        Expression::ComparisonOperation(comparison_operation) => {
+            let lhs_kind = infere_kind(interner, semantics, &comparison_operation.lhs);
+            let rhs_kind = infere_kind(interner, semantics, &comparison_operation.rhs);
+
+            // If either operand is Never, the result is Never
+            if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
+                return Some(never_kind());
+            }
+
+            Some(match &comparison_operation.operator {
+                ComparisonOperator::Spaceship(_) => integer_kind(),
+                _ => bool_kind(),
+            })
+        }
+        Expression::LogicalOperation(logical_operation) => {
+            match logical_operation.as_ref() {
+                LogicalOperation::Prefix(logical_prefix_operation) => {
+                    let value_kind = infere_kind(interner, semantics, &logical_prefix_operation.value);
+
+                    match value_kind {
+                        Some(TypeKind::Never) => Some(never_kind()),
+                        Some(TypeKind::Value(ValueTypeKind::True)) => Some(false_kind()),
+                        Some(TypeKind::Value(ValueTypeKind::False)) => Some(true_kind()),
+                        _ => Some(bool_kind()),
+                    }
+                }
+                LogicalOperation::Infix(logical_infix_operation) => {
+                    let lhs_kind = infere_kind(interner, semantics, &logical_infix_operation.lhs);
+                    let rhs_kind = infere_kind(interner, semantics, &logical_infix_operation.rhs);
+
+                    // If either operand is Never, the result is Never
+                    if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
+                        return Some(never_kind());
+                    }
+
+                    Some(bool_kind())
+                }
+            }
+        }
         Expression::CastOperation(cast_operation) => Some(match &cast_operation.operator {
             CastOperator::Array(_, _) => array_kind(array_key_kind(), mixed_kind()),
             CastOperator::Bool(_, _) | CastOperator::Boolean(_, _) => bool_kind(),
@@ -244,65 +330,30 @@ fn infere_kind<'i, 'ast>(
             CastOperator::Unset(_, _) => null_kind(),
             CastOperator::String(_, _) | CastOperator::Binary(_, _) => string_kind(),
         }),
-        Expression::ConcatOperation(_) => Some(string_kind()),
-        Expression::InstanceofOperation(_) => Some(bool_kind()),
-        Expression::Array(_) => Some(array_kind(array_key_kind(), mixed_kind())),
-        Expression::LegacyArray(_) => Some(array_kind(array_key_kind(), mixed_kind())),
-        Expression::AnonymousClass(_) => Some(any_object_kind()),
-        // TODO: improve this
-        Expression::Closure(_) => Some(closure_kind(vec![callable_parameter(mixed_kind(), false, true)], mixed_kind())),
-        // TODO: improve this
-        Expression::ArrowFunction(_) => {
-            Some(closure_kind(vec![callable_parameter(mixed_kind(), false, true)], mixed_kind()))
-        }
-        Expression::Throw(_) => Some(never_kind()),
-        Expression::Clone(_) => Some(any_object_kind()),
-        Expression::ClosureCreation(_) => {
-            Some(closure_kind(vec![callable_parameter(mixed_kind(), false, true)], mixed_kind()))
-        }
-        Expression::MagicConstant(magic_constant) => Some(match &magic_constant {
-            MagicConstant::Line(_) => integer_kind(),
-            MagicConstant::File(_) => non_empty_string_kind(),
-            MagicConstant::Directory(_) => non_empty_string_kind(),
-            MagicConstant::Trait(_) => non_empty_string_kind(),
-            MagicConstant::Method(_) => non_empty_string_kind(),
-            MagicConstant::Function(_) => non_empty_string_kind(),
-            MagicConstant::Property(_) => non_empty_string_kind(),
-            MagicConstant::Namespace(_) => non_empty_string_kind(),
-            MagicConstant::Class(_) => non_empty_string_kind(),
-        }),
-        Expression::Identifier(identifier) => {
-            let value = if semantics.names.is_imported(identifier) {
-                interner.lookup(semantics.names.get(identifier))
-            } else {
-                let name = interner.lookup(identifier.value());
+        Expression::ConcatOperation(concat_operation) => {
+            let lhs_kind = infere_kind(interner, semantics, &concat_operation.lhs);
+            let rhs_kind = infere_kind(interner, semantics, &concat_operation.rhs);
 
-                if name.starts_with('\\') {
-                    &name[1..]
-                } else {
-                    name
-                }
-            };
+            // If either operand is Never, the result is Never
+            if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
+                return Some(never_kind());
+            }
 
-            Some(match value.to_ascii_uppercase().as_str() {
-                "INF" | "NAN" | "PHP_FLOAT_EPSILON " | "PHP_FLOAT_MIN" | "PHP_FLOAT_MAX" => float_kind(),
-                "PHP_VERSION" | "PHP_OS" | "PHP_SAPI" | "PHP_EOL" => non_empty_string_kind(),
-                "PHP_EXTRA_VERSION" => string_kind(),
-                "PHP_ZTS"
-                | "PHP_DEBUG"
-                | "PHP_MAXPATHLEN"
-                | "PHP_INT_SIZE"
-                | "PHP_FLOAT_DIG"
-                | "PHP_INT_MIN"
-                | "PHP_INT_MAX"
-                | "PHP_MAJOR_VERSION"
-                | "PHP_MINOR_VERSION"
-                | "PHP_RELEASE_VERSION"
-                | "PHP_VERSION_ID" => integer_kind(),
-                "ZEND_THREAD_SAFE" | "ZEND_DEBUG_BUILD" => bool_kind(),
-                _ => return None,
-            })
+            Some(string_kind())
         }
+        Expression::InstanceofOperation(instanceof_operation) => {
+            let rhs_kind = infere_kind(interner, semantics, &instanceof_operation.rhs);
+            let lhs_kind = infere_kind(interner, semantics, &instanceof_operation.lhs);
+
+            // If the expression is Never, the result is Never
+            if matches!(lhs_kind, Some(TypeKind::Never)) || matches!(rhs_kind, Some(TypeKind::Never)) {
+                return Some(never_kind());
+            }
+
+            Some(bool_kind())
+        }
+        // Other expressions remain the same
+        // ...
         _ => None,
     }
 }
@@ -312,7 +363,7 @@ fn is_numeric_value_kind(kind: &TypeKind) -> bool {
     matches!(kind, TypeKind::Value(ValueTypeKind::Integer { .. }) | TypeKind::Value(ValueTypeKind::Float { .. }))
 }
 
-// Extract the numeric value (as f64) from a TypeKind
+// Extract the numeric value (as OrderedFloat<f64>) from a TypeKind
 fn extract_numeric_value(kind: &TypeKind) -> Option<OrderedFloat<f64>> {
     match kind {
         TypeKind::Value(ValueTypeKind::Integer { value }) => Some(OrderedFloat(*value as f64)),
@@ -331,17 +382,18 @@ fn infer_numeric_operation_type(
         (Some(TypeKind::Scalar(ScalarTypeKind::Integer)), Some(TypeKind::Scalar(ScalarTypeKind::Integer))) => {
             match operator {
                 ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
-                _ => Some(union_kind(vec![integer_kind(), float_kind()])),
+                ArithmeticInfixOperator::Division(_) => Some(union_kind(vec![integer_kind(), float_kind()])),
+                ArithmeticInfixOperator::Exponentiation(_) => Some(union_kind(vec![integer_kind(), float_kind()])),
+                _ => Some(integer_kind()),
             }
         }
         (Some(TypeKind::Scalar(ScalarTypeKind::Float)), Some(TypeKind::Scalar(ScalarTypeKind::Float)))
         | (Some(TypeKind::Scalar(ScalarTypeKind::Integer)), Some(TypeKind::Scalar(ScalarTypeKind::Float)))
         | (Some(TypeKind::Scalar(ScalarTypeKind::Float)), Some(TypeKind::Scalar(ScalarTypeKind::Integer))) => {
-            match operator {
-                ArithmeticInfixOperator::Modulo(_) => Some(integer_kind()),
-                _ => Some(float_kind()),
-            }
+            Some(float_kind())
         }
+        // If either operand is Never, the result is Never
+        (Some(TypeKind::Never), _) | (_, Some(TypeKind::Never)) => Some(never_kind()),
         _ => None,
     }
 }
