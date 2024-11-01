@@ -187,9 +187,18 @@ fn infere_kind<'i, 'ast>(
                                     }
                                     ArithmeticInfixOperator::Modulo(_) => {
                                         if rhs_num != 0.0 {
-                                            lhs_num % rhs_num
+                                            // Convert operands to integers by truncating the decimal part
+                                            let lhs_int = lhs_num.0.trunc() as i64;
+                                            let rhs_int = rhs_num.0.trunc() as i64;
+
+                                            if rhs_int != 0 {
+                                                let result = lhs_int % rhs_int;
+                                                return Some(value_integer_kind(result));
+                                            } else {
+                                                return Some(never_kind());
+                                            }
                                         } else {
-                                            return Some(never_kind()); // Modulo by zero
+                                            return Some(never_kind());
                                         }
                                     }
                                     ArithmeticInfixOperator::Exponentiation(_) => OrderedFloat(lhs_num.powf(*rhs_num)),
