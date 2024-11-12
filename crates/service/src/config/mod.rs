@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::config::internal::Entry;
+use crate::formatter::config::FormatterConfiguration;
 use crate::linter::config::LinterConfiguration;
 use crate::source::config::SourceConfiguration;
 
@@ -54,6 +55,9 @@ pub struct Configuration {
 
     /// Configuration options for the linter.
     pub linter: LinterConfiguration,
+
+    /// Configuration options for the formatter.
+    pub format: FormatterConfiguration,
 }
 
 impl Configuration {
@@ -65,12 +69,19 @@ impl Configuration {
     /// * `stack_size` - The size of the stack for each thread.
     /// * `source` - Configuration options for source discovery.
     /// * `linter` - Configuration options for the linter.
+    /// * `format` - Configuration options for the formatter.
     ///
     /// # Returns
     ///
     /// A new `Configuration` with the given source and linter configurations.
-    pub fn new(threads: usize, stack_size: usize, source: SourceConfiguration, linter: LinterConfiguration) -> Self {
-        Self { threads, stack_size, source, linter }
+    pub fn new(
+        threads: usize,
+        stack_size: usize,
+        source: SourceConfiguration,
+        linter: LinterConfiguration,
+        format: FormatterConfiguration,
+    ) -> Self {
+        Self { threads, stack_size, source, linter, format }
     }
 
     pub fn load() -> Result<Configuration, ConfigurationError> {
@@ -81,7 +92,7 @@ impl Configuration {
 
         let builder = Config::builder()
             .add_source(File::with_name(CONFIGURATION_FILE).required(false).format(FileFormat::Toml))
-            .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX));
+            .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX).try_parsing(true).list_separator(","));
 
         tracing::debug!("loading configuration from sources");
 
@@ -110,6 +121,7 @@ impl Configuration {
             threads: *LOGICAL_CPUS,
             stack_size: DEFAULT_STACK_SIZE,
             linter: LinterConfiguration::default(),
+            format: FormatterConfiguration::default(),
         }
     }
 }
@@ -155,6 +167,9 @@ mod internal {
 
             tracing::trace!("configuring linter entry");
             builder = self.linter.configure(builder)?;
+
+            tracing::trace!("configuring formatter entry");
+            builder = self.format.configure(builder)?;
 
             Ok(builder)
         }
@@ -268,6 +283,21 @@ mod internal {
                 .set_default("linter.default_plugins", Value::new(None, ValueKind::Nil))?
                 .set_default("linter.plugins", Value::new(None, ValueKind::Array(vec![])))?
                 .set_default("linter.rules", Value::new(None, ValueKind::Array(vec![])))?;
+
+            Ok(builder)
+        }
+    }
+
+    impl Entry for FormatterConfiguration {
+        fn configure<St: BuilderState>(
+            self,
+            builder: ConfigBuilder<St>,
+        ) -> Result<ConfigBuilder<St>, ConfigurationError> {
+            use ::config::Value;
+            use ::config::ValueKind;
+
+            let builder = builder
+                .set_default("format.style", Value::new(None, ValueKind::String(self.style.as_str().to_owned())))?;
 
             Ok(builder)
         }

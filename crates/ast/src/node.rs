@@ -226,13 +226,13 @@ pub enum NodeKind {
     YieldPair,
     YieldValue,
     Statement,
-    StatementExpression,
+    ExpressionStatement,
     BracedExpressionStringPart,
     DocumentString,
     InterpolatedString,
     LiteralStringPart,
     ShellExecuteString,
-    String,
+    CompositeString,
     StringPart,
     ClosingTag,
     EchoOpeningTag,
@@ -253,7 +253,7 @@ pub enum NodeKind {
     Variable,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Node<'a> {
     Program(&'a Program),
@@ -469,13 +469,13 @@ pub enum Node<'a> {
     YieldPair(&'a YieldPair),
     YieldValue(&'a YieldValue),
     Statement(&'a Statement),
-    StatementExpression(&'a StatementExpression),
+    ExpressionStatement(&'a ExpressionStatement),
     BracedExpressionStringPart(&'a BracedExpressionStringPart),
     DocumentString(&'a DocumentString),
     InterpolatedString(&'a InterpolatedString),
     LiteralStringPart(&'a LiteralStringPart),
     ShellExecuteString(&'a ShellExecuteString),
-    String(&'a CompositeString),
+    CompositeString(&'a CompositeString),
     StringPart(&'a StringPart),
     ClosingTag(&'a ClosingTag),
     EchoOpeningTag(&'a EchoOpeningTag),
@@ -520,6 +520,58 @@ impl<'a> Node<'a> {
         }
 
         result
+    }
+
+    #[inline]
+    pub const fn is_declaration(&self) -> bool {
+        match self {
+            Self::Class(_)
+            | Self::Interface(_)
+            | Self::Trait(_)
+            | Self::Enum(_)
+            | Self::Function(_)
+            | Self::Method(_) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub const fn is_statement(&self) -> bool {
+        match self {
+            Self::Statement(_)
+            | Self::OpeningTag(_)
+            | Self::ClosingTag(_)
+            | Self::Inline(_)
+            | Self::Namespace(_)
+            | Self::Use(_)
+            | Self::Class(_)
+            | Self::Interface(_)
+            | Self::Trait(_)
+            | Self::Enum(_)
+            | Self::Block(_)
+            | Self::Constant(_)
+            | Self::Function(_)
+            | Self::Declare(_)
+            | Self::Goto(_)
+            | Self::Label(_)
+            | Self::Try(_)
+            | Self::Foreach(_)
+            | Self::For(_)
+            | Self::While(_)
+            | Self::DoWhile(_)
+            | Self::Continue(_)
+            | Self::Break(_)
+            | Self::Switch(_)
+            | Self::If(_)
+            | Self::Return(_)
+            | Self::ExpressionStatement(_)
+            | Self::Echo(_)
+            | Self::Global(_)
+            | Self::Static(_)
+            | Self::HaltCompiler(_)
+            | Self::Unset(_) => true,
+            _ => false,
+        }
     }
 
     #[inline]
@@ -738,13 +790,13 @@ impl<'a> Node<'a> {
             Self::YieldPair(_) => NodeKind::YieldPair,
             Self::YieldValue(_) => NodeKind::YieldValue,
             Self::Statement(_) => NodeKind::Statement,
-            Self::StatementExpression(_) => NodeKind::StatementExpression,
+            Self::ExpressionStatement(_) => NodeKind::ExpressionStatement,
             Self::BracedExpressionStringPart(_) => NodeKind::BracedExpressionStringPart,
             Self::DocumentString(_) => NodeKind::DocumentString,
             Self::InterpolatedString(_) => NodeKind::InterpolatedString,
             Self::LiteralStringPart(_) => NodeKind::LiteralStringPart,
             Self::ShellExecuteString(_) => NodeKind::ShellExecuteString,
-            Self::String(_) => NodeKind::String,
+            Self::CompositeString(_) => NodeKind::CompositeString,
             Self::StringPart(_) => NodeKind::StringPart,
             Self::ClosingTag(_) => NodeKind::ClosingTag,
             Self::EchoOpeningTag(_) => NodeKind::EchoOpeningTag,
@@ -1428,7 +1480,7 @@ impl<'a> Node<'a> {
                 Expression::Referenced(node) => Node::Referenced(node),
                 Expression::Suppressed(node) => Node::Suppressed(node),
                 Expression::Literal(node) => Node::Literal(node),
-                Expression::CompositeString(node) => Node::String(node),
+                Expression::CompositeString(node) => Node::CompositeString(node),
                 Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
                 Expression::BitwiseOperation(node) => Node::BitwiseOperation(node),
@@ -1966,7 +2018,7 @@ impl<'a> Node<'a> {
                 Statement::Switch(node) => vec![Node::Switch(node)],
                 Statement::If(node) => vec![Node::If(node)],
                 Statement::Return(node) => vec![Node::Return(node)],
-                Statement::Expression(node) => vec![Node::StatementExpression(node)],
+                Statement::Expression(node) => vec![Node::ExpressionStatement(node)],
                 Statement::Echo(node) => vec![Node::Echo(node)],
                 Statement::Global(node) => vec![Node::Global(node)],
                 Statement::Static(node) => vec![Node::Static(node)],
@@ -1974,13 +2026,15 @@ impl<'a> Node<'a> {
                 Statement::Unset(node) => vec![Node::Unset(node)],
                 Statement::Noop(_) => vec![],
             },
-            Node::StatementExpression(node) => vec![Node::Expression(&node.expression)],
+            Node::ExpressionStatement(node) => {
+                vec![Node::Expression(&node.expression), Node::Terminator(&node.terminator)]
+            }
             Node::BracedExpressionStringPart(node) => vec![Node::Expression(&node.expression)],
             Node::DocumentString(node) => node.parts.iter().map(Node::StringPart).collect(),
             Node::InterpolatedString(node) => node.parts.iter().map(Node::StringPart).collect(),
             Node::LiteralStringPart(_) => vec![],
             Node::ShellExecuteString(node) => node.parts.iter().map(Node::StringPart).collect(),
-            Node::String(node) => vec![match node {
+            Node::CompositeString(node) => vec![match node {
                 CompositeString::ShellExecute(node) => Node::ShellExecuteString(node),
                 CompositeString::Interpolated(node) => Node::InterpolatedString(node),
                 CompositeString::Document(node) => Node::DocumentString(node),
@@ -2272,13 +2326,13 @@ impl<'a> HasSpan for Node<'a> {
             Self::YieldPair(node) => node.span(),
             Self::YieldValue(node) => node.span(),
             Self::Statement(node) => node.span(),
-            Self::StatementExpression(node) => node.span(),
+            Self::ExpressionStatement(node) => node.span(),
             Self::BracedExpressionStringPart(node) => node.span(),
             Self::DocumentString(node) => node.span(),
             Self::InterpolatedString(node) => node.span(),
             Self::LiteralStringPart(node) => node.span(),
             Self::ShellExecuteString(node) => node.span(),
-            Self::String(node) => node.span(),
+            Self::CompositeString(node) => node.span(),
             Self::StringPart(node) => node.span(),
             Self::ClosingTag(node) => node.span(),
             Self::EchoOpeningTag(node) => node.span(),

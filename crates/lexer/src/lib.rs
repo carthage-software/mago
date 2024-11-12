@@ -870,7 +870,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
                             let buffer = self.input.consume(1);
                             let end = self.input.position();
 
-                            self.mode = LexerMode::Halt(HaltStage::LookingForSemicolon);
+                            self.mode = LexerMode::Halt(HaltStage::LookingForTerminator);
 
                             self.token(TokenKind::RightParenthesis, buffer, start, end)
                         } else {
@@ -880,7 +880,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
                             )));
                         }
                     }
-                    HaltStage::LookingForSemicolon => {
+                    HaltStage::LookingForTerminator => {
                         if self.input.is_at(b";", false) {
                             let buffer = self.input.consume(1);
                             let end = self.input.position();
@@ -888,6 +888,13 @@ impl<'a, 'i> Lexer<'a, 'i> {
                             self.mode = LexerMode::Halt(HaltStage::End);
 
                             self.token(TokenKind::Semicolon, buffer, start, end)
+                        } else if self.input.is_at(b"?>", false) {
+                            let buffer = self.input.consume(1);
+                            let end = self.input.position();
+
+                            self.mode = LexerMode::Halt(HaltStage::End);
+
+                            self.token(TokenKind::CloseTag, buffer, start, end)
                         } else {
                             return Some(Err(SyntaxError::UnexpectedToken(
                                 self.input.read(1)[0],

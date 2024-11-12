@@ -6,7 +6,7 @@ use fennec_token::DocumentKind;
 
 /// Represents the different stages of the `halt_compiler` keyword.
 ///
-/// The `halt_compiler` keyword is followed by `"("`, `")"`, and `";"`.
+/// The `halt_compiler` keyword is followed by `"("`, `")"`, and `";"` or `"?>"`.
 ///
 /// This enum is used to track the current stage of the `halt_compiler` keyword
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
@@ -14,7 +14,7 @@ use fennec_token::DocumentKind;
 pub enum HaltStage {
     LookingForLeftParenthesis,
     LookingForRightParenthesis,
-    LookingForSemicolon,
+    LookingForTerminator,
     End,
 }
 

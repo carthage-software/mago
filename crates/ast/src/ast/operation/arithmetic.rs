@@ -4,6 +4,8 @@ use strum::Display;
 
 use fennec_span::HasSpan;
 use fennec_span::Span;
+use fennec_token::GetPrecedence;
+use fennec_token::Precedence;
 
 use crate::ast::expression::Expression;
 
@@ -17,7 +19,7 @@ pub enum ArithmeticOperation {
 }
 
 /// Represents a PHP arithmetic prefix operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum ArithmeticPrefixOperator {
     Increment(Span),
@@ -34,7 +36,7 @@ pub struct ArithmeticPrefixOperation {
 }
 
 /// Represents a PHP arithmetic infix operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum ArithmeticInfixOperator {
     Addition(Span),
@@ -54,7 +56,7 @@ pub struct ArithmeticInfixOperation {
 }
 
 /// Represents a PHP arithmetic postfix operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum ArithmeticPostfixOperator {
     Increment(Span),
@@ -66,6 +68,74 @@ pub enum ArithmeticPostfixOperator {
 pub struct ArithmeticPostfixOperation {
     pub value: Expression,
     pub operator: ArithmeticPostfixOperator,
+}
+
+impl ArithmeticInfixOperator {
+    #[inline]
+    pub fn is_addition(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Addition(_))
+    }
+
+    #[inline]
+    pub fn is_subtraction(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Subtraction(_))
+    }
+
+    #[inline]
+    pub fn is_multiplicative(&self) -> bool {
+        matches!(
+            self,
+            ArithmeticInfixOperator::Multiplication(_)
+                | ArithmeticInfixOperator::Division(_)
+                | ArithmeticInfixOperator::Modulo(_)
+        )
+    }
+
+    #[inline]
+    pub fn is_multiplication(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Multiplication(_))
+    }
+
+    #[inline]
+    pub fn is_division(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Division(_))
+    }
+
+    #[inline]
+    pub fn is_modulo(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Modulo(_))
+    }
+
+    #[inline]
+    pub fn is_exponentiation(&self) -> bool {
+        matches!(self, ArithmeticInfixOperator::Exponentiation(_))
+    }
+
+    #[inline]
+    pub fn is_same_as(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Addition(_), Self::Addition(_))
+            | (Self::Subtraction(_), Self::Subtraction(_))
+            | (Self::Multiplication(_), Self::Multiplication(_))
+            | (Self::Division(_), Self::Division(_))
+            | (Self::Modulo(_), Self::Modulo(_))
+            | (Self::Exponentiation(_), Self::Exponentiation(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl GetPrecedence for ArithmeticInfixOperator {
+    #[inline]
+    fn precedence(&self) -> Precedence {
+        match self {
+            ArithmeticInfixOperator::Addition(_) | ArithmeticInfixOperator::Subtraction(_) => Precedence::AddSub,
+            ArithmeticInfixOperator::Multiplication(_)
+            | ArithmeticInfixOperator::Division(_)
+            | ArithmeticInfixOperator::Modulo(_) => Precedence::MulDivMod,
+            ArithmeticInfixOperator::Exponentiation(_) => Precedence::Pow,
+        }
+    }
 }
 
 impl HasSpan for ArithmeticOperation {

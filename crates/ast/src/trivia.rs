@@ -7,7 +7,7 @@ use fennec_span::HasSpan;
 use fennec_span::Span;
 
 /// Represents the kind of trivia.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum TriviaKind {
     WhiteSpace,
@@ -21,7 +21,7 @@ pub enum TriviaKind {
 ///
 /// A trivia is a piece of information that is not part of the syntax tree,
 /// such as comments and white spaces.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Trivia {
     pub kind: TriviaKind,
     pub span: Span,
@@ -38,6 +38,14 @@ impl TriviaKind {
                 | TriviaKind::HashComment
                 | TriviaKind::DocBlockComment
         )
+    }
+
+    pub fn is_block_comment(&self) -> bool {
+        matches!(self, TriviaKind::MultiLineComment | TriviaKind::DocBlockComment)
+    }
+
+    pub fn is_single_line_comment(&self) -> bool {
+        matches!(self, TriviaKind::HashComment | TriviaKind::SingleLineComment)
     }
 }
 

@@ -49,6 +49,7 @@ clap = { version = "4.5.20", features = [
 ] }
 futures = "0.3.31"
 async-walkdir = "2.0.0"
+termtree = "0.5.1"
 
 [dependencies]
 fennec-cli = { path = "crates/cli" }

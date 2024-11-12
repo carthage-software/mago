@@ -91,6 +91,44 @@ impl SwitchBody {
     }
 }
 
+impl SwitchCase {
+    /// Returns the statements within the case.
+    pub fn statements(&self) -> &[Statement] {
+        match self {
+            SwitchCase::Expression(case) => case.statements.as_slice(),
+            SwitchCase::Default(case) => case.statements.as_slice(),
+        }
+    }
+
+    /// Returns `true` if the case is a default case.
+    pub fn is_default(&self) -> bool {
+        match self {
+            SwitchCase::Expression(_) => false,
+            SwitchCase::Default(_) => true,
+        }
+    }
+
+    /// Returns `true` if the case is empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            SwitchCase::Expression(case) => case.statements.is_empty(),
+            SwitchCase::Default(case) => case.statements.is_empty(),
+        }
+    }
+
+    /// Returns the case is fall-through.
+    ///
+    /// A case is considered fall-through if it is not empty and
+    /// does not end with a `break` statement.
+    pub fn is_fall_through(&self) -> bool {
+        let Some(last_statement) = self.statements().last() else {
+            return false;
+        };
+
+        !matches!(last_statement, Statement::Break(_))
+    }
+}
+
 impl HasSpan for Switch {
     fn span(&self) -> Span {
         Span::between(self.switch.span(), self.body.span())

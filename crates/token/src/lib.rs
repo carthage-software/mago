@@ -52,9 +52,14 @@ pub enum Precedence {
     Instanceof,
     Prefix,
     Pow,
+    Clone,
     CallDim,
+    New,
     ObjectAccess,
-    CloneOrNew,
+}
+
+pub trait GetPrecedence {
+    fn precedence(&self) -> Precedence;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]

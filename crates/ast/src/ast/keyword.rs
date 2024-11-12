@@ -5,7 +5,7 @@ use fennec_interner::StringIdentifier;
 use fennec_span::HasSpan;
 use fennec_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Keyword {
     pub span: Span,
     pub value: StringIdentifier,

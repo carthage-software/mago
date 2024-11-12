@@ -1218,7 +1218,7 @@ generate_ast_walker! {
         walker.walk_terminator(&r#return.terminator, context);
     }
 
-    StatementExpression as statement_expression => {
+    ExpressionStatement as statement_expression => {
         walker.walk_expression(&statement_expression.expression, context);
         walker.walk_terminator(&statement_expression.terminator, context);
     }

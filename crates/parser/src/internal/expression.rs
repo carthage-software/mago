@@ -60,7 +60,7 @@ pub fn parse_expression_with_precedence<'a, 'i>(
                 break;
             }
 
-            left = parse_postfix_expression(stream, left)?;
+            left = parse_postfix_expression(stream, left, precedence)?;
         } else if next.kind.is_infix() {
             let infix_precedence = Precedence::infix(&next.kind);
 
@@ -187,6 +187,7 @@ fn parse_arrow_function_or_closure<'a, 'i>(
 fn parse_postfix_expression<'a, 'i>(
     stream: &mut TokenStream<'a, 'i>,
     lhs: Expression,
+    precedence: Precedence,
 ) -> Result<Expression, ParseError> {
     let operator = utils::peek(stream)?;
 
@@ -238,7 +239,7 @@ fn parse_postfix_expression<'a, 'i>(
             let selector_or_variable = member::parse_classlike_constant_selector_or_variable(stream)?;
             let current = utils::peek(stream)?;
 
-            if matches!(current.kind, T!["("]) {
+            if Precedence::CallDim > precedence && matches!(current.kind, T!["("]) {
                 let method = match selector_or_variable {
                     Either::Left(selector) => match selector {
                         ClassLikeConstantSelector::Identifier(i) => ClassLikeMemberSelector::Identifier(i),
@@ -295,7 +296,7 @@ fn parse_postfix_expression<'a, 'i>(
             let arrow = utils::expect_any(stream)?.span;
             let selector = member::parse_classlike_memeber_selector(stream)?;
 
-            if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
+            if Precedence::CallDim > precedence && matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
                 if matches!(
                     (
                         utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind),
@@ -331,7 +332,7 @@ fn parse_postfix_expression<'a, 'i>(
             let question_mark_arrow = utils::expect_any(stream)?.span;
             let selector = member::parse_classlike_memeber_selector(stream)?;
 
-            if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
+            if Precedence::CallDim > precedence && matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
                 Expression::Call(Call::NullSafeMethod(NullSafeMethodCall {
                     object: Box::new(lhs),
                     question_mark_arrow,

@@ -4,6 +4,8 @@ use strum::Display;
 
 use fennec_span::HasSpan;
 use fennec_span::Span;
+use fennec_token::GetPrecedence;
+use fennec_token::Precedence;
 
 use crate::ast::expression::Expression;
 
@@ -16,7 +18,7 @@ pub enum BitwiseOperation {
 }
 
 /// Represents a PHP bitwise prefix operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum BitwisePrefixOperator {
     Not(Span),
@@ -30,7 +32,7 @@ pub struct BitwisePrefixOperation {
 }
 
 /// Represents a PHP bitwise infix operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum BitwiseInfixOperator {
     And(Span),
@@ -46,6 +48,62 @@ pub struct BitwiseInfixOperation {
     pub lhs: Expression,
     pub operator: BitwiseInfixOperator,
     pub rhs: Expression,
+}
+
+impl BitwiseInfixOperator {
+    #[inline]
+    pub fn is_and(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::And(_))
+    }
+
+    #[inline]
+    pub fn is_or(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::Or(_))
+    }
+
+    #[inline]
+    pub fn is_xor(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::Xor(_))
+    }
+
+    #[inline]
+    pub fn is_shift(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::LeftShift(_) | BitwiseInfixOperator::RightShift(_))
+    }
+
+    #[inline]
+    pub fn is_left_shift(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::LeftShift(_))
+    }
+
+    #[inline]
+    pub fn is_right_shift(&self) -> bool {
+        matches!(self, BitwiseInfixOperator::RightShift(_))
+    }
+
+    #[inline]
+    pub fn is_same_as(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::And(_), Self::And(_))
+            | (Self::Or(_), Self::Or(_))
+            | (Self::Xor(_), Self::Xor(_))
+            | (Self::LeftShift(_), Self::LeftShift(_))
+            | (Self::RightShift(_), Self::RightShift(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl GetPrecedence for BitwiseInfixOperator {
+    #[inline]
+    fn precedence(&self) -> Precedence {
+        match self {
+            BitwiseInfixOperator::And(_) => Precedence::BitwiseAnd,
+            BitwiseInfixOperator::Or(_) => Precedence::BitwiseOr,
+            BitwiseInfixOperator::Xor(_) => Precedence::BitwiseXor,
+            BitwiseInfixOperator::LeftShift(_) | BitwiseInfixOperator::RightShift(_) => Precedence::BitShift,
+        }
+    }
 }
 
 impl HasSpan for BitwiseOperation {

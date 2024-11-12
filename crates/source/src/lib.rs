@@ -205,33 +205,34 @@ impl SourceManager {
             return Err(SourceError::UnavailableSource(source_id));
         };
 
-        let content = entry.value() .content
-        .get_or_try_init(|| async {
-            let path = entry
-                .path
-                .as_ref()
-                .expect("source entry must contain either content or path");
+        let content = entry.value()
+            .content
+            .get_or_try_init(|| async {
+                let path = entry
+                    .path
+                    .as_ref()
+                    .expect("source entry must contain either content or path");
 
-            std::fs::read(path)
-                .map(|bytes| match String::from_utf8_lossy(&bytes) {
-                    Cow::Borrowed(str) => str.to_string(),
-                    Cow::Owned(string) => {
-                        tracing::warn!(
-                            "encountered invalid utf-8 sequence in file {:?}. behavior with non-utf-8 files is undefined and may lead to unexpected results.",
-                            path,
-                        );
+                std::fs::read(path)
+                    .map(|bytes| match String::from_utf8_lossy(&bytes) {
+                        Cow::Borrowed(str) => str.to_string(),
+                        Cow::Owned(string) => {
+                            tracing::warn!(
+                                "encountered invalid utf-8 sequence in file {:?}. behavior with non-utf-8 files is undefined and may lead to unexpected results.",
+                                path,
+                            );
 
-                        string
-                    }
-                })
-                .map(|content| {
-                    let lines = line_starts(&content).collect();
-                    let size = content.len();
-                    let content = self.interner.intern(content);
+                            string
+                        }
+                    })
+                    .map(|content| {
+                        let lines = line_starts(&content).collect();
+                        let size = content.len();
+                        let content = self.interner.intern(content);
 
-                    (content, size, lines)
-                })
-        }).await;
+                        (content, size, lines)
+                    })
+            }).await;
 
         match content {
             Ok((content, size, lines)) => Ok(Source {
@@ -243,6 +244,30 @@ impl SourceManager {
             }),
             Err(err) => Err(SourceError::IOError(err)),
         }
+    }
+
+    pub fn write(&self, source_id: SourceIdentifier, content: String) -> Result<(), SourceError> {
+        let mut entry = self.sources.get_mut(&source_id).ok_or(SourceError::UnavailableSource(source_id))?;
+
+        // Update the content of the source entry.
+        let lines = line_starts(&content).collect();
+        let size = content.len();
+        let content = self.interner.intern(content);
+
+        let (_, v) = entry.pair_mut();
+        if let Some((old_content, _, _)) = v.content.get() {
+            if *old_content == content {
+                return Ok(());
+            }
+        }
+
+        v.content = OnceCell::from((content, size, lines));
+
+        if let Some(path) = entry.value().path.as_ref() {
+            std::fs::write(path, self.interner.lookup(&content)).map_err(SourceError::IOError)?;
+        }
+
+        Ok(())
     }
 
     /// Retrieve the number of sources in the manager.

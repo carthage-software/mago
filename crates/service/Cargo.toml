@@ -16,7 +16,11 @@ fennec-semantics = { path = "../semantics" }
 fennec-linter = { path = "../linter" }
 fennec-reflection = { path = "../reflection" }
 fennec-reflector = { path = "../reflector" }
+fennec-span = { path = "../span" }
 fennec-feedback = { path = "../feedback" }
+fennec-formatter = { path = "../formatter" }
+fennec-ast = { path = "../ast" }
+fennec-parser = { path = "../parser" }
 tokio = { workspace = true }
 serde = { workspace = true }
 ahash = { workspace = true }

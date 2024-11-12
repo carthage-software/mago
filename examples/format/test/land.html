@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Land Plan with Rotated Houses</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+        </style>
+    </head>
+    <body>
+        <svg
+            viewBox="0 0 620 620"
+            xmlns="http://www.w3.org/2000/svg"
+            width="80%"
+            height="auto"
+        >
+            <!-- Definitions for styles -->
+            <style>
+                :root {
+                    --dirt: #8b4513;
+                    --grass: #228b22;
+                    --water: #1e90ff;
+                    --dirty-water: #483d8b;
+                    --asphalt: #708090;
+                    --street-lines: #ffffff;
+                    --fence: #a0522d;
+                    --inner-fence: #8b4513;
+                    --building: #d3d3d3;
+                    --tree: #556b2f;
+                    --green-house: #008000;
+
+                    --fence-width: 0.5;
+                    --road-width: 4;
+                    --line-width: 0.1;
+                    --roundabout-radius: 8;
+                }
+
+                .land {
+                    fill: var(--grass);
+                    stroke: var(--fence);
+                    stroke-width: var(--fence-width);
+                }
+
+                .road-surface {
+                    fill: var(--asphalt);
+                }
+
+                .road-line {
+                    stroke: var(--street-lines);
+                    stroke-width: var(--line-width);
+                }
+
+                .dashed {
+                    stroke-dasharray: 2, 2;
+                }
+
+                .plot {
+                    fill: var(--dirt);
+                    stroke: var(--inner-fence);
+                    stroke-width: 0.2;
+                }
+
+                .yard {
+                    fill: var(--grass);
+                    stroke: transparent;
+                    stroke-width: 0.2;
+                }
+
+                .house {
+                    fill: var(--building);
+                }
+
+                .pool {
+                    fill: var(--water);
+                }
+            </style>
+
+            <!-- Land area -->
+            <rect class="land" width="620" height="620" />
+
+            <!-- Existing roads and roundabout -->
+            <!-- Vertical Road -->
+            <rect class="road-surface" x="308" y="570" width="4" height="50" />
+            <!-- Vertical Road Lines -->
+            <line class="road-line" x1="308" y1="570" x2="308" y2="620" />
+            <line class="road-line" x1="312" y1="570" x2="312" y2="620" />
+            <!-- Vertical Road Center Line -->
+            <line
+                class="road-line dashed"
+                x1="310"
+                y1="570"
+                x2="310"
+                y2="620"
+            />
+            <!-- Roundabout -->
+            <circle class="road-surface" cx="310" cy="570" r="8" />
+            <!-- Roundabout Outer Line -->
+            <circle class="road-line" cx="310" cy="570" r="8" fill="none" />
+            <!-- Left Road -->
+            <rect class="road-surface" x="252" y="568" width="50" height="4" />
+            <!-- Left Road Lines -->
+            <line class="road-line" x1="252" y1="568" x2="302" y2="568" />
+            <line class="road-line" x1="252" y1="572" x2="302" y2="572" />
+            <!-- Left Road Center Line -->
+            <line
+                class="road-line dashed"
+                x1="252"
+                y1="570"
+                x2="302"
+                y2="570"
+            />
+            <!-- Right Road -->
+            <rect class="road-surface" x="318" y="568" width="50" height="4" />
+            <!-- Right Road Lines -->
+            <line class="road-line" x1="318" y1="568" x2="368" y2="568" />
+            <line class="road-line" x1="318" y1="572" x2="368" y2="572" />
+            <!-- Right Road Center Line -->
+            <line
+                class="road-line dashed"
+                x1="318"
+                y1="570"
+                x2="368"
+                y2="570"
+            />
+
+            <!-- Left House -->
+            <rect class="plot" x="217" y="550" width="35" height="35" />
+            <rect class="yard" x="217" y="550" width="10" height="35" />
+            <rect class="yard" x="217" y="550" width="35" height="5" />
+            <rect class="yard" x="217" y="580" width="35" height="5" />
+            <rect class="yard" x="247" y="550" width="5" height="35" />
+            <rect class="house" x="227" y="555" width="20" height="25" />
+            <rect class="pool" x="220" y="560" width="3" height="6" />
+
+            <!-- Right House -->
+            <g class="house-plot">
+                <!-- Front Yard -->
+                <rect
+                    class="front-yard"
+                    x="368"
+                    y="533"
+                    width="5"
+                    height="35"
+                />
+                <!-- Main House -->
+                <rect
+                    class="main-house"
+                    x="373"
+                    y="538"
+                    width="20"
+                    height="25"
+                />
+                <!-- Back Yard -->
+                <rect
+                    class="back-yard"
+                    x="393"
+                    y="533"
+                    width="10"
+                    height="35"
+                />
+                <!-- Pool in Back Yard -->
+                <rect class="pool" x="395" y="540" width="4" height="5" />
+            </g>
+        </svg>
+    </body>
+</html>

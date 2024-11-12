@@ -47,6 +47,15 @@ pub struct NamedArgument {
     pub value: Expression,
 }
 
+impl Argument {
+    pub fn value(&self) -> &Expression {
+        match self {
+            Argument::Positional(arg) => &arg.value,
+            Argument::Named(arg) => &arg.value,
+        }
+    }
+}
+
 impl HasSpan for ArgumentList {
     fn span(&self) -> Span {
         Span::between(self.left_parenthesis, self.right_parenthesis)

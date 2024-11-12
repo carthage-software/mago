@@ -12,5 +12,11 @@ pub fn print(error: impl Error) {
 pub fn bail<T>(error: impl Error) -> T {
     print(error);
 
-    std::process::exit(1);
+    // we exit with a non-zero status code to indicate an error
+    // if this build is debug build, we will panic instead
+    if cfg!(debug_assertions) {
+        panic!("bail");
+    } else {
+        std::process::exit(1);
+    }
 }

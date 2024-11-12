@@ -39,7 +39,7 @@ use crate::ast::terminator::Terminator;
 use crate::ast::unset::Unset;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct StatementExpression {
+pub struct ExpressionStatement {
     pub expression: Expression,
     pub terminator: Terminator,
 }
@@ -73,7 +73,7 @@ pub enum Statement {
     Switch(Box<Switch>),
     If(Box<If>),
     Return(Return),
-    Expression(StatementExpression),
+    Expression(ExpressionStatement),
     Echo(Echo),
     Global(Global),
     Static(Static),
@@ -82,7 +82,7 @@ pub enum Statement {
     Noop(Span),
 }
 
-impl HasSpan for StatementExpression {
+impl HasSpan for ExpressionStatement {
     fn span(&self) -> Span {
         self.expression.span().join(self.terminator.span())
     }

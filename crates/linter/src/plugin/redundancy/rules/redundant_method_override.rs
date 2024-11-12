@@ -46,7 +46,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantMethodOverrideRule {
 
         let expression = match &statement {
             Statement::Return(Return { value: Some(expression), .. }) => expression,
-            Statement::Expression(StatementExpression { expression, .. }) => expression,
+            Statement::Expression(ExpressionStatement { expression, .. }) => expression,
             _ => return,
         };
 

@@ -64,6 +64,11 @@ impl HasSpan for Modifier {
 }
 
 impl Sequence<Modifier> {
+    /// Returns the first abstract modifier in the sequence, if any.
+    pub fn get_static(&self) -> Option<&Modifier> {
+        self.iter().find(|modifier| matches!(modifier, Modifier::Static(..)))
+    }
+
     /// Returns `true` if the sequence contains a static modifier.
     pub fn contains_static(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Static(..)))
@@ -89,9 +94,19 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::Abstract(..)))
     }
 
+    /// Returns the first abstract modifier in the sequence, if any.
+    pub fn get_readonly(&self) -> Option<&Modifier> {
+        self.iter().find(|modifier| matches!(modifier, Modifier::Readonly(..)))
+    }
+
     /// Returns `true` if the sequence contains a readonly modifier.
     pub fn contains_readonly(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Readonly(..)))
+    }
+
+    pub fn get_first_visibility(&self) -> Option<&Modifier> {
+        self.iter()
+            .find(|modifier| matches!(modifier, Modifier::Public(..) | Modifier::Protected(..) | Modifier::Private(..)))
     }
 
     /// Returns `true` if the sequence contains a visibility modifier.

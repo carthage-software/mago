@@ -25,7 +25,7 @@ pub mod trait_use;
 
 /// Represents a PHP interface.
 ///
-/// # Example:
+/// # Example:
 ///
 /// ```php
 /// <?php

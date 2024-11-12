@@ -64,19 +64,19 @@ pub fn parse_statement<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<State
                     // unlike when we have modifiers, here, we don't know if this is meant to be a closure or a function
                     parse_closure_or_function(stream, attributes)?
                 }
-                T!["fn"] => Statement::Expression(StatementExpression {
+                T!["fn"] => Statement::Expression(ExpressionStatement {
                     expression: Expression::ArrowFunction(Box::new(parse_arrow_function_with_attributes(
                         stream, attributes,
                     )?)),
                     terminator: parse_terminator(stream)?,
                 }),
-                T!["static"] if maybe_after == Some(T!["fn"]) => Statement::Expression(StatementExpression {
+                T!["static"] if maybe_after == Some(T!["fn"]) => Statement::Expression(ExpressionStatement {
                     expression: Expression::ArrowFunction(Box::new(parse_arrow_function_with_attributes(
                         stream, attributes,
                     )?)),
                     terminator: parse_terminator(stream)?,
                 }),
-                T!["static"] if maybe_after == Some(T!["function"]) => Statement::Expression(StatementExpression {
+                T!["static"] if maybe_after == Some(T!["function"]) => Statement::Expression(ExpressionStatement {
                     expression: Expression::Closure(Box::new(parse_closure_with_attributes(stream, attributes)?)),
                     terminator: parse_terminator(stream)?,
                 }),
@@ -139,7 +139,7 @@ pub fn parse_statement<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<State
         kind if kind.is_identifier_maybe_reserved() && matches!(utils::peek_nth(stream, 1)?.kind, T![":"]) => {
             Statement::Label(parse_label(stream)?)
         }
-        _ => Statement::Expression(StatementExpression {
+        _ => Statement::Expression(ExpressionStatement {
             expression: parse_expression(stream)?,
             terminator: parse_terminator(stream)?,
         }),
@@ -152,7 +152,7 @@ fn parse_closure_or_function<'a, 'i>(
 ) -> Result<Statement, ParseError> {
     Ok(match (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)) {
         // if the next token is `(` or `&` followed by `(`, then we know this is a closure
-        (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(StatementExpression {
+        (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(ExpressionStatement {
             expression: Expression::Closure(Box::new(parse_closure_with_attributes(stream, attributes)?)),
             terminator: parse_terminator(stream)?,
         }),

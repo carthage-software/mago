@@ -153,6 +153,17 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
         self.inner.iter()
     }
 
+    /// Returns an iterator over the sequence, where each item includes
+    /// the index of the element, the element and the token following it.
+    /// The token is `None` only for the last element if it has no trailing token.
+    pub fn iter_with_tokens(&self) -> impl Iterator<Item = (usize, &T, Option<&Token>)> {
+        self.inner.iter().enumerate().map(move |(i, item)| {
+            let token = self.tokens.get(i);
+
+            (i, item, token)
+        })
+    }
+
     pub fn as_slice(&self) -> &[T] {
         self.inner.as_slice()
     }

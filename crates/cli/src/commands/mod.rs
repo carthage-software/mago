@@ -1,12 +1,16 @@
+use ast::AstCommand;
 use clap::builder::styling::AnsiColor;
 use clap::builder::styling::Effects;
 use clap::builder::Styles;
 use clap::Parser;
 
 use crate::commands::fix::FixCommand;
+use crate::commands::format::FormatCommand;
 use crate::commands::lint::LintCommand;
 
+pub mod ast;
 pub mod fix;
+pub mod format;
 pub mod lint;
 
 pub const CLAP_STYLING: Styles = Styles::styled()
@@ -42,4 +46,8 @@ pub enum FennecCommand {
     Lint(LintCommand),
     #[command(name = "fix")]
     Fix(FixCommand),
+    #[command(name = "format")]
+    Format(FormatCommand),
+    #[command(name = "ast")]
+    Ast(AstCommand),
 }

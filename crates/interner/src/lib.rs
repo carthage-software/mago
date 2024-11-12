@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use lasso::Key;
@@ -100,6 +101,37 @@ impl Interner {
         self.rodeo.get_or_intern(str)
     }
 
+    /// Interns a string if it has not already been interned, then returns a reference
+    /// to the interned string.
+    ///
+    /// # Arguments
+    ///
+    /// * `string` - A string or any type that implements `AsRef<str>`, representing the
+    ///   string to intern.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the interned version of the string.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if it encounters an invalid identifier. This should never
+    /// occur unless there is an issue with the identifier or the interner is used
+    /// incorrectly.
+    pub fn interned_str(&mut self, string: impl AsRef<str>) -> &str {
+        let str = string.as_ref();
+        if str.is_empty() {
+            return "";
+        }
+
+        let identifier = self.rodeo.get_or_intern(str);
+
+        self.rodeo.try_resolve(&identifier).expect(
+            "invalid string identifier; this should never happen unless the identifier is \
+                corrupted or the interner is used incorrectly",
+        )
+    }
+
     /// Returns the interned string for the specified identifier.
     ///
     /// # Arguments
@@ -159,6 +191,37 @@ impl ThreadedInterner {
         self.rodeo.get_or_intern(str)
     }
 
+    /// Interns a string if it has not already been interned, then returns a reference
+    /// to the interned string.
+    ///
+    /// # Arguments
+    ///
+    /// * `string` - A string or any type that implements `AsRef<str>`, representing the
+    ///   string to intern.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the interned version of the string.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if it encounters an invalid identifier. This should never
+    /// occur unless there is an issue with the identifier or the interner is used
+    /// incorrectly.
+    pub fn interned_str(&self, string: impl AsRef<str>) -> &str {
+        let str = string.as_ref();
+        if str.is_empty() {
+            return "";
+        }
+
+        let identifier = self.rodeo.get_or_intern(str);
+
+        self.rodeo.try_resolve(&identifier).expect(
+            "invalid string identifier; this should never happen unless the identifier is \
+                corrupted or the interner is used incorrectly",
+        )
+    }
+
     /// Looks up an interned string by its identifier.
     ///
     /// # Arguments
@@ -167,7 +230,9 @@ impl ThreadedInterner {
     ///
     /// # Panics
     ///
-    /// Panics if the identifier is invalid
+    /// This method will panic if it encounters an invalid identifier. This should never
+    /// occur unless there is an issue with the identifier or the interner is used
+    /// incorrectly.
     pub fn lookup(&self, identifier: &StringIdentifier) -> &str {
         if identifier.is_empty() {
             return "";
@@ -177,6 +242,11 @@ impl ThreadedInterner {
             "invalid string identifier; this should never happen unless the identifier is \
                 corrupted or the interner is used incorrectly",
         )
+    }
+
+    /// Returns all interned strings and their identifiers as a hashmap.
+    pub fn all(&self) -> HashSet<(StringIdentifier, &str)> {
+        self.rodeo.iter().collect()
     }
 }
 

@@ -5,6 +5,7 @@ use fennec_interner::ThreadedInterner;
 use fennec_service::config::Configuration;
 use fennec_service::linter::LintService;
 use fennec_service::source::SourceService;
+use fennec_source::error::SourceError;
 
 use crate::utils::bail;
 
@@ -77,15 +78,11 @@ pub async fn execute(command: FixCommand, configuration: Configuration) -> i32 {
                 if command.dry_run {
                     // todo, print the diff in a pretty way
                     println!("TOO LAZY TO PRETTY PRINT: {:#?}", code);
-                } else if let Some(path) = source.path {
-                    std::fs::write(path, code.get_fixed())?;
-
-                    fennec_feedback::info!("fixed issue in `{}`", source_name);
                 } else {
-                    unreachable!();
+                    source_manager.write(source.identifier, code.get_fixed())?
                 }
 
-                Ok::<(), std::io::Error>(())
+                Ok::<(), SourceError>(())
             }
         }));
     }

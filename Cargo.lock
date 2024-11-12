@@ -638,6 +638,7 @@ version = "0.0.0"
 dependencies = [
  "ahash",
  "clap",
+ "fennec-ast",
  "fennec-feedback",
  "fennec-fixer",
  "fennec-interner",
@@ -645,6 +646,8 @@ dependencies = [
  "fennec-service",
  "fennec-source",
  "serde",
+ "serde_json",
+ "termtree",
  "tokio",
 ]
 
@@ -682,6 +685,22 @@ name = "fennec-fixer"
 version = "0.0.0"
 dependencies = [
  "pretty_assertions",
+ "serde",
+ "strum",
+ "tracing",
+]
+
+[[package]]
+name = "fennec-formatter"
+version = "0.0.0"
+dependencies = [
+ "ahash",
+ "fennec-ast",
+ "fennec-feedback",
+ "fennec-interner",
+ "fennec-source",
+ "fennec-span",
+ "fennec-token",
  "serde",
  "strum",
  "tracing",
@@ -755,6 +774,7 @@ version = "0.0.0"
 dependencies = [
  "either",
  "fennec-ast",
+ "fennec-feedback",
  "fennec-interner",
  "fennec-lexer",
  "fennec-reporting",
@@ -836,14 +856,18 @@ dependencies = [
  "ahash",
  "async-walkdir",
  "config",
+ "fennec-ast",
  "fennec-feedback",
+ "fennec-formatter",
  "fennec-interner",
  "fennec-linter",
+ "fennec-parser",
  "fennec-reflection",
  "fennec-reflector",
  "fennec-reporting",
  "fennec-semantics",
  "fennec-source",
+ "fennec-span",
  "futures",
  "glob-match",
  "num_cpus",
@@ -1858,6 +1882,12 @@ dependencies = [
  "rustix",
  "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "termtree"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "thiserror"

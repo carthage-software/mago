@@ -136,6 +136,15 @@ impl HasSpan for Span {
     }
 }
 
+impl<T> HasSpan for &T
+where
+    T: HasSpan,
+{
+    fn span(&self) -> Span {
+        (*self).span()
+    }
+}
+
 impl<T: HasSpan> HasPosition for T {
     fn position(&self) -> Position {
         self.start_position()
