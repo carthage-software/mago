@@ -50,7 +50,7 @@ pub(super) fn print_binaryish_expression<'a>(
     } else {
         Document::empty()
     };
-    
+
     if must_break {
         if is_rhs_of_binaryish {
             Document::Group(Group::new(vec![
@@ -90,4 +90,46 @@ pub(super) fn print_binaryish_expression<'a>(
             ]))
         }
     }
+}
+
+pub(super) fn should_inline_logical_or_coalesce_expression<'a>(expression: &'a Expression) -> bool {
+    let rhs = match expression {
+        Expression::LogicalOperation(logical_operation) => {
+            if let LogicalOperation::Infix(infix_logical_operation) = logical_operation.as_ref() {
+                &infix_logical_operation.rhs
+            } else {
+                return false;
+            }
+        }
+        Expression::CoalesceOperation(coalesce_operation) => &coalesce_operation.rhs,
+        _ => {
+            return false
+        },
+    };
+
+    if let Expression::Array(array) = rhs {
+        if array.elements.len() > 0 {
+            return true;
+        }
+
+        return false;
+    }
+
+    if let Expression::List(list) = rhs {
+        if list.elements.len() > 0 {
+            return true;
+        }
+
+        return false;
+    }
+
+    if let Expression::LegacyArray(legacy_array) = rhs {
+        if legacy_array.elements.len() > 0 {
+            return true;
+        }
+
+        return false;
+    }
+
+    false
 }

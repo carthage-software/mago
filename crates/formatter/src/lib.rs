@@ -33,6 +33,9 @@ pub fn format<'a>(
 ) -> String {
     let mut formatter = Formatter::new(interner, source, settings);
     let document = formatter.format(program);
+
+    fennec_feedback::trace!("document = {}", document);
+
     let printer = Printer::new(document, &formatter.source, formatter.settings);
 
     printer.build()

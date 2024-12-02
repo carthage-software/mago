@@ -97,6 +97,11 @@ impl<'a> Group<'a> {
         self.id = Some(id);
         self
     }
+
+    pub fn maybe_with_id(mut self, id: Option<GroupIdentifier>) -> Self {
+        self.id = id;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -174,6 +179,11 @@ impl<'a> IfBreak<'a> {
         self.group_id = Some(id);
         self
     }
+
+    pub fn maybe_with_id(mut self, id: Option<GroupIdentifier>) -> Self {
+        self.group_id = id;
+        self
+    }
 }
 
 /// Doc Builder
@@ -197,137 +207,123 @@ impl<'a> Document<'a> {
     pub fn boxed(self) -> Box<Document<'a>> {
         Box::new(self)
     }
+
+    pub fn can_break(&self) -> bool {
+        self.any(|doc| matches!(doc, Document::Line(_)))
+    }
+
+    pub fn any<F>(&self, predicate: F) -> bool
+    where
+        F: Fn(&Document<'a>) -> bool,
+    {
+        if predicate(self) {
+            return true;
+        }
+
+        match self {
+            Document::Array(docs) | Document::LineSuffix(docs) | Document::Indent(docs) => docs.iter().any(predicate),
+            Document::IndentIfBreak(IndentIfBreak { contents, .. }) | Document::Group(Group { contents, .. }) => {
+                contents.iter().any(predicate)
+            }
+            Document::IfBreak(IfBreak { break_contents, flat_content, .. }) => {
+                predicate(break_contents) || predicate(flat_content)
+            }
+            Document::Fill(fill) => fill.parts.iter().any(predicate),
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Document<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", print_doc_to_debug(self, 0))
+        write!(f, "{}", print_doc_to_debug(self))
     }
 }
 
-fn print_doc_to_debug(doc: &Document, indent: usize) -> String {
-    let mut string = String::new();
+fn print_doc_to_debug(doc: &Document) -> String {
     match doc {
-        Document::String(s) => {
-            string.push('"');
-            string.push_str(&s.to_string());
-            string.push('"');
-        }
-        Document::Array(contents) => {
-            string.push_str("array(");
-            for (idx, doc) in contents.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != contents.len() - 1 {
-                    string.push_str(", ");
-                }
-            }
-            string.push_str(")");
-        }
-        Document::Indent(contents) => {
-            string.push_str("indent(");
-            for (idx, doc) in contents.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != contents.len() - 1 {
-                    string.push_str(", ");
-                }
-            }
-            string.push_str(")");
-        }
-        Document::IndentIfBreak(indent_if_break) => {
-            string.push_str("indent_if_break(");
-            for (idx, doc) in indent_if_break.contents.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != indent_if_break.contents.len() - 1 {
-                    string.push_str(", ");
-                }
-            }
-
-            if let Some(id) = indent_if_break.group_id {
-                string.push_str(&format!(", {{ group_id: {} }}", id.0));
-            }
-
-            string.push_str(")");
-        }
-        Document::Group(group) => {
-            if group.expanded_states.is_some() {
-                string.push_str("conditional_group(");
-            }
-            string.push_str("group(");
-            for (idx, doc) in group.contents.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != group.contents.len() - 1 {
-                    string.push_str(", ");
-                }
-            }
-
-            if let Some(expanded_states) = &group.expanded_states {
-                string.push_str(", expanded_states(");
-                for (idx, doc) in expanded_states.iter().enumerate() {
-                    string.push_str(&print_doc_to_debug(doc, indent + 1));
-                    if idx != expanded_states.len() - 1 {
-                        string.push_str(", ");
-                    }
-                }
-                string.push_str(")");
-            }
-
-            string.push_str(&format!(", {{ should_break: {} }}", group.should_break));
-            if let Some(id) = group.id {
-                string.push_str(&format!(", {{ id: {} }}", id.0));
-            }
-
-            string.push_str(")");
-            if group.expanded_states.is_some() {
-                string.push_str(")");
-            }
-        }
-        Document::Line(Line { soft, hard, .. }) => {
-            if *soft {
-                string.push_str("softline");
-            } else if *hard {
-                string.push_str("hardline");
+        Document::String(s) => format!("{:?}", s),
+        Document::Array(docs) => {
+            let printed: Vec<String> = docs.iter().map(|d| print_doc_to_debug(d)).collect();
+            if printed.len() == 1 {
+                printed[0].clone()
             } else {
-                string.push_str("line");
+                format!("[{}]", printed.join(", "))
             }
         }
-        Document::IfBreak(if_break) => {
-            string.push_str(&format!(
-                "if_break({}, {}",
-                print_doc_to_debug(&if_break.break_contents, indent + 1),
-                print_doc_to_debug(&if_break.flat_content, indent + 1)
-            ));
-
-            if let Some(group_id) = if_break.group_id {
-                string.push_str(&format!(",\n {{ id: {} }}", group_id.0));
-            }
-
-            string.push(')');
+        Document::Indent(docs) => {
+            format!("indent({})", print_doc_to_debug(&Document::Array(docs.clone())))
         }
-        Document::Fill(fill) => {
-            string.push_str("fill(");
-            let parts = fill.parts();
-            for (idx, doc) in parts.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != parts.len() - 1 {
-                    string.push_str(", ");
-                }
+        Document::IndentIfBreak(IndentIfBreak { contents, group_id }) => {
+            let mut options = vec![];
+            if let Some(id) = group_id {
+                options.push(format!("groupId: {:?}", id));
             }
-            string.push_str(")");
+            let options_str =
+                if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+            format!("indentIfBreak({}{}", print_doc_to_debug(&Document::Array(contents.clone())), options_str)
+        }
+        Document::Group(Group { contents, should_break, expanded_states, id }) => {
+            let mut options = vec![];
+            if *should_break {
+                options.push("shouldBreak: true".to_string());
+            }
+            if let Some(id) = id {
+                options.push(format!("id: {:?}", id));
+            }
+            let expanded_states_str = if let Some(states) = expanded_states {
+                format!(
+                    "conditionalGroup([{}]",
+                    states.iter().map(|s| print_doc_to_debug(s)).collect::<Vec<_>>().join(", ")
+                )
+            } else {
+                String::new()
+            };
+            let options_str =
+                if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+
+            if expanded_states_str.is_empty() {
+                format!("group({}{})", print_doc_to_debug(&Document::Array(contents.clone())), options_str)
+            } else {
+                format!(
+                    "{}, {}{})",
+                    expanded_states_str,
+                    print_doc_to_debug(&Document::Array(contents.clone())),
+                    options_str,
+                )
+            }
+        }
+        Document::Line(line) => {
+            if line.literal {
+                "literalline".to_string()
+            } else if line.hard {
+                "hardline".to_string()
+            } else if line.soft {
+                "softline".to_string()
+            } else {
+                "line".to_string()
+            }
         }
         Document::LineSuffix(docs) => {
-            string.push_str("line_suffix(");
-            for (idx, doc) in docs.iter().enumerate() {
-                string.push_str(&print_doc_to_debug(doc, indent + 1));
-                if idx != docs.len() - 1 {
-                    string.push_str(", ");
-                }
+            format!("lineSuffix({})", print_doc_to_debug(&Document::Array(docs.clone())))
+        }
+        Document::IfBreak(IfBreak { break_contents, flat_content, group_id }) => {
+            let mut options = vec![];
+            if let Some(id) = group_id {
+                options.push(format!("groupId: {:?}", id));
             }
-            string.push_str(")");
+            let options_str =
+                if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+            format!(
+                "ifBreak({}, {}{})",
+                print_doc_to_debug(break_contents),
+                print_doc_to_debug(flat_content),
+                options_str
+            )
         }
-        Document::BreakParent => {
-            string.push_str("break_parent");
+        Document::Fill(Fill { parts }) => {
+            format!("fill([{}])", parts.iter().map(|p| print_doc_to_debug(p)).collect::<Vec<_>>().join(", "))
         }
+        Document::BreakParent => "breakParent".to_string(),
     }
-
-    string
 }

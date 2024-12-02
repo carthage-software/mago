@@ -1,3 +1,5 @@
+use assignment::print_assignment;
+use assignment::AssignmentLikeNode;
 use block::print_block_of_nodes;
 use fennec_ast::*;
 use fennec_span::HasSpan;
@@ -24,6 +26,7 @@ use crate::token;
 use crate::wrap;
 use crate::Formatter;
 
+pub mod assignment;
 pub mod binaryish;
 pub mod block;
 pub mod call;
@@ -620,7 +623,10 @@ impl<'a> Format<'a> for ClassLikeConstant {
 impl<'a> Format<'a> for ClassLikeConstantItem {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, ClassLikeConstantItem, {
-            group!(self.name.format(f), space!(), token!(f, self.equals, "="), space!(), self.value.format(f))
+            let lhs = self.name.format(f);
+            let operator = token!(f, self.equals, "=");
+
+            print_assignment(f, AssignmentLikeNode::ClassLikeConstantItem(self), lhs, operator, &self.value)
         })
     }
 }
@@ -664,7 +670,10 @@ impl<'a> Format<'a> for EnumCaseUnitItem {
 impl<'a> Format<'a> for EnumCaseBackedItem {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, EnumCaseBackedItem, {
-            group!(self.name.format(f), space!(), token!(f, self.equals, "="), space!(), self.value.format(f))
+            let lhs = self.name.format(f);
+            let operator = token!(f, self.equals, "=");
+
+            print_assignment(f, AssignmentLikeNode::EnumCaseBackedItem(self), lhs, operator, &self.value)
         })
     }
 }
@@ -776,7 +785,10 @@ impl<'a> Format<'a> for PropertyAbstractItem {
 impl<'a> Format<'a> for PropertyConcreteItem {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, PropertyConcreteItem, {
-            group!(self.variable.format(f), space!(), token!(f, self.equals, "="), space!(), self.value.format(f))
+            let lhs = self.variable.format(f);
+            let operator = token!(f, self.equals, "=");
+
+            print_assignment(f, AssignmentLikeNode::PropertyConcreteItem(self), lhs, operator, &self.value)
         })
     }
 }
@@ -877,21 +889,13 @@ impl<'a> Format<'a> for ExpressionStatement {
 impl<'a> Format<'a> for Extends {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Extends, {
-            let id = f.next_id();
-
-            Document::Group(
-                Group::new(vec![
-                    self.extends.format(f),
-                    Document::IndentIfBreak(IndentIfBreak::new(vec![
-                        Document::IfBreak(IfBreak::new(Document::Line(Line::hardline()), Document::space())),
-                        TokenSeparatedSequenceFormatter::new(",")
-                            .with_trailing_separator(false)
-                            .with_break_with(id)
-                            .format(f, &self.types),
-                    ])),
-                ])
-                .with_id(id),
-            )
+            Document::Group(Group::new(vec![
+                self.extends.format(f),
+                Document::IndentIfBreak(IndentIfBreak::new(vec![
+                    Document::IfBreak(IfBreak::new(Document::Line(Line::hardline()), Document::space())),
+                    TokenSeparatedSequenceFormatter::new(",").with_trailing_separator(false).format(f, &self.types),
+                ])),
+            ]))
         })
     }
 }
@@ -899,21 +903,13 @@ impl<'a> Format<'a> for Extends {
 impl<'a> Format<'a> for Implements {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Implements, {
-            let id = f.next_id();
-
-            Document::Group(
-                Group::new(vec![
-                    self.implements.format(f),
-                    Document::IndentIfBreak(IndentIfBreak::new(vec![
-                        Document::IfBreak(IfBreak::new(Document::Line(Line::hardline()), Document::space())),
-                        TokenSeparatedSequenceFormatter::new(",")
-                            .with_trailing_separator(false)
-                            .with_break_with(id)
-                            .format(f, &self.types),
-                    ])),
-                ])
-                .with_id(id),
-            )
+            Document::Group(Group::new(vec![
+                self.implements.format(f),
+                Document::IndentIfBreak(IndentIfBreak::new(vec![
+                    Document::IfBreak(IfBreak::new(Document::Line(Line::hardline()), Document::space())),
+                    TokenSeparatedSequenceFormatter::new(",").with_trailing_separator(false).format(f, &self.types),
+                ])),
+            ]))
         })
     }
 }
@@ -1112,7 +1108,10 @@ impl<'a> Format<'a> for Echo {
 impl<'a> Format<'a> for ConstantItem {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, ConstantItem, {
-            group!(self.name.format(f), space!(), token!(f, self.equals, "="), space!(), self.value.format(f))
+            let lhs = self.name.format(f);
+            let operator = token!(f, self.equals, "=");
+
+            print_assignment(f, AssignmentLikeNode::ConstantItem(self), lhs, operator, &self.value)
         })
     }
 }
@@ -1318,7 +1317,7 @@ impl<'a> Format<'a> for AttributeList {
                 .with_trailing_separator(true)
                 .format_with_delimiter(f, &self.attributes, delimiter, false);
 
-            document
+            Document::Group(Group::new(vec![document]))
         })
     }
 }

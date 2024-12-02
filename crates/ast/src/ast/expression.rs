@@ -250,6 +250,51 @@ impl Expression {
             _ => false,
         }
     }
+
+    pub fn is_binary(&self) -> bool {
+        match &self {
+            Expression::ArithmeticOperation(arithmetic) => {
+                matches!(arithmetic.as_ref(), ArithmeticOperation::Infix(_))
+            }
+            Expression::BitwiseOperation(bitwise) => {
+                matches!(bitwise.as_ref(), BitwiseOperation::Infix(_))
+            }
+            Expression::LogicalOperation(logical) => {
+                matches!(logical.as_ref(), LogicalOperation::Infix(_))
+            }
+            Expression::ComparisonOperation(_) => true,
+            Expression::ConcatOperation(_) => true,
+            Expression::CoalesceOperation(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_unary(&self) -> bool {
+        match &self {
+            Expression::Suppressed(_) => true,
+            Expression::Referenced(_) => true,
+            Expression::ArithmeticOperation(arithmetic) => {
+                matches!(arithmetic.as_ref(), ArithmeticOperation::Prefix(_))
+            }
+            Expression::BitwiseOperation(bitwise) => {
+                matches!(bitwise.as_ref(), BitwiseOperation::Prefix(_))
+            }
+            Expression::LogicalOperation(logical) => {
+                matches!(logical.as_ref(), LogicalOperation::Prefix(_))
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_string_literal(&self) -> bool {
+        match &self {
+            Expression::Literal(literal) => match literal {
+                Literal::String(_) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 impl HasSpan for Parenthesized {

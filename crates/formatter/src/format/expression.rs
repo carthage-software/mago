@@ -9,6 +9,8 @@ use crate::default_line;
 use crate::document::Document;
 use crate::document::Line;
 use crate::empty_string;
+use crate::format::assignment::print_assignment;
+use crate::format::assignment::AssignmentLikeNode;
 use crate::format::binaryish;
 use crate::format::binaryish::print_binaryish_expression;
 use crate::format::call::collect_method_call_chain;
@@ -167,7 +169,12 @@ impl<'a> Format<'a> for Array {
                 ArrayStyle::Short => {
                     let delimiter = Delimiter::Brackets(self.left_bracket, self.right_bracket);
 
-                    formatter.format_with_delimiter(f, &self.elements, delimiter, f.settings.preserve_broken_arrays)
+                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
+                        f,
+                        &self.elements,
+                        delimiter,
+                        f.settings.preserve_broken_arrays,
+                    )]))
                 }
                 ArrayStyle::Long => {
                     let delimiter = Delimiter::Parentheses(self.left_bracket, self.right_bracket);
@@ -197,7 +204,12 @@ impl<'a> Format<'a> for LegacyArray {
                 ArrayStyle::Short => {
                     let delimiter = Delimiter::Brackets(self.left_parenthesis, self.right_parenthesis);
 
-                    formatter.format_with_delimiter(f, &self.elements, delimiter, f.settings.preserve_broken_arrays)
+                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
+                        f,
+                        &self.elements,
+                        delimiter,
+                        f.settings.preserve_broken_arrays,
+                    )]))
                 }
                 ArrayStyle::Long => {
                     let delimiter = Delimiter::Parentheses(self.left_parenthesis, self.right_parenthesis);
@@ -227,7 +239,12 @@ impl<'a> Format<'a> for List {
                 ListStyle::Short => {
                     let delimiter = Delimiter::Brackets(self.left_parenthesis, self.right_parenthesis);
 
-                    formatter.format_with_delimiter(f, &self.elements, delimiter, f.settings.preserve_broken_arrays)
+                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
+                        f,
+                        &self.elements,
+                        delimiter,
+                        f.settings.preserve_broken_arrays,
+                    )]))
                 }
                 ListStyle::Long => {
                     let delimiter = Delimiter::Parentheses(self.left_parenthesis, self.right_parenthesis);
@@ -263,12 +280,16 @@ impl<'a> Format<'a> for ArrayElement {
 impl<'a> Format<'a> for KeyValueArrayElement {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, KeyValueArrayElement, {
-            group!(
-                self.key.format(f),
-                space!(),
-                token!(f, self.double_arrow, "=>"),
-                indent_if_break!(if_break!(default_line!(), space!()), self.value.format(f))
-            )
+            let lhs = self.key.format(f);
+            let operator = token!(f, self.double_arrow, "=>");
+
+            Document::Group(Group::new(vec![print_assignment(
+                f,
+                AssignmentLikeNode::KeyValueArrayElement(self),
+                lhs,
+                operator,
+                &self.value,
+            )]))
         })
     }
 }
@@ -554,7 +575,7 @@ impl<'a> Format<'a> for ArithmeticPostfixOperation {
 impl<'a> Format<'a> for AssignmentOperation {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, AssignmentOperation, {
-            let left = self.lhs.format(f);
+            let lhs = self.lhs.format(f);
 
             let operator = match self.operator {
                 AssignmentOperator::Assign(span) => token!(f, span, "="),
@@ -573,22 +594,7 @@ impl<'a> Format<'a> for AssignmentOperation {
                 AssignmentOperator::Coalesce(span) => token!(f, span, "??="),
             };
 
-            if f.has_leading_multi_line_comments(self.rhs.span()) {
-                Document::Group(Group::new(vec![
-                    left,
-                    Document::space(),
-                    operator,
-                    Document::Indent(vec![Document::Line(Line::hardline()), self.rhs.format(f)]),
-                ]))
-            } else {
-                Document::Group(Group::new(vec![
-                    left,
-                    Document::space(),
-                    operator,
-                    Document::space(),
-                    self.rhs.format(f),
-                ]))
-            }
+            print_assignment(f, AssignmentLikeNode::AssignmentOperation(self), lhs, operator, &self.rhs)
         })
     }
 }

@@ -128,13 +128,19 @@ impl<'a> Formatter<'a> {
                 {
                     // check if there is anything other than whitespace between the end of the node and the trivia
                     let node_end = span.end.offset;
-                    let trivia_start = t.span.start.offset;
-                    let has_whitespace = self.source_text[node_end..trivia_start].chars().all(char::is_whitespace);
-                    if !has_whitespace {
-                        return None;
-                    }
+                    let trivia_start_line = self.source.line_number(t.span.start.offset);
+                    let trivia_end_line = self.source.line_number(t.span.end.offset);
+                    if trivia_start_line == trivia_end_line {
+                        let has_whitespace =
+                            self.source_text[node_end..t.span.start.offset].chars().all(char::is_whitespace);
+                        if !has_whitespace {
+                            return None;
+                        }
 
-                    Some(t)
+                        Some(t)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -155,17 +161,22 @@ impl<'a> Formatter<'a> {
                     && !self.used_trivia_indices.contains(&i)
                     && self.source.line_number(t.span.start.offset) == ending_line
                 {
-                    // check if there is anything other than whitespace between the end of the node and the trivia
                     let node_end = span.end.offset;
-                    let trivia_start = t.span.start.offset;
-                    let has_whitespace = self.source_text[node_end..trivia_start].chars().all(char::is_whitespace);
-                    if !has_whitespace {
-                        return None;
+                    let trivia_start_line = self.source.line_number(t.span.start.offset);
+                    let trivia_end_line = self.source.line_number(t.span.end.offset);
+                    if trivia_start_line == trivia_end_line {
+                        let has_whitespace =
+                            self.source_text[node_end..t.span.start.offset].chars().all(char::is_whitespace);
+                        if !has_whitespace {
+                            return None;
+                        }
+
+                        self.used_trivia_indices.insert(i);
+
+                        Some(t)
+                    } else {
+                        None
                     }
-
-                    self.used_trivia_indices.insert(i);
-
-                    Some(t)
                 } else {
                     None
                 }
