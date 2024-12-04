@@ -695,6 +695,7 @@ name = "fennec-formatter"
 version = "0.0.0"
 dependencies = [
  "ahash",
+ "bitflags",
  "fennec-ast",
  "fennec-feedback",
  "fennec-interner",

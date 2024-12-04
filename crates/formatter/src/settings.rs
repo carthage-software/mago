@@ -33,10 +33,6 @@ pub struct FormatSettings {
     /// Default: false
     pub space_around_declare_equals: bool,
 
-    /// Include a semicolon after `declare(strict_types=1)`.
-    /// Default: true
-    pub strict_types_semicolon: bool,
-
     /// Keyword casing (e.g., lowercase, uppercase).
     /// Default: lowercase
     pub keyword_case: CasingStyle,
@@ -158,21 +154,9 @@ pub struct FormatSettings {
     /// Default: false
     pub split_use_statements: bool,
 
-    /// Array style (`[a, b]` or `array(a, b)`).
-    /// Default: Short
-    pub array_style: ArrayStyle,
-
     /// List style (`[a, b]` or `list(a, b)`).
     /// Default: Short
     pub list_style: ListStyle,
-
-    /// PHP attributes without arguments should (not) have empty parentheses.
-    /// Default: WithParens
-    pub attr_parens: OptionalParensStyle,
-
-    /// Class instantiation with no arguments (`new Foo` or `new Foo()`).
-    /// Default: WithParens
-    pub empty_new_parens: OptionalParensStyle,
 
     /// Null type hint style (`null|foo` or `?foo`).
     /// Default: NullPipe
@@ -210,15 +194,6 @@ pub struct FormatSettings {
     ///
     /// Default: true
     pub space_concatenation: bool,
-
-    /// Whether to preserve arrays that are already broken into multiple lines.
-    ///
-    /// If enabled, arrays that span multiple lines will remain in multiple lines,
-    /// even if they can fit into a single line. This gives users the option to
-    /// manually decide when an array should use a multi-line format for readability.
-    ///
-    /// Default: true
-    pub preserve_broken_arrays: bool,
 
     /// Whether to preserve argument list that are already broken into multiple lines.
     ///
@@ -281,7 +256,6 @@ impl FormatSettings {
             single_quote: true,
             trailing_comma: true,
             space_around_declare_equals: false,
-            strict_types_semicolon: true,
             keyword_case: CasingStyle::Lowercase,
             string_cast: StringCastOperator::String,
             float_cast: FloatCastOperator::Float,
@@ -313,10 +287,7 @@ impl FormatSettings {
             static_methods_first: false,
             static_properties_first: false,
             split_use_statements: true,
-            array_style: ArrayStyle::Short,
             list_style: ListStyle::Short,
-            attr_parens: OptionalParensStyle::WithoutParens,
-            empty_new_parens: OptionalParensStyle::WithParens,
             null_type_hint: NullTypeHint::NullPipe,
             binary_op_spacing: 1,
             replace_angle_not_equals: true,
@@ -325,7 +296,6 @@ impl FormatSettings {
             method_chain_break_threshold: 3,
             break_promoted_properties_list: true,
             space_concatenation: true,
-            preserve_broken_arrays: false,
             preserve_broken_argument_lists: false,
             inline_single_attribute_group: false,
             preserve_attribute_group_newlines: true,
@@ -347,7 +317,6 @@ impl Default for FormatSettings {
             single_quote: false,
             trailing_comma: true,
             space_around_declare_equals: false,
-            strict_types_semicolon: true,
             keyword_case: CasingStyle::default(),
             string_cast: StringCastOperator::default(),
             float_cast: FloatCastOperator::default(),
@@ -379,10 +348,7 @@ impl Default for FormatSettings {
             static_methods_first: false,
             static_properties_first: false,
             split_use_statements: false,
-            array_style: ArrayStyle::default(),
             list_style: ListStyle::default(),
-            attr_parens: OptionalParensStyle::default(),
-            empty_new_parens: OptionalParensStyle::default(),
             null_type_hint: NullTypeHint::default(),
             binary_op_spacing: 1,
             replace_angle_not_equals: true,
@@ -391,7 +357,6 @@ impl Default for FormatSettings {
             method_chain_break_threshold: 4,
             break_promoted_properties_list: true,
             space_concatenation: true,
-            preserve_broken_arrays: true,
             preserve_broken_argument_lists: true,
             inline_single_attribute_group: true,
             preserve_attribute_group_newlines: true,
@@ -534,16 +499,6 @@ pub enum IntCastOperator {
     Integer,
 }
 
-/// Specifies array style.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum ArrayStyle {
-    #[default]
-    #[serde(alias = "short", alias = "[]")]
-    Short,
-    #[serde(alias = "long", alias = "legacy", alias = "array()")]
-    Long,
-}
-
 /// Specifies list style.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum ListStyle {
@@ -552,16 +507,6 @@ pub enum ListStyle {
     Short,
     #[serde(alias = "long", alias = "legacy", alias = "list()")]
     Long,
-}
-
-/// Specifies optional parentheses style.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum OptionalParensStyle {
-    #[default]
-    #[serde(alias = "with_parens", alias = "with")]
-    WithParens,
-    #[serde(alias = "without_parens", alias = "without")]
-    WithoutParens,
 }
 
 /// Specifies null type hint style.

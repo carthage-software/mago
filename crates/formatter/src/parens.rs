@@ -204,15 +204,37 @@ impl<'a> Formatter<'a> {
             return false;
         };
 
-        if let Node::FunctionCall(_) = self.parent_node() {
-            return matches!(expression, Expression::Access(_));
+        if let Node::Call(call) = self.parent_node() {
+            if let Call::Function(_) = call {
+                return matches!(expression, Expression::Access(_) | Expression::Instantiation(_));
+            }
+
+            if let Expression::Instantiation(new) = expression {
+                if new.arguments.is_none() {
+                    // parentheses are required if the instantiation has no arguments
+                    // e.g. `new Foo->baz()` should be `(new Foo)->baz()`
+                    return true;
+                }
+
+                // parentheses are not required if the instantiation has arguments
+                // e.g. `new Foo()->baz()`.
+                //
+                // but this is only allowed in PHP 8.4, so for now, we add
+                // parentheses to be safe, in the future, we can add an option
+                // to remove them.
+                //
+                // TODO(azjezz): we should add an option to remove parentheses.
+                return true;
+            } else {
+                return self.callee_expression_need_parenthesis(expression);
+            }
         }
 
         if let Node::Instantiation(_) = self.parent_node() {
             return self.callee_expression_need_parenthesis(expression);
         }
 
-        if let Some(Node::Call(_) | Node::Access(_)) = self.grandparent_node() {
+        if let Some(Node::Access(_)) = self.grandparent_node() {
             return self.callee_expression_need_parenthesis(expression);
         }
 

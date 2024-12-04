@@ -14,26 +14,26 @@ use const some\other\space\CONST;
 const MYCONST = 123;
 
 const a = 1,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4,
-    c = 3,
-    d = 4;
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4,
+c = 3,
+d = 4;
 
 if ($a) {
     echo "a";
@@ -45,7 +45,7 @@ if ($a) {
 
 do {
     echo "a";
-}while ($a);
+} while ($a);
 
 $a = 12;
 
@@ -105,8 +105,7 @@ class Talker
         A::smallTalk as public asmalltalk;
 
         C::bigTalk as Ctalk;
-        C::smallTalk as cmallstalk;
-    }
+        C::smallTalk as cmallstalk;}
 }
 
 (new Talker())->bigTalk();

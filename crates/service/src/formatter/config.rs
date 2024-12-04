@@ -37,10 +37,6 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_around_declare_equals: Option<bool>,
 
-    /// Include a semicolon after `declare(strict_types=1)`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub strict_types_semicolon: Option<bool>,
-
     /// Keyword casing (e.g., lowercase, uppercase, camelCase).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keyword_case: Option<CasingStyle>,
@@ -166,21 +162,9 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub split_use_statements: Option<bool>,
 
-    /// Array style (`[a, b]` or `array(a, b)`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub array_style: Option<ArrayStyle>,
-
     /// List style (`[a, b]` or `list(a, b)`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub list_style: Option<ListStyle>,
-
-    /// PHP attributes without arguments should (not) have empty parentheses.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attr_parens: Option<OptionalParensStyle>,
-
-    /// Class instantiation with no arguments (`new Foo` or `new Foo()`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub empty_new_parens: Option<OptionalParensStyle>,
 
     /// Null type hint style (`null|foo` or `?foo`).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -213,10 +197,6 @@ pub struct FormatterConfiguration {
     /// Whether to add a space before and after the concatenation operator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_concatenation: Option<bool>,
-
-    /// Whether to preserve arrays that are already broken into multiple lines.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub preserve_broken_arrays: Option<bool>,
 
     /// Whether to preserve argument lists that are already broken into multiple lines.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -267,7 +247,6 @@ impl FormatterConfiguration {
             single_quote: self.single_quote.unwrap_or(d.single_quote),
             trailing_comma: self.trailing_comma.unwrap_or(d.trailing_comma),
             space_around_declare_equals: self.space_around_declare_equals.unwrap_or(d.space_around_declare_equals),
-            strict_types_semicolon: self.strict_types_semicolon.unwrap_or(d.strict_types_semicolon),
             keyword_case: self.keyword_case.unwrap_or(d.keyword_case),
             string_cast: self.string_cast.unwrap_or(d.string_cast),
             float_cast: self.float_cast.unwrap_or(d.float_cast),
@@ -303,10 +282,7 @@ impl FormatterConfiguration {
             static_methods_first: self.static_methods_first.unwrap_or(d.static_methods_first),
             static_properties_first: self.static_properties_first.unwrap_or(d.static_properties_first),
             split_use_statements: self.split_use_statements.unwrap_or(d.split_use_statements),
-            array_style: self.array_style.unwrap_or(d.array_style),
             list_style: self.list_style.unwrap_or(d.list_style),
-            attr_parens: self.attr_parens.unwrap_or(d.attr_parens),
-            empty_new_parens: self.empty_new_parens.unwrap_or(d.empty_new_parens),
             null_type_hint: self.null_type_hint.unwrap_or(d.null_type_hint),
             binary_op_spacing: self.binary_op_spacing.unwrap_or(d.binary_op_spacing),
             replace_angle_not_equals: self.replace_angle_not_equals.unwrap_or(d.replace_angle_not_equals),
@@ -317,7 +293,6 @@ impl FormatterConfiguration {
                 .break_promoted_properties_list
                 .unwrap_or(d.break_promoted_properties_list),
             space_concatenation: self.space_concatenation.unwrap_or(d.space_concatenation),
-            preserve_broken_arrays: self.preserve_broken_arrays.unwrap_or(d.preserve_broken_arrays),
             preserve_broken_argument_lists: self
                 .preserve_broken_argument_lists
                 .unwrap_or(d.preserve_broken_argument_lists),

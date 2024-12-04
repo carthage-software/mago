@@ -25,10 +25,6 @@ pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<S
     let mut should_include_new_line = true;
     let last_non_noop_index = stmts.iter().rposition(|stmt| !matches!(stmt, Statement::Noop(_)));
     for (i, stmt) in stmts.iter().enumerate() {
-        if matches!(stmt, Statement::Noop(_)) {
-            continue;
-        }
-
         if matches!(stmt, Statement::ClosingTag(_)) {
             // stop including new lines after closing tags
             should_include_new_line = false;

@@ -17,27 +17,33 @@ function from_base(string $number, int $from_base): int
     foreach (Byte\chunk($number) as $digit) {
         $oval = Byte\ord($digit);
 
-        if (($oval <= 57) && ($oval >= 48)) {
+        if ($oval <= 57 && $oval >= 48) {
             $dval = $oval - 48;
-        } else if (($oval >= 97) && ($oval <= 122)) {
+        } else if ($oval >= 97 && $oval <= 122) {
             $dval = $oval - 87;
-        } else if (($oval >= 65) && ($oval <= 90)) {
+        } else if ($oval >= 65 && $oval <= 90) {
             $dval = $oval - 55;
         } else {
             $dval = 99;
         }
 
         if ($from_base < $dval) {
-            throw new Exception\InvalidArgumentException(Str\format("Invalid digit %s in base %d", $digit, $from_base));
+            throw new Exception\InvalidArgumentException(
+                Str\format("Invalid digit %s in base %d", $digit, $from_base),
+            );
         }
 
         $oldval = $result;
 
-        $result = $from_base * $result + $dval;
+        $result = ($from_base * $result) + $dval;
 
-        if (($oldval > $limit) || ($oldval > $result)) {
+        if ($oldval > $limit || $oldval > $result) {
             throw new Exception\OverflowException(
-                Str\format("Unexpected integer overflow parsing %s from base %d", $number, $from_base),
+                Str\format(
+                    "Unexpected integer overflow parsing %s from base %d",
+                    $number,
+                    $from_base,
+                ),
             );
         }
     }

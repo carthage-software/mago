@@ -28,12 +28,7 @@ use crate::Formatter;
 impl<'a> Format<'a> for If {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, If, {
-            group!(
-                self.r#if.format(f),
-                space!(),
-                misc::print_condition(f, self.left_parenthesis, &self.condition, self.right_parenthesis),
-                self.body.format(f)
-            )
+            group!(self.r#if.format(f), space!(), misc::print_condition(f, &self.condition), self.body.format(f))
         })
     }
 }
@@ -81,7 +76,7 @@ impl<'a> Format<'a> for IfStatementBodyElseIfClause {
             group!(
                 self.elseif.format(f),
                 space!(),
-                misc::print_condition(f, self.left_parenthesis, &self.condition, self.right_parenthesis),
+                misc::print_condition(f, &self.condition),
                 misc::print_clause(f, &self.statement, false),
             )
         })
@@ -149,7 +144,7 @@ impl<'a> Format<'a> for IfColonDelimitedBodyElseIfClause {
             let mut parts = vec![
                 self.elseif.format(f),
                 space!(),
-                misc::print_condition(f, self.left_parenthesis, &self.condition, self.right_parenthesis),
+                misc::print_condition(f, &self.condition),
                 token!(f, self.colon, ":"),
             ];
 
@@ -176,7 +171,7 @@ impl<'a> Format<'a> for DoWhile {
                 misc::print_clause(f, &self.statement, false),
                 self.r#while.format(f),
                 space!(),
-                misc::print_condition(f, self.left_parenthesis, &self.condition, self.right_parenthesis),
+                misc::print_condition(f, &self.condition),
                 self.terminator.format(f),
             )
         })

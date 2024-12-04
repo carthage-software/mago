@@ -89,18 +89,23 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
         Self { inner: vec![], tokens: vec![] }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> Option<&T> {
         self.inner.get(index)
     }
 
+    #[inline]
+    #[must_use]
     pub fn first(&self) -> Option<&T> {
         self.inner.first()
     }
@@ -164,6 +169,7 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
         })
     }
 
+    #[inline]
     pub fn as_slice(&self) -> &[T] {
         self.inner.as_slice()
     }

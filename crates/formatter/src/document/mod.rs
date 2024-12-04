@@ -186,7 +186,14 @@ impl<'a> IfBreak<'a> {
     }
 }
 
-/// Doc Builder
+#[derive(Clone, Copy)]
+pub enum Separator {
+    #[allow(unused)]
+    Softline,
+    Hardline,
+    CommaLine, // [",", line]
+}
+
 impl<'a> Document<'a> {
     #[inline]
     pub fn string(s: &'a str) -> Document<'a> {
@@ -231,6 +238,24 @@ impl<'a> Document<'a> {
             Document::Fill(fill) => fill.parts.iter().any(predicate),
             _ => false,
         }
+    }
+
+    pub fn join(documents: Vec<Document<'a>>, separator: Separator) -> Vec<Document<'a>> {
+        let mut parts = vec![];
+        for (i, document) in documents.into_iter().enumerate() {
+            if i != 0 {
+                parts.push(match separator {
+                    Separator::Softline => Document::Line(Line::softline()),
+                    Separator::Hardline => Document::Line(Line::hardline()),
+                    Separator::CommaLine => {
+                        Document::Array(vec![Document::String(","), Document::Line(Line::default())])
+                    }
+                });
+            }
+
+            parts.push(document);
+        }
+        parts
     }
 }
 

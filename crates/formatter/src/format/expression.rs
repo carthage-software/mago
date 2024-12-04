@@ -9,21 +9,26 @@ use crate::default_line;
 use crate::document::Document;
 use crate::document::Line;
 use crate::empty_string;
+use crate::format::array::print_array_like;
+use crate::format::array::ArrayLike;
 use crate::format::assignment::print_assignment;
 use crate::format::assignment::AssignmentLikeNode;
 use crate::format::binaryish;
 use crate::format::binaryish::print_binaryish_expression;
 use crate::format::call::collect_method_call_chain;
 use crate::format::call::print_method_call_chain;
+use crate::format::call_arguments::print_argument_list;
+use crate::format::call_node::print_call_like_node;
+use crate::format::call_node::CallLikeNode;
 use crate::format::class_like::print_class_like_body;
 use crate::format::delimited;
 use crate::format::delimited::Delimiter;
 use crate::format::misc::print_condition;
 use crate::format::misc::print_modifiers;
-use crate::format::misc::should_inline_expression;
 use crate::format::sequence::TokenSeparatedSequenceFormatter;
 use crate::format::Group;
 use crate::format::IfBreak;
+use crate::format::Separator;
 use crate::group;
 use crate::hardline;
 use crate::if_break;
@@ -161,106 +166,19 @@ impl<'a> Format<'a> for NestedVariable {
 
 impl<'a> Format<'a> for Array {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, Array, {
-            let formatter =
-                TokenSeparatedSequenceFormatter::new(",").with_trailing_separator(f.settings.trailing_comma);
-
-            match f.settings.array_style {
-                ArrayStyle::Short => {
-                    let delimiter = Delimiter::Brackets(self.left_bracket, self.right_bracket);
-
-                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
-                        f,
-                        &self.elements,
-                        delimiter,
-                        f.settings.preserve_broken_arrays,
-                    )]))
-                }
-                ArrayStyle::Long => {
-                    let delimiter = Delimiter::Parentheses(self.left_bracket, self.right_bracket);
-
-                    Document::Group(Group::new(vec![
-                        Document::String("array"),
-                        formatter.format_with_delimiter(
-                            f,
-                            &self.elements,
-                            delimiter,
-                            f.settings.preserve_broken_arrays,
-                        ),
-                    ]))
-                }
-            }
-        })
+        wrap!(f, self, Array, { print_array_like(f, ArrayLike::Array(self)) })
     }
 }
 
 impl<'a> Format<'a> for LegacyArray {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, LegacyArray, {
-            let formatter =
-                TokenSeparatedSequenceFormatter::new(",").with_trailing_separator(f.settings.trailing_comma);
-
-            match f.settings.array_style {
-                ArrayStyle::Short => {
-                    let delimiter = Delimiter::Brackets(self.left_parenthesis, self.right_parenthesis);
-
-                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
-                        f,
-                        &self.elements,
-                        delimiter,
-                        f.settings.preserve_broken_arrays,
-                    )]))
-                }
-                ArrayStyle::Long => {
-                    let delimiter = Delimiter::Parentheses(self.left_parenthesis, self.right_parenthesis);
-
-                    Document::Group(Group::new(vec![
-                        self.array.format(f),
-                        formatter.format_with_delimiter(
-                            f,
-                            &self.elements,
-                            delimiter,
-                            f.settings.preserve_broken_arrays,
-                        ),
-                    ]))
-                }
-            }
-        })
+        wrap!(f, self, LegacyArray, { print_array_like(f, ArrayLike::LegacyArray(self)) })
     }
 }
 
 impl<'a> Format<'a> for List {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, List, {
-            let formatter =
-                TokenSeparatedSequenceFormatter::new(",").with_trailing_separator(f.settings.trailing_comma);
-
-            match f.settings.list_style {
-                ListStyle::Short => {
-                    let delimiter = Delimiter::Brackets(self.left_parenthesis, self.right_parenthesis);
-
-                    Document::Group(Group::new(vec![formatter.format_with_delimiter(
-                        f,
-                        &self.elements,
-                        delimiter,
-                        f.settings.preserve_broken_arrays,
-                    )]))
-                }
-                ListStyle::Long => {
-                    let delimiter = Delimiter::Parentheses(self.left_parenthesis, self.right_parenthesis);
-
-                    Document::Group(Group::new(vec![
-                        self.list.format(f),
-                        formatter.format_with_delimiter(
-                            f,
-                            &self.elements,
-                            delimiter,
-                            f.settings.preserve_broken_arrays,
-                        ),
-                    ]))
-                }
-            }
-        })
+        wrap!(f, self, List, { print_array_like(f, ArrayLike::List(self)) })
     }
 }
 
@@ -416,16 +334,9 @@ impl<'a> Format<'a> for PrintConstruct {
 
 impl<'a> Format<'a> for ExitConstruct {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ExitConstruct, {
-            // TODO: add support to check what syntax to use `exit` or `die`
-            // and whether to use parentheses or not if there are no arguments
-            match self.arguments {
-                Some(ref arguments) => {
-                    group![self.exit.format(f), arguments.format(f)]
-                }
-                None => self.exit.format(f),
-            }
-        })
+        // TODO: add support to check what syntax to use `exit` or `die`
+        // and whether to use parentheses or not if there are no arguments
+        wrap!(f, self, ExitConstruct, { print_call_like_node(f, CallLikeNode::ExitConstruct(self)) })
     }
 }
 
@@ -433,42 +344,13 @@ impl<'a> Format<'a> for DieConstruct {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         // TODO: add support to check what syntax to use `exit` or `die`
         // and whether to use parentheses or not if there are no arguments
-        wrap!(f, self, DieConstruct, {
-            match self.arguments {
-                Some(ref arguments) => {
-                    array![self.die.format(f), arguments.format(f)]
-                }
-                None => self.die.format(f),
-            }
-        })
+        wrap!(f, self, DieConstruct, { print_call_like_node(f, CallLikeNode::DieConstruct(self)) })
     }
 }
 
 impl<'a> Format<'a> for ArgumentList {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ArgumentList, {
-            let inline;
-            if f.settings.inline_single_breaking_argument && 1 == self.arguments.len() {
-                inline = if let Some(argument) = self.arguments.first() {
-                    if f.has_surrounding_comments(argument.span()) {
-                        false
-                    } else {
-                        should_inline_expression(f, argument.value())
-                    }
-                } else {
-                    false
-                };
-            } else {
-                inline = false;
-            }
-
-            let delimiter = Delimiter::Parentheses(self.left_parenthesis, self.right_parenthesis);
-
-            TokenSeparatedSequenceFormatter::new(",")
-                .with_trailing_separator(f.settings.trailing_comma)
-                .with_force_inline(inline)
-                .format_with_delimiter(f, &self.arguments, delimiter, f.settings.preserve_broken_argument_lists)
-        })
+        wrap!(f, self, ArgumentList, { print_argument_list(f, self) })
     }
 }
 
@@ -847,59 +729,7 @@ impl<'a> Format<'a> for ClassConstantAccess {
 
 impl<'a> Format<'a> for Call {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, Call, {
-            match self {
-                Call::Function(c) => c.format(f),
-                Call::Method(c) => c.format(f),
-                Call::NullSafeMethod(c) => c.format(f),
-                Call::StaticMethod(c) => c.format(f),
-            }
-        })
-    }
-}
-
-impl<'a> Format<'a> for FunctionCall {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, FunctionCall, { group!(self.function.format(f), self.arguments.format(f)) })
-    }
-}
-
-impl<'a> Format<'a> for MethodCall {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, MethodCall, {
-            Document::Group(Group::new(vec![
-                self.object.format(f),
-                token!(f, self.arrow, "->"),
-                self.method.format(f),
-                self.arguments.format(f),
-            ]))
-        })
-    }
-}
-
-impl<'a> Format<'a> for NullSafeMethodCall {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, NullSafeMethodCall, {
-            Document::Group(Group::new(vec![
-                self.object.format(f),
-                token!(f, self.question_mark_arrow, "?->"),
-                self.method.format(f),
-                self.arguments.format(f),
-            ]))
-        })
-    }
-}
-
-impl<'a> Format<'a> for StaticMethodCall {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, StaticMethodCall, {
-            Document::Group(Group::new(vec![
-                self.class.format(f),
-                token!(f, self.double_colon, "::"),
-                self.method.format(f),
-                self.arguments.format(f),
-            ]))
-        })
+        wrap!(f, self, Call, { print_call_like_node(f, CallLikeNode::Call(self)) })
     }
 }
 
@@ -1071,14 +901,7 @@ impl<'a> Format<'a> for Throw {
 
 impl<'a> Format<'a> for Instantiation {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, Instantiation, {
-            group!(
-                self.new.format(f),
-                space!(),
-                self.class.format(f),
-                if let Some(arguments) = &self.arguments { arguments.format(f) } else { static_str!("()") }
-            )
-        })
+        wrap!(f, self, Instantiation, { print_call_like_node(f, CallLikeNode::Instantiation(self)) })
     }
 }
 
@@ -1148,29 +971,37 @@ impl<'a> Format<'a> for MatchExpressionArm {
 impl<'a> Format<'a> for Match {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Match, {
-            let mut contents = vec![
-                self.r#match.format(f),
-                space!(),
-                print_condition(f, self.left_parenthesis, &self.expression, self.right_parenthesis),
-            ];
+            let mut contents = vec![self.r#match.format(f), space!(), print_condition(f, &self.expression)];
 
             match f.settings.control_brace_style {
                 BraceStyle::SameLine => {
                     contents.push(Document::space());
                 }
                 BraceStyle::NextLine => {
-                    contents.push(Document::IfBreak(IfBreak::new(Document::space(), Document::Line(Line::default()))));
+                    contents.push(Document::Line(Line::default()));
                 }
             };
 
-            let delimiter = Delimiter::Braces(self.left_brace, self.right_brace);
+            contents.push(Document::String("{"));
 
-            contents.push(
-                TokenSeparatedSequenceFormatter::new(",")
-                    .with_trailing_separator(f.settings.trailing_comma)
-                    .with_force_break(true)
-                    .format_with_delimiter(f, &self.arms, delimiter, false),
-            );
+            if !self.arms.is_empty() {
+                let mut inner_contents =
+                    Document::join(self.arms.iter().map(|arm| arm.format(f)).collect::<Vec<_>>(), Separator::CommaLine);
+
+                if f.settings.trailing_comma {
+                    inner_contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                }
+
+                contents.push(Document::Indent(vec![Document::Line(Line::default()), Document::Array(inner_contents)]));
+            }
+
+            if let Some(comments) = f.print_dangling_comments(self.left_brace.join(self.right_brace), true) {
+                contents.push(comments);
+            } else if !self.arms.is_empty() {
+                contents.push(Document::Line(Line::default()));
+            }
+
+            contents.push(Document::String("}"));
 
             Document::Group(Group::new(contents))
         })
@@ -1518,7 +1349,7 @@ impl<'a> Format<'a> for AnonymousClass {
             let mut signature = vec![];
             signature.push(self.new.format(f));
             signature.push(space!());
-            signature.push(print_modifiers(f, &self.modifiers));
+            signature.extend(print_modifiers(f, &self.modifiers));
             signature.push(self.class.format(f));
 
             if let Some(arguments) = &self.arguments {

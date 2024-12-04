@@ -5,11 +5,9 @@ use fennec_span::Span;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
-use crate::format::misc::print_token_with_indented_leading_comments;
 use crate::format::sequence::SequenceFormatter;
 use crate::format::statement;
 use crate::format::Format;
-use crate::token;
 use crate::Formatter;
 
 pub(super) fn print_block_of_nodes<'a, T: Format<'a> + HasSpan>(
@@ -18,20 +16,24 @@ pub(super) fn print_block_of_nodes<'a, T: Format<'a> + HasSpan>(
     nodes: &'a Sequence<T>,
     right_brace: Span,
 ) -> Document<'a> {
-    Document::Group(Group::new(vec![
-        token!(f, left_brace, "{"),
-        {
-            if nodes.is_empty() {
-                Document::empty()
-            } else {
-                Document::Indent(vec![
-                    Document::Line(Line::hardline()),
-                    SequenceFormatter::new().with_force_break(true).format(f, nodes),
-                ])
-            }
-        },
-        print_token_with_indented_leading_comments(f, right_brace, "}", true),
-    ]))
+    let mut contents = vec![Document::String("{"), {
+        if nodes.is_empty() {
+            Document::empty()
+        } else {
+            Document::Indent(vec![
+                Document::Line(Line::hardline()),
+                SequenceFormatter::new().with_force_break(true).format(f, nodes),
+            ])
+        }
+    }];
+
+    if let Some(comments) = f.print_dangling_comments(left_brace.join(right_brace), true) {
+        contents.push(comments);
+    }
+
+    contents.push(Document::String("}"));
+
+    return Document::Group(Group::new(contents));
 }
 
 pub(super) fn print_block<'a>(
@@ -41,8 +43,7 @@ pub(super) fn print_block<'a>(
     right_brace: &Span,
 ) -> Document<'a> {
     let mut contents = vec![];
-    contents.push(token!(f, *left_brace, "{"));
-
+    contents.push(Document::String("{"));
     let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
     let should_break;
     if has_body {
@@ -82,7 +83,13 @@ pub(super) fn print_block<'a>(
         };
     };
 
-    contents.push(print_token_with_indented_leading_comments(f, *right_brace, "}", should_break));
+    if let Some(comments) = f.print_dangling_comments(left_brace.join(*right_brace), true) {
+        contents.push(comments);
+    } else {
+        contents.push(Document::Line(Line::softline()));
+    }
+
+    contents.push(Document::String("}"));
 
     Document::Group(Group::new(contents).with_break(should_break))
 }

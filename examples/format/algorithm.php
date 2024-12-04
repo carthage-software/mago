@@ -105,7 +105,7 @@ enum Algorithm: string implements DefaultInterface
     public static function default(): static
     {
         return self::Default /**
-             * Trailing multi line
-             */;
+         * Trailing multi line
+         */;
     }
 }

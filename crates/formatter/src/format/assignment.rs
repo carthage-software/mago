@@ -1,6 +1,7 @@
 use fennec_ast::*;
 use fennec_span::*;
 
+use crate::comment::CommentFlags;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IndentIfBreak;
@@ -62,11 +63,6 @@ pub(super) fn print_assignment<'a>(
     rhs_expression: &'a Expression,
 ) -> Document<'a> {
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
-
-    fennec_feedback::error!("|- the layout decided for: {:?}", assignment_node);
-    fennec_feedback::error!("|---> is: {:?}", layout);
-    fennec_feedback::error!("|---> LHS: {:?}", lhs);
-
     let rhs = rhs_expression.format(f);
 
     match layout {
@@ -128,10 +124,6 @@ fn choose_layout<'a, 'b>(
     assignment_like_node: &'b AssignmentLikeNode<'a>,
     rhs_expression: &'a Expression,
 ) -> Layout {
-    if f.has_leading_multi_line_comments(rhs_expression.span()) {
-        return Layout::BreakAfterOperator;
-    }
-
     let is_tail = !is_assignment(rhs_expression);
 
     let should_use_chain_formatting = matches!(assignment_like_node, AssignmentLikeNode::AssignmentOperation(_))
@@ -150,7 +142,7 @@ fn choose_layout<'a, 'b>(
         return Layout::ChainTail;
     }
 
-    if !is_tail {
+    if !is_tail || f.has_leading_own_line_comment(rhs_expression.span()) {
         return Layout::BreakAfterOperator;
     }
 
@@ -159,6 +151,7 @@ fn choose_layout<'a, 'b>(
             construct.as_ref(),
             Construct::Require(_) | Construct::RequireOnce(_) | Construct::Include(_) | Construct::IncludeOnce(_)
         ) {
+            // special case for require/include constructs.
             return Layout::NeverBreakAfterOperator;
         }
     }
@@ -431,7 +424,7 @@ const LONE_SHORT_ARGUMENT_THRESHOLD_RATE: f32 = 0.25;
 
 fn is_lone_short_argument<'a>(f: &Formatter<'a>, argument_value: &'a Expression) -> bool {
     let argument_span = argument_value.span();
-    if f.has_leading_comments(argument_span) || f.has_trailing_comments(argument_span) {
+    if f.has_comment(argument_span, CommentFlags::all()) {
         return false;
     }
 

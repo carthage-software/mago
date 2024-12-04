@@ -13,6 +13,7 @@ ahash = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+bitflags = { workspace = true }
 fennec-ast = { path = "../ast" }
 fennec-source = { path = "../source" }
 fennec-span = { path = "../span" }

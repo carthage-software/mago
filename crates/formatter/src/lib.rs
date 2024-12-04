@@ -1,4 +1,5 @@
-use ahash::HashSet;
+use std::iter::Peekable;
+use std::vec::IntoIter;
 
 use fennec_ast::Node;
 use fennec_ast::Program;
@@ -41,16 +42,21 @@ pub fn format<'a>(
     printer.build()
 }
 
+struct ArgumentState {
+    expand_first_argument: bool,
+    expand_last_argument: bool,
+}
+
 pub struct Formatter<'a> {
     interner: &'a ThreadedInterner,
     source: &'a Source,
     source_text: &'a str,
     settings: FormatSettings,
     stack: Vec<Node<'a>>,
-    trivias: Vec<Trivia>,
-    used_trivia_indices: HashSet<usize>,
+    comments: Peekable<IntoIter<Trivia>>,
     scripting_mode: bool,
     id_builder: GroupIdentifierBuilder,
+    argument_state: ArgumentState,
 }
 
 impl<'a> Formatter<'a> {
@@ -61,15 +67,16 @@ impl<'a> Formatter<'a> {
             source_text: interner.lookup(&source.content),
             settings,
             stack: vec![],
-            trivias: vec![],
-            used_trivia_indices: Default::default(),
+            comments: vec![].into_iter().peekable(),
             scripting_mode: false,
             id_builder: GroupIdentifierBuilder::new(),
+            argument_state: ArgumentState { expand_first_argument: false, expand_last_argument: false },
         }
     }
 
     pub fn format(&mut self, program: &'a Program) -> Document<'a> {
-        self.trivias = program.trivia.iter().copied().collect();
+        self.comments =
+            program.trivia.iter().filter(|t| t.kind.is_comment()).copied().collect::<Vec<_>>().into_iter().peekable();
 
         program.format(self)
     }
@@ -110,6 +117,15 @@ impl<'a> Formatter<'a> {
     pub(crate) fn nth_parent_kind(&self, n: usize) -> Option<Node<'a>> {
         let len = self.stack.len();
         (len > n).then(|| self.stack[len - n - 1])
+    }
+
+    fn is_previous_line_empty(&self, start_index: usize) -> bool {
+        let idx = start_index - 1;
+        let idx = self.skip_spaces(Some(idx), true);
+        let idx = self.skip_newline(idx, true);
+        let idx = self.skip_spaces(idx, true);
+        let idx2 = self.skip_newline(idx, true);
+        idx != idx2
     }
 
     pub(crate) fn is_next_line_empty(&self, span: Span) -> bool {
@@ -216,29 +232,6 @@ impl<'a> Formatter<'a> {
         let idx = self.skip_spaces(Some(start_index), backwards);
         let idx2 = self.skip_newline(idx, backwards);
         idx != idx2
-    }
-
-    pub(crate) const fn count_newlines_in_slice(slice: &str) -> usize {
-        let bytes = slice.as_bytes();
-        let mut newline_count = 0;
-
-        let mut i = 0;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'\n' => newline_count += 1,
-                b'\r' => {
-                    // Handle '\r\n' by skipping the '\n' after '\r'
-                    newline_count += 1;
-                    if i + 1 < bytes.len() && bytes[i + 1] == b'\n' {
-                        i += 1;
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-
-        newline_count
     }
 
     pub(crate) fn split_lines(slice: &'a str) -> Vec<&'a str> {

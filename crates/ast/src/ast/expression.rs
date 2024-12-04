@@ -47,6 +47,7 @@ use crate::ast::string::CompositeString;
 use crate::ast::string::StringPart;
 use crate::ast::throw::Throw;
 use crate::ast::variable::Variable;
+use crate::node::NodeKind;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Parenthesized {
@@ -293,6 +294,49 @@ impl Expression {
                 _ => false,
             },
             _ => false,
+        }
+    }
+
+    pub fn node_kind(&self) -> NodeKind {
+        match &self {
+            Expression::Parenthesized(_) => NodeKind::Parenthesized,
+            Expression::Referenced(_) => NodeKind::Referenced,
+            Expression::Suppressed(_) => NodeKind::Suppressed,
+            Expression::Literal(_) => NodeKind::Literal,
+            Expression::CompositeString(_) => NodeKind::CompositeString,
+            Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
+            Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
+            Expression::BitwiseOperation(_) => NodeKind::BitwiseOperation,
+            Expression::ComparisonOperation(_) => NodeKind::ComparisonOperation,
+            Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
+            Expression::CastOperation(_) => NodeKind::CastOperation,
+            Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
+            Expression::CoalesceOperation(_) => NodeKind::CoalesceOperation,
+            Expression::ConcatOperation(_) => NodeKind::ConcatOperation,
+            Expression::InstanceofOperation(_) => NodeKind::InstanceofOperation,
+            Expression::Array(_) => NodeKind::Array,
+            Expression::LegacyArray(_) => NodeKind::LegacyArray,
+            Expression::List(_) => NodeKind::List,
+            Expression::ArrayAccess(_) => NodeKind::ArrayAccess,
+            Expression::ArrayAppend(_) => NodeKind::ArrayAppend,
+            Expression::AnonymousClass(_) => NodeKind::AnonymousClass,
+            Expression::Closure(_) => NodeKind::Closure,
+            Expression::ArrowFunction(_) => NodeKind::ArrowFunction,
+            Expression::Variable(_) => NodeKind::Variable,
+            Expression::Identifier(_) => NodeKind::Identifier,
+            Expression::Match(_) => NodeKind::Match,
+            Expression::Yield(_) => NodeKind::Yield,
+            Expression::Construct(_) => NodeKind::Construct,
+            Expression::Throw(_) => NodeKind::Throw,
+            Expression::Clone(_) => NodeKind::Clone,
+            Expression::Call(_) => NodeKind::Call,
+            Expression::Access(_) => NodeKind::Access,
+            Expression::ClosureCreation(_) => NodeKind::ClosureCreation,
+            Expression::Instantiation(_) => NodeKind::Instantiation,
+            Expression::MagicConstant(_) => NodeKind::MagicConstant,
+            Expression::Parent(_) => NodeKind::Keyword,
+            Expression::Static(_) => NodeKind::Keyword,
+            Expression::Self_(_) => NodeKind::Keyword,
         }
     }
 }

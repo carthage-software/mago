@@ -3,55 +3,22 @@ use fennec_span::HasSpan;
 use fennec_span::Span;
 
 use crate::array;
-use crate::default_line;
 use crate::document::Document;
 use crate::document::Line;
-use crate::empty_string;
 use crate::format::statement::print_statement_sequence;
 use crate::format::BraceStyle;
 use crate::format::Format;
 use crate::group;
-use crate::hardline;
-use crate::if_break;
 use crate::indent;
 use crate::settings::StaticVisibilityOrder;
-use crate::space;
 use crate::static_str;
 use crate::token;
 use crate::Formatter;
 
-pub(super) fn should_inline_expression<'a>(f: &mut Formatter<'a>, expression: &'a Expression) -> bool {
-    if f.has_surrounding_comments(expression.span()) {
-        return false;
-    }
+use super::Group;
 
-    if let Expression::Parenthesized(inner) = expression {
-        return should_inline_expression(f, &inner.expression);
-    }
-
-    if let Expression::Referenced(inner) = expression {
-        return should_inline_expression(f, &inner.expression);
-    }
-
-    if let Expression::Suppressed(inner) = expression {
-        return should_inline_expression(f, &inner.expression);
-    }
-
-    if matches!(
-        expression,
-        Expression::Array(_)
-            | Expression::LegacyArray(_)
-            | Expression::List(_)
-            | Expression::Closure(_)
-            | Expression::ClosureCreation(_)
-            | Expression::Call(_)
-            | Expression::AnonymousClass(_)
-            | Expression::Match(_)
-    ) {
-        return true;
-    }
-
-    return false;
+pub(super) fn has_new_line_in_range<'a>(text: &'a str, start: usize, end: usize) -> bool {
+    text[(start as usize)..(end as usize)].contains('\n')
 }
 
 pub(super) fn print_token_with_indented_leading_comments<'a>(
@@ -61,7 +28,7 @@ pub(super) fn print_token_with_indented_leading_comments<'a>(
     mut should_break: bool,
 ) -> Document<'a> {
     let mut parts = vec![];
-    if let Some(leading_comments) = f.print_leading_comments(span, false) {
+    if let Some(leading_comments) = f.print_leading_comments(span) {
         parts.push(indent!(Document::Line(Line::hardline()), leading_comments));
 
         should_break = true;
@@ -73,7 +40,7 @@ pub(super) fn print_token_with_indented_leading_comments<'a>(
     }
 
     parts.push(static_str!(value));
-    if let Some(trailing_comments) = f.print_trailing_comments(span, true) {
+    if let Some(trailing_comments) = f.print_trailing_comments(span) {
         parts.push(trailing_comments);
     }
 
@@ -89,68 +56,70 @@ pub(super) fn print_colon_delimited_body<'a>(
 ) -> Document<'a> {
     let mut parts = vec![token!(f, *colon, ":")];
 
-    let statements = print_statement_sequence(f, &statements);
-    let has_statements = !statements.is_empty();
-    if has_statements {
-        parts.push(indent!(@hardline!()));
+    let mut statements = print_statement_sequence(f, &statements);
+    if !statements.is_empty() {
+        statements.insert(0, Document::Line(Line::hardline()));
+
+        parts.push(Document::Indent(statements));
     }
 
-    for stmt in statements {
-        parts.push(indent!(stmt));
+    if let Some(comments) = f.print_dangling_comments(colon.join(terminator.span()), true) {
+        parts.push(comments);
+    } else {
+        parts.push(Document::Line(Line::hardline()));
     }
 
-    parts.extend(hardline!());
     parts.push(end_keyword.format(f));
     parts.push(terminator.format(f));
 
-    group!(@parts)
+    Document::Group(Group::new(parts).with_break(true))
 }
 
-pub(super) fn print_modifiers<'a>(f: &mut Formatter<'a>, modifiers: &'a Sequence<Modifier>) -> Document<'a> {
-    let mut parts = vec![];
+pub(super) fn print_modifiers<'a>(f: &mut Formatter<'a>, modifiers: &'a Sequence<Modifier>) -> Vec<Document<'a>> {
+    let mut printed_modifiers = vec![];
 
     if let Some(modifier) = modifiers.get_final() {
-        parts.push(modifier.format(f));
-        parts.push(space!());
+        printed_modifiers.push(modifier.format(f));
+        printed_modifiers.push(Document::space());
     }
 
     if let Some(modifier) = modifiers.get_abstract() {
-        parts.push(modifier.format(f));
-        parts.push(space!());
+        printed_modifiers.push(modifier.format(f));
+        printed_modifiers.push(Document::space());
     }
 
     match f.settings.static_visibility_order {
         StaticVisibilityOrder::VisibilityFirst => {
             if let Some(modifier) = modifiers.get_first_visibility() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             }
 
             if let Some(modifier) = modifiers.get_static() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             } else if let Some(modifier) = modifiers.get_readonly() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             }
         }
         StaticVisibilityOrder::StaticFirst => {
             if let Some(modifier) = modifiers.get_static() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             } else if let Some(modifier) = modifiers.get_readonly() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             }
 
             if let Some(modifier) = modifiers.get_first_visibility() {
-                parts.push(modifier.format(f));
-                parts.push(space!());
+                printed_modifiers.push(modifier.format(f));
+                printed_modifiers.push(Document::space());
             }
         }
     }
 
-    group!(@parts)
+    printed_modifiers
 }
 
 pub(super) fn print_attribute_list_sequence<'a>(
@@ -175,7 +144,7 @@ pub(super) fn print_attribute_list_sequence<'a>(
 
         let mut parts = vec![];
         parts.push(attribute_list);
-        parts.push(if_break!(array!(default_line!(), Document::BreakParent), space!()));
+        parts.push(Document::Line(Line::default()));
 
         return Some(group!(@parts));
     }
@@ -183,10 +152,10 @@ pub(super) fn print_attribute_list_sequence<'a>(
     let mut parts = vec![];
     for attribute_list in lists {
         parts.push(attribute_list);
-        parts.extend(hardline!());
+        parts.push(Document::Line(Line::default()));
     }
 
-    Some(group!(@parts))
+    Some(Document::Group(Group::new(parts).with_break(true)))
 }
 
 pub(super) fn print_clause<'a>(f: &mut Formatter<'a>, node: &'a Statement, force_space: bool) -> Document<'a> {
@@ -226,46 +195,41 @@ pub(super) fn adjust_clause<'a>(
     };
 
     let clause = match node {
-        Statement::Noop(s) => token!(f, *s, ";"),
+        Statement::Noop(_) => clause,
         Statement::Block(_) => {
             is_block = true;
 
             match f.settings.control_brace_style {
-                BraceStyle::SameLine => array!(space!(), clause),
-                BraceStyle::NextLine => array!(default_line!(), clause),
+                BraceStyle::SameLine => array!(Document::space(), clause),
+                BraceStyle::NextLine => array!(Document::Line(Line::default()), clause),
             }
         }
         _ => {
             if force_space {
-                array!(space!(), clause)
+                Document::Array(vec![Document::space(), clause])
             } else {
-                indent!(array!(@hardline!()), clause)
+                Document::Indent(vec![Document::BreakParent, Document::Line(Line::hardline()), clause])
             }
         }
     };
 
     if has_trailing_segment {
         if is_block {
-            return array!(clause, space!());
+            Document::Array(vec![clause, Document::space()])
         } else {
-            return array!(clause, array!(@hardline!()));
+            Document::Indent(vec![Document::BreakParent, clause, Document::Line(Line::hardline())])
         }
     } else {
         clause
     }
 }
 
-pub(super) fn print_condition<'a>(
-    f: &mut Formatter<'a>,
-    left_parenthesis: Span,
-    condition: &'a Expression,
-    right_parenthesis: Span,
-) -> Document<'a> {
-    group!(
-        token!(f, left_parenthesis, "("),
-        if f.settings.control_space_parens { space!() } else { empty_string!() },
+pub(super) fn print_condition<'a>(f: &mut Formatter<'a>, condition: &'a Expression) -> Document<'a> {
+    Document::Group(Group::new(vec![
+        Document::String("("),
+        if f.settings.control_space_parens { Document::space() } else { Document::empty() },
         condition.format(f),
-        if f.settings.control_space_parens { space!() } else { empty_string!() },
-        token!(f, right_parenthesis, ")")
-    )
+        if f.settings.control_space_parens { Document::space() } else { Document::empty() },
+        Document::String(")"),
+    ]))
 }

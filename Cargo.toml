@@ -26,10 +26,7 @@ strum = { version = "0.26", features = ["derive"] }
 ordered-float = { version = "4.0", default-features = false }
 pretty_assertions = { version = "1.4.1" }
 either = { version = "1.13.0" }
-codespan-reporting = { version = "0.11.1", features = [
-    "serde",
-    "serialization",
-] }
+codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 config = { version = "0.14.0", features = ["toml"] }
 toml = { version = "0.8.19" }
@@ -41,15 +38,11 @@ glob-match = "0.2.1"
 paste = "1.0.15"
 criterion = "0.5.1"
 lasso = "0.7.3"
-clap = { version = "4.5.20", features = [
-    "cargo",
-    "derive",
-    "unicode",
-    "wrap_help",
-] }
+clap = { version = "4.5.20", features = ["cargo", "derive", "unicode", "wrap_help"] }
 futures = "0.3.31"
 async-walkdir = "2.0.0"
 termtree = "0.5.1"
+bitflags = "2.6.0"
 
 [dependencies]
 fennec-cli = { path = "crates/cli" }

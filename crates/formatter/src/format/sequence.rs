@@ -2,6 +2,7 @@ use fennec_ast::sequence::Sequence;
 use fennec_ast::sequence::TokenSeparatedSequence;
 use fennec_span::HasSpan;
 
+use crate::comment::CommentFlags;
 use crate::document::Group;
 use crate::document::IfBreak;
 use crate::document::Line;
@@ -31,21 +32,6 @@ impl<'a> TokenSeparatedSequenceFormatter<'a> {
 
     pub fn with_trailing_separator(mut self, trailing_separator: bool) -> Self {
         self.trailing_separator = trailing_separator;
-        self
-    }
-
-    pub fn with_force_break(mut self, force_break: bool) -> Self {
-        self.force_break = force_break;
-        self
-    }
-
-    pub fn with_force_inline(mut self, force_inline: bool) -> Self {
-        self.force_inline = force_inline;
-        self
-    }
-
-    pub fn with_break_parent(mut self, break_parent: bool) -> Self {
-        self.break_parent = break_parent;
         self
     }
 
@@ -81,10 +67,10 @@ impl<'a> TokenSeparatedSequenceFormatter<'a> {
                 // ```
                 //
                 // resulting in `b` and the right parenthesis being commented out.
-                must_break = must_break || f.has_trailing_single_line_comments(separator.span);
+                must_break = must_break || f.has_comment(separator.span, CommentFlags::Trailing & CommentFlags::Line);
 
-                let leading_comments = f.print_leading_comments(separator.span, true);
-                let trailing_comments = f.print_trailing_comments(separator.span, true);
+                let leading_comments = f.print_leading_comments(separator.span);
+                let trailing_comments = f.print_trailing_comments(separator.span);
                 let has_comments = leading_comments.is_some() || trailing_comments.is_some();
                 let separator =
                     f.print_comments(leading_comments, Document::String(f.lookup(&separator.value)), trailing_comments);
@@ -211,7 +197,7 @@ impl SequenceFormatter {
                         contents.push(Document::Line(Line::hardline()));
                     }
                 } else {
-                    contents.push(Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())));
+                    contents.push(Document::Line(Line::default()));
                 }
             }
         }

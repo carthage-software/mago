@@ -102,9 +102,7 @@ pub(super) fn should_inline_logical_or_coalesce_expression<'a>(expression: &'a E
             }
         }
         Expression::CoalesceOperation(coalesce_operation) => &coalesce_operation.rhs,
-        _ => {
-            return false
-        },
+        _ => return false,
     };
 
     if let Expression::Array(array) = rhs {

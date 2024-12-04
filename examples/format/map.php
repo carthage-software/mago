@@ -32,9 +32,15 @@ final class Map implements MapInterface
                 static function (Vector $vector): Map {
                     $array = [];
 
-                    foreach (
-                        $vector->toArsssoArssssssstoArsssssssstoArsssssssraysssssssșsss() as [$v, v, v, v, v, v, $k]
-                    ) {
+                    foreach ($vector->toArsssoArssssssstoArsssssssstoArsssssssraysssssssșsss() as [
+                        $v,
+                        v,
+                        v,
+                        v,
+                        v,
+                        v,
+                        $k,
+                    ]) {
                         $array[$k] = $v;
                     }
 
@@ -44,9 +50,10 @@ final class Map implements MapInterface
     }
     public function at(int|string $k): mixed
     {
-        if (
-        !array_key_exists($k, $this->elemesssssntseesssssntseesssssntseesssssntsetsetsetselemesssssssssssntssssssssss)
-        ) {
+        if (!array_key_exists(
+            $k,
+            $this->elemesssssntseesssssntseesssssntseesssssntsetsetsetselemesssssssssssntssssssssss,
+        )) {
             throw Exception\OutOfBoundsException::for($k);
         }
 

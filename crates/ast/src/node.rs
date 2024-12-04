@@ -540,6 +540,9 @@ impl<'a> Node<'a> {
         match self {
             Self::Statement(_)
             | Self::OpeningTag(_)
+            | Self::EchoOpeningTag(_)
+            | Self::FullOpeningTag(_)
+            | Self::ShortOpeningTag(_)
             | Self::ClosingTag(_)
             | Self::Inline(_)
             | Self::Namespace(_)

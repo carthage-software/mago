@@ -9,8 +9,8 @@ macro_rules! static_str {
 #[macro_export]
 macro_rules! token {
     ($f:ident, $s:expr, $v:expr) => {{
-        let leading_comments = $f.print_leading_comments($s, true);
-        let trailing_comments = $f.print_trailing_comments($s, true);
+        let leading_comments = $f.print_leading_comments($s);
+        let trailing_comments = $f.print_trailing_comments($s);
         $f.print_comments(leading_comments, $crate::static_str!($v), trailing_comments)
     }};
 }
@@ -149,11 +149,12 @@ macro_rules! group {
 macro_rules! conditional_group {
     ($p:ident, $c: expr, $( $x:expr ),* $(,)?) => {
         {
-            let mut temp_vec = $p.vec();
-            $(
-                temp_vec.push($x);
-            )*
-            let contents = $p.vec_single($c);
+            let contents = vec![$c];
+            let mut temp_vec = vec![];
+                $(
+                    temp_vec.push($x);
+                )*
+
             $crate::document::Document::Group($crate::document::Group::new_conditional_group(contents, temp_vec))
         }
     };
@@ -163,7 +164,7 @@ macro_rules! conditional_group {
 macro_rules! group_break {
     ($p:ident, $( $x:expr ),* $(,)?) => {
         {
-            let mut temp_vec = $p.vec();
+            let mut temp_vec = vec![];
             $(
                 temp_vec.push($x);
             )*
@@ -270,10 +271,10 @@ macro_rules! wrap {
     ($f:ident, $self:expr, $node:ident, $block:block) => {{
         let node = fennec_ast::Node::$node($self);
         $f.enter_node(node);
-        let leading = $f.print_leading_comments(node.span(), true);
+        let leading = $f.print_leading_comments(node.span());
         let doc = $block;
         let doc = $f.wrap_parens(doc, node);
-        let trailing = $f.print_trailing_comments(node.span(), true);
+        let trailing = $f.print_trailing_comments(node.span());
         let doc = $f.print_comments(leading, doc, trailing);
         $f.leave_node();
         doc

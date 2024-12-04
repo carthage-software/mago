@@ -12,8 +12,6 @@ use crate::Formatter;
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(super) enum Delimiter {
     Parentheses(Span, Span),
-    Braces(Span, Span),
-    Brackets(Span, Span),
     Attributes(Span, Span),
 }
 
@@ -22,8 +20,6 @@ impl Delimiter {
     pub fn left_as_str(&self) -> &'static str {
         match self {
             Self::Parentheses(_, _) => "(",
-            Self::Braces(_, _) => "{",
-            Self::Brackets(_, _) => "[",
             Self::Attributes(_, _) => "#[",
         }
     }
@@ -32,8 +28,6 @@ impl Delimiter {
     pub fn right_as_str(&self) -> &'static str {
         match self {
             Self::Parentheses(_, _) => ")",
-            Self::Braces(_, _) => "}",
-            Self::Brackets(_, _) => "]",
             Self::Attributes(_, _) => "]",
         }
     }
@@ -44,8 +38,6 @@ impl Delimiter {
     pub fn needs_space(&self) -> bool {
         match self {
             Self::Parentheses(_, _) => false,
-            Self::Braces(_, _) => true,
-            Self::Brackets(_, _) => false,
             Self::Attributes(_, _) => false,
         }
     }
@@ -55,8 +47,6 @@ impl Delimiter {
     pub fn spans(&self) -> (&Span, &Span) {
         match self {
             Self::Parentheses(left, right) => (left, right),
-            Self::Braces(left, right) => (left, right),
-            Self::Brackets(left, right) => (left, right),
             Self::Attributes(left, right) => (left, right),
         }
     }
@@ -80,13 +70,13 @@ impl Delimiter {
         let left_delimiter = self.spans().0;
 
         let mut contents = vec![];
-        if let Some(comments) = f.print_leading_comments(*left_delimiter, true) {
+        if let Some(comments) = f.print_leading_comments(*left_delimiter) {
             contents.push(comments);
         }
 
         contents.push(Document::String(self.left_as_str()));
 
-        let has_trailing_comments = if let Some(comments) = f.print_trailing_comments(*left_delimiter, false) {
+        let has_trailing_comments = if let Some(comments) = f.print_trailing_comments(*left_delimiter) {
             contents.push(Document::IfBreak(IfBreak::new(
                 Document::Indent(vec![Document::Line(Line::default())]),
                 Document::space(),
@@ -110,7 +100,7 @@ impl Delimiter {
         let right_delimiter = self.spans().1;
 
         let mut contents = vec![];
-        let has_leading_comments = if let Some(leading_comments) = f.print_leading_comments(*right_delimiter, false) {
+        let has_leading_comments = if let Some(leading_comments) = f.print_leading_comments(*right_delimiter) {
             contents.push(Document::Indent(vec![Document::Line(Line::hardline()), leading_comments]));
 
             true
@@ -124,7 +114,7 @@ impl Delimiter {
 
         contents.push(Document::String(self.right_as_str()));
 
-        if let Some(trailing_comments) = f.print_trailing_comments(*right_delimiter, true) {
+        if let Some(trailing_comments) = f.print_trailing_comments(*right_delimiter) {
             contents.push(trailing_comments);
         }
 
