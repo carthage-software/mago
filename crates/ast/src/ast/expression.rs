@@ -36,7 +36,6 @@ use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
-use crate::ast::operation::logical::LogicalOperation;
 use crate::ast::operation::ternary::TernaryOperation;
 use crate::ast::operation::unary::UnaryPostfixOperation;
 use crate::ast::operation::unary::UnaryPrefixOperation;
@@ -66,7 +65,6 @@ pub enum Expression {
     ArithmeticOperation(Box<ArithmeticOperation>),
     AssignmentOperation(Box<AssignmentOperation>),
     BitwiseOperation(Box<BitwiseOperation>),
-    LogicalOperation(Box<LogicalOperation>),
     TernaryOperation(Box<TernaryOperation>),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
@@ -171,15 +169,6 @@ impl Expression {
                         })
                         .unwrap_or(true)
             }
-            Self::LogicalOperation(operation) => match operation.as_ref() {
-                LogicalOperation::Prefix(logical_prefix_operation) => {
-                    logical_prefix_operation.value.is_constant(initilization)
-                }
-                LogicalOperation::Infix(logical_infix_operation) => {
-                    logical_infix_operation.lhs.is_constant(initilization)
-                        && logical_infix_operation.rhs.is_constant(initilization)
-                }
-            },
             Self::TernaryOperation(operation) => match operation.as_ref() {
                 TernaryOperation::Conditional(conditional_ternary_operation) => {
                     conditional_ternary_operation.condition.is_constant(initilization)
@@ -273,7 +262,6 @@ impl Expression {
             Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
             Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
             Expression::BitwiseOperation(_) => NodeKind::BitwiseOperation,
-            Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
             Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
@@ -320,7 +308,6 @@ impl HasSpan for Expression {
             Expression::ArithmeticOperation(expression) => expression.span(),
             Expression::AssignmentOperation(expression) => expression.span(),
             Expression::BitwiseOperation(expression) => expression.span(),
-            Expression::LogicalOperation(expression) => expression.span(),
             Expression::TernaryOperation(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),

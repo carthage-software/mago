@@ -1300,9 +1300,6 @@ generate_ast_walker! {
             Expression::BitwiseOperation(bitwise_operation) => {
                 walker.walk_bitwise_operation(bitwise_operation.as_ref(), context)
             }
-            Expression::LogicalOperation(logical_operation) => {
-                walker.walk_logical_operation(logical_operation.as_ref(), context)
-            }
             Expression::TernaryOperation(ternary_operation) => {
                 walker.walk_ternary_operation(ternary_operation.as_ref(), context)
             }
@@ -1529,34 +1526,6 @@ generate_ast_walker! {
     }
 
     BitwiseInfixOperator as bitwise_infix_operator => {
-        // Do nothing
-    }
-
-    LogicalOperation as logical_operation => {
-        match logical_operation {
-            LogicalOperation::Prefix(logical_prefix_operation) =>
-                walker.walk_logical_prefix_operation(logical_prefix_operation, context),
-            LogicalOperation::Infix(logical_infix_operation) =>
-                walker.walk_logical_infix_operation(logical_infix_operation, context),
-        };
-    }
-
-    LogicalPrefixOperation as logical_prefix_operation => {
-        walker.walk_logical_prefix_operator(&logical_prefix_operation.operator, context);
-        walker.walk_expression(&logical_prefix_operation.value, context);
-    }
-
-    LogicalPrefixOperator as logical_prefix_operator => {
-        // Do nothing
-    }
-
-    LogicalInfixOperation as logical_infix_operation => {
-        walker.walk_expression(&logical_infix_operation.lhs, context);
-        walker.walk_logical_infix_operator(&logical_infix_operation.operator, context);
-        walker.walk_expression(&logical_infix_operation.rhs, context);
-    }
-
-    LogicalInfixOperator as logical_infix_operator => {
         // Do nothing
     }
 

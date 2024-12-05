@@ -736,7 +736,9 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
     // If the left-hand side is a comparison or logical operation, we need to adjust the associativity
     // of the assignment operation to ensure it is applied to the rightmost operand.
     match lhs {
-        Expression::BinaryOperation(operation) if operation.operator.is_comparison() => {
+        Expression::BinaryOperation(operation)
+            if operation.operator.is_comparison() || operation.operator.is_logical() =>
+        {
             // make `($x == $y) = $z` into `$x == ($y = $z)`
             let BinaryOperation { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
 
@@ -749,33 +751,6 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
                     rhs,
                 }))),
             })
-        }
-        Expression::LogicalOperation(logical) => {
-            match *logical {
-                LogicalOperation::Infix(logical_infix_operation) => {
-                    // make `($x && $y) = $z` into `$x && ($y = $z)`
-                    let LogicalInfixOperation { lhs: logical_lhs, operator: logical_operator, rhs: logical_rhs } =
-                        logical_infix_operation;
-
-                    Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                        lhs: logical_lhs,
-                        operator: logical_operator,
-                        rhs: Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                            lhs: logical_rhs,
-                            operator,
-                            rhs,
-                        })),
-                    })))
-                }
-                LogicalOperation::Prefix(logical_prefix_operation) => {
-                    // nothitng to do here
-                    Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                        lhs: Expression::LogicalOperation(Box::new(LogicalOperation::Prefix(logical_prefix_operation))),
-                        operator,
-                        rhs,
-                    }))
-                }
-            }
         }
         Expression::BitwiseOperation(bitwise) => match *bitwise {
             BitwiseOperation::Infix(bitwise_infix_operation) => {

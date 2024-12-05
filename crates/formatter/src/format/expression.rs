@@ -57,7 +57,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
                 Expression::BitwiseOperation(op) => op.format(f),
-                Expression::LogicalOperation(op) => op.format(f),
                 Expression::TernaryOperation(op) => op.format(f),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
@@ -845,30 +844,6 @@ impl<'a> Format<'a> for ClassConstantAccess {
 impl<'a> Format<'a> for Call {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Call, { print_call_like_node(f, CallLikeNode::Call(self)) })
-    }
-}
-
-impl<'a> Format<'a> for LogicalOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, LogicalOperation, {
-            match self {
-                LogicalOperation::Prefix(o) => o.format(f),
-                LogicalOperation::Infix(_) => unreachable!(),
-            }
-        })
-    }
-}
-
-impl<'a> Format<'a> for LogicalPrefixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, LogicalPrefixOperation, {
-            group!(
-                match self.operator {
-                    LogicalPrefixOperator::Not(span) => token!(f, span, "!"),
-                },
-                self.value.format(f),
-            )
-        })
     }
 }
 

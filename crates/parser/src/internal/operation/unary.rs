@@ -59,6 +59,14 @@ pub fn parse_unary_prefix_operation<'a, 'i>(
                     "(unset)",
                     "(binary)",
                     "(string)",
+                    "@",
+                    "!",
+                    "~",
+                    "-",
+                    "+",
+                    "++",
+                    "--",
+                    "&"
                 ],
             ));
         }

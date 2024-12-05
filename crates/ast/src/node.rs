@@ -177,11 +177,6 @@ pub enum NodeKind {
     BitwiseOperation,
     BitwisePrefixOperation,
     BitwisePrefixOperator,
-    LogicalInfixOperation,
-    LogicalInfixOperator,
-    LogicalOperation,
-    LogicalPrefixOperation,
-    LogicalPrefixOperator,
     ConditionalTernaryOperation,
     ElvisTernaryOperation,
     TernaryOperation,
@@ -417,11 +412,6 @@ pub enum Node<'a> {
     BitwiseOperation(&'a BitwiseOperation),
     BitwisePrefixOperation(&'a BitwisePrefixOperation),
     BitwisePrefixOperator(&'a BitwisePrefixOperator),
-    LogicalInfixOperation(&'a LogicalInfixOperation),
-    LogicalInfixOperator(&'a LogicalInfixOperator),
-    LogicalOperation(&'a LogicalOperation),
-    LogicalPrefixOperation(&'a LogicalPrefixOperation),
-    LogicalPrefixOperator(&'a LogicalPrefixOperator),
     ConditionalTernaryOperation(&'a ConditionalTernaryOperation),
     ElvisTernaryOperation(&'a ElvisTernaryOperation),
     TernaryOperation(&'a TernaryOperation),
@@ -738,11 +728,6 @@ impl<'a> Node<'a> {
             Self::BitwiseOperation(_) => NodeKind::BitwiseOperation,
             Self::BitwisePrefixOperation(_) => NodeKind::BitwisePrefixOperation,
             Self::BitwisePrefixOperator(_) => NodeKind::BitwisePrefixOperator,
-            Self::LogicalInfixOperation(_) => NodeKind::LogicalInfixOperation,
-            Self::LogicalInfixOperator(_) => NodeKind::LogicalInfixOperator,
-            Self::LogicalOperation(_) => NodeKind::LogicalOperation,
-            Self::LogicalPrefixOperation(_) => NodeKind::LogicalPrefixOperation,
-            Self::LogicalPrefixOperator(_) => NodeKind::LogicalPrefixOperator,
             Self::ConditionalTernaryOperation(_) => NodeKind::ConditionalTernaryOperation,
             Self::ElvisTernaryOperation(_) => NodeKind::ElvisTernaryOperation,
             Self::TernaryOperation(_) => NodeKind::TernaryOperation,
@@ -1476,7 +1461,6 @@ impl<'a> Node<'a> {
                 Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
                 Expression::BitwiseOperation(node) => Node::BitwiseOperation(node),
-                Expression::LogicalOperation(node) => Node::LogicalOperation(node),
                 Expression::TernaryOperation(node) => Node::TernaryOperation(node),
                 Expression::Array(node) => Node::Array(node),
                 Expression::LegacyArray(node) => Node::LegacyArray(node),
@@ -1773,20 +1757,6 @@ impl<'a> Node<'a> {
                 vec![Node::BitwisePrefixOperator(&node.operator), Node::Expression(&node.value)]
             }
             Node::BitwisePrefixOperator(_) => vec![],
-            Node::LogicalInfixOperation(node) => vec![
-                Node::Expression(&node.lhs),
-                Node::LogicalInfixOperator(&node.operator),
-                Node::Expression(&node.rhs),
-            ],
-            Node::LogicalInfixOperator(_) => vec![],
-            Node::LogicalOperation(node) => vec![match node {
-                LogicalOperation::Infix(node) => Node::LogicalInfixOperation(node),
-                LogicalOperation::Prefix(node) => Node::LogicalPrefixOperation(node),
-            }],
-            Node::LogicalPrefixOperation(node) => {
-                vec![Node::LogicalPrefixOperator(&node.operator), Node::Expression(&node.value)]
-            }
-            Node::LogicalPrefixOperator(_) => vec![],
             Node::ConditionalTernaryOperation(node) => {
                 let mut children = vec![Node::Expression(&node.condition)];
 
@@ -2316,11 +2286,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::BitwiseOperation(node) => node.span(),
             Self::BitwisePrefixOperation(node) => node.span(),
             Self::BitwisePrefixOperator(node) => node.span(),
-            Self::LogicalInfixOperation(node) => node.span(),
-            Self::LogicalInfixOperator(node) => node.span(),
-            Self::LogicalOperation(node) => node.span(),
-            Self::LogicalPrefixOperation(node) => node.span(),
-            Self::LogicalPrefixOperator(node) => node.span(),
             Self::ConditionalTernaryOperation(node) => node.span(),
             Self::ElvisTernaryOperation(node) => node.span(),
             Self::TernaryOperation(node) => node.span(),

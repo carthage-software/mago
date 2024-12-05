@@ -187,60 +187,6 @@ where
 }
 
 #[inline]
-pub fn get_logical_operation_kind<F>(logical_operation: &LogicalOperation, get_expression_kind: F) -> TypeKind
-where
-    F: Fn(&Expression) -> TypeKind,
-{
-    match logical_operation {
-        LogicalOperation::Prefix(logical_prefix_operation) => {
-            let value_kind = get_expression_kind(&logical_prefix_operation.value);
-
-            if matches!(value_kind, TypeKind::Never) {
-                return never_kind();
-            }
-
-            match value_kind.is_truthy() {
-                Trinary::True => false_kind(),
-                Trinary::False => true_kind(),
-                _ => bool_kind(),
-            }
-        }
-        LogicalOperation::Infix(logical_infix_operation) => {
-            let lhs_kind = get_expression_kind(&logical_infix_operation.lhs);
-            let rhs_kind = get_expression_kind(&logical_infix_operation.rhs);
-
-            if matches!(lhs_kind, TypeKind::Never) || matches!(rhs_kind, TypeKind::Never) {
-                return never_kind();
-            }
-
-            match (lhs_kind.is_truthy(), rhs_kind.is_truthy()) {
-                (Trinary::True, Trinary::True) => match logical_infix_operation.operator {
-                    LogicalInfixOperator::And(_) | LogicalInfixOperator::LowPrecedenceAnd(_) => true_kind(),
-                    LogicalInfixOperator::Or(_) | LogicalInfixOperator::LowPrecedenceOr(_) => true_kind(),
-                    LogicalInfixOperator::LowPrecedenceXor(_) => false_kind(),
-                },
-                (Trinary::False, Trinary::False) => match logical_infix_operation.operator {
-                    LogicalInfixOperator::And(_) | LogicalInfixOperator::LowPrecedenceAnd(_) => false_kind(),
-                    LogicalInfixOperator::Or(_) | LogicalInfixOperator::LowPrecedenceOr(_) => false_kind(),
-                    LogicalInfixOperator::LowPrecedenceXor(_) => false_kind(),
-                },
-                (Trinary::True, Trinary::False) => match logical_infix_operation.operator {
-                    LogicalInfixOperator::And(_) | LogicalInfixOperator::LowPrecedenceAnd(_) => false_kind(),
-                    LogicalInfixOperator::Or(_) | LogicalInfixOperator::LowPrecedenceOr(_) => true_kind(),
-                    LogicalInfixOperator::LowPrecedenceXor(_) => true_kind(),
-                },
-                (Trinary::False, Trinary::True) => match logical_infix_operation.operator {
-                    LogicalInfixOperator::And(_) | LogicalInfixOperator::LowPrecedenceAnd(_) => false_kind(),
-                    LogicalInfixOperator::Or(_) | LogicalInfixOperator::LowPrecedenceOr(_) => true_kind(),
-                    LogicalInfixOperator::LowPrecedenceXor(_) => true_kind(),
-                },
-                (_, _) => bool_kind(),
-            }
-        }
-    }
-}
-
-#[inline]
 pub fn get_unary_prefix_operation_kind<F>(unary_operation: &UnaryPrefixOperation, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
@@ -395,6 +341,21 @@ where
     }
 
     match &binary_operation.operator {
+        BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => match (left_kind.is_truthy(), right_kind.is_truthy()) {
+            (Trinary::True, Trinary::True) => true_kind(),
+            (_, Trinary::False) | (Trinary::False, _) => false_kind(),
+            (_, _) => bool_kind(),
+        },
+        BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => match (left_kind.is_truthy(), right_kind.is_truthy()) {
+            (Trinary::True, _) | (_, Trinary::True) => true_kind(),
+            (Trinary::False, Trinary::False) => false_kind(),
+            (_, _) => bool_kind(),
+        },
+        BinaryOperator::LowXor(_) => match (left_kind.is_truthy(), right_kind.is_truthy()) {
+            (Trinary::True, Trinary::False) | (Trinary::False, Trinary::True) => true_kind(),
+            (Trinary::True, Trinary::True) | (Trinary::False, Trinary::False) => false_kind(),
+            (_, _) => bool_kind(),
+        },
         BinaryOperator::StringConcat(_) => {
             if left_kind.is_non_empty_string().or(right_kind.is_non_empty_string()).is_true() {
                 return non_empty_string_kind();
