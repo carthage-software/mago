@@ -123,14 +123,14 @@ pub fn parse_optional_string_part<'a, 'i>(
             Some(StringPart::Literal(LiteralStringPart { span: token.span, value: token.value }))
         }
         kind if kind == closing_kind => None,
-        _ => Some(StringPart::Expression(parse_expression(stream)?)),
+        _ => Some(StringPart::Expression(Box::new(parse_expression(stream)?))),
     })
 }
 pub fn parse_braced_expression_string_part<'a, 'i>(
     stream: &mut TokenStream<'a, 'i>,
 ) -> Result<BracedExpressionStringPart, ParseError> {
     let left_brace = utils::expect_span(stream, T!["{"])?;
-    let expression = parse_expression(stream)?;
+    let expression = Box::new(parse_expression(stream)?);
     let right_brace = utils::expect_span(stream, T!["}"])?;
 
     Ok(BracedExpressionStringPart { left_brace, expression, right_brace })

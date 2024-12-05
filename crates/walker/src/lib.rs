@@ -1290,16 +1290,16 @@ generate_ast_walker! {
             Expression::UnaryPrefix(operation) => walker.walk_unary_prefix_expression(operation, context),
             Expression::UnaryPostfix(operation) => walker.walk_unary_postfix_expression(operation, context),
             Expression::Literal(literal) => walker.walk_literal_expression(literal, context),
-            Expression::CompositeString(string) => walker.walk_composite_string(string.as_ref(), context),
+            Expression::CompositeString(string) => walker.walk_composite_string(string, context),
             Expression::AssignmentOperation(assignment) => {
                 walker.walk_assignment(&assignment, context)
             }
             Expression::Conditional(conditional) => {
                 walker.walk_conditional(conditional, context)
             }
-            Expression::Array(array) => walker.walk_array(array.as_ref(), context),
-            Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array.as_ref(), context),
-            Expression::List(list) => walker.walk_list(list.as_ref(), context),
+            Expression::Array(array) => walker.walk_array(array, context),
+            Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array, context),
+            Expression::List(list) => walker.walk_list(list, context),
             Expression::ArrayAccess(array_access) => walker.walk_array_access(array_access.as_ref(), context),
             Expression::ArrayAppend(array_append) => walker.walk_array_append(array_append.as_ref(), context),
             Expression::AnonymousClass(anonymous_class) => {

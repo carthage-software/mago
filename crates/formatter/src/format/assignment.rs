@@ -233,7 +233,7 @@ fn is_property_like_with_short_key<'a, 'b>(
             f.lookup(&enum_case_backed_item.name.value).len()
         }
         AssignmentLikeNode::PropertyConcreteItem(property_item) => f.lookup(&property_item.variable.name).len(),
-        AssignmentLikeNode::KeyValueArrayElement(element) => match &element.key {
+        AssignmentLikeNode::KeyValueArrayElement(element) => match element.key.as_ref() {
             Expression::Variable(variable) => {
                 if let Variable::Direct(variable) = variable {
                     f.lookup(&variable.name).len()

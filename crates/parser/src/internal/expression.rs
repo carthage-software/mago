@@ -117,7 +117,7 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
         (T!["self"], _) => Expression::Self_(utils::expect_any_keyword(stream)?),
         (T!["parent"], _) => Expression::Parent(utils::expect_any_keyword(stream)?),
         (kind, _) if kind.is_construct() => Expression::Construct(Box::new(parse_construct(stream)?)),
-        (T!["list"], Some(T!["("])) => Expression::List(Box::new(parse_list(stream)?)),
+        (T!["list"], Some(T!["("])) => Expression::List(parse_list(stream)?),
         (T!["new"], Some(T!["class" | "#["])) => Expression::AnonymousClass(Box::new(parse_anonymous_class(stream)?)),
         (T!["new"], Some(T!["static"])) => Expression::Instantiation(Box::new(parse_instantiation(stream)?)),
         (T!["new"], Some(kind)) if kind.is_modifier() => {
@@ -127,7 +127,7 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
         (T!["throw"], _) => Expression::Throw(Box::new(parse_throw(stream)?)),
         (T!["yield"], _) => Expression::Yield(Box::new(parse_yield(stream)?)),
         (T!["clone"], _) => Expression::Clone(Box::new(parse_clone(stream)?)),
-        (T!["\""] | T!["<<<"] | T!["`"], ..) => Expression::CompositeString(Box::new(parse_string(stream)?)),
+        (T!["\""] | T!["<<<"] | T!["`"], ..) => Expression::CompositeString(parse_string(stream)?),
         (T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "enum" | "from"], ..) => {
             Expression::Identifier(identifier::parse_identifier(stream)?)
         }
@@ -137,8 +137,8 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
         (T!["match"], _) => Expression::Match(Box::new(parse_match(stream)?)),
-        (T!["array"], Some(T!["("])) => Expression::LegacyArray(Box::new(parse_legacy_array(stream)?)),
-        (T!["["], _) => Expression::Array(Box::new(parse_array(stream)?)),
+        (T!["array"], Some(T!["("])) => Expression::LegacyArray(parse_legacy_array(stream)?),
+        (T!["["], _) => Expression::Array(parse_array(stream)?),
         (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(parse_magic_constant(stream)?),
         (T!["$" | "${" | "$variable"], _) => variable::parse_variable(stream).map(Expression::Variable)?,
         _ => return Err(utils::unexpected(stream, Some(token), &[])),

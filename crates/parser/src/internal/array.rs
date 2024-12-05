@@ -95,7 +95,8 @@ pub fn parse_array_element<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<A
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["..."]) => {
             let ellipsis = utils::expect_any(stream)?.span;
-            let value = parse_expression(stream)?;
+            let value = Box::new(parse_expression(stream)?);
+
             ArrayElement::Variadic(VariadicArrayElement { ellipsis, value })
         }
         Some(T![","]) => {
@@ -104,7 +105,7 @@ pub fn parse_array_element<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<A
             ArrayElement::Missing(MissingArrayElement { comma })
         }
         _ => {
-            let expression = parse_expression(stream)?;
+            let expression = Box::new(parse_expression(stream)?);
 
             match utils::maybe_peek(stream)?.map(|t| t.kind) {
                 Some(T!["=>"]) => {
@@ -113,7 +114,7 @@ pub fn parse_array_element<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<A
                     ArrayElement::KeyValue(KeyValueArrayElement {
                         key: expression,
                         double_arrow,
-                        value: parse_expression(stream)?,
+                        value: Box::new(parse_expression(stream)?),
                     })
                 }
                 _ => ArrayElement::Value(ValueArrayElement { value: expression }),

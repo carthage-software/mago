@@ -61,7 +61,7 @@ pub struct DocumentString {
 #[serde(tag = "type", content = "value")]
 pub enum StringPart {
     Literal(LiteralStringPart),
-    Expression(Expression),
+    Expression(Box<Expression>),
     BracedExpression(BracedExpressionStringPart),
 }
 
@@ -74,7 +74,7 @@ pub struct LiteralStringPart {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct BracedExpressionStringPart {
     pub left_brace: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub right_brace: Span,
 }
 

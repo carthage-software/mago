@@ -58,12 +58,12 @@ pub enum Expression {
     UnaryPostfix(UnaryPostfixExpression),
     Parenthesized(ParenthesizedExpression),
     Literal(LiteralExpression),
-    CompositeString(Box<CompositeString>),
+    CompositeString(CompositeString),
     AssignmentOperation(Assignment),
     Conditional(Conditional),
-    Array(Box<Array>),
-    LegacyArray(Box<LegacyArray>),
-    List(Box<List>),
+    Array(Array),
+    LegacyArray(LegacyArray),
+    List(List),
     ArrayAccess(Box<ArrayAccess>),
     ArrayAppend(Box<ArrayAppend>),
     AnonymousClass(Box<AnonymousClass>),
@@ -167,7 +167,7 @@ impl Expression {
                 }
                 ArrayElement::Missing(_) => false,
             }),
-            Self::CompositeString(string) => match string.as_ref() {
+            Self::CompositeString(string) => match string {
                 CompositeString::Interpolated(interpolated_string) => {
                     interpolated_string.parts.iter().all(|part| match part {
                         StringPart::Literal(_) => true,
