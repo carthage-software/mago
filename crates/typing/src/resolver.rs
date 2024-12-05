@@ -85,7 +85,6 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::CoalesceOperation(coalesce_operation) => {
                 get_coalesce_operation_kind(coalesce_operation, |e| self.resolve(e))
             }
-            Expression::InstanceofOperation(_) => bool_kind(),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),
             Expression::LegacyArray(legacy_array) => get_array_kind(&legacy_array.elements, |e| self.resolve(e)),
             Expression::ArrayAccess(array_access) => get_array_index_kind(self.resolve(&array_access.array)),

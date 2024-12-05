@@ -61,7 +61,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::LogicalOperation(op) => op.format(f),
                 Expression::TernaryOperation(op) => op.format(f),
                 Expression::CoalesceOperation(_) => unreachable!(),
-                Expression::InstanceofOperation(_) => unreachable!(),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
                 Expression::List(list) => list.format(f),

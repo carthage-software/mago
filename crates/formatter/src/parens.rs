@@ -70,17 +70,17 @@ impl<'a> Formatter<'a> {
                     return !matches!(operator, BinaryOperator::NullCoalesce(_));
                 }
 
+                if let BinaryOperator::Instanceof(_) = e.operator {
+                    // Add parentheses if parent is an instanceof operator.
+                    return true;
+                }
+
                 &e.operator
             }
             Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
                 return true;
             }
-            Some(
-                Node::InstanceofOperation(_)
-                | Node::ConditionalTernaryOperation(_)
-                | Node::ElvisTernaryOperation(_)
-                | Node::ArrayAppend(_),
-            ) => {
+            Some(Node::ConditionalTernaryOperation(_) | Node::ElvisTernaryOperation(_) | Node::ArrayAppend(_)) => {
                 return true;
             }
             Some(Node::ArrayAccess(access)) => {
@@ -263,7 +263,6 @@ impl<'a> Formatter<'a> {
             | Node::ComparisonOperation(_)
             | Node::BitwiseInfixOperation(_)
             | Node::ArithmeticInfixOperation(_)
-            | Node::InstanceofOperation(_)
             | Node::ElvisTernaryOperation(_) => true,
             Node::ConditionalTernaryOperation(op) => op.then.is_none(),
             _ => false,

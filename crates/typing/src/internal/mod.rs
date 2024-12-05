@@ -429,6 +429,7 @@ where
 
             string_kind()
         }
+        BinaryOperator::Instanceof(_) => bool_kind(),
         _ => mixed_kind(false),
     }
 }

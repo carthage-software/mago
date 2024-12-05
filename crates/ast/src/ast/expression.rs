@@ -38,7 +38,6 @@ use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
 use crate::ast::operation::coalesce::CoalesceOperation;
 use crate::ast::operation::comparison::ComparisonOperation;
-use crate::ast::operation::instanceof::InstanceofOperation;
 use crate::ast::operation::logical::LogicalOperation;
 use crate::ast::operation::ternary::TernaryOperation;
 use crate::ast::operation::unary::UnaryPostfixOperation;
@@ -73,7 +72,6 @@ pub enum Expression {
     LogicalOperation(Box<LogicalOperation>),
     TernaryOperation(Box<TernaryOperation>),
     CoalesceOperation(Box<CoalesceOperation>),
-    InstanceofOperation(Box<InstanceofOperation>),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
     List(Box<List>),
@@ -289,7 +287,6 @@ impl Expression {
             Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
             Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
             Expression::CoalesceOperation(_) => NodeKind::CoalesceOperation,
-            Expression::InstanceofOperation(_) => NodeKind::InstanceofOperation,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
             Expression::List(_) => NodeKind::List,
@@ -339,7 +336,6 @@ impl HasSpan for Expression {
             Expression::LogicalOperation(expression) => expression.span(),
             Expression::TernaryOperation(expression) => expression.span(),
             Expression::CoalesceOperation(expression) => expression.span(),
-            Expression::InstanceofOperation(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),
             Expression::List(expression) => expression.span(),

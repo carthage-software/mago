@@ -180,7 +180,6 @@ pub enum NodeKind {
     CoalesceOperation,
     ComparisonOperation,
     ComparisonOperator,
-    InstanceofOperation,
     LogicalInfixOperation,
     LogicalInfixOperator,
     LogicalOperation,
@@ -424,7 +423,6 @@ pub enum Node<'a> {
     CoalesceOperation(&'a CoalesceOperation),
     ComparisonOperation(&'a ComparisonOperation),
     ComparisonOperator(&'a ComparisonOperator),
-    InstanceofOperation(&'a InstanceofOperation),
     LogicalInfixOperation(&'a LogicalInfixOperation),
     LogicalInfixOperator(&'a LogicalInfixOperator),
     LogicalOperation(&'a LogicalOperation),
@@ -749,7 +747,6 @@ impl<'a> Node<'a> {
             Self::CoalesceOperation(_) => NodeKind::CoalesceOperation,
             Self::ComparisonOperation(_) => NodeKind::ComparisonOperation,
             Self::ComparisonOperator(_) => NodeKind::ComparisonOperator,
-            Self::InstanceofOperation(_) => NodeKind::InstanceofOperation,
             Self::LogicalInfixOperation(_) => NodeKind::LogicalInfixOperation,
             Self::LogicalInfixOperator(_) => NodeKind::LogicalInfixOperator,
             Self::LogicalOperation(_) => NodeKind::LogicalOperation,
@@ -1492,7 +1489,6 @@ impl<'a> Node<'a> {
                 Expression::LogicalOperation(node) => Node::LogicalOperation(node),
                 Expression::TernaryOperation(node) => Node::TernaryOperation(node),
                 Expression::CoalesceOperation(node) => Node::CoalesceOperation(node),
-                Expression::InstanceofOperation(node) => Node::InstanceofOperation(node),
                 Expression::Array(node) => Node::Array(node),
                 Expression::LegacyArray(node) => Node::LegacyArray(node),
                 Expression::List(node) => Node::List(node),
@@ -1795,9 +1791,6 @@ impl<'a> Node<'a> {
                 vec![Node::Expression(&node.lhs), Node::ComparisonOperator(&node.operator), Node::Expression(&node.rhs)]
             }
             Node::ComparisonOperator(_) => vec![],
-            Node::InstanceofOperation(node) => {
-                vec![Node::Expression(&node.rhs), Node::Expression(&node.lhs)]
-            }
             Node::LogicalInfixOperation(node) => vec![
                 Node::Expression(&node.lhs),
                 Node::LogicalInfixOperator(&node.operator),
@@ -2344,7 +2337,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::CoalesceOperation(node) => node.span(),
             Self::ComparisonOperation(node) => node.span(),
             Self::ComparisonOperator(node) => node.span(),
-            Self::InstanceofOperation(node) => node.span(),
             Self::LogicalInfixOperation(node) => node.span(),
             Self::LogicalInfixOperator(node) => node.span(),
             Self::LogicalOperation(node) => node.span(),

@@ -6,6 +6,5 @@ pub mod assignment;
 pub mod bitwise;
 pub mod coalesce;
 pub mod comparison;
-pub mod instanceof;
 pub mod logical;
 pub mod ternary;

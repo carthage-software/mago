@@ -162,7 +162,6 @@ pub use crate::ast::operation::bitwise::BitwisePrefixOperator;
 pub use crate::ast::operation::coalesce::CoalesceOperation;
 pub use crate::ast::operation::comparison::ComparisonOperation;
 pub use crate::ast::operation::comparison::ComparisonOperator;
-pub use crate::ast::operation::instanceof::InstanceofOperation;
 pub use crate::ast::operation::logical::LogicalInfixOperation;
 pub use crate::ast::operation::logical::LogicalInfixOperator;
 pub use crate::ast::operation::logical::LogicalOperation;

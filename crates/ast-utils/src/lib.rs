@@ -317,9 +317,6 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
         Expression::CoalesceOperation(coalesce_operation) => {
             expression_has_yield(&coalesce_operation.lhs) || expression_has_yield(&coalesce_operation.rhs)
         }
-        Expression::InstanceofOperation(instanceof_operation) => {
-            expression_has_yield(&instanceof_operation.lhs) || expression_has_yield(&instanceof_operation.rhs)
-        }
         Expression::Array(array) => array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
                 expression_has_yield(&key_value_array_element.key)
