@@ -31,11 +31,11 @@ use crate::ast::function_like::closure::Closure;
 use crate::ast::identifier::Identifier;
 use crate::ast::instantiation::Instantiation;
 use crate::ast::keyword::Keyword;
-use crate::ast::literal::Literal;
+use crate::ast::literal::LiteralExpression;
 use crate::ast::magic_constant::MagicConstant;
 use crate::ast::operation::binary::BinaryExpression;
-use crate::ast::operation::unary::UnaryPostfixOperation;
-use crate::ast::operation::unary::UnaryPrefixOperation;
+use crate::ast::operation::unary::UnaryPostfixExpression;
+use crate::ast::operation::unary::UnaryPrefixExpression;
 use crate::ast::r#yield::Yield;
 use crate::ast::string::CompositeString;
 use crate::ast::string::StringPart;
@@ -44,20 +44,20 @@ use crate::ast::variable::Variable;
 use crate::node::NodeKind;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Parenthesized {
+pub struct ParenthesizedExpression {
     pub left_parenthesis: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub right_parenthesis: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Expression {
-    BinaryExpression(BinaryExpression),
-    UnaryPrefixOperation(UnaryPrefixOperation),
-    UnaryPostfixOperation(UnaryPostfixOperation),
-    Parenthesized(Box<Parenthesized>),
-    Literal(Literal),
+    Binary(BinaryExpression),
+    UnaryPrefix(UnaryPrefixExpression),
+    UnaryPostfix(UnaryPostfixExpression),
+    Parenthesized(ParenthesizedExpression),
+    Literal(LiteralExpression),
     CompositeString(Box<CompositeString>),
     AssignmentOperation(Assignment),
     Conditional(Conditional),
@@ -89,15 +89,15 @@ pub enum Expression {
 impl Expression {
     pub fn is_constant(&self, initilization: bool) -> bool {
         match &self {
-            Self::BinaryExpression(operation) => {
+            Self::Binary(operation) => {
                 operation.operator.is_constant()
                     && operation.lhs.is_constant(initilization)
                     && operation.rhs.is_constant(initilization)
             }
-            Self::UnaryPrefixOperation(operation) => {
+            Self::UnaryPrefix(operation) => {
                 operation.operator.is_constant() && operation.operand.is_constant(initilization)
             }
-            Self::UnaryPostfixOperation(operation) => {
+            Self::UnaryPostfix(operation) => {
                 operation.operator.is_constant() && operation.operand.is_constant(initilization)
             }
             Self::Literal(_) => true,
@@ -188,12 +188,12 @@ impl Expression {
 
     #[inline]
     pub const fn is_binary(&self) -> bool {
-        matches!(&self, Expression::BinaryExpression(_))
+        matches!(&self, Expression::Binary(_))
     }
 
     #[inline]
     pub const fn is_unary(&self) -> bool {
-        matches!(&self, Expression::UnaryPrefixOperation(_) | Expression::UnaryPostfixOperation(_))
+        matches!(&self, Expression::UnaryPrefix(_) | Expression::UnaryPostfix(_))
     }
 
     #[inline]
@@ -205,7 +205,7 @@ impl Expression {
     pub fn is_string_literal(&self) -> bool {
         match &self {
             Expression::Literal(literal) => match literal {
-                Literal::String(_) => true,
+                LiteralExpression::String(_) => true,
                 _ => false,
             },
             _ => false,
@@ -214,11 +214,11 @@ impl Expression {
 
     pub fn node_kind(&self) -> NodeKind {
         match &self {
-            Expression::BinaryExpression(_) => NodeKind::BinaryExpression,
-            Expression::UnaryPrefixOperation(_) => NodeKind::UnaryPrefixOperation,
-            Expression::UnaryPostfixOperation(_) => NodeKind::UnaryPostfixOperation,
+            Expression::Binary(_) => NodeKind::BinaryExpression,
+            Expression::UnaryPrefix(_) => NodeKind::UnaryPrefixExpression,
+            Expression::UnaryPostfix(_) => NodeKind::UnaryPostfixExpression,
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
-            Expression::Literal(_) => NodeKind::Literal,
+            Expression::Literal(_) => NodeKind::LiteralExpression,
             Expression::CompositeString(_) => NodeKind::CompositeString,
             Expression::AssignmentOperation(_) => NodeKind::Assignment,
             Expression::Conditional(_) => NodeKind::Conditional,
@@ -249,7 +249,7 @@ impl Expression {
     }
 }
 
-impl HasSpan for Parenthesized {
+impl HasSpan for ParenthesizedExpression {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
     }
@@ -258,9 +258,9 @@ impl HasSpan for Parenthesized {
 impl HasSpan for Expression {
     fn span(&self) -> Span {
         match &self {
-            Expression::BinaryExpression(expression) => expression.span(),
-            Expression::UnaryPrefixOperation(expression) => expression.span(),
-            Expression::UnaryPostfixOperation(expression) => expression.span(),
+            Expression::Binary(expression) => expression.span(),
+            Expression::UnaryPrefix(expression) => expression.span(),
+            Expression::UnaryPostfix(expression) => expression.span(),
             Expression::Parenthesized(expression) => expression.span(),
             Expression::Literal(expression) => expression.span(),
             Expression::CompositeString(expression) => expression.span(),

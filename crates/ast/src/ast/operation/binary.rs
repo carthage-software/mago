@@ -244,7 +244,7 @@ impl GetPrecedence for BinaryOperator {
             Self::LowOr(_) => Precedence::KeyOr,
             Self::LowXor(_) => Precedence::KeyXor,
             Self::Instanceof(_) => Precedence::Instanceof,
-            Self::Elvis(_) => Precedence::Ternary,
+            Self::Elvis(_) => Precedence::ElvisOrConditional,
         }
     }
 }

@@ -89,7 +89,7 @@ pub(super) fn print_binaryish_expression<'a>(
 
 pub(super) fn should_inline_logical_or_coalesce_expression<'a>(expression: &'a Expression) -> bool {
     let rhs = match expression {
-        Expression::BinaryExpression(operation) => {
+        Expression::Binary(operation) => {
             if !operation.operator.is_logical() && !operation.operator.is_null_coalesce() {
                 return false;
             }

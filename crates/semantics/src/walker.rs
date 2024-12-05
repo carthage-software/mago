@@ -1774,7 +1774,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
             match name.to_ascii_lowercase().as_str() {
                 STRICT_TYPES_DECLARE_DIRECTIVE => {
                     let value = match &item.value {
-                        Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => value.clone(),
+                        Expression::Literal(LiteralExpression::Integer(LiteralInteger { value, .. })) => value.clone(),
                         _ => None,
                     };
 
@@ -1800,7 +1800,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
                     }
                 }
                 TICKS_DECLARE_DIRECTIVE => {
-                    if !matches!(item.value, Expression::Literal(Literal::Integer(_))) {
+                    if !matches!(item.value, Expression::Literal(LiteralExpression::Integer(_))) {
                         context.report(
                             Issue::error(format!("`{}` declare directive must be set to a literal integer", name))
                                 .with_annotation(Annotation::primary(item.value.span())),
@@ -1808,7 +1808,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
                     }
                 }
                 ENCODING_DECLARE_DIRECTIVE => {
-                    if !matches!(item.value, Expression::Literal(Literal::String(_))) {
+                    if !matches!(item.value, Expression::Literal(LiteralExpression::String(_))) {
                         context.report(
                             Issue::error(format!("`{}` declare directive must be set to a literal integer", name))
                                 .with_annotation(Annotation::primary(item.value.span())),

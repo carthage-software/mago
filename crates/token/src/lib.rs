@@ -35,7 +35,7 @@ pub enum Precedence {
     KeyXor,
     KeyAnd,
     Assignment,
-    Ternary,
+    ElvisOrConditional,
     NullCoalesce,
     Or,
     And,
@@ -278,7 +278,7 @@ impl Precedence {
             T!["&&"] => Precedence::And,
             T!["||"] => Precedence::Or,
             T!["??"] => Precedence::NullCoalesce,
-            T!["?" | "?:"] => Precedence::Ternary,
+            T!["?" | "?:"] => Precedence::ElvisOrConditional,
             T!["="
                 | "+="
                 | "-="
@@ -329,7 +329,7 @@ impl Precedence {
             | Self::KeyOr
             | Self::KeyXor => Associativity::Left,
             Self::Pow | Self::NullCoalesce | Self::Assignment => Associativity::Right,
-            Self::Ternary | Self::Equality | Self::Comparison => Associativity::NonAssociative,
+            Self::ElvisOrConditional | Self::Equality | Self::Comparison => Associativity::NonAssociative,
             _ => return None,
         })
     }

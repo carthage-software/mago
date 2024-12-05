@@ -64,7 +64,7 @@ pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expre
         return should_hug_expression(f, &inner.expression);
     }
 
-    if let Expression::UnaryPrefixOperation(operation) = expression {
+    if let Expression::UnaryPrefix(operation) = expression {
         return should_hug_expression(f, &operation.operand);
     }
 

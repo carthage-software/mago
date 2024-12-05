@@ -249,7 +249,7 @@ fn is_property_like_with_short_key<'a, 'b>(
                 }
             }
             Expression::Literal(literal) => {
-                if let Literal::String(string_literal) = literal {
+                if let LiteralExpression::String(string_literal) = literal {
                     f.lookup(&string_literal.value).len()
                 } else {
                     return false;
@@ -279,7 +279,7 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
     }
 
     match rhs_expression {
-        Expression::BinaryExpression(operation) => {
+        Expression::Binary(operation) => {
             if let BinaryOperator::Elvis(_) = operation.operator {
                 let condition = operation.lhs.as_ref();
 
@@ -305,7 +305,7 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
     let mut current_expression = rhs_expression;
     loop {
         current_expression = match current_expression {
-            Expression::UnaryPrefixOperation(operation) => operation.operand.as_ref(),
+            Expression::UnaryPrefix(operation) => operation.operand.as_ref(),
             _ => {
                 break;
             }
@@ -431,9 +431,7 @@ fn is_lone_short_argument<'a>(f: &Formatter<'a>, argument_value: &'a Expression)
             }
             _ => false,
         },
-        Expression::UnaryPrefixOperation(unary) if !unary.operator.is_cast() => {
-            is_lone_short_argument(f, &unary.operand)
-        }
+        Expression::UnaryPrefix(unary) if !unary.operator.is_cast() => is_lone_short_argument(f, &unary.operand),
         _ => false,
     }
 }

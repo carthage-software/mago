@@ -104,7 +104,7 @@ where
 #[inline]
 pub fn get_unary_prefix_operation_kind<F>(
     interner: &ThreadedInterner,
-    unary_operation: &UnaryPrefixOperation,
+    unary_operation: &UnaryPrefixExpression,
     get_expression_kind: F,
 ) -> TypeKind
 where
@@ -215,7 +215,7 @@ where
 }
 
 #[inline]
-pub fn get_unary_postfix_operation_kind<F>(unary_operation: &UnaryPostfixOperation, get_expression_kind: F) -> TypeKind
+pub fn get_unary_postfix_operation_kind<F>(unary_operation: &UnaryPostfixExpression, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
@@ -812,10 +812,10 @@ where
 }
 
 #[inline]
-pub fn get_literal_kind(interner: &ThreadedInterner, literal: &Literal) -> TypeKind {
+pub fn get_literal_kind(interner: &ThreadedInterner, literal: &LiteralExpression) -> TypeKind {
     match &literal {
-        Literal::String(string) => get_literal_string_value_kind(interner, string.value, true),
-        Literal::Integer(integer) => {
+        LiteralExpression::String(string) => get_literal_string_value_kind(interner, string.value, true),
+        LiteralExpression::Integer(integer) => {
             if let Some(value) = integer.value {
                 if value > i64::MAX as u64 {
                     integer_kind()
@@ -827,10 +827,10 @@ pub fn get_literal_kind(interner: &ThreadedInterner, literal: &Literal) -> TypeK
                 integer_kind()
             }
         }
-        Literal::Float(literal_float) => value_float_kind(literal_float.value),
-        Literal::True(_) => true_kind(),
-        Literal::False(_) => false_kind(),
-        Literal::Null(_) => null_kind(),
+        LiteralExpression::Float(literal_float) => value_float_kind(literal_float.value),
+        LiteralExpression::True(_) => true_kind(),
+        LiteralExpression::False(_) => false_kind(),
+        LiteralExpression::Null(_) => null_kind(),
     }
 }
 

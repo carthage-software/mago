@@ -8,30 +8,30 @@ use crate::error::ParseError;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_literal<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Literal, ParseError> {
+pub fn parse_literal<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<LiteralExpression, ParseError> {
     let token = utils::expect_any(stream)?;
 
     Ok(match &token.kind {
-        T![LiteralFloat] => Literal::Float(LiteralFloat {
+        T![LiteralFloat] => LiteralExpression::Float(LiteralFloat {
             span: token.span,
             raw: token.value,
             value: OrderedFloat(parse_literal_float(stream.interner().lookup(&token.value), &token.span.start)),
         }),
-        T![LiteralInteger] => Literal::Integer(LiteralInteger {
+        T![LiteralInteger] => LiteralExpression::Integer(LiteralInteger {
             span: token.span,
             raw: token.value,
             value: parse_literal_integer(stream.interner().lookup(&token.value), &token.span.start),
         }),
-        T!["true"] => Literal::True(utils::to_keyword(token)),
-        T!["false"] => Literal::False(utils::to_keyword(token)),
-        T!["null"] => Literal::Null(utils::to_keyword(token)),
+        T!["true"] => LiteralExpression::True(utils::to_keyword(token)),
+        T!["false"] => LiteralExpression::False(utils::to_keyword(token)),
+        T!["null"] => LiteralExpression::Null(utils::to_keyword(token)),
         T![LiteralString] => {
             let value = stream.interner().lookup(&token.value);
 
             let kind =
                 if value.starts_with('"') { LiteralStringKind::DoubleQuoted } else { LiteralStringKind::SingleQuoted };
 
-            Literal::String(LiteralString { kind, span: token.span, value: token.value })
+            LiteralExpression::String(LiteralString { kind, span: token.span, value: token.value })
         }
         T![PartialLiteralString] => {
             let value = stream.interner().lookup(&token.value);

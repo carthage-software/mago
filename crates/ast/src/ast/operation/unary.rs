@@ -44,13 +44,13 @@ pub enum UnaryPostfixOperator {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPrefixOperation {
+pub struct UnaryPrefixExpression {
     pub operator: UnaryPrefixOperator,
     pub operand: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPostfixOperation {
+pub struct UnaryPostfixExpression {
     pub operand: Box<Expression>,
     pub operator: UnaryPostfixOperator,
 }
@@ -217,13 +217,13 @@ impl HasSpan for UnaryPostfixOperator {
     }
 }
 
-impl HasSpan for UnaryPrefixOperation {
+impl HasSpan for UnaryPrefixExpression {
     fn span(&self) -> Span {
         self.operator.span().join(self.operand.span())
     }
 }
 
-impl HasSpan for UnaryPostfixOperation {
+impl HasSpan for UnaryPostfixExpression {
     fn span(&self) -> Span {
         self.operand.span().join(self.operator.span())
     }

@@ -1285,11 +1285,11 @@ generate_ast_walker! {
 
     Expression as expression => {
         match &expression {
-            Expression::Parenthesized(parenthesized) => walker.walk_parenthesized(parenthesized.as_ref(), context),
-            Expression::BinaryExpression(expr) => walker.walk_binary_expression(expr, context),
-            Expression::UnaryPrefixOperation(operation) => walker.walk_unary_prefix_operation(operation, context),
-            Expression::UnaryPostfixOperation(operation) => walker.walk_unary_postfix_operation(operation, context),
-            Expression::Literal(literal) => walker.walk_literal(literal, context),
+            Expression::Parenthesized(parenthesized) => walker.walk_parenthesized_expression(&parenthesized, context),
+            Expression::Binary(expr) => walker.walk_binary_expression(expr, context),
+            Expression::UnaryPrefix(operation) => walker.walk_unary_prefix_expression(operation, context),
+            Expression::UnaryPostfix(operation) => walker.walk_unary_postfix_expression(operation, context),
+            Expression::Literal(literal) => walker.walk_literal_expression(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string.as_ref(), context),
             Expression::AssignmentOperation(assignment) => {
                 walker.walk_assignment(&assignment, context)
@@ -1345,36 +1345,36 @@ generate_ast_walker! {
         }
     }
 
-    UnaryPrefixOperation as unary_prefix_operation => {
-        walker.walk_unary_prefix_operator(&unary_prefix_operation.operator, context);
-        walker.walk_expression(&unary_prefix_operation.operand, context);
+    UnaryPrefixExpression as unary_prefix_expression => {
+        walker.walk_unary_prefix_operator(&unary_prefix_expression.operator, context);
+        walker.walk_expression(&unary_prefix_expression.operand, context);
     }
 
     UnaryPrefixOperator as unary_prefix_operator => {
         // Do nothing
     }
 
-    UnaryPostfixOperation as unary_postfix_operation => {
-        walker.walk_expression(&unary_postfix_operation.operand, context);
-        walker.walk_unary_postfix_operator(&unary_postfix_operation.operator, context);
+    UnaryPostfixExpression as unary_postfix_expression => {
+        walker.walk_expression(&unary_postfix_expression.operand, context);
+        walker.walk_unary_postfix_operator(&unary_postfix_expression.operator, context);
     }
 
     UnaryPostfixOperator as unary_postfix_operator => {
         // Do nothing
     }
 
-    Parenthesized as parenthesized => {
-        walker.walk_expression(&parenthesized.expression, context)
+    ParenthesizedExpression as parenthesized_expression => {
+        walker.walk_expression(&parenthesized_expression.expression, context)
     }
 
-    Literal as literal => {
-        match literal {
-            Literal::String(string) => walker.walk_literal_string(string, context),
-            Literal::Integer(integer) => walker.walk_literal_integer(integer, context),
-            Literal::Float(float) => walker.walk_literal_float(float, context),
-            Literal::True(keyword) => walker.walk_true_keyword(keyword, context),
-            Literal::False(keyword) => walker.walk_false_keyword(keyword, context),
-            Literal::Null(keyword) => walker.walk_null_keyword(keyword, context),
+    LiteralExpression as literal_expression => {
+        match literal_expression {
+            LiteralExpression::String(string) => walker.walk_literal_string(string, context),
+            LiteralExpression::Integer(integer) => walker.walk_literal_integer(integer, context),
+            LiteralExpression::Float(float) => walker.walk_literal_float(float, context),
+            LiteralExpression::True(keyword) => walker.walk_true_keyword(keyword, context),
+            LiteralExpression::False(keyword) => walker.walk_false_keyword(keyword, context),
+            LiteralExpression::Null(keyword) => walker.walk_null_keyword(keyword, context),
         }
     }
 

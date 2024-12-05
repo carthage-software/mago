@@ -33,8 +33,10 @@ impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
             return;
         }
 
-        let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) =
-            (lhs.as_ref(), rhs.as_ref())
+        let (
+            Expression::Literal(LiteralExpression::String(left)),
+            Expression::Literal(LiteralExpression::String(right)),
+        ) = (lhs.as_ref(), rhs.as_ref())
         else {
             return;
         };

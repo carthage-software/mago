@@ -23,7 +23,7 @@ impl<'a> Formatter<'a> {
 
         if self.called_or_accessed_node_needs_parenthesis(node)
             || self.binarish_node_needs_parenthesis(node)
-            || self.ternary_or_assignment_needs_parenthesis(node)
+            || self.conditional_or_assignment_needs_parenthesis(node)
             || self.cast_needs_parenthesis(node)
         {
             return true;
@@ -32,7 +32,7 @@ impl<'a> Formatter<'a> {
         false
     }
 
-    fn ternary_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
+    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
         if !matches!(node, Node::AssignmentOperation(_) | Node::Conditional(_)) {
             return false;
         }
@@ -45,7 +45,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn cast_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        if !matches!(node, Node::UnaryPrefixOperation(operation) if operation.operator.is_cast()) {
+        if !matches!(node, Node::UnaryPrefixExpression(operation) if operation.operator.is_cast()) {
             return false;
         }
 
@@ -82,7 +82,7 @@ impl<'a> Formatter<'a> {
 
                 &e.operator
             }
-            Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
+            Some(Node::UnaryPrefixExpression(operation)) if operation.operator.is_cast() => {
                 return true;
             }
             Some(Node::Conditional(_) | Node::ArrayAppend(_)) => {
@@ -270,7 +270,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_unary(&self, node: Node<'a>) -> bool {
         match node {
-            Node::UnaryPrefixOperation(_) | Node::UnaryPostfixOperation(_) => true,
+            Node::UnaryPrefixExpression(_) | Node::UnaryPostfixExpression(_) => true,
             _ => false,
         }
     }

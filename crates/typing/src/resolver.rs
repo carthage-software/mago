@@ -55,21 +55,17 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn resolve<'ast>(&self, expression: &'ast Expression) -> TypeKind {
         match expression {
             Expression::Parenthesized(parenthesized) => self.resolve(&parenthesized.expression),
-            Expression::BinaryExpression(operation) => {
-                get_binary_operation_kind(&self.interner, operation, |e| self.resolve(e))
-            }
-            Expression::UnaryPrefixOperation(operation) => {
+            Expression::Binary(operation) => get_binary_operation_kind(&self.interner, operation, |e| self.resolve(e)),
+            Expression::UnaryPrefix(operation) => {
                 get_unary_prefix_operation_kind(&self.interner, operation, |e| self.resolve(e))
             }
-            Expression::UnaryPostfixOperation(operation) => {
-                get_unary_postfix_operation_kind(operation, |e| self.resolve(e))
-            }
+            Expression::UnaryPostfix(operation) => get_unary_postfix_operation_kind(operation, |e| self.resolve(e)),
             Expression::Literal(literal) => get_literal_kind(self.interner, literal),
             Expression::CompositeString(composite_string) => {
                 get_composite_string_kind(composite_string, |e| self.resolve(e))
             }
             Expression::AssignmentOperation(assignment_operation) => self.resolve(&assignment_operation.rhs),
-            Expression::Conditional(ternary_operation) => get_conditional_kind(ternary_operation, |e| self.resolve(e)),
+            Expression::Conditional(conditional) => get_conditional_kind(conditional, |e| self.resolve(e)),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),
             Expression::LegacyArray(legacy_array) => get_array_kind(&legacy_array.elements, |e| self.resolve(e)),
             Expression::ArrayAccess(array_access) => get_array_index_kind(self.resolve(&array_access.array)),
