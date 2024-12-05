@@ -301,29 +301,7 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
     let mut current_expression = rhs_expression;
     loop {
         current_expression = match current_expression {
-            Expression::Suppressed(s) => &s.expression,
-            Expression::Referenced(r) => &r.expression,
-            Expression::ArithmeticOperation(arithmetic) => {
-                if let ArithmeticOperation::Prefix(prefix_arithmetic) = arithmetic.as_ref() {
-                    &prefix_arithmetic.value
-                } else {
-                    break;
-                }
-            }
-            Expression::BitwiseOperation(bitwise) => {
-                if let BitwiseOperation::Prefix(prefix_bitwise) = bitwise.as_ref() {
-                    &prefix_bitwise.value
-                } else {
-                    break;
-                }
-            }
-            Expression::LogicalOperation(logical) => {
-                if let LogicalOperation::Prefix(prefix_logical) = logical.as_ref() {
-                    &prefix_logical.value
-                } else {
-                    break;
-                }
-            }
+            Expression::UnaryPrefixOperation(operation) => operation.operand.as_ref(),
             _ => {
                 break;
             }
@@ -449,28 +427,8 @@ fn is_lone_short_argument<'a>(f: &Formatter<'a>, argument_value: &'a Expression)
             }
             _ => false,
         },
-        Expression::Suppressed(s) => is_lone_short_argument(f, &s.expression),
-        Expression::Referenced(r) => is_lone_short_argument(f, &r.expression),
-        Expression::ArithmeticOperation(arithmetic) => {
-            if let ArithmeticOperation::Prefix(prefix_arithmetic) = arithmetic.as_ref() {
-                is_lone_short_argument(f, &prefix_arithmetic.value)
-            } else {
-                false
-            }
-        }
-        Expression::BitwiseOperation(bitwise) => {
-            if let BitwiseOperation::Prefix(prefix_bitwise) = bitwise.as_ref() {
-                is_lone_short_argument(f, &prefix_bitwise.value)
-            } else {
-                false
-            }
-        }
-        Expression::LogicalOperation(logical) => {
-            if let LogicalOperation::Prefix(prefix_logical) = logical.as_ref() {
-                is_lone_short_argument(f, &prefix_logical.value)
-            } else {
-                false
-            }
+        Expression::UnaryPrefixOperation(unary) if !unary.operator.is_cast() => {
+            is_lone_short_argument(f, &unary.operand)
         }
         _ => false,
     }

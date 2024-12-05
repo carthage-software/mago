@@ -51,12 +51,9 @@ impl<'a> Format<'a> for Expression {
 
         wrap!(f, self, Expression, {
             match self {
-                Expression::Referenced(referenced) => {
-                    group!(token!(f, referenced.ampersand, "&"), referenced.expression.format(f))
-                }
-                Expression::Suppressed(suppressed) => {
-                    group!(token!(f, suppressed.at, "@"), suppressed.expression.format(f))
-                }
+                Expression::BinaryOperation(op) => op.format(f),
+                Expression::UnaryPrefixOperation(op) => op.format(f),
+                Expression::UnaryPostfixOperation(op) => op.format(f),
                 Expression::Literal(literal) => literal.format(f),
                 Expression::CompositeString(c) => c.format(f),
                 Expression::ArithmeticOperation(op) => op.format(f),
@@ -64,7 +61,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::BitwiseOperation(op) => op.format(f),
                 Expression::ComparisonOperation(op) => op.format(f),
                 Expression::LogicalOperation(op) => op.format(f),
-                Expression::CastOperation(op) => op.format(f),
                 Expression::TernaryOperation(op) => op.format(f),
                 Expression::CoalesceOperation(op) => op.format(f),
                 Expression::ConcatOperation(op) => op.format(f),
@@ -108,6 +104,155 @@ impl<'a> Format<'a> for Expression {
                 _ => unreachable!(),
             }
         })
+    }
+}
+
+impl<'a> Format<'a> for BinaryOperation {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, BinaryOperation, {
+            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
+        })
+    }
+}
+
+impl<'a> Format<'a> for UnaryPrefixOperation {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, UnaryPrefixOperation, {
+            if self.operator.is_cast() {
+                Document::Group(Group::new(vec![self.operator.format(f), Document::space(), self.operand.format(f)]))
+            } else {
+                Document::Group(Group::new(vec![self.operator.format(f), self.operand.format(f)]))
+            }
+        })
+    }
+}
+
+impl<'a> Format<'a> for UnaryPrefixOperator {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, UnaryPrefixOperator, {
+            let cast_operator = |n: &str| match f.settings.keyword_case {
+                CasingStyle::Lowercase => {
+                    static_str!(f.as_str(format!("({})", n.to_lowercase())))
+                }
+                CasingStyle::Uppercase => {
+                    static_str!(f.as_str(format!("({})", n.to_uppercase())))
+                }
+            };
+
+            match self {
+                UnaryPrefixOperator::ArrayCast(_, _) => cast_operator("array"),
+                UnaryPrefixOperator::BoolCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("bool")
+                    } else {
+                        match f.settings.bool_cast {
+                            BoolCastOperator::Bool => cast_operator("bool"),
+                            BoolCastOperator::Boolean => cast_operator("boolean"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::BooleanCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("boolean")
+                    } else {
+                        match f.settings.bool_cast {
+                            BoolCastOperator::Bool => cast_operator("bool"),
+                            BoolCastOperator::Boolean => cast_operator("boolean"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::DoubleCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("double")
+                    } else {
+                        match f.settings.float_cast {
+                            FloatCastOperator::Float => cast_operator("float"),
+                            FloatCastOperator::Double => cast_operator("double"),
+                            FloatCastOperator::Real => cast_operator("real"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::RealCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("real")
+                    } else {
+                        match f.settings.float_cast {
+                            FloatCastOperator::Float => cast_operator("float"),
+                            FloatCastOperator::Double => cast_operator("double"),
+                            FloatCastOperator::Real => cast_operator("real"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::FloatCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("float")
+                    } else {
+                        match f.settings.float_cast {
+                            FloatCastOperator::Float => cast_operator("float"),
+                            FloatCastOperator::Double => cast_operator("double"),
+                            FloatCastOperator::Real => cast_operator("real"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::IntCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("int")
+                    } else {
+                        match f.settings.int_cast {
+                            IntCastOperator::Int => cast_operator("int"),
+                            IntCastOperator::Integer => cast_operator("integer"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::IntegerCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("integer")
+                    } else {
+                        match f.settings.int_cast {
+                            IntCastOperator::Int => cast_operator("int"),
+                            IntCastOperator::Integer => cast_operator("integer"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::ObjectCast(_, _) => cast_operator("object"),
+                UnaryPrefixOperator::UnsetCast(_, _) => cast_operator("unset"),
+                UnaryPrefixOperator::StringCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("string")
+                    } else {
+                        match f.settings.string_cast {
+                            StringCastOperator::String => cast_operator("string"),
+                            StringCastOperator::Binary => cast_operator("binary"),
+                        }
+                    }
+                }
+                UnaryPrefixOperator::BinaryCast(_, _) => {
+                    if f.settings.leave_casts_as_is {
+                        cast_operator("binary")
+                    } else {
+                        match f.settings.string_cast {
+                            StringCastOperator::String => cast_operator("string"),
+                            StringCastOperator::Binary => cast_operator("binary"),
+                        }
+                    }
+                }
+                _ => Document::String(self.as_str(&f.interner)),
+            }
+        })
+    }
+}
+
+impl<'a> Format<'a> for UnaryPostfixOperation {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, UnaryPostfixOperation, {
+            Document::Group(Group::new(vec![self.operand.format(f), self.operator.format(f)]))
+        })
+    }
+}
+
+impl<'a> Format<'a> for UnaryPostfixOperator {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, UnaryPostfixOperator, { Document::String(self.as_str()) })
     }
 }
 
@@ -730,126 +875,6 @@ impl<'a> Format<'a> for ClassConstantAccess {
 impl<'a> Format<'a> for Call {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Call, { print_call_like_node(f, CallLikeNode::Call(self)) })
-    }
-}
-
-impl<'a> Format<'a> for CastOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, CastOperation, { group!(self.operator.format(f), space!(), self.value.format(f)) })
-    }
-}
-
-impl<'a> Format<'a> for CastOperator {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, CastOperator, {
-            let op = |n: &str| match f.settings.keyword_case {
-                CasingStyle::Lowercase => {
-                    static_str!(f.as_str(format!("({})", n.to_lowercase())))
-                }
-                CasingStyle::Uppercase => {
-                    static_str!(f.as_str(format!("({})", n.to_uppercase())))
-                }
-            };
-
-            match self {
-                CastOperator::Array(_, _) => op("array"),
-                CastOperator::Bool(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("bool")
-                    } else {
-                        match f.settings.bool_cast {
-                            BoolCastOperator::Bool => op("bool"),
-                            BoolCastOperator::Boolean => op("boolean"),
-                        }
-                    }
-                }
-                CastOperator::Boolean(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("boolean")
-                    } else {
-                        match f.settings.bool_cast {
-                            BoolCastOperator::Bool => op("bool"),
-                            BoolCastOperator::Boolean => op("boolean"),
-                        }
-                    }
-                }
-                CastOperator::Double(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("float")
-                    } else {
-                        match f.settings.float_cast {
-                            FloatCastOperator::Float => op("float"),
-                            FloatCastOperator::Double => op("double"),
-                            FloatCastOperator::Real => op("real"),
-                        }
-                    }
-                }
-                CastOperator::Real(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("real")
-                    } else {
-                        match f.settings.float_cast {
-                            FloatCastOperator::Float => op("float"),
-                            FloatCastOperator::Double => op("double"),
-                            FloatCastOperator::Real => op("real"),
-                        }
-                    }
-                }
-                CastOperator::Float(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("float")
-                    } else {
-                        match f.settings.float_cast {
-                            FloatCastOperator::Float => op("float"),
-                            FloatCastOperator::Double => op("double"),
-                            FloatCastOperator::Real => op("real"),
-                        }
-                    }
-                }
-                CastOperator::Int(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("int")
-                    } else {
-                        match f.settings.int_cast {
-                            IntCastOperator::Int => op("int"),
-                            IntCastOperator::Integer => op("integer"),
-                        }
-                    }
-                }
-                CastOperator::Integer(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("integer")
-                    } else {
-                        match f.settings.int_cast {
-                            IntCastOperator::Int => op("int"),
-                            IntCastOperator::Integer => op("integer"),
-                        }
-                    }
-                }
-                CastOperator::Object(_, _) => op("object"),
-                CastOperator::Unset(_, _) => op("unset"),
-                CastOperator::String(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("string")
-                    } else {
-                        match f.settings.string_cast {
-                            StringCastOperator::String => op("string"),
-                            StringCastOperator::Binary => op("binary"),
-                        }
-                    }
-                }
-                CastOperator::Binary(_, _) => {
-                    if f.settings.leave_casts_as_is {
-                        op("binary")
-                    } else {
-                        match f.settings.string_cast {
-                            StringCastOperator::String => op("string"),
-                            StringCastOperator::Binary => op("binary"),
-                        }
-                    }
-                }
-            }
-        })
     }
 }
 

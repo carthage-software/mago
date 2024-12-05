@@ -5,4 +5,3 @@ pub mod require_parameter_type;
 pub mod require_property_type;
 pub mod require_return_type;
 pub mod require_strict_types;
-pub mod utils;

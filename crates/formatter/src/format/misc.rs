@@ -64,12 +64,8 @@ pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expre
         return should_hug_expression(f, &inner.expression);
     }
 
-    if let Expression::Referenced(inner) = expression {
-        return should_hug_expression(f, &inner.expression);
-    }
-
-    if let Expression::Suppressed(inner) = expression {
-        return should_hug_expression(f, &inner.expression);
+    if let Expression::UnaryPrefixOperation(operation) = expression {
+        return should_hug_expression(f, &operation.operand);
     }
 
     // if the expression has leading or trailing comments, we can't hug it

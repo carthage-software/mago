@@ -1,9 +1,9 @@
+use crate::plugin::safety::rules::no_error_control_operator::NoErrorControlOperatorRule;
 use crate::plugin::safety::rules::no_eval::NoEvalRule;
 use crate::plugin::safety::rules::no_ffi::NoFFIRule;
 use crate::plugin::safety::rules::no_global::NoGlobalRule;
 use crate::plugin::safety::rules::no_request_variable::NoRequestVariableRule;
 use crate::plugin::safety::rules::no_shell_execute_string::NoShellExecuteStringRule;
-use crate::plugin::safety::rules::no_suppressed_expression::NoSuppressedExpressionRule;
 
 use crate::plugin::Plugin;
 use crate::rule::Rule;
@@ -29,7 +29,7 @@ impl Plugin for SafetyPlugin {
             Box::new(NoRequestVariableRule),
             Box::new(NoShellExecuteStringRule),
             Box::new(NoEvalRule),
-            Box::new(NoSuppressedExpressionRule),
+            Box::new(NoErrorControlOperatorRule),
         ]
     }
 }

@@ -41,5 +41,5 @@ Function Main(): Never {
     return;
 }
 
-
-function Example()
+$a = @fopen('file.txt', 'r');
+$s = &$a;

@@ -34,14 +34,16 @@ use crate::ast::magic_constant::MagicConstant;
 use crate::ast::operation::arithmetic::ArithmeticOperation;
 use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
+use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
-use crate::ast::operation::cast::CastOperation;
 use crate::ast::operation::coalesce::CoalesceOperation;
 use crate::ast::operation::comparison::ComparisonOperation;
 use crate::ast::operation::concat::ConcatOperation;
 use crate::ast::operation::instanceof::InstanceofOperation;
 use crate::ast::operation::logical::LogicalOperation;
 use crate::ast::operation::ternary::TernaryOperation;
+use crate::ast::operation::unary::UnaryPostfixOperation;
+use crate::ast::operation::unary::UnaryPrefixOperation;
 use crate::ast::r#yield::Yield;
 use crate::ast::string::CompositeString;
 use crate::ast::string::StringPart;
@@ -56,24 +58,13 @@ pub struct Parenthesized {
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Referenced {
-    pub ampersand: Span,
-    pub expression: Expression,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Suppressed {
-    pub at: Span,
-    pub expression: Expression,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Expression {
+    BinaryOperation(BinaryOperation),
+    UnaryPrefixOperation(UnaryPrefixOperation),
+    UnaryPostfixOperation(UnaryPostfixOperation),
     Parenthesized(Box<Parenthesized>),
-    Referenced(Box<Referenced>),
-    Suppressed(Box<Suppressed>),
     Literal(Literal),
     CompositeString(Box<CompositeString>),
     ArithmeticOperation(Box<ArithmeticOperation>),
@@ -81,7 +72,6 @@ pub enum Expression {
     BitwiseOperation(Box<BitwiseOperation>),
     ComparisonOperation(Box<ComparisonOperation>),
     LogicalOperation(Box<LogicalOperation>),
-    CastOperation(Box<CastOperation>),
     TernaryOperation(Box<TernaryOperation>),
     CoalesceOperation(Box<CoalesceOperation>),
     ConcatOperation(Box<ConcatOperation>),
@@ -114,6 +104,17 @@ pub enum Expression {
 impl Expression {
     pub fn is_constant(&self, initilization: bool) -> bool {
         match &self {
+            Self::BinaryOperation(operation) => {
+                operation.operator.is_constant()
+                    && operation.lhs.is_constant(initilization)
+                    && operation.rhs.is_constant(initilization)
+            }
+            Self::UnaryPrefixOperation(operation) => {
+                operation.operator.is_constant() && operation.operand.is_constant(initilization)
+            }
+            Self::UnaryPostfixOperation(operation) => {
+                operation.operator.is_constant() && operation.operand.is_constant(initilization)
+            }
             Self::Literal(_) => true,
             Self::Identifier(_) => true,
             Self::MagicConstant(_) => true,
@@ -252,45 +253,22 @@ impl Expression {
         }
     }
 
-    pub fn is_binary(&self) -> bool {
-        match &self {
-            Expression::ArithmeticOperation(arithmetic) => {
-                matches!(arithmetic.as_ref(), ArithmeticOperation::Infix(_))
-            }
-            Expression::BitwiseOperation(bitwise) => {
-                matches!(bitwise.as_ref(), BitwiseOperation::Infix(_))
-            }
-            Expression::LogicalOperation(logical) => {
-                matches!(logical.as_ref(), LogicalOperation::Infix(_))
-            }
-            Expression::ComparisonOperation(_) => true,
-            Expression::ConcatOperation(_) => true,
-            Expression::CoalesceOperation(_) => true,
-            _ => false,
-        }
+    #[inline]
+    pub const fn is_binary(&self) -> bool {
+        matches!(&self, Expression::BinaryOperation(_))
     }
 
-    pub fn is_unary(&self) -> bool {
-        match &self {
-            Expression::Suppressed(_) => true,
-            Expression::Referenced(_) => true,
-            Expression::ArithmeticOperation(arithmetic) => {
-                matches!(arithmetic.as_ref(), ArithmeticOperation::Prefix(_))
-            }
-            Expression::BitwiseOperation(bitwise) => {
-                matches!(bitwise.as_ref(), BitwiseOperation::Prefix(_))
-            }
-            Expression::LogicalOperation(logical) => {
-                matches!(logical.as_ref(), LogicalOperation::Prefix(_))
-            }
-            _ => false,
-        }
+    #[inline]
+    pub const fn is_unary(&self) -> bool {
+        matches!(&self, Expression::UnaryPrefixOperation(_) | Expression::UnaryPostfixOperation(_))
     }
 
+    #[inline]
     pub fn is_literal(&self) -> bool {
         matches!(self, Expression::Literal(_))
     }
 
+    #[inline]
     pub fn is_string_literal(&self) -> bool {
         match &self {
             Expression::Literal(literal) => match literal {
@@ -303,9 +281,10 @@ impl Expression {
 
     pub fn node_kind(&self) -> NodeKind {
         match &self {
+            Expression::BinaryOperation(_) => NodeKind::BinaryOperation,
+            Expression::UnaryPrefixOperation(_) => NodeKind::UnaryPrefixOperation,
+            Expression::UnaryPostfixOperation(_) => NodeKind::UnaryPostfixOperation,
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
-            Expression::Referenced(_) => NodeKind::Referenced,
-            Expression::Suppressed(_) => NodeKind::Suppressed,
             Expression::Literal(_) => NodeKind::Literal,
             Expression::CompositeString(_) => NodeKind::CompositeString,
             Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
@@ -313,7 +292,6 @@ impl Expression {
             Expression::BitwiseOperation(_) => NodeKind::BitwiseOperation,
             Expression::ComparisonOperation(_) => NodeKind::ComparisonOperation,
             Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
-            Expression::CastOperation(_) => NodeKind::CastOperation,
             Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
             Expression::CoalesceOperation(_) => NodeKind::CoalesceOperation,
             Expression::ConcatOperation(_) => NodeKind::ConcatOperation,
@@ -351,24 +329,13 @@ impl HasSpan for Parenthesized {
     }
 }
 
-impl HasSpan for Referenced {
-    fn span(&self) -> Span {
-        self.ampersand.join(self.expression.span())
-    }
-}
-
-impl HasSpan for Suppressed {
-    fn span(&self) -> Span {
-        self.at.join(self.expression.span())
-    }
-}
-
 impl HasSpan for Expression {
     fn span(&self) -> Span {
         match &self {
+            Expression::BinaryOperation(expression) => expression.span(),
+            Expression::UnaryPrefixOperation(expression) => expression.span(),
+            Expression::UnaryPostfixOperation(expression) => expression.span(),
             Expression::Parenthesized(expression) => expression.span(),
-            Expression::Referenced(expression) => expression.span(),
-            Expression::Suppressed(expression) => expression.span(),
             Expression::Literal(expression) => expression.span(),
             Expression::CompositeString(expression) => expression.span(),
             Expression::ArithmeticOperation(expression) => expression.span(),
@@ -376,7 +343,6 @@ impl HasSpan for Expression {
             Expression::BitwiseOperation(expression) => expression.span(),
             Expression::ComparisonOperation(expression) => expression.span(),
             Expression::LogicalOperation(expression) => expression.span(),
-            Expression::CastOperation(expression) => expression.span(),
             Expression::TernaryOperation(expression) => expression.span(),
             Expression::CoalesceOperation(expression) => expression.span(),
             Expression::ConcatOperation(expression) => expression.span(),

@@ -1286,8 +1286,9 @@ generate_ast_walker! {
     Expression as expression => {
         match &expression {
             Expression::Parenthesized(parenthesized) => walker.walk_parenthesized(parenthesized.as_ref(), context),
-            Expression::Referenced(referenced) => walker.walk_referenced(referenced.as_ref(), context),
-            Expression::Suppressed(suppressed) => walker.walk_suppressed(suppressed.as_ref(), context),
+            Expression::BinaryOperation(operation) => walker.walk_binary_operation(operation, context),
+            Expression::UnaryPrefixOperation(operation) => walker.walk_unary_prefix_operation(operation, context),
+            Expression::UnaryPostfixOperation(operation) => walker.walk_unary_postfix_operation(operation, context),
             Expression::Literal(literal) => walker.walk_literal(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string.as_ref(), context),
             Expression::ArithmeticOperation(arithmetic_operation) => {
@@ -1305,7 +1306,6 @@ generate_ast_walker! {
             Expression::LogicalOperation(logical_operation) => {
                 walker.walk_logical_operation(logical_operation.as_ref(), context)
             }
-            Expression::CastOperation(cast_operation) => walker.walk_cast_operation(cast_operation.as_ref(), context),
             Expression::TernaryOperation(ternary_operation) => {
                 walker.walk_ternary_operation(ternary_operation.as_ref(), context)
             }
@@ -1348,16 +1348,44 @@ generate_ast_walker! {
         }
     }
 
+    BinaryOperation as binary_operation => {
+        walker.walk_expression(&binary_operation.lhs, context);
+        walker.walk_binary_operator(&binary_operation.operator, context);
+        walker.walk_expression(&binary_operation.rhs, context);
+    }
+
+    BinaryOperator as binary_operator => {
+        match binary_operator {
+            BinaryOperator::Instanceof(keyword)
+            | BinaryOperator::LowAnd(keyword)
+            | BinaryOperator::LowOr(keyword)
+            | BinaryOperator::LowXor(keyword) => {
+                walker.walk_keyword(keyword, context);
+            }
+            _ => {}
+        }
+    }
+
+    UnaryPrefixOperation as unary_prefix_operation => {
+        walker.walk_unary_prefix_operator(&unary_prefix_operation.operator, context);
+        walker.walk_expression(&unary_prefix_operation.operand, context);
+    }
+
+    UnaryPrefixOperator as unary_prefix_operator => {
+        // Do nothing
+    }
+
+    UnaryPostfixOperation as unary_postfix_operation => {
+        walker.walk_expression(&unary_postfix_operation.operand, context);
+        walker.walk_unary_postfix_operator(&unary_postfix_operation.operator, context);
+    }
+
+    UnaryPostfixOperator as unary_postfix_operator => {
+        // Do nothing
+    }
+
     Parenthesized as parenthesized => {
         walker.walk_expression(&parenthesized.expression, context)
-    }
-
-    Referenced as referenced => {
-        walker.walk_expression(&referenced.expression, context)
-    }
-
-    Suppressed as suppressed => {
-        walker.walk_expression(&suppressed.expression, context)
     }
 
     Literal as literal => {
@@ -1551,15 +1579,6 @@ generate_ast_walker! {
     }
 
     LogicalInfixOperator as logical_infix_operator => {
-        // Do nothing
-    }
-
-    CastOperation as cast_operation => {
-        walker.walk_cast_operator(&cast_operation.operator, context);
-        walker.walk_expression(&cast_operation.value, context);
-    }
-
-    CastOperator as cast_operator => {
         // Do nothing
     }
 

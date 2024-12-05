@@ -273,8 +273,7 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
     loop {
         node = match node {
             Expression::Parenthesized(parenthesized) => &parenthesized.expression,
-            Expression::Suppressed(suppressed) => &suppressed.expression,
-            Expression::Referenced(referenced) => &referenced.expression,
+            Expression::UnaryPrefixOperation(operation) if !operation.operator.is_cast() => operation.operand.as_ref(),
             _ => break,
         };
     }
@@ -349,8 +348,17 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
 
     match node {
         Expression::Parenthesized(parenthesized) => is_simple_call_argument(&parenthesized.expression, depth),
-        Expression::Suppressed(suppressed) => is_simple_call_argument(&suppressed.expression, depth),
-        Expression::Referenced(referenced) => is_simple_call_argument(&referenced.expression, depth),
+        Expression::UnaryPrefixOperation(operation) => {
+            if let UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_) = operation.operator {
+                return false;
+            }
+
+            if operation.operator.is_cast() {
+                return false;
+            }
+
+            is_simple_call_argument(&operation.operand, depth)
+        }
         Expression::Array(array) => array.elements.iter().all(is_simple_element),
         Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
         Expression::Call(call) => {
@@ -410,31 +418,6 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
                     }
                     None => true,
                 }
-            } else {
-                false
-            }
-        }
-        Expression::ArithmeticOperation(arithmetic) => {
-            if let ArithmeticOperation::Prefix(ArithmeticPrefixOperation {
-                operator: ArithmeticPrefixOperator::Minus(_) | ArithmeticPrefixOperator::Plus(_),
-                value,
-            }) = arithmetic.as_ref()
-            {
-                is_simple_call_argument(&value, depth)
-            } else {
-                false
-            }
-        }
-        Expression::BitwiseOperation(bitwise) => {
-            if let BitwiseOperation::Prefix(operation) = bitwise.as_ref() {
-                is_simple_call_argument(&operation.value, depth)
-            } else {
-                false
-            }
-        }
-        Expression::LogicalOperation(logical) => {
-            if let LogicalOperation::Prefix(operation) = logical.as_ref() {
-                is_simple_call_argument(&operation.value, depth)
             } else {
                 false
             }

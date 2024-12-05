@@ -241,14 +241,14 @@ where
 }
 
 #[inline]
-pub fn get_cast_operation_kind<F>(cast_operation: &CastOperation, get_expression_kind: F) -> TypeKind
+pub fn get_unary_prefix_operation_kind<F>(unary_operation: &UnaryPrefixOperation, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
-    let value_kind = get_expression_kind(&cast_operation.value);
+    let value_kind = get_expression_kind(&unary_operation.operand);
 
-    match &cast_operation.operator {
-        CastOperator::Array(_, _) => {
+    match &unary_operation.operator {
+        UnaryPrefixOperator::ArrayCast(_, _) => {
             if value_kind.is_array() {
                 // the value is already an array, which could be more specific, so we keep it.
                 value_kind
@@ -256,7 +256,7 @@ where
                 array_kind(array_key_kind(), mixed_kind(false), None)
             }
         }
-        CastOperator::Bool(_, _) | CastOperator::Boolean(_, _) => {
+        UnaryPrefixOperator::BoolCast(_, _) | UnaryPrefixOperator::BooleanCast(_, _) => {
             if value_kind.is_bool().is_true() {
                 return value_kind;
             }
@@ -267,21 +267,23 @@ where
                 Trinary::False => false_kind(),
             }
         }
-        CastOperator::Double(_, _) | CastOperator::Real(_, _) | CastOperator::Float(_, _) => {
+        UnaryPrefixOperator::DoubleCast(_, _)
+        | UnaryPrefixOperator::RealCast(_, _)
+        | UnaryPrefixOperator::FloatCast(_, _) => {
             if value_kind.is_float().is_true() {
                 return value_kind;
             } else {
                 return float_kind();
             }
         }
-        CastOperator::Int(_, _) | CastOperator::Integer(_, _) => {
+        UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
             if value_kind.is_integer().is_true() {
                 return value_kind;
             } else {
                 return integer_kind();
             }
         }
-        CastOperator::Object(_, _) => {
+        UnaryPrefixOperator::ObjectCast(_, _) => {
             if value_kind.is_object() {
                 // the value is already an object, which could be more specific, so we keep it.
                 value_kind
@@ -289,13 +291,48 @@ where
                 any_object_kind()
             }
         }
-        CastOperator::Unset(_, _) => void_kind(),
-        CastOperator::String(_, _) | CastOperator::Binary(_, _) => {
+        UnaryPrefixOperator::UnsetCast(_, _) => void_kind(),
+        UnaryPrefixOperator::StringCast(_, _) | UnaryPrefixOperator::BinaryCast(_, _) => {
             if value_kind.is_string().is_true() {
                 // the value is already a string, which could be more specific, so we keep it.
                 value_kind
             } else {
                 string_kind()
+            }
+        }
+        UnaryPrefixOperator::ErrorControl(_) => void_kind(),
+        UnaryPrefixOperator::Reference(_) => value_kind,
+        UnaryPrefixOperator::BitwiseNot(_) => {
+            if value_kind.is_integer().is_true() {
+                return value_kind;
+            } else {
+                return integer_kind();
+            }
+        }
+        UnaryPrefixOperator::Not(_) => match value_kind.is_truthy() {
+            Trinary::True => false_kind(),
+            Trinary::Maybe => bool_kind(),
+            Trinary::False => true_kind(),
+        },
+        UnaryPrefixOperator::PreIncrement(_) => {
+            if value_kind.is_integer().is_true() {
+                return value_kind;
+            } else {
+                return integer_kind();
+            }
+        }
+        UnaryPrefixOperator::PreDecrement(_) => {
+            if value_kind.is_integer().is_true() {
+                return value_kind;
+            } else {
+                return integer_kind();
+            }
+        }
+        UnaryPrefixOperator::Plus(_) | UnaryPrefixOperator::Negation(_) => {
+            if value_kind.is_integer().is_true() || value_kind.is_float().is_true() {
+                return value_kind;
+            } else {
+                return union_kind(vec![integer_kind(), float_kind()]);
             }
         }
     }

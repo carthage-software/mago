@@ -55,8 +55,9 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn resolve<'ast>(&self, expression: &'ast Expression) -> TypeKind {
         match expression {
             Expression::Parenthesized(parenthesized) => self.resolve(&parenthesized.expression),
-            Expression::Referenced(referenced) => self.resolve(&referenced.expression),
-            Expression::Suppressed(suppressed) => self.resolve(&suppressed.expression),
+            Expression::UnaryPrefixOperation(operation) => {
+                get_unary_prefix_operation_kind(operation, |e| self.resolve(e))
+            }
             Expression::Literal(literal) => get_literal_kind(self.interner, literal),
             Expression::CompositeString(composite_string) => {
                 get_composite_string_kind(composite_string, |e| self.resolve(e))
@@ -77,7 +78,6 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::LogicalOperation(logical_operation) => {
                 get_logical_operation_kind(logical_operation, |e| self.resolve(e))
             }
-            Expression::CastOperation(cast_operation) => get_cast_operation_kind(cast_operation, |e| self.resolve(e)),
             Expression::TernaryOperation(ternary_operation) => {
                 get_ternary_operation_kind(ternary_operation, |e| self.resolve(e))
             }
@@ -561,12 +561,11 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 | MagicConstant::Namespace(_) => TypeKind::Scalar(ScalarTypeKind::LiteralString),
                 MagicConstant::Class(_) => TypeKind::Scalar(ScalarTypeKind::ClassString(None)),
             },
-            // Requires more context
-            Expression::Variable(_) => mixed_kind(false),
-            Expression::Yield(_) => mixed_kind(false),
             // Non-readable expressions
             Expression::ArrayAppend(_) => never_kind(),
             Expression::List(_) => never_kind(),
+            // Requires more context
+            _ => mixed_kind(false),
         }
     }
 }

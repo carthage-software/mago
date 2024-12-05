@@ -45,7 +45,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn cast_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        if !matches!(node, Node::CastOperation(_)) {
+        if !matches!(node, Node::UnaryPrefixOperation(operation) if operation.operator.is_cast()) {
             return false;
         }
 
@@ -83,9 +83,11 @@ impl<'a> Formatter<'a> {
                     return true;
                 }
             }
+            Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
+                return true;
+            }
             Some(
-                Node::CastOperation(_)
-                | Node::InstanceofOperation(_)
+                Node::InstanceofOperation(_)
                 | Node::ConditionalTernaryOperation(_)
                 | Node::ElvisTernaryOperation(_)
                 | Node::ArrayAppend(_),
@@ -266,13 +268,13 @@ impl<'a> Formatter<'a> {
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
-            Node::ConcatOperation(_)
+            Node::BinaryOperation(_)
+            | Node::ConcatOperation(_)
             | Node::CoalesceOperation(_)
             | Node::LogicalInfixOperation(_)
             | Node::ComparisonOperation(_)
             | Node::BitwiseInfixOperation(_)
             | Node::ArithmeticInfixOperation(_)
-            | Node::CastOperation(_)
             | Node::InstanceofOperation(_)
             | Node::ElvisTernaryOperation(_) => true,
             Node::ConditionalTernaryOperation(op) => op.then.is_none(),
@@ -282,7 +284,9 @@ impl<'a> Formatter<'a> {
 
     const fn is_unary(&self, node: Node<'a>) -> bool {
         match node {
-            Node::ArithmeticPostfixOperation(_)
+            Node::UnaryPrefixOperation(_)
+            | Node::UnaryPostfixOperation(_)
+            | Node::ArithmeticPostfixOperation(_)
             | Node::BitwisePrefixOperation(_)
             | Node::LogicalPrefixOperation(_)
             | Node::ArithmeticPrefixOperation(_) => true,

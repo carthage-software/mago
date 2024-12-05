@@ -1,3 +1,4 @@
+use fennec_ast::BinaryOperator;
 use strum::Display;
 
 use fennec_ast::ArithmeticInfixOperator;
@@ -59,11 +60,18 @@ impl BinaryishOperator {
     }
 }
 
+impl From<BinaryOperator> for BinaryishOperator {
+    fn from(_: BinaryOperator) -> Self {
+        todo!()
+    }
+}
+
 impl From<BitwiseInfixOperator> for BinaryishOperator {
     fn from(op: BitwiseInfixOperator) -> Self {
         Self::Bitwise(op)
     }
 }
+
 impl From<LogicalInfixOperator> for BinaryishOperator {
     fn from(op: LogicalInfixOperator) -> Self {
         Self::Logical(op)

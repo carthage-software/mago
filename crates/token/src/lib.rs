@@ -629,7 +629,7 @@ impl TokenKind {
     }
 
     #[inline(always)]
-    pub fn is_cast(&self) -> bool {
+    pub const fn is_cast(&self) -> bool {
         matches!(
             self,
             T!["(string)"
@@ -645,6 +645,15 @@ impl TokenKind {
                 | "(object)"
                 | "(unset)"]
         )
+    }
+
+    #[inline(always)]
+    pub const fn is_unary_prefix(&self) -> bool {
+        if self.is_cast() {
+            return true;
+        }
+
+        matches!(self, T!["@" | "!" | "~" | "-" | "+" | "++" | "--" | "&"])
     }
 
     #[inline(always)]

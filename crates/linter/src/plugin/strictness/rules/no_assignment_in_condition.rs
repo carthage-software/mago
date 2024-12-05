@@ -1,10 +1,10 @@
 use fennec_ast::ast::*;
+use fennec_ast_utils::get_assignment_from_expression;
 use fennec_reporting::*;
 use fennec_span::*;
 use fennec_walker::Walker;
 
 use crate::context::LintContext;
-use crate::plugin::strictness::rules::utils::get_assignment_from_expression;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]

@@ -9,6 +9,7 @@ use crate::error::ParseError;
 use crate::internal::argument;
 use crate::internal::array::parse_array;
 use crate::internal::array::parse_legacy_array;
+use crate::internal::array::parse_list;
 use crate::internal::attribute;
 use crate::internal::class_like::member;
 use crate::internal::class_like::parse_anonymous_class;
@@ -21,17 +22,13 @@ use crate::internal::identifier;
 use crate::internal::instantiation::parse_instantiation;
 use crate::internal::literal;
 use crate::internal::magic_constant::parse_magic_constant;
-use crate::internal::operation::arithmetic::parse_prefix_operation;
-use crate::internal::operation::cast;
-use crate::internal::operation::logical::parse_logical_not;
+use crate::internal::operation::unary;
 use crate::internal::r#yield::parse_yield;
 use crate::internal::string::parse_string;
 use crate::internal::throw::parse_throw;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 use crate::internal::variable;
-
-use super::array::parse_list;
 
 pub fn parse_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expression, ParseError> {
     parse_expression_with_precedence(stream, Precedence::Lowest)
@@ -95,8 +92,8 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
         return literal::parse_literal(stream).map(Expression::Literal);
     }
 
-    if token.kind.is_cast() {
-        return cast::parse_cast(stream).map(Box::new).map(Expression::CastOperation);
+    if token.kind.is_unary_prefix() {
+        return unary::parse_unary_prefix_operation(stream).map(Expression::UnaryPrefixOperation);
     }
 
     if matches!(token.kind, T!["#["]) {
@@ -143,24 +140,7 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
         (T!["array"], Some(T!["("])) => Expression::LegacyArray(Box::new(parse_legacy_array(stream)?)),
         (T!["["], _) => Expression::Array(Box::new(parse_array(stream)?)),
         (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(parse_magic_constant(stream)?),
-        (T!["--" | "++" | "-" | "+"], _) => {
-            Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Prefix(parse_prefix_operation(stream)?)))
-        }
-        (T!["!"], _) => Expression::LogicalOperation(Box::new(parse_logical_not(stream)?)),
-        (T!["@"], _) => Expression::Suppressed(Box::new(Suppressed {
-            at: utils::expect_any(stream)?.span,
-            expression: parse_expression_with_precedence(stream, Precedence::Prefix)?,
-        })),
-        (T!["&"], _) => Expression::Referenced(Box::new(Referenced {
-            ampersand: utils::expect_any(stream)?.span,
-            expression: parse_expression_with_precedence(stream, Precedence::BitwiseAnd)?,
-        })),
-        (T!["~"], _) => Expression::BitwiseOperation(Box::new(BitwiseOperation::Prefix(BitwisePrefixOperation {
-            operator: BitwisePrefixOperator::Not(utils::expect_any(stream)?.span),
-            value: parse_expression_with_precedence(stream, Precedence::Prefix)?,
-        }))),
         (T!["$" | "${" | "$variable"], _) => variable::parse_variable(stream).map(Expression::Variable)?,
-
         _ => return Err(utils::unexpected(stream, Some(token), &[])),
     })
 }
