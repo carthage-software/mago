@@ -16,6 +16,7 @@ use crate::ast::array::ArrayAppend;
 use crate::ast::array::ArrayElement;
 use crate::ast::array::LegacyArray;
 use crate::ast::array::List;
+use crate::ast::assignment::Assignment;
 use crate::ast::call::Call;
 use crate::ast::class_like::member::ClassLikeConstantSelector;
 use crate::ast::class_like::member::ClassLikeMemberSelector;
@@ -32,7 +33,6 @@ use crate::ast::instantiation::Instantiation;
 use crate::ast::keyword::Keyword;
 use crate::ast::literal::Literal;
 use crate::ast::magic_constant::MagicConstant;
-use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::unary::UnaryPostfixOperation;
 use crate::ast::operation::unary::UnaryPrefixOperation;
@@ -59,7 +59,7 @@ pub enum Expression {
     Parenthesized(Box<Parenthesized>),
     Literal(Literal),
     CompositeString(Box<CompositeString>),
-    AssignmentOperation(Box<AssignmentOperation>),
+    AssignmentOperation(Assignment),
     Conditional(Conditional),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
@@ -220,7 +220,7 @@ impl Expression {
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
             Expression::Literal(_) => NodeKind::Literal,
             Expression::CompositeString(_) => NodeKind::CompositeString,
-            Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
+            Expression::AssignmentOperation(_) => NodeKind::Assignment,
             Expression::Conditional(_) => NodeKind::Conditional,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,

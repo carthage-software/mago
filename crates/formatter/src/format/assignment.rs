@@ -14,7 +14,7 @@ use crate::Formatter;
 #[derive(Debug, Clone, Copy)]
 pub(super) enum AssignmentLikeNode<'a> {
     /// Represents a standard assignment operation, such as `$a = $b`.
-    AssignmentOperation(&'a AssignmentOperation),
+    AssignmentOperation(&'a Assignment),
 
     /// Represents a class-like constant item.
     ///
@@ -193,7 +193,7 @@ fn is_assignment<'a>(expression: &'a Expression) -> bool {
 fn is_complex_destructuring<'a, 'b>(assignment_like_node: &'b AssignmentLikeNode<'a>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
-            let elements = match &assignment.lhs {
+            let elements = match assignment.lhs.as_ref() {
                 Expression::Array(array) => &array.elements,
                 Expression::List(list) => &list.elements,
                 Expression::LegacyArray(array) => &array.elements,
@@ -211,7 +211,10 @@ fn is_complex_destructuring<'a, 'b>(assignment_like_node: &'b AssignmentLikeNode
 fn is_arrow_function_variable_declarator<'a, 'b>(assignment_like_node: &'b AssignmentLikeNode<'a>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
-            matches!((&assignment.lhs, &assignment.rhs), (Expression::Variable(_), Expression::ArrowFunction(_)))
+            matches!(
+                (assignment.lhs.as_ref(), assignment.rhs.as_ref()),
+                (Expression::Variable(_), Expression::ArrowFunction(_))
+            )
         }
         _ => false,
     }

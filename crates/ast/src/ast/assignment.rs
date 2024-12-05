@@ -29,10 +29,10 @@ pub enum AssignmentOperator {
 
 /// Represents a PHP assignment operation
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct AssignmentOperation {
-    pub lhs: Expression,
+pub struct Assignment {
+    pub lhs: Box<Expression>,
     pub operator: AssignmentOperator,
-    pub rhs: Expression,
+    pub rhs: Box<Expression>,
 }
 
 impl HasSpan for AssignmentOperator {
@@ -56,7 +56,7 @@ impl HasSpan for AssignmentOperator {
     }
 }
 
-impl HasSpan for AssignmentOperation {
+impl HasSpan for Assignment {
     fn span(&self) -> Span {
         self.lhs.span().join(self.rhs.span())
     }

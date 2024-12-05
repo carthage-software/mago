@@ -738,7 +738,7 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
     // If the left-hand side is a comparison or logical operation, we need to adjust the associativity
     // of the assignment operation to ensure it is applied to the rightmost operand.
     let Expression::BinaryOperation(operation) = lhs else {
-        return Expression::AssignmentOperation(Box::new(AssignmentOperation { lhs, operator, rhs }));
+        return Expression::AssignmentOperation(Assignment { lhs: Box::new(lhs), operator, rhs: Box::new(rhs) });
     };
 
     if operation.operator.is_comparison()
@@ -752,17 +752,17 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
         Expression::BinaryOperation(BinaryOperation {
             lhs: binary_lhs,
             operator: binary_operator,
-            rhs: Box::new(Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                lhs: *binary_rhs,
+            rhs: Box::new(Expression::AssignmentOperation(Assignment {
+                lhs: binary_rhs,
                 operator,
-                rhs,
-            }))),
+                rhs: Box::new(rhs),
+            })),
         })
     } else {
-        Expression::AssignmentOperation(Box::new(AssignmentOperation {
-            lhs: Expression::BinaryOperation(operation),
+        Expression::AssignmentOperation(Assignment {
+            lhs: Box::new(Expression::BinaryOperation(operation)),
             operator,
-            rhs,
-        }))
+            rhs: Box::new(rhs),
+        })
     }
 }

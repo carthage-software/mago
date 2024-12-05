@@ -534,7 +534,7 @@ impl<'a> Format<'a> for NamedArgument {
     }
 }
 
-impl<'a> Format<'a> for AssignmentOperation {
+impl<'a> Format<'a> for Assignment {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, AssignmentOperation, {
             let lhs = self.lhs.format(f);

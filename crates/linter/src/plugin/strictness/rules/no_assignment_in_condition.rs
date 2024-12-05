@@ -11,12 +11,7 @@ use crate::rule::Rule;
 pub struct NoAssignmentInConditionRule;
 
 impl NoAssignmentInConditionRule {
-    fn report<'ast>(
-        &self,
-        condition: &'ast Expression,
-        assignment: &'ast AssignmentOperation,
-        context: &mut LintContext,
-    ) {
+    fn report<'ast>(&self, condition: &'ast Expression, assignment: &'ast Assignment, context: &mut LintContext) {
         let mut issue = Issue::new(context.level(), "avoid assignments in conditions")
             .with_annotation(Annotation::primary(assignment.span()))
             .with_annotation(Annotation::secondary(condition.span()))

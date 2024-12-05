@@ -761,7 +761,7 @@ pub fn expression_has_throws<'ast>(expression: &'ast Expression) -> bool {
 ///
 /// If no assignment operation is found, it will return `None`.
 #[inline]
-pub fn get_assignment_from_expression<'ast>(expression: &'ast Expression) -> Option<&'ast AssignmentOperation> {
+pub fn get_assignment_from_expression<'ast>(expression: &'ast Expression) -> Option<&'ast Assignment> {
     match &expression {
         Expression::AssignmentOperation(assignment_operation) => Some(assignment_operation),
         Expression::Parenthesized(parenthesized) => get_assignment_from_expression(&parenthesized.expression),

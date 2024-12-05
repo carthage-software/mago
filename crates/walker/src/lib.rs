@@ -1291,8 +1291,8 @@ generate_ast_walker! {
             Expression::UnaryPostfixOperation(operation) => walker.walk_unary_postfix_operation(operation, context),
             Expression::Literal(literal) => walker.walk_literal(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string.as_ref(), context),
-            Expression::AssignmentOperation(assignment_operation) => {
-                walker.walk_assignment_operation(assignment_operation.as_ref(), context)
+            Expression::AssignmentOperation(assignment) => {
+                walker.walk_assignment(&assignment, context)
             }
             Expression::Conditional(conditional) => {
                 walker.walk_conditional(conditional, context)
@@ -1446,10 +1446,10 @@ generate_ast_walker! {
         walker.walk_expression(&braced_expression_string_part.expression, context);
     }
 
-    AssignmentOperation as assignment_operation => {
-        walker.walk_expression(&assignment_operation.lhs, context);
-        walker.walk_assignment_operator(&assignment_operation.operator, context);
-        walker.walk_expression(&assignment_operation.rhs, context);
+    Assignment as assignment => {
+        walker.walk_expression(&assignment.lhs, context);
+        walker.walk_assignment_operator(&assignment.operator, context);
+        walker.walk_expression(&assignment.rhs, context);
     }
 
     AssignmentOperator as assignment_operator => {

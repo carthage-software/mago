@@ -246,20 +246,20 @@ mod internal {
             }
         }
 
-        fn walk_assignment_operation<'ast>(
+        fn walk_assignment<'ast>(
             &self,
-            assignment_operation: &'ast AssignmentOperation,
+            assignment: &'ast Assignment,
             context: &mut (Vec<VariableReference>, &'a LintContext<'a>),
         ) {
             // we need to walk the right hand side first to ensure that we don't
             // mark variables as being assigned to when they are only being used
             // in the right hand side.
-            self.walk_expression(&assignment_operation.rhs, context);
+            self.walk_expression(&assignment.rhs, context);
 
             let mut variables = Vec::default();
-            scan_expression_for_assignment(&assignment_operation.lhs, &context.1, &mut variables);
+            scan_expression_for_assignment(&assignment.lhs, &context.1, &mut variables);
 
-            match assignment_operation.operator {
+            match assignment.operator {
                 AssignmentOperator::Assign(_) => {
                     context.0.extend(variables);
                 }
@@ -276,7 +276,7 @@ mod internal {
             }
 
             // then we walk the left hand side
-            self.walk_expression(&assignment_operation.lhs, context);
+            self.walk_expression(&assignment.lhs, context);
         }
 
         fn walk_in_direct_variable<'ast>(
