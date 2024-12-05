@@ -279,7 +279,7 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
     }
 
     match rhs_expression {
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             if let BinaryOperator::Elvis(_) = operation.operator {
                 let condition = operation.lhs.as_ref();
 

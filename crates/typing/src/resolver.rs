@@ -55,7 +55,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn resolve<'ast>(&self, expression: &'ast Expression) -> TypeKind {
         match expression {
             Expression::Parenthesized(parenthesized) => self.resolve(&parenthesized.expression),
-            Expression::BinaryOperation(operation) => {
+            Expression::BinaryExpression(operation) => {
                 get_binary_operation_kind(&self.interner, operation, |e| self.resolve(e))
             }
             Expression::UnaryPrefixOperation(operation) => {

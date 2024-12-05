@@ -33,7 +33,7 @@ use crate::ast::instantiation::Instantiation;
 use crate::ast::keyword::Keyword;
 use crate::ast::literal::Literal;
 use crate::ast::magic_constant::MagicConstant;
-use crate::ast::operation::binary::BinaryOperation;
+use crate::ast::operation::binary::BinaryExpression;
 use crate::ast::operation::unary::UnaryPostfixOperation;
 use crate::ast::operation::unary::UnaryPrefixOperation;
 use crate::ast::r#yield::Yield;
@@ -53,7 +53,7 @@ pub struct Parenthesized {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Expression {
-    BinaryOperation(BinaryOperation),
+    BinaryExpression(BinaryExpression),
     UnaryPrefixOperation(UnaryPrefixOperation),
     UnaryPostfixOperation(UnaryPostfixOperation),
     Parenthesized(Box<Parenthesized>),
@@ -89,7 +89,7 @@ pub enum Expression {
 impl Expression {
     pub fn is_constant(&self, initilization: bool) -> bool {
         match &self {
-            Self::BinaryOperation(operation) => {
+            Self::BinaryExpression(operation) => {
                 operation.operator.is_constant()
                     && operation.lhs.is_constant(initilization)
                     && operation.rhs.is_constant(initilization)
@@ -188,7 +188,7 @@ impl Expression {
 
     #[inline]
     pub const fn is_binary(&self) -> bool {
-        matches!(&self, Expression::BinaryOperation(_))
+        matches!(&self, Expression::BinaryExpression(_))
     }
 
     #[inline]
@@ -214,7 +214,7 @@ impl Expression {
 
     pub fn node_kind(&self) -> NodeKind {
         match &self {
-            Expression::BinaryOperation(_) => NodeKind::BinaryOperation,
+            Expression::BinaryExpression(_) => NodeKind::BinaryExpression,
             Expression::UnaryPrefixOperation(_) => NodeKind::UnaryPrefixOperation,
             Expression::UnaryPostfixOperation(_) => NodeKind::UnaryPostfixOperation,
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
@@ -258,7 +258,7 @@ impl HasSpan for Parenthesized {
 impl HasSpan for Expression {
     fn span(&self) -> Span {
         match &self {
-            Expression::BinaryOperation(expression) => expression.span(),
+            Expression::BinaryExpression(expression) => expression.span(),
             Expression::UnaryPrefixOperation(expression) => expression.span(),
             Expression::UnaryPostfixOperation(expression) => expression.span(),
             Expression::Parenthesized(expression) => expression.span(),

@@ -260,7 +260,7 @@ where
 #[inline]
 pub fn get_binary_operation_kind<F>(
     interner: &ThreadedInterner,
-    binary_operation: &BinaryOperation,
+    binary_operation: &BinaryExpression,
     get_expression_kind: F,
 ) -> TypeKind
 where

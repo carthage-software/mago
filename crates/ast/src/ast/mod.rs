@@ -146,7 +146,7 @@ pub use crate::ast::modifier::Modifier;
 pub use crate::ast::namespace::Namespace;
 pub use crate::ast::namespace::NamespaceBody;
 pub use crate::ast::namespace::NamespaceImplicitBody;
-pub use crate::ast::operation::binary::BinaryOperation;
+pub use crate::ast::operation::binary::BinaryExpression;
 pub use crate::ast::operation::binary::BinaryOperator;
 pub use crate::ast::operation::unary::UnaryPostfixOperation;
 pub use crate::ast::operation::unary::UnaryPostfixOperator;

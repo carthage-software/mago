@@ -49,7 +49,7 @@ impl<'a> Format<'a> for Expression {
 
         wrap!(f, self, Expression, {
             match self {
-                Expression::BinaryOperation(op) => op.format(f),
+                Expression::BinaryExpression(op) => op.format(f),
                 Expression::UnaryPrefixOperation(op) => op.format(f),
                 Expression::UnaryPostfixOperation(op) => op.format(f),
                 Expression::Literal(literal) => literal.format(f),
@@ -98,9 +98,9 @@ impl<'a> Format<'a> for Expression {
     }
 }
 
-impl<'a> Format<'a> for BinaryOperation {
+impl<'a> Format<'a> for BinaryExpression {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, BinaryOperation, {
+        wrap!(f, self, BinaryExpression, {
             binaryish::print_binaryish_expression(f, &self.lhs, &self.operator, &self.rhs)
         })
     }

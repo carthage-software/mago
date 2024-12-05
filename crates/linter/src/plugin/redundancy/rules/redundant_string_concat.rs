@@ -22,8 +22,12 @@ impl Rule for RedundantStringConcatRule {
 }
 
 impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
-    fn walk_in_binary_operation<'ast>(&self, binary_operation: &'ast BinaryOperation, context: &mut LintContext<'a>) {
-        let BinaryOperation { lhs, operator, rhs } = binary_operation;
+    fn walk_in_binary_expression<'ast>(
+        &self,
+        binary_expression: &'ast BinaryExpression,
+        context: &mut LintContext<'a>,
+    ) {
+        let BinaryExpression { lhs, operator, rhs } = binary_expression;
 
         if !operator.is_concatenation() {
             return;

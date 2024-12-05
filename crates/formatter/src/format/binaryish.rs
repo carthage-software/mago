@@ -23,7 +23,7 @@ pub(super) fn print_binaryish_expression<'a>(
     let parent_node = f.nth_parent_kind(2);
 
     let is_rhs_of_binaryish = match parent_node {
-        Some(Node::BinaryOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
+        Some(Node::BinaryExpression(o)) => o.operator.span().end.offset < operator.span().start.offset,
         _ => false,
     };
 
@@ -89,7 +89,7 @@ pub(super) fn print_binaryish_expression<'a>(
 
 pub(super) fn should_inline_logical_or_coalesce_expression<'a>(expression: &'a Expression) -> bool {
     let rhs = match expression {
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             if !operation.operator.is_logical() && !operation.operator.is_null_coalesce() {
                 return false;
             }

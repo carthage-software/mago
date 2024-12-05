@@ -292,7 +292,7 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
         Expression::Instantiation(instantiation) => {
             instantiation.arguments.as_ref().map_or(true, |argument_list| argument_list.arguments.len() < 2)
         }
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             is_simple_call_argument(&operation.lhs, 1) && is_simple_call_argument(&operation.rhs, 1)
         }
         _ => is_simple_call_argument(node, 2),
@@ -405,7 +405,7 @@ fn could_expand_argument_value<'a>(argument_value: &'a Expression, arrow_chain_r
         Expression::LegacyArray(expr) => expr.elements.len() > 0,
         Expression::List(expr) => expr.elements.len() > 0,
         Expression::Closure(_) => true,
-        Expression::BinaryOperation(operation) => could_expand_argument_value(&operation.lhs, arrow_chain_recursion),
+        Expression::BinaryExpression(operation) => could_expand_argument_value(&operation.lhs, arrow_chain_recursion),
         Expression::ArrowFunction(arrow_function) => match &arrow_function.expression {
             Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {
                 could_expand_argument_value(&arrow_function.expression, true)

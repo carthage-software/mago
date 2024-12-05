@@ -51,7 +51,7 @@ pub enum BinaryOperator {
 ///
 /// A binary operation is an operation that takes two operands, a left-hand side and a right-hand side.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct BinaryOperation {
+pub struct BinaryExpression {
     pub lhs: Box<Expression>,
     pub operator: BinaryOperator,
     pub rhs: Box<Expression>,
@@ -286,7 +286,7 @@ impl HasSpan for BinaryOperator {
     }
 }
 
-impl HasSpan for BinaryOperation {
+impl HasSpan for BinaryExpression {
     fn span(&self) -> Span {
         self.lhs.span().join(self.rhs.span())
     }

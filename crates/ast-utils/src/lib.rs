@@ -268,7 +268,7 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
         Expression::Parenthesized(parenthesized) => expression_has_yield(&parenthesized.expression),
         Expression::Literal(_) => false,
         Expression::CompositeString(_) => false,
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             expression_has_yield(&operation.lhs) || expression_has_yield(&operation.rhs)
         }
         Expression::UnaryPrefixOperation(operation) => expression_has_yield(&operation.operand),
@@ -575,7 +575,7 @@ pub fn expression_has_throws<'ast>(expression: &'ast Expression) -> bool {
         Expression::Parenthesized(parenthesized) => expression_has_throws(&parenthesized.expression),
         Expression::Literal(_) => false,
         Expression::CompositeString(_) => false,
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             expression_has_throws(&operation.lhs) || expression_has_throws(&operation.rhs)
         }
         Expression::UnaryPrefixOperation(operation) => expression_has_throws(&operation.operand),
@@ -765,7 +765,7 @@ pub fn get_assignment_from_expression<'ast>(expression: &'ast Expression) -> Opt
     match &expression {
         Expression::AssignmentOperation(assignment_operation) => Some(assignment_operation),
         Expression::Parenthesized(parenthesized) => get_assignment_from_expression(&parenthesized.expression),
-        Expression::BinaryOperation(operation) => {
+        Expression::BinaryExpression(operation) => {
             get_assignment_from_expression(&operation.lhs).or_else(|| get_assignment_from_expression(&operation.rhs))
         }
         Expression::UnaryPrefixOperation(operation) => get_assignment_from_expression(&operation.operand),
@@ -1012,7 +1012,7 @@ pub fn is_truthy(expression: &Expression) -> bool {
         Expression::Array(array) => !array.elements.is_empty(),
         Expression::LegacyArray(array) => !array.elements.is_empty(),
         Expression::ClosureCreation(_) => true,
-        Expression::BinaryOperation(operation) => match operation.operator {
+        Expression::BinaryExpression(operation) => match operation.operator {
             BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_truthy(&operation.lhs) || is_truthy(&operation.rhs),
             BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => {
                 is_truthy(&operation.lhs) && is_truthy(&operation.rhs)
@@ -1049,7 +1049,7 @@ pub fn is_falsy(expression: &Expression) -> bool {
         Expression::Array(array) => array.elements.is_empty(),
         Expression::LegacyArray(array) => array.elements.is_empty(),
         Expression::AssignmentOperation(assignment) => is_falsy(&assignment.rhs),
-        Expression::BinaryOperation(operation) => match operation.operator {
+        Expression::BinaryExpression(operation) => match operation.operator {
             BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_falsy(&operation.lhs) && is_falsy(&operation.rhs),
             BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => is_falsy(&operation.lhs) || is_falsy(&operation.rhs),
             BinaryOperator::NullCoalesce(_) => is_falsy(&operation.lhs) && is_falsy(&operation.rhs),

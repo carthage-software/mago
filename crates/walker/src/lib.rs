@@ -1286,7 +1286,7 @@ generate_ast_walker! {
     Expression as expression => {
         match &expression {
             Expression::Parenthesized(parenthesized) => walker.walk_parenthesized(parenthesized.as_ref(), context),
-            Expression::BinaryOperation(operation) => walker.walk_binary_operation(operation, context),
+            Expression::BinaryExpression(expr) => walker.walk_binary_expression(expr, context),
             Expression::UnaryPrefixOperation(operation) => walker.walk_unary_prefix_operation(operation, context),
             Expression::UnaryPostfixOperation(operation) => walker.walk_unary_postfix_operation(operation, context),
             Expression::Literal(literal) => walker.walk_literal(literal, context),
@@ -1327,10 +1327,10 @@ generate_ast_walker! {
         }
     }
 
-    BinaryOperation as binary_operation => {
-        walker.walk_expression(&binary_operation.lhs, context);
-        walker.walk_binary_operator(&binary_operation.operator, context);
-        walker.walk_expression(&binary_operation.rhs, context);
+    BinaryExpression as binary_expression => {
+        walker.walk_expression(&binary_expression.lhs, context);
+        walker.walk_binary_operator(&binary_expression.operator, context);
+        walker.walk_expression(&binary_expression.rhs, context);
     }
 
     BinaryOperator as binary_operator => {

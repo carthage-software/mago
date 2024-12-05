@@ -58,12 +58,12 @@ impl<'a> Formatter<'a> {
 
     fn binarish_node_needs_parenthesis(&self, node: Node<'a>) -> bool {
         let operator = match node {
-            Node::BinaryOperation(e) => &e.operator,
+            Node::BinaryExpression(e) => &e.operator,
             _ => return false,
         };
 
         let parent_operator = match self.nth_parent_kind(2) {
-            Some(Node::BinaryOperation(e)) => {
+            Some(Node::BinaryExpression(e)) => {
                 if let BinaryOperator::NullCoalesce(_) = e.operator {
                     // Add parentheses if parent is a coalesce operator,
                     //  unless the child is a coalesce operator as well.
@@ -262,7 +262,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
-            Node::BinaryOperation(_) => true,
+            Node::BinaryExpression(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
             _ => false,
         }

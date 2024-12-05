@@ -127,7 +127,7 @@ pub enum NodeKind {
     DeclareItem,
     Echo,
     Expression,
-    BinaryOperation,
+    BinaryExpression,
     BinaryOperator,
     UnaryPrefixOperation,
     UnaryPrefixOperator,
@@ -349,7 +349,7 @@ pub enum Node<'a> {
     DeclareItem(&'a DeclareItem),
     Echo(&'a Echo),
     Expression(&'a Expression),
-    BinaryOperation(&'a BinaryOperation),
+    BinaryExpression(&'a BinaryExpression),
     BinaryOperator(&'a BinaryOperator),
     UnaryPrefixOperation(&'a UnaryPrefixOperation),
     UnaryPrefixOperator(&'a UnaryPrefixOperator),
@@ -651,7 +651,7 @@ impl<'a> Node<'a> {
             Self::DeclareItem(_) => NodeKind::DeclareItem,
             Self::Echo(_) => NodeKind::Echo,
             Self::Expression(_) => NodeKind::Expression,
-            Self::BinaryOperation(_) => NodeKind::BinaryOperation,
+            Self::BinaryExpression(_) => NodeKind::BinaryExpression,
             Self::BinaryOperator(_) => NodeKind::BinaryOperator,
             Self::UnaryPrefixOperation(_) => NodeKind::UnaryPrefixOperation,
             Self::UnaryPrefixOperator(_) => NodeKind::UnaryPrefixOperator,
@@ -1411,7 +1411,7 @@ impl<'a> Node<'a> {
             }
             Node::Parenthesized(node) => vec![Node::Expression(&node.expression)],
             Node::Expression(node) => vec![match node {
-                Expression::BinaryOperation(node) => Node::BinaryOperation(node),
+                Expression::BinaryExpression(node) => Node::BinaryExpression(node),
                 Expression::UnaryPrefixOperation(node) => Node::UnaryPrefixOperation(node),
                 Expression::UnaryPostfixOperation(node) => Node::UnaryPostfixOperation(node),
                 Expression::Parenthesized(node) => Node::Parenthesized(node),
@@ -1443,7 +1443,7 @@ impl<'a> Node<'a> {
                 Expression::Instantiation(node) => Node::Instantiation(node),
                 Expression::MagicConstant(node) => Node::MagicConstant(node),
             }],
-            Node::BinaryOperation(node) => {
+            Node::BinaryExpression(node) => {
                 vec![Node::Expression(&node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(&node.rhs)]
             }
             Node::BinaryOperator(operator) => match operator {
@@ -2153,7 +2153,7 @@ impl<'a> HasSpan for Node<'a> {
             Self::DeclareItem(node) => node.span(),
             Self::Echo(node) => node.span(),
             Self::Expression(node) => node.span(),
-            Self::BinaryOperation(node) => node.span(),
+            Self::BinaryExpression(node) => node.span(),
             Self::BinaryOperator(node) => node.span(),
             Self::UnaryPrefixOperation(node) => node.span(),
             Self::UnaryPrefixOperator(node) => node.span(),
