@@ -64,9 +64,9 @@ impl<'a> Formatter<'a> {
 
         let parent_operator = match self.nth_parent_kind(2) {
             Some(Node::BinaryOperation(e)) => {
-                // Add parentheses if parent is a coalesce operator, unless the child is a coalesce operator
-                // as well.
                 if let BinaryOperator::NullCoalesce(_) = e.operator {
+                    // Add parentheses if parent is a coalesce operator,
+                    //  unless the child is a coalesce operator as well.
                     return !matches!(operator, BinaryOperator::NullCoalesce(_));
                 }
 
@@ -75,12 +75,17 @@ impl<'a> Formatter<'a> {
                     return true;
                 }
 
+                if let BinaryOperator::Elvis(_) = e.operator {
+                    // Add parentheses if parent is an elvis operator.
+                    return true;
+                }
+
                 &e.operator
             }
             Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
                 return true;
             }
-            Some(Node::ConditionalTernaryOperation(_) | Node::ElvisTernaryOperation(_) | Node::ArrayAppend(_)) => {
+            Some(Node::ConditionalTernaryOperation(_) | Node::ArrayAppend(_)) => {
                 return true;
             }
             Some(Node::ArrayAccess(access)) => {
@@ -257,10 +262,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
-            Node::BinaryOperation(_)
-            | Node::BitwiseInfixOperation(_)
-            | Node::ArithmeticInfixOperation(_)
-            | Node::ElvisTernaryOperation(_) => true,
+            Node::BinaryOperation(_) | Node::BitwiseInfixOperation(_) | Node::ArithmeticInfixOperation(_) => true,
             Node::ConditionalTernaryOperation(op) => op.then.is_none(),
             _ => false,
         }

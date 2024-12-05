@@ -300,10 +300,6 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
                     || conditional_ternary_operation.then.as_ref().map(expression_has_yield).unwrap_or(false)
                     || expression_has_yield(&conditional_ternary_operation.r#else)
             }
-            TernaryOperation::Elvis(elvis_ternary_operation) => {
-                expression_has_yield(&elvis_ternary_operation.condition)
-                    || expression_has_yield(&elvis_ternary_operation.r#else)
-            }
         },
         Expression::Array(array) => array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
@@ -613,10 +609,6 @@ pub fn expression_has_throws<'ast>(expression: &'ast Expression) -> bool {
                     || conditional_ternary_operation.then.as_ref().map(expression_has_throws).unwrap_or(false)
                     || expression_has_throws(&conditional_ternary_operation.r#else)
             }
-            TernaryOperation::Elvis(elvis_ternary_operation) => {
-                expression_has_throws(&elvis_ternary_operation.condition)
-                    || expression_has_throws(&elvis_ternary_operation.r#else)
-            }
         },
         Expression::Array(array) => array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
@@ -810,10 +802,6 @@ pub fn get_assignment_from_expression<'ast>(expression: &'ast Expression) -> Opt
                             .and_then(|then| get_assignment_from_expression(then))
                     })
                     .or_else(|| get_assignment_from_expression(&conditional_ternary_operation.r#else))
-            }
-            TernaryOperation::Elvis(elvis_ternary_operation) => {
-                get_assignment_from_expression(&elvis_ternary_operation.condition)
-                    .or_else(|| get_assignment_from_expression(&elvis_ternary_operation.r#else))
             }
         },
         Expression::Array(array) => array.elements.iter().find_map(|element| match &element {

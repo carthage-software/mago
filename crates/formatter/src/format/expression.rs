@@ -967,7 +967,6 @@ impl<'a> Format<'a> for TernaryOperation {
         wrap!(f, self, TernaryOperation, {
             match self {
                 TernaryOperation::Conditional(t) => t.format(f),
-                TernaryOperation::Elvis(t) => t.format(f),
             }
         })
     }
@@ -1003,22 +1002,6 @@ impl<'a> Format<'a> for ConditionalTernaryOperation {
                     )
                 }
             }
-        })
-    }
-}
-
-impl<'a> Format<'a> for ElvisTernaryOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ElvisTernaryOperation, {
-            group!(
-                self.condition.format(f),
-                indent_if_break!(
-                    if_break!(default_line!(), space!()),
-                    token!(f, self.question_mark_colon, "?:"),
-                    space!()
-                ),
-                self.r#else.format(f)
-            )
         })
     }
 }

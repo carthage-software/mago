@@ -315,16 +315,6 @@ where
                 }
             }
         }
-        TernaryOperation::Elvis(elvis_ternary_operation) => {
-            let condition_kind = get_expression_kind(&elvis_ternary_operation.condition);
-            let else_kind = get_expression_kind(&elvis_ternary_operation.r#else);
-
-            match condition_kind.is_truthy() {
-                Trinary::True => condition_kind,
-                Trinary::Maybe => union_kind(vec![condition_kind, else_kind]),
-                Trinary::False => else_kind,
-            }
-        }
     }
 }
 
@@ -484,6 +474,11 @@ where
                 Trinary::Maybe => union_kind(vec![left_kind, right_kind]),
             }
         }
+        BinaryOperator::Elvis(_) => match left_kind.is_truthy() {
+            Trinary::True => left_kind,
+            Trinary::Maybe => union_kind(vec![left_kind, right_kind]),
+            Trinary::False => right_kind,
+        },
         _ => mixed_kind(false),
     }
 }

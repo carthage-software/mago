@@ -178,7 +178,6 @@ pub enum NodeKind {
     BitwisePrefixOperation,
     BitwisePrefixOperator,
     ConditionalTernaryOperation,
-    ElvisTernaryOperation,
     TernaryOperation,
     DoWhile,
     Foreach,
@@ -413,7 +412,6 @@ pub enum Node<'a> {
     BitwisePrefixOperation(&'a BitwisePrefixOperation),
     BitwisePrefixOperator(&'a BitwisePrefixOperator),
     ConditionalTernaryOperation(&'a ConditionalTernaryOperation),
-    ElvisTernaryOperation(&'a ElvisTernaryOperation),
     TernaryOperation(&'a TernaryOperation),
     DoWhile(&'a DoWhile),
     Foreach(&'a Foreach),
@@ -729,7 +727,6 @@ impl<'a> Node<'a> {
             Self::BitwisePrefixOperation(_) => NodeKind::BitwisePrefixOperation,
             Self::BitwisePrefixOperator(_) => NodeKind::BitwisePrefixOperator,
             Self::ConditionalTernaryOperation(_) => NodeKind::ConditionalTernaryOperation,
-            Self::ElvisTernaryOperation(_) => NodeKind::ElvisTernaryOperation,
             Self::TernaryOperation(_) => NodeKind::TernaryOperation,
             Self::DoWhile(_) => NodeKind::DoWhile,
             Self::Foreach(_) => NodeKind::Foreach,
@@ -1768,12 +1765,8 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::ElvisTernaryOperation(node) => {
-                vec![Node::Expression(&node.condition), Node::Expression(&node.r#else)]
-            }
             Node::TernaryOperation(node) => vec![match node {
                 TernaryOperation::Conditional(node) => Node::ConditionalTernaryOperation(node),
-                TernaryOperation::Elvis(node) => Node::ElvisTernaryOperation(node),
             }],
             Node::DoWhile(node) => vec![
                 Node::Keyword(&node.r#do),
@@ -2287,7 +2280,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::BitwisePrefixOperation(node) => node.span(),
             Self::BitwisePrefixOperator(node) => node.span(),
             Self::ConditionalTernaryOperation(node) => node.span(),
-            Self::ElvisTernaryOperation(node) => node.span(),
             Self::TernaryOperation(node) => node.span(),
             Self::DoWhile(node) => node.span(),
             Self::Foreach(node) => node.span(),

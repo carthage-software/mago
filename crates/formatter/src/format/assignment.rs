@@ -276,9 +276,15 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
     }
 
     match rhs_expression {
+        Expression::BinaryOperation(operation) => {
+            if let BinaryOperator::Elvis(_) = operation.operator {
+                let condition = operation.lhs.as_ref();
+
+                return condition.is_binary() && !should_inline_logical_or_coalesce_expression(&condition);
+            }
+        }
         Expression::TernaryOperation(ternary) => {
             let condition = match ternary.as_ref() {
-                TernaryOperation::Elvis(elvis_ternary_operation) => &elvis_ternary_operation.condition,
                 TernaryOperation::Conditional(conditional_ternary_operation) => {
                     &conditional_ternary_operation.condition
                 }

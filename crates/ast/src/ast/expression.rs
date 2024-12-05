@@ -179,10 +179,6 @@ impl Expression {
                             .unwrap_or(true)
                         && conditional_ternary_operation.r#else.is_constant(initilization)
                 }
-                TernaryOperation::Elvis(elvis_ternary_operation) => {
-                    elvis_ternary_operation.condition.is_constant(initilization)
-                        && elvis_ternary_operation.r#else.is_constant(initilization)
-                }
             },
             Self::Array(array) => array.elements.inner.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {

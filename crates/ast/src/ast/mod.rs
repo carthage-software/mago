@@ -160,7 +160,6 @@ pub use crate::ast::operation::bitwise::BitwiseOperation;
 pub use crate::ast::operation::bitwise::BitwisePrefixOperation;
 pub use crate::ast::operation::bitwise::BitwisePrefixOperator;
 pub use crate::ast::operation::ternary::ConditionalTernaryOperation;
-pub use crate::ast::operation::ternary::ElvisTernaryOperation;
 pub use crate::ast::operation::ternary::TernaryOperation;
 pub use crate::ast::operation::unary::UnaryPostfixOperation;
 pub use crate::ast::operation::unary::UnaryPostfixOperator;

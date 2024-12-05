@@ -370,11 +370,16 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
                 })))
             }
         }
-        T!["?:"] => Expression::TernaryOperation(Box::new(TernaryOperation::Elvis(ElvisTernaryOperation {
-            condition: lhs,
-            question_mark_colon: utils::expect_any(stream)?.span,
-            r#else: parse_expression(stream)?,
-        }))),
+        T!["?:"] => {
+            let question_colon = utils::expect_any(stream)?.span;
+            let rhs = parse_expression_with_precedence(stream, Precedence::Ternary)?;
+
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Elvis(question_colon),
+                rhs: Box::new(rhs),
+            })
+        }
         T!["+"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
             lhs,
             operator: ArithmeticInfixOperator::Addition(utils::expect_any(stream)?.span),

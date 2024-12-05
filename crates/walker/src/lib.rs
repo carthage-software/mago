@@ -1533,8 +1533,6 @@ generate_ast_walker! {
         match ternary_operation {
             TernaryOperation::Conditional(conditional_ternary_operation) =>
                 walker.walk_conditional_ternary_operation(conditional_ternary_operation, context),
-            TernaryOperation::Elvis(elvis_ternary_operation) =>
-                walker.walk_elvis_ternary_operation(elvis_ternary_operation, context),
         };
     }
 
@@ -1545,11 +1543,6 @@ generate_ast_walker! {
         }
 
         walker.walk_expression(&conditional_ternary_operation.r#else, context);
-    }
-
-    ElvisTernaryOperation as elvis_ternary_operation => {
-        walker.walk_expression(&elvis_ternary_operation.condition, context);
-        walker.walk_expression(&elvis_ternary_operation.r#else, context);
     }
 
     Array as array => {
