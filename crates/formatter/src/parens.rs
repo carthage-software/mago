@@ -259,7 +259,6 @@ impl<'a> Formatter<'a> {
         match node {
             Node::BinaryOperation(_)
             | Node::LogicalInfixOperation(_)
-            | Node::ComparisonOperation(_)
             | Node::BitwiseInfixOperation(_)
             | Node::ArithmeticInfixOperation(_)
             | Node::ElvisTernaryOperation(_) => true,

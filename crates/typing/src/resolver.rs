@@ -70,12 +70,6 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::BitwiseOperation(bitwise_operation) => {
                 get_bitwise_operation_kind(&self.interner, bitwise_operation, |e| self.resolve(e))
             }
-            Expression::ComparisonOperation(comparison_operation) => {
-                let lhs_kind = self.resolve(&comparison_operation.lhs);
-                let rhs_kind = self.resolve(&comparison_operation.rhs);
-
-                return compute_comparison_result(&lhs_kind, &rhs_kind, &comparison_operation.operator);
-            }
             Expression::LogicalOperation(logical_operation) => {
                 get_logical_operation_kind(logical_operation, |e| self.resolve(e))
             }

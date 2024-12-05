@@ -57,7 +57,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
                 Expression::BitwiseOperation(op) => op.format(f),
-                Expression::ComparisonOperation(_) => unreachable!(),
                 Expression::LogicalOperation(op) => op.format(f),
                 Expression::TernaryOperation(op) => op.format(f),
                 Expression::Array(array) => array.format(f),

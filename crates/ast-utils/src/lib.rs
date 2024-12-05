@@ -294,9 +294,6 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
                 expression_has_yield(&bitwise_infix_operation.lhs) || expression_has_yield(&bitwise_infix_operation.rhs)
             }
         },
-        Expression::ComparisonOperation(comparison_operation) => {
-            expression_has_yield(&comparison_operation.lhs) || expression_has_yield(&comparison_operation.rhs)
-        }
         Expression::LogicalOperation(logical_operation) => match logical_operation.as_ref() {
             LogicalOperation::Prefix(logical_prefix_operation) => expression_has_yield(&logical_prefix_operation.value),
             LogicalOperation::Infix(logical_infix_operation) => {

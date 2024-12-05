@@ -411,6 +411,106 @@ where
 
             string_kind()
         }
+        BinaryOperator::Equal(_) | BinaryOperator::Identical(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind == right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_) | BinaryOperator::NotIdentical(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind != right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::LessThan(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind < right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::GreaterThan(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind > right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::LessThanOrEqual(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind <= right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::GreaterThanOrEqual(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                if left_kind >= right_kind {
+                    return true_kind();
+                } else {
+                    return false_kind();
+                }
+            } else {
+                bool_kind()
+            }
+        }
+        BinaryOperator::Spaceship(_) => {
+            if can_extract_literal_value(&left_kind) && can_extract_literal_value(&right_kind) {
+                let left_kind = extract_literal_value(&left_kind);
+                let right_kind = extract_literal_value(&right_kind);
+
+                let cmp_result = left_kind.partial_cmp(&right_kind).unwrap_or(std::cmp::Ordering::Equal);
+
+                return value_integer_kind(match cmp_result {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                });
+            } else {
+                integer_range_kind(-1, 1)
+            }
+        }
         BinaryOperator::Instanceof(_) => bool_kind(),
         BinaryOperator::NullCoalesce(_) => {
             if left_kind == right_kind {
@@ -798,48 +898,6 @@ pub fn resolve_numeric_operation_kind(
             never_kind()
         }
         _ => union_kind(vec![integer_kind(), float_kind()]),
-    }
-}
-
-// Compute the result of a logical operation when both operands are known
-#[inline]
-pub fn compute_comparison_result(lhs_kind: &TypeKind, rhs_kind: &TypeKind, operator: &ComparisonOperator) -> TypeKind {
-    use ComparisonOperator::*;
-
-    if matches!(lhs_kind, TypeKind::Never) || matches!(rhs_kind, TypeKind::Never) {
-        return never_kind();
-    }
-
-    if can_extract_literal_value(lhs_kind) && can_extract_literal_value(rhs_kind) {
-        let lhs_value = extract_literal_value(lhs_kind);
-        let rhs_value = extract_literal_value(rhs_kind);
-
-        let result = match operator {
-            Equal(_) => lhs_value == rhs_value,
-            NotEqual(_) | AngledNotEqual(_) => lhs_value != rhs_value,
-            Identical(_) => lhs_value == rhs_value,
-            NotIdentical(_) => lhs_value != rhs_value,
-            LessThan(_) => lhs_value < rhs_value,
-            GreaterThan(_) => lhs_value > rhs_value,
-            LessThanOrEqual(_) => lhs_value <= rhs_value,
-            GreaterThanOrEqual(_) => lhs_value >= rhs_value,
-            Spaceship(_) => {
-                let cmp_result = lhs_value.partial_cmp(&rhs_value).unwrap_or(std::cmp::Ordering::Equal);
-
-                return value_integer_kind(match cmp_result {
-                    std::cmp::Ordering::Less => -1,
-                    std::cmp::Ordering::Equal => 0,
-                    std::cmp::Ordering::Greater => 1,
-                });
-            }
-        };
-
-        return if result { true_kind() } else { false_kind() };
-    }
-
-    match operator {
-        Spaceship(_) => integer_range_kind(-1, 1),
-        _ => bool_kind(),
     }
 }
 

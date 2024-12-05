@@ -540,64 +540,104 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             })))
         }
         T!["=="] => {
-            let operator = ComparisonOperator::Equal(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Equal(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["==="] => {
-            let operator = ComparisonOperator::Identical(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Identical(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["!="] => {
-            let operator = ComparisonOperator::NotEqual(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::NotEqual(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["!=="] => {
-            let operator = ComparisonOperator::NotIdentical(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::NotIdentical(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["<>"] => {
-            let operator = ComparisonOperator::AngledNotEqual(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::AngledNotEqual(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["<"] => {
-            let operator = ComparisonOperator::LessThan(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LessThan(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T![">"] => {
-            let operator = ComparisonOperator::GreaterThan(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::GreaterThan(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["<="] => {
-            let operator = ComparisonOperator::LessThanOrEqual(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LessThanOrEqual(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T![">="] => {
-            let operator = ComparisonOperator::GreaterThanOrEqual(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::GreaterThanOrEqual(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["<=>"] => {
-            let operator = ComparisonOperator::Spaceship(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Spaceship(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["&&"] => {
             let and = utils::expect_any(stream)?.span;
@@ -696,20 +736,19 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
     // If the left-hand side is a comparison or logical operation, we need to adjust the associativity
     // of the assignment operation to ensure it is applied to the rightmost operand.
     match lhs {
-        Expression::ComparisonOperation(comparison) => {
+        Expression::BinaryOperation(operation) if operation.operator.is_comparison() => {
             // make `($x == $y) = $z` into `$x == ($y = $z)`
-            let ComparisonOperation { lhs: comparison_lhs, operator: comparison_operator, rhs: comparison_rhs } =
-                *comparison;
+            let BinaryOperation { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
 
-            Expression::ComparisonOperation(Box::new(ComparisonOperation {
-                lhs: comparison_lhs,
-                operator: comparison_operator,
-                rhs: Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                    lhs: comparison_rhs,
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: binary_lhs,
+                operator: binary_operator,
+                rhs: Box::new(Expression::AssignmentOperation(Box::new(AssignmentOperation {
+                    lhs: *binary_rhs,
                     operator,
                     rhs,
-                })),
-            }))
+                }))),
+            })
         }
         Expression::LogicalOperation(logical) => {
             match *logical {

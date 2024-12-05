@@ -1300,9 +1300,6 @@ generate_ast_walker! {
             Expression::BitwiseOperation(bitwise_operation) => {
                 walker.walk_bitwise_operation(bitwise_operation.as_ref(), context)
             }
-            Expression::ComparisonOperation(comparison_operation) => {
-                walker.walk_comparison_operation(comparison_operation.as_ref(), context)
-            }
             Expression::LogicalOperation(logical_operation) => {
                 walker.walk_logical_operation(logical_operation.as_ref(), context)
             }
@@ -1532,16 +1529,6 @@ generate_ast_walker! {
     }
 
     BitwiseInfixOperator as bitwise_infix_operator => {
-        // Do nothing
-    }
-
-    ComparisonOperation as comparison_operation => {
-        walker.walk_expression(&comparison_operation.lhs, context);
-        walker.walk_comparison_operator(&comparison_operation.operator, context);
-        walker.walk_expression(&comparison_operation.rhs, context);
-    }
-
-    ComparisonOperator as comparison_operator => {
         // Do nothing
     }
 

@@ -23,19 +23,15 @@ impl Rule for RequireIdentityComparisonRule {
 }
 
 impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
-    fn walk_in_comparison_operation<'ast>(
-        &self,
-        comparison_operation: &'ast ComparisonOperation,
-        context: &mut LintContext<'a>,
-    ) {
-        match &comparison_operation.operator {
-            ComparisonOperator::Equal(span) => {
+    fn walk_in_binary_operation<'ast>(&self, binary_operation: &'ast BinaryOperation, context: &mut LintContext<'a>) {
+        match &binary_operation.operator {
+            BinaryOperator::Equal(span) => {
                 let issue =
                     Issue::new(context.level(), "use identity comparison `===` instead of equality comparison `==`")
                         .with_annotations([
                             Annotation::primary(*span),
-                            Annotation::secondary(comparison_operation.lhs.span()),
-                            Annotation::secondary(comparison_operation.rhs.span()),
+                            Annotation::secondary(binary_operation.lhs.span()),
+                            Annotation::secondary(binary_operation.rhs.span()),
                         ])
                         .with_note(
                             "identity comparison `===` checks for both value and type equality, \
@@ -46,13 +42,13 @@ impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
                 context
                     .report_with_fix(issue, |plan| plan.replace(span.to_range(), "===", SafetyClassification::Unsafe));
             }
-            ComparisonOperator::NotEqual(span) => {
+            BinaryOperator::NotEqual(span) => {
                 let issue =
                     Issue::new(context.level(), "use identity inequality `!==` instead of inequality comparison `!=`")
                         .with_annotations([
                             Annotation::primary(*span),
-                            Annotation::secondary(comparison_operation.lhs.span()),
-                            Annotation::secondary(comparison_operation.rhs.span()),
+                            Annotation::secondary(binary_operation.lhs.span()),
+                            Annotation::secondary(binary_operation.rhs.span()),
                         ])
                         .with_note(
                             "identity inequality `!==` checks for both value and type inequality, \

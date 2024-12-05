@@ -177,8 +177,6 @@ pub enum NodeKind {
     BitwiseOperation,
     BitwisePrefixOperation,
     BitwisePrefixOperator,
-    ComparisonOperation,
-    ComparisonOperator,
     LogicalInfixOperation,
     LogicalInfixOperator,
     LogicalOperation,
@@ -419,8 +417,6 @@ pub enum Node<'a> {
     BitwiseOperation(&'a BitwiseOperation),
     BitwisePrefixOperation(&'a BitwisePrefixOperation),
     BitwisePrefixOperator(&'a BitwisePrefixOperator),
-    ComparisonOperation(&'a ComparisonOperation),
-    ComparisonOperator(&'a ComparisonOperator),
     LogicalInfixOperation(&'a LogicalInfixOperation),
     LogicalInfixOperator(&'a LogicalInfixOperator),
     LogicalOperation(&'a LogicalOperation),
@@ -742,8 +738,6 @@ impl<'a> Node<'a> {
             Self::BitwiseOperation(_) => NodeKind::BitwiseOperation,
             Self::BitwisePrefixOperation(_) => NodeKind::BitwisePrefixOperation,
             Self::BitwisePrefixOperator(_) => NodeKind::BitwisePrefixOperator,
-            Self::ComparisonOperation(_) => NodeKind::ComparisonOperation,
-            Self::ComparisonOperator(_) => NodeKind::ComparisonOperator,
             Self::LogicalInfixOperation(_) => NodeKind::LogicalInfixOperation,
             Self::LogicalInfixOperator(_) => NodeKind::LogicalInfixOperator,
             Self::LogicalOperation(_) => NodeKind::LogicalOperation,
@@ -1482,7 +1476,6 @@ impl<'a> Node<'a> {
                 Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
                 Expression::BitwiseOperation(node) => Node::BitwiseOperation(node),
-                Expression::ComparisonOperation(node) => Node::ComparisonOperation(node),
                 Expression::LogicalOperation(node) => Node::LogicalOperation(node),
                 Expression::TernaryOperation(node) => Node::TernaryOperation(node),
                 Expression::Array(node) => Node::Array(node),
@@ -1780,11 +1773,6 @@ impl<'a> Node<'a> {
                 vec![Node::BitwisePrefixOperator(&node.operator), Node::Expression(&node.value)]
             }
             Node::BitwisePrefixOperator(_) => vec![],
-
-            Node::ComparisonOperation(node) => {
-                vec![Node::Expression(&node.lhs), Node::ComparisonOperator(&node.operator), Node::Expression(&node.rhs)]
-            }
-            Node::ComparisonOperator(_) => vec![],
             Node::LogicalInfixOperation(node) => vec![
                 Node::Expression(&node.lhs),
                 Node::LogicalInfixOperator(&node.operator),
@@ -2328,8 +2316,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::BitwiseOperation(node) => node.span(),
             Self::BitwisePrefixOperation(node) => node.span(),
             Self::BitwisePrefixOperator(node) => node.span(),
-            Self::ComparisonOperation(node) => node.span(),
-            Self::ComparisonOperator(node) => node.span(),
             Self::LogicalInfixOperation(node) => node.span(),
             Self::LogicalInfixOperator(node) => node.span(),
             Self::LogicalOperation(node) => node.span(),
