@@ -67,12 +67,12 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn is_multiplicative(&self) -> bool {
+    pub const fn is_multiplicative(&self) -> bool {
         matches!(self, Self::Multiplication(_) | Self::Division(_) | Self::Modulo(_))
     }
 
     #[inline]
-    pub fn is_arithmetic(&self) -> bool {
+    pub const fn is_arithmetic(&self) -> bool {
         matches!(
             self,
             Self::Addition(_)
@@ -85,12 +85,12 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn is_bit_shift(&self) -> bool {
+    pub const fn is_bit_shift(&self) -> bool {
         matches!(self, Self::LeftShift(_) | Self::RightShift(_))
     }
 
     #[inline]
-    pub fn is_bitwise(&self) -> bool {
+    pub const fn is_bitwise(&self) -> bool {
         matches!(
             self,
             Self::BitwiseAnd(_) | Self::BitwiseOr(_) | Self::BitwiseXor(_) | Self::LeftShift(_) | Self::RightShift(_)
@@ -98,7 +98,7 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn is_equality(&self) -> bool {
+    pub const fn is_equality(&self) -> bool {
         matches!(
             self,
             Self::Equal(_)
@@ -111,7 +111,7 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn is_comparison(&self) -> bool {
+    pub const fn is_comparison(&self) -> bool {
         matches!(
             self,
             Self::Equal(_)
@@ -128,8 +128,13 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn is_logical(&self) -> bool {
+    pub const fn is_logical(&self) -> bool {
         matches!(self, Self::And(_) | Self::Or(_) | Self::LowAnd(_) | Self::LowOr(_) | Self::LowXor(_))
+    }
+
+    #[inline]
+    pub const fn is_concatenation(&self) -> bool {
+        matches!(self, Self::StringConcat(_))
     }
 
     #[inline]

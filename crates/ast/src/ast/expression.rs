@@ -38,7 +38,6 @@ use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
 use crate::ast::operation::coalesce::CoalesceOperation;
 use crate::ast::operation::comparison::ComparisonOperation;
-use crate::ast::operation::concat::ConcatOperation;
 use crate::ast::operation::instanceof::InstanceofOperation;
 use crate::ast::operation::logical::LogicalOperation;
 use crate::ast::operation::ternary::TernaryOperation;
@@ -74,7 +73,6 @@ pub enum Expression {
     LogicalOperation(Box<LogicalOperation>),
     TernaryOperation(Box<TernaryOperation>),
     CoalesceOperation(Box<CoalesceOperation>),
-    ConcatOperation(Box<ConcatOperation>),
     InstanceofOperation(Box<InstanceofOperation>),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
@@ -194,9 +192,6 @@ impl Expression {
                         && logical_infix_operation.rhs.is_constant(initilization)
                 }
             },
-            Self::ConcatOperation(operation) => {
-                operation.lhs.is_constant(initilization) && operation.rhs.is_constant(initilization)
-            }
             Self::TernaryOperation(operation) => match operation.as_ref() {
                 TernaryOperation::Conditional(conditional_ternary_operation) => {
                     conditional_ternary_operation.condition.is_constant(initilization)
@@ -294,7 +289,6 @@ impl Expression {
             Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
             Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
             Expression::CoalesceOperation(_) => NodeKind::CoalesceOperation,
-            Expression::ConcatOperation(_) => NodeKind::ConcatOperation,
             Expression::InstanceofOperation(_) => NodeKind::InstanceofOperation,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
@@ -345,7 +339,6 @@ impl HasSpan for Expression {
             Expression::LogicalOperation(expression) => expression.span(),
             Expression::TernaryOperation(expression) => expression.span(),
             Expression::CoalesceOperation(expression) => expression.span(),
-            Expression::ConcatOperation(expression) => expression.span(),
             Expression::InstanceofOperation(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),

@@ -22,12 +22,15 @@ impl Rule for RedundantStringConcatRule {
 }
 
 impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
-    fn walk_in_concat_operation<'ast>(&self, concat_operation: &'ast ConcatOperation, context: &mut LintContext<'a>) {
-        let ConcatOperation {
-            lhs: Expression::Literal(Literal::String(left)),
-            rhs: Expression::Literal(Literal::String(right)),
-            ..
-        } = concat_operation
+    fn walk_in_binary_operation<'ast>(&self, binary_operation: &'ast BinaryOperation, context: &mut LintContext<'a>) {
+        let BinaryOperation { lhs, operator, rhs } = binary_operation;
+
+        if !operator.is_concatenation() {
+            return;
+        }
+
+        let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) =
+            (lhs.as_ref(), rhs.as_ref())
         else {
             return;
         };
@@ -55,7 +58,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
             let issue = Issue::new(context.level(), "string concatenation can be simplified")
                 .with_help("consider combining these strings into a single string")
                 .with_annotations(vec![
-                    Annotation::primary(concat_operation.dot),
+                    Annotation::primary(operator.span()),
                     Annotation::secondary(left.span()),
                     Annotation::secondary(right.span()),
                 ]);

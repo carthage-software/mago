@@ -1,13 +1,11 @@
 use fennec_ast::*;
 use fennec_span::HasSpan;
 
-use crate::binaryish::BinaryishOperator;
 use crate::document::Document;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::format::Format;
 use crate::format::Group;
-use crate::token;
 use crate::Formatter;
 
 use super::IfBreak;
@@ -15,31 +13,29 @@ use super::IfBreak;
 pub(super) fn print_binaryish_expression<'a>(
     f: &mut Formatter<'a>,
     left: &'a Expression,
-    operator: BinaryishOperator,
+    operator: &'a BinaryOperator,
     right: &'a Expression,
 ) -> Document<'a> {
     let spaced = match operator {
-        BinaryishOperator::Concat(_) => f.settings.space_concatenation,
+        BinaryOperator::StringConcat(_) => f.settings.space_concatenation,
         _ => true,
     };
 
-    let parent_node = f.nth_parent_kind(match operator {
-        BinaryishOperator::Logical(_) | BinaryishOperator::Bitwise(_) | BinaryishOperator::Arithmetic(_) => 3,
-        BinaryishOperator::Comparison(_) | BinaryishOperator::Concat(_) | BinaryishOperator::Coalesce(_) => 2,
-    });
+    let parent_node = f.nth_parent_kind(2);
 
     let is_rhs_of_binaryish = match parent_node {
-        Some(Node::LogicalInfixOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
-        Some(Node::ComparisonOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
-        Some(Node::BitwiseInfixOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
-        Some(Node::ArithmeticInfixOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
-        Some(Node::ConcatOperation(o)) => o.dot.end.offset < operator.span().start.offset,
-        Some(Node::CoalesceOperation(o)) => o.double_question_mark.end.offset < operator.span().start.offset,
+        Some(Node::BinaryOperation(o)) => o.operator.span().end.offset < operator.span().start.offset,
         _ => false,
     };
 
     let lhs = left.format(f);
-    let operator = token!(f, operator.span(), operator.as_str());
+    let operator = match operator {
+        BinaryOperator::Instanceof(keyword) => keyword.format(f),
+        BinaryOperator::LowAnd(keyword) => keyword.format(f),
+        BinaryOperator::LowOr(keyword) => keyword.format(f),
+        BinaryOperator::LowXor(keyword) => keyword.format(f),
+        _ => Document::String(operator.as_str(&f.interner)),
+    };
     let rhs = right.format(f);
 
     let must_break = f.settings.preserve_multiline_binary_operations

@@ -55,6 +55,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn resolve<'ast>(&self, expression: &'ast Expression) -> TypeKind {
         match expression {
             Expression::Parenthesized(parenthesized) => self.resolve(&parenthesized.expression),
+            Expression::BinaryOperation(operation) => get_binary_operation_kind(operation, |e| self.resolve(e)),
             Expression::UnaryPrefixOperation(operation) => {
                 get_unary_prefix_operation_kind(operation, |e| self.resolve(e))
             }
@@ -83,9 +84,6 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             }
             Expression::CoalesceOperation(coalesce_operation) => {
                 get_coalesce_operation_kind(coalesce_operation, |e| self.resolve(e))
-            }
-            Expression::ConcatOperation(concat_operation) => {
-                get_concat_operation_kind(concat_operation, |e| self.resolve(e))
             }
             Expression::InstanceofOperation(_) => bool_kind(),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),

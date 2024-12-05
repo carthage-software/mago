@@ -2,7 +2,6 @@ use fennec_ast::*;
 use fennec_span::HasSpan;
 
 use crate::array;
-use crate::binaryish::BinaryishOperator;
 use crate::braced;
 use crate::bracketed;
 use crate::default_line;
@@ -14,7 +13,6 @@ use crate::format::array::ArrayLike;
 use crate::format::assignment::print_assignment;
 use crate::format::assignment::AssignmentLikeNode;
 use crate::format::binaryish;
-use crate::format::binaryish::print_binaryish_expression;
 use crate::format::call::collect_method_call_chain;
 use crate::format::call::print_method_call_chain;
 use crate::format::call_arguments::print_argument_list;
@@ -59,12 +57,11 @@ impl<'a> Format<'a> for Expression {
                 Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
                 Expression::BitwiseOperation(op) => op.format(f),
-                Expression::ComparisonOperation(op) => op.format(f),
+                Expression::ComparisonOperation(_) => unreachable!(),
                 Expression::LogicalOperation(op) => op.format(f),
                 Expression::TernaryOperation(op) => op.format(f),
-                Expression::CoalesceOperation(op) => op.format(f),
-                Expression::ConcatOperation(op) => op.format(f),
-                Expression::InstanceofOperation(op) => op.format(f),
+                Expression::CoalesceOperation(_) => unreachable!(),
+                Expression::InstanceofOperation(_) => unreachable!(),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
                 Expression::List(list) => list.format(f),
@@ -110,7 +107,7 @@ impl<'a> Format<'a> for Expression {
 impl<'a> Format<'a> for BinaryOperation {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, BinaryOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
+            binaryish::print_binaryish_expression(f, &self.lhs, &self.operator, &self.rhs)
         })
     }
 }
@@ -543,20 +540,12 @@ impl<'a> Format<'a> for NamedArgument {
     }
 }
 
-impl<'a> Format<'a> for ConcatOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ConcatOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::Concat(self.dot), &self.rhs)
-        })
-    }
-}
-
 impl<'a> Format<'a> for ArithmeticOperation {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, ArithmeticOperation, {
             match self {
                 ArithmeticOperation::Prefix(o) => o.format(f),
-                ArithmeticOperation::Infix(o) => o.format(f),
+                ArithmeticOperation::Infix(_) => unreachable!(),
                 ArithmeticOperation::Postfix(o) => o.format(f),
             }
         })
@@ -574,14 +563,6 @@ impl<'a> Format<'a> for ArithmeticPrefixOperation {
             };
 
             group!(operator, self.value.format(f))
-        })
-    }
-}
-
-impl<'a> Format<'a> for ArithmeticInfixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ArithmeticInfixOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
         })
     }
 }
@@ -631,7 +612,7 @@ impl<'a> Format<'a> for BitwiseOperation {
         wrap!(f, self, BitwiseOperation, {
             match self {
                 BitwiseOperation::Prefix(o) => o.format(f),
-                BitwiseOperation::Infix(o) => o.format(f),
+                BitwiseOperation::Infix(_) => unreachable!(),
             }
         })
     }
@@ -645,14 +626,6 @@ impl<'a> Format<'a> for BitwisePrefixOperation {
             };
 
             group!(operator, self.value.format(f))
-        })
-    }
-}
-
-impl<'a> Format<'a> for BitwiseInfixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, BitwiseInfixOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
         })
     }
 }
@@ -878,20 +851,12 @@ impl<'a> Format<'a> for Call {
     }
 }
 
-impl<'a> Format<'a> for ComparisonOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ComparisonOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
-        })
-    }
-}
-
 impl<'a> Format<'a> for LogicalOperation {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, LogicalOperation, {
             match self {
                 LogicalOperation::Prefix(o) => o.format(f),
-                LogicalOperation::Infix(o) => o.format(f),
+                LogicalOperation::Infix(_) => unreachable!(),
             }
         })
     }
@@ -906,14 +871,6 @@ impl<'a> Format<'a> for LogicalPrefixOperation {
                 },
                 self.value.format(f),
             )
-        })
-    }
-}
-
-impl<'a> Format<'a> for LogicalInfixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, LogicalInfixOperation, {
-            binaryish::print_binaryish_expression(f, &self.lhs, BinaryishOperator::from(self.operator), &self.rhs)
         })
     }
 }
@@ -1029,22 +986,6 @@ impl<'a> Format<'a> for Match {
             contents.push(Document::String("}"));
 
             Document::Group(Group::new(contents).with_break(true))
-        })
-    }
-}
-
-impl<'a> Format<'a> for CoalesceOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, CoalesceOperation, {
-            print_binaryish_expression(f, &self.lhs, BinaryishOperator::Coalesce(self.double_question_mark), &self.rhs)
-        })
-    }
-}
-
-impl<'a> Format<'a> for InstanceofOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, InstanceofOperation, {
-            group!(self.lhs.format(f), space!(), self.instanceof.format(f), space!(), self.rhs.format(f))
         })
     }
 }

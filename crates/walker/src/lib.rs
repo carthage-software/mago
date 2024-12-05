@@ -1312,9 +1312,6 @@ generate_ast_walker! {
             Expression::CoalesceOperation(coalesce_operation) => {
                 walker.walk_coalesce_operation(coalesce_operation.as_ref(), context)
             }
-            Expression::ConcatOperation(concat_operation) => {
-                walker.walk_concat_operation(concat_operation.as_ref(), context)
-            }
             Expression::InstanceofOperation(instanceof_operation) => {
                 walker.walk_instanceof_operation(instanceof_operation.as_ref(), context)
             }
@@ -1608,11 +1605,6 @@ generate_ast_walker! {
     CoalesceOperation as coalesce_operation => {
         walker.walk_expression(&coalesce_operation.lhs, context);
         walker.walk_expression(&coalesce_operation.rhs, context);
-    }
-
-    ConcatOperation as concat_operation => {
-        walker.walk_expression(&concat_operation.lhs, context);
-        walker.walk_expression(&concat_operation.rhs, context);
     }
 
     InstanceofOperation as instanceof_operation => {

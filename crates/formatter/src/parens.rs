@@ -2,7 +2,7 @@ use fennec_ast::*;
 use fennec_span::HasSpan;
 use fennec_token::GetPrecedence;
 
-use crate::binaryish::BinaryishOperator;
+use crate::binaryish::should_flatten;
 use crate::document::Document;
 use crate::document::Group;
 use crate::Formatter;
@@ -57,31 +57,20 @@ impl<'a> Formatter<'a> {
     }
 
     fn binarish_node_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        let (n, operator) = match node {
-            Node::LogicalInfixOperation(e) => (3, BinaryishOperator::from(e.operator)),
-            Node::ComparisonOperation(e) => (2, BinaryishOperator::from(e.operator)),
-            Node::BitwiseInfixOperation(e) => (3, BinaryishOperator::from(e.operator)),
-            Node::ArithmeticInfixOperation(e) => (3, BinaryishOperator::from(e.operator)),
-            Node::ConcatOperation(o) => (2, BinaryishOperator::Concat(o.dot)),
-            Node::CoalesceOperation(o) => (2, BinaryishOperator::Coalesce(o.double_question_mark)),
+        let operator = match node {
+            Node::BinaryOperation(e) => &e.operator,
             _ => return false,
         };
 
-        let parent_node = self.nth_parent_kind(n);
-        let parent_operator = match parent_node {
-            Some(Node::LogicalInfixOperation(e)) => BinaryishOperator::from(e.operator),
-            Some(Node::ComparisonOperation(e)) => BinaryishOperator::from(e.operator),
-            Some(Node::BitwiseInfixOperation(e)) => BinaryishOperator::from(e.operator),
-            Some(Node::ArithmeticInfixOperation(e)) => BinaryishOperator::from(e.operator),
-            Some(Node::ConcatOperation(o)) => BinaryishOperator::Concat(o.dot),
-            Some(Node::CoalesceOperation(_)) => {
+        let parent_operator = match self.nth_parent_kind(2) {
+            Some(Node::BinaryOperation(e)) => {
                 // Add parentheses if parent is a coalesce operator, unless the child is a coalesce operator
                 // as well.
-                if let BinaryishOperator::Coalesce(_) = operator {
-                    return false;
-                } else {
-                    return true;
+                if let BinaryOperator::NullCoalesce(_) = e.operator {
+                    return !matches!(operator, BinaryOperator::NullCoalesce(_));
                 }
+
+                &e.operator
             }
             Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
                 return true;
@@ -149,7 +138,7 @@ impl<'a> Formatter<'a> {
                 return node.span().start.offset == call.span().start.offset;
             }
             _ => {
-                let grand_parent_node = self.nth_parent_kind(n + 1);
+                let grand_parent_node = self.nth_parent_kind(3);
 
                 if let Some(Node::Access(_)) = grand_parent_node {
                     return true;
@@ -159,7 +148,7 @@ impl<'a> Formatter<'a> {
             }
         };
 
-        if operator.is_bitwise_shift() {
+        if operator.is_bit_shift() {
             return true;
         }
 
@@ -194,7 +183,7 @@ impl<'a> Formatter<'a> {
             return false;
         }
 
-        if !operator.should_flatten(parent_operator) {
+        if !should_flatten(operator, parent_operator) {
             return true;
         }
 
@@ -269,7 +258,6 @@ impl<'a> Formatter<'a> {
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
             Node::BinaryOperation(_)
-            | Node::ConcatOperation(_)
             | Node::CoalesceOperation(_)
             | Node::LogicalInfixOperation(_)
             | Node::ComparisonOperation(_)

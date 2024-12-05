@@ -406,26 +406,31 @@ where
 }
 
 #[inline]
-pub fn get_concat_operation_kind<F>(concat_operation: &ConcatOperation, get_expression_kind: F) -> TypeKind
+pub fn get_binary_operation_kind<F>(binary_operation: &BinaryOperation, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
-    let lhs = get_expression_kind(&concat_operation.lhs);
-    let rhs = get_expression_kind(&concat_operation.rhs);
+    let lhs = get_expression_kind(&binary_operation.lhs);
+    let rhs = get_expression_kind(&binary_operation.rhs);
 
     if matches!(lhs, TypeKind::Never) || matches!(rhs, TypeKind::Never) {
         return never_kind();
     }
 
-    if lhs.is_non_empty_string().or(rhs.is_non_empty_string()).is_true() {
-        return non_empty_string_kind();
-    }
+    match &binary_operation.operator {
+        BinaryOperator::StringConcat(_) => {
+            if lhs.is_non_empty_string().or(rhs.is_non_empty_string()).is_true() {
+                return non_empty_string_kind();
+            }
 
-    if lhs.is_integer().or(lhs.is_float()).and(rhs.is_integer().or(rhs.is_float())).is_true() {
-        return TypeKind::Scalar(ScalarTypeKind::NumericString);
-    }
+            if lhs.is_integer().or(lhs.is_float()).and(rhs.is_integer().or(rhs.is_float())).is_true() {
+                return TypeKind::Scalar(ScalarTypeKind::NumericString);
+            }
 
-    string_kind()
+            string_kind()
+        }
+        _ => mixed_kind(false),
+    }
 }
 
 #[inline]

@@ -596,66 +596,74 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             Expression::ComparisonOperation(Box::new(ComparisonOperation { lhs, operator, rhs }))
         }
         T!["&&"] => {
-            let operator = LogicalInfixOperator::And(utils::expect_any(stream)?.span);
+            let and = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::And)?;
 
-            Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::And(and),
+                rhs: Box::new(rhs),
+            })
         }
         T!["||"] => {
-            let operator = LogicalInfixOperator::Or(utils::expect_any(stream)?.span);
+            let or = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Or)?;
 
-            Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Or(or),
+                rhs: Box::new(rhs),
+            })
         }
         T!["and"] => {
-            let operator = LogicalInfixOperator::LowPrecedenceAnd(utils::expect_any_keyword(stream)?);
+            let and = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalAnd)?;
 
-            Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LowAnd(and),
+                rhs: Box::new(rhs),
+            })
         }
         T!["or"] => {
-            let operator = LogicalInfixOperator::LowPrecedenceOr(utils::expect_any_keyword(stream)?);
+            let or = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalOr)?;
 
-            Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LowOr(or),
+                rhs: Box::new(rhs),
+            })
         }
         T!["xor"] => {
-            let operator = LogicalInfixOperator::LowPrecedenceXor(utils::expect_any_keyword(stream)?);
+            let xor = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalXor)?;
 
-            Expression::LogicalOperation(Box::new(LogicalOperation::Infix(LogicalInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LowXor(xor),
+                rhs: Box::new(rhs),
+            })
         }
         T!["."] => {
             let dot = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Concat)?;
 
-            Expression::ConcatOperation(Box::new(ConcatOperation { lhs, dot, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::StringConcat(dot),
+                rhs: Box::new(rhs),
+            })
         }
         T!["instanceof"] => {
             let instanceof = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::Instanceof)?;
 
-            Expression::InstanceofOperation(Box::new(InstanceofOperation { lhs, instanceof, rhs }))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::Instanceof(instanceof),
+                rhs: Box::new(rhs),
+            })
         }
         _ => unreachable!(),
     })
