@@ -61,12 +61,12 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::UnaryPrefixOperation(operation) => {
                 get_unary_prefix_operation_kind(&self.interner, operation, |e| self.resolve(e))
             }
+            Expression::UnaryPostfixOperation(operation) => {
+                get_unary_postfix_operation_kind(operation, |e| self.resolve(e))
+            }
             Expression::Literal(literal) => get_literal_kind(self.interner, literal),
             Expression::CompositeString(composite_string) => {
                 get_composite_string_kind(composite_string, |e| self.resolve(e))
-            }
-            Expression::ArithmeticOperation(arithmetic_operation) => {
-                get_arithmetic_operation_kind(&self.interner, arithmetic_operation, |e| self.resolve(e))
             }
             Expression::AssignmentOperation(assignment_operation) => self.resolve(&assignment_operation.rhs),
             Expression::Conditional(ternary_operation) => get_conditional_kind(ternary_operation, |e| self.resolve(e)),

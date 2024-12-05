@@ -321,18 +321,14 @@ fn parse_postfix_expression<'a, 'i>(
                 })))
             }
         }
-        T!["++"] => {
-            Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Postfix(ArithmeticPostfixOperation {
-                value: lhs,
-                operator: ArithmeticPostfixOperator::Increment(utils::expect_any(stream)?.span),
-            })))
-        }
-        T!["--"] => {
-            Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Postfix(ArithmeticPostfixOperation {
-                value: lhs,
-                operator: ArithmeticPostfixOperator::Decrement(utils::expect_any(stream)?.span),
-            })))
-        }
+        T!["++"] => Expression::UnaryPostfixOperation(UnaryPostfixOperation {
+            operand: Box::new(lhs),
+            operator: UnaryPostfixOperator::PostIncrement(utils::expect_any(stream)?.span),
+        }),
+        T!["--"] => Expression::UnaryPostfixOperation(UnaryPostfixOperation {
+            operand: Box::new(lhs),
+            operator: UnaryPostfixOperator::PostDecrement(utils::expect_any(stream)?.span),
+        }),
         _ => unreachable!(),
     })
 }
@@ -380,36 +376,36 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
                 rhs: Box::new(rhs),
             })
         }
-        T!["+"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Addition(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::AddSub)?,
-        }))),
-        T!["-"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Subtraction(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::AddSub)?,
-        }))),
-        T!["*"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Multiplication(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::MulDivMod)?,
-        }))),
-        T!["/"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Division(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::MulDivMod)?,
-        }))),
-        T!["%"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Modulo(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::MulDivMod)?,
-        }))),
-        T!["**"] => Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-            lhs,
-            operator: ArithmeticInfixOperator::Exponentiation(utils::expect_any(stream)?.span),
-            rhs: parse_expression_with_precedence(stream, Precedence::Pow)?,
-        }))),
+        T!["+"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Addition(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::AddSub)?),
+        }),
+        T!["-"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Subtraction(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::AddSub)?),
+        }),
+        T!["*"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Multiplication(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
+        }),
+        T!["/"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Division(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
+        }),
+        T!["%"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Modulo(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
+        }),
+        T!["**"] => Expression::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs),
+            operator: BinaryOperator::Exponentiation(utils::expect_any(stream)?.span),
+            rhs: Box::new(parse_expression_with_precedence(stream, Precedence::Pow)?),
+        }),
         T!["="] => {
             let operator = AssignmentOperator::Assign(utils::expect_any(stream)?.span);
             let rhs = parse_expression_with_precedence(stream, Precedence::Assignment)?;
@@ -741,65 +737,32 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
 fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, rhs: Expression) -> Expression {
     // If the left-hand side is a comparison or logical operation, we need to adjust the associativity
     // of the assignment operation to ensure it is applied to the rightmost operand.
-    match lhs {
-        Expression::BinaryOperation(operation)
-            if operation.operator.is_comparison()
-                || operation.operator.is_logical()
-                || operation.operator.is_bitwise() =>
-        {
-            // make `($x == $y) = $z` into `$x == ($y = $z)`
-            let BinaryOperation { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
+    let Expression::BinaryOperation(operation) = lhs else {
+        return Expression::AssignmentOperation(Box::new(AssignmentOperation { lhs, operator, rhs }));
+    };
 
-            Expression::BinaryOperation(BinaryOperation {
-                lhs: binary_lhs,
-                operator: binary_operator,
-                rhs: Box::new(Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                    lhs: *binary_rhs,
-                    operator,
-                    rhs,
-                }))),
-            })
-        }
-        Expression::ArithmeticOperation(arithmetic) => match *arithmetic {
-            ArithmeticOperation::Infix(arithmetic_infix_operation) => {
-                // make `($x + $y) = $z` into `$x + ($y = $z)`
-                let ArithmeticInfixOperation {
-                    lhs: arithmetic_lhs,
-                    operator: arithmetic_operator,
-                    rhs: arithmetic_rhs,
-                } = arithmetic_infix_operation;
+    if operation.operator.is_comparison()
+        || operation.operator.is_logical()
+        || operation.operator.is_bitwise()
+        || operation.operator.is_arithmetic()
+    {
+        // make `($x == $y) = $z` into `$x == ($y = $z)`
+        let BinaryOperation { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
 
-                Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Infix(ArithmeticInfixOperation {
-                    lhs: arithmetic_lhs,
-                    operator: arithmetic_operator,
-                    rhs: Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                        lhs: arithmetic_rhs,
-                        operator,
-                        rhs,
-                    })),
-                })))
-            }
-            ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
-                // nothitng to do here
-                Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                    lhs: Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Prefix(
-                        arithmetic_prefix_operation,
-                    ))),
-                    operator,
-                    rhs,
-                }))
-            }
-            ArithmeticOperation::Postfix(arithmetic_postfix_operation) => {
-                // nothitng to do here
-                Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                    lhs: Expression::ArithmeticOperation(Box::new(ArithmeticOperation::Postfix(
-                        arithmetic_postfix_operation,
-                    ))),
-                    operator,
-                    rhs,
-                }))
-            }
-        },
-        _ => Expression::AssignmentOperation(Box::new(AssignmentOperation { lhs, operator, rhs })),
+        Expression::BinaryOperation(BinaryOperation {
+            lhs: binary_lhs,
+            operator: binary_operator,
+            rhs: Box::new(Expression::AssignmentOperation(Box::new(AssignmentOperation {
+                lhs: *binary_rhs,
+                operator,
+                rhs,
+            }))),
+        })
+    } else {
+        Expression::AssignmentOperation(Box::new(AssignmentOperation {
+            lhs: Expression::BinaryOperation(operation),
+            operator,
+            rhs,
+        }))
     }
 }

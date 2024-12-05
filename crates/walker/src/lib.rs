@@ -1291,9 +1291,6 @@ generate_ast_walker! {
             Expression::UnaryPostfixOperation(operation) => walker.walk_unary_postfix_operation(operation, context),
             Expression::Literal(literal) => walker.walk_literal(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string.as_ref(), context),
-            Expression::ArithmeticOperation(arithmetic_operation) => {
-                walker.walk_arithmetic_operation(arithmetic_operation.as_ref(), context)
-            }
             Expression::AssignmentOperation(assignment_operation) => {
                 walker.walk_assignment_operation(assignment_operation.as_ref(), context)
             }
@@ -1447,45 +1444,6 @@ generate_ast_walker! {
 
     BracedExpressionStringPart as braced_expression_string_part => {
         walker.walk_expression(&braced_expression_string_part.expression, context);
-    }
-
-    ArithmeticOperation as arithmetic_operation => {
-        match arithmetic_operation {
-            ArithmeticOperation::Prefix(arithmetic_prefix_operation) =>
-                walker.walk_arithmetic_prefix_operation(arithmetic_prefix_operation, context),
-            ArithmeticOperation::Infix(arithmetic_infix_operation) =>
-                walker.walk_arithmetic_infix_operation(arithmetic_infix_operation, context),
-            ArithmeticOperation::Postfix(arithmetic_postfix_operation) =>
-                walker.walk_arithmetic_postfix_operation(arithmetic_postfix_operation, context),
-        };
-    }
-
-    ArithmeticPrefixOperation as arithmetic_prefix_operation => {
-        walker.walk_arithmetic_prefix_operator(&arithmetic_prefix_operation.operator, context);
-        walker.walk_expression(&arithmetic_prefix_operation.value, context);
-    }
-
-    ArithmeticPrefixOperator as arithmetic_prefix_operator => {
-        // Do nothing
-    }
-
-    ArithmeticInfixOperation as arithmetic_infix_operation => {
-        walker.walk_expression(&arithmetic_infix_operation.lhs, context);
-        walker.walk_arithmetic_infix_operator(&arithmetic_infix_operation.operator, context);
-        walker.walk_expression(&arithmetic_infix_operation.rhs, context);
-    }
-
-    ArithmeticInfixOperator as arithmetic_infix_operator => {
-        // Do nothing
-    }
-
-    ArithmeticPostfixOperation as arithmetic_postfix_operation => {
-        walker.walk_expression(&arithmetic_postfix_operation.value, context);
-        walker.walk_arithmetic_postfix_operator(&arithmetic_postfix_operation.operator, context);
-    }
-
-    ArithmeticPostfixOperator as arithmetic_postfix_operator => {
-        // Do nothing
     }
 
     AssignmentOperation as assignment_operation => {

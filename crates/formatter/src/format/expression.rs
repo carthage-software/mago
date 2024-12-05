@@ -54,7 +54,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::UnaryPostfixOperation(op) => op.format(f),
                 Expression::Literal(literal) => literal.format(f),
                 Expression::CompositeString(c) => c.format(f),
-                Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
                 Expression::Conditional(op) => op.format(f),
                 Expression::Array(array) => array.format(f),
@@ -531,46 +530,6 @@ impl<'a> Format<'a> for NamedArgument {
                     self.value.format(f),
                 ])),
             }
-        })
-    }
-}
-
-impl<'a> Format<'a> for ArithmeticOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ArithmeticOperation, {
-            match self {
-                ArithmeticOperation::Prefix(o) => o.format(f),
-                ArithmeticOperation::Infix(_) => unreachable!(),
-                ArithmeticOperation::Postfix(o) => o.format(f),
-            }
-        })
-    }
-}
-
-impl<'a> Format<'a> for ArithmeticPrefixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ArithmeticPrefixOperation, {
-            let operator = match self.operator {
-                ArithmeticPrefixOperator::Decrement(span) => token!(f, span, "--"),
-                ArithmeticPrefixOperator::Increment(span) => token!(f, span, "++"),
-                ArithmeticPrefixOperator::Minus(span) => token!(f, span, "-"),
-                ArithmeticPrefixOperator::Plus(span) => token!(f, span, "+"),
-            };
-
-            group!(operator, self.value.format(f))
-        })
-    }
-}
-
-impl<'a> Format<'a> for ArithmeticPostfixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ArithmeticPostfixOperation, {
-            let operator = match self.operator {
-                ArithmeticPostfixOperator::Decrement(span) => token!(f, span, "--"),
-                ArithmeticPostfixOperator::Increment(span) => token!(f, span, "++"),
-            };
-
-            array!(self.value.format(f), operator)
         })
     }
 }

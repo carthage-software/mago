@@ -32,8 +32,6 @@ use crate::ast::instantiation::Instantiation;
 use crate::ast::keyword::Keyword;
 use crate::ast::literal::Literal;
 use crate::ast::magic_constant::MagicConstant;
-use crate::ast::operation::arithmetic::ArithmeticOperation;
-use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::unary::UnaryPostfixOperation;
@@ -61,7 +59,6 @@ pub enum Expression {
     Parenthesized(Box<Parenthesized>),
     Literal(Literal),
     CompositeString(Box<CompositeString>),
-    ArithmeticOperation(Box<ArithmeticOperation>),
     AssignmentOperation(Box<AssignmentOperation>),
     Conditional(Conditional),
     Array(Box<Array>),
@@ -110,21 +107,6 @@ impl Expression {
             Self::Parent(_) => true,
             Self::Static(_) => true,
             Self::Parenthesized(expression) => expression.expression.is_constant(initilization),
-            Self::ArithmeticOperation(expression) => match expression.as_ref() {
-                ArithmeticOperation::Infix(arithmetic_infix_operation) => {
-                    arithmetic_infix_operation.lhs.is_constant(initilization)
-                        && arithmetic_infix_operation.rhs.is_constant(initilization)
-                }
-                ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
-                    match arithmetic_prefix_operation.operator {
-                        ArithmeticPrefixOperator::Plus(_) | ArithmeticPrefixOperator::Minus(_) => {
-                            arithmetic_prefix_operation.value.is_constant(initilization)
-                        }
-                        _ => false,
-                    }
-                }
-                ArithmeticOperation::Postfix(_) => false,
-            },
             Self::Access(access) => match access.as_ref() {
                 Access::ClassConstant(ClassConstantAccess { class, constant, .. }) => {
                     matches!(constant, ClassLikeConstantSelector::Identifier(_)) && class.is_constant(initilization)
@@ -238,7 +220,6 @@ impl Expression {
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
             Expression::Literal(_) => NodeKind::Literal,
             Expression::CompositeString(_) => NodeKind::CompositeString,
-            Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
             Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
             Expression::Conditional(_) => NodeKind::Conditional,
             Expression::Array(_) => NodeKind::Array,
@@ -283,7 +264,6 @@ impl HasSpan for Expression {
             Expression::Parenthesized(expression) => expression.span(),
             Expression::Literal(expression) => expression.span(),
             Expression::CompositeString(expression) => expression.span(),
-            Expression::ArithmeticOperation(expression) => expression.span(),
             Expression::AssignmentOperation(expression) => expression.span(),
             Expression::Conditional(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),

@@ -180,27 +180,50 @@ where
             Trinary::Maybe => bool_kind(),
             Trinary::False => true_kind(),
         },
-        UnaryPrefixOperator::PreIncrement(_) => {
-            if value_kind.is_integer().is_true() {
-                return value_kind;
-            } else {
-                return integer_kind();
+        operator if operator.is_arithmetic() => {
+            match value_kind {
+                TypeKind::Value(ValueTypeKind::Integer { value }) => match operator {
+                    UnaryPrefixOperator::PreIncrement(_) => value_integer_kind(value.wrapping_add(1)),
+                    UnaryPrefixOperator::PreDecrement(_) => value_integer_kind(value.wrapping_sub(1)),
+                    UnaryPrefixOperator::Plus(_) => value_integer_kind(value),
+                    UnaryPrefixOperator::Negation(_) => value_integer_kind(-value),
+                    _ => unreachable!(),
+                },
+                TypeKind::Value(ValueTypeKind::Float { value }) => match operator {
+                    UnaryPrefixOperator::PreIncrement(_) => value_float_kind(value + 1.0),
+                    UnaryPrefixOperator::PreDecrement(_) => value_float_kind(value - 1.0),
+                    UnaryPrefixOperator::Plus(_) => value_float_kind(value),
+                    UnaryPrefixOperator::Negation(_) => value_float_kind(-value),
+                    _ => unreachable!(),
+                },
+                TypeKind::Scalar(ScalarTypeKind::Integer { .. }) => match operator {
+                    UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_) => integer_kind(),
+                    UnaryPrefixOperator::Plus(_) | UnaryPrefixOperator::Negation(_) => integer_kind(),
+                    _ => unreachable!(),
+                },
+                TypeKind::Scalar(ScalarTypeKind::Float) => float_kind(),
+                TypeKind::Scalar(ScalarTypeKind::NumericString) => {
+                    // If the operand is a non-empty string, the result is an integer
+                    integer_kind()
+                }
+                kind if is_gmp_or_bcmath_number(interner, &kind) => kind,
+                _ => never_kind(),
             }
         }
-        UnaryPrefixOperator::PreDecrement(_) => {
-            if value_kind.is_integer().is_true() {
-                return value_kind;
-            } else {
-                return integer_kind();
-            }
-        }
-        UnaryPrefixOperator::Plus(_) | UnaryPrefixOperator::Negation(_) => {
-            if value_kind.is_integer().is_true() || value_kind.is_float().is_true() {
-                return value_kind;
-            } else {
-                return union_kind(vec![integer_kind(), float_kind()]);
-            }
-        }
+        _ => mixed_kind(false),
+    }
+}
+
+#[inline]
+pub fn get_unary_postfix_operation_kind<F>(unary_operation: &UnaryPostfixOperation, get_expression_kind: F) -> TypeKind
+where
+    F: Fn(&Expression) -> TypeKind,
+{
+    let value_kind = get_expression_kind(&unary_operation.operand);
+
+    match &unary_operation.operator {
+        UnaryPostfixOperator::PostIncrement(_) => value_kind,
+        UnaryPostfixOperator::PostDecrement(_) => value_kind,
     }
 }
 
@@ -589,6 +612,104 @@ where
                 lhs_value.wrapping_shr(rhs_value as u32)
             })
         }
+        operator if operator.is_arithmetic() => {
+            match (&left_kind, &right_kind) {
+                (
+                    TypeKind::Value(ValueTypeKind::Integer { value: lhs }),
+                    TypeKind::Value(ValueTypeKind::Integer { value: rhs_value }),
+                ) => {
+                    match operator {
+                        BinaryOperator::Addition(_) => value_integer_kind(lhs.wrapping_add(*rhs_value)),
+                        BinaryOperator::Subtraction(_) => value_integer_kind(lhs.wrapping_sub(*rhs_value)),
+                        BinaryOperator::Multiplication(_) => value_integer_kind(lhs.wrapping_mul(*rhs_value)),
+                        BinaryOperator::Division(_) => {
+                            if *rhs_value != 0 {
+                                if lhs % rhs_value == 0 {
+                                    // Division is exact, result is integer
+                                    value_integer_kind(lhs / rhs_value)
+                                } else {
+                                    // Division results in float
+                                    value_float_kind(OrderedFloat((*lhs as f64) / (*rhs_value as f64)))
+                                }
+                            } else {
+                                // Division by zero; in PHP, this throws, resulting in `never`
+                                never_kind()
+                            }
+                        }
+                        BinaryOperator::Modulo(_) => {
+                            if *rhs_value != 0 {
+                                value_integer_kind(lhs % rhs_value)
+                            } else {
+                                // Modulo by zero; in PHP, this throws, resulting in `never`
+                                never_kind()
+                            }
+                        }
+                        BinaryOperator::Exponentiation(_) => {
+                            // Exponentiation of integers
+                            let base = *lhs as f64;
+                            let exponent = *rhs_value as f64;
+                            let result = base.powf(exponent);
+
+                            if result.fract() == 0.0 && result >= i64::MIN as f64 && result <= i64::MAX as f64 {
+                                // Result is an integer
+                                value_integer_kind(result as i64)
+                            } else {
+                                // Result is a float
+                                value_float_kind(OrderedFloat(result))
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                // Both operands are numeric literals (integer or float)
+                (lhs_value_kind, rhs_value_kind)
+                    if is_numeric_value_kind(lhs_value_kind) && is_numeric_value_kind(rhs_value_kind) =>
+                {
+                    let lhs_value = extract_numeric_value(lhs_value_kind);
+                    let rhs_value = extract_numeric_value(rhs_value_kind);
+
+                    match (lhs_value, rhs_value) {
+                        (Some(lhs_num), Some(rhs_num)) => {
+                            let result = match &operator {
+                                BinaryOperator::Addition(_) => lhs_num + rhs_num,
+                                BinaryOperator::Subtraction(_) => lhs_num - rhs_num,
+                                BinaryOperator::Multiplication(_) => lhs_num * rhs_num,
+                                BinaryOperator::Division(_) => {
+                                    if rhs_num != 0.0 {
+                                        lhs_num / rhs_num
+                                    } else {
+                                        return never_kind(); // Division by zero
+                                    }
+                                }
+                                BinaryOperator::Modulo(_) => {
+                                    if rhs_num != 0.0 {
+                                        // Convert operands to integers by truncating the decimal part
+                                        let lhs_int = lhs_num.0.trunc() as i64;
+                                        let rhs_int = rhs_num.0.trunc() as i64;
+
+                                        if rhs_int != 0 {
+                                            let result = lhs_int % rhs_int;
+                                            return value_integer_kind(result);
+                                        } else {
+                                            return never_kind(); // Modulo by zero
+                                        }
+                                    } else {
+                                        return never_kind(); // Modulo by zero
+                                    }
+                                }
+                                BinaryOperator::Exponentiation(_) => OrderedFloat(lhs_num.powf(*rhs_num)),
+                                _ => unreachable!(),
+                            };
+
+                            value_float_kind(result)
+                        }
+                        _ => float_kind(),
+                    }
+                }
+                // One or both operands are not literals
+                _ => resolve_numeric_operation_kind(interner, left_kind, right_kind, &operator),
+            }
+        }
         BinaryOperator::Instanceof(_) => bool_kind(),
         _ => mixed_kind(false),
     }
@@ -691,157 +812,6 @@ where
 }
 
 #[inline]
-pub fn get_arithmetic_operation_kind<F>(
-    interner: &ThreadedInterner,
-    arithmetic_operation: &ArithmeticOperation,
-    get_expression_kind: F,
-) -> TypeKind
-where
-    F: Fn(&Expression) -> TypeKind,
-{
-    match arithmetic_operation {
-        ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
-            match get_expression_kind(&arithmetic_prefix_operation.value) {
-                TypeKind::Value(ValueTypeKind::Integer { value }) => match &arithmetic_prefix_operation.operator {
-                    ArithmeticPrefixOperator::Increment(_) => value_integer_kind(value.wrapping_add(1)),
-                    ArithmeticPrefixOperator::Decrement(_) => value_integer_kind(value.wrapping_sub(1)),
-                    ArithmeticPrefixOperator::Plus(_) => value_integer_kind(value),
-                    ArithmeticPrefixOperator::Minus(_) => value_integer_kind(-value),
-                },
-                TypeKind::Value(ValueTypeKind::Float { value }) => match &arithmetic_prefix_operation.operator {
-                    ArithmeticPrefixOperator::Increment(_) => value_float_kind(value + 1.0),
-                    ArithmeticPrefixOperator::Decrement(_) => value_float_kind(value - 1.0),
-                    ArithmeticPrefixOperator::Plus(_) => value_float_kind(value),
-                    ArithmeticPrefixOperator::Minus(_) => value_float_kind(-value),
-                },
-                TypeKind::Scalar(ScalarTypeKind::Integer { .. }) => match &arithmetic_prefix_operation.operator {
-                    ArithmeticPrefixOperator::Increment(_) | ArithmeticPrefixOperator::Decrement(_) => integer_kind(),
-                    ArithmeticPrefixOperator::Plus(_) | ArithmeticPrefixOperator::Minus(_) => integer_kind(),
-                },
-                TypeKind::Scalar(ScalarTypeKind::Float) => float_kind(),
-                TypeKind::Scalar(ScalarTypeKind::NumericString) => {
-                    // If the operand is a non-empty string, the result is an integer
-                    integer_kind()
-                }
-                kind if is_gmp_or_bcmath_number(interner, &kind) => kind,
-                _ => never_kind(),
-            }
-        }
-        ArithmeticOperation::Infix(arithmetic_infix_operation) => {
-            let lhs_kind = get_expression_kind(&arithmetic_infix_operation.lhs);
-            let rhs_kind = get_expression_kind(&arithmetic_infix_operation.rhs);
-
-            match (&lhs_kind, &rhs_kind) {
-                (TypeKind::Never, _) | (_, TypeKind::Never) => {
-                    // If either operand is Never, the result is Never
-                    never_kind()
-                }
-                (
-                    TypeKind::Value(ValueTypeKind::Integer { value: lhs }),
-                    TypeKind::Value(ValueTypeKind::Integer { value: rhs_value }),
-                ) => {
-                    match &arithmetic_infix_operation.operator {
-                        ArithmeticInfixOperator::Addition(_) => value_integer_kind(lhs.wrapping_add(*rhs_value)),
-                        ArithmeticInfixOperator::Subtraction(_) => value_integer_kind(lhs.wrapping_sub(*rhs_value)),
-                        ArithmeticInfixOperator::Multiplication(_) => value_integer_kind(lhs.wrapping_mul(*rhs_value)),
-                        ArithmeticInfixOperator::Division(_) => {
-                            if *rhs_value != 0 {
-                                if lhs % rhs_value == 0 {
-                                    // Division is exact, result is integer
-                                    value_integer_kind(lhs / rhs_value)
-                                } else {
-                                    // Division results in float
-                                    value_float_kind(OrderedFloat((*lhs as f64) / (*rhs_value as f64)))
-                                }
-                            } else {
-                                // Division by zero; in PHP, this throws, resulting in `never`
-                                never_kind()
-                            }
-                        }
-                        ArithmeticInfixOperator::Modulo(_) => {
-                            if *rhs_value != 0 {
-                                value_integer_kind(lhs % rhs_value)
-                            } else {
-                                // Modulo by zero; in PHP, this throws, resulting in `never`
-                                never_kind()
-                            }
-                        }
-                        ArithmeticInfixOperator::Exponentiation(_) => {
-                            // Exponentiation of integers
-                            let base = *lhs as f64;
-                            let exponent = *rhs_value as f64;
-                            let result = base.powf(exponent);
-
-                            if result.fract() == 0.0 && result >= i64::MIN as f64 && result <= i64::MAX as f64 {
-                                // Result is an integer
-                                value_integer_kind(result as i64)
-                            } else {
-                                // Result is a float
-                                value_float_kind(OrderedFloat(result))
-                            }
-                        }
-                    }
-                }
-                // Both operands are numeric literals (integer or float)
-                (lhs_value_kind, rhs_value_kind)
-                    if is_numeric_value_kind(lhs_value_kind) && is_numeric_value_kind(rhs_value_kind) =>
-                {
-                    let lhs_value = extract_numeric_value(lhs_value_kind);
-                    let rhs_value = extract_numeric_value(rhs_value_kind);
-
-                    match (lhs_value, rhs_value) {
-                        (Some(lhs_num), Some(rhs_num)) => {
-                            let result = match &arithmetic_infix_operation.operator {
-                                ArithmeticInfixOperator::Addition(_) => lhs_num + rhs_num,
-                                ArithmeticInfixOperator::Subtraction(_) => lhs_num - rhs_num,
-                                ArithmeticInfixOperator::Multiplication(_) => lhs_num * rhs_num,
-                                ArithmeticInfixOperator::Division(_) => {
-                                    if rhs_num != 0.0 {
-                                        lhs_num / rhs_num
-                                    } else {
-                                        return never_kind(); // Division by zero
-                                    }
-                                }
-                                ArithmeticInfixOperator::Modulo(_) => {
-                                    if rhs_num != 0.0 {
-                                        // Convert operands to integers by truncating the decimal part
-                                        let lhs_int = lhs_num.0.trunc() as i64;
-                                        let rhs_int = rhs_num.0.trunc() as i64;
-
-                                        if rhs_int != 0 {
-                                            let result = lhs_int % rhs_int;
-                                            return value_integer_kind(result);
-                                        } else {
-                                            return never_kind(); // Modulo by zero
-                                        }
-                                    } else {
-                                        return never_kind(); // Modulo by zero
-                                    }
-                                }
-                                ArithmeticInfixOperator::Exponentiation(_) => OrderedFloat(lhs_num.powf(*rhs_num)),
-                            };
-
-                            value_float_kind(result)
-                        }
-                        _ => float_kind(),
-                    }
-                }
-                // One or both operands are not literals
-                _ => resolve_numeric_operation_kind(
-                    interner,
-                    lhs_kind.clone(),
-                    rhs_kind.clone(),
-                    &arithmetic_infix_operation.operator,
-                ),
-            }
-        }
-        ArithmeticOperation::Postfix(arithmetic_postfix_operation) => {
-            get_expression_kind(&arithmetic_postfix_operation.value)
-        }
-    }
-}
-
-#[inline]
 pub fn get_literal_kind(interner: &ThreadedInterner, literal: &Literal) -> TypeKind {
     match &literal {
         Literal::String(string) => get_literal_string_value_kind(interner, string.value, true),
@@ -936,16 +906,16 @@ pub fn resolve_numeric_operation_kind(
     interner: &ThreadedInterner,
     lhs_kind: TypeKind,
     rhs_kind: TypeKind,
-    operator: &ArithmeticInfixOperator,
+    operator: &BinaryOperator,
 ) -> TypeKind {
     match (lhs_kind, rhs_kind) {
         // If either operand is Never, the result is Never
         (TypeKind::Never, _) | (_, TypeKind::Never) => never_kind(),
         (TypeKind::Scalar(ScalarTypeKind::Integer { .. }), TypeKind::Scalar(ScalarTypeKind::Integer { .. })) => {
             match operator {
-                ArithmeticInfixOperator::Modulo(_) => integer_kind(),
-                ArithmeticInfixOperator::Division(_) => union_kind(vec![integer_kind(), float_kind()]),
-                ArithmeticInfixOperator::Exponentiation(_) => union_kind(vec![integer_kind(), float_kind()]),
+                BinaryOperator::Modulo(_) => integer_kind(),
+                BinaryOperator::Division(_) => union_kind(vec![integer_kind(), float_kind()]),
+                BinaryOperator::Exponentiation(_) => union_kind(vec![integer_kind(), float_kind()]),
                 _ => integer_kind(),
             }
         }

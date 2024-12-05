@@ -273,18 +273,6 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
         }
         Expression::UnaryPrefixOperation(operation) => expression_has_yield(&operation.operand),
         Expression::UnaryPostfixOperation(operation) => expression_has_yield(&operation.operand),
-        Expression::ArithmeticOperation(arithmetic_operation) => match arithmetic_operation.as_ref() {
-            ArithmeticOperation::Prefix(arithmetic_prefix_operation) => {
-                expression_has_yield(&arithmetic_prefix_operation.value)
-            }
-            ArithmeticOperation::Infix(arithmetic_infix_operation) => {
-                expression_has_yield(&arithmetic_infix_operation.lhs)
-                    || expression_has_yield(&arithmetic_infix_operation.rhs)
-            }
-            ArithmeticOperation::Postfix(arithmetic_postfix_operation) => {
-                expression_has_yield(&arithmetic_postfix_operation.value)
-            }
-        },
         Expression::AssignmentOperation(assignment_operation) => {
             expression_has_yield(&assignment_operation.lhs) || expression_has_yield(&assignment_operation.rhs)
         }

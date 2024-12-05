@@ -163,13 +163,6 @@ pub enum NodeKind {
     Namespace,
     NamespaceBody,
     NamespaceImplicitBody,
-    ArithmeticInfixOperation,
-    ArithmeticInfixOperator,
-    ArithmeticOperation,
-    ArithmeticPostfixOperation,
-    ArithmeticPostfixOperator,
-    ArithmeticPrefixOperation,
-    ArithmeticPrefixOperator,
     AssignmentOperation,
     AssignmentOperator,
     ConditionalTernaryOperation,
@@ -392,13 +385,6 @@ pub enum Node<'a> {
     Namespace(&'a Namespace),
     NamespaceBody(&'a NamespaceBody),
     NamespaceImplicitBody(&'a NamespaceImplicitBody),
-    ArithmeticInfixOperation(&'a ArithmeticInfixOperation),
-    ArithmeticInfixOperator(&'a ArithmeticInfixOperator),
-    ArithmeticOperation(&'a ArithmeticOperation),
-    ArithmeticPostfixOperation(&'a ArithmeticPostfixOperation),
-    ArithmeticPostfixOperator(&'a ArithmeticPostfixOperator),
-    ArithmeticPrefixOperation(&'a ArithmeticPrefixOperation),
-    ArithmeticPrefixOperator(&'a ArithmeticPrefixOperator),
     AssignmentOperation(&'a AssignmentOperation),
     AssignmentOperator(&'a AssignmentOperator),
     Conditional(&'a Conditional),
@@ -701,13 +687,6 @@ impl<'a> Node<'a> {
             Self::Namespace(_) => NodeKind::Namespace,
             Self::NamespaceBody(_) => NodeKind::NamespaceBody,
             Self::NamespaceImplicitBody(_) => NodeKind::NamespaceImplicitBody,
-            Self::ArithmeticInfixOperation(_) => NodeKind::ArithmeticInfixOperation,
-            Self::ArithmeticInfixOperator(_) => NodeKind::ArithmeticInfixOperator,
-            Self::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
-            Self::ArithmeticPostfixOperation(_) => NodeKind::ArithmeticPostfixOperation,
-            Self::ArithmeticPostfixOperator(_) => NodeKind::ArithmeticPostfixOperator,
-            Self::ArithmeticPrefixOperation(_) => NodeKind::ArithmeticPrefixOperation,
-            Self::ArithmeticPrefixOperator(_) => NodeKind::ArithmeticPrefixOperator,
             Self::AssignmentOperation(_) => NodeKind::AssignmentOperation,
             Self::AssignmentOperator(_) => NodeKind::AssignmentOperator,
             Self::Conditional(_) => NodeKind::Conditional,
@@ -1438,7 +1417,6 @@ impl<'a> Node<'a> {
                 Expression::Parenthesized(node) => Node::Parenthesized(node),
                 Expression::Literal(node) => Node::Literal(node),
                 Expression::CompositeString(node) => Node::CompositeString(node),
-                Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
                 Expression::Conditional(node) => Node::Conditional(node),
                 Expression::Array(node) => Node::Array(node),
@@ -1699,25 +1677,6 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::ArithmeticInfixOperation(node) => vec![
-                Node::Expression(&node.lhs),
-                Node::ArithmeticInfixOperator(&node.operator),
-                Node::Expression(&node.rhs),
-            ],
-            Node::ArithmeticInfixOperator(_) => vec![],
-            Node::ArithmeticOperation(node) => vec![match node {
-                ArithmeticOperation::Infix(node) => Node::ArithmeticInfixOperation(node),
-                ArithmeticOperation::Postfix(node) => Node::ArithmeticPostfixOperation(node),
-                ArithmeticOperation::Prefix(node) => Node::ArithmeticPrefixOperation(node),
-            }],
-            Node::ArithmeticPostfixOperation(node) => {
-                vec![Node::Expression(&node.value), Node::ArithmeticPostfixOperator(&node.operator)]
-            }
-            Node::ArithmeticPostfixOperator(_) => vec![],
-            Node::ArithmeticPrefixOperation(node) => {
-                vec![Node::ArithmeticPrefixOperator(&node.operator), Node::Expression(&node.value)]
-            }
-            Node::ArithmeticPrefixOperator(_) => vec![],
             Node::AssignmentOperation(node) => {
                 vec![Node::Expression(&node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(&node.rhs)]
             }
@@ -2230,13 +2189,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::Namespace(node) => node.span(),
             Self::NamespaceBody(node) => node.span(),
             Self::NamespaceImplicitBody(node) => node.span(),
-            Self::ArithmeticInfixOperation(node) => node.span(),
-            Self::ArithmeticInfixOperator(node) => node.span(),
-            Self::ArithmeticOperation(node) => node.span(),
-            Self::ArithmeticPostfixOperation(node) => node.span(),
-            Self::ArithmeticPostfixOperator(node) => node.span(),
-            Self::ArithmeticPrefixOperation(node) => node.span(),
-            Self::ArithmeticPrefixOperator(node) => node.span(),
             Self::AssignmentOperation(node) => node.span(),
             Self::AssignmentOperator(node) => node.span(),
             Self::Conditional(node) => node.span(),

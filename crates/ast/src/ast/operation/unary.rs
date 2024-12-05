@@ -89,6 +89,11 @@ impl UnaryPrefixOperator {
     }
 
     #[inline]
+    pub const fn is_arithmetic(&self) -> bool {
+        matches!(self, Self::Plus(_) | Self::Negation(_) | Self::PreIncrement(_) | Self::PreDecrement(_))
+    }
+
+    #[inline]
     pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
         match self {
             UnaryPrefixOperator::ErrorControl(_) => "@",

@@ -262,7 +262,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
-            Node::BinaryOperation(_) | Node::ArithmeticInfixOperation(_) => true,
+            Node::BinaryOperation(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
             _ => false,
         }
@@ -270,10 +270,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_unary(&self, node: Node<'a>) -> bool {
         match node {
-            Node::UnaryPrefixOperation(_)
-            | Node::UnaryPostfixOperation(_)
-            | Node::ArithmeticPostfixOperation(_)
-            | Node::ArithmeticPrefixOperation(_) => true,
+            Node::UnaryPrefixOperation(_) | Node::UnaryPostfixOperation(_) => true,
             _ => false,
         }
     }
