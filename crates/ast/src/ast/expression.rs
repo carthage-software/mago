@@ -36,7 +36,6 @@ use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
-use crate::ast::operation::coalesce::CoalesceOperation;
 use crate::ast::operation::comparison::ComparisonOperation;
 use crate::ast::operation::logical::LogicalOperation;
 use crate::ast::operation::ternary::TernaryOperation;
@@ -71,7 +70,6 @@ pub enum Expression {
     ComparisonOperation(Box<ComparisonOperation>),
     LogicalOperation(Box<LogicalOperation>),
     TernaryOperation(Box<TernaryOperation>),
-    CoalesceOperation(Box<CoalesceOperation>),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
     List(Box<List>),
@@ -174,9 +172,6 @@ impl Expression {
                             })
                         })
                         .unwrap_or(true)
-            }
-            Self::CoalesceOperation(operation) => {
-                operation.lhs.is_constant(initilization) && operation.rhs.is_constant(initilization)
             }
             Self::ComparisonOperation(operation) => {
                 operation.lhs.is_constant(initilization) && operation.rhs.is_constant(initilization)
@@ -286,7 +281,6 @@ impl Expression {
             Expression::ComparisonOperation(_) => NodeKind::ComparisonOperation,
             Expression::LogicalOperation(_) => NodeKind::LogicalOperation,
             Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
-            Expression::CoalesceOperation(_) => NodeKind::CoalesceOperation,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
             Expression::List(_) => NodeKind::List,
@@ -335,7 +329,6 @@ impl HasSpan for Expression {
             Expression::ComparisonOperation(expression) => expression.span(),
             Expression::LogicalOperation(expression) => expression.span(),
             Expression::TernaryOperation(expression) => expression.span(),
-            Expression::CoalesceOperation(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),
             Expression::List(expression) => expression.span(),

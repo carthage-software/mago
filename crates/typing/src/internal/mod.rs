@@ -383,53 +383,46 @@ where
 }
 
 #[inline]
-pub fn get_coalesce_operation_kind<F>(coalesce_operation: &CoalesceOperation, get_expression_kind: F) -> TypeKind
+pub fn get_binary_operation_kind<F>(binary_operation: &BinaryOperation, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
-    let left_kind = get_expression_kind(&coalesce_operation.lhs);
-    let right_kind = get_expression_kind(&coalesce_operation.rhs);
+    let left_kind = get_expression_kind(&binary_operation.lhs);
+    let right_kind = get_expression_kind(&binary_operation.rhs);
 
     if matches!(left_kind, TypeKind::Never) || matches!(right_kind, TypeKind::Never) {
         return never_kind();
     }
 
-    if left_kind == right_kind {
-        return left_kind;
-    }
-
-    match left_kind.is_nullable() {
-        Trinary::False => left_kind,
-        Trinary::True => right_kind,
-        Trinary::Maybe => union_kind(vec![left_kind, right_kind]),
-    }
-}
-
-#[inline]
-pub fn get_binary_operation_kind<F>(binary_operation: &BinaryOperation, get_expression_kind: F) -> TypeKind
-where
-    F: Fn(&Expression) -> TypeKind,
-{
-    let lhs = get_expression_kind(&binary_operation.lhs);
-    let rhs = get_expression_kind(&binary_operation.rhs);
-
-    if matches!(lhs, TypeKind::Never) || matches!(rhs, TypeKind::Never) {
-        return never_kind();
-    }
-
     match &binary_operation.operator {
         BinaryOperator::StringConcat(_) => {
-            if lhs.is_non_empty_string().or(rhs.is_non_empty_string()).is_true() {
+            if left_kind.is_non_empty_string().or(right_kind.is_non_empty_string()).is_true() {
                 return non_empty_string_kind();
             }
 
-            if lhs.is_integer().or(lhs.is_float()).and(rhs.is_integer().or(rhs.is_float())).is_true() {
+            if left_kind
+                .is_integer()
+                .or(left_kind.is_float())
+                .and(right_kind.is_integer().or(right_kind.is_float()))
+                .is_true()
+            {
                 return TypeKind::Scalar(ScalarTypeKind::NumericString);
             }
 
             string_kind()
         }
         BinaryOperator::Instanceof(_) => bool_kind(),
+        BinaryOperator::NullCoalesce(_) => {
+            if left_kind == right_kind {
+                return left_kind;
+            }
+
+            match left_kind.is_nullable() {
+                Trinary::False => left_kind,
+                Trinary::True => right_kind,
+                Trinary::Maybe => union_kind(vec![left_kind, right_kind]),
+            }
+        }
         _ => mixed_kind(false),
     }
 }

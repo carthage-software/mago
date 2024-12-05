@@ -305,7 +305,6 @@ impl Precedence {
     #[inline(always)]
     pub fn postfix(kind: &TokenKind) -> Self {
         match kind {
-            T!["??"] => Self::NullCoalesce,
             T!["++" | "--"] => Self::Prefix,
             T!["(" | "["] => Self::CallDim,
             T!["->" | "?->" | "::"] => Self::ObjectAccess,
@@ -475,13 +474,14 @@ impl TokenKind {
                 | ".="
                 | "??="
                 | "/="
-                | "*="]
+                | "*="
+                | "??"]
         )
     }
 
     #[inline(always)]
     pub fn is_postfix(&self) -> bool {
-        matches!(self, T!["++" | "--" | "(" | "[" | "->" | "?->" | "::" | "??"])
+        matches!(self, T!["++" | "--" | "(" | "[" | "->" | "?->" | "::"])
     }
 
     #[inline(always)]

@@ -1309,9 +1309,6 @@ generate_ast_walker! {
             Expression::TernaryOperation(ternary_operation) => {
                 walker.walk_ternary_operation(ternary_operation.as_ref(), context)
             }
-            Expression::CoalesceOperation(coalesce_operation) => {
-                walker.walk_coalesce_operation(coalesce_operation.as_ref(), context)
-            }
             Expression::Array(array) => walker.walk_array(array.as_ref(), context),
             Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array.as_ref(), context),
             Expression::List(list) => walker.walk_list(list.as_ref(), context),
@@ -1597,11 +1594,6 @@ generate_ast_walker! {
     ElvisTernaryOperation as elvis_ternary_operation => {
         walker.walk_expression(&elvis_ternary_operation.condition, context);
         walker.walk_expression(&elvis_ternary_operation.r#else, context);
-    }
-
-    CoalesceOperation as coalesce_operation => {
-        walker.walk_expression(&coalesce_operation.lhs, context);
-        walker.walk_expression(&coalesce_operation.rhs, context);
     }
 
     Array as array => {

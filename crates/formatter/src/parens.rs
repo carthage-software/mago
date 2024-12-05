@@ -258,7 +258,6 @@ impl<'a> Formatter<'a> {
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
             Node::BinaryOperation(_)
-            | Node::CoalesceOperation(_)
             | Node::LogicalInfixOperation(_)
             | Node::ComparisonOperation(_)
             | Node::BitwiseInfixOperation(_)

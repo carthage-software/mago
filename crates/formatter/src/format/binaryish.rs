@@ -2,13 +2,12 @@ use fennec_ast::*;
 use fennec_span::HasSpan;
 
 use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::format::Format;
-use crate::format::Group;
 use crate::Formatter;
-
-use super::IfBreak;
 
 pub(super) fn print_binaryish_expression<'a>(
     f: &mut Formatter<'a>,
@@ -90,14 +89,13 @@ pub(super) fn print_binaryish_expression<'a>(
 
 pub(super) fn should_inline_logical_or_coalesce_expression<'a>(expression: &'a Expression) -> bool {
     let rhs = match expression {
-        Expression::LogicalOperation(logical_operation) => {
-            if let LogicalOperation::Infix(infix_logical_operation) = logical_operation.as_ref() {
-                &infix_logical_operation.rhs
-            } else {
+        Expression::BinaryOperation(operation) => {
+            if !operation.operator.is_logical() && !operation.operator.is_null_coalesce() {
                 return false;
             }
+
+            operation.rhs.as_ref()
         }
-        Expression::CoalesceOperation(coalesce_operation) => &coalesce_operation.rhs,
         _ => return false,
     };
 

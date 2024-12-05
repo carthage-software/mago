@@ -138,6 +138,11 @@ impl BinaryOperator {
     }
 
     #[inline]
+    pub const fn is_null_coalesce(&self) -> bool {
+        matches!(self, Self::NullCoalesce(_))
+    }
+
+    #[inline]
     pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
         match self {
             Self::Addition(_) => "+",

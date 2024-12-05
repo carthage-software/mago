@@ -172,12 +172,6 @@ fn parse_postfix_expression<'a, 'i>(
     let operator = utils::peek(stream)?;
 
     Ok(match operator.kind {
-        T!["??"] => {
-            let double_question_mark = utils::expect_any(stream)?.span;
-            let rhs = parse_expression_with_precedence(stream, Precedence::NullCoalesce)?;
-
-            Expression::CoalesceOperation(Box::new(CoalesceOperation { lhs, double_question_mark, rhs }))
-        }
         T!["("] => {
             if matches!(
                 (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)),
@@ -347,6 +341,16 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
     let operator = utils::peek(stream)?;
 
     Ok(match operator.kind {
+        T!["??"] => {
+            let qq = utils::expect_any(stream)?.span;
+            let rhs = parse_expression_with_precedence(stream, Precedence::NullCoalesce)?;
+
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::NullCoalesce(qq),
+                rhs: Box::new(rhs),
+            })
+        }
         T!["?"] => {
             if matches!(utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), Some(T![":"])) {
                 Expression::TernaryOperation(Box::new(TernaryOperation::Conditional(ConditionalTernaryOperation {
