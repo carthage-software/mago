@@ -131,7 +131,7 @@ fn parse_lhs_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<Expr
         (T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "enum" | "from"], ..) => {
             Expression::Identifier(identifier::parse_identifier(stream)?)
         }
-        (T!["("], _) => Expression::Parenthesized(ParenthesizedExpression {
+        (T!["("], _) => Expression::Parenthesized(Parenthesized {
             left_parenthesis: utils::expect_span(stream, T!["("])?,
             expression: Box::new(parse_expression(stream)?),
             right_parenthesis: utils::expect_span(stream, T![")"])?,
@@ -194,18 +194,18 @@ fn parse_postfix_expression<'a, 'i>(
             let left_bracket = utils::expect_any(stream)?.span;
             let next = utils::peek(stream)?;
             if matches!(next.kind, T!["]"]) {
-                Expression::ArrayAppend(Box::new(ArrayAppend {
-                    array: lhs,
+                Expression::ArrayAppend(ArrayAppend {
+                    array: Box::new(lhs),
                     left_bracket,
                     right_bracket: utils::expect_any(stream)?.span,
-                }))
+                })
             } else {
-                Expression::ArrayAccess(Box::new(ArrayAccess {
-                    array: lhs,
+                Expression::ArrayAccess(ArrayAccess {
+                    array: Box::new(lhs),
                     left_bracket,
-                    index: parse_expression(stream)?,
+                    index: Box::new(parse_expression(stream)?),
                     right_bracket: utils::expect(stream, T!["]"])?.span,
-                }))
+                })
             }
         }
         T!["::"] => {
@@ -321,11 +321,11 @@ fn parse_postfix_expression<'a, 'i>(
                 })))
             }
         }
-        T!["++"] => Expression::UnaryPostfix(UnaryPostfixExpression {
+        T!["++"] => Expression::UnaryPostfix(UnaryPostfix {
             operand: Box::new(lhs),
             operator: UnaryPostfixOperator::PostIncrement(utils::expect_any(stream)?.span),
         }),
-        T!["--"] => Expression::UnaryPostfix(UnaryPostfixExpression {
+        T!["--"] => Expression::UnaryPostfix(UnaryPostfix {
             operand: Box::new(lhs),
             operator: UnaryPostfixOperator::PostDecrement(utils::expect_any(stream)?.span),
         }),
@@ -341,7 +341,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let qq = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::NullCoalesce)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::NullCoalesce(qq),
                 rhs: Box::new(rhs),
@@ -370,38 +370,38 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let question_colon = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::ElvisOrConditional)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::Elvis(question_colon),
                 rhs: Box::new(rhs),
             })
         }
-        T!["+"] => Expression::Binary(BinaryExpression {
+        T!["+"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Addition(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::AddSub)?),
         }),
-        T!["-"] => Expression::Binary(BinaryExpression {
+        T!["-"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Subtraction(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::AddSub)?),
         }),
-        T!["*"] => Expression::Binary(BinaryExpression {
+        T!["*"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Multiplication(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
         }),
-        T!["/"] => Expression::Binary(BinaryExpression {
+        T!["/"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Division(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
         }),
-        T!["%"] => Expression::Binary(BinaryExpression {
+        T!["%"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Modulo(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::MulDivMod)?),
         }),
-        T!["**"] => Expression::Binary(BinaryExpression {
+        T!["**"] => Expression::Binary(Binary {
             lhs: Box::new(lhs),
             operator: BinaryOperator::Exponentiation(utils::expect_any(stream)?.span),
             rhs: Box::new(parse_expression_with_precedence(stream, Precedence::Pow)?),
@@ -494,7 +494,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseAnd)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::BitwiseAnd(operator),
                 rhs: Box::new(rhs),
@@ -504,7 +504,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseOr)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::BitwiseOr(operator),
                 rhs: Box::new(rhs),
@@ -514,7 +514,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseXor)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::BitwiseXor(operator),
                 rhs: Box::new(rhs),
@@ -524,7 +524,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitShift)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::LeftShift(operator),
                 rhs: Box::new(rhs),
@@ -534,7 +534,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitShift)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::RightShift(operator),
                 rhs: Box::new(rhs),
@@ -544,7 +544,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::Equal(operator),
                 rhs: Box::new(rhs),
@@ -554,7 +554,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::Identical(operator),
                 rhs: Box::new(rhs),
@@ -564,7 +564,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::NotEqual(operator),
                 rhs: Box::new(rhs),
@@ -574,7 +574,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::NotIdentical(operator),
                 rhs: Box::new(rhs),
@@ -584,7 +584,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::AngledNotEqual(operator),
                 rhs: Box::new(rhs),
@@ -594,7 +594,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::LessThan(operator),
                 rhs: Box::new(rhs),
@@ -604,7 +604,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::GreaterThan(operator),
                 rhs: Box::new(rhs),
@@ -614,7 +614,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::LessThanOrEqual(operator),
                 rhs: Box::new(rhs),
@@ -624,7 +624,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Comparison)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::GreaterThanOrEqual(operator),
                 rhs: Box::new(rhs),
@@ -634,7 +634,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Equality)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::Spaceship(operator),
                 rhs: Box::new(rhs),
@@ -644,57 +644,37 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let and = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::And)?;
 
-            Expression::Binary(BinaryExpression {
-                lhs: Box::new(lhs),
-                operator: BinaryOperator::And(and),
-                rhs: Box::new(rhs),
-            })
+            Expression::Binary(Binary { lhs: Box::new(lhs), operator: BinaryOperator::And(and), rhs: Box::new(rhs) })
         }
         T!["||"] => {
             let or = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Or)?;
 
-            Expression::Binary(BinaryExpression {
-                lhs: Box::new(lhs),
-                operator: BinaryOperator::Or(or),
-                rhs: Box::new(rhs),
-            })
+            Expression::Binary(Binary { lhs: Box::new(lhs), operator: BinaryOperator::Or(or), rhs: Box::new(rhs) })
         }
         T!["and"] => {
             let and = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalAnd)?;
 
-            Expression::Binary(BinaryExpression {
-                lhs: Box::new(lhs),
-                operator: BinaryOperator::LowAnd(and),
-                rhs: Box::new(rhs),
-            })
+            Expression::Binary(Binary { lhs: Box::new(lhs), operator: BinaryOperator::LowAnd(and), rhs: Box::new(rhs) })
         }
         T!["or"] => {
             let or = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalOr)?;
 
-            Expression::Binary(BinaryExpression {
-                lhs: Box::new(lhs),
-                operator: BinaryOperator::LowOr(or),
-                rhs: Box::new(rhs),
-            })
+            Expression::Binary(Binary { lhs: Box::new(lhs), operator: BinaryOperator::LowOr(or), rhs: Box::new(rhs) })
         }
         T!["xor"] => {
             let xor = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::LowLogicalXor)?;
 
-            Expression::Binary(BinaryExpression {
-                lhs: Box::new(lhs),
-                operator: BinaryOperator::LowXor(xor),
-                rhs: Box::new(rhs),
-            })
+            Expression::Binary(Binary { lhs: Box::new(lhs), operator: BinaryOperator::LowXor(xor), rhs: Box::new(rhs) })
         }
         T!["."] => {
             let dot = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::Concat)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::StringConcat(dot),
                 rhs: Box::new(rhs),
@@ -704,7 +684,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             let instanceof = utils::expect_any_keyword(stream)?;
             let rhs = parse_expression_with_precedence(stream, Precedence::Instanceof)?;
 
-            Expression::Binary(BinaryExpression {
+            Expression::Binary(Binary {
                 lhs: Box::new(lhs),
                 operator: BinaryOperator::Instanceof(instanceof),
                 rhs: Box::new(rhs),
@@ -747,9 +727,9 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
         || operation.operator.is_arithmetic()
     {
         // make `($x == $y) = $z` into `$x == ($y = $z)`
-        let BinaryExpression { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
+        let Binary { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
 
-        Expression::Binary(BinaryExpression {
+        Expression::Binary(Binary {
             lhs: binary_lhs,
             operator: binary_operator,
             rhs: Box::new(Expression::AssignmentOperation(Assignment {

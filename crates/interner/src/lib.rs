@@ -258,3 +258,15 @@ impl std::fmt::Display for StringIdentifier {
 
 unsafe impl Send for ThreadedInterner {}
 unsafe impl Sync for ThreadedInterner {}
+
+impl std::default::Default for Interner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::default::Default for ThreadedInterner {
+    fn default() -> Self {
+        Self::new()
+    }
+}

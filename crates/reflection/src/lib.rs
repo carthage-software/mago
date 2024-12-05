@@ -131,12 +131,12 @@ impl CodebaseReflection {
 
     /// Checks if a constant with the given name exists.
     pub fn constant_exists(&self, name: &StringIdentifier) -> bool {
-        self.constant_identifiers.contains_key(&name)
+        self.constant_identifiers.contains_key(name)
     }
 
     /// Checks if a function with the given name exists.
     pub fn function_exists(&self, name: &StringIdentifier) -> bool {
-        self.function_identifiers.contains_key(&name)
+        self.function_identifiers.contains_key(name)
     }
 
     /// Checks if a class with the given name exists.

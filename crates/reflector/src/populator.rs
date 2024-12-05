@@ -90,7 +90,7 @@ fn populate_class_like_reflection(
         populate_data_from_trait(interner, codebase, &mut reflection, trait_name);
     }
 
-    if let Some(parent_classname) = reflection.inheritance.direct_extended_class.clone() {
+    if let Some(parent_classname) = reflection.inheritance.direct_extended_class {
         populate_data_from_parent_classlike(interner, codebase, &mut reflection, parent_classname.value);
     }
 
@@ -292,7 +292,7 @@ fn inherit_methods_from_parent(reflection: &mut ClassLikeReflection, parent_refl
     let class_is_trait = reflection.is_trait();
 
     for (method_name, appering_class_like) in &parent_reflection.methods.appering_members {
-        if reflection.methods.appering_members.contains_key(&method_name) {
+        if reflection.methods.appering_members.contains_key(method_name) {
             continue;
         }
 

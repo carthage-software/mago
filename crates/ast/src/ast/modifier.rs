@@ -42,10 +42,7 @@ impl Modifier {
 
     /// Returns `true` if the modifier is a visibility modifier.
     pub fn is_visibility(&self) -> bool {
-        match self {
-            Modifier::Public { .. } | Modifier::Protected { .. } | Modifier::Private { .. } => true,
-            _ => false,
-        }
+        matches!(self, Modifier::Public { .. } | Modifier::Protected { .. } | Modifier::Private { .. })
     }
 }
 

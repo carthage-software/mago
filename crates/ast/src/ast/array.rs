@@ -10,15 +10,15 @@ use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ArrayAccess {
-    pub array: Expression,
+    pub array: Box<Expression>,
     pub left_bracket: Span,
-    pub index: Expression,
+    pub index: Box<Expression>,
     pub right_bracket: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ArrayAppend {
-    pub array: Expression,
+    pub array: Box<Expression>,
     pub left_bracket: Span,
     pub right_bracket: Span,
 }

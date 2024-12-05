@@ -127,11 +127,11 @@ pub enum NodeKind {
     DeclareItem,
     Echo,
     Expression,
-    BinaryExpression,
+    Binary,
     BinaryOperator,
-    UnaryPrefixExpression,
+    UnaryPrefix,
     UnaryPrefixOperator,
-    UnaryPostfixExpression,
+    UnaryPostfix,
     UnaryPostfixOperator,
     Parenthesized,
     ArrowFunction,
@@ -348,13 +348,13 @@ pub enum Node<'a> {
     DeclareItem(&'a DeclareItem),
     Echo(&'a Echo),
     Expression(&'a Expression),
-    BinaryExpression(&'a BinaryExpression),
+    Binary(&'a Binary),
     BinaryOperator(&'a BinaryOperator),
-    UnaryPrefixExpression(&'a UnaryPrefixExpression),
+    UnaryPrefix(&'a UnaryPrefix),
     UnaryPrefixOperator(&'a UnaryPrefixOperator),
-    UnaryPostfixExpression(&'a UnaryPostfixExpression),
+    UnaryPostfix(&'a UnaryPostfix),
     UnaryPostfixOperator(&'a UnaryPostfixOperator),
-    ParenthesizedExpression(&'a ParenthesizedExpression),
+    Parenthesized(&'a Parenthesized),
     ArrowFunction(&'a ArrowFunction),
     Closure(&'a Closure),
     ClosureUseClause(&'a ClosureUseClause),
@@ -375,7 +375,7 @@ pub enum Node<'a> {
     Inline(&'a Inline),
     Instantiation(&'a Instantiation),
     Keyword(&'a Keyword),
-    LiteralExpression(&'a LiteralExpression),
+    LiteralExpression(&'a Literal),
     LiteralFloat(&'a LiteralFloat),
     LiteralInteger(&'a LiteralInteger),
     LiteralString(&'a LiteralString),
@@ -650,13 +650,13 @@ impl<'a> Node<'a> {
             Self::DeclareItem(_) => NodeKind::DeclareItem,
             Self::Echo(_) => NodeKind::Echo,
             Self::Expression(_) => NodeKind::Expression,
-            Self::BinaryExpression(_) => NodeKind::BinaryExpression,
+            Self::Binary(_) => NodeKind::Binary,
             Self::BinaryOperator(_) => NodeKind::BinaryOperator,
-            Self::UnaryPrefixExpression(_) => NodeKind::UnaryPrefixExpression,
+            Self::UnaryPrefix(_) => NodeKind::UnaryPrefix,
             Self::UnaryPrefixOperator(_) => NodeKind::UnaryPrefixOperator,
-            Self::UnaryPostfixExpression(_) => NodeKind::UnaryPostfixExpression,
+            Self::UnaryPostfix(_) => NodeKind::UnaryPostfix,
             Self::UnaryPostfixOperator(_) => NodeKind::UnaryPostfixOperator,
-            Self::ParenthesizedExpression(_) => NodeKind::Parenthesized,
+            Self::Parenthesized(_) => NodeKind::Parenthesized,
             Self::ArrowFunction(_) => NodeKind::ArrowFunction,
             Self::Closure(_) => NodeKind::Closure,
             Self::ClosureUseClause(_) => NodeKind::ClosureUseClause,
@@ -1221,13 +1221,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::If(node) => {
-                let mut children = vec![];
-
-                children.push(Node::Keyword(&node.r#if));
-                children.push(Node::Expression(&node.condition));
-                children.push(Node::IfBody(&node.body));
-
-                children
+                vec![Node::Keyword(&node.r#if), Node::Expression(&node.condition), Node::IfBody(&node.body)]
             }
             Node::IfBody(node) => match node {
                 IfBody::Statement(statement_body) => vec![Node::IfStatementBody(statement_body)],
@@ -1383,37 +1377,29 @@ impl<'a> Node<'a> {
                 DeclareBody::ColonDelimited(body) => vec![Node::DeclareColonDelimitedBody(body)],
             },
             Node::DeclareColonDelimitedBody(node) => {
-                let mut children = vec![];
+                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
 
-                children.extend(node.statements.iter().map(Node::Statement));
                 children.push(Node::Keyword(&node.end_declare));
                 children.push(Node::Terminator(&node.terminator));
 
                 children
             }
             Node::DeclareItem(node) => {
-                let mut children = vec![];
-
-                children.push(Node::LocalIdentifier(&node.name));
-                children.push(Node::Expression(&node.value));
-
-                children
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
             Node::Echo(node) => {
-                let mut children = vec![];
-
-                children.push(Node::Keyword(&node.echo));
+                let mut children = vec![Node::Keyword(&node.echo)];
                 children.extend(node.values.iter().map(Node::Expression));
                 children.push(Node::Terminator(&node.terminator));
 
                 children
             }
-            Node::ParenthesizedExpression(node) => vec![Node::Expression(&node.expression)],
+            Node::Parenthesized(node) => vec![Node::Expression(&node.expression)],
             Node::Expression(node) => vec![match node {
-                Expression::Binary(node) => Node::BinaryExpression(node),
-                Expression::UnaryPrefix(node) => Node::UnaryPrefixExpression(node),
-                Expression::UnaryPostfix(node) => Node::UnaryPostfixExpression(node),
-                Expression::Parenthesized(node) => Node::ParenthesizedExpression(node),
+                Expression::Binary(node) => Node::Binary(node),
+                Expression::UnaryPrefix(node) => Node::UnaryPrefix(node),
+                Expression::UnaryPostfix(node) => Node::UnaryPostfix(node),
+                Expression::Parenthesized(node) => Node::Parenthesized(node),
                 Expression::Literal(node) => Node::LiteralExpression(node),
                 Expression::CompositeString(node) => Node::CompositeString(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
@@ -1442,7 +1428,7 @@ impl<'a> Node<'a> {
                 Expression::Instantiation(node) => Node::Instantiation(node),
                 Expression::MagicConstant(node) => Node::MagicConstant(node),
             }],
-            Node::BinaryExpression(node) => {
+            Node::Binary(node) => {
                 vec![Node::Expression(&node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(&node.rhs)]
             }
             Node::BinaryOperator(operator) => match operator {
@@ -1477,7 +1463,7 @@ impl<'a> Node<'a> {
                 BinaryOperator::LowOr(keyword) => vec![Node::Keyword(keyword)],
                 BinaryOperator::LowXor(keyword) => vec![Node::Keyword(keyword)],
             },
-            Node::UnaryPrefixExpression(node) => {
+            Node::UnaryPrefix(node) => {
                 vec![Node::UnaryPrefixOperator(&node.operator), Node::Expression(&node.operand)]
             }
             Node::UnaryPrefixOperator(operator) => match operator {
@@ -1502,7 +1488,7 @@ impl<'a> Node<'a> {
                 UnaryPrefixOperator::Plus(_) => vec![],
                 UnaryPrefixOperator::Negation(_) => vec![],
             },
-            Node::UnaryPostfixExpression(node) => {
+            Node::UnaryPostfix(node) => {
                 vec![Node::Expression(&node.operand), Node::UnaryPostfixOperator(&node.operator)]
             }
             Node::UnaryPostfixOperator(operator) => match operator {
@@ -1622,12 +1608,12 @@ impl<'a> Node<'a> {
             }
             Node::Keyword(_) => vec![],
             Node::LiteralExpression(node) => vec![match node {
-                LiteralExpression::Float(node) => Node::LiteralFloat(node),
-                LiteralExpression::Integer(node) => Node::LiteralInteger(node),
-                LiteralExpression::String(node) => Node::LiteralString(node),
-                LiteralExpression::True(node) => Node::Keyword(node),
-                LiteralExpression::False(node) => Node::Keyword(node),
-                LiteralExpression::Null(node) => Node::Keyword(node),
+                Literal::Float(node) => Node::LiteralFloat(node),
+                Literal::Integer(node) => Node::LiteralInteger(node),
+                Literal::String(node) => Node::LiteralString(node),
+                Literal::True(node) => Node::Keyword(node),
+                Literal::False(node) => Node::Keyword(node),
+                Literal::Null(node) => Node::Keyword(node),
             }],
             Node::LiteralFloat(_) => vec![],
             Node::LiteralInteger(_) => vec![],
@@ -2152,13 +2138,13 @@ impl<'a> HasSpan for Node<'a> {
             Self::DeclareItem(node) => node.span(),
             Self::Echo(node) => node.span(),
             Self::Expression(node) => node.span(),
-            Self::BinaryExpression(node) => node.span(),
+            Self::Binary(node) => node.span(),
             Self::BinaryOperator(node) => node.span(),
-            Self::UnaryPrefixExpression(node) => node.span(),
+            Self::UnaryPrefix(node) => node.span(),
             Self::UnaryPrefixOperator(node) => node.span(),
-            Self::UnaryPostfixExpression(node) => node.span(),
+            Self::UnaryPostfix(node) => node.span(),
             Self::UnaryPostfixOperator(node) => node.span(),
-            Self::ParenthesizedExpression(node) => node.span(),
+            Self::Parenthesized(node) => node.span(),
             Self::ArrowFunction(node) => node.span(),
             Self::Closure(node) => node.span(),
             Self::ClosureUseClause(node) => node.span(),

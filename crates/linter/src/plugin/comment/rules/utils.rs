@@ -42,7 +42,7 @@ fn remove_star_prefix(content: &str) -> String {
     }
 
     for line in lines {
-        result.push_str("\n");
+        result.push('\n');
         result.push_str(line);
     }
 

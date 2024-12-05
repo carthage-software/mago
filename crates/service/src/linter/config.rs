@@ -12,7 +12,7 @@ pub enum LinterLevel {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinterConfiguration {
     pub level: Option<LinterLevel>,
     pub default_plugins: Option<bool>,
@@ -26,10 +26,4 @@ pub struct LinterRuleConfiguration {
     pub level: Option<LinterLevel>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub options: HashMap<String, Value>,
-}
-
-impl Default for LinterConfiguration {
-    fn default() -> Self {
-        Self { level: None, default_plugins: None, plugins: Vec::new(), rules: Vec::new() }
-    }
 }

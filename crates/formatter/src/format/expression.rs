@@ -98,17 +98,15 @@ impl<'a> Format<'a> for Expression {
     }
 }
 
-impl<'a> Format<'a> for BinaryExpression {
+impl<'a> Format<'a> for Binary {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, BinaryExpression, {
-            binaryish::print_binaryish_expression(f, &self.lhs, &self.operator, &self.rhs)
-        })
+        wrap!(f, self, Binary, { binaryish::print_binaryish_expression(f, &self.lhs, &self.operator, &self.rhs) })
     }
 }
 
-impl<'a> Format<'a> for UnaryPrefixExpression {
+impl<'a> Format<'a> for UnaryPrefix {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, UnaryPrefixExpression, {
+        wrap!(f, self, UnaryPrefix, {
             if self.operator.is_cast() {
                 Document::Group(Group::new(vec![self.operator.format(f), Document::space(), self.operand.format(f)]))
             } else {
@@ -233,9 +231,9 @@ impl<'a> Format<'a> for UnaryPrefixOperator {
     }
 }
 
-impl<'a> Format<'a> for UnaryPostfixExpression {
+impl<'a> Format<'a> for UnaryPostfix {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, UnaryPostfixExpression, {
+        wrap!(f, self, UnaryPostfix, {
             Document::Group(Group::new(vec![self.operand.format(f), self.operator.format(f)]))
         })
     }
@@ -247,22 +245,22 @@ impl<'a> Format<'a> for UnaryPostfixOperator {
     }
 }
 
-impl<'a> Format<'a> for LiteralExpression {
+impl<'a> Format<'a> for Literal {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, LiteralExpression, {
             match self {
-                LiteralExpression::String(literal_string) => {
+                Literal::String(literal_string) => {
                     static_str!(f.lookup(&literal_string.value))
                 }
-                LiteralExpression::Integer(literal_integer) => {
+                Literal::Integer(literal_integer) => {
                     static_str!(f.lookup(&literal_integer.raw))
                 }
-                LiteralExpression::Float(literal_float) => {
+                Literal::Float(literal_float) => {
                     static_str!(f.lookup(&literal_float.raw))
                 }
-                LiteralExpression::True(keyword) => keyword.format(f),
-                LiteralExpression::False(keyword) => keyword.format(f),
-                LiteralExpression::Null(keyword) => keyword.format(f),
+                Literal::True(keyword) => keyword.format(f),
+                Literal::False(keyword) => keyword.format(f),
+                Literal::Null(keyword) => keyword.format(f),
             }
         })
     }

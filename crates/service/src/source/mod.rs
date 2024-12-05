@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use ahash::HashSet;
 use async_walkdir::Error;
@@ -76,7 +76,7 @@ impl SourceService {
                 }
 
                 if path.is_file() && is_accepted_file(&path, &extensions) {
-                    let name = match path.strip_prefix(&root) {
+                    let name = match path.strip_prefix(root) {
                         Ok(rel_path) => rel_path.to_path_buf(),
                         Err(_) => path.clone(),
                     };
@@ -92,11 +92,11 @@ impl SourceService {
     }
 }
 
-fn is_excluded(path: &PathBuf, excludes: &HashSet<&String>) -> bool {
+fn is_excluded(path: &Path, excludes: &HashSet<&String>) -> bool {
     excludes.iter().any(|ex| path.ends_with(ex) || glob_match::glob_match(ex, path.to_string_lossy().as_ref()))
 }
 
-fn is_accepted_file(path: &PathBuf, extensions: &HashSet<&String>) -> bool {
+fn is_accepted_file(path: &Path, extensions: &HashSet<&String>) -> bool {
     if extensions.is_empty() {
         path.extension().and_then(|s| s.to_str()).map(|ext| ext.eq_ignore_ascii_case("php")).unwrap_or(false)
     } else {

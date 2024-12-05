@@ -11,7 +11,7 @@ use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-pub enum LiteralExpression {
+pub enum Literal {
     String(LiteralString),
     Integer(LiteralInteger),
     Float(LiteralFloat),
@@ -48,15 +48,15 @@ pub struct LiteralFloat {
     pub value: OrderedFloat<f64>,
 }
 
-impl HasSpan for LiteralExpression {
+impl HasSpan for Literal {
     fn span(&self) -> Span {
         match self {
-            LiteralExpression::String(value) => value.span(),
-            LiteralExpression::Integer(value) => value.span(),
-            LiteralExpression::Float(value) => value.span(),
-            LiteralExpression::True(value) => value.span(),
-            LiteralExpression::False(value) => value.span(),
-            LiteralExpression::Null(value) => value.span(),
+            Literal::String(value) => value.span(),
+            Literal::Integer(value) => value.span(),
+            Literal::Float(value) => value.span(),
+            Literal::True(value) => value.span(),
+            Literal::False(value) => value.span(),
+            Literal::Null(value) => value.span(),
         }
     }
 }

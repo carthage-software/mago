@@ -11,7 +11,7 @@ use crate::rule::Rule;
 pub struct RedundantParenthesesRule;
 
 impl RedundantParenthesesRule {
-    fn report<'ast>(&self, parenthesized: &'ast ParenthesizedExpression, context: &mut LintContext<'_>) {
+    fn report<'ast>(&self, parenthesized: &'ast Parenthesized, context: &mut LintContext<'_>) {
         let issue = Issue::new(context.level(), "redundant parentheses")
             .with_annotations([
                 Annotation::primary(parenthesized.left_parenthesis),
@@ -39,12 +39,8 @@ impl Rule for RedundantParenthesesRule {
 }
 
 impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
-    fn walk_in_parenthesized_expression<'ast>(
-        &self,
-        parenthesized_expression: &'ast ParenthesizedExpression,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(inner) = parenthesized_expression.expression.as_ref() {
+    fn walk_in_parenthesized<'ast>(&self, parenthesized: &'ast Parenthesized, context: &mut LintContext<'a>) {
+        if let Expression::Parenthesized(inner) = parenthesized.expression.as_ref() {
             self.report(inner, context);
         }
     }

@@ -23,7 +23,7 @@ pub(super) fn print_binaryish_expression<'a>(
     let parent_node = f.nth_parent_kind(2);
 
     let is_rhs_of_binaryish = match parent_node {
-        Some(Node::BinaryExpression(o)) => o.operator.span().end.offset < operator.span().start.offset,
+        Some(Node::Binary(o)) => o.operator.span().end.offset < operator.span().start.offset,
         _ => false,
     };
 

@@ -330,7 +330,7 @@ impl<'a> Files<'a> for SourceManager {
     }
 }
 
-fn codespan_line_start(lines: &Vec<usize>, size: usize, line_index: usize) -> Result<usize, Error> {
+fn codespan_line_start(lines: &[usize], size: usize, line_index: usize) -> Result<usize, Error> {
     match line_index.cmp(&lines.len()) {
         Ordering::Less => Ok(lines.get(line_index).cloned().expect("failed despite previous check")),
         Ordering::Equal => Ok(size),
@@ -338,7 +338,7 @@ fn codespan_line_start(lines: &Vec<usize>, size: usize, line_index: usize) -> Re
     }
 }
 
-fn codespan_line_range(lines: &Vec<usize>, size: usize, line_index: usize) -> Result<Range<usize>, Error> {
+fn codespan_line_range(lines: &[usize], size: usize, line_index: usize) -> Result<Range<usize>, Error> {
     let line_start = codespan_line_start(lines, size, line_index)?;
     let next_line_start = codespan_line_start(lines, size, line_index + 1)?;
 

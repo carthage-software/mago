@@ -62,7 +62,7 @@ impl Linter {
 
         tracing::info!("Adding rule `{full_name}`...");
 
-        let settings = self.settings.get_rule_settings(full_name.as_str()).map(|c| c.clone()).unwrap_or_else(|| {
+        let settings = self.settings.get_rule_settings(full_name.as_str()).cloned().unwrap_or_else(|| {
             tracing::debug!("No configuration found for rule `{full_name}`, using default.");
 
             RuleSettings::from_level(rule.get_default_level())
@@ -91,7 +91,7 @@ impl Linter {
         self.rules.write().expect("Unable to add rule: poisoned lock").push(ConfiguredRule {
             level,
             settings,
-            plugin: plugin.into(),
+            plugin,
             rule,
         });
     }
@@ -101,7 +101,7 @@ impl Linter {
 
         tracing::debug!("Linting source `{}`...", source_name);
 
-        let mut context = Context::new(&self.interner, &semantics);
+        let mut context = Context::new(&self.interner, semantics);
 
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
 

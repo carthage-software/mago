@@ -42,7 +42,7 @@ impl<'a> Walker<LintContext<'a>> for RequireStrictTypesRule {
                     }
 
                     match &item.value {
-                        Expression::Literal(LiteralExpression::Integer(integer)) => {
+                        Expression::Literal(Literal::Integer(integer)) => {
                             let disabled = match &integer.value {
                                 Some(val) => *val == 0,
                                 None => {

@@ -112,19 +112,17 @@ impl<'a, 'i> Lexer<'a, 'i> {
     /// use fennec_source::SourceIdentifier;
     /// use fennec_lexer::input::Input;
     ///
-    /// fn main() {
-    ///     let interner = ThreadedInterner::new();
+    /// let interner = ThreadedInterner::new();
     ///
-    ///     let source = SourceIdentifier::empty();
-    ///     let input = Input::new(source, b"<?php echo 'Hello, World!'; ?>");
+    /// let source = SourceIdentifier::empty();
+    /// let input = Input::new(source, b"<?php echo 'Hello, World!'; ?>");
     ///
-    ///     let mut lexer = Lexer::new(&interner, input);
+    /// let mut lexer = Lexer::new(&interner, input);
     ///
-    ///     while let Some(result) = lexer.advance() {
-    ///         match result {
-    ///             Ok(token) => println!("Token: {:?}", token),
-    ///             Err(error) => eprintln!("Syntax error: {:?}", error),
-    ///         }
+    /// while let Some(result) = lexer.advance() {
+    ///     match result {
+    ///         Ok(token) => println!("Token: {:?}", token),
+    ///         Err(error) => eprintln!("Syntax error: {:?}", error),
     ///     }
     /// }
     /// ```
@@ -186,9 +184,9 @@ impl<'a, 'i> Lexer<'a, 'i> {
                     self.token(TokenKind::InlineText, buffer, start, end)
                 }
             }
-            LexerMode::Script => loop {
+            LexerMode::Script => {
                 let whitespaces = self.input.consume_whitespaces();
-                if whitespaces.len() > 0 {
+                if !whitespaces.is_empty() {
                     let start = self.input.position();
                     let buffer = whitespaces;
                     let end = self.input.position();
@@ -333,15 +331,8 @@ impl<'a, 'i> Lexer<'a, 'i> {
                     }
                     [b'$', start_of_identifier!(), ..] => {
                         let mut length = 2;
-                        loop {
-                            match self.input.peek(length, 1) {
-                                [part_of_identifier!(), ..] => {
-                                    length += 1;
-                                }
-                                _ => {
-                                    break;
-                                }
-                            }
+                        while let [part_of_identifier!(), ..] = self.input.peek(length, 1) {
+                            length += 1;
                         }
 
                         (TokenKind::Variable, length)
@@ -573,7 +564,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
                 let end = self.input.position();
 
                 return self.token(token_kind, buffer, start, end);
-            },
+            }
             LexerMode::DoubleQuoteString(interpolation) => match &interpolation {
                 Interpolation::None => {
                     let start = self.input.position();
@@ -627,11 +618,8 @@ impl<'a, 'i> Lexer<'a, 'i> {
                     let buffer = self.input.consume(length);
                     let end = self.input.position();
 
-                    match &token_kind {
-                        TokenKind::DoubleQuote => {
-                            self.mode = LexerMode::Script;
-                        }
-                        _ => {}
+                    if TokenKind::DoubleQuote == token_kind {
+                        self.mode = LexerMode::Script;
                     }
 
                     return self.token(token_kind, buffer, start, end);
@@ -692,11 +680,8 @@ impl<'a, 'i> Lexer<'a, 'i> {
                     let buffer = self.input.consume(length);
                     let end = self.input.position();
 
-                    match &token_kind {
-                        TokenKind::Backtick => {
-                            self.mode = LexerMode::Script;
-                        }
-                        _ => {}
+                    if TokenKind::Backtick == token_kind {
+                        self.mode = LexerMode::Script;
                     }
 
                     return self.token(token_kind, buffer, start, end);
@@ -773,18 +758,14 @@ impl<'a, 'i> Lexer<'a, 'i> {
                         let buffer = self.input.consume(length);
                         let end = self.input.position();
 
-                        match &token_kind {
-                            TokenKind::DocumentEnd => {
-                                self.mode = LexerMode::Script;
-                            }
-                            _ => {}
+                        if TokenKind::DocumentEnd == token_kind {
+                            self.mode = LexerMode::Script;
                         }
 
-                        return self.token(token_kind, buffer, start, end);
+                        self.token(token_kind, buffer, start, end)
                     }
                     Interpolation::Until(offset) => {
-                        return self
-                            .interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None));
+                        self.interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None))
                     }
                 },
                 DocumentKind::Nowdoc => {
@@ -830,7 +811,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
                         return self.token(TokenKind::DocumentEnd, buffer, start, end);
                     }
 
-                    return self.token(TokenKind::StringPart, buffer, start, end);
+                    self.token(TokenKind::StringPart, buffer, start, end)
                 }
             },
             LexerMode::Halt(stage) => 'halt: {
@@ -944,7 +925,7 @@ fn matches_start_of_heredoc_document(input: &Input) -> bool {
     let mut length = 3;
     let mut whitespaces = 0;
     loop {
-        if input.peek(length + whitespaces, 1).get(0).map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
+        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
             whitespaces += 1;
         } else {
             break;
@@ -977,7 +958,7 @@ fn matches_start_of_double_quote_heredoc_document(input: &Input) -> bool {
     let mut length = 3;
     let mut whitespaces = 0;
     loop {
-        if input.peek(length + whitespaces, 1).get(0).map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
+        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
             whitespaces += 1;
         } else {
             break;
@@ -1022,7 +1003,7 @@ fn matches_start_of_nowdoc_document(input: &Input) -> bool {
     let mut length = 3;
     let mut whitespaces = 0;
     loop {
-        if input.peek(length + whitespaces, 1).get(0).map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
+        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
             whitespaces += 1;
         } else {
             break;
@@ -1090,7 +1071,7 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
     let mut length = 3;
     let mut whitespaces = 0;
     loop {
-        if input.peek(length + whitespaces, 1).get(0).map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
+        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
             whitespaces += 1;
         } else {
             break;
@@ -1124,7 +1105,7 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
     let mut length = 3;
     let mut whitespaces = 0;
     loop {
-        if input.peek(length + whitespaces, 1).get(0).map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
+        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
             whitespaces += 1;
         } else {
             break;
@@ -1162,11 +1143,7 @@ fn read_literal_string(input: &Input, quote: &u8) -> (TokenKind, usize) {
         match input.peek(length, 1) {
             [b'\\', ..] => {
                 length += 1;
-                if last_was_backslash {
-                    last_was_backslash = false;
-                } else {
-                    last_was_backslash = true;
-                }
+                last_was_backslash = !last_was_backslash;
             }
             [byte, ..] => {
                 if byte == quote && !last_was_backslash {

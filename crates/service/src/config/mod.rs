@@ -235,7 +235,7 @@ mod internal {
                     "source.extensions",
                     Value::new(None, ValueKind::Array(vec![Value::new(None, ValueKind::String("php".to_string()))])),
                 )
-                .map_err(|error| ConfigurationError::from(error))
+                .map_err(ConfigurationError::from)
         }
 
         fn normalize(&mut self) -> Result<(), ConfigurationError> {

@@ -17,6 +17,7 @@ use crate::ast::array::ArrayElement;
 use crate::ast::array::LegacyArray;
 use crate::ast::array::List;
 use crate::ast::assignment::Assignment;
+use crate::ast::binary::Binary;
 use crate::ast::call::Call;
 use crate::ast::class_like::member::ClassLikeConstantSelector;
 use crate::ast::class_like::member::ClassLikeMemberSelector;
@@ -31,20 +32,19 @@ use crate::ast::function_like::closure::Closure;
 use crate::ast::identifier::Identifier;
 use crate::ast::instantiation::Instantiation;
 use crate::ast::keyword::Keyword;
-use crate::ast::literal::LiteralExpression;
+use crate::ast::literal::Literal;
 use crate::ast::magic_constant::MagicConstant;
-use crate::ast::operation::binary::BinaryExpression;
-use crate::ast::operation::unary::UnaryPostfixExpression;
-use crate::ast::operation::unary::UnaryPrefixExpression;
 use crate::ast::r#yield::Yield;
 use crate::ast::string::CompositeString;
 use crate::ast::string::StringPart;
 use crate::ast::throw::Throw;
+use crate::ast::unary::UnaryPostfix;
+use crate::ast::unary::UnaryPrefix;
 use crate::ast::variable::Variable;
 use crate::node::NodeKind;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ParenthesizedExpression {
+pub struct Parenthesized {
     pub left_parenthesis: Span,
     pub expression: Box<Expression>,
     pub right_parenthesis: Span,
@@ -53,19 +53,19 @@ pub struct ParenthesizedExpression {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Expression {
-    Binary(BinaryExpression),
-    UnaryPrefix(UnaryPrefixExpression),
-    UnaryPostfix(UnaryPostfixExpression),
-    Parenthesized(ParenthesizedExpression),
-    Literal(LiteralExpression),
+    Binary(Binary),
+    UnaryPrefix(UnaryPrefix),
+    UnaryPostfix(UnaryPostfix),
+    Parenthesized(Parenthesized),
+    Literal(Literal),
     CompositeString(CompositeString),
     AssignmentOperation(Assignment),
     Conditional(Conditional),
     Array(Array),
     LegacyArray(LegacyArray),
     List(List),
-    ArrayAccess(Box<ArrayAccess>),
-    ArrayAppend(Box<ArrayAppend>),
+    ArrayAccess(ArrayAccess),
+    ArrayAppend(ArrayAppend),
     AnonymousClass(Box<AnonymousClass>),
     Closure(Box<Closure>),
     ArrowFunction(Box<ArrowFunction>),
@@ -203,20 +203,14 @@ impl Expression {
 
     #[inline]
     pub fn is_string_literal(&self) -> bool {
-        match &self {
-            Expression::Literal(literal) => match literal {
-                LiteralExpression::String(_) => true,
-                _ => false,
-            },
-            _ => false,
-        }
+        matches!(self, Expression::Literal(Literal::String(_)))
     }
 
     pub fn node_kind(&self) -> NodeKind {
         match &self {
-            Expression::Binary(_) => NodeKind::BinaryExpression,
-            Expression::UnaryPrefix(_) => NodeKind::UnaryPrefixExpression,
-            Expression::UnaryPostfix(_) => NodeKind::UnaryPostfixExpression,
+            Expression::Binary(_) => NodeKind::Binary,
+            Expression::UnaryPrefix(_) => NodeKind::UnaryPrefix,
+            Expression::UnaryPostfix(_) => NodeKind::UnaryPostfix,
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
             Expression::Literal(_) => NodeKind::LiteralExpression,
             Expression::CompositeString(_) => NodeKind::CompositeString,
@@ -249,7 +243,7 @@ impl Expression {
     }
 }
 
-impl HasSpan for ParenthesizedExpression {
+impl HasSpan for Parenthesized {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
     }

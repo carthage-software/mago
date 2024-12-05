@@ -27,8 +27,8 @@ impl DisallowedFunctionsRule {
         } else {
             let name = context.interner.lookup(&identifier.value());
 
-            if name.starts_with('\\') {
-                &name[1..]
+            if let Some(stripped) = name.strip_prefix('\\') {
+                stripped
             } else {
                 name
             }

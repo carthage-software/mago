@@ -27,7 +27,7 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
         let either_case = context.option("either").and_then(|v| v.as_bool()).unwrap_or(false);
 
         if either_case {
-            if !fennec_casing::is_camel_case(&name) && !fennec_casing::is_snake_case(&name) {
+            if !fennec_casing::is_camel_case(name) && !fennec_casing::is_snake_case(name) {
                 context.report(
                     Issue::new(
                         context.level(),
@@ -44,8 +44,8 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
                     ))
                     .with_help(format!(
                         "consider renaming it to `{}` or `{}` to adhere to the naming convention.",
-                        fennec_casing::to_camel_case(&name),
-                        fennec_casing::to_snake_case(&name)
+                        fennec_casing::to_camel_case(name),
+                        fennec_casing::to_snake_case(name)
                     )),
                 );
             }
@@ -54,7 +54,7 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
         }
 
         if camel_case {
-            if !fennec_casing::is_camel_case(&name) {
+            if !fennec_casing::is_camel_case(name) {
                 context.report(
                     Issue::new(context.level(), format!("function name `{}` should be in camel case", name))
                         .with_annotations([
@@ -65,7 +65,7 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
                         .with_note(format!("the function name `{}` does not follow camel naming convention.", name))
                         .with_help(format!(
                             "consider renaming it to `{}` to adhere to the naming convention.",
-                            fennec_casing::to_camel_case(&name)
+                            fennec_casing::to_camel_case(name)
                         )),
                 );
             }
@@ -73,7 +73,7 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
             return;
         }
 
-        if !fennec_casing::is_snake_case(&name) {
+        if !fennec_casing::is_snake_case(name) {
             context.report(
                 Issue::new(context.level(), format!("function name `{}` should be in snake case", name))
                     .with_annotations([
@@ -84,7 +84,7 @@ impl<'a> Walker<LintContext<'a>> for FunctionRule {
                     .with_note(format!("the function name `{}` does not follow snake naming convention.", name))
                     .with_help(format!(
                         "consider renaming it to `{}` to adhere to the naming convention.",
-                        fennec_casing::to_snake_case(&name)
+                        fennec_casing::to_snake_case(name)
                     )),
             );
         }

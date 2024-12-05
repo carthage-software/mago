@@ -44,13 +44,13 @@ pub enum UnaryPostfixOperator {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPrefixExpression {
+pub struct UnaryPrefix {
     pub operator: UnaryPrefixOperator,
     pub operand: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPostfixExpression {
+pub struct UnaryPostfix {
     pub operand: Box<Expression>,
     pub operator: UnaryPostfixOperator,
 }
@@ -58,15 +58,15 @@ pub struct UnaryPostfixExpression {
 impl UnaryPrefixOperator {
     #[inline]
     pub const fn is_constant(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::BitwiseNot(_)
-            | Self::Not(_)
-            | Self::PreIncrement(_)
-            | Self::PreDecrement(_)
-            | Self::Plus(_)
-            | Self::Negation(_) => true,
-            _ => false,
-        }
+                | Self::Not(_)
+                | Self::PreIncrement(_)
+                | Self::PreDecrement(_)
+                | Self::Plus(_)
+                | Self::Negation(_)
+        )
     }
 
     #[inline]
@@ -109,7 +109,7 @@ impl UnaryPrefixOperator {
             | UnaryPrefixOperator::ObjectCast(_, value)
             | UnaryPrefixOperator::UnsetCast(_, value)
             | UnaryPrefixOperator::StringCast(_, value)
-            | UnaryPrefixOperator::BinaryCast(_, value) => interner.lookup(&value),
+            | UnaryPrefixOperator::BinaryCast(_, value) => interner.lookup(value),
             UnaryPrefixOperator::BitwiseNot(_) => "~",
             UnaryPrefixOperator::Not(_) => "!",
             UnaryPrefixOperator::PreIncrement(_) => "++",
@@ -151,7 +151,7 @@ impl UnaryPostfixOperator {
     #[inline]
     pub const fn is_constant(&self) -> bool {
         match self {
-            Self::PostIncrement(_) | Self::PostDecrement(_) => true,
+            Self::PostIncrement(_) | Self::PostDecrement(_) => false,
         }
     }
 
@@ -217,13 +217,13 @@ impl HasSpan for UnaryPostfixOperator {
     }
 }
 
-impl HasSpan for UnaryPrefixExpression {
+impl HasSpan for UnaryPrefix {
     fn span(&self) -> Span {
         self.operator.span().join(self.operand.span())
     }
 }
 
-impl HasSpan for UnaryPostfixExpression {
+impl HasSpan for UnaryPostfix {
     fn span(&self) -> Span {
         self.operand.span().join(self.operator.span())
     }

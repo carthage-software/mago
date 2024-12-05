@@ -45,7 +45,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn cast_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        if !matches!(node, Node::UnaryPrefixExpression(operation) if operation.operator.is_cast()) {
+        if !matches!(node, Node::UnaryPrefix(operation) if operation.operator.is_cast()) {
             return false;
         }
 
@@ -58,12 +58,12 @@ impl<'a> Formatter<'a> {
 
     fn binarish_node_needs_parenthesis(&self, node: Node<'a>) -> bool {
         let operator = match node {
-            Node::BinaryExpression(e) => &e.operator,
+            Node::Binary(e) => &e.operator,
             _ => return false,
         };
 
         let parent_operator = match self.nth_parent_kind(2) {
-            Some(Node::BinaryExpression(e)) => {
+            Some(Node::Binary(e)) => {
                 if let BinaryOperator::NullCoalesce(_) = e.operator {
                     // Add parentheses if parent is a coalesce operator,
                     //  unless the child is a coalesce operator as well.
@@ -82,7 +82,7 @@ impl<'a> Formatter<'a> {
 
                 &e.operator
             }
-            Some(Node::UnaryPrefixExpression(operation)) if operation.operator.is_cast() => {
+            Some(Node::UnaryPrefix(operation)) if operation.operator.is_cast() => {
                 return true;
             }
             Some(Node::Conditional(_) | Node::ArrayAppend(_)) => {
@@ -262,7 +262,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
-            Node::BinaryExpression(_) => true,
+            Node::Binary(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
             _ => false,
         }
@@ -270,7 +270,7 @@ impl<'a> Formatter<'a> {
 
     const fn is_unary(&self, node: Node<'a>) -> bool {
         match node {
-            Node::UnaryPrefixExpression(_) | Node::UnaryPostfixExpression(_) => true,
+            Node::UnaryPrefix(_) | Node::UnaryPostfix(_) => true,
             _ => false,
         }
     }

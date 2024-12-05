@@ -23,19 +23,15 @@ impl Rule for RequireIdentityComparisonRule {
 }
 
 impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
-    fn walk_in_binary_expression<'ast>(
-        &self,
-        binary_expression: &'ast BinaryExpression,
-        context: &mut LintContext<'a>,
-    ) {
-        match &binary_expression.operator {
+    fn walk_in_binary<'ast>(&self, binary: &'ast Binary, context: &mut LintContext<'a>) {
+        match &binary.operator {
             BinaryOperator::Equal(span) => {
                 let issue =
                     Issue::new(context.level(), "use identity comparison `===` instead of equality comparison `==`")
                         .with_annotations([
                             Annotation::primary(*span),
-                            Annotation::secondary(binary_expression.lhs.span()),
-                            Annotation::secondary(binary_expression.rhs.span()),
+                            Annotation::secondary(binary.lhs.span()),
+                            Annotation::secondary(binary.rhs.span()),
                         ])
                         .with_note(
                             "identity comparison `===` checks for both value and type equality, \
@@ -51,8 +47,8 @@ impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
                     Issue::new(context.level(), "use identity inequality `!==` instead of inequality comparison `!=`")
                         .with_annotations([
                             Annotation::primary(*span),
-                            Annotation::secondary(binary_expression.lhs.span()),
-                            Annotation::secondary(binary_expression.rhs.span()),
+                            Annotation::secondary(binary.lhs.span()),
+                            Annotation::secondary(binary.rhs.span()),
                         ])
                         .with_note(
                             "identity inequality `!==` checks for both value and type inequality, \
@@ -63,9 +59,7 @@ impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
                 context
                     .report_with_fix(issue, |plan| plan.replace(span.to_range(), "!==", SafetyClassification::Unsafe));
             }
-            _ => {
-                return;
-            }
+            _ => {}
         }
     }
 }

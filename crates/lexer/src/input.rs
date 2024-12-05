@@ -91,7 +91,7 @@ impl<'a> Input<'a> {
     /// A byte slice containing the consumed characters.
     #[inline]
     pub fn consume(&mut self, count: usize) -> &'a [u8] {
-        let (from, until) = self.to_bound(count);
+        let (from, until) = self.calculate_bound(count);
 
         self.skip(count);
 
@@ -188,7 +188,7 @@ impl<'a> Input<'a> {
     /// A byte slice containing the next `n` characters.
     #[inline]
     pub fn read(&self, n: usize) -> &'a [u8] {
-        let (from, until) = self.to_bound(n);
+        let (from, until) = self.calculate_bound(n);
 
         &self.bytes[from..until]
     }
@@ -205,7 +205,7 @@ impl<'a> Input<'a> {
     /// `true` if the next bytes match `search`; `false` otherwise.
     #[inline]
     pub fn is_at(&self, search: &[u8], ignore_ascii_case: bool) -> bool {
-        let (from, until) = self.to_bound(search.len());
+        let (from, until) = self.calculate_bound(search.len());
         let slice = &self.bytes[from..until];
 
         if ignore_ascii_case {
@@ -344,7 +344,7 @@ impl<'a> Input<'a> {
     ///
     /// A tuple `(from, until)` representing the start and end indices for slicing.
     #[inline]
-    const fn to_bound(&self, n: usize) -> (usize, usize) {
+    const fn calculate_bound(&self, n: usize) -> (usize, usize) {
         if self.has_reached_eof() {
             return (self.length, self.length);
         }
@@ -504,10 +504,10 @@ mod tests {
         let bytes = b"abcdef";
         let input = Input::new(SourceIdentifier::dummy(), bytes);
 
-        let (from, until) = input.to_bound(3);
+        let (from, until) = input.calculate_bound(3);
         assert_eq!((from, until), (0, 3));
 
-        let (from, until) = input.to_bound(10); // Exceeds length
+        let (from, until) = input.calculate_bound(10); // Exceeds length
         assert_eq!((from, until), (0, 6));
     }
 }

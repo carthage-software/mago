@@ -999,7 +999,7 @@ pub fn is_truthy(expression: &Expression) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => is_truthy(&parenthesized.expression),
         Expression::Literal(literal) => match &literal {
-            LiteralExpression::True(_) => true,
+            Literal::True(_) => true,
             _ => false,
         },
         Expression::AnonymousClass(_) => true,
@@ -1039,7 +1039,7 @@ pub fn is_falsy(expression: &Expression) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => is_falsy(&parenthesized.expression),
         Expression::Literal(literal) => match &literal {
-            LiteralExpression::False(_) | LiteralExpression::Null(_) => true,
+            Literal::False(_) | Literal::Null(_) => true,
             _ => false,
         },
         Expression::Array(array) => array.elements.is_empty(),

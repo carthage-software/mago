@@ -1285,10 +1285,10 @@ generate_ast_walker! {
 
     Expression as expression => {
         match &expression {
-            Expression::Parenthesized(parenthesized) => walker.walk_parenthesized_expression(&parenthesized, context),
-            Expression::Binary(expr) => walker.walk_binary_expression(expr, context),
-            Expression::UnaryPrefix(operation) => walker.walk_unary_prefix_expression(operation, context),
-            Expression::UnaryPostfix(operation) => walker.walk_unary_postfix_expression(operation, context),
+            Expression::Parenthesized(parenthesized) => walker.walk_parenthesized(&parenthesized, context),
+            Expression::Binary(expr) => walker.walk_binary(expr, context),
+            Expression::UnaryPrefix(operation) => walker.walk_unary_prefix(operation, context),
+            Expression::UnaryPostfix(operation) => walker.walk_unary_postfix(operation, context),
             Expression::Literal(literal) => walker.walk_literal_expression(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string, context),
             Expression::AssignmentOperation(assignment) => {
@@ -1300,8 +1300,8 @@ generate_ast_walker! {
             Expression::Array(array) => walker.walk_array(array, context),
             Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array, context),
             Expression::List(list) => walker.walk_list(list, context),
-            Expression::ArrayAccess(array_access) => walker.walk_array_access(array_access.as_ref(), context),
-            Expression::ArrayAppend(array_append) => walker.walk_array_append(array_append.as_ref(), context),
+            Expression::ArrayAccess(array_access) => walker.walk_array_access(array_access, context),
+            Expression::ArrayAppend(array_append) => walker.walk_array_append(array_append, context),
             Expression::AnonymousClass(anonymous_class) => {
                 walker.walk_anonymous_class(anonymous_class.as_ref(), context)
             }
@@ -1327,10 +1327,10 @@ generate_ast_walker! {
         }
     }
 
-    BinaryExpression as binary_expression => {
-        walker.walk_expression(&binary_expression.lhs, context);
-        walker.walk_binary_operator(&binary_expression.operator, context);
-        walker.walk_expression(&binary_expression.rhs, context);
+    Binary as binary => {
+        walker.walk_expression(&binary.lhs, context);
+        walker.walk_binary_operator(&binary.operator, context);
+        walker.walk_expression(&binary.rhs, context);
     }
 
     BinaryOperator as binary_operator => {
@@ -1345,36 +1345,36 @@ generate_ast_walker! {
         }
     }
 
-    UnaryPrefixExpression as unary_prefix_expression => {
-        walker.walk_unary_prefix_operator(&unary_prefix_expression.operator, context);
-        walker.walk_expression(&unary_prefix_expression.operand, context);
+    UnaryPrefix as unary_prefix => {
+        walker.walk_unary_prefix_operator(&unary_prefix.operator, context);
+        walker.walk_expression(&unary_prefix.operand, context);
     }
 
     UnaryPrefixOperator as unary_prefix_operator => {
         // Do nothing
     }
 
-    UnaryPostfixExpression as unary_postfix_expression => {
-        walker.walk_expression(&unary_postfix_expression.operand, context);
-        walker.walk_unary_postfix_operator(&unary_postfix_expression.operator, context);
+    UnaryPostfix as unary_postfix => {
+        walker.walk_expression(&unary_postfix.operand, context);
+        walker.walk_unary_postfix_operator(&unary_postfix.operator, context);
     }
 
     UnaryPostfixOperator as unary_postfix_operator => {
         // Do nothing
     }
 
-    ParenthesizedExpression as parenthesized_expression => {
-        walker.walk_expression(&parenthesized_expression.expression, context)
+    Parenthesized as parenthesized => {
+        walker.walk_expression(&parenthesized.expression, context)
     }
 
-    LiteralExpression as literal_expression => {
+    Literal as literal_expression => {
         match literal_expression {
-            LiteralExpression::String(string) => walker.walk_literal_string(string, context),
-            LiteralExpression::Integer(integer) => walker.walk_literal_integer(integer, context),
-            LiteralExpression::Float(float) => walker.walk_literal_float(float, context),
-            LiteralExpression::True(keyword) => walker.walk_true_keyword(keyword, context),
-            LiteralExpression::False(keyword) => walker.walk_false_keyword(keyword, context),
-            LiteralExpression::Null(keyword) => walker.walk_null_keyword(keyword, context),
+            Literal::String(string) => walker.walk_literal_string(string, context),
+            Literal::Integer(integer) => walker.walk_literal_integer(integer, context),
+            Literal::Float(float) => walker.walk_literal_float(float, context),
+            Literal::True(keyword) => walker.walk_true_keyword(keyword, context),
+            Literal::False(keyword) => walker.walk_false_keyword(keyword, context),
+            Literal::Null(keyword) => walker.walk_null_keyword(keyword, context),
         }
     }
 

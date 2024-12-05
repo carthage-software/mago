@@ -457,7 +457,7 @@ mod internal {
                 }
             }
             Expression::ArrayAppend(append) => {
-                if let Expression::Variable(Variable::Direct(variable)) = &append.array {
+                if let Expression::Variable(Variable::Direct(variable)) = append.array.as_ref() {
                     let name = context.interner.lookup(&variable.name);
                     if !is_predefined_variable(name) {
                         variables.push(VariableReference::Use(variable.name));
@@ -467,7 +467,7 @@ mod internal {
                 scan_expression_for_assignment(&append.array, context, variables);
             }
             Expression::ArrayAccess(access) => {
-                if let Expression::Variable(Variable::Direct(variable)) = &access.array {
+                if let Expression::Variable(Variable::Direct(variable)) = access.array.as_ref() {
                     let name = context.interner.lookup(&variable.name);
                     if !is_predefined_variable(name) {
                         variables.push(VariableReference::Use(variable.name));

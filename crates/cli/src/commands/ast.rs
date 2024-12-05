@@ -79,7 +79,7 @@ pub async fn execute(command: AstCommand) -> i32 {
     }
 }
 
-fn node_to_tree<'a>(node: Node<'a>) -> Tree<NodeKind> {
+fn node_to_tree(node: Node<'_>) -> Tree<NodeKind> {
     let mut tree = Tree::new(node.kind());
     for child in node.children() {
         tree.push(node_to_tree(child));

@@ -7,9 +7,7 @@ use crate::internal::expression::parse_expression_with_precedence;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_unary_prefix_operation<'a, 'i>(
-    stream: &mut TokenStream<'a, 'i>,
-) -> Result<UnaryPrefixExpression, ParseError> {
+pub fn parse_unary_prefix_operation<'a, 'i>(stream: &mut TokenStream<'a, 'i>) -> Result<UnaryPrefix, ParseError> {
     let token = utils::expect_any(stream)?;
     let mut precedence = Precedence::Prefix;
 
@@ -72,5 +70,5 @@ pub fn parse_unary_prefix_operation<'a, 'i>(
         }
     };
 
-    Ok(UnaryPrefixExpression { operator, operand: Box::new(parse_expression_with_precedence(stream, precedence)?) })
+    Ok(UnaryPrefix { operator, operand: Box::new(parse_expression_with_precedence(stream, precedence)?) })
 }

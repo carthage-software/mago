@@ -82,8 +82,8 @@ impl<'a> LintContext<'a> {
         } else {
             let name = self.lookup(&identifier.value());
 
-            if name.starts_with('\\') {
-                &name[1..]
+            if let Some(stripped) = name.strip_prefix('\\') {
+                stripped
             } else {
                 name
             }
