@@ -18,5 +18,4 @@ fennec-ast = { path = "../ast" }
 fennec-source = { path = "../source" }
 fennec-span = { path = "../span" }
 fennec-token = { path = "../token" }
-fennec-feedback = { path = "../feedback" }
 fennec-interner = { path = "../interner" }

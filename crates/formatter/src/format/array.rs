@@ -9,6 +9,9 @@ use crate::format::misc;
 use crate::format::Format;
 use crate::Formatter;
 
+use super::misc::is_string_word_type;
+use super::misc::should_hug_expression;
+
 #[allow(clippy::enum_variant_names)]
 pub enum ArrayLike<'a> {
     Array(&'a Array),
@@ -101,6 +104,14 @@ pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<
     }
 
     let mut parts = vec![left_delimiter];
+
+    if let Some(element) = inline_single_element(f, &array_like) {
+        parts.push(element);
+        parts.push(right_delimiter);
+
+        return Document::Group(Group::new(parts));
+    }
+
     parts.push(Document::Indent({
         let len = array_like.len();
         let mut indent_parts = vec![];
@@ -115,10 +126,6 @@ pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<
             indent_parts.push(Document::Line(Line::default()));
         }
 
-        if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), false) {
-            indent_parts.push(dangling_comments);
-        };
-
         indent_parts
     }));
 
@@ -126,7 +133,12 @@ pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<
         parts.push(Document::IfBreak(IfBreak::then(Document::String(","))));
     }
 
-    parts.push(Document::Line(Line::softline()));
+    if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
+        parts.push(dangling_comments);
+    } else {
+        parts.push(Document::Line(Line::softline()));
+    }
+
     parts.push(right_delimiter);
 
     // preserve new lines between the opening delimiter ( e.g. `[` or `(` ) and the first element
@@ -137,4 +149,46 @@ pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<
     );
 
     Document::Group(Group::new(parts).with_break(should_break))
+}
+
+fn inline_single_element<'a>(f: &mut Formatter<'a>, array_like: &ArrayLike<'a>) -> Option<Document<'a>> {
+    if array_like.len() != 1 {
+        return None;
+    }
+
+    let elements = array_like.elements();
+    let Some(first_element) = elements.first() else {
+        return None;
+    };
+
+    match first_element {
+        ArrayElement::KeyValue(element) => {
+            if !element.key.is_literal() && !is_string_word_type(&element.key) {
+                return None;
+            }
+
+            if should_hug_expression(f, &element.value) {
+                return Some(first_element.format(f));
+            } else {
+                return None;
+            }
+        }
+        ArrayElement::Value(element) => {
+            if should_hug_expression(f, &element.value) {
+                return Some(first_element.format(f));
+            } else {
+                return None;
+            }
+        }
+        ArrayElement::Variadic(element) => {
+            if should_hug_expression(f, &element.value) {
+                return Some(first_element.format(f));
+            } else {
+                return None;
+            }
+        }
+        ArrayElement::Missing(_) => {
+            return None;
+        }
+    }
 }

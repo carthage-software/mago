@@ -3,6 +3,7 @@ use fennec_span::HasSpan;
 use fennec_span::Span;
 
 use crate::array;
+use crate::comment::CommentFlags;
 use crate::document::Document;
 use crate::document::Line;
 use crate::format::statement::print_statement_sequence;
@@ -19,6 +20,86 @@ use super::Group;
 
 pub(super) fn has_new_line_in_range<'a>(text: &'a str, start: usize, end: usize) -> bool {
     text[(start as usize)..(end as usize)].contains('\n')
+}
+
+/// Determines whether an expression can be "hugged" within brackets without line breaks.
+///
+/// # Overview
+///
+/// A "huggable" expression can be formatted compactly within parentheses `()` or square brackets `[]`
+/// without requiring additional line breaks or indentation. This means the expression can be
+/// rendered on the same line as the opening and closing brackets.
+///
+/// # Hugging Rules
+///
+/// 1. Nested expressions are recursively checked
+/// 2. Expressions with leading or trailing comments cannot be hugged
+/// 3. Specific expression types are considered huggable
+///
+/// # Supported Huggable Expressions
+///
+/// - Arrays
+/// - Legacy Arrays
+/// - Lists
+/// - Closures
+/// - Closure Creations
+/// - Function Calls
+/// - Anonymous Classes
+/// - Match Expressions
+///
+/// # Parameters
+///
+/// - `f`: The formatter context
+/// - `expression`: The expression to check for hugging potential
+///
+/// # Returns
+///
+/// `true` if the expression can be formatted compactly, `false` otherwise
+///
+/// # Performance
+///
+/// O(1) for most checks, with potential O(n) recursion for nested expressions
+pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expression) -> bool {
+    if let Expression::Parenthesized(inner) = expression {
+        return should_hug_expression(f, &inner.expression);
+    }
+
+    if let Expression::Referenced(inner) = expression {
+        return should_hug_expression(f, &inner.expression);
+    }
+
+    if let Expression::Suppressed(inner) = expression {
+        return should_hug_expression(f, &inner.expression);
+    }
+
+    // if the expression has leading or trailing comments, we can't hug it
+    if f.has_comment(expression.span(), CommentFlags::Leading | CommentFlags::Trailing) {
+        return false;
+    }
+
+    matches!(
+        expression,
+        Expression::Array(_)
+            | Expression::LegacyArray(_)
+            | Expression::List(_)
+            | Expression::Closure(_)
+            | Expression::ClosureCreation(_)
+            | Expression::Call(_)
+            | Expression::AnonymousClass(_)
+            | Expression::Match(_)
+    )
+}
+
+pub(super) fn is_string_word_type<'a>(node: &'a Expression) -> bool {
+    match node {
+        Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_) => true,
+        Expression::MagicConstant(_) => true,
+        Expression::Identifier(identifier) => matches!(identifier, Identifier::Local(_)),
+        Expression::Variable(variable) => {
+            matches!(variable, Variable::Direct(_))
+        }
+        _ => false,
+    }
 }
 
 pub(super) fn print_token_with_indented_leading_comments<'a>(

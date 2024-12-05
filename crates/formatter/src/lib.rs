@@ -16,15 +16,16 @@ use crate::format::Format;
 use crate::printer::Printer;
 use crate::settings::FormatSettings;
 
-pub mod binaryish;
-pub mod comment;
-pub mod document;
-pub mod format;
-pub mod macros;
-pub mod parens;
-pub mod printer;
 pub mod settings;
-pub mod utils;
+
+mod binaryish;
+mod comment;
+mod document;
+mod format;
+mod macros;
+mod parens;
+mod printer;
+mod utils;
 
 pub fn format<'a>(
     settings: FormatSettings,
@@ -34,8 +35,6 @@ pub fn format<'a>(
 ) -> String {
     let mut formatter = Formatter::new(interner, source, settings);
     let document = formatter.format(program);
-
-    fennec_feedback::trace!("document = {}", document);
 
     let printer = Printer::new(document, &formatter.source, formatter.settings);
 

@@ -46,16 +46,6 @@ impl BinaryishOperator {
     }
 
     #[inline]
-    pub fn is_concat(&self) -> bool {
-        matches!(self, Self::Concat(_))
-    }
-
-    #[inline]
-    pub fn is_coalesce(&self) -> bool {
-        matches!(self, Self::Coalesce(_))
-    }
-
-    #[inline]
     pub fn is_same_as(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Bitwise(a), Self::Bitwise(b)) => a.is_same_as(b),

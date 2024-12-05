@@ -1003,7 +1003,7 @@ impl<'a> Format<'a> for Match {
 
             contents.push(Document::String("}"));
 
-            Document::Group(Group::new(contents))
+            Document::Group(Group::new(contents).with_break(true))
         })
     }
 }
@@ -1100,15 +1100,17 @@ impl<'a> Format<'a> for CompositeString {
 impl<'a> Format<'a> for DocumentString {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, DocumentString, {
-            let mut parts = vec![static_str!("<<<")];
+            let label = f.lookup(&self.label);
+
+            let mut contents = vec![Document::String("<<<")];
             match self.kind {
                 DocumentKind::Heredoc => {
-                    parts.push(static_str!(f.lookup(&self.label)));
+                    contents.push(Document::String(label));
                 }
                 DocumentKind::Nowdoc => {
-                    parts.push(static_str!("'"));
-                    parts.push(static_str!(f.lookup(&self.label)));
-                    parts.push(static_str!("'"));
+                    contents.push(Document::String("'"));
+                    contents.push(Document::String(label));
+                    contents.push(Document::String("'"));
                 }
             }
 
@@ -1119,30 +1121,36 @@ impl<'a> Format<'a> for DocumentString {
                 DocumentIndentation::Mixed(t, w) => t + w,
             };
 
-            parts.push(default_line!());
+            contents.push(Document::Line(Line::hardline()));
             for part in self.parts.iter() {
                 let formatted = match part {
                     StringPart::Literal(l) => {
-                        let lines = Formatter::split_lines(f.lookup(&l.value));
-                        let mut parts = vec![];
-                        for line in lines {
+                        let content = f.lookup(&l.value);
+                        let mut part_contents = vec![];
+                        for line in Formatter::split_lines(content) {
                             let line = Formatter::skip_leading_whitespace_up_to(line, indent);
 
-                            parts.push(static_str!(line));
-                            parts.push(default_line!());
+                            part_contents.push(Document::String(line));
                         }
 
-                        array!(@parts)
+                        part_contents = Document::join(part_contents, Separator::Hardline);
+
+                        // if ends with a newline, add a newline
+                        if content.ends_with('\n') {
+                            part_contents.push(Document::Line(Line::hardline()));
+                        }
+
+                        Document::Array(part_contents)
                     }
                     _ => part.format(f),
                 };
 
-                parts.push(formatted);
+                contents.push(formatted);
             }
-            parts.push(static_str!(f.lookup(&self.label)));
-            parts.push(Document::BreakParent);
 
-            group!(@parts)
+            contents.push(Document::String(label));
+
+            Document::Group(Group::new(contents))
         })
     }
 }

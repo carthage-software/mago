@@ -106,7 +106,7 @@ impl<'a> Formatter<'a> {
                 // ```php
                 // $foo ?? ($bar[$baz]);
                 // ```
-                return node.span().start.offset == access.span().start.offset;
+                return access.left_bracket.start.offset > node.span().start.offset;
             }
             Some(Node::Access(access)) => {
                 // we add parentheses if the parent is an access and the child is a binaryish node

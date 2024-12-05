@@ -287,6 +287,10 @@ impl Expression {
         }
     }
 
+    pub fn is_literal(&self) -> bool {
+        matches!(self, Expression::Literal(_))
+    }
+
     pub fn is_string_literal(&self) -> bool {
         match &self {
             Expression::Literal(literal) => match literal {

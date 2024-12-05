@@ -4,10 +4,12 @@ use fennec_span::*;
 use crate::comment::CommentFlags;
 use crate::document::*;
 use crate::format::call_node::CallLikeNode;
-use crate::format::misc;
+use crate::format::misc::should_hug_expression;
 use crate::utils::will_break;
 use crate::Format;
 use crate::Formatter;
+
+use super::misc::is_string_word_type;
 
 pub(super) fn print_call_arguments<'a>(f: &mut Formatter<'a>, expression: &CallLikeNode<'a>) -> Document<'a> {
     let Some(argument_list) = expression.arguments() else {
@@ -82,6 +84,19 @@ pub(super) fn print_argument_list<'a>(f: &mut Formatter<'a>, argument_list: &'a 
         Document::Group(Group::new(parts).with_break(true))
     };
 
+    if should_inline_single_breaking_argument(f, argument_list) {
+        // we have a single argument that we can hug
+        // this means we can avoid any spacing and just print the argument
+        // between the parentheses
+        let single_argument = argument_list.arguments.first().unwrap().format(f);
+
+        return Document::Group(Group::new(vec![
+            Document::String("("),
+            Document::Group(Group::new(vec![single_argument]).with_break(true)),
+            Document::String(")"),
+        ]));
+    }
+
     if should_expand_first_arg(f, argument_list) {
         f.argument_state.expand_first_argument = true;
         let mut first_doc = argument_list.arguments.first().unwrap().format(f);
@@ -148,6 +163,8 @@ pub(super) fn print_argument_list<'a>(f: &mut Formatter<'a>, argument_list: &'a 
                 Document::Array(vec![
                     Document::String("("),
                     Document::Array(get_printed_arguments(f, -1)),
+                    Document::String(","),
+                    Document::Line(Line::default()),
                     Document::Group(Group::new(vec![get_last_doc(f)]).with_break(true)),
                     Document::String(")"),
                 ]),
@@ -166,13 +183,26 @@ pub(super) fn print_argument_list<'a>(f: &mut Formatter<'a>, argument_list: &'a 
     contents.push(Document::Line(Line::softline()));
     contents.push(Document::String(")"));
 
-    Document::Group(Group::new(contents).with_break(argument_list.arguments.iter().any(|arg| {
-        let span = arg.span();
-        let start = span.start.offset;
-        let end = span.end.offset;
+    Document::Group(Group::new(contents))
+}
 
-        misc::has_new_line_in_range(f.source_text, start, end)
-    })))
+fn should_inline_single_breaking_argument<'a>(f: &Formatter<'a>, argument_list: &'a ArgumentList) -> bool {
+    if !f.settings.inline_single_breaking_argument {
+        return false;
+    }
+
+    if argument_list.arguments.len() != 1 {
+        return false;
+    }
+
+    let argument = &argument_list.arguments.as_slice()[0];
+    if f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+        || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+    {
+        return false;
+    }
+
+    should_hug_expression(f, argument.value())
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>
@@ -191,9 +221,11 @@ fn should_expand_first_arg<'a>(f: &Formatter<'a>, argument_list: &'a ArgumentLis
         return false;
     }
 
-    if !matches!(first_argument.value(), Expression::Closure(c) if c.use_clause.is_none()) {
-        return false;
-    }
+    match first_argument.value() {
+        Expression::Closure(c) if c.use_clause.is_none() => {}
+        Expression::Match(_) => {}
+        _ => return false,
+    };
 
     match second_argument.value() {
         Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => false,
@@ -311,11 +343,14 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
         ArrayElement::Missing(_) => true,
     };
 
+    if node.is_literal() || is_string_word_type(node) {
+        return true;
+    }
+
     match node {
         Expression::Parenthesized(parenthesized) => is_simple_call_argument(&parenthesized.expression, depth),
         Expression::Suppressed(suppressed) => is_simple_call_argument(&suppressed.expression, depth),
         Expression::Referenced(referenced) => is_simple_call_argument(&referenced.expression, depth),
-        Expression::Literal(_) => true,
         Expression::Array(array) => array.elements.iter().all(is_simple_element),
         Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
         Expression::Call(call) => {
@@ -404,7 +439,6 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
                 false
             }
         }
-        node if is_string_word_type(node) => true,
         _ => false,
     }
 }
@@ -448,20 +482,6 @@ fn could_expand_argument_value<'a>(argument_value: &'a Expression, arrow_chain_r
             Expression::Call(_) | Expression::TernaryOperation(_) => !arrow_chain_recursion,
             _ => false,
         },
-        _ => false,
-    }
-}
-
-fn is_string_word_type<'a>(node: &'a Expression) -> bool {
-    match node {
-        Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_) => true,
-        Expression::MagicConstant(_) => true,
-        Expression::Identifier(identifier) => {
-            matches!(identifier, Identifier::Local(_))
-        }
-        Expression::Variable(variable) => {
-            matches!(variable, Variable::Direct(_))
-        }
         _ => false,
     }
 }

@@ -6,19 +6,6 @@ use crate::document::Line;
 use crate::format::Format;
 use crate::Formatter;
 
-pub fn statement_sequence_contains_inline<'a>(stmts: &'a Sequence<Statement>) -> bool {
-    stmts.iter().any(|stmt| statement_contains_inline(stmt))
-}
-
-pub fn statement_contains_inline<'a>(stmt: &'a Statement) -> bool {
-    !Node::Statement(stmt)
-        .filter_map(|node| match node {
-            Node::Inline(_) => Some(true),
-            _ => None,
-        })
-        .is_empty()
-}
-
 pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<Statement>) -> Vec<Document<'a>> {
     let mut parts = vec![];
 

@@ -286,7 +286,7 @@ fn print_doc_to_debug(doc: &Document) -> String {
             }
             let options_str =
                 if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
-            format!("indentIfBreak({}{}", print_doc_to_debug(&Document::Array(contents.clone())), options_str)
+            format!("indentIfBreak({}{})", print_doc_to_debug(&Document::Array(contents.clone())), options_str)
         }
         Document::Group(Group { contents, should_break, expanded_states, id }) => {
             let mut options = vec![];

@@ -697,7 +697,6 @@ dependencies = [
  "ahash",
  "bitflags",
  "fennec-ast",
- "fennec-feedback",
  "fennec-interner",
  "fennec-source",
  "fennec-span",
