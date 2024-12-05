@@ -1297,9 +1297,6 @@ generate_ast_walker! {
             Expression::AssignmentOperation(assignment_operation) => {
                 walker.walk_assignment_operation(assignment_operation.as_ref(), context)
             }
-            Expression::BitwiseOperation(bitwise_operation) => {
-                walker.walk_bitwise_operation(bitwise_operation.as_ref(), context)
-            }
             Expression::Conditional(conditional) => {
                 walker.walk_conditional(conditional, context)
             }
@@ -1498,34 +1495,6 @@ generate_ast_walker! {
     }
 
     AssignmentOperator as assignment_operator => {
-        // Do nothing
-    }
-
-    BitwiseOperation as bitwise_operation => {
-        match bitwise_operation {
-            BitwiseOperation::Prefix(bitwise_prefix_operation) =>
-                walker.walk_bitwise_prefix_operation(bitwise_prefix_operation, context),
-            BitwiseOperation::Infix(bitwise_infix_operation) =>
-                walker.walk_bitwise_infix_operation(bitwise_infix_operation, context),
-        };
-    }
-
-    BitwisePrefixOperation as bitwise_prefix_operation => {
-        walker.walk_bitwise_prefix_operator(&bitwise_prefix_operation.operator, context);
-        walker.walk_expression(&bitwise_prefix_operation.value, context);
-    }
-
-    BitwisePrefixOperator as bitwise_prefix_operator => {
-        // Do nothing
-    }
-
-    BitwiseInfixOperation as bitwise_infix_operation => {
-        walker.walk_expression(&bitwise_infix_operation.lhs, context);
-        walker.walk_bitwise_infix_operator(&bitwise_infix_operation.operator, context);
-        walker.walk_expression(&bitwise_infix_operation.rhs, context);
-    }
-
-    BitwiseInfixOperator as bitwise_infix_operator => {
         // Do nothing
     }
 

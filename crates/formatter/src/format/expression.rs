@@ -56,7 +56,6 @@ impl<'a> Format<'a> for Expression {
                 Expression::CompositeString(c) => c.format(f),
                 Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
-                Expression::BitwiseOperation(op) => op.format(f),
                 Expression::Conditional(op) => op.format(f),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
@@ -599,29 +598,6 @@ impl<'a> Format<'a> for AssignmentOperation {
             };
 
             print_assignment(f, AssignmentLikeNode::AssignmentOperation(self), lhs, operator, &self.rhs)
-        })
-    }
-}
-
-impl<'a> Format<'a> for BitwiseOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, BitwiseOperation, {
-            match self {
-                BitwiseOperation::Prefix(o) => o.format(f),
-                BitwiseOperation::Infix(_) => unreachable!(),
-            }
-        })
-    }
-}
-
-impl<'a> Format<'a> for BitwisePrefixOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, BitwisePrefixOperation, {
-            let operator = match self.operator {
-                BitwisePrefixOperator::Not(span) => token!(f, span, "~"),
-            };
-
-            group!(operator, self.value.format(f))
         })
     }
 }

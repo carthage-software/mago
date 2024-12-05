@@ -55,9 +55,11 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn resolve<'ast>(&self, expression: &'ast Expression) -> TypeKind {
         match expression {
             Expression::Parenthesized(parenthesized) => self.resolve(&parenthesized.expression),
-            Expression::BinaryOperation(operation) => get_binary_operation_kind(operation, |e| self.resolve(e)),
+            Expression::BinaryOperation(operation) => {
+                get_binary_operation_kind(&self.interner, operation, |e| self.resolve(e))
+            }
             Expression::UnaryPrefixOperation(operation) => {
-                get_unary_prefix_operation_kind(operation, |e| self.resolve(e))
+                get_unary_prefix_operation_kind(&self.interner, operation, |e| self.resolve(e))
             }
             Expression::Literal(literal) => get_literal_kind(self.interner, literal),
             Expression::CompositeString(composite_string) => {
@@ -67,9 +69,6 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 get_arithmetic_operation_kind(&self.interner, arithmetic_operation, |e| self.resolve(e))
             }
             Expression::AssignmentOperation(assignment_operation) => self.resolve(&assignment_operation.rhs),
-            Expression::BitwiseOperation(bitwise_operation) => {
-                get_bitwise_operation_kind(&self.interner, bitwise_operation, |e| self.resolve(e))
-            }
             Expression::Conditional(ternary_operation) => get_conditional_kind(ternary_operation, |e| self.resolve(e)),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),
             Expression::LegacyArray(legacy_array) => get_array_kind(&legacy_array.elements, |e| self.resolve(e)),

@@ -172,11 +172,6 @@ pub enum NodeKind {
     ArithmeticPrefixOperator,
     AssignmentOperation,
     AssignmentOperator,
-    BitwiseInfixOperation,
-    BitwiseInfixOperator,
-    BitwiseOperation,
-    BitwisePrefixOperation,
-    BitwisePrefixOperator,
     ConditionalTernaryOperation,
     Conditional,
     DoWhile,
@@ -406,11 +401,6 @@ pub enum Node<'a> {
     ArithmeticPrefixOperator(&'a ArithmeticPrefixOperator),
     AssignmentOperation(&'a AssignmentOperation),
     AssignmentOperator(&'a AssignmentOperator),
-    BitwiseInfixOperation(&'a BitwiseInfixOperation),
-    BitwiseInfixOperator(&'a BitwiseInfixOperator),
-    BitwiseOperation(&'a BitwiseOperation),
-    BitwisePrefixOperation(&'a BitwisePrefixOperation),
-    BitwisePrefixOperator(&'a BitwisePrefixOperator),
     Conditional(&'a Conditional),
     DoWhile(&'a DoWhile),
     Foreach(&'a Foreach),
@@ -720,11 +710,6 @@ impl<'a> Node<'a> {
             Self::ArithmeticPrefixOperator(_) => NodeKind::ArithmeticPrefixOperator,
             Self::AssignmentOperation(_) => NodeKind::AssignmentOperation,
             Self::AssignmentOperator(_) => NodeKind::AssignmentOperator,
-            Self::BitwiseInfixOperation(_) => NodeKind::BitwiseInfixOperation,
-            Self::BitwiseInfixOperator(_) => NodeKind::BitwiseInfixOperator,
-            Self::BitwiseOperation(_) => NodeKind::BitwiseOperation,
-            Self::BitwisePrefixOperation(_) => NodeKind::BitwisePrefixOperation,
-            Self::BitwisePrefixOperator(_) => NodeKind::BitwisePrefixOperator,
             Self::Conditional(_) => NodeKind::Conditional,
             Self::DoWhile(_) => NodeKind::DoWhile,
             Self::Foreach(_) => NodeKind::Foreach,
@@ -1455,7 +1440,6 @@ impl<'a> Node<'a> {
                 Expression::CompositeString(node) => Node::CompositeString(node),
                 Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
-                Expression::BitwiseOperation(node) => Node::BitwiseOperation(node),
                 Expression::Conditional(node) => Node::Conditional(node),
                 Expression::Array(node) => Node::Array(node),
                 Expression::LegacyArray(node) => Node::LegacyArray(node),
@@ -1738,20 +1722,6 @@ impl<'a> Node<'a> {
                 vec![Node::Expression(&node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(&node.rhs)]
             }
             Node::AssignmentOperator(_) => vec![],
-            Node::BitwiseInfixOperation(node) => vec![
-                Node::Expression(&node.lhs),
-                Node::BitwiseInfixOperator(&node.operator),
-                Node::Expression(&node.rhs),
-            ],
-            Node::BitwiseInfixOperator(_) => vec![],
-            Node::BitwiseOperation(node) => vec![match node {
-                BitwiseOperation::Infix(node) => Node::BitwiseInfixOperation(node),
-                BitwiseOperation::Prefix(node) => Node::BitwisePrefixOperation(node),
-            }],
-            Node::BitwisePrefixOperation(node) => {
-                vec![Node::BitwisePrefixOperator(&node.operator), Node::Expression(&node.value)]
-            }
-            Node::BitwisePrefixOperator(_) => vec![],
             Node::Conditional(node) => {
                 let mut children = vec![Node::Expression(&node.condition)];
 
@@ -2269,11 +2239,6 @@ impl<'a> HasSpan for Node<'a> {
             Self::ArithmeticPrefixOperator(node) => node.span(),
             Self::AssignmentOperation(node) => node.span(),
             Self::AssignmentOperator(node) => node.span(),
-            Self::BitwiseInfixOperation(node) => node.span(),
-            Self::BitwiseInfixOperator(node) => node.span(),
-            Self::BitwiseOperation(node) => node.span(),
-            Self::BitwisePrefixOperation(node) => node.span(),
-            Self::BitwisePrefixOperator(node) => node.span(),
             Self::Conditional(node) => node.span(),
             Self::DoWhile(node) => node.span(),
             Self::Foreach(node) => node.span(),

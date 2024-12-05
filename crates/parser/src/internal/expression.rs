@@ -495,54 +495,54 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
             create_assignment_expression(lhs, operator, rhs)
         }
         T!["&"] => {
-            let operator = BitwiseInfixOperator::And(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseAnd)?;
 
-            Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::BitwiseAnd(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["|"] => {
-            let operator = BitwiseInfixOperator::Or(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseOr)?;
 
-            Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::BitwiseOr(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["^"] => {
-            let operator = BitwiseInfixOperator::Xor(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitwiseXor)?;
 
-            Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::BitwiseXor(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["<<"] => {
-            let operator = BitwiseInfixOperator::LeftShift(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitShift)?;
 
-            Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::LeftShift(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T![">>"] => {
-            let operator = BitwiseInfixOperator::RightShift(utils::expect_any(stream)?.span);
+            let operator = utils::expect_any(stream)?.span;
             let rhs = parse_expression_with_precedence(stream, Precedence::BitShift)?;
 
-            Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                lhs,
-                operator,
-                rhs,
-            })))
+            Expression::BinaryOperation(BinaryOperation {
+                lhs: Box::new(lhs),
+                operator: BinaryOperator::RightShift(operator),
+                rhs: Box::new(rhs),
+            })
         }
         T!["=="] => {
             let operator = utils::expect_any(stream)?.span;
@@ -729,6 +729,7 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
 /// is applied to the rightmost operand of the parent expression.
 ///
 /// For example:
+///
 ///  * `($x == $y) = $z` is transformed to `$x == ($y = $z)`
 ///  * `($x && $y) = $z` is transformed to `$x && ($y = $z)`
 ///  * `($x + $y) = $z` is transformed to `$x + ($y = $z)`
@@ -742,7 +743,9 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
     // of the assignment operation to ensure it is applied to the rightmost operand.
     match lhs {
         Expression::BinaryOperation(operation)
-            if operation.operator.is_comparison() || operation.operator.is_logical() =>
+            if operation.operator.is_comparison()
+                || operation.operator.is_logical()
+                || operation.operator.is_bitwise() =>
         {
             // make `($x == $y) = $z` into `$x == ($y = $z)`
             let BinaryOperation { lhs: binary_lhs, operator: binary_operator, rhs: binary_rhs } = operation;
@@ -757,31 +760,6 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
                 }))),
             })
         }
-        Expression::BitwiseOperation(bitwise) => match *bitwise {
-            BitwiseOperation::Infix(bitwise_infix_operation) => {
-                // make `($x & $y) = $z` into `$x & ($y = $z)`
-                let BitwiseInfixOperation { lhs: bitwise_lhs, operator: bitwise_operator, rhs: bitwise_rhs } =
-                    bitwise_infix_operation;
-
-                Expression::BitwiseOperation(Box::new(BitwiseOperation::Infix(BitwiseInfixOperation {
-                    lhs: bitwise_lhs,
-                    operator: bitwise_operator,
-                    rhs: Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                        lhs: bitwise_rhs,
-                        operator,
-                        rhs,
-                    })),
-                })))
-            }
-            BitwiseOperation::Prefix(bitwise_prefix_operation) => {
-                // nothitng to do here
-                Expression::AssignmentOperation(Box::new(AssignmentOperation {
-                    lhs: Expression::BitwiseOperation(Box::new(BitwiseOperation::Prefix(bitwise_prefix_operation))),
-                    operator,
-                    rhs,
-                }))
-            }
-        },
         Expression::ArithmeticOperation(arithmetic) => match *arithmetic {
             ArithmeticOperation::Infix(arithmetic_infix_operation) => {
                 // make `($x + $y) = $z` into `$x + ($y = $z)`

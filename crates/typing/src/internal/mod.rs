@@ -102,92 +102,11 @@ where
 }
 
 #[inline]
-pub fn get_bitwise_operation_kind<F>(
+pub fn get_unary_prefix_operation_kind<F>(
     interner: &ThreadedInterner,
-    bitwise_operation: &BitwiseOperation,
+    unary_operation: &UnaryPrefixOperation,
     get_expression_kind: F,
 ) -> TypeKind
-where
-    F: Fn(&Expression) -> TypeKind,
-{
-    match bitwise_operation {
-        BitwiseOperation::Prefix(bitwise_prefix_operation) => {
-            match get_expression_kind(&bitwise_prefix_operation.value) {
-                TypeKind::Never => never_kind(),
-                TypeKind::Value(ValueTypeKind::Integer { value }) => value_integer_kind(!value),
-                TypeKind::Scalar(ScalarTypeKind::Integer { .. }) => integer_kind(),
-                kind if is_gmp_or_bcmath_number(interner, &kind) => kind,
-                kind if kind.is_object() || kind.is_resource() || kind.is_array() => never_kind(),
-                _ => integer_kind(),
-            }
-        }
-        BitwiseOperation::Infix(bitwise_infix_operation) => {
-            match (get_expression_kind(&bitwise_infix_operation.lhs), get_expression_kind(&bitwise_infix_operation.rhs))
-            {
-                (TypeKind::Never, _) | (_, TypeKind::Never) => never_kind(),
-                (lhs_value_kind, rhs_value_kind)
-                    if is_numeric_value_kind(&lhs_value_kind) && is_numeric_value_kind(&rhs_value_kind) =>
-                {
-                    if !can_extract_literal_value(&lhs_value_kind) || !can_extract_literal_value(&rhs_value_kind) {
-                        return integer_kind();
-                    }
-
-                    let lhs_value = extract_literal_value(&lhs_value_kind);
-                    let rhs_value = extract_literal_value(&rhs_value_kind);
-
-                    let lhs_value = lhs_value.trunc() as i64;
-                    let rhs_value = rhs_value.trunc() as i64;
-
-                    let result = match &bitwise_infix_operation.operator {
-                        BitwiseInfixOperator::And(_) => lhs_value & rhs_value,
-                        BitwiseInfixOperator::Or(_) => lhs_value | rhs_value,
-                        BitwiseInfixOperator::Xor(_) => lhs_value ^ rhs_value,
-                        BitwiseInfixOperator::LeftShift(_) => {
-                            if rhs_value < 0 {
-                                return never_kind();
-                            }
-
-                            if rhs_value > u32::MAX as i64 {
-                                0i64
-                            } else {
-                                lhs_value.wrapping_shl(rhs_value as u32)
-                            }
-                        }
-                        BitwiseInfixOperator::RightShift(_) => {
-                            if rhs_value < 0 {
-                                return never_kind();
-                            }
-
-                            if rhs_value > u32::MAX as i64 {
-                                0i64
-                            } else {
-                                lhs_value.wrapping_shr(rhs_value as u32)
-                            }
-                        }
-                    };
-
-                    value_integer_kind(result)
-                }
-                (kind, _) if is_gmp_or_bcmath_number(interner, &kind) => kind,
-                (_, kind) if is_gmp_or_bcmath_number(interner, &kind) => kind,
-                (left, right)
-                    if left.is_object()
-                        || left.is_resource()
-                        || left.is_array()
-                        || right.is_object()
-                        || right.is_resource()
-                        || right.is_array() =>
-                {
-                    never_kind()
-                }
-                _ => integer_kind(),
-            }
-        }
-    }
-}
-
-#[inline]
-pub fn get_unary_prefix_operation_kind<F>(unary_operation: &UnaryPrefixOperation, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
@@ -248,13 +167,14 @@ where
         }
         UnaryPrefixOperator::ErrorControl(_) => void_kind(),
         UnaryPrefixOperator::Reference(_) => value_kind,
-        UnaryPrefixOperator::BitwiseNot(_) => {
-            if value_kind.is_integer().is_true() {
-                return value_kind;
-            } else {
-                return integer_kind();
-            }
-        }
+        UnaryPrefixOperator::BitwiseNot(_) => match value_kind {
+            TypeKind::Never => never_kind(),
+            TypeKind::Value(ValueTypeKind::Integer { value }) => value_integer_kind(!value),
+            TypeKind::Scalar(ScalarTypeKind::Integer { .. }) => integer_kind(),
+            kind if is_gmp_or_bcmath_number(interner, &kind) => kind,
+            kind if kind.is_object() || kind.is_resource() || kind.is_array() => never_kind(),
+            _ => integer_kind(),
+        },
         UnaryPrefixOperator::Not(_) => match value_kind.is_truthy() {
             Trinary::True => false_kind(),
             Trinary::Maybe => bool_kind(),
@@ -315,7 +235,11 @@ where
 }
 
 #[inline]
-pub fn get_binary_operation_kind<F>(binary_operation: &BinaryOperation, get_expression_kind: F) -> TypeKind
+pub fn get_binary_operation_kind<F>(
+    interner: &ThreadedInterner,
+    binary_operation: &BinaryOperation,
+    get_expression_kind: F,
+) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
@@ -458,7 +382,6 @@ where
                 integer_range_kind(-1, 1)
             }
         }
-        BinaryOperator::Instanceof(_) => bool_kind(),
         BinaryOperator::NullCoalesce(_) => {
             if left_kind == right_kind {
                 return left_kind;
@@ -475,6 +398,198 @@ where
             Trinary::Maybe => union_kind(vec![left_kind, right_kind]),
             Trinary::False => right_kind,
         },
+        BinaryOperator::BitwiseOr(_) => {
+            if !is_numeric_value_kind(&left_kind)
+                || !can_extract_literal_value(&left_kind)
+                || !is_numeric_value_kind(&right_kind)
+                || !can_extract_literal_value(&right_kind)
+            {
+                if is_gmp_or_bcmath_number(interner, &left_kind) {
+                    return left_kind;
+                }
+
+                if is_gmp_or_bcmath_number(interner, &right_kind) {
+                    return right_kind;
+                }
+
+                return if left_kind.is_object()
+                    || left_kind.is_resource()
+                    || left_kind.is_array()
+                    || right_kind.is_object()
+                    || right_kind.is_resource()
+                    || right_kind.is_array()
+                {
+                    never_kind()
+                } else {
+                    integer_kind()
+                };
+            }
+
+            let lhs_value = extract_literal_value(&left_kind);
+            let rhs_value = extract_literal_value(&right_kind);
+
+            let lhs_value = lhs_value.trunc() as i64;
+            let rhs_value = rhs_value.trunc() as i64;
+
+            value_integer_kind(lhs_value | rhs_value)
+        }
+        BinaryOperator::BitwiseAnd(_) => {
+            if !is_numeric_value_kind(&left_kind)
+                || !can_extract_literal_value(&left_kind)
+                || !is_numeric_value_kind(&right_kind)
+                || !can_extract_literal_value(&right_kind)
+            {
+                if is_gmp_or_bcmath_number(interner, &left_kind) {
+                    return left_kind;
+                }
+
+                if is_gmp_or_bcmath_number(interner, &right_kind) {
+                    return right_kind;
+                }
+
+                return if left_kind.is_object()
+                    || left_kind.is_resource()
+                    || left_kind.is_array()
+                    || right_kind.is_object()
+                    || right_kind.is_resource()
+                    || right_kind.is_array()
+                {
+                    never_kind()
+                } else {
+                    integer_kind()
+                };
+            }
+
+            let lhs_value = extract_literal_value(&left_kind);
+            let rhs_value = extract_literal_value(&right_kind);
+
+            let lhs_value = lhs_value.trunc() as i64;
+            let rhs_value = rhs_value.trunc() as i64;
+
+            value_integer_kind(lhs_value & rhs_value)
+        }
+        BinaryOperator::BitwiseXor(_) => {
+            if !is_numeric_value_kind(&left_kind)
+                || !can_extract_literal_value(&left_kind)
+                || !is_numeric_value_kind(&right_kind)
+                || !can_extract_literal_value(&right_kind)
+            {
+                if is_gmp_or_bcmath_number(interner, &left_kind) {
+                    return left_kind;
+                }
+
+                if is_gmp_or_bcmath_number(interner, &right_kind) {
+                    return right_kind;
+                }
+
+                return if left_kind.is_object()
+                    || left_kind.is_resource()
+                    || left_kind.is_array()
+                    || right_kind.is_object()
+                    || right_kind.is_resource()
+                    || right_kind.is_array()
+                {
+                    never_kind()
+                } else {
+                    integer_kind()
+                };
+            }
+
+            let lhs_value = extract_literal_value(&left_kind);
+            let rhs_value = extract_literal_value(&right_kind);
+
+            let lhs_value = lhs_value.trunc() as i64;
+            let rhs_value = rhs_value.trunc() as i64;
+
+            value_integer_kind(lhs_value ^ rhs_value)
+        }
+        BinaryOperator::LeftShift(_) => {
+            if !is_numeric_value_kind(&left_kind)
+                || !can_extract_literal_value(&left_kind)
+                || !is_numeric_value_kind(&right_kind)
+                || !can_extract_literal_value(&right_kind)
+            {
+                if is_gmp_or_bcmath_number(interner, &left_kind) {
+                    return left_kind;
+                }
+
+                if is_gmp_or_bcmath_number(interner, &right_kind) {
+                    return right_kind;
+                }
+
+                return if left_kind.is_object()
+                    || left_kind.is_resource()
+                    || left_kind.is_array()
+                    || right_kind.is_object()
+                    || right_kind.is_resource()
+                    || right_kind.is_array()
+                {
+                    never_kind()
+                } else {
+                    integer_kind()
+                };
+            }
+
+            let lhs_value = extract_literal_value(&left_kind);
+            let rhs_value = extract_literal_value(&right_kind);
+
+            let lhs_value = lhs_value.trunc() as i64;
+            let rhs_value = rhs_value.trunc() as i64;
+
+            if rhs_value < 0 {
+                return never_kind();
+            }
+
+            value_integer_kind(if rhs_value > u32::MAX as i64 {
+                0i64
+            } else {
+                lhs_value.wrapping_shl(rhs_value as u32)
+            })
+        }
+        BinaryOperator::RightShift(_) => {
+            if !is_numeric_value_kind(&left_kind)
+                || !can_extract_literal_value(&left_kind)
+                || !is_numeric_value_kind(&right_kind)
+                || !can_extract_literal_value(&right_kind)
+            {
+                if is_gmp_or_bcmath_number(interner, &left_kind) {
+                    return left_kind;
+                }
+
+                if is_gmp_or_bcmath_number(interner, &right_kind) {
+                    return right_kind;
+                }
+
+                return if left_kind.is_object()
+                    || left_kind.is_resource()
+                    || left_kind.is_array()
+                    || right_kind.is_object()
+                    || right_kind.is_resource()
+                    || right_kind.is_array()
+                {
+                    never_kind()
+                } else {
+                    integer_kind()
+                };
+            }
+
+            let lhs_value = extract_literal_value(&left_kind);
+            let rhs_value = extract_literal_value(&right_kind);
+
+            let lhs_value = lhs_value.trunc() as i64;
+            let rhs_value = rhs_value.trunc() as i64;
+
+            if rhs_value < 0 {
+                return never_kind();
+            }
+
+            value_integer_kind(if rhs_value > u32::MAX as i64 {
+                0i64
+            } else {
+                lhs_value.wrapping_shr(rhs_value as u32)
+            })
+        }
+        BinaryOperator::Instanceof(_) => bool_kind(),
         _ => mixed_kind(false),
     }
 }

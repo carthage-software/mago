@@ -288,12 +288,6 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
         Expression::AssignmentOperation(assignment_operation) => {
             expression_has_yield(&assignment_operation.lhs) || expression_has_yield(&assignment_operation.rhs)
         }
-        Expression::BitwiseOperation(bitwise_operation) => match bitwise_operation.as_ref() {
-            BitwiseOperation::Prefix(bitwise_prefix_operation) => expression_has_yield(&bitwise_prefix_operation.value),
-            BitwiseOperation::Infix(bitwise_infix_operation) => {
-                expression_has_yield(&bitwise_infix_operation.lhs) || expression_has_yield(&bitwise_infix_operation.rhs)
-            }
-        },
         Expression::Conditional(conditional) => {
             expression_has_yield(&conditional.condition)
                 || conditional.then.as_ref().map(|e| expression_has_yield(e.as_ref())).unwrap_or(false)

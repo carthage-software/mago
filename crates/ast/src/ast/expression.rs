@@ -22,6 +22,7 @@ use crate::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::class_like::AnonymousClass;
 use crate::ast::clone::Clone;
 use crate::ast::closure_creation::ClosureCreation;
+use crate::ast::conditional::Conditional;
 use crate::ast::construct::Construct;
 use crate::ast::control_flow::r#match::Match;
 use crate::ast::function_like::arrow_function::ArrowFunction;
@@ -35,8 +36,6 @@ use crate::ast::operation::arithmetic::ArithmeticOperation;
 use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
-use crate::ast::operation::bitwise::BitwiseOperation;
-use crate::ast::operation::ternary::Conditional;
 use crate::ast::operation::unary::UnaryPostfixOperation;
 use crate::ast::operation::unary::UnaryPrefixOperation;
 use crate::ast::r#yield::Yield;
@@ -64,7 +63,6 @@ pub enum Expression {
     CompositeString(Box<CompositeString>),
     ArithmeticOperation(Box<ArithmeticOperation>),
     AssignmentOperation(Box<AssignmentOperation>),
-    BitwiseOperation(Box<BitwiseOperation>),
     Conditional(Conditional),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
@@ -142,15 +140,6 @@ impl Expression {
             Self::ArrayAccess(access) => {
                 access.array.is_constant(initilization) && access.index.is_constant(initilization)
             }
-            Self::BitwiseOperation(expression) => match expression.as_ref() {
-                BitwiseOperation::Prefix(bitwise_prefix_operation) => {
-                    bitwise_prefix_operation.value.is_constant(initilization)
-                }
-                BitwiseOperation::Infix(bitwise_infix_operation) => {
-                    bitwise_infix_operation.lhs.is_constant(initilization)
-                        && bitwise_infix_operation.rhs.is_constant(initilization)
-                }
-            },
             Self::Instantiation(instantiation) if initilization => {
                 instantiation.class.is_constant(initilization)
                     && instantiation
@@ -251,7 +240,6 @@ impl Expression {
             Expression::CompositeString(_) => NodeKind::CompositeString,
             Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
             Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
-            Expression::BitwiseOperation(_) => NodeKind::BitwiseOperation,
             Expression::Conditional(_) => NodeKind::Conditional,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
@@ -297,7 +285,6 @@ impl HasSpan for Expression {
             Expression::CompositeString(expression) => expression.span(),
             Expression::ArithmeticOperation(expression) => expression.span(),
             Expression::AssignmentOperation(expression) => expression.span(),
-            Expression::BitwiseOperation(expression) => expression.span(),
             Expression::Conditional(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),
