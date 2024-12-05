@@ -33,7 +33,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn ternary_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        if !matches!(node, Node::AssignmentOperation(_) | Node::TernaryOperation(_)) {
+        if !matches!(node, Node::AssignmentOperation(_) | Node::Conditional(_)) {
             return false;
         }
 
@@ -85,7 +85,7 @@ impl<'a> Formatter<'a> {
             Some(Node::UnaryPrefixOperation(operation)) if operation.operator.is_cast() => {
                 return true;
             }
-            Some(Node::ConditionalTernaryOperation(_) | Node::ArrayAppend(_)) => {
+            Some(Node::Conditional(_) | Node::ArrayAppend(_)) => {
                 return true;
             }
             Some(Node::ArrayAccess(access)) => {
@@ -257,13 +257,13 @@ impl<'a> Formatter<'a> {
     }
 
     const fn is_unary_or_binary_or_ternary(&self, node: Node<'a>) -> bool {
-        self.is_unary(node) || self.is_binaryish(node) || self.is_ternary(node)
+        self.is_unary(node) || self.is_binaryish(node) || self.is_conditional(node)
     }
 
     const fn is_binaryish(&self, node: Node<'a>) -> bool {
         match node {
             Node::BinaryOperation(_) | Node::BitwiseInfixOperation(_) | Node::ArithmeticInfixOperation(_) => true,
-            Node::ConditionalTernaryOperation(op) => op.then.is_none(),
+            Node::Conditional(conditional) => conditional.then.is_none(),
             _ => false,
         }
     }
@@ -275,13 +275,12 @@ impl<'a> Formatter<'a> {
             | Node::ArithmeticPostfixOperation(_)
             | Node::BitwisePrefixOperation(_)
             | Node::ArithmeticPrefixOperation(_) => true,
-            Node::ConditionalTernaryOperation(op) => op.then.is_none(),
             _ => false,
         }
     }
 
-    const fn is_ternary(&self, node: Node<'a>) -> bool {
-        if let Node::ConditionalTernaryOperation(op) = node {
+    const fn is_conditional(&self, node: Node<'a>) -> bool {
+        if let Node::Conditional(op) = node {
             op.then.is_some()
         } else {
             false

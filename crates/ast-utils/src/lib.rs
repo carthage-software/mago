@@ -294,13 +294,11 @@ pub fn expression_has_yield<'ast>(expression: &'ast Expression) -> bool {
                 expression_has_yield(&bitwise_infix_operation.lhs) || expression_has_yield(&bitwise_infix_operation.rhs)
             }
         },
-        Expression::TernaryOperation(ternary_operation) => match ternary_operation.as_ref() {
-            TernaryOperation::Conditional(conditional_ternary_operation) => {
-                expression_has_yield(&conditional_ternary_operation.condition)
-                    || conditional_ternary_operation.then.as_ref().map(expression_has_yield).unwrap_or(false)
-                    || expression_has_yield(&conditional_ternary_operation.r#else)
-            }
-        },
+        Expression::Conditional(conditional) => {
+            expression_has_yield(&conditional.condition)
+                || conditional.then.as_ref().map(|e| expression_has_yield(e.as_ref())).unwrap_or(false)
+                || expression_has_yield(&conditional.r#else)
+        }
         Expression::Array(array) => array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
                 expression_has_yield(&key_value_array_element.key)
@@ -603,13 +601,11 @@ pub fn expression_has_throws<'ast>(expression: &'ast Expression) -> bool {
         Expression::AssignmentOperation(assignment_operation) => {
             expression_has_throws(&assignment_operation.lhs) || expression_has_throws(&assignment_operation.rhs)
         }
-        Expression::TernaryOperation(ternary_operation) => match ternary_operation.as_ref() {
-            TernaryOperation::Conditional(conditional_ternary_operation) => {
-                expression_has_throws(&conditional_ternary_operation.condition)
-                    || conditional_ternary_operation.then.as_ref().map(expression_has_throws).unwrap_or(false)
-                    || expression_has_throws(&conditional_ternary_operation.r#else)
-            }
-        },
+        Expression::Conditional(conditional) => {
+            expression_has_throws(&conditional.condition)
+                || conditional.then.as_ref().map(|e| expression_has_throws(e.as_ref())).unwrap_or(false)
+                || expression_has_throws(&conditional.r#else)
+        }
         Expression::Array(array) => array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
                 expression_has_throws(&key_value_array_element.key)
@@ -792,18 +788,9 @@ pub fn get_assignment_from_expression<'ast>(expression: &'ast Expression) -> Opt
         }
         Expression::UnaryPrefixOperation(operation) => get_assignment_from_expression(&operation.operand),
         Expression::UnaryPostfixOperation(operation) => get_assignment_from_expression(&operation.operand),
-        Expression::TernaryOperation(ternary_operation) => match ternary_operation.as_ref() {
-            TernaryOperation::Conditional(conditional_ternary_operation) => {
-                get_assignment_from_expression(&conditional_ternary_operation.condition)
-                    .or_else(|| {
-                        conditional_ternary_operation
-                            .then
-                            .as_ref()
-                            .and_then(|then| get_assignment_from_expression(then))
-                    })
-                    .or_else(|| get_assignment_from_expression(&conditional_ternary_operation.r#else))
-            }
-        },
+        Expression::Conditional(conditional) => get_assignment_from_expression(&conditional.condition)
+            .or_else(|| conditional.then.as_ref().and_then(|then| get_assignment_from_expression(then)))
+            .or_else(|| get_assignment_from_expression(&conditional.r#else)),
         Expression::Array(array) => array.elements.iter().find_map(|element| match &element {
             ArrayElement::KeyValue(key_value_array_element) => {
                 get_assignment_from_expression(&key_value_array_element.key)

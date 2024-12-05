@@ -36,7 +36,7 @@ use crate::ast::operation::arithmetic::ArithmeticPrefixOperator;
 use crate::ast::operation::assignment::AssignmentOperation;
 use crate::ast::operation::binary::BinaryOperation;
 use crate::ast::operation::bitwise::BitwiseOperation;
-use crate::ast::operation::ternary::TernaryOperation;
+use crate::ast::operation::ternary::Conditional;
 use crate::ast::operation::unary::UnaryPostfixOperation;
 use crate::ast::operation::unary::UnaryPrefixOperation;
 use crate::ast::r#yield::Yield;
@@ -65,7 +65,7 @@ pub enum Expression {
     ArithmeticOperation(Box<ArithmeticOperation>),
     AssignmentOperation(Box<AssignmentOperation>),
     BitwiseOperation(Box<BitwiseOperation>),
-    TernaryOperation(Box<TernaryOperation>),
+    Conditional(Conditional),
     Array(Box<Array>),
     LegacyArray(Box<LegacyArray>),
     List(Box<List>),
@@ -169,17 +169,11 @@ impl Expression {
                         })
                         .unwrap_or(true)
             }
-            Self::TernaryOperation(operation) => match operation.as_ref() {
-                TernaryOperation::Conditional(conditional_ternary_operation) => {
-                    conditional_ternary_operation.condition.is_constant(initilization)
-                        && conditional_ternary_operation
-                            .then
-                            .as_ref()
-                            .map(|e| e.is_constant(initilization))
-                            .unwrap_or(true)
-                        && conditional_ternary_operation.r#else.is_constant(initilization)
-                }
-            },
+            Self::Conditional(conditional) => {
+                conditional.condition.is_constant(initilization)
+                    && conditional.then.as_ref().map(|e| e.is_constant(initilization)).unwrap_or(true)
+                    && conditional.r#else.is_constant(initilization)
+            }
             Self::Array(array) => array.elements.inner.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {
                     key_value_array_element.key.is_constant(initilization)
@@ -258,7 +252,7 @@ impl Expression {
             Expression::ArithmeticOperation(_) => NodeKind::ArithmeticOperation,
             Expression::AssignmentOperation(_) => NodeKind::AssignmentOperation,
             Expression::BitwiseOperation(_) => NodeKind::BitwiseOperation,
-            Expression::TernaryOperation(_) => NodeKind::TernaryOperation,
+            Expression::Conditional(_) => NodeKind::Conditional,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
             Expression::List(_) => NodeKind::List,
@@ -304,7 +298,7 @@ impl HasSpan for Expression {
             Expression::ArithmeticOperation(expression) => expression.span(),
             Expression::AssignmentOperation(expression) => expression.span(),
             Expression::BitwiseOperation(expression) => expression.span(),
-            Expression::TernaryOperation(expression) => expression.span(),
+            Expression::Conditional(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),
             Expression::List(expression) => expression.span(),

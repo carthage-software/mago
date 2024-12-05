@@ -1300,8 +1300,8 @@ generate_ast_walker! {
             Expression::BitwiseOperation(bitwise_operation) => {
                 walker.walk_bitwise_operation(bitwise_operation.as_ref(), context)
             }
-            Expression::TernaryOperation(ternary_operation) => {
-                walker.walk_ternary_operation(ternary_operation.as_ref(), context)
+            Expression::Conditional(conditional) => {
+                walker.walk_conditional(conditional, context)
             }
             Expression::Array(array) => walker.walk_array(array.as_ref(), context),
             Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array.as_ref(), context),
@@ -1529,20 +1529,13 @@ generate_ast_walker! {
         // Do nothing
     }
 
-    TernaryOperation as ternary_operation => {
-        match ternary_operation {
-            TernaryOperation::Conditional(conditional_ternary_operation) =>
-                walker.walk_conditional_ternary_operation(conditional_ternary_operation, context),
-        };
-    }
-
-    ConditionalTernaryOperation as conditional_ternary_operation => {
-        walker.walk_expression(&conditional_ternary_operation.condition, context);
-        if let Some(then) = &conditional_ternary_operation.then {
+    Conditional as conditional => {
+        walker.walk_expression(&conditional.condition, context);
+        if let Some(then) = &conditional.then {
             walker.walk_expression(then, context);
         }
 
-        walker.walk_expression(&conditional_ternary_operation.r#else, context);
+        walker.walk_expression(&conditional.r#else, context);
     }
 
     Array as array => {

@@ -57,7 +57,7 @@ impl<'a> Format<'a> for Expression {
                 Expression::ArithmeticOperation(op) => op.format(f),
                 Expression::AssignmentOperation(op) => op.format(f),
                 Expression::BitwiseOperation(op) => op.format(f),
-                Expression::TernaryOperation(op) => op.format(f),
+                Expression::Conditional(op) => op.format(f),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
                 Expression::List(list) => list.format(f),
@@ -962,19 +962,9 @@ impl<'a> Format<'a> for Match {
     }
 }
 
-impl<'a> Format<'a> for TernaryOperation {
+impl<'a> Format<'a> for Conditional {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, TernaryOperation, {
-            match self {
-                TernaryOperation::Conditional(t) => t.format(f),
-            }
-        })
-    }
-}
-
-impl<'a> Format<'a> for ConditionalTernaryOperation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, ConditionalTernaryOperation, {
+        wrap!(f, self, Conditional, {
             match &self.then {
                 Some(then) => {
                     group!(

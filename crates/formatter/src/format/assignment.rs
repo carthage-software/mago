@@ -283,14 +283,9 @@ fn should_break_after_operator<'a, 'b>(f: &Formatter<'a>, rhs_expression: &'a Ex
                 return condition.is_binary() && !should_inline_logical_or_coalesce_expression(&condition);
             }
         }
-        Expression::TernaryOperation(ternary) => {
-            let condition = match ternary.as_ref() {
-                TernaryOperation::Conditional(conditional_ternary_operation) => {
-                    &conditional_ternary_operation.condition
-                }
-            };
-
-            return condition.is_binary() && !should_inline_logical_or_coalesce_expression(&condition);
+        Expression::Conditional(conditional) => {
+            return conditional.condition.is_binary()
+                && !should_inline_logical_or_coalesce_expression(&conditional.condition);
         }
         Expression::AnonymousClass(anonymous_class) => {
             if anonymous_class.attributes.len() > 0 {

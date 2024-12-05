@@ -229,7 +229,7 @@ fn should_expand_first_arg<'a>(f: &Formatter<'a>, argument_list: &'a ArgumentLis
 
     match second_argument.value() {
         Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => false,
-        Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::TernaryOperation(_) => false,
+        Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::Conditional(_) => false,
         expression => is_hopefully_short_call_argument(expression) && !could_expand_argument_value(expression, false),
     }
 }
@@ -410,7 +410,7 @@ fn could_expand_argument_value<'a>(argument_value: &'a Expression, arrow_chain_r
             Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {
                 could_expand_argument_value(&arrow_function.expression, true)
             }
-            Expression::Call(_) | Expression::TernaryOperation(_) => !arrow_chain_recursion,
+            Expression::Call(_) | Expression::Conditional(_) => !arrow_chain_recursion,
             _ => false,
         },
         _ => false,

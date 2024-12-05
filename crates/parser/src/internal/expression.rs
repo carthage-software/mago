@@ -353,21 +353,21 @@ fn parse_infix_expression<'a, 'i>(stream: &mut TokenStream<'a, 'i>, lhs: Express
         }
         T!["?"] => {
             if matches!(utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), Some(T![":"])) {
-                Expression::TernaryOperation(Box::new(TernaryOperation::Conditional(ConditionalTernaryOperation {
-                    condition: lhs,
+                Expression::Conditional(Conditional {
+                    condition: Box::new(lhs),
                     question_mark: utils::expect_any(stream)?.span,
                     then: None,
                     colon: utils::expect_any(stream)?.span,
-                    r#else: parse_expression(stream)?,
-                })))
+                    r#else: Box::new(parse_expression(stream)?),
+                })
             } else {
-                Expression::TernaryOperation(Box::new(TernaryOperation::Conditional(ConditionalTernaryOperation {
-                    condition: lhs,
+                Expression::Conditional(Conditional {
+                    condition: Box::new(lhs),
                     question_mark: utils::expect_any(stream)?.span,
-                    then: Some(parse_expression(stream)?),
+                    then: Some(Box::new(parse_expression(stream)?)),
                     colon: utils::expect_span(stream, T![":"])?,
-                    r#else: parse_expression(stream)?,
-                })))
+                    r#else: Box::new(parse_expression(stream)?),
+                })
             }
         }
         T!["?:"] => {

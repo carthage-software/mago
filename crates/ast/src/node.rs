@@ -178,7 +178,7 @@ pub enum NodeKind {
     BitwisePrefixOperation,
     BitwisePrefixOperator,
     ConditionalTernaryOperation,
-    TernaryOperation,
+    Conditional,
     DoWhile,
     Foreach,
     ForeachBody,
@@ -411,8 +411,7 @@ pub enum Node<'a> {
     BitwiseOperation(&'a BitwiseOperation),
     BitwisePrefixOperation(&'a BitwisePrefixOperation),
     BitwisePrefixOperator(&'a BitwisePrefixOperator),
-    ConditionalTernaryOperation(&'a ConditionalTernaryOperation),
-    TernaryOperation(&'a TernaryOperation),
+    Conditional(&'a Conditional),
     DoWhile(&'a DoWhile),
     Foreach(&'a Foreach),
     ForeachBody(&'a ForeachBody),
@@ -726,8 +725,7 @@ impl<'a> Node<'a> {
             Self::BitwiseOperation(_) => NodeKind::BitwiseOperation,
             Self::BitwisePrefixOperation(_) => NodeKind::BitwisePrefixOperation,
             Self::BitwisePrefixOperator(_) => NodeKind::BitwisePrefixOperator,
-            Self::ConditionalTernaryOperation(_) => NodeKind::ConditionalTernaryOperation,
-            Self::TernaryOperation(_) => NodeKind::TernaryOperation,
+            Self::Conditional(_) => NodeKind::Conditional,
             Self::DoWhile(_) => NodeKind::DoWhile,
             Self::Foreach(_) => NodeKind::Foreach,
             Self::ForeachBody(_) => NodeKind::ForeachBody,
@@ -1458,7 +1456,7 @@ impl<'a> Node<'a> {
                 Expression::ArithmeticOperation(node) => Node::ArithmeticOperation(node),
                 Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
                 Expression::BitwiseOperation(node) => Node::BitwiseOperation(node),
-                Expression::TernaryOperation(node) => Node::TernaryOperation(node),
+                Expression::Conditional(node) => Node::Conditional(node),
                 Expression::Array(node) => Node::Array(node),
                 Expression::LegacyArray(node) => Node::LegacyArray(node),
                 Expression::List(node) => Node::List(node),
@@ -1754,7 +1752,7 @@ impl<'a> Node<'a> {
                 vec![Node::BitwisePrefixOperator(&node.operator), Node::Expression(&node.value)]
             }
             Node::BitwisePrefixOperator(_) => vec![],
-            Node::ConditionalTernaryOperation(node) => {
+            Node::Conditional(node) => {
                 let mut children = vec![Node::Expression(&node.condition)];
 
                 if let Some(then) = &node.then {
@@ -1765,9 +1763,6 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::TernaryOperation(node) => vec![match node {
-                TernaryOperation::Conditional(node) => Node::ConditionalTernaryOperation(node),
-            }],
             Node::DoWhile(node) => vec![
                 Node::Keyword(&node.r#do),
                 Node::Statement(&node.statement),
@@ -2279,8 +2274,7 @@ impl<'a> HasSpan for Node<'a> {
             Self::BitwiseOperation(node) => node.span(),
             Self::BitwisePrefixOperation(node) => node.span(),
             Self::BitwisePrefixOperator(node) => node.span(),
-            Self::ConditionalTernaryOperation(node) => node.span(),
-            Self::TernaryOperation(node) => node.span(),
+            Self::Conditional(node) => node.span(),
             Self::DoWhile(node) => node.span(),
             Self::Foreach(node) => node.span(),
             Self::ForeachBody(node) => node.span(),

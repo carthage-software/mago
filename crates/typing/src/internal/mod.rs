@@ -285,34 +285,30 @@ where
 }
 
 #[inline]
-pub fn get_ternary_operation_kind<F>(ternary_operation: &TernaryOperation, get_expression_kind: F) -> TypeKind
+pub fn get_conditional_kind<F>(conditional: &Conditional, get_expression_kind: F) -> TypeKind
 where
     F: Fn(&Expression) -> TypeKind,
 {
-    match ternary_operation {
-        TernaryOperation::Conditional(conditional_ternary_operation) => {
-            let condition_kind = get_expression_kind(&conditional_ternary_operation.condition);
+    let condition_kind = get_expression_kind(&conditional.condition);
 
-            match &conditional_ternary_operation.then {
-                Some(then) => {
-                    let then_kind = get_expression_kind(then);
-                    let else_kind = get_expression_kind(&conditional_ternary_operation.r#else);
+    match &conditional.then {
+        Some(then) => {
+            let then_kind = get_expression_kind(then.as_ref());
+            let else_kind = get_expression_kind(&conditional.r#else);
 
-                    match condition_kind.is_truthy() {
-                        Trinary::True => then_kind,
-                        Trinary::Maybe => union_kind(vec![then_kind, else_kind]),
-                        Trinary::False => else_kind,
-                    }
-                }
-                None => {
-                    let else_kind = get_expression_kind(&conditional_ternary_operation.r#else);
+            match condition_kind.is_truthy() {
+                Trinary::True => then_kind,
+                Trinary::Maybe => union_kind(vec![then_kind, else_kind]),
+                Trinary::False => else_kind,
+            }
+        }
+        None => {
+            let else_kind = get_expression_kind(&conditional.r#else);
 
-                    match condition_kind.is_truthy() {
-                        Trinary::True => condition_kind,
-                        Trinary::Maybe => union_kind(vec![condition_kind, else_kind]),
-                        Trinary::False => else_kind,
-                    }
-                }
+            match condition_kind.is_truthy() {
+                Trinary::True => condition_kind,
+                Trinary::Maybe => union_kind(vec![condition_kind, else_kind]),
+                Trinary::False => else_kind,
             }
         }
     }

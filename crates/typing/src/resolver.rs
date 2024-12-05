@@ -70,9 +70,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::BitwiseOperation(bitwise_operation) => {
                 get_bitwise_operation_kind(&self.interner, bitwise_operation, |e| self.resolve(e))
             }
-            Expression::TernaryOperation(ternary_operation) => {
-                get_ternary_operation_kind(ternary_operation, |e| self.resolve(e))
-            }
+            Expression::Conditional(ternary_operation) => get_conditional_kind(ternary_operation, |e| self.resolve(e)),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),
             Expression::LegacyArray(legacy_array) => get_array_kind(&legacy_array.elements, |e| self.resolve(e)),
             Expression::ArrayAccess(array_access) => get_array_index_kind(self.resolve(&array_access.array)),
