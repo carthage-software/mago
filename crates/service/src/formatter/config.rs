@@ -6,9 +6,6 @@ use fennec_formatter::settings::*;
 /// Configuration options for formatting source code.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormatterConfiguration {
-    /// Formatting style to use.
-    pub style: FormattingStyle,
-
     /// Specify the maximum line length that the printer will wrap on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub print_width: Option<usize>,
@@ -223,21 +220,9 @@ pub struct FormatterConfiguration {
     pub method_chain_breaking_style: Option<MethodChainBreakingStyle>,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum FormattingStyle {
-    #[default]
-    #[serde(alias = "default")]
-    Default,
-    #[serde(alias = "fennec")]
-    Fennec,
-}
-
 impl FormatterConfiguration {
     pub fn get_settings(&self) -> FormatSettings {
-        let d = match self.style {
-            FormattingStyle::Default => FormatSettings::default(),
-            FormattingStyle::Fennec => FormatSettings::fennec_style(),
-        };
+        let d = FormatSettings::default();
 
         FormatSettings {
             print_width: self.print_width.unwrap_or(d.print_width),
@@ -309,28 +294,6 @@ impl FormatterConfiguration {
                 .preserve_multiline_binary_operations
                 .unwrap_or(d.preserve_multiline_binary_operations),
             method_chain_breaking_style: self.method_chain_breaking_style.unwrap_or(d.method_chain_breaking_style),
-        }
-    }
-}
-
-impl FormattingStyle {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            FormattingStyle::Default => "default",
-            FormattingStyle::Fennec => "fennec",
-        }
-    }
-}
-
-impl<S> From<S> for FormattingStyle
-where
-    S: AsRef<str>,
-{
-    fn from(value: S) -> Self {
-        if value.as_ref().eq_ignore_ascii_case("fennec") {
-            Self::Fennec
-        } else {
-            Self::Default
         }
     }
 }

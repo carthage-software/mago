@@ -12,6 +12,5 @@ workspace = true
 fennec-interner = { path = "../interner" }
 codespan-reporting = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 dashmap = { workspace = true }

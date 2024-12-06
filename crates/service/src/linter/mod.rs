@@ -70,7 +70,7 @@ impl LintService {
 
                 async move {
                     // Step 1: load the source
-                    let source = manager.load(source_id).await?;
+                    let source = manager.load(source_id)?;
                     source_pb.inc(1);
 
                     // Step 2: build semantics

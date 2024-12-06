@@ -40,6 +40,7 @@ It is inspired by the Rust programming language and its toolchain, and aims to p
 ### Tooling
 
 - [x] CLI Tool: [`crates/cli`](crates/cli)
+- [x] Web Assembly (WASM) Interface: [`crates/wasm`](crates/wasm)
 - [ ] Web Interface
 - [ ] Language Server Protocol
 - [ ] Editor Integration

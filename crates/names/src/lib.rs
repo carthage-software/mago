@@ -1,11 +1,13 @@
+use std::collections::HashSet;
+
 use ahash::HashMap;
-use fennec_span::HasPosition;
 use serde::Deserialize;
 use serde::Serialize;
 
 use fennec_ast::Program;
 use fennec_interner::StringIdentifier;
 use fennec_interner::ThreadedInterner;
+use fennec_span::HasPosition;
 use fennec_span::Position;
 use fennec_walker::MutWalker;
 
@@ -20,7 +22,7 @@ mod internal;
 /// to resolved names (represented as `StringIdentifier`s).
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Names {
-    pub(crate) names: HashMap<usize, (StringIdentifier, bool)>,
+    names: HashMap<usize, (StringIdentifier, bool)>,
 }
 
 impl Names {
@@ -44,6 +46,16 @@ impl Names {
         resolver.walk_program(program, &mut context);
 
         resolver.resolved_names
+    }
+
+    /// Returns the number of resolved names.
+    pub fn len(&self) -> usize {
+        self.names.len()
+    }
+
+    /// Returns `true` if there are no resolved names.
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
     }
 
     /// Checks if a name is resolved at the given position.
@@ -99,5 +111,12 @@ impl Names {
     /// * `name` - The `StringIdentifier` of the resolved name.
     pub(crate) fn insert_at<P: Into<usize>>(&mut self, position: P, name: StringIdentifier, imported: bool) {
         self.names.insert(position.into(), (name, imported));
+    }
+
+    /// Returns a set of all resolved names.
+    ///
+    /// The set contains tuples of positions and resolved names.
+    pub fn all(&self) -> HashSet<(&usize, &(StringIdentifier, bool))> {
+        HashSet::from_iter(self.names.iter())
     }
 }

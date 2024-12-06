@@ -67,7 +67,7 @@ pub async fn execute(command: FixCommand, configuration: Configuration) -> i32 {
             let interner = interner.clone();
 
             async move {
-                let source = source_manager.load(source).await.unwrap_or_else(bail);
+                let source = source_manager.load(source).unwrap_or_else(bail);
                 let source_name = interner.lookup(&source.identifier.value());
                 let source_content = interner.lookup(&source.content);
 

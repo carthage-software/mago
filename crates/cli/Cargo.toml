@@ -17,7 +17,7 @@ fennec-fixer = { path = "../fixer" }
 fennec-service = { path = "../service" }
 fennec-feedback = { path = "../feedback" }
 serde = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true , features = ["rt", "rt-multi-thread", "time"] }
 clap = { workspace = true }
 ahash = { workspace = true }
 termtree = { workspace = true }

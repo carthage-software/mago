@@ -68,7 +68,7 @@ pub async fn execute(command: AstCommand) -> i32 {
         if let Some(error) = &error {
             let issue = Into::<Issue>::into(error);
 
-            Reporter::new(source_manager).report(issue).await;
+            Reporter::new(source_manager).report(issue);
         }
     }
 

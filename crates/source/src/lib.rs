@@ -1,4 +1,7 @@
+#![feature(once_cell_try)]
+
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -10,7 +13,6 @@ use codespan_reporting::files::Files;
 use dashmap::DashMap;
 use serde::Deserialize;
 use serde::Serialize;
-use tokio::sync::OnceCell;
 
 use fennec_interner::StringIdentifier;
 use fennec_interner::ThreadedInterner;
@@ -198,14 +200,14 @@ impl SourceManager {
     /// # Returns
     ///
     /// The source with the given identifier, or an error if the source does not exist, or could not be loaded.
-    pub async fn load(&self, source_id: SourceIdentifier) -> Result<Source, SourceError> {
+    pub fn load(&self, source_id: SourceIdentifier) -> Result<Source, SourceError> {
         let Some(entry) = self.sources.get(&source_id) else {
             return Err(SourceError::UnavailableSource(source_id));
         };
 
         let content = entry.value()
             .content
-            .get_or_try_init(|| async {
+            .get_or_try_init(||  {
                 let path = entry
                     .path
                     .as_ref()
@@ -230,7 +232,7 @@ impl SourceManager {
 
                         (content, size, lines)
                     })
-            }).await;
+            });
 
         match content {
             Ok((content, size, lines)) => Ok(Source {

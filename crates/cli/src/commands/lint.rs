@@ -37,9 +37,9 @@ pub async fn execute(command: LintCommand, configuration: Configuration) -> i32 
     let issues_contain_errors = issues.get_highest_level().map_or(false, |level| level >= Level::Error);
 
     if command.only_fixable {
-        Reporter::new(source_manager).report_all(issues.only_fixable()).await;
+        Reporter::new(source_manager).report_all(issues.only_fixable());
     } else {
-        Reporter::new(source_manager).report_all(issues).await;
+        Reporter::new(source_manager).report_all(issues);
     }
 
     if issues_contain_errors {

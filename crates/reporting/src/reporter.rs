@@ -1,12 +1,12 @@
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 
 pub use codespan_reporting::term::termcolor::*;
 
 use codespan_reporting::diagnostic::Diagnostic;
 use codespan_reporting::term;
 use codespan_reporting::term::Config;
-use tokio::sync::Mutex;
-use tokio::sync::MutexGuard;
 
 use fennec_source::SourceIdentifier;
 use fennec_source::SourceManager;
@@ -31,17 +31,17 @@ impl Reporter {
         }
     }
 
-    pub async fn report(&self, issue: Issue) {
-        let mut writer = Gaurd(self.writer.lock().await);
+    pub fn report(&self, issue: Issue) {
+        let mut writer = Gaurd(self.writer.lock().expect("failed to aquire lock"));
 
         let diagnostic: Diagnostic<SourceIdentifier> = issue.into();
 
         term::emit(&mut writer, &self.config, &self.manager, &diagnostic).unwrap();
     }
 
-    pub async fn report_all(&self, issues: impl IntoIterator<Item = Issue>) -> Option<Level> {
+    pub fn report_all(&self, issues: impl IntoIterator<Item = Issue>) -> Option<Level> {
         let collection = IssueCollection::from(issues);
-        let mut writer = Gaurd(self.writer.lock().await);
+        let mut writer = Gaurd(self.writer.lock().expect("failed to aquire lock"));
 
         let highest_level = collection.get_highest_level();
         let mut errors = 0;

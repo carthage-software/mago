@@ -2,7 +2,6 @@ use clap::Parser;
 
 use fennec_interner::ThreadedInterner;
 use fennec_service::config::Configuration;
-use fennec_service::formatter::config::FormattingStyle;
 use fennec_service::formatter::FormatterService;
 use fennec_service::source::SourceService;
 
@@ -20,8 +19,6 @@ This command will format source files according to the rules defined in the conf
 "#
 )]
 pub struct FormatCommand {
-    #[arg(long, short = 's', help = "The formatting style", value_name = "STYLE")]
-    pub style: Option<String>,
     #[arg(long, short = 'w', help = "The width of the printed source code", value_name = "WIDTH")]
     pub print_width: Option<usize>,
 }
@@ -31,10 +28,6 @@ pub async fn execute(command: FormatCommand, mut configuration: Configuration) -
 
     let source_service = SourceService::new(interner.clone(), configuration.source);
     let source_manager = source_service.load().await.unwrap_or_else(bail);
-
-    if let Some(style) = command.style {
-        configuration.format.style = FormattingStyle::from(style);
-    }
 
     if let Some(width) = command.print_width {
         configuration.format.print_width = Some(width);

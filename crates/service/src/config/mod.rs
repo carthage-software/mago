@@ -293,12 +293,6 @@ mod internal {
             self,
             builder: ConfigBuilder<St>,
         ) -> Result<ConfigBuilder<St>, ConfigurationError> {
-            use ::config::Value;
-            use ::config::ValueKind;
-
-            let builder = builder
-                .set_default("format.style", Value::new(None, ValueKind::String(self.style.as_str().to_owned())))?;
-
             Ok(builder)
         }
     }

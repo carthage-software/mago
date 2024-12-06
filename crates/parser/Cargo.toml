@@ -21,7 +21,6 @@ ordered-float = { workspace = true, features = ["serde", "rand"] }
 either = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
