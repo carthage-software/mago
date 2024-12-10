@@ -6,6 +6,7 @@ pub mod best_practices;
 pub mod comment;
 pub mod consistency;
 pub mod naming;
+pub mod phpunit;
 pub mod redundancy;
 pub mod safety;
 pub mod strictness;
