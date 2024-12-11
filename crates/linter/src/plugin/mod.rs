@@ -5,6 +5,7 @@ use crate::rule::Rule;
 pub mod best_practices;
 pub mod comment;
 pub mod consistency;
+pub mod laravel;
 pub mod naming;
 pub mod phpunit;
 pub mod redundancy;

@@ -34,6 +34,9 @@ plugins = [
     "redundancy",
     "safety",
     "strictness",
+    # "symfony",
+    # "phpunit",
+    # "laravel"
 ]
 
 # Configuration for individual rules

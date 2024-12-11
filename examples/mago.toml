@@ -4,8 +4,9 @@ includes = []
 excludes = []
 
 [linter]
+# plugins = ["symfony", "laravel", "phpunit"]
 
-# This rule is disabled by default because it is experimental, enable it if you want to have a peek at it.
-# [[linter.rules]]
+# This rule is disabled by default because it is experimental, enable it if you want to have a peek at it.
+# [[linter.rules]]
 # name = "comment/docblock-syntax"
 # level = "Warning"
