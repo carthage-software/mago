@@ -396,7 +396,7 @@ impl SemanticsWalker {
 
                     last_read_visibility = Some(modifier.span());
                 }
-                Modifier::PrivateSet(_) => {
+                Modifier::PrivateSet(_) | Modifier::ProtectedSet(_) | Modifier::PublicSet(_) => {
                     if let Some(last_visibility) = last_write_visibility {
                         context.report(
                             Issue::error(format!(
@@ -1138,11 +1138,14 @@ impl SemanticsWalker {
                         last_visibility = Some(modifier.span());
                     }
                 }
-                Modifier::PrivateSet(_) => {
+                Modifier::PrivateSet(k) | Modifier::ProtectedSet(k) | Modifier::PublicSet(k) => {
+                    let modifier_name = context.interner.lookup(&k.value);
+
                     context.report(
-                        Issue::error("`private(set)` modifier is not allowed on methods".to_string())
+                        Issue::error(format!("`{}` modifier is not allowed on methods", modifier_name))
                             .with_annotation(
-                                Annotation::primary(modifier.span()).with_message("`private(set)` modifier"),
+                                Annotation::primary(modifier.span())
+                                    .with_message(format!("`{}` modifier", modifier_name)),
                             )
                             .with_annotation(
                                 Annotation::secondary(method.span()).with_message(format!(
@@ -1704,7 +1707,12 @@ impl SemanticsWalker {
         let mut last_visibility: Option<Span> = None;
         for modifier in class_like_constant.modifiers.iter() {
             match modifier {
-                Modifier::Readonly(k) | Modifier::Static(k) | Modifier::Abstract(k) | Modifier::PrivateSet(k) => {
+                Modifier::Readonly(k)
+                | Modifier::Static(k)
+                | Modifier::Abstract(k)
+                | Modifier::PrivateSet(k)
+                | Modifier::ProtectedSet(k)
+                | Modifier::PublicSet(k) => {
                     context.report(
                         Issue::error(format!(
                             "`{}` modifier is not allowed on constants",
@@ -2309,6 +2317,8 @@ impl Walker<Context<'_>> for SemanticsWalker {
                 Modifier::Public(keyword)
                 | Modifier::Protected(keyword)
                 | Modifier::Private(keyword)
+                | Modifier::PublicSet(keyword)
+                | Modifier::ProtectedSet(keyword)
                 | Modifier::PrivateSet(keyword) => {
                     let visibility_name = context.interner.lookup(&keyword.value);
 
@@ -3157,6 +3167,8 @@ impl Walker<Context<'_>> for SemanticsWalker {
                 Modifier::Static(_)
                 | Modifier::Abstract(_)
                 | Modifier::PrivateSet(_)
+                | Modifier::ProtectedSet(_)
+                | Modifier::PublicSet(_)
                 | Modifier::Public(_)
                 | Modifier::Protected(_)
                 | Modifier::Private(_) => {
@@ -3744,7 +3756,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
                             last_read_visibility = Some(modifier.span());
                         }
                     }
-                    Modifier::PrivateSet(_) => {
+                    Modifier::PrivateSet(_) | Modifier::ProtectedSet(_) | Modifier::PublicSet(_) => {
                         if let Some(s) = last_write_visibility {
                             context.report(
                                 Issue::error(format!(
