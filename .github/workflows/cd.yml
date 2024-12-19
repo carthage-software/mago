@@ -62,35 +62,30 @@ jobs:
           # Windows ( MinGW )
           - { target: x86_64-pc-windows-gnu, os: windows-2019 }
           # Windows ( MSVC )
-          - { target: i686-pc-windows-msvc, os: windows-2019 }
-          - { target: x86_64-pc-windows-msvc, os: windows-2019 }
+          - { target: i686-pc-windows-msvc, os: windows-2019, test: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-2019, test: true }
           # macOS
-          - { target: aarch64-apple-darwin, os: macos-15 }
-          - { target: x86_64-apple-darwin, os: macos-15 }
-          # *BSD
+          - { target: aarch64-apple-darwin, os: macos-15, test: true }
+          - { target: x86_64-apple-darwin, os: macos-15, test: true }
+          # FreeBSD
           - { target: i686-unknown-freebsd, os: ubuntu-20.04 }
           - { target: x86_64-unknown-freebsd, os: ubuntu-20.04 }
-          - { target: x86_64-unknown-netbsd, os: ubuntu-20.04 }
           # Linux
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-20.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-20.04, test: true }
           - { target: arm-unknown-linux-gnueabi, os: ubuntu-20.04 }
           - { target: arm-unknown-linux-gnueabihf, os: ubuntu-20.04 }
           - { target: armv7-unknown-linux-gnueabihf, os: ubuntu-20.04 }
           - { target: arm-unknown-linux-musleabi, os: ubuntu-20.04 }
           - { target: arm-unknown-linux-musleabihf, os: ubuntu-20.04 }
           - { target: armv7-unknown-linux-musleabihf, os: ubuntu-20.04 }
-          - { target: i686-unknown-linux-gnu, os: ubuntu-20.04 }
-          - { target: i686-unknown-linux-musl, os: ubuntu-20.04 }
-          - { target: mips-unknown-linux-gnu, os: ubuntu-20.04, nightly: true }
-          - { target: mips64-unknown-linux-gnuabi64, os: ubuntu-20.04, nightly: true }
-          - { target: mipsel-unknown-linux-gnu, os: ubuntu-20.04, nightly: true }
-          - { target: mips64el-unknown-linux-gnuabi64, os: ubuntu-20.04, nightly: true }
+          - { target: i686-unknown-linux-gnu, os: ubuntu-20.04, test: true }
+          - { target: i686-unknown-linux-musl, os: ubuntu-20.04, test: true }
           - { target: powerpc-unknown-linux-gnu, os: ubuntu-20.04 }
           - { target: powerpc64-unknown-linux-gnu, os: ubuntu-20.04 }
           - { target: powerpc64le-unknown-linux-gnu, os: ubuntu-20.04 }
           - { target: s390x-unknown-linux-gnu, os: ubuntu-20.04 }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-20.04 }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04, test: true }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-20.04, test: true }
 
     env:
       BUILD_CMD: cargo
@@ -99,12 +94,10 @@ jobs:
       - name: checkout source code
         uses: actions/checkout@v4
 
-      - name: Determine tag version
+      - name: set version env variable
         id: version
         shell: bash
-        run: |
-          CLEAN_TAG=${GITHUB_REF_NAME#v}
-          echo "CLEAN_TAG=$CLEAN_TAG" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ needs.crate_metadata.outputs.version }}" >> $GITHUB_OUTPUT
 
       - name: install prerequisites
         shell: bash
@@ -117,7 +110,7 @@ jobs:
       - name: install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.job.nightly == 'true' && 'nightly' || 'stable' }}
+          toolchain: ${{ needs.crate_metadata.outputs.msrv }}
           targets: ${{ matrix.job.target }}
           override: true
 
@@ -163,6 +156,7 @@ jobs:
           echo "BIN_NAME=${BIN_NAME}" >> $GITHUB_OUTPUT
 
       - name: run tests
+        if: matrix.job.test
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
@@ -182,18 +176,18 @@ jobs:
         id: package
         shell: bash
         run: |
-          CLEAN_TAG="${{ steps.version.outputs.CLEAN_TAG }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
           TARGET="${{ matrix.job.target }}"
           PKG_SUFFIX=".tar.gz"
           case "$TARGET" in
             *-pc-windows-msvc) PKG_SUFFIX=".zip" ;;
           esac
 
-          PKG_NAME="mago-${CLEAN_TAG}-${TARGET}${PKG_SUFFIX}"
+          PKG_NAME="mago-${VERSION}-${TARGET}${PKG_SUFFIX}"
           echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_OUTPUT
 
           PKG_STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/package"
-          ARCHIVE_DIR="${PKG_STAGING}/mago-${CLEAN_TAG}-${TARGET}/"
+          ARCHIVE_DIR="${PKG_STAGING}/mago-${VERSION}-${TARGET}/"
           mkdir -p "${ARCHIVE_DIR}"
 
           # Binary
@@ -205,10 +199,10 @@ jobs:
           pushd "${PKG_STAGING}/" >/dev/null
           case "$PKG_SUFFIX" in
             .zip)
-              7z -y a "${PKG_NAME}" "mago-${CLEAN_TAG}-${TARGET}/*"
+              7z -y a "${PKG_NAME}" "mago-${VERSION}-${TARGET}/*"
               ;;
             .tar.gz)
-              tar czf "${PKG_NAME}" "mago-${CLEAN_TAG}-${TARGET}"/*
+              tar czf "${PKG_NAME}" "mago-${VERSION}-${TARGET}"/*
               ;;
           esac
           popd >/dev/null
@@ -220,9 +214,9 @@ jobs:
         if: matrix.job.target == 'x86_64-unknown-linux-gnu'
         shell: bash
         run: |
-          CLEAN_TAG="${{ steps.version.outputs.CLEAN_TAG }}"
-          # Since WASM is universal, just name it 'mago-{CLEAN_TAG}-wasm.tar.gz'
-          WASM_PKG_NAME="mago-${CLEAN_TAG}-wasm.tar.gz"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          # Since WASM is universal, just name it 'mago-{VERSION}-wasm.tar.gz'
+          WASM_PKG_NAME="mago-${VERSION}-wasm.tar.gz"
           echo "WASM_PKG_NAME=${WASM_PKG_NAME}" >> $GITHUB_OUTPUT
 
           WASM_STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/wasm"
@@ -235,9 +229,9 @@ jobs:
       - name: create Debian package
         id: debian-package
         shell: bash
-        if: startsWith(matrix.job.os, 'ubuntu') && !endsWith(matrix.job.target, 'bsd')
+        if: startsWith(matrix.job.os, 'ubuntu') && !endsWith(matrix.job.target, 'freebsd')
         run: |
-          CLEAN_TAG="${{ steps.version.outputs.CLEAN_TAG }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
           TARGET="${{ matrix.job.target }}"
 
           # Derive arch from target:
@@ -252,7 +246,7 @@ jobs:
             *s390x*) DPKG_ARCH="s390x" ;;
           esac
 
-          DPKG_NAME="mago-${CLEAN_TAG}-${TARGET}.deb"
+          DPKG_NAME="mago-${VERSION}-${TARGET}.deb"
 
           echo "DPKG_NAME=${DPKG_NAME}" >> $GITHUB_OUTPUT
 
@@ -269,7 +263,7 @@ jobs:
           mkdir -p "${DPKG_DIR}/DEBIAN"
           cat > "${DPKG_DIR}/DEBIAN/control" <<EOF
           Package: mago
-          Version: ${CLEAN_TAG}
+          Version: ${VERSION}
           Section: devel
           Priority: optional
           Maintainer: ${{ needs.crate_metadata.outputs.maintainer }}
