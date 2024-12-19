@@ -36,7 +36,7 @@ impl<'a> Walker<LintContext<'a>> for NoMultiAssignmentsRule {
                     .with_message("Consider splitting this statement into multiple assignments."),
             )
             .with_note("Multiple assignments in a single statement can be confusing and lead to unexpected behavior.")
-            .with_help(format!("Did you mean `{a} = ({b} == {c})` instead? Ensure the intended logic is clear."));
+            .with_help(format!("Did you mean `{a} = ({b} === {c})` instead? Ensure the intended logic is clear."));
 
         context.report(issue);
     }
