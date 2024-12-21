@@ -7,9 +7,9 @@ use config::ValueKind;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::config::error::ConfigurationError;
 use crate::config::ConfigurationEntry;
 use crate::config::CURRENT_DIR;
+use crate::error::Error;
 
 /// Configuration options for source discovery.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -58,7 +58,7 @@ impl SourceConfiguration {
 }
 
 impl ConfigurationEntry for SourceConfiguration {
-    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, ConfigurationError> {
+    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
         builder
             .set_default("source.root", Value::new(None, ValueKind::String(self.root.to_string_lossy().to_string())))?
             .set_default("source.paths", Value::new(None, ValueKind::Array(vec![])))?
@@ -68,14 +68,14 @@ impl ConfigurationEntry for SourceConfiguration {
                 "source.extensions",
                 Value::new(None, ValueKind::Array(vec![Value::new(None, ValueKind::String("php".to_string()))])),
             )
-            .map_err(ConfigurationError::from)
+            .map_err(Error::from)
     }
 
-    fn normalize(&mut self) -> Result<(), ConfigurationError> {
+    fn normalize(&mut self) -> Result<(), Error> {
         // Make root absolute if not already
         let root = if !self.root.is_absolute() { (*CURRENT_DIR).join(&self.root) } else { self.root.clone() };
 
-        self.root = root.canonicalize().map_err(|e| ConfigurationError::CanonicalizingRootPath(root, e))?;
+        self.root = root.canonicalize().map_err(|e| Error::CanonicalizingPath(root, e))?;
 
         // Normalize source paths
         self.paths = self
@@ -84,9 +84,9 @@ impl ConfigurationEntry for SourceConfiguration {
             .map(|p| {
                 let path = if p.is_absolute() { p.clone() } else { self.root.join(p) };
 
-                path.canonicalize().map_err(|e| ConfigurationError::CanonicalizingSourcePath(p.clone(), e))
+                path.canonicalize().map_err(|e| Error::CanonicalizingPath(p.clone(), e))
             })
-            .collect::<Result<Vec<PathBuf>, ConfigurationError>>()?;
+            .collect::<Result<Vec<PathBuf>, Error>>()?;
 
         // Normalize include paths
         self.includes = self
@@ -95,9 +95,9 @@ impl ConfigurationEntry for SourceConfiguration {
             .map(|p| {
                 let path = if p.is_absolute() { p.clone() } else { self.root.join(p) };
 
-                path.canonicalize().map_err(|e| ConfigurationError::CanonicalizingIncludePath(p.clone(), e))
+                path.canonicalize().map_err(|e| Error::CanonicalizingPath(p.clone(), e))
             })
-            .collect::<Result<Vec<PathBuf>, ConfigurationError>>()?;
+            .collect::<Result<Vec<PathBuf>, Error>>()?;
 
         Ok(())
     }

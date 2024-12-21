@@ -7,3 +7,8 @@ macro_rules! enum_variants {
         clap::builder::PossibleValuesParser::new(<$e>::VARIANTS).map(|s| s.parse::<$e>().unwrap())
     }};
 }
+
+#[macro_export]
+macro_rules! reporting_arguments {
+    () => {};
+}

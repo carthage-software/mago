@@ -1,3 +1,5 @@
+use std::process::ExitCode;
+
 use clap::Parser;
 use serde_json::json;
 use termtree::Tree;
@@ -5,6 +7,7 @@ use termtree::Tree;
 use mago_ast::node::NodeKind;
 use mago_ast::Node;
 use mago_interner::ThreadedInterner;
+use mago_parser::parse_source;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
@@ -12,86 +15,110 @@ use mago_reporting::Issue;
 use mago_source::SourceManager;
 
 use crate::enum_variants;
-use crate::service::ast::AstService;
-use crate::utils::bail;
+use crate::error::Error;
 
+/// Represents the `ast` command, which parses a PHP file and prints its abstract syntax tree (AST).
 #[derive(Parser, Debug)]
 #[command(
     name = "ast",
-    about = "Prints the abstract syntax tree of a PHP file.",
-    long_about = "Given a PHP file, this command will parse the file and print the abstract syntax tree (AST) to the console."
+    about = "Parses a PHP file and prints its abstract syntax tree (AST).",
+    long_about = "The `ast` command takes a PHP file as input, parses it, and outputs the abstract syntax tree (AST). The output can be displayed in a tree format or JSON format based on user preference."
 )]
 pub struct AstCommand {
+    /// Path to the PHP file to be parsed.
     #[arg(long, short = 'f', help = "The PHP file to parse.", required = true)]
     pub file: String,
 
+    /// Outputs the AST in JSON format if specified.
     #[arg(long, help = "Outputs the result in JSON format.")]
     pub json: bool,
 
+    /// Specifies the issue reporting target to use.
     #[arg(long, default_value_t, help = "The issue reporting target to use.", ignore_case = true, value_parser = enum_variants!(ReportingTarget))]
     pub reporting_target: ReportingTarget,
 
+    /// Specifies the issue reporting format to use.
     #[arg(long, default_value_t, help = "The issue reporting format to use.", ignore_case = true, value_parser = enum_variants!(ReportingFormat))]
     pub reporting_format: ReportingFormat,
 }
 
-pub async fn execute(command: AstCommand) -> i32 {
+/// Executes the AST command with the provided options.
+///
+/// # Arguments
+///
+/// * `command` - The `AstCommand` structure containing user-specified options.
+///
+/// # Returns
+///
+/// An `ExitCode` indicating the success or failure of the command.
+///
+/// # Errors
+///
+/// An error is returned if the file does not exist or is not readable.
+pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
     let file_path = std::path::Path::new(&command.file).to_path_buf();
 
-    // Check if the file exists and is readable
+    // Verify if the file exists and is readable.
     if !file_path.exists() {
-        mago_feedback::error!("file '{}' does not exist.", command.file);
+        mago_feedback::error!("File '{}' does not exist.", command.file);
 
-        return 1;
+        return Ok(ExitCode::FAILURE);
     }
 
     if !file_path.is_file() {
-        mago_feedback::error!("'{}' is not a valid file.", command.file);
+        mago_feedback::error!("The path '{}' is not a file.", command.file);
 
-        return 1;
+        return Ok(ExitCode::FAILURE);
     }
 
+    // Initialize interner and source manager.
     let interner = ThreadedInterner::new();
     let source_manager = SourceManager::new(interner.clone());
 
-    let source_id = source_manager.insert_path(command.file, file_path, true);
+    // Load the source file.
+    let source_id = source_manager.insert_path(command.file.clone(), file_path, true);
+    let source = source_manager.load(&source_id)?;
 
-    let service = AstService::new(interner.clone(), source_manager.clone());
-
-    let (ast, error) = service.parse(source_id).await.unwrap_or_else(bail);
+    // Parse the source file into an AST.
+    let (ast, error) = parse_source(&interner, &source);
 
     let has_error = error.is_some();
     if command.json {
-        // Prepare JSON output
+        // Prepare and display JSON output.
         let result = json!({
             "interner": interner.all().into_iter().collect::<Vec<_>>(),
             "program": ast,
             "error": error.map(|e| Into::<Issue>::into(&e)),
         });
 
-        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+        println!("{}", serde_json::to_string_pretty(&result)?);
     } else {
-        // Print the AST as a tree
+        // Display the AST as a tree.
         let tree = node_to_tree(Node::Program(&ast));
 
         println!("{tree}");
 
+        // Report errors if any exist.
         if let Some(error) = &error {
             let issue = Into::<Issue>::into(error);
 
-            Reporter::new(interner, source_manager, command.reporting_target)
-                .report([issue], command.reporting_format)
-                .unwrap_or_else(bail);
+            Reporter::new(interner.clone(), source_manager, command.reporting_target)
+                .report([issue], command.reporting_format)?;
         }
     }
 
-    if has_error {
-        1
-    } else {
-        0
-    }
+    Ok(if has_error { ExitCode::FAILURE } else { ExitCode::SUCCESS })
 }
 
+/// Converts an AST node into a tree structure for visualization.
+///
+/// # Arguments
+///
+/// * `node` - The AST node to be converted into a tree.
+///
+/// # Returns
+///
+/// A `Tree` representation of the AST node and its children.
 fn node_to_tree(node: Node<'_>) -> Tree<NodeKind> {
     let mut tree = Tree::new(node.kind());
     for child in node.children() {

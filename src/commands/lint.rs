@@ -1,16 +1,30 @@
+use std::process::ExitCode;
+
 use clap::Parser;
 
+use mago_feedback::create_progress_bar;
+use mago_feedback::remove_progress_bar;
+use mago_feedback::ProgressBarTheme;
 use mago_interner::ThreadedInterner;
+use mago_linter::settings::RuleSettings;
+use mago_linter::settings::Settings;
+use mago_linter::Linter;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
+use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
 use mago_reporting::Level;
+use mago_semantics::Semantics;
+use mago_source::error::SourceError;
+use mago_source::SourceManager;
 
+use crate::config::linter::LinterConfiguration;
+use crate::config::linter::LinterLevel;
 use crate::config::Configuration;
 use crate::enum_variants;
-use crate::service::linter::LintService;
-use crate::service::source::SourceService;
-use crate::utils::bail;
+use crate::error::Error;
+use crate::source;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -35,27 +49,112 @@ pub struct LintCommand {
     pub reporting_format: ReportingFormat,
 }
 
-pub async fn execute(command: LintCommand, configuration: Configuration) -> i32 {
+pub async fn execute(command: LintCommand, configuration: Configuration) -> Result<ExitCode, Error> {
     let interner = ThreadedInterner::new();
+    let source_manager = source::load(&interner, &configuration.source).await?;
 
-    let source_service = SourceService::new(interner.clone(), configuration.source);
-    let source_manager = source_service.load().await.unwrap_or_else(bail);
+    // Initialize the linter
+    let linter = create_linter(&interner, &configuration.linter);
+    let issues = process_sources(&interner, &source_manager, &linter).await?;
 
-    let lint_service = LintService::new(configuration.linter, interner.clone(), source_manager.clone());
-    let issues = lint_service.run().await.unwrap_or_else(bail);
     let issues_contain_errors = issues.get_highest_level().is_some_and(|level| level >= Level::Error);
 
     let reporter = Reporter::new(interner, source_manager, command.reporting_target);
 
     if command.only_fixable {
-        reporter.report(issues.only_fixable(), command.reporting_format).unwrap_or_else(bail);
+        reporter.report(issues.only_fixable(), command.reporting_format)?;
     } else {
-        reporter.report(issues, command.reporting_format).unwrap_or_else(bail);
+        reporter.report(issues, command.reporting_format)?;
     }
 
-    if issues_contain_errors {
-        1
-    } else {
-        0
+    Ok(if issues_contain_errors { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+}
+
+#[inline]
+pub(super) async fn process_sources(
+    interner: &ThreadedInterner,
+    manager: &SourceManager,
+    linter: &Linter,
+) -> Result<IssueCollection, Error> {
+    // Collect all user-defined sources.
+    let sources: Vec<_> = manager.user_defined_source_ids().collect();
+
+    let length = sources.len();
+    let mut handles = Vec::with_capacity(length);
+
+    for source_id in sources {
+        handles.push(tokio::spawn({
+            let interner = interner.clone();
+            let manager = manager.clone();
+            let linter = linter.clone();
+
+            async move {
+                // Step 1: load the source
+                let source = manager.load(&source_id)?;
+                // Step 2: build semantics
+                let semantics = Semantics::build(&interner, source);
+                // Step 3: Collect issues
+                let mut issues = linter.lint(&semantics);
+                issues.extend(semantics.issues);
+                if let Some(error) = &semantics.parse_error {
+                    issues.push(Into::<Issue>::into(error));
+                }
+
+                Result::<_, SourceError>::Ok(issues)
+            }
+        }));
     }
+
+    let progress_bar = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Cyan);
+    let mut results = Vec::with_capacity(length);
+    for handle in handles {
+        results.push(handle.await??);
+    }
+
+    remove_progress_bar(progress_bar);
+
+    Ok(IssueCollection::from(results.into_iter().flatten()))
+}
+
+pub(super) fn create_linter(interner: &ThreadedInterner, configuration: &LinterConfiguration) -> Linter {
+    let mut settings = Settings::new();
+
+    if let Some(level) = configuration.level {
+        settings = match level {
+            LinterLevel::Off => settings.off(),
+            LinterLevel::Help => settings.with_level(Level::Help),
+            LinterLevel::Note => settings.with_level(Level::Note),
+            LinterLevel::Warning => settings.with_level(Level::Warning),
+            LinterLevel::Error => settings.with_level(Level::Error),
+        };
+    }
+
+    if let Some(default_plugins) = configuration.default_plugins {
+        settings = settings.with_default_plugins(default_plugins);
+    }
+
+    settings = settings.with_plugins(configuration.plugins.clone());
+
+    for rule in &configuration.rules {
+        let rule_settings = match rule.level {
+            Some(linter_level) => match linter_level {
+                LinterLevel::Off => RuleSettings::disabled(),
+                LinterLevel::Help => RuleSettings::from_level(Some(Level::Help)),
+                LinterLevel::Note => RuleSettings::from_level(Some(Level::Note)),
+                LinterLevel::Warning => RuleSettings::from_level(Some(Level::Warning)),
+                LinterLevel::Error => RuleSettings::from_level(Some(Level::Error)),
+            },
+            None => RuleSettings::enabled(),
+        };
+
+        settings = settings.with_rule(rule.name.clone(), rule_settings.with_options(rule.options.clone()));
+    }
+
+    let mut linter = Linter::new(settings, interner.clone());
+
+    mago_linter::foreach_plugin!(|plugin| {
+        linter.add_plugin(plugin);
+    });
+
+    linter
 }

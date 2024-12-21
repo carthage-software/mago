@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::LazyLock;
 
 use config::builder::BuilderState;
 use config::Config;
@@ -9,46 +8,18 @@ use config::File;
 use config::FileFormat;
 use config::Value;
 use config::ValueKind;
-use num_cpus::get as get_logical_cpus;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::config::error::ConfigurationError;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::source::SourceConfiguration;
+use crate::consts::*;
+use crate::error::Error;
 
-pub mod error;
 pub mod formatter;
 pub mod linter;
 pub mod source;
-
-/// The name of the environment variable prefix for mago.
-pub const ENVIRONMENT_PREFIX: &str = "MAGO";
-/// The name of the configuration file for mago.
-pub const CONFIGURATION_FILE: &str = "mago";
-/// The minimum stack size for each thread.
-pub const MINIMUM_STACK_SIZE: usize = 8 * 1024 * 1024;
-/// The default stack size for each thread.
-pub const DEFAULT_STACK_SIZE: usize = 36 * 1024 * 1024;
-/// The maximum stack size for each thread.
-pub const MAXIMUM_STACK_SIZE: usize = 256 * 1024 * 1024;
-/// The number of logical CPUs on the system.
-pub const LOGICAL_CPUS: LazyLock<usize> = LazyLock::new(get_logical_cpus);
-/// The current working directory.
-pub const CURRENT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    std::env::current_dir().unwrap_or_else(|e| {
-        tracing::error!("failed to get the current working directory: {}", e);
-        tracing::error!(
-            "this might occur if the directory has been deleted or if the process lacks the necessary permissions"
-        );
-        tracing::error!(
-            "please ensure that the directory exists and that you have the required permissions to access it"
-        );
-
-        std::process::exit(1);
-    })
-});
 
 /// Configuration options for mago.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -72,7 +43,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn load() -> Result<Configuration, ConfigurationError> {
+    pub fn load() -> Result<Configuration, Error> {
         let builder = Config::builder()
             .add_source(File::with_name(CONFIGURATION_FILE).required(false).format(FileFormat::Toml))
             .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX).try_parsing(true).list_separator(","));
@@ -111,15 +82,15 @@ impl Configuration {
 
 trait ConfigurationEntry {
     /// Configures the builder with the entry.
-    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, ConfigurationError>;
+    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error>;
 
-    fn normalize(&mut self) -> Result<(), ConfigurationError> {
+    fn normalize(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl ConfigurationEntry for Configuration {
-    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, ConfigurationError> {
+    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
         tracing::trace!("configuring configuration entry");
 
         let mut builder = builder
@@ -138,7 +109,7 @@ impl ConfigurationEntry for Configuration {
         Ok(builder)
     }
 
-    fn normalize(&mut self) -> Result<(), ConfigurationError> {
+    fn normalize(&mut self) -> Result<(), Error> {
         if self.threads == 0 {
             tracing::info!("thread configuration is zero, using the number of logical CPUs: {}", *LOGICAL_CPUS);
 

@@ -17,12 +17,12 @@ pub enum ReportingError {
 impl std::fmt::Display for ReportingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SourceError(error) => write!(f, "source error: {}", error),
-            Self::JsonError(error) => write!(f, "json error: {}", error),
-            Self::FilesError(error) => write!(f, "files error: {}", error),
-            Self::IoError(error) => write!(f, "io error: {}", error),
-            Self::InvalidTarget(target) => write!(f, "invalid target: {}", target),
-            Self::InvalidFormat(format) => write!(f, "invalid format: {}", format),
+            Self::SourceError(error) => write!(f, "Source error: {}", error),
+            Self::JsonError(error) => write!(f, "Json error: {}", error),
+            Self::FilesError(error) => write!(f, "Files error: {}", error),
+            Self::IoError(error) => write!(f, "IO error: {}", error),
+            Self::InvalidTarget(target) => write!(f, "Invalid target: {}", target),
+            Self::InvalidFormat(format) => write!(f, "Invalid format: {}", format),
         }
     }
 }
