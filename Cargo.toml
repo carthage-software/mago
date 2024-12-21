@@ -20,8 +20,6 @@ package.rust-version = "1.83.0"
 members = ["crates/*"]
 
 [workspace.lints.clippy]
-borrow_interior_mutable_const = { level = "allow" }
-declare_interior_mutable_const = { level = "allow" }
 # ast nodes are large enums, we want to keep them as is ( for now )
 large_enum_variant = { level = "allow" }
 
@@ -118,6 +116,7 @@ mago-feedback = { workspace = true }
 mago-semantics = { workspace = true }
 mago-linter = { workspace = true }
 mago-reflection = { workspace = true }
+mago-names = { workspace = true }
 mago-reflector = { workspace = true }
 mago-span = { workspace = true }
 mago-formatter = { workspace = true }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use mago_symbol_table::get_symbols;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -214,12 +215,14 @@ pub fn mago_get_insight(code: String, format_settings: Option<String>) -> Result
         formatted = Some(mago_formatter::format(settings, &interner, &semantics.source, &semantics.program));
     }
 
+    let symbols = get_symbols(&interner, &semantics.program);
+
     Ok(serde_wasm_bindgen::to_value(&CodeInsight {
         strings: interner.all(),
         program: semantics.program,
         parse_error: semantics.parse_error.as_ref().map(|e| e.into()),
         names: semantics.names.all(),
-        symbols: semantics.symbols,
+        symbols,
         semantic_issues: semantics.issues,
         formatted,
     })?)

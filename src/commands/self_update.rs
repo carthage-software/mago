@@ -1,18 +1,13 @@
+use std::process::ExitCode;
+
 use clap::Parser;
 
-use mago_feedback::error;
 use mago_feedback::info;
-use mago_feedback::warn;
-use self_update::cargo_crate_version;
-use self_update::errors::Error;
+use self_update::backends::github::Update;
 use self_update::Status;
 
-const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const TARGET: &str = env!("TARGET");
-const REPO_OWNER: &str = "carthage-software";
-const REPO_NAME: &str = "mago";
-const BIN_NAME: &str = "mago";
-const ISSUE_URL: &str = "https://github.com/carthage-software/mago/issues/new";
+use crate::consts::*;
+use crate::error::Error;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -42,16 +37,16 @@ pub struct SelfUpdateCommand {
     pub tag: Option<String>,
 }
 
-pub fn execute(command: SelfUpdateCommand) -> i32 {
-    info!("Current version: {}", CURRENT_VERSION);
+pub fn execute(command: SelfUpdateCommand) -> Result<ExitCode, Error> {
+    info!("Current version: {}", VERSION);
 
-    let mut status_builder = self_update::backends::github::Update::configure();
+    let mut status_builder = Update::configure();
     status_builder
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
         .target(TARGET)
-        .bin_name(BIN_NAME)
-        .current_version(cargo_crate_version!())
+        .bin_name(BIN)
+        .current_version(VERSION)
         .bin_path_in_archive("{{ bin }}-{{ version }}-{{ target }}/{{ bin }}")
         .show_download_progress(!command.no_progress)
         .show_output(!command.no_output)
@@ -61,18 +56,18 @@ pub fn execute(command: SelfUpdateCommand) -> i32 {
         status_builder.target_version_tag(&tag);
     }
 
-    let status = status_builder.build().unwrap_or_else(update_error);
+    let status = status_builder.build()?;
 
     if command.check {
-        let release = status.get_latest_release().unwrap_or_else(update_error);
+        let release = status.get_latest_release()?;
 
         info!("Latest release: {}", release.version);
         info!("Date: {}", release.date);
 
-        return 0;
+        return Ok(ExitCode::SUCCESS);
     }
 
-    let status = status.update().unwrap_or_else(update_error);
+    let status = status.update()?;
 
     match status {
         Status::UpToDate(latest_version) => {
@@ -83,50 +78,5 @@ pub fn execute(command: SelfUpdateCommand) -> i32 {
         }
     }
 
-    0
-}
-
-fn update_error<T>(error: Error) -> T {
-    println!();
-
-    let mut code = 1;
-    match error {
-        Error::Network(e) => {
-            error!("Network error occurred: {}", e);
-            error!("Check your connection and try again.");
-        }
-        Error::Release(e) => {
-            if e.contains("No asset found for target") {
-                error!("No release assets found for the target '{}'.", TARGET);
-                error!("This may happen if your target is not supported by our official builds.");
-                error!("If you built this binary yourself, recompile the new version or use your original installation method.");
-                error!("Binaries downloaded from GitHub should not encounter this error.");
-                error!("Need help? Open an issue at {}.", ISSUE_URL);
-            } else {
-                error!("Failed to fetch release information: {}", e);
-                error!("This could indicate a problem with GitHub API or repository configuration.");
-                error!("Please open an issue at {} with the error details.", ISSUE_URL);
-            }
-        }
-        Error::Io(e) => {
-            error!("I/O error occurred: {}", e);
-            error!("Ensure you have sufficient permissions and disk space.");
-        }
-        Error::Update(e) => {
-            if e.contains("Update aborted") {
-                warn!("Update aborted by user.");
-
-                code = 0;
-            } else {
-                error!("Update error occurred: {}", e);
-                error!("Please verify the installation directory and file permissions.");
-            }
-        }
-        _ => {
-            error!("An unexpected error occurred: {}", error);
-            error!("Please open an issue at {} with the error details.", ISSUE_URL);
-        }
-    }
-
-    std::process::exit(code);
+    Ok(ExitCode::SUCCESS)
 }

@@ -5,8 +5,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use toml::value::Value;
 
-use crate::config::error::ConfigurationError;
 use crate::config::ConfigurationEntry;
+use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum LinterLevel {
@@ -34,7 +34,7 @@ pub struct LinterRuleConfiguration {
 }
 
 impl ConfigurationEntry for LinterConfiguration {
-    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, ConfigurationError> {
+    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
         use ::config::Value;
         use ::config::ValueKind;
 

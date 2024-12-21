@@ -1,11 +1,21 @@
+use std::process::ExitCode;
+
 use clap::Parser;
 
+use mago_feedback::create_progress_bar;
+use mago_feedback::remove_progress_bar;
+use mago_feedback::ProgressBarTheme;
+use mago_fixer::FixPlan;
+use mago_fixer::SafetyClassification;
 use mago_interner::ThreadedInterner;
+use mago_reporting::IssueCollection;
+use mago_source::SourceIdentifier;
 
+use crate::commands::lint::process_sources;
 use crate::config::Configuration;
-use crate::service::linter::LintService;
-use crate::service::source::SourceService;
-use crate::utils::bail;
+use crate::error::Error;
+use crate::source;
+use crate::utils;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -26,43 +36,146 @@ pub struct FixCommand {
     pub dry_run: bool,
 }
 
-pub async fn execute(command: FixCommand, configuration: Configuration) -> i32 {
+impl FixCommand {
+    pub fn get_classification(&self) -> SafetyClassification {
+        if self.r#unsafe {
+            SafetyClassification::Unsafe
+        } else if self.potentially_unsafe {
+            SafetyClassification::PotentiallyUnsafe
+        } else {
+            SafetyClassification::Safe
+        }
+    }
+}
+
+pub async fn execute(command: FixCommand, configuration: Configuration) -> Result<ExitCode, Error> {
+    // Initialize the interner for managing identifiers.
     let interner = ThreadedInterner::new();
+    // Load sources
+    let source_manager = source::load(&interner, &configuration.source, true).await?;
 
-    let source_service = SourceService::new(interner.clone(), configuration.source);
-    let source_manager = source_service.load().await.unwrap_or_else(bail);
+    let issues = process_sources(&interner, &source_manager, &configuration.linter).await?;
+    let (plans, skipped_unsafe, skipped_potentially_unsafe) =
+        filter_fix_plans(&interner, issues, command.get_classification());
 
-    let service = LintService::new(configuration.linter, interner.clone(), source_manager.clone());
+    let total = plans.len();
+    let mut handles = Vec::with_capacity(total);
+    for (source, plan) in plans.into_iter() {
+        handles.push(tokio::spawn({
+            let source_manager = source_manager.clone();
+            let interner = interner.clone();
 
-    let result = service.fix(command.r#unsafe, command.potentially_unsafe, command.dry_run).await.unwrap_or_else(bail);
+            async move {
+                let source = source_manager.load(&source)?;
+                let source_content = interner.lookup(&source.content);
 
-    if result.skipped_unsafe > 0 {
+                utils::apply_changes(
+                    &interner,
+                    &source_manager,
+                    &source,
+                    plan.execute(source_content).get_fixed(),
+                    command.dry_run,
+                )
+            }
+        }));
+    }
+
+    let progress_bar = create_progress_bar(total, "✨  Fixing", ProgressBarTheme::Magenta);
+    let mut changed = 0;
+    for handle in handles {
+        if handle.await?? {
+            changed += 1;
+        }
+
+        progress_bar.inc(1);
+    }
+
+    remove_progress_bar(progress_bar);
+
+    if skipped_unsafe > 0 {
         mago_feedback::warn!(
             "Skipped {} fixes because they were marked as unsafe. To apply those fixes, use the `--unsafe` flag.",
-            result.skipped_unsafe
+            skipped_unsafe
         );
     }
 
-    if result.skipped_potentially_unsafe > 0 {
+    if skipped_potentially_unsafe > 0 {
         mago_feedback::warn!(
             "Skipped {} fixes because they were marked as potentially unsafe. To apply those fixes, use the `--potentially-unsafe` flag.",
-            result.skipped_potentially_unsafe
+            skipped_potentially_unsafe
         );
     }
 
-    if result.changed == 0 {
+    if changed == 0 {
         mago_feedback::info!("No fixes were applied");
 
-        return 0;
+        return Ok(ExitCode::SUCCESS);
     }
 
-    if command.dry_run {
-        mago_feedback::info!("Found {} fixes that can be applied", result.changed);
+    Ok(if command.dry_run {
+        mago_feedback::info!("Found {} fixes that can be applied", changed);
 
-        1
+        ExitCode::FAILURE
     } else {
-        mago_feedback::info!("Applied {} fixes successfully", result.changed);
+        mago_feedback::info!("Applied {} fixes successfully", changed);
 
-        0
+        ExitCode::SUCCESS
+    })
+}
+
+fn filter_fix_plans(
+    interner: &ThreadedInterner,
+    issues: IssueCollection,
+    classification: SafetyClassification,
+) -> (Vec<(SourceIdentifier, FixPlan)>, usize, usize) {
+    let mut skipped_unsafe = 0;
+    let mut skipped_potentially_unsafe = 0;
+
+    let mut results = vec![];
+    for (source, plan) in issues.to_fix_plans() {
+        if plan.is_empty() {
+            continue;
+        }
+
+        let mut operations = vec![];
+        for operation in plan.take_operations() {
+            match operation.get_safety_classification() {
+                SafetyClassification::Unsafe => {
+                    if classification == SafetyClassification::Unsafe {
+                        operations.push(operation);
+                    } else {
+                        skipped_unsafe += 1;
+
+                        mago_feedback::warn!(
+                            "Skipping a fix for `{}` because it contains unsafe changes.",
+                            interner.lookup(&source.0)
+                        );
+                    }
+                }
+                SafetyClassification::PotentiallyUnsafe => {
+                    if classification == SafetyClassification::Unsafe
+                        || classification == SafetyClassification::PotentiallyUnsafe
+                    {
+                        operations.push(operation);
+                    } else {
+                        skipped_potentially_unsafe += 1;
+
+                        mago_feedback::warn!(
+                            "Skipping a fix for `{}` because it contains potentially unsafe changes.",
+                            interner.lookup(&source.0)
+                        );
+                    }
+                }
+                SafetyClassification::Safe => {
+                    operations.push(operation);
+                }
+            }
+        }
+
+        if !operations.is_empty() {
+            results.push((source, FixPlan::from_operations(operations)));
+        }
     }
+
+    (results, skipped_unsafe, skipped_potentially_unsafe)
 }

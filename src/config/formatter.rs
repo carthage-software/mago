@@ -5,8 +5,8 @@ use serde::Serialize;
 
 use mago_formatter::settings::*;
 
-use crate::config::error::ConfigurationError;
 use crate::config::ConfigurationEntry;
+use crate::error::Error;
 
 /// Configuration options for formatting source code.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -165,7 +165,7 @@ impl FormatterConfiguration {
 }
 
 impl ConfigurationEntry for FormatterConfiguration {
-    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, ConfigurationError> {
+    fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
         Ok(builder)
     }
 }
