@@ -11,7 +11,6 @@ use mago_interner::ThreadedInterner;
 use mago_reporting::IssueCollection;
 use mago_source::SourceIdentifier;
 
-use crate::commands::lint::create_linter;
 use crate::commands::lint::process_sources;
 use crate::config::Configuration;
 use crate::error::Error;
@@ -53,10 +52,9 @@ pub async fn execute(command: FixCommand, configuration: Configuration) -> Resul
     // Initialize the interner for managing identifiers.
     let interner = ThreadedInterner::new();
     // Load sources
-    let source_manager = source::load(&interner, &configuration.source).await?;
+    let source_manager = source::load(&interner, &configuration.source, true).await?;
 
-    let linter = create_linter(&interner, &configuration.linter);
-    let issues = process_sources(&interner, &source_manager, &linter).await?;
+    let issues = process_sources(&interner, &source_manager, &configuration.linter).await?;
     let (plans, skipped_unsafe, skipped_potentially_unsafe) =
         filter_fix_plans(&interner, issues, command.get_classification());
 

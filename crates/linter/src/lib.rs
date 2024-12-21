@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 
 use mago_interner::ThreadedInterner;
+use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
 use mago_semantics::Semantics;
 
@@ -22,6 +23,7 @@ pub mod settings;
 pub struct Linter {
     settings: Settings,
     interner: ThreadedInterner,
+    codebase: Arc<CodebaseReflection>,
     rules: Arc<RwLock<Vec<ConfiguredRule>>>,
 }
 
@@ -34,12 +36,13 @@ impl Linter {
     ///
     /// - `settings`: The settings to use for the linter.
     /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the semantics.
+    /// - `codebase`: The codebase reflection to use for the linter.
     ///
     /// # Returns
     ///
     /// A new linter.
-    pub fn new(settings: Settings, interner: ThreadedInterner) -> Self {
-        Self { settings, interner, rules: Arc::new(RwLock::new(Vec::new())) }
+    pub fn new(settings: Settings, interner: ThreadedInterner, codebase: CodebaseReflection) -> Self {
+        Self { settings, interner, codebase: Arc::new(codebase), rules: Arc::new(RwLock::new(Vec::new())) }
     }
 
     /// Creates a new linter with all plugins enabled.
@@ -51,12 +54,13 @@ impl Linter {
     ///
     /// - `settings`: The settings to use for the linter.
     /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the semantics.
+    /// - `codebase`: The codebase reflection to use for the linter.
     ///
     /// # Returns
     ///
     /// A new linter with all plugins enabled.
-    pub fn with_all_plugins(settings: Settings, interner: ThreadedInterner) -> Self {
-        let mut linter = Self::new(settings, interner);
+    pub fn with_all_plugins(settings: Settings, interner: ThreadedInterner, codebase: CodebaseReflection) -> Self {
+        let mut linter = Self::new(settings, interner, codebase);
 
         crate::foreach_plugin!(|plugin| linter.add_plugin(plugin));
 
@@ -161,7 +165,7 @@ impl Linter {
 
         tracing::debug!("Linting source `{}`...", source_name);
 
-        let mut context = Context::new(&self.interner, semantics);
+        let mut context = Context::new(&self.interner, &self.codebase, semantics);
 
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
 

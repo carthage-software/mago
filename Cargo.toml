@@ -116,6 +116,7 @@ mago-feedback = { workspace = true }
 mago-semantics = { workspace = true }
 mago-linter = { workspace = true }
 mago-reflection = { workspace = true }
+mago-names = { workspace = true }
 mago-reflector = { workspace = true }
 mago-span = { workspace = true }
 mago-formatter = { workspace = true }

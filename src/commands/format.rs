@@ -53,7 +53,7 @@ pub async fn execute(command: FormatCommand, mut configuration: Configuration) -
     // Initialize the interner for managing identifiers.
     let interner = ThreadedInterner::new();
     // Load sources
-    let source_manager = source::load(&interner, &configuration.source).await?;
+    let source_manager = source::load(&interner, &configuration.source, false).await?;
 
     // Update the print width in configuration if provided.
     if let Some(width) = command.print_width {

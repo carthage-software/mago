@@ -11,6 +11,7 @@ pub mod migration;
 pub mod naming;
 pub mod phpunit;
 pub mod redundancy;
+pub mod runtime;
 pub mod safety;
 pub mod strictness;
 pub mod symfony;

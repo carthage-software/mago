@@ -27,12 +27,12 @@ use super::r#type::reflect_hint;
 pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&class.attributes, context),
-        name: ClassLikeName::Class(Name::new(*context.semantics.names.get(&class.name), class.name.span)),
+        name: ClassLikeName::Class(Name::new(*context.names.get(&class.name), class.name.span)),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
             if let Some(extends) = &class.extends {
                 if let Some(first_parent) = extends.types.first() {
-                    let parent = Name::new(*context.semantics.names.get(first_parent), first_parent.span());
+                    let parent = Name::new(*context.names.get(first_parent), first_parent.span());
 
                     reflection.direct_extended_class = Some(parent);
                     reflection.all_extended_classes.insert(parent);
@@ -42,7 +42,7 @@ pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -
 
             if let Some(impelemnts) = &class.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let name = Name::new(*context.names.get(interface), interface.span());
 
                     reflection.direct_implemented_interfaces.insert(name);
                     reflection.all_implemented_interfaces.insert(name);
@@ -83,7 +83,7 @@ pub fn reflect_anonymous_class<'ast>(
             let mut reflection = InheritanceReflection::default();
             if let Some(extends) = &class.extends {
                 if let Some(first_parent) = extends.types.first() {
-                    let parent = Name::new(*context.semantics.names.get(first_parent), first_parent.span());
+                    let parent = Name::new(*context.names.get(first_parent), first_parent.span());
 
                     reflection.direct_extended_class = Some(parent);
                     reflection.all_extended_classes.insert(parent);
@@ -93,7 +93,7 @@ pub fn reflect_anonymous_class<'ast>(
 
             if let Some(impelemnts) = &class.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let name = Name::new(*context.names.get(interface), interface.span());
 
                     reflection.direct_implemented_interfaces.insert(name);
                     reflection.all_implemented_interfaces.insert(name);
@@ -126,13 +126,13 @@ pub fn reflect_anonymous_class<'ast>(
 pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&interface.attributes, context),
-        name: ClassLikeName::Interface(Name::new(*context.semantics.names.get(&interface.name), interface.name.span)),
+        name: ClassLikeName::Interface(Name::new(*context.names.get(&interface.name), interface.name.span)),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
 
             if let Some(extends) = &interface.extends {
                 for interface in extends.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let name = Name::new(*context.names.get(interface), interface.span());
 
                     reflection.direct_extended_interfaces.insert(name);
                     reflection.all_extended_interfaces.insert(name);
@@ -165,7 +165,7 @@ pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Co
 pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&r#trait.attributes, context),
-        name: ClassLikeName::Trait(Name::new(*context.semantics.names.get(&r#trait.name), r#trait.name.span)),
+        name: ClassLikeName::Trait(Name::new(*context.names.get(&r#trait.name), r#trait.name.span)),
         inheritance: InheritanceReflection::default(),
         backing_type: None,
         is_final: false,
@@ -190,13 +190,13 @@ pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>)
 pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&r#enum.attributes, context),
-        name: ClassLikeName::Enum(Name::new(*context.semantics.names.get(&r#enum.name), r#enum.name.span)),
+        name: ClassLikeName::Enum(Name::new(*context.names.get(&r#enum.name), r#enum.name.span)),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
 
             if let Some(impelemnts) = &r#enum.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let name = Name::new(*context.names.get(interface), interface.span());
 
                     reflection.direct_implemented_interfaces.insert(name);
                     reflection.all_implemented_interfaces.insert(name);
@@ -238,7 +238,7 @@ fn reflect_class_like_members<'ast>(
         match &member {
             ClassLikeMember::TraitUse(trait_use) => {
                 for trait_name in trait_use.trait_names.iter() {
-                    let name = Name::new(*context.semantics.names.get(trait_name), trait_name.span());
+                    let name = Name::new(*context.names.get(trait_name), trait_name.span());
 
                     reflection.used_traits.insert(name.value);
                     reflection.used_trait_names.insert(name.value, name);
@@ -312,7 +312,7 @@ fn reflect_class_like_constant<'ast>(
                 member: Name::new(item.name.value, item.name.span),
             },
             is_final,
-            inferred_type_reflection: mago_typing::infere(context.interner, context.semantics, &item.value),
+            inferred_type_reflection: mago_typing::infere(context.interner, context.source, context.names, &item.value),
             item_span: item.span(),
             definition_span: constant.span(),
         });
@@ -340,7 +340,7 @@ fn reflect_class_like_enum_case<'ast>(
                 class_like: class_like.name,
                 member: Name::new(enum_case_backed_item.name.value, enum_case_backed_item.name.span),
             },
-            Some(mago_typing::infere(context.interner, context.semantics, &enum_case_backed_item.value)),
+            Some(mago_typing::infere(context.interner, context.source, context.names, &enum_case_backed_item.value)),
             true,
         ),
     };
@@ -451,7 +451,8 @@ fn reflect_class_like_property<'ast>(
                         Some(PropertyDefaultValueReflection {
                             inferred_type_reflection: mago_typing::infere(
                                 context.interner,
-                                context.semantics,
+                                context.source,
+                                context.names,
                                 &item.value,
                             ),
                             span: item.value.span(),
@@ -505,7 +506,12 @@ fn reflect_class_like_property<'ast>(
                         member: Name::new(item.variable.name, item.variable.span),
                     },
                     Some(PropertyDefaultValueReflection {
-                        inferred_type_reflection: mago_typing::infere(context.interner, context.semantics, &item.value),
+                        inferred_type_reflection: mago_typing::infere(
+                            context.interner,
+                            context.source,
+                            context.names,
+                            &item.value,
+                        ),
                         span: item.value.span(),
                     }),
                 ),

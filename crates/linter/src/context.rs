@@ -1,35 +1,40 @@
-use mago_ast::Identifier;
-use mago_semantics::Semantics;
 use toml::value::Value;
 
 use mago_ast::Hint;
+use mago_ast::Identifier;
 use mago_fixer::FixPlan;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_reflection::CodebaseReflection;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
+use mago_semantics::Semantics;
 use mago_span::HasPosition;
-use mago_span::HasSpan;
-use mago_span::Span;
 
-use crate::consts::ANONYMOUS_CLASS_NAME;
 use crate::rule::ConfiguredRule;
 
 #[derive(Debug)]
 pub struct Context<'a> {
     pub interner: &'a ThreadedInterner,
+    pub codebase: &'a CodebaseReflection,
     pub semantics: &'a Semantics,
     pub issues: IssueCollection,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(interner: &'a ThreadedInterner, semantics: &'a Semantics) -> Self {
-        Self { interner, semantics, issues: IssueCollection::default() }
+    pub fn new(interner: &'a ThreadedInterner, codebase: &'a CodebaseReflection, semantics: &'a Semantics) -> Self {
+        Self { interner, codebase, semantics, issues: IssueCollection::default() }
     }
 
     pub fn for_rule<'b>(&'b mut self, rule: &'b ConfiguredRule) -> LintContext<'b> {
-        LintContext { rule, interner: self.interner, semantics: self.semantics, issues: &mut self.issues }
+        LintContext {
+            rule,
+            interner: self.interner,
+            codebase: self.codebase,
+            semantics: self.semantics,
+            issues: &mut self.issues,
+        }
     }
 
     pub fn take_issue_collection(self) -> IssueCollection {
@@ -41,6 +46,7 @@ impl<'a> Context<'a> {
 pub struct LintContext<'a> {
     pub rule: &'a ConfiguredRule,
     pub interner: &'a ThreadedInterner,
+    pub codebase: &'a CodebaseReflection,
     pub semantics: &'a Semantics,
     pub issues: &'a mut IssueCollection,
 }
@@ -143,22 +149,5 @@ impl LintContext<'_> {
         let issue = issue.with_suggestion(self.semantics.source.identifier, plan);
 
         self.report(issue);
-    }
-
-    pub fn get_class_like_details(&self, node: &impl HasSpan) -> (String, String, String, Span) {
-        let class_like_symbol = self
-            .semantics
-            .symbols
-            .get_enclosing_class_like(node.span().start.offset)
-            .expect("expected to find a class-like symbol at the given position");
-
-        let class_like_kind = class_like_symbol.kind.to_string();
-        let class_like_span = class_like_symbol.span;
-        let (class_like_name, class_like_fqcn) = class_like_symbol
-            .identifier
-            .map(|i| (self.lookup(&i.name).to_string(), self.lookup(&i.fully_qualified_name).to_string()))
-            .unwrap_or_else(|| (ANONYMOUS_CLASS_NAME.to_string(), ANONYMOUS_CLASS_NAME.to_string()));
-
-        (class_like_kind, class_like_name, class_like_fqcn, class_like_span)
     }
 }

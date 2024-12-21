@@ -20,7 +20,7 @@ pub fn reflect_function<'ast>(
     FunctionLikeReflection {
         attribute_reflections: reflect_attributes(&function.attributes, context),
         visibility_reflection: None,
-        name: FunctionLikeName::Function(Name::new(*context.semantics.names.get(&function.name), function.name.span)),
+        name: FunctionLikeName::Function(Name::new(*context.names.get(&function.name), function.name.span)),
         // TODO: parse docblock to get the template list
         templates: vec![],
         parameters: reflect_function_like_parameter_list(&function.parameters, context, scope),
@@ -126,7 +126,7 @@ pub fn reflect_function_like_parameter<'ast>(
         is_passed_by_reference: parameter.ampersand.is_some(),
         is_promoted_property: parameter.is_promoted_property(),
         default: parameter.default_value.as_ref().map(|d| FunctionLikeParameterDefaultValueReflection {
-            type_reflection: mago_typing::infere(context.interner, context.semantics, &d.value),
+            type_reflection: mago_typing::infere(context.interner, context.source, context.names, &d.value),
             span: d.span(),
         }),
     }
