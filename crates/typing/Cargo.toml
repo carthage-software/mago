@@ -15,8 +15,8 @@ workspace = true
 [dependencies]
 mago-ast = { workspace = true }
 mago-reflection = { workspace = true }
+mago-source = { workspace = true }
 mago-span = { workspace = true }
-mago-semantics = { workspace = true }
 mago-names = { workspace = true }
 mago-interner = { workspace = true }
 mago-trinary = { workspace = true }

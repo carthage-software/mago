@@ -3,11 +3,12 @@ use ahash::HashSet;
 use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_names::Names;
 use mago_reflection::identifier::ClassLikeName;
 use mago_reflection::identifier::FunctionLikeName;
 use mago_reflection::r#type::kind::*;
 use mago_reflection::CodebaseReflection;
-use mago_semantics::Semantics;
+use mago_source::Source;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_trinary::Trinary;
@@ -33,7 +34,8 @@ use crate::internal::*;
 /// methods, and constants, making it slightly more powerful in providing initial type information.
 pub struct TypeResolver<'i, 'c> {
     interner: &'i ThreadedInterner,
-    semantics: &'c Semantics,
+    source: &'c Source,
+    names: &'c Names,
     codebase: Option<&'c CodebaseReflection>,
     constant_resolver: ConstantTypeResolver<'i, 'c>,
 }
@@ -41,14 +43,16 @@ pub struct TypeResolver<'i, 'c> {
 impl<'i, 'c> TypeResolver<'i, 'c> {
     pub fn new(
         interner: &'i ThreadedInterner,
-        semantics: &'c Semantics,
+        source: &'c Source,
+        names: &'c Names,
         codebase: Option<&'c CodebaseReflection>,
     ) -> Self {
         Self {
             interner,
-            semantics,
+            source,
+            names,
             codebase,
-            constant_resolver: ConstantTypeResolver::new(interner, semantics, codebase),
+            constant_resolver: ConstantTypeResolver::new(interner, names, codebase),
         }
     }
 
@@ -93,7 +97,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 // could be better..
                 any_closure_kind()
             }
-            Expression::Identifier(identifier) => self.constant_resolver.resolve(identifier),
+            Expression::ConstantAccess(access) => self.constant_resolver.resolve(&access.name),
             Expression::Match(match_expression) => {
                 let mut kinds = HashSet::default();
                 for arm in match_expression.arms.iter() {
@@ -229,7 +233,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                         if let (Expression::Identifier(name), ClassLikeMemberSelector::Identifier(method)) =
                             (static_method_call.class.as_ref(), &static_method_call.method)
                         {
-                            let class_name = self.semantics.names.get(name);
+                            let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(class_name) {
                                 if let Some(method) = class_reflection.get_method(&method.value) {
@@ -333,7 +337,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                         if let (Expression::Identifier(name), Variable::Direct(variable)) =
                             (&static_property_access.class, &static_property_access.property)
                         {
-                            let class_name = self.semantics.names.get(name);
+                            let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(class_name) {
                                 if let Some(property) = class_reflection.get_property(&variable.name) {
@@ -360,7 +364,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                         if let (Expression::Identifier(name), ClassLikeConstantSelector::Identifier(constant)) =
                             (&class_constant_access.class, &class_constant_access.constant)
                         {
-                            let class_name = self.semantics.names.get(name);
+                            let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(class_name) {
                                 if let Some(constant) = class_reflection.get_constant(&constant.value) {
@@ -471,7 +475,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             return any_closure_kind();
                         };
 
-                        let class_name = self.semantics.names.get(class_name);
+                        let class_name = self.names.get(class_name);
                         let Some(class_reflection) = codebase.get_class(class_name) else {
                             return any_closure_kind();
                         };
@@ -500,12 +504,12 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             }
             Expression::MagicConstant(magic_constant) => match &magic_constant {
                 MagicConstant::Line(local_identifier) => {
-                    let line = self.semantics.source.line_number(local_identifier.offset());
+                    let line = self.source.line_number(local_identifier.offset());
 
                     value_integer_kind(line as i64)
                 }
                 MagicConstant::File(_) => {
-                    if let Some(file) = &self.semantics.source.path {
+                    if let Some(file) = &self.source.path {
                         let file_id = self.interner.intern(file.to_string_lossy());
 
                         get_literal_string_value_kind(self.interner, file_id, false)
@@ -514,7 +518,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                     }
                 }
                 MagicConstant::Directory(_) => {
-                    if let Some(directory) = self.semantics.source.path.as_ref().and_then(|p| p.parent()) {
+                    if let Some(directory) = self.source.path.as_ref().and_then(|p| p.parent()) {
                         let directory_id = self.interner.intern(directory.to_string_lossy());
 
                         get_literal_string_value_kind(self.interner, directory_id, false)

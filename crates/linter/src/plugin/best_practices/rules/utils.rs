@@ -361,7 +361,7 @@ mod internal {
                 return;
             };
 
-            let function_name = context.1.lookup_function_name(function_identifier);
+            let function_name = context.1.resolve_function_name(function_identifier);
 
             context.0 = self.0.eq(function_name);
         }

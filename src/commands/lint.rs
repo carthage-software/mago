@@ -9,6 +9,8 @@ use mago_interner::ThreadedInterner;
 use mago_linter::settings::RuleSettings;
 use mago_linter::settings::Settings;
 use mago_linter::Linter;
+use mago_reflection::CodebaseReflection;
+use mago_reflector::reflect;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
@@ -24,6 +26,7 @@ use crate::config::linter::LinterLevel;
 use crate::config::Configuration;
 use crate::enum_variants;
 use crate::error::Error;
+use crate::reflection::reflect_all_external_sources;
 use crate::source;
 
 #[derive(Parser, Debug)]
@@ -51,11 +54,9 @@ pub struct LintCommand {
 
 pub async fn execute(command: LintCommand, configuration: Configuration) -> Result<ExitCode, Error> {
     let interner = ThreadedInterner::new();
-    let source_manager = source::load(&interner, &configuration.source).await?;
+    let source_manager = source::load(&interner, &configuration.source, true).await?;
 
-    // Initialize the linter
-    let linter = create_linter(&interner, &configuration.linter);
-    let issues = process_sources(&interner, &source_manager, &linter).await?;
+    let issues = process_sources(&interner, &source_manager, &configuration.linter).await?;
 
     let issues_contain_errors = issues.get_highest_level().is_some_and(|level| level >= Level::Error);
 
@@ -74,29 +75,53 @@ pub async fn execute(command: LintCommand, configuration: Configuration) -> Resu
 pub(super) async fn process_sources(
     interner: &ThreadedInterner,
     manager: &SourceManager,
-    linter: &Linter,
+    configuration: &LinterConfiguration,
 ) -> Result<IssueCollection, Error> {
     // Collect all user-defined sources.
     let sources: Vec<_> = manager.user_defined_source_ids().collect();
-
     let length = sources.len();
-    let mut handles = Vec::with_capacity(length);
 
+    let progress_bar = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Cyan);
+
+    let mut codebase = reflect_all_external_sources(interner, manager).await?;
+    let mut handles = Vec::with_capacity(length);
     for source_id in sources {
         handles.push(tokio::spawn({
             let interner = interner.clone();
             let manager = manager.clone();
-            let linter = linter.clone();
 
             async move {
                 // Step 1: load the source
                 let source = manager.load(&source_id)?;
                 // Step 2: build semantics
                 let semantics = Semantics::build(&interner, source);
-                // Step 3: Collect issues
-                let mut issues = linter.lint(&semantics);
-                issues.extend(semantics.issues);
-                if let Some(error) = &semantics.parse_error {
+                let reflections = reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
+
+                Result::<_, Error>::Ok((semantics, reflections))
+            }
+        }));
+    }
+
+    let mut semantics = Vec::with_capacity(length);
+    for handle in handles {
+        let (semantic, reflections) = handle.await??;
+
+        codebase = mago_reflector::merge(codebase, reflections);
+        semantics.push(semantic);
+    }
+
+    mago_reflector::populate(interner, &mut codebase);
+    let linter = create_linter(interner, configuration, codebase);
+
+    let mut handles = Vec::with_capacity(length);
+    for semantic in semantics {
+        handles.push(tokio::spawn({
+            let linter = linter.clone();
+
+            async move {
+                let mut issues = linter.lint(&semantic);
+                issues.extend(semantic.issues);
+                if let Some(error) = &semantic.parse_error {
                     issues.push(Into::<Issue>::into(error));
                 }
 
@@ -105,7 +130,6 @@ pub(super) async fn process_sources(
         }));
     }
 
-    let progress_bar = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Cyan);
     let mut results = Vec::with_capacity(length);
     for handle in handles {
         results.push(handle.await??);
@@ -116,7 +140,11 @@ pub(super) async fn process_sources(
     Ok(IssueCollection::from(results.into_iter().flatten()))
 }
 
-pub(super) fn create_linter(interner: &ThreadedInterner, configuration: &LinterConfiguration) -> Linter {
+pub(super) fn create_linter(
+    interner: &ThreadedInterner,
+    configuration: &LinterConfiguration,
+    codebase: CodebaseReflection,
+) -> Linter {
     let mut settings = Settings::new();
 
     if let Some(level) = configuration.level {
@@ -150,7 +178,7 @@ pub(super) fn create_linter(interner: &ThreadedInterner, configuration: &LinterC
         settings = settings.with_rule(rule.name.clone(), rule_settings.with_options(rule.options.clone()));
     }
 
-    let mut linter = Linter::new(settings, interner.clone());
+    let mut linter = Linter::new(settings, interner.clone(), codebase);
 
     mago_linter::foreach_plugin!(|plugin| {
         linter.add_plugin(plugin);

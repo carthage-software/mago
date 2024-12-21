@@ -8,7 +8,13 @@ use mago_span::Span;
 use crate::ast::class_like::member::ClassLikeConstantSelector;
 use crate::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::expression::Expression;
+use crate::ast::identifier::Identifier;
 use crate::ast::variable::Variable;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct ConstantAccess {
+    pub name: Identifier,
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
@@ -45,6 +51,12 @@ pub struct ClassConstantAccess {
     pub class: Expression,
     pub double_colon: Span,
     pub constant: ClassLikeConstantSelector,
+}
+
+impl HasSpan for ConstantAccess {
+    fn span(&self) -> Span {
+        self.name.span()
+    }
 }
 
 impl HasSpan for Access {

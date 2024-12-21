@@ -14,6 +14,7 @@ use crate::Program;
 #[serde(tag = "type", content = "value")]
 pub enum NodeKind {
     Program,
+    ConstantAccess,
     Access,
     ClassConstantAccess,
     NullSafePropertyAccess,
@@ -236,6 +237,7 @@ pub enum NodeKind {
 pub enum Node<'a> {
     Program(&'a Program),
     Access(&'a Access),
+    ConstantAccess(&'a ConstantAccess),
     ClassConstantAccess(&'a ClassConstantAccess),
     NullSafePropertyAccess(&'a NullSafePropertyAccess),
     PropertyAccess(&'a PropertyAccess),
@@ -533,6 +535,7 @@ impl<'a> Node<'a> {
         match &self {
             Self::Program(_) => NodeKind::Program,
             Self::Access(_) => NodeKind::Access,
+            Self::ConstantAccess(_) => NodeKind::ConstantAccess,
             Self::ClassConstantAccess(_) => NodeKind::ClassConstantAccess,
             Self::NullSafePropertyAccess(_) => NodeKind::NullSafePropertyAccess,
             Self::PropertyAccess(_) => NodeKind::PropertyAccess,
@@ -760,6 +763,9 @@ impl<'a> Node<'a> {
                 Access::StaticProperty(node) => vec![Node::StaticPropertyAccess(node)],
                 Access::ClassConstant(node) => vec![Node::ClassConstantAccess(node)],
             },
+            Node::ConstantAccess(node) => {
+                vec![Node::Identifier(&node.name)]
+            }
             Node::ClassConstantAccess(node) => {
                 vec![Node::Expression(&node.class), Node::ClassLikeConstantSelector(&node.constant)]
             }
@@ -1368,6 +1374,7 @@ impl<'a> Node<'a> {
             Node::Expression(node) => vec![match node {
                 Expression::Binary(node) => Node::Binary(node),
                 Expression::UnaryPrefix(node) => Node::UnaryPrefix(node),
+                Expression::ConstantAccess(node) => Node::ConstantAccess(node),
                 Expression::UnaryPostfix(node) => Node::UnaryPostfix(node),
                 Expression::Parenthesized(node) => Node::Parenthesized(node),
                 Expression::Literal(node) => Node::Literal(node),
@@ -1997,6 +2004,7 @@ impl HasSpan for Node<'_> {
         match self {
             Self::Program(node) => node.span(),
             Self::Access(node) => node.span(),
+            Self::ConstantAccess(node) => node.span(),
             Self::ClassConstantAccess(node) => node.span(),
             Self::NullSafePropertyAccess(node) => node.span(),
             Self::PropertyAccess(node) => node.span(),

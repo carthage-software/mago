@@ -132,6 +132,22 @@ impl Interner {
         )
     }
 
+    /// Given an identifier, returns the identifier for the same string but with all
+    /// characters in lowercase.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The identifier of the string to lower.
+    ///
+    /// # Returns
+    ///
+    /// The identifier of the string with all characters in lowercase.
+    pub fn lowered(&mut self, identifier: &StringIdentifier) -> StringIdentifier {
+        let string = self.lookup(identifier);
+
+        self.intern(string.to_ascii_lowercase())
+    }
+
     /// Returns the interned string for the specified identifier.
     ///
     /// # Arguments
@@ -220,6 +236,22 @@ impl ThreadedInterner {
             "invalid string identifier; this should never happen unless the identifier is \
                 corrupted or the interner is used incorrectly",
         )
+    }
+
+    /// Given an identifier, returns the identifier for the same string but with all
+    /// characters in lowercase.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The identifier of the string to lower.
+    ///
+    /// # Returns
+    ///
+    /// The identifier of the string with all characters in lowercase.
+    pub fn lowered(&self, identifier: &StringIdentifier) -> StringIdentifier {
+        let string = self.lookup(identifier);
+
+        self.intern(string.to_ascii_lowercase())
     }
 
     /// Looks up an interned string by its identifier.

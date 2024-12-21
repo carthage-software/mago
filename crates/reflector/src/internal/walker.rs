@@ -106,4 +106,10 @@ impl<'a> MutWalker<Context<'a>> for ReflectionWalker {
             self.reflection.register_constant(reflection);
         }
     }
+
+    fn walk_in_function_call(&mut self, function_call: &FunctionCall, context: &mut Context<'a>) {
+        if let Some(constant_reflection) = reflect_defined_constant(function_call, context) {
+            self.reflection.register_constant(constant_reflection);
+        }
+    }
 }

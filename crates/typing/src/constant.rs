@@ -1,34 +1,30 @@
 use mago_ast::Identifier;
 use mago_interner::ThreadedInterner;
+use mago_names::Names;
 use mago_reflection::r#type::kind::*;
 use mago_reflection::CodebaseReflection;
-use mago_semantics::Semantics;
 use mago_trinary::Trinary;
 use ordered_float::OrderedFloat;
 
 pub struct ConstantTypeResolver<'i, 'c> {
     interner: &'i ThreadedInterner,
-    semantics: &'c Semantics,
+    names: &'c Names,
     codebase: Option<&'c CodebaseReflection>,
 }
 
 impl<'i, 'c> ConstantTypeResolver<'i, 'c> {
-    pub fn new(
-        interner: &'i ThreadedInterner,
-        semantics: &'c Semantics,
-        codebase: Option<&'c CodebaseReflection>,
-    ) -> Self {
-        Self { interner, semantics, codebase }
+    pub fn new(interner: &'i ThreadedInterner, names: &'c Names, codebase: Option<&'c CodebaseReflection>) -> Self {
+        Self { interner, names, codebase }
     }
 
     pub fn resolve(&self, constant: &Identifier) -> TypeKind {
-        let (short_name, full_name) = if self.semantics.names.is_imported(constant) {
-            let name = self.interner.lookup(self.semantics.names.get(constant));
+        let (short_name, full_name) = if self.names.is_imported(constant) {
+            let name = self.interner.lookup(self.names.get(constant));
 
             (name, name)
         } else {
             let short_name = self.interner.lookup(&constant.value());
-            let imported_name = self.interner.lookup(self.semantics.names.get(constant));
+            let imported_name = self.interner.lookup(self.names.get(constant));
 
             if let Some(stripped) = short_name.strip_prefix('\\') {
                 (stripped, imported_name)

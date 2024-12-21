@@ -7,6 +7,7 @@ use mago_span::Span;
 
 use crate::ast::access::Access;
 use crate::ast::access::ClassConstantAccess;
+use crate::ast::access::ConstantAccess;
 use crate::ast::access::NullSafePropertyAccess;
 use crate::ast::access::PropertyAccess;
 use crate::ast::argument::Argument;
@@ -70,6 +71,7 @@ pub enum Expression {
     Closure(Box<Closure>),
     ArrowFunction(Box<ArrowFunction>),
     Variable(Variable),
+    ConstantAccess(ConstantAccess),
     Identifier(Identifier),
     Match(Box<Match>),
     Yield(Box<Yield>),
@@ -209,6 +211,7 @@ impl Expression {
     pub fn node_kind(&self) -> NodeKind {
         match &self {
             Expression::Binary(_) => NodeKind::Binary,
+            Expression::ConstantAccess(_) => NodeKind::ConstantAccess,
             Expression::UnaryPrefix(_) => NodeKind::UnaryPrefix,
             Expression::UnaryPostfix(_) => NodeKind::UnaryPostfix,
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
@@ -253,6 +256,7 @@ impl HasSpan for Expression {
     fn span(&self) -> Span {
         match &self {
             Expression::Binary(expression) => expression.span(),
+            Expression::ConstantAccess(expression) => expression.span(),
             Expression::UnaryPrefix(expression) => expression.span(),
             Expression::UnaryPostfix(expression) => expression.span(),
             Expression::Parenthesized(expression) => expression.span(),

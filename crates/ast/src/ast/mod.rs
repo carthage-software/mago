@@ -1,5 +1,6 @@
 pub use crate::ast::access::Access;
 pub use crate::ast::access::ClassConstantAccess;
+pub use crate::ast::access::ConstantAccess;
 pub use crate::ast::access::NullSafePropertyAccess;
 pub use crate::ast::access::PropertyAccess;
 pub use crate::ast::access::StaticPropertyAccess;

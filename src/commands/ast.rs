@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
+use mago_names::Names;
 use serde_json::json;
 use termtree::Tree;
 
@@ -28,6 +29,9 @@ pub struct AstCommand {
     /// Path to the PHP file to be parsed.
     #[arg(long, short = 'f', help = "The PHP file to parse.", required = true)]
     pub file: String,
+
+    #[arg(long, help = "Includes names in the output.")]
+    pub include_names: bool,
 
     /// Outputs the AST in JSON format if specified.
     #[arg(long, help = "Outputs the result in JSON format.")]
@@ -97,6 +101,16 @@ pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
         let tree = node_to_tree(Node::Program(&ast));
 
         println!("{tree}");
+
+        if command.include_names {
+            let names = Names::resolve(&interner, &ast);
+
+            for (position, (value, is_imported)) in names.all() {
+                let name = interner.lookup(value);
+
+                println!("{}: {}{}", position, name, if *is_imported { " (imported)" } else { "" });
+            }
+        }
 
         // Report errors if any exist.
         if let Some(error) = &error {

@@ -50,7 +50,7 @@ impl<'a> Walker<LintContext<'a>> for NoRequestAllRule {
                             return false;
                         };
 
-                        let name = context.lookup_function_name(identifier);
+                        let name = context.resolve_function_name(identifier);
 
                         name.eq_ignore_ascii_case(REQUEST_HELPER)
                     }

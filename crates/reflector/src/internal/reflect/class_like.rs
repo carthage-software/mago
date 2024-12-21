@@ -27,26 +27,38 @@ use super::r#type::reflect_hint;
 pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&class.attributes, context),
-        name: ClassLikeName::Class(Name::new(*context.semantics.names.get(&class.name), class.name.span)),
+        name: {
+            let value = *context.names.get(&class.name);
+
+            ClassLikeName::Class(Name { value, lower: context.interner.lowered(&value), span: class.name.span })
+        },
         inheritance: {
             let mut reflection = InheritanceReflection::default();
             if let Some(extends) = &class.extends {
                 if let Some(first_parent) = extends.types.first() {
-                    let parent = Name::new(*context.semantics.names.get(first_parent), first_parent.span());
+                    let parent = {
+                        let value = *context.names.get(&first_parent);
+
+                        Name { value, lower: context.interner.lowered(&value), span: first_parent.span() }
+                    };
 
                     reflection.direct_extended_class = Some(parent);
                     reflection.all_extended_classes.insert(parent);
-                    reflection.names.insert(parent.value, parent);
+                    reflection.names.insert(parent.lower, parent);
                 }
             }
 
             if let Some(impelemnts) = &class.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let interface = {
+                        let value = *context.names.get(&interface);
 
-                    reflection.direct_implemented_interfaces.insert(name);
-                    reflection.all_implemented_interfaces.insert(name);
-                    reflection.names.insert(name.value, name);
+                        Name { value, lower: context.interner.lowered(&value), span: interface.span() }
+                    };
+
+                    reflection.direct_implemented_interfaces.insert(interface);
+                    reflection.all_implemented_interfaces.insert(interface);
+                    reflection.names.insert(interface.lower, interface);
                 }
             }
 
@@ -83,21 +95,29 @@ pub fn reflect_anonymous_class<'ast>(
             let mut reflection = InheritanceReflection::default();
             if let Some(extends) = &class.extends {
                 if let Some(first_parent) = extends.types.first() {
-                    let parent = Name::new(*context.semantics.names.get(first_parent), first_parent.span());
+                    let parent = {
+                        let value = *context.names.get(&first_parent);
+
+                        Name { value, lower: context.interner.lowered(&value), span: first_parent.span() }
+                    };
 
                     reflection.direct_extended_class = Some(parent);
                     reflection.all_extended_classes.insert(parent);
-                    reflection.names.insert(parent.value, parent);
+                    reflection.names.insert(parent.lower, parent);
                 }
             }
 
             if let Some(impelemnts) = &class.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let interface = {
+                        let value = *context.names.get(&interface);
 
-                    reflection.direct_implemented_interfaces.insert(name);
-                    reflection.all_implemented_interfaces.insert(name);
-                    reflection.names.insert(name.value, name);
+                        Name { value, lower: context.interner.lowered(&value), span: interface.span() }
+                    };
+
+                    reflection.direct_implemented_interfaces.insert(interface);
+                    reflection.all_implemented_interfaces.insert(interface);
+                    reflection.names.insert(interface.lower, interface);
                 }
             }
 
@@ -126,17 +146,29 @@ pub fn reflect_anonymous_class<'ast>(
 pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&interface.attributes, context),
-        name: ClassLikeName::Interface(Name::new(*context.semantics.names.get(&interface.name), interface.name.span)),
+        name: {
+            let value = *context.names.get(&interface.name);
+
+            ClassLikeName::Interface(Name {
+                value,
+                lower: context.interner.lowered(&value),
+                span: interface.name.span(),
+            })
+        },
         inheritance: {
             let mut reflection = InheritanceReflection::default();
 
             if let Some(extends) = &interface.extends {
                 for interface in extends.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let interface = {
+                        let value = *context.names.get(&interface);
 
-                    reflection.direct_extended_interfaces.insert(name);
-                    reflection.all_extended_interfaces.insert(name);
-                    reflection.names.insert(name.value, name);
+                        Name { value, lower: context.interner.lowered(&value), span: interface.span() }
+                    };
+
+                    reflection.direct_implemented_interfaces.insert(interface);
+                    reflection.all_implemented_interfaces.insert(interface);
+                    reflection.names.insert(interface.lower, interface);
                 }
             }
 
@@ -165,7 +197,11 @@ pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Co
 pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&r#trait.attributes, context),
-        name: ClassLikeName::Trait(Name::new(*context.semantics.names.get(&r#trait.name), r#trait.name.span)),
+        name: {
+            let value = *context.names.get(&r#trait.name);
+
+            ClassLikeName::Trait(Name { value, lower: context.interner.lowered(&value), span: r#trait.name.span() })
+        },
         inheritance: InheritanceReflection::default(),
         backing_type: None,
         is_final: false,
@@ -190,17 +226,25 @@ pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>)
 pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
         attribute_reflections: reflect_attributes(&r#enum.attributes, context),
-        name: ClassLikeName::Enum(Name::new(*context.semantics.names.get(&r#enum.name), r#enum.name.span)),
+        name: {
+            let value = *context.names.get(&r#enum.name);
+
+            ClassLikeName::Enum(Name { value, lower: context.interner.lowered(&value), span: r#enum.name.span() })
+        },
         inheritance: {
             let mut reflection = InheritanceReflection::default();
 
             if let Some(impelemnts) = &r#enum.implements {
                 for interface in impelemnts.types.iter() {
-                    let name = Name::new(*context.semantics.names.get(interface), interface.span());
+                    let interface = {
+                        let value = *context.names.get(&interface);
 
-                    reflection.direct_implemented_interfaces.insert(name);
-                    reflection.all_implemented_interfaces.insert(name);
-                    reflection.names.insert(name.value, name);
+                        Name { value, lower: context.interner.lowered(&value), span: interface.span() }
+                    };
+
+                    reflection.direct_implemented_interfaces.insert(interface);
+                    reflection.all_implemented_interfaces.insert(interface);
+                    reflection.names.insert(interface.lower, interface);
                 }
             }
 
@@ -238,10 +282,11 @@ fn reflect_class_like_members<'ast>(
         match &member {
             ClassLikeMember::TraitUse(trait_use) => {
                 for trait_name in trait_use.trait_names.iter() {
-                    let name = Name::new(*context.semantics.names.get(trait_name), trait_name.span());
+                    let value = *context.names.get(trait_name);
+                    let name = Name { value, lower: context.interner.lowered(&value), span: trait_name.span() };
 
                     reflection.used_traits.insert(name.value);
-                    reflection.used_trait_names.insert(name.value, name);
+                    reflection.used_trait_names.insert(name.lower, name);
                 }
             }
             ClassLikeMember::Constant(class_like_constant) => {
@@ -309,10 +354,14 @@ fn reflect_class_like_constant<'ast>(
             type_reflection: type_reflection.clone(),
             name: ClassLikeMemberName {
                 class_like: class_like.name,
-                member: Name::new(item.name.value, item.name.span),
+                member: {
+                    let value = item.name.value;
+
+                    Name { value, lower: context.interner.lowered(&value), span: item.name.span }
+                },
             },
             is_final,
-            inferred_type_reflection: mago_typing::infere(context.interner, context.semantics, &item.value),
+            inferred_type_reflection: mago_typing::infere(context.interner, context.source, context.names, &item.value),
             item_span: item.span(),
             definition_span: constant.span(),
         });
@@ -330,7 +379,11 @@ fn reflect_class_like_enum_case<'ast>(
         EnumCaseItem::Unit(enum_case_unit_item) => (
             ClassLikeMemberName {
                 class_like: class_like.name,
-                member: Name::new(enum_case_unit_item.name.value, enum_case_unit_item.name.span),
+                member: Name {
+                    value: enum_case_unit_item.name.value,
+                    lower: context.interner.lowered(&enum_case_unit_item.name.value),
+                    span: enum_case_unit_item.name.span,
+                },
             },
             None,
             false,
@@ -338,9 +391,13 @@ fn reflect_class_like_enum_case<'ast>(
         EnumCaseItem::Backed(enum_case_backed_item) => (
             ClassLikeMemberName {
                 class_like: class_like.name,
-                member: Name::new(enum_case_backed_item.name.value, enum_case_backed_item.name.span),
+                member: Name {
+                    value: enum_case_backed_item.name.value,
+                    lower: context.interner.lowered(&enum_case_backed_item.name.value),
+                    span: enum_case_backed_item.name.span,
+                },
             },
-            Some(mago_typing::infere(context.interner, context.semantics, &enum_case_backed_item.value)),
+            Some(mago_typing::infere(context.interner, context.source, context.names, &enum_case_backed_item.value)),
             true,
         ),
     };
@@ -359,7 +416,8 @@ fn reflect_class_like_method<'ast>(
     method: &'ast Method,
     context: &'ast mut Context<'_>,
 ) -> (Name, FunctionLikeReflection) {
-    let name = Name::new(method.name.value, method.name.span);
+    let name =
+        Name { value: method.name.value, lower: context.interner.lowered(&method.name.value), span: method.name.span };
 
     let (has_yield, has_throws, is_abstract) = match &method.body {
         MethodBody::Abstract(_) => (false, false, true),
@@ -439,19 +497,28 @@ fn reflect_class_like_property<'ast>(
                     PropertyItem::Abstract(item) => (
                         ClassLikeMemberName {
                             class_like: class_like.name,
-                            member: Name::new(item.variable.name, item.variable.span),
+                            member: Name {
+                                value: item.variable.name,
+                                lower: item.variable.name,
+                                span: item.variable.span,
+                            },
                         },
                         None,
                     ),
                     PropertyItem::Concrete(item) => (
                         ClassLikeMemberName {
                             class_like: class_like.name,
-                            member: Name::new(item.variable.name, item.variable.span),
+                            member: Name {
+                                value: item.variable.name,
+                                lower: item.variable.name,
+                                span: item.variable.span,
+                            },
                         },
                         Some(PropertyDefaultValueReflection {
                             inferred_type_reflection: mago_typing::infere(
                                 context.interner,
-                                context.semantics,
+                                context.source,
+                                context.names,
                                 &item.value,
                             ),
                             span: item.value.span(),
@@ -495,17 +562,22 @@ fn reflect_class_like_property<'ast>(
                 PropertyItem::Abstract(item) => (
                     ClassLikeMemberName {
                         class_like: class_like.name,
-                        member: Name::new(item.variable.name, item.variable.span),
+                        member: Name { value: item.variable.name, lower: item.variable.name, span: item.variable.span },
                     },
                     None,
                 ),
                 PropertyItem::Concrete(item) => (
                     ClassLikeMemberName {
                         class_like: class_like.name,
-                        member: Name::new(item.variable.name, item.variable.span),
+                        member: Name { value: item.variable.name, lower: item.variable.name, span: item.variable.span },
                     },
                     Some(PropertyDefaultValueReflection {
-                        inferred_type_reflection: mago_typing::infere(context.interner, context.semantics, &item.value),
+                        inferred_type_reflection: mago_typing::infere(
+                            context.interner,
+                            context.source,
+                            context.names,
+                            &item.value,
+                        ),
                         span: item.value.span(),
                     }),
                 ),
@@ -521,7 +593,9 @@ fn reflect_class_like_property<'ast>(
                 hooks: {
                     let mut map = HashMap::default();
                     for hook in hooked_property.hooks.hooks.iter() {
-                        let hook_name = Name::new(hook.name.value, hook.name.span);
+                        let hook_name =
+                            Name::new(hook.name.value, context.interner.lowered(&hook.name.value), hook.name.span);
+
                         let function_like_name =
                             FunctionLikeName::PropertyHook(name.class_like, name.member, hook_name);
 

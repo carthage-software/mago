@@ -71,7 +71,7 @@ impl CodebaseReflection {
         let mut exists = false;
 
         if let FunctionLikeName::Function(id) = function_like.name {
-            if let Entry::Vacant(e) = self.function_identifiers.entry(id.value) {
+            if let Entry::Vacant(e) = self.function_identifiers.entry(id.lower) {
                 e.insert(function_like.name);
             } else {
                 exists = true;
@@ -95,28 +95,28 @@ impl CodebaseReflection {
 
         match class_like.name {
             ClassLikeName::Class(identifier) => {
-                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.value) {
+                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.lower) {
                     e.insert(class_like.name);
                 } else {
                     exists = true;
                 }
             }
             ClassLikeName::Enum(identifier) => {
-                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.value) {
+                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.lower) {
                     e.insert(class_like.name);
                 } else {
                     exists = true;
                 }
             }
             ClassLikeName::Interface(identifier) => {
-                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.value) {
+                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.lower) {
                     e.insert(class_like.name);
                 } else {
                     exists = true;
                 }
             }
             ClassLikeName::Trait(identifier) => {
-                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.value) {
+                if let Entry::Vacant(e) = self.class_like_names.entry(identifier.lower) {
                     e.insert(class_like.name);
                 } else {
                     exists = true;
@@ -177,9 +177,9 @@ impl CodebaseReflection {
     }
 
     /// Retrieves a function by name, if it exists.
-    pub fn get_function(&self, name: &StringIdentifier) -> Option<&FunctionLikeReflection> {
-        if let Some(identifier) = self.function_identifiers.get(name) {
-            self.function_like_reflections.get(identifier)
+    pub fn get_function(&self, identifier: &StringIdentifier) -> Option<&FunctionLikeReflection> {
+        if let Some(name) = self.function_identifiers.get(identifier) {
+            self.function_like_reflections.get(name)
         } else {
             None
         }

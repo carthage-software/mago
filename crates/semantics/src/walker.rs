@@ -3936,7 +3936,7 @@ fn hint_contains_generator(context: &mut Context<'_>, hint: &Hint) -> bool {
         Hint::Identifier(identifier) => {
             let symbol = context.lookup_name(&identifier.span().start);
 
-            "Generator" == symbol
+            "generator".eq_ignore_ascii_case(symbol)
         }
         Hint::Parenthesized(parenthesized_hint) => hint_contains_generator(context, &parenthesized_hint.hint),
         Hint::Nullable(nullable_hint) => hint_contains_generator(context, &nullable_hint.hint),

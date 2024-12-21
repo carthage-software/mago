@@ -265,13 +265,13 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
         }
     }
 
-    fn walk_in_expression<'ast>(&mut self, expression: &'ast Expression, context: &mut NameContext<'a>) {
-        if let Expression::Identifier(identifier) = expression {
-            if !self.resolved_names.contains(&identifier.span().start) {
-                let (name, imported) = context.resolve_name(NameKind::Constant, identifier.value());
+    fn walk_in_constant_access(&mut self, constant_access: &ConstantAccess, context: &mut NameContext<'a>) {
+        let identifier = &constant_access.name;
 
-                self.resolved_names.insert_at(identifier.span().start, name, imported);
-            }
+        if !self.resolved_names.contains(&identifier.span().start) {
+            let (name, imported) = context.resolve_name(NameKind::Constant, identifier.value());
+
+            self.resolved_names.insert_at(identifier.span().start, name, imported);
         }
     }
 

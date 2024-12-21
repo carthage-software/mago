@@ -52,7 +52,7 @@ impl<'a> Walker<LintContext<'a>> for StrStartsWithRule {
             return;
         };
 
-        let function_name = context.lookup_function_name(function_identifier);
+        let function_name = context.resolve_function_name(function_identifier);
         if function_name != STRPOS {
             return;
         }

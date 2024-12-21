@@ -24,6 +24,7 @@ mago-ast-utils = { workspace = true }
 mago-names = { workspace = true }
 mago-source = { workspace = true }
 mago-symbol-table = { workspace = true }
+mago-reflection = { workspace = true }
 mago-walker = { workspace = true }
 mago-casing = { workspace = true }
 ahash = { workspace = true }

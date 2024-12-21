@@ -16,28 +16,17 @@ impl RedundantFinalMethodModifierRule {
             return;
         };
 
-        let (class_like_kind, class_like_name, class_like_fqcn, class_like_span) =
-            context.get_class_like_details(method);
-
         let method_name = context.interner.lookup(&method.name.value);
 
         let message = if in_enum {
-            format!(
-                "The `final` modifier on method `{}` is redundant in enum `{}` as enums cannot be extended.",
-                method_name, class_like_name
-            )
+            format!("The `final` modifier on enum method `{}` is redundant as enums cannot be extended.", method_name,)
         } else {
-            format!(
-                "The `final` modifier on method `{}` is redundant as the class `{}` is already final.",
-                method_name, class_like_name
-            )
+            format!("The `final` modifier on method `{}` is redundant as the class is already final.", method_name,)
         };
 
         let issue = Issue::new(context.level(), message)
             .with_annotations([
-                Annotation::primary(final_modifier.span()).with_message("This `final` modifier is redundant."),
-                Annotation::secondary(class_like_span)
-                    .with_message(format!("{} `{}` defined here.", class_like_kind, class_like_fqcn)),
+                Annotation::primary(final_modifier.span()).with_message("This `final` modifier is redundant.")
             ])
             .with_help("Remove the redundant `final` modifier.");
 

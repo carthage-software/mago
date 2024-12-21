@@ -4,6 +4,8 @@ includes = []
 excludes = []
 
 [linter]
+default_plugins = false
+plugins = ["analysis"]
 # plugins = ["symfony", "laravel", "phpunit"]
 
 # This rule is disabled by default because it is experimental, enable it if you want to have a peek at it.

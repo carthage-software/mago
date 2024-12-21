@@ -52,3 +52,5 @@ pub static CURRENT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         std::process::exit(1);
     })
 });
+
+include!("../stubs/map.rs");

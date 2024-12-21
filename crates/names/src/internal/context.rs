@@ -49,6 +49,10 @@ impl<'a> NameContext<'a> {
 
     pub fn get_namespaced_identifier(&mut self, identifier: &LocalIdentifier) -> StringIdentifier {
         if let Some(mut namespaced) = self.get_namespace_name() {
+            if namespaced.is_empty() {
+                return identifier.value;
+            }
+
             namespaced.push('\\');
             namespaced.push_str(self.interner.lookup(&identifier.value));
 
@@ -63,21 +67,24 @@ impl<'a> NameContext<'a> {
             self.name_resolution_contexts.last().expect("expected there to be at least one name resolution context");
 
         let namespace_name = self.interner.lookup(&namespace);
-
         self.name_resolution_contexts.push(NameResolutionContext {
-            namespace_name: namespace_name.to_string(),
+            namespace_name: namespace_name.to_owned(),
             default_aliases: previous_context.default_aliases.clone(),
             function_aliases: previous_context.function_aliases.clone(),
             constant_aliases: previous_context.constant_aliases.clone(),
         });
 
         self.namespace_name = Some(if let Some(mut previous_namespace) = self.namespace_name.clone() {
-            previous_namespace.push('\\');
-            previous_namespace.push_str(namespace_name);
+            if !previous_namespace.is_empty() {
+                previous_namespace.push('\\');
+                previous_namespace.push_str(namespace_name);
 
-            previous_namespace
+                previous_namespace
+            } else {
+                namespace_name.to_owned()
+            }
         } else {
-            namespace_name.to_string()
+            namespace_name.to_owned()
         });
     }
 
@@ -95,12 +102,12 @@ impl<'a> NameContext<'a> {
         let name = self.interner.lookup(&name_id);
 
         let alias = match alias_id {
-            Some(alias_id) => self.interner.lookup(&alias_id).to_string(),
+            Some(alias_id) => self.interner.lookup(&alias_id).to_ascii_lowercase(),
             None => {
                 if let Some(last_backslash_pos) = name.rfind('\\') {
-                    name[last_backslash_pos + 1..].to_string()
+                    name[last_backslash_pos + 1..].to_ascii_lowercase()
                 } else {
-                    name.to_string()
+                    name.to_ascii_lowercase()
                 }
             }
         };
@@ -111,28 +118,32 @@ impl<'a> NameContext<'a> {
             .expect("expected there to be at least one resolution context in the context");
 
         match kind {
-            NameKind::Default => context.default_aliases.insert(alias, name.to_string()),
-            NameKind::Function => context.function_aliases.insert(alias, name.to_string()),
-            NameKind::Constant => context.constant_aliases.insert(alias, name.to_string()),
+            NameKind::Default => context.default_aliases.insert(alias, name.to_owned()),
+            NameKind::Function => context.function_aliases.insert(alias, name.to_owned()),
+            NameKind::Constant => context.constant_aliases.insert(alias, name.to_owned()),
         };
     }
 
     pub fn resolve_name(&mut self, kind: NameKind, name_id: StringIdentifier) -> (StringIdentifier, bool) {
-        let name = self.interner.lookup(&name_id).to_string();
+        let name = self.interner.lookup(&name_id);
 
         if let Some(stripped) = name.strip_prefix('\\') {
             return (self.interner.intern(stripped), true);
         }
 
-        if let Some(alias) = self.resolve_alias(kind, name.as_str()) {
+        if let Some(alias) = self.resolve_alias(kind, name) {
             return (alias, true);
         }
 
         match self.get_namespace_name() {
             Some(namespace_name) => {
+                if namespace_name.is_empty() {
+                    return (name_id, false);
+                }
+
                 let mut resolved = namespace_name.clone();
                 resolved.push('\\');
-                resolved.push_str(name.as_str());
+                resolved.push_str(name);
 
                 (self.interner.intern(resolved), false)
             }
@@ -148,10 +159,10 @@ impl<'a> NameContext<'a> {
 
         let parts = name.split('\\').collect::<Vec<_>>();
         let first_part = parts.first().expect("expected there to be at least one part in the name");
+        let first_part_lower = first_part.to_ascii_lowercase();
 
         if parts.len() > 1 {
             let suffix = parts[1..].join("\\");
-            let first_part_lower = first_part.to_ascii_lowercase();
 
             let alias = if first_part_lower == "namespace" {
                 if let Some(namespace_name) = &self.namespace_name {
@@ -164,7 +175,7 @@ impl<'a> NameContext<'a> {
 
                 return Some(self.interner.intern(suffix));
             } else {
-                context.default_aliases.get(*first_part)
+                context.default_aliases.get(first_part_lower.as_str())
             };
 
             if let Some(alias) = alias {
@@ -172,13 +183,13 @@ impl<'a> NameContext<'a> {
                 resolved.push('\\');
                 resolved.push_str(&suffix);
 
-                return Some(self.interner.intern(alias));
+                return Some(self.interner.intern(resolved));
             }
         } else {
             let alias = match kind {
-                NameKind::Default => context.default_aliases.get(*first_part),
-                NameKind::Function => context.function_aliases.get(*first_part),
-                NameKind::Constant => context.constant_aliases.get(*first_part),
+                NameKind::Default => context.default_aliases.get(first_part_lower.as_str()),
+                NameKind::Function => context.function_aliases.get(first_part_lower.as_str()),
+                NameKind::Constant => context.constant_aliases.get(first_part_lower.as_str()),
             };
 
             if let Some(resolved) = alias {

@@ -74,6 +74,7 @@ impl<'a> Format<'a> for Expression {
                     }
                 }
                 Expression::Access(a) => a.format(f),
+                Expression::ConstantAccess(a) => a.format(f),
                 Expression::ClosureCreation(c) => c.format(f),
                 Expression::Parent(k) => k.format(f),
                 Expression::Static(k) => k.format(f),
@@ -654,6 +655,12 @@ impl<'a> Format<'a> for ClassLikeConstantSelector {
                 ClassLikeConstantSelector::Expression(s) => s.format(f),
             }
         })
+    }
+}
+
+impl<'a> Format<'a> for ConstantAccess {
+    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        wrap!(f, self, ConstantAccess, { self.name.format(f) })
     }
 }
 

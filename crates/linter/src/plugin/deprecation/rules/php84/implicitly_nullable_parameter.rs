@@ -43,7 +43,7 @@ impl<'a> Walker<LintContext<'a>> for ImplicitlyNullableParameterRule {
         };
 
         let parameter_name = context.lookup(&function_like_parameter.variable.name);
-        let current_hint = context.lookup_hint(hint);
+        let current_hint = context.get_readable_hint(hint);
         let replacement_hint = match hint {
             Hint::Union(_) => format!("null|{}", current_hint),
             Hint::Intersection(_) => format!("null|({})", current_hint),

@@ -25,8 +25,6 @@ use mago_names::Names;
 use mago_parser::error::ParseError;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
-use mago_symbol_table::get_symbols;
-use mago_symbol_table::table::SymbolTable;
 use mago_walker::Walker;
 
 use crate::context::Context;
@@ -52,9 +50,6 @@ pub struct Semantics {
 
     /// The resolved names within the source code, used for identifier resolution.
     pub names: Names,
-
-    /// The symbol table containing definitions of classes, functions, constants, etc.
-    pub symbols: SymbolTable,
 
     /// A collection of semantic issues found during analysis, such as invalid inheritance,
     ///  improper returns, duplicate names, etc.
@@ -92,10 +87,6 @@ impl Semantics {
         // This step links identifiers to their declarations, handling scopes and imports.
         let names = Names::resolve(interner, &program);
 
-        // Construct the symbol table from the AST.
-        // The symbol table contains all the symbols defined in the source code.
-        let symbols = get_symbols(interner, &program);
-
         // Perform semantic analysis and collect issues.
         // This includes checks for type correctness, proper usage of constructs, etc.
         let mut context = Context::new(interner, &program, &names);
@@ -103,7 +94,7 @@ impl Semantics {
         let issues = context.take_issue_collection();
 
         // Return the Semantics object containing all analysis results.
-        Self { source, program, parse_error, names, symbols, issues }
+        Self { source, program, parse_error, names, issues }
     }
 
     /// Determines whether the semantic analysis was successful,
@@ -120,11 +111,6 @@ impl Semantics {
     /// Determines whether the source code contains any semantic issues.
     pub fn has_issues(&self) -> bool {
         !self.issues.is_empty()
-    }
-
-    /// Determines whether the source code contains any symbols.
-    pub fn has_symbols(&self) -> bool {
-        !self.symbols.is_empty()
     }
 
     /// Checks if the source code is external, i.e., not a user-defined file.

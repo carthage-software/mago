@@ -82,7 +82,7 @@ impl<'a> Walker<LintContext<'a>> for NoDebugSymbolsRule {
             return;
         };
 
-        let function_name = context.lookup_function_name(function_identifier);
+        let function_name = context.resolve_function_name(function_identifier);
 
         if DEBUG_FUNCTIONS.contains(&function_name) {
             let issue = Issue::new(context.level(), format!("Usage of debug function `{}` detected.", function_name))

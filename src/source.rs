@@ -9,16 +9,27 @@ use mago_interner::ThreadedInterner;
 use mago_source::SourceManager;
 
 use crate::config::source::SourceConfiguration;
+use crate::consts::PHP_STUBS;
 use crate::error::Error;
 
 /// Load the source manager by scanning and processing the sources
 /// as per the given configuration.
 ///
+/// # Arguments
+///
+/// * `interner` - The interner to use for string interning.
+/// * `configuration` - The configuration to use for loading the sources.
+/// * `include_stubs` - Whether to include stubs in the source manager.
+///
 /// # Returns
 ///
 /// A `Result` containing the new source manager or a `SourceError` if
 /// an error occurred during the build process.
-pub async fn load(interner: &ThreadedInterner, configuration: &SourceConfiguration) -> Result<SourceManager, Error> {
+pub async fn load(
+    interner: &ThreadedInterner,
+    configuration: &SourceConfiguration,
+    include_stubs: bool,
+) -> Result<SourceManager, Error> {
     let SourceConfiguration { root, paths, includes, excludes, extensions } = configuration;
 
     let mut starting_paths = Vec::new();
@@ -42,7 +53,7 @@ pub async fn load(interner: &ThreadedInterner, configuration: &SourceConfigurati
     let excludes_set: HashSet<&String> = excludes.iter().collect();
     let extensions: HashSet<&String> = extensions.iter().collect();
 
-    let manager = SourceManager::new(interner.clone());
+    let mut manager = SourceManager::new(interner.clone());
     for (path, user_defined) in starting_paths.into_iter() {
         let mut entries = WalkDir::new(path)
             // filter out .git directories
@@ -72,6 +83,12 @@ pub async fn load(interner: &ThreadedInterner, configuration: &SourceConfigurati
 
                 manager.insert_path(name_str, path.clone(), user_defined);
             }
+        }
+    }
+
+    if include_stubs {
+        for (stub, content) in PHP_STUBS {
+            manager.insert_content(stub.to_owned(), content.to_owned(), false);
         }
     }
 

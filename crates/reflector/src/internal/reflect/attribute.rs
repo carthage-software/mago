@@ -16,7 +16,11 @@ pub fn reflect_attributes<'ast>(
     for attribute_list in attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
             let reflection = AttributeReflection {
-                name: Name { value: *context.semantics.names.get(&attribute.name), span: attribute.name.span() },
+                name: {
+                    let value = *context.names.get(&attribute.name);
+
+                    Name { value, lower: context.interner.lowered(&value), span: attribute.name.span() }
+                },
                 arguments: reflect_attribute_arguments(&attribute.arguments, context),
                 span: attribute.span(),
             };
@@ -40,12 +44,16 @@ pub fn reflect_attribute_arguments<'ast>(
     for argument in argument_list.arguments.iter() {
         arguments.push(match &argument {
             Argument::Positional(arg) => AttributeArgumentReflection::Positional {
-                value_type_reflection: mago_typing::infere(context.interner, context.semantics, &arg.value),
+                value_type_reflection: mago_typing::infere(context.interner, context.source, context.names, &arg.value),
                 span: arg.span(),
             },
             Argument::Named(arg) => AttributeArgumentReflection::Named {
-                name: Name { value: arg.name.value, span: arg.name.span },
-                value_type_reflection: mago_typing::infere(context.interner, context.semantics, &arg.value),
+                name: {
+                    let value = arg.name.value;
+
+                    Name { value, lower: context.interner.lowered(&value), span: arg.name.span }
+                },
+                value_type_reflection: mago_typing::infere(context.interner, context.source, context.names, &arg.value),
                 span: arg.span(),
             },
         });

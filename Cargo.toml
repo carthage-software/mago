@@ -68,7 +68,7 @@ codespan-reporting = { version = "0.11.1", features = [
     "serialization",
 ] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-config = { version = "0.14.0", features = ["toml"] }
+config = { version = "0.15.4", features = ["toml"] }
 toml = { version = "0.8.19" }
 num_cpus = "1.16.0"
 regex = "1.11.0"
@@ -116,6 +116,7 @@ mago-feedback = { workspace = true }
 mago-semantics = { workspace = true }
 mago-linter = { workspace = true }
 mago-reflection = { workspace = true }
+mago-names = { workspace = true }
 mago-reflector = { workspace = true }
 mago-span = { workspace = true }
 mago-formatter = { workspace = true }

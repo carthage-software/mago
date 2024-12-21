@@ -26,7 +26,7 @@ impl<'a> Walker<LintContext<'a>> for DisallowedFunctionsRule {
             return;
         };
 
-        let function_name = context.lookup_function_name(identifier);
+        let function_name = context.resolve_function_name(identifier);
 
         // Check if the function is disallowed
         if let Some(disallowed_functions) = context.option("functions").and_then(|o| o.as_array()) {

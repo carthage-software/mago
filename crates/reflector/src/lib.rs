@@ -1,6 +1,8 @@
+use mago_ast::Program;
 use mago_interner::ThreadedInterner;
+use mago_names::Names;
 use mago_reflection::CodebaseReflection;
-use mago_semantics::Semantics;
+use mago_source::Source;
 use mago_walker::*;
 
 use crate::internal::context::Context;
@@ -9,23 +11,25 @@ use crate::internal::walker::ReflectionWalker;
 mod internal;
 mod populator;
 
-/// Construct a codebase reflection from the given semantics.
+/// Construct a codebase reflection from the given program.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// - `interner`: The interner to use for string interning.
-/// - `semantics`: The semantics of the program.
+/// - `interner`: The `ThreadedInterner` instance used for string interning.
+/// - `source`: The `Source` instance containing the source code of the program.
+/// - `program`: The `Program` instance to reflect.
+/// - `names`: The `Names` instance containing the names of the program.
 ///
 /// # Returns
 ///
 /// A reflection result containing the reflection of the codebase and any issues found during reflection.
 #[inline]
-pub fn reflect(interner: &ThreadedInterner, semantics: &Semantics) -> CodebaseReflection {
+pub fn reflect(interner: &ThreadedInterner, source: &Source, program: &Program, names: &Names) -> CodebaseReflection {
     let mut walker = ReflectionWalker::new();
 
-    let mut context = Context::new(interner, semantics);
+    let mut context = Context::new(interner, source, names);
 
-    walker.walk_program(&semantics.program, &mut context);
+    walker.walk_program(program, &mut context);
 
     walker.reflection
 }

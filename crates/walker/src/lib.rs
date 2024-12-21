@@ -1316,6 +1316,7 @@ generate_ast_walker! {
             Expression::Clone(clone) => walker.walk_clone(clone.as_ref(), context),
             Expression::Call(call) => walker.walk_call(call, context),
             Expression::Access(access) => walker.walk_access(access.as_ref(), context),
+            Expression::ConstantAccess(expr) => walker.walk_constant_access(expr, context),
             Expression::ClosureCreation(closure_creation) => {
                 walker.walk_closure_creation(closure_creation.as_ref(), context)
             }
@@ -1881,6 +1882,10 @@ generate_ast_walker! {
 
     ClassLikeMemberExpressionSelector as class_like_member_expression_selector => {
         walker.walk_expression(&class_like_member_expression_selector.expression, context);
+    }
+
+    ConstantAccess as constant_access => {
+        walker.walk_identifier(&constant_access.name, context);
     }
 
     Access as access => {

@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use crate::rule::Rule;
 
+pub mod analysis;
 pub mod best_practices;
 pub mod comment;
 pub mod consistency;
@@ -27,6 +28,7 @@ macro_rules! foreach_plugin {
         $do($crate::plugin::naming::NamingPlugin);
         $do($crate::plugin::phpunit::PHPUnitPlugin);
         $do($crate::plugin::redundancy::RedundancyPlugin);
+        $do($crate::plugin::analysis::AnalysisPlugin);
         $do($crate::plugin::safety::SafetyPlugin);
         $do($crate::plugin::strictness::StrictnessPlugin);
         $do($crate::plugin::symfony::SymfonyPlugin);

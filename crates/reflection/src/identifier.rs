@@ -7,7 +7,11 @@ use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Name {
+    /// The name of the symbol.
     pub value: StringIdentifier,
+    /// The lowercased name of the symbol.
+    pub lower: StringIdentifier,
+    /// The span of the symbol name.
     pub span: Span,
 }
 
@@ -36,8 +40,8 @@ pub enum FunctionLikeName {
 }
 
 impl Name {
-    pub fn new(value: StringIdentifier, span: Span) -> Self {
-        Self { value, span }
+    pub fn new(value: StringIdentifier, lower: StringIdentifier, span: Span) -> Self {
+        Name { value, lower, span }
     }
 }
 
@@ -80,6 +84,10 @@ impl ClassLikeMemberName {
 }
 
 impl FunctionLikeName {
+    pub fn is_function(&self) -> bool {
+        matches!(self, FunctionLikeName::Function(_))
+    }
+
     pub fn get_key(&self, interner: &ThreadedInterner) -> String {
         match self {
             FunctionLikeName::Function(name) => interner.lookup(&name.value).to_string(),

@@ -1,0 +1,33 @@
+<?php
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS128L_KEYBYTES = 16;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS128L_NSECBYTES = 0;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS128L_NPUBBYTES = 16;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS128L_ABYTES = 32;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS256_KEYBYTES = 32;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS256_NSECBYTES = 0;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS256_NPUBBYTES = 32;
+/**
+ * @since 8.4
+ */
+const SODIUM_CRYPTO_AEAD_AEGIS256_ABYTES = 32;

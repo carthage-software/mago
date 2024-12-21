@@ -1,2 +1,3 @@
 /crates/wasm/pkg
 /target
+/stubs/map.rs
