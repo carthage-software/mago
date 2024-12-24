@@ -1,13 +1,8 @@
-use std::path::Path;
-use std::path::PathBuf;
-
 use ahash::HashSet;
-use async_walkdir::Filtering;
-use async_walkdir::WalkDir;
-use futures::StreamExt;
-
 use mago_interner::ThreadedInterner;
 use mago_source::SourceManager;
+use std::path::Path;
+use tracing::debug;
 
 use crate::config::source::SourceConfiguration;
 use crate::consts::PHP_STUBS;
@@ -16,7 +11,7 @@ use crate::error::Error;
 /// Load the source manager by scanning and processing the sources
 /// as per the given configuration.
 ///
-/// # Arguments
+/// #_Arguments
 ///
 /// * `interner` - The interner to use for string interning.
 /// * `configuration` - The configuration to use for loading the sources.
@@ -33,85 +28,62 @@ pub async fn load(
 ) -> Result<SourceManager, Error> {
     let SourceConfiguration { root, paths, includes, excludes, extensions } = configuration;
 
-    let mut starting_paths = Vec::new();
-
-    if paths.is_empty() {
-        starting_paths.push((root.clone(), true));
-    } else {
-        for source in paths {
-            starting_paths.push((source.clone(), true));
-        }
-    }
-
-    for include in includes {
-        starting_paths.push((include.clone(), false));
-    }
-
-    if paths.is_empty() && includes.is_empty() {
-        starting_paths.push((root.clone(), true));
-    }
-
-    let excludes_set: HashSet<Exclusion> = excludes
-        .iter()
-        .map(|exclude| {
-            // if it contains a wildcard, treat it as a pattern
-            if exclude.contains('*') {
-                Exclusion::Pattern(exclude.clone())
-            } else {
-                let path = Path::new(exclude);
-
-                if path.is_absolute() {
-                    Exclusion::Path(path.to_path_buf())
-                } else {
-                    Exclusion::Path(root.join(path))
-                }
-            }
-        })
-        .collect();
-
-    let extensions: HashSet<&String> = extensions.iter().collect();
-
     let manager = SourceManager::new(interner.clone());
-    for (path, user_defined) in starting_paths.into_iter() {
-        let mut entries = WalkDir::new(path)
-            // filter out .git directories
-            .filter(|entry| async move {
-                if entry.path().starts_with(".") {
-                    Filtering::IgnoreDir
-                } else {
-                    Filtering::Continue
+    let extensions: HashSet<&String> = extensions.iter().collect();
+    let has_paths = !paths.is_empty();
+    let has_includes = !includes.is_empty();
+    let has_excludes = !excludes.is_empty();
+
+    let entries = jwalk::WalkDir::new(root.clone()).process_read_dir(|_, _, _, children| {
+        children.iter_mut().for_each(|dir_entry_result| {
+            if let Ok(dir_entry) = dir_entry_result {
+                if dir_entry.path().starts_with(".") || dir_entry.file_name.eq_ignore_ascii_case("node_modules") {
+                    dir_entry.read_children_path = None;
                 }
-            });
-
-        // Check for errors after processing all entries in the current path
-        while let Some(entry) = entries.next().await {
-            let path = entry?.path();
-            if !path.is_file() {
-                continue;
             }
+        });
+    });
 
-            // Skip user-defined sources if they are included in the `includes` list.
-            if user_defined && includes.iter().any(|include| path.starts_with(include)) {
-                continue;
-            }
-
-            // Skip excluded files and directories.
-            if is_excluded(&path, &excludes_set) {
-                continue;
-            }
-
-            // Skip files that do not have an accepted extension.
-            if !is_accepted_file(&path, &extensions) {
-                continue;
-            }
-
-            let name = match path.strip_prefix(root) {
-                Ok(rel_path) => rel_path.display().to_string(),
-                Err(_) => path.display().to_string(),
-            };
-
-            manager.insert_path(name, path.clone(), user_defined);
+    for entry in entries {
+        if let Err(_) = entry {
+            continue;
         }
+
+        let path = entry.unwrap().path();
+
+        if !path.is_file() {
+            continue;
+        }
+
+        if !is_accepted_file(&path, &extensions) {
+            continue;
+        }
+
+        let name = match path.strip_prefix(root.clone()) {
+            Ok(rel_path) => rel_path.display().to_string(),
+            Err(_) => path.display().to_string(),
+        };
+
+        if has_excludes
+            && excludes.iter().any(|p| {
+                name.starts_with(p)
+                    || glob_match::glob_match(p, name.as_str())
+                    || glob_match::glob_match(p, path.to_string_lossy().as_ref())
+            })
+        {
+            mago_feedback::debug!("Skipping: {:?}", name);
+            continue;
+        }
+
+        let is_path = has_paths && paths.iter().any(|p| path.starts_with(p));
+
+        let is_include = has_includes && includes.iter().any(|p| path.starts_with(p));
+
+        if !is_path && !is_include {
+            continue;
+        }
+
+        manager.insert_path(name, path.clone(), if is_include { false } else { true });
     }
 
     if include_stubs {
@@ -123,28 +95,10 @@ pub async fn load(
     Ok(manager)
 }
 
-fn is_excluded(path: &Path, excludes: &HashSet<Exclusion>) -> bool {
-    for exclusion in excludes {
-        return match exclusion {
-            Exclusion::Path(p) if path.starts_with(p) => true,
-            Exclusion::Pattern(p) if glob_match::glob_match(p, path.to_string_lossy().as_ref()) => true,
-            _ => continue,
-        };
-    }
-
-    false
-}
-
 fn is_accepted_file(path: &Path, extensions: &HashSet<&String>) -> bool {
     if extensions.is_empty() {
         path.extension().and_then(|s| s.to_str()).map(|ext| ext.eq_ignore_ascii_case("php")).unwrap_or(false)
     } else {
         path.extension().and_then(|s| s.to_str()).map(|ext| extensions.contains(&ext.to_string())).unwrap_or(false)
     }
-}
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-enum Exclusion {
-    Path(PathBuf),
-    Pattern(String),
 }
