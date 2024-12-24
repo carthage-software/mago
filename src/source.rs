@@ -2,7 +2,6 @@ use ahash::HashSet;
 use mago_interner::ThreadedInterner;
 use mago_source::SourceManager;
 use std::path::Path;
-use tracing::debug;
 
 use crate::config::source::SourceConfiguration;
 use crate::consts::PHP_STUBS;
