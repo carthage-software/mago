@@ -10,7 +10,7 @@ use crate::error::Error;
 /// Load the source manager by scanning and processing the sources
 /// as per the given configuration.
 ///
-/// #_Arguments
+/// # Arguments
 ///
 /// * `interner` - The interner to use for string interning.
 /// * `configuration` - The configuration to use for loading the sources.
