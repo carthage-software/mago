@@ -1,2 +1,4 @@
 /crates/wasm/pkg
 /target
+
+/vendor/
