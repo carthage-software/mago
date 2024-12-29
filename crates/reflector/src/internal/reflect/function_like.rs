@@ -39,6 +39,7 @@ pub fn reflect_function<'ast>(
         is_overriding: false,
         span: function.span(),
         is_populated: false,
+        issues: Default::default(),
     }
 }
 
@@ -67,6 +68,7 @@ pub fn reflect_closure<'ast>(
         is_overriding: false,
         span: closure.span(),
         is_populated: false,
+        issues: Default::default(),
     }
 }
 
@@ -99,6 +101,7 @@ pub fn reflect_arrow_function<'ast>(
         is_overriding: false,
         span: arrow_function.span(),
         is_populated: false,
+        issues: Default::default(),
     }
 }
 
@@ -131,6 +134,7 @@ pub fn reflect_function_like_parameter<'ast>(
             type_reflection: mago_typing::infere(context.interner, context.source, context.names, &d.value),
             span: d.span(),
         }),
+        span: parameter.span(),
     }
 }
 

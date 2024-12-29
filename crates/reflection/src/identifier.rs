@@ -3,6 +3,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_interner::StringIdentifier;
+use mago_span::HasSpan;
 use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -108,6 +109,42 @@ impl FunctionLikeName {
                     span.end.offset
                 )
             }
+        }
+    }
+}
+
+impl HasSpan for Name {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ClassLikeName {
+    fn span(&self) -> Span {
+        match self {
+            ClassLikeName::Class(name) => name.span,
+            ClassLikeName::Interface(name) => name.span,
+            ClassLikeName::Enum(name) => name.span,
+            ClassLikeName::Trait(name) => name.span,
+            ClassLikeName::AnonymousClass(span) => *span,
+        }
+    }
+}
+
+impl HasSpan for ClassLikeMemberName {
+    fn span(&self) -> Span {
+        self.member.span
+    }
+}
+
+impl HasSpan for FunctionLikeName {
+    fn span(&self) -> Span {
+        match self {
+            FunctionLikeName::Function(name) => name.span,
+            FunctionLikeName::Method(_, name) => name.span,
+            FunctionLikeName::PropertyHook(_, _, name) => name.span,
+            FunctionLikeName::Closure(span) => *span,
+            FunctionLikeName::ArrowFunction(span) => *span,
         }
     }
 }

@@ -69,6 +69,7 @@ pub fn merge(
         reflection.register_constant(interner, constant);
     }
 
+    reflection.populated = false;
     reflection
 }
 

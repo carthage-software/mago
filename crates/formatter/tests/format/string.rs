@@ -1,12 +1,11 @@
 use indoc::indoc;
 
 use mago_formatter::settings::FormatSettings;
-use mago_source::error::SourceError;
 
 use crate::test_format;
 
 #[test]
-pub fn test_single_quote() -> Result<(), SourceError> {
+pub fn test_single_quote() {
     let code = indoc! {r#"
         <?php
 
@@ -37,7 +36,7 @@ pub fn test_single_quote() -> Result<(), SourceError> {
 }
 
 #[test]
-pub fn test_double_quote() -> Result<(), SourceError> {
+pub fn test_double_quote() {
     let code = indoc! {r#"
         <?php
 

@@ -24,7 +24,14 @@ impl Rule for NoEmptyCommentsRule {
 
 impl<'a> Walker<LintContext<'a>> for NoEmptyCommentsRule {
     fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+        let preseve_single_line =
+            context.option("preserve-single-line-comments").and_then(|c| c.as_bool()).unwrap_or(false);
+
         for trivia in program.trivia.iter() {
+            if trivia.kind.is_single_line_comment() && preseve_single_line {
+                continue;
+            }
+
             if let Some(content) = comment_content(trivia, context) {
                 let content = content.trim();
                 if !content.is_empty() {

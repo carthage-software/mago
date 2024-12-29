@@ -43,9 +43,17 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
         }
     }
 
-    fn walk_in_assignment<'ast>(&self, assignment: &'ast Assignment, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
-            self.report(rhs, context);
+    fn walk_in_statement_expression(&self, statement_expression: &ExpressionStatement, context: &mut LintContext<'a>) {
+        if let Expression::Parenthesized(parenthesized) = &statement_expression.expression {
+            self.report(parenthesized, context);
+
+            return;
+        }
+
+        if let Expression::AssignmentOperation(assignment) = &statement_expression.expression {
+            if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
+                self.report(rhs, context);
+            }
         }
     }
 
@@ -88,6 +96,48 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
     ) {
         if let Expression::Parenthesized(condition) = &if_colon_delimited_body_else_if_clause.condition {
             self.report(condition, context);
+        }
+    }
+
+    fn walk_in_function_like_parameter_default_value(
+        &self,
+        function_like_parameter_default_value: &FunctionLikeParameterDefaultValue,
+        context: &mut LintContext<'a>,
+    ) {
+        if let Expression::Parenthesized(value) = &function_like_parameter_default_value.value {
+            self.report(value, context);
+        }
+    }
+
+    fn walk_in_enum_case_backed_item(&self, enum_case_backed_item: &EnumCaseBackedItem, context: &mut LintContext<'a>) {
+        if let Expression::Parenthesized(value) = &enum_case_backed_item.value {
+            self.report(value, context);
+        }
+    }
+
+    fn walk_in_property_concrete_item(
+        &self,
+        property_concrete_item: &PropertyConcreteItem,
+        context: &mut LintContext<'a>,
+    ) {
+        if let Expression::Parenthesized(value) = &property_concrete_item.value {
+            self.report(value, context);
+        }
+    }
+
+    fn walk_in_constant_item(&self, constant_item: &ConstantItem, context: &mut LintContext<'a>) {
+        if let Expression::Parenthesized(value) = &constant_item.value {
+            self.report(value, context);
+        }
+    }
+
+    fn walk_in_class_like_constant_item(
+        &self,
+        class_like_constant_item: &ClassLikeConstantItem,
+        context: &mut LintContext<'a>,
+    ) {
+        if let Expression::Parenthesized(value) = &class_like_constant_item.value {
+            self.report(value, context);
         }
     }
 }

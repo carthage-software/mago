@@ -1,10 +1,10 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-
-use mago_feedback::info;
 use self_update::backends::github::Update;
 use self_update::Status;
+
+use mago_feedback::info;
 
 use crate::consts::*;
 use crate::error::Error;
@@ -12,28 +12,32 @@ use crate::error::Error;
 #[derive(Parser, Debug)]
 #[command(
     name = "self-update",
-    about = "Check for updates or update Mago to the latest version",
-    long_about = r#"The `self-update` command allows you to update Mago to the latest version
-or check if updates are available. By default, it fetches the latest release
-from GitHub and replaces the current binary with the updated version.
+    about = "check for updates or upgrade Mago to the latest version",
+    long_about = r#"
+The `self-update` command helps keep Mago up-to-date by checking for and applying the latest updates.
 
-You can also specify additional options like downloading a specific version
-or suppressing output."#
+This command ensures you are always using the most recent version of Mago with the latest features and fixes.
+"#
 )]
 pub struct SelfUpdateCommand {
-    #[arg(long, short, help = "Check for updates but do not install them")]
+    /// Check for updates but do not install them.
+    #[arg(long, short, help = "check for updates without installing them")]
     pub check: bool,
 
-    #[arg(long, help = "Do not show progress bars")]
+    /// Disable progress bars during the update process.
+    #[arg(long, help = "disable progress bars")]
     pub no_progress: bool,
 
-    #[arg(long, help = "Do not ask for confirmation")]
+    /// Skip confirmation prompts during updates.
+    #[arg(long, help = "skip confirmation prompts")]
     pub no_confirm: bool,
 
-    #[arg(long, help = "Toggle update output information")]
+    /// Suppress update output information.
+    #[arg(long, help = "suppress output information during the update process")]
     pub no_output: bool,
 
-    #[arg(long, help = "Update to a specific version")]
+    /// Update to a specific version by providing the version tag.
+    #[arg(long, help = "update to a specific version", value_name = "VERSION_TAG")]
     pub tag: Option<String>,
 }
 

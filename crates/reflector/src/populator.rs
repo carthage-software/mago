@@ -2,6 +2,8 @@ use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reflection::identifier::ClassLikeName;
+use mago_reflection::identifier::FunctionLikeName;
+use mago_reflection::identifier::Name;
 use mago_reflection::CodebaseReflection;
 
 #[inline(always)]
@@ -10,14 +12,23 @@ pub fn populate(interner: &ThreadedInterner, codebase: &mut CodebaseReflection) 
         return;
     }
 
-    let new_class_like_names = codebase
+    populate_all_class_like_reflections(interner, codebase);
+    populate_all_function_like_reflections(codebase);
+    populate_all_constant_reflections(codebase);
+
+    codebase.populated = true;
+}
+
+#[inline]
+fn populate_all_class_like_reflections(interner: &ThreadedInterner, codebase: &mut CodebaseReflection) {
+    let unpopulated_classlike_names = codebase
         .class_like_reflections
         .iter()
         .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
         .collect::<Vec<_>>();
 
-    for name in &new_class_like_names {
-        if let Some(reflection) = codebase.class_like_reflections.get_mut(name) {
+    for classlike_name in &unpopulated_classlike_names {
+        if let Some(reflection) = codebase.class_like_reflections.get_mut(classlike_name) {
             reflection.properties.declaring_members = Default::default();
             reflection.properties.appering_members = Default::default();
             reflection.methods.declaring_members = Default::default();
@@ -25,39 +36,74 @@ pub fn populate(interner: &ThreadedInterner, codebase: &mut CodebaseReflection) 
         }
     }
 
-    for class_like_name in &new_class_like_names {
-        populate_class_like_reflection(interner, codebase, *class_like_name);
+    for classlike_name in &unpopulated_classlike_names {
+        populate_class_like_reflection(interner, codebase, *classlike_name);
     }
 
     for (classlike_name, classlike_reflection) in &codebase.class_like_reflections {
-        let Some(classlike_name) = classlike_name.inner().map(|v| v.value) else {
+        let Some(classlike_name) = classlike_name.inner().map(|v| v.value).map(|s| interner.lowered(&s)) else {
             continue;
         };
 
         if let Some(parent_class) = &classlike_reflection.inheritance.direct_extended_class {
-            codebase.direct_classlike_descendants.entry(parent_class.value).or_default().insert(classlike_name);
+            let parent_class = interner.lowered(&parent_class.value);
+
+            codebase.direct_classlike_descendants.entry(parent_class).or_default().insert(classlike_name);
         }
 
         for parent_class in &classlike_reflection.inheritance.all_extended_classes {
-            codebase.all_classlike_descendants.entry(parent_class.value).or_default().insert(classlike_name);
+            let parent_class = interner.lowered(&parent_class.value);
+
+            codebase.all_classlike_descendants.entry(parent_class).or_default().insert(classlike_name);
         }
 
         for parent_interface in &classlike_reflection.inheritance.direct_implemented_interfaces {
-            codebase.direct_classlike_descendants.entry(parent_interface.value).or_default().insert(classlike_name);
+            let parent_interface = interner.lowered(&parent_interface.value);
+
+            codebase.direct_classlike_descendants.entry(parent_interface).or_default().insert(classlike_name);
         }
 
         for parent_interface in &classlike_reflection.inheritance.all_extended_interfaces {
-            codebase.all_classlike_descendants.entry(parent_interface.value).or_default().insert(classlike_name);
+            let parent_interface = interner.lowered(&parent_interface.value);
+
+            codebase.all_classlike_descendants.entry(parent_interface).or_default().insert(classlike_name);
         }
 
         for used_trait in &classlike_reflection.used_traits {
-            codebase.all_classlike_descendants.entry(*used_trait).or_default().insert(classlike_name);
+            let used_trait = interner.lowered(used_trait);
+
+            codebase.all_classlike_descendants.entry(used_trait).or_default().insert(classlike_name);
         }
     }
 
     codebase.all_classlike_descendants.shrink_to_fit();
     codebase.direct_classlike_descendants.shrink_to_fit();
-    codebase.populated = true;
+}
+
+#[inline]
+fn populate_all_function_like_reflections(codebase: &mut CodebaseReflection) {
+    let unpopulated_function_like_names = codebase
+        .function_like_reflections
+        .iter()
+        .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
+        .collect::<Vec<_>>();
+
+    for function_like_name in &unpopulated_function_like_names {
+        populate_function_like_reflection(codebase, *function_like_name);
+    }
+}
+
+#[inline]
+fn populate_all_constant_reflections(codebase: &mut CodebaseReflection) {
+    let unpopulated_constant_names = codebase
+        .constant_reflections
+        .iter()
+        .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
+        .collect::<Vec<_>>();
+
+    for constant_name in &unpopulated_constant_names {
+        populate_constant_reflection(codebase, *constant_name);
+    }
 }
 
 #[inline]
@@ -105,6 +151,8 @@ fn populate_class_like_reflection(
     reflection.inheritance.all_extended_classes.shrink_to_fit();
     reflection.inheritance.all_implemented_interfaces.shrink_to_fit();
     reflection.inheritance.names.shrink_to_fit();
+    reflection.inheritance.require_extensions.shrink_to_fit();
+    reflection.inheritance.require_implementations.shrink_to_fit();
     reflection.constants.shrink_to_fit();
     reflection.properties.members.shrink_to_fit();
     reflection.properties.appering_members.shrink_to_fit();
@@ -112,7 +160,6 @@ fn populate_class_like_reflection(
     reflection.methods.members.shrink_to_fit();
     reflection.methods.appering_members.shrink_to_fit();
     reflection.methods.declaring_members.shrink_to_fit();
-
     reflection.is_populated = true;
 
     codebase.class_like_reflections.insert(class_like_name, reflection);
@@ -126,7 +173,7 @@ fn populate_interface_data_from_parent_interface(
     parent_name_id: StringIdentifier,
 ) {
     let parent_name_id = interner.lowered(&parent_name_id);
-    let Some(parent_name) = codebase.class_like_names_lowercase.get(&parent_name_id).cloned() else {
+    let Some(parent_name) = codebase.class_like_names.get(&parent_name_id).cloned() else {
         return;
     };
 
@@ -163,7 +210,7 @@ fn populate_data_from_parent_classlike(
     parent_name_id: StringIdentifier,
 ) {
     let parent_name_id = interner.lowered(&parent_name_id);
-    let Some(parent_name) = codebase.class_like_names_lowercase.get(&parent_name_id).cloned() else {
+    let Some(parent_name) = codebase.class_like_names.get(&parent_name_id).cloned() else {
         return;
     };
 
@@ -178,8 +225,10 @@ fn populate_data_from_parent_classlike(
             continue;
         }
 
+        let identifier = extended_class.value;
+
         reflection.inheritance.all_extended_classes.insert(*extended_class);
-        reflection.inheritance.names.insert(extended_class.value, *extended_class);
+        reflection.inheritance.names.insert(interner.lowered(&identifier), *extended_class);
     }
 
     for implemented_interface in &parent_reflection.inheritance.all_implemented_interfaces {
@@ -187,17 +236,18 @@ fn populate_data_from_parent_classlike(
             continue;
         }
 
+        let identifier = implemented_interface.value;
+
         reflection.inheritance.all_implemented_interfaces.insert(*implemented_interface);
-        reflection.inheritance.names.insert(implemented_interface.value, *implemented_interface);
+        reflection.inheritance.names.insert(interner.lowered(&identifier), *implemented_interface);
     }
 
-    for (used_trait, used_trait_name) in &parent_reflection.used_trait_names {
+    for used_trait in &parent_reflection.used_traits {
         if reflection.used_traits.contains(used_trait) {
             continue;
         }
 
         reflection.used_traits.insert(*used_trait);
-        reflection.used_trait_names.insert(*used_trait, *used_trait_name);
     }
 
     for (constant_name, constant) in &parent_reflection.constants {
@@ -222,7 +272,7 @@ fn populate_data_from_trait(
     trait_name_id: StringIdentifier,
 ) {
     let trait_name_id = interner.lowered(&trait_name_id);
-    let Some(trait_name) = codebase.class_like_names_lowercase.get(&trait_name_id).cloned() else {
+    let Some(trait_name) = codebase.class_like_names.get(&trait_name_id).cloned() else {
         return;
     };
 
@@ -336,4 +386,22 @@ fn inherit_methods_from_parent(reflection: &mut ClassLikeReflection, parent_refl
             reflection.methods.inheritable_members.insert(*method_name, *declaring_class);
         }
     }
+}
+
+#[inline]
+fn populate_function_like_reflection(codebase: &mut CodebaseReflection, function_like_name: FunctionLikeName) {
+    let Some(reflection) = codebase.function_like_reflections.get_mut(&function_like_name) else {
+        return;
+    };
+
+    reflection.is_populated = true;
+}
+
+#[inline]
+fn populate_constant_reflection(codebase: &mut CodebaseReflection, constant_name: Name) {
+    let Some(reflection) = codebase.constant_reflections.get_mut(&constant_name) else {
+        return;
+    };
+
+    reflection.is_populated = true;
 }

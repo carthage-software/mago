@@ -1,3 +1,4 @@
+use mago_source::SourceCategory;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
@@ -117,8 +118,8 @@ impl Symbol {
     }
 
     /// Returns `true` if the symbol is user-defined within the project or comes from an external library.
-    pub fn is_user_defined(&self) -> bool {
-        self.source().is_user_defined()
+    pub const fn category(&self) -> SourceCategory {
+        self.span.start.source.category()
     }
 }
 

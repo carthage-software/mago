@@ -27,31 +27,37 @@ pub const CLAP_STYLING: Styles = Styles::styled()
 #[derive(Parser, Debug)]
 #[command(
     version,
+    author,
     styles = CLAP_STYLING,
-    // Ascii art by Todd Vargo (https://ascii.co.uk/art/fox)
+    about = "the ultimate toolkit for PHP developers – analyze, fix, and refactor your code with style",
     long_about = r#"
---------------------------------------------------------------------------
-  /\   /\            |
- //\\_//\\     ____  | Mago 🦊 is an all-in-one, oxidized PHP toolchain,
- \_     _/    /   /  | built to handle everything from static analysis and
-  / * * \    /^^^]   | refactoring to full project management.
-  \_\O/_/    [   ]   |
-   /   \_    [   /   |
-   \     \_  /  /    |
-    [ [ /  \/ _/     | https://carthage.software/mago
-   _[ [ \  /_/       |
---------------------------------------------------------------------------
-"#,
-)]
+----------------------------------------------------------------------------------------------
+  Welcome to Mago – the ultimate PHP toolkit, reimagined for the modern developer.
+
+  Mago isn’t just a toolchain; it’s your secret weapon for taming PHP projects of any size.
+  Whether you're diving into a legacy codebase or crafting something cutting-edge,
+  Mago equips you with the tools to:
+
+  🚀 Analyze, lint, and fix your code with unmatched speed and precision.
+  🎨 Format your PHP effortlessly for consistent, beautiful code.
+  🔍 Explore your code with powerful AST visualization.
+  🛠 Refactor smarter, not harder, with automated fixes.
+  🌐 Stay ahead with easy updates and blazing-fast performance.
+
+  Designed to make PHP development faster, easier, and just a bit magical.
+
+  Start transforming your workflow today. Learn more at: https://carthage.software/mago
+  ----------------------------------------------------------------------------------------------
+"#)]
 pub enum MagoCommand {
+    #[command(name = "ast")]
+    Ast(AstCommand),
     #[command(name = "lint")]
     Lint(LintCommand),
     #[command(name = "fix")]
     Fix(FixCommand),
     #[command(name = "format")]
     Format(FormatCommand),
-    #[command(name = "ast")]
-    Ast(AstCommand),
     #[command(name = "self-update")]
     SelfUpdate(SelfUpdateCommand),
 }

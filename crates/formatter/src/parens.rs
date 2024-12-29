@@ -74,7 +74,14 @@ impl<'a> Formatter<'a> {
                 // Add parentheses if parent is an unary operator.
                 return true;
             }
-            Some(Node::Conditional(_) | Node::ArrayAppend(_)) => {
+            Some(Node::Conditional(_)) => {
+                if operator.is_logical() || operator.is_comparison() {
+                    return false;
+                }
+
+                return true;
+            }
+            Some(Node::ArrayAppend(_)) => {
                 return true;
             }
             Some(Node::ArrayAccess(access)) => {

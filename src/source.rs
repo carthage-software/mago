@@ -1,5 +1,6 @@
 use ahash::HashSet;
 use mago_interner::ThreadedInterner;
+use mago_source::SourceCategory;
 use mago_source::SourceManager;
 use std::path::Path;
 
@@ -82,12 +83,12 @@ pub async fn load(
             continue;
         }
 
-        manager.insert_path(name, path.clone(), if is_include { false } else { true });
+        manager.insert_path(name, path.clone(), if is_include { SourceCategory::UserDefined } else { SourceCategory::External });
     }
 
     if include_stubs {
         for (stub, content) in PHP_STUBS {
-            manager.insert_content(stub.to_owned(), content.to_owned(), false);
+            manager.insert_content(stub.to_owned(), content.to_owned(), SourceCategory::BuiltIn);
         }
     }
 

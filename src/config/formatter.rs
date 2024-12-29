@@ -92,10 +92,6 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub null_type_hint: Option<NullTypeHint>,
 
-    /// Spacing around binary operators.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub binary_op_spacing: Option<usize>,
-
     /// Spacing in union/intersection types (`A | B` or `A|B`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub type_spacing: Option<usize>,
@@ -112,13 +108,13 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_concatenation: Option<bool>,
 
-    /// Whether to preserve binary operations that are already broken into multiple lines.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub preserve_multiline_binary_operations: Option<bool>,
-
     /// How to format broken method/property chains.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method_chain_breaking_style: Option<MethodChainBreakingStyle>,
+
+    /// Whether to add a line before a binary operator or after if it is broken.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_before_binary_operator: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -148,18 +144,14 @@ impl FormatterConfiguration {
                 .unwrap_or(d.space_before_arrow_function_params),
             static_before_visibility: self.static_before_visibility.unwrap_or(d.static_before_visibility),
             null_type_hint: self.null_type_hint.unwrap_or(d.null_type_hint),
-            binary_op_spacing: self.binary_op_spacing.unwrap_or(d.binary_op_spacing),
             type_spacing: self.type_spacing.unwrap_or(d.type_spacing),
             method_chain_break_threshold: self.method_chain_break_threshold.unwrap_or(d.method_chain_break_threshold),
             break_promoted_properties_list: self
                 .break_promoted_properties_list
                 .unwrap_or(d.break_promoted_properties_list),
             space_concatenation: self.space_concatenation.unwrap_or(d.space_concatenation),
-
-            preserve_multiline_binary_operations: self
-                .preserve_multiline_binary_operations
-                .unwrap_or(d.preserve_multiline_binary_operations),
             method_chain_breaking_style: self.method_chain_breaking_style.unwrap_or(d.method_chain_breaking_style),
+            line_before_binary_operator: self.line_before_binary_operator.unwrap_or(d.line_before_binary_operator),
         }
     }
 }

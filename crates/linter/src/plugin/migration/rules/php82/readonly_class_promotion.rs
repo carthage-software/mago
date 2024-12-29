@@ -32,15 +32,33 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
             return;
         }
 
+        if !reflection.is_final && context.option("final-only").and_then(|c| c.as_bool()).unwrap_or(false) {
+            return;
+        }
+
         let mut all_properties_readonly = true;
         let mut property_count = 0;
         for member in class.members.iter() {
-            if let ClassLikeMember::Property(property) = member {
-                property_count += 1;
-                if !property.modifiers().contains_readonly() {
-                    all_properties_readonly = false;
-                    break;
+            match member {
+                ClassLikeMember::Property(property) => {
+                    property_count += 1;
+                    if !property.modifiers().contains_readonly() {
+                        all_properties_readonly = false;
+                        break;
+                    }
                 }
+                ClassLikeMember::Method(method) => {
+                    for param in method.parameters.parameters.iter() {
+                        if param.is_promoted_property() {
+                            property_count += 1;
+                            if !param.modifiers.contains_readonly() {
+                                all_properties_readonly = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -74,10 +92,22 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
         context.report_with_fix(issue, |plan| {
             // Remove readonly from all properties
             for member in class.members.iter() {
-                if let ClassLikeMember::Property(property) = member {
-                    if let Some(readonly) = property.modifiers().get_readonly() {
-                        plan.delete(readonly.span().to_range(), SafetyClassification::Safe);
+                match member {
+                    ClassLikeMember::Property(property) => {
+                        if let Some(readonly) = property.modifiers().get_readonly() {
+                            plan.delete(readonly.span().to_range(), SafetyClassification::Safe);
+                        }
                     }
+                    ClassLikeMember::Method(method) => {
+                        for param in method.parameters.parameters.iter() {
+                            if param.is_promoted_property() {
+                                if let Some(readonly) = param.modifiers.get_readonly() {
+                                    plan.delete(readonly.span().to_range(), SafetyClassification::Safe);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
 

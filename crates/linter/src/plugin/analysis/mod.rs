@@ -1,3 +1,5 @@
+use crate::plugin::analysis::rules::inheritance::InheritanceRule;
+use crate::plugin::analysis::rules::instantiation::InstantiationRule;
 use crate::plugin::analysis::rules::undefined_constant::UndefinedConstantRule;
 use crate::plugin::analysis::rules::undefined_function::UndefinedFunctionRule;
 
@@ -19,6 +21,11 @@ impl Plugin for AnalysisPlugin {
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![Box::new(UndefinedConstantRule), Box::new(UndefinedFunctionRule)]
+        vec![
+            Box::new(InheritanceRule),
+            Box::new(InstantiationRule),
+            Box::new(UndefinedConstantRule),
+            Box::new(UndefinedFunctionRule),
+        ]
     }
 }

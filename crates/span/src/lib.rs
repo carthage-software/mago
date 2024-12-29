@@ -116,6 +116,14 @@ impl Span {
     pub fn subspan(&self, start: usize, end: usize) -> Span {
         Span::new(self.start.forward(start), self.start.forward(end))
     }
+
+    pub fn is_before(&self, other: impl HasPosition) -> bool {
+        self.end.offset <= other.position().offset
+    }
+
+    pub fn is_after(&self, other: impl HasPosition) -> bool {
+        self.start.offset >= other.position().offset
+    }
 }
 
 impl HasPosition for Position {

@@ -49,7 +49,7 @@ pub trait Rule: for<'a> Walker<LintContext<'a>> + Send + Sync + Debug {
     /// * `configuration` - The configuration for this specific rule.
     /// * `context` - The context for the linting process, which may contain shared state.
     fn lint(&self, program: &Program, context: &mut LintContext<'_>) {
-        if !program.source.is_user_defined() {
+        if !program.source.category().is_user_defined() {
             // Skip linting for non-user-defined programs by default
             //
             // Rules that need to lint non-user-defined programs should override this method

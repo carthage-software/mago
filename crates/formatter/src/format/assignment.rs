@@ -124,6 +124,10 @@ fn choose_layout<'a, 'b>(
     assignment_like_node: &'b AssignmentLikeNode<'a>,
     rhs_expression: &'a Expression,
 ) -> Layout {
+    if let Expression::Parenthesized(parenthesized) = rhs_expression {
+        return choose_layout(f, lhs, assignment_like_node, &parenthesized.expression);
+    }
+
     let is_tail = !is_assignment(rhs_expression);
 
     let should_use_chain_formatting = matches!(assignment_like_node, AssignmentLikeNode::AssignmentOperation(_))
@@ -253,6 +257,10 @@ fn is_property_like_with_short_key<'a>(f: &Formatter<'a>, assignment_like_node: 
 
 /// <https://github.com/prettier/prettier/blob/eebf0e4b5ec8ac24393c56ced4b4819d4c551f31/src/language-js/print/assignment.js#L182>
 fn should_break_after_operator<'a>(f: &Formatter<'a>, rhs_expression: &'a Expression, has_short_key: bool) -> bool {
+    if let Expression::Parenthesized(parenthesized) = rhs_expression {
+        return should_break_after_operator(f, &parenthesized.expression, has_short_key);
+    }
+
     if rhs_expression.is_binary() && !should_inline_logical_or_coalesce_expression(rhs_expression) {
         return true;
     }
@@ -260,14 +268,21 @@ fn should_break_after_operator<'a>(f: &Formatter<'a>, rhs_expression: &'a Expres
     match rhs_expression {
         Expression::Binary(operation) => {
             if let BinaryOperator::Elvis(_) = operation.operator {
-                let condition = operation.lhs.as_ref();
+                let mut condition = operation.lhs.as_ref();
+                while let Expression::Parenthesized(parenthesized) = condition {
+                    condition = &parenthesized.expression;
+                }
 
                 return condition.is_binary() && !should_inline_logical_or_coalesce_expression(condition);
             }
         }
         Expression::Conditional(conditional) => {
-            return conditional.condition.is_binary()
-                && !should_inline_logical_or_coalesce_expression(&conditional.condition);
+            let mut condition = conditional.condition.as_ref();
+            while let Expression::Parenthesized(parenthesized) = condition {
+                condition = &parenthesized.expression;
+            }
+
+            return condition.is_binary() && !should_inline_logical_or_coalesce_expression(condition);
         }
         Expression::AnonymousClass(anonymous_class) => {
             if !anonymous_class.attributes.is_empty() {

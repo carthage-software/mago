@@ -1,12 +1,11 @@
 use indoc::indoc;
 
 use mago_formatter::settings::FormatSettings;
-use mago_source::error::SourceError;
 
 use crate::test_format;
 
 #[test]
-pub fn test_format_expressions() -> Result<(), SourceError> {
+pub fn test_format_expressions() {
     let code = indoc! {r#"
         <?php
 

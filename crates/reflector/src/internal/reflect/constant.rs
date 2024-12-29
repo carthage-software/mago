@@ -16,6 +16,7 @@ pub fn reflect_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<C
             item_span: item.span(),
             definition_span: constant.span(),
             is_populated: false,
+            issues: Default::default(),
         });
     }
 
@@ -52,5 +53,6 @@ pub fn reflect_defined_constant(define: &FunctionCall, context: &mut Context<'_>
         item_span: define.span(),
         definition_span: define.span(),
         is_populated: false,
+        issues: Default::default(),
     })
 }

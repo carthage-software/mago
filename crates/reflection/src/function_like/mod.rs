@@ -1,6 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_reporting::IssueCollection;
+use mago_source::HasSource;
+use mago_source::SourceIdentifier;
+use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::attribute::AttributeReflection;
@@ -9,6 +13,7 @@ use crate::function_like::parameter::FunctionLikeParameterReflection;
 use crate::function_like::r#return::FunctionLikeReturnTypeReflection;
 use crate::identifier::FunctionLikeName;
 use crate::r#type::kind::Template;
+use crate::Reflection;
 
 pub mod parameter;
 pub mod r#return;
@@ -17,7 +22,7 @@ pub mod r#return;
 ///
 /// This includes details about its parameters, return type, attributes, and various properties
 /// like visibility, overrides, and whether it supports specific PHP features.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FunctionLikeReflection {
     /// Attributes associated with this function-like entity.
     pub attribute_reflections: Vec<AttributeReflection>,
@@ -80,26 +85,68 @@ pub struct FunctionLikeReflection {
 
     /// Indicate if this function-like entity is populated.
     pub is_populated: bool,
+
+    /// Collection of issues associated with this function-like entity.
+    pub issues: IssueCollection,
 }
 
 impl FunctionLikeReflection {
+    /// Checks if this entity is a function.
     pub fn is_function(&self) -> bool {
         matches!(self.name, FunctionLikeName::Function(_))
     }
 
+    /// Checks if this entity is a method.
     pub fn is_method(&self) -> bool {
         matches!(self.name, FunctionLikeName::Method(_, _))
     }
 
+    /// Checks if this entity is a property hook.
     pub fn is_property_hook(&self) -> bool {
         matches!(self.name, FunctionLikeName::PropertyHook(_, _, _))
     }
 
+    /// Checks if this entity is a closure.
     pub fn is_closure(&self) -> bool {
         matches!(self.name, FunctionLikeName::Closure(_))
     }
 
+    /// Checks if this entity is an arrow function.
     pub fn is_arrow_function(&self) -> bool {
         matches!(self.name, FunctionLikeName::ArrowFunction(_))
+    }
+}
+
+impl HasSpan for FunctionLikeReflection {
+    /// Returns the span of the function-like entity in the source code.
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSource for FunctionLikeReflection {
+    /// Returns the source identifier of the file containing this function-like entity.
+    fn source(&self) -> SourceIdentifier {
+        self.span.source()
+    }
+}
+
+impl Reflection for FunctionLikeReflection {
+    /// Returns the source category of the function-like entity.
+    fn get_category(&self) -> crate::SourceCategory {
+        self.source().category()
+    }
+
+    /// Indicates whether the function-like entity's reflection data is fully populated.
+    ///
+    /// If `is_populated` is `false`, additional processing may be required to resolve
+    /// all metadata for this entity.
+    fn is_populated(&self) -> bool {
+        self.is_populated
+    }
+
+    /// Returns the issues encountered while processing the function-like entity.
+    fn get_issues(&self) -> &IssueCollection {
+        &self.issues
     }
 }

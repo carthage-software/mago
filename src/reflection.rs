@@ -1,10 +1,12 @@
-use crate::error::Error;
 use mago_interner::ThreadedInterner;
 use mago_names::Names;
 use mago_parser::parse_source;
 use mago_reflection::CodebaseReflection;
+use mago_source::SourceCategory;
 use mago_source::SourceIdentifier;
 use mago_source::SourceManager;
+
+use crate::error::Error;
 
 /// Creates a reflection of all external sources managed by the `SourceManager`.
 ///
@@ -24,12 +26,12 @@ use mago_source::SourceManager;
 /// # Errors
 ///
 /// - Returns an `Error` if any source cannot be loaded, parsed, or reflected.
-pub async fn reflect_all_external_sources(
+pub async fn reflect_all_non_user_defined_sources(
     interner: &ThreadedInterner,
     manager: &SourceManager,
 ) -> Result<CodebaseReflection, Error> {
     // Collect all external source identifiers managed by the SourceManager.
-    let source_ids = manager.external_source_ids().collect::<Vec<_>>();
+    let source_ids = manager.source_ids_except_category(SourceCategory::UserDefined).collect::<Vec<_>>();
     let total_sources = source_ids.len();
 
     // Create a vector to hold the async tasks for reflecting each source.

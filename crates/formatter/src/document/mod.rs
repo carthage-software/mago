@@ -56,18 +56,6 @@ impl Line {
     pub fn hardline() -> Self {
         Self { hard: true, ..Self::default() }
     }
-
-    pub fn literal_line() -> Self {
-        Self { literal: true, ..Self::default() }
-    }
-
-    pub fn hardline_without_break_parent() -> Self {
-        Self { hard: true, ..Self::default() }
-    }
-
-    pub fn literal_line_without_break_parent() -> Self {
-        Self { hard: true, literal: true, ..Self::default() }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -96,11 +84,6 @@ impl<'a> Group<'a> {
         self.id = Some(id);
         self
     }
-
-    pub fn maybe_with_id(mut self, id: Option<GroupIdentifier>) -> Self {
-        self.id = id;
-        self
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -126,10 +109,6 @@ pub struct Fill<'a> {
 }
 
 impl<'a> Fill<'a> {
-    pub fn new(documents: Vec<Document<'a>>) -> Self {
-        Self { parts: documents }
-    }
-
     pub fn drain_out_pair(&mut self) -> (Option<Document<'a>>, Option<Document<'a>>) {
         let content = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
         let whitespace = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
@@ -151,10 +130,6 @@ impl<'a> Fill<'a> {
 
     pub fn parts(&self) -> &[Document<'a>] {
         &self.parts
-    }
-
-    pub fn take_parts(self) -> Vec<Document<'a>> {
-        self.parts
     }
 }
 
@@ -178,11 +153,6 @@ impl<'a> IfBreak<'a> {
         self.group_id = Some(id);
         self
     }
-
-    pub fn maybe_with_id(mut self, id: Option<GroupIdentifier>) -> Self {
-        self.group_id = id;
-        self
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -196,11 +166,6 @@ pub enum Separator {
 
 impl<'a> Document<'a> {
     #[inline]
-    pub fn string(s: &'a str) -> Document<'a> {
-        Document::String(s)
-    }
-
-    #[inline]
     pub fn empty() -> Document<'a> {
         Document::String("")
     }
@@ -208,11 +173,6 @@ impl<'a> Document<'a> {
     #[inline]
     pub fn space() -> Document<'a> {
         Document::String(" ")
-    }
-
-    #[inline]
-    pub fn boxed(self) -> Box<Document<'a>> {
-        Box::new(self)
     }
 
     pub fn can_break(&self) -> bool {

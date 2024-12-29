@@ -10,12 +10,15 @@ use crate::format::block::print_block_of_nodes;
 use crate::format::call_node::print_call_like_node;
 use crate::format::call_node::CallLikeNode;
 use crate::format::class_like::print_class_like_body;
+use crate::format::misc::has_new_line_in_range;
 use crate::format::misc::print_attribute_list_sequence;
 use crate::format::misc::print_colon_delimited_body;
 use crate::format::misc::print_modifiers;
 use crate::format::parameters::print_function_like_parameters;
 use crate::format::statement::print_statement_sequence;
 use crate::settings::*;
+use crate::utils::get_left_side;
+use crate::utils::has_naked_left_side;
 use crate::wrap;
 use crate::Formatter;
 
@@ -1139,13 +1142,65 @@ impl<'a> Format<'a> for Enum {
 
 impl<'a> Format<'a> for Return {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+        fn return_argument_has_leading_comment<'a>(f: &mut Formatter<'a>, argument: &'a Expression) -> bool {
+            if f.has_leading_own_line_comment(argument.span())
+                || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {
+                    has_new_line_in_range(f.source_text, comment.start, comment.end)
+                })
+            {
+                return true;
+            }
+
+            if has_naked_left_side(argument) {
+                let mut left_most = argument;
+                while let Some(new_left_most) = get_left_side(left_most) {
+                    left_most = new_left_most;
+
+                    if f.has_leading_own_line_comment(left_most.span()) {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+
         wrap!(f, self, Return, {
             let mut parts = vec![];
 
             parts.push(self.r#return.format(f));
             if let Some(value) = &self.value {
                 parts.push(Document::space());
-                parts.push(value.format(f));
+
+                if return_argument_has_leading_comment(f, value) {
+                    parts.push(Document::String("("));
+                    parts.push(Document::Indent(vec![Document::Line(Line::hardline()), value.format(f)]));
+                    parts.push(Document::Line(Line::hardline()));
+                    parts.push(Document::String(")"));
+                } else {
+                    let mut expression = value;
+                    while let Expression::Parenthesized(parenthesized) = expression {
+                        expression = &parenthesized.expression;
+                    }
+
+                    if expression.is_binary()
+                        || matches!(expression, Expression::Conditional(conditional) if (
+                            conditional.then.is_none() || (
+                                matches!(conditional.then.as_ref().map(|e| e.as_ref()), Some(Expression::Conditional(_))) &&
+                                matches!(conditional.r#else.as_ref(), Expression::Conditional(_))
+                            )
+                        ))
+                    {
+                        parts.push(Document::Group(Group::new(vec![
+                            Document::IfBreak(IfBreak::then(Document::String("("))),
+                            Document::Indent(vec![Document::Line(Line::softline()), value.format(f)]),
+                            Document::Line(Line::softline()),
+                            Document::IfBreak(IfBreak::then(Document::String(")"))),
+                        ])));
+                    } else {
+                        parts.push(value.format(f));
+                    }
+                }
             }
 
             parts.push(self.terminator.format(f));

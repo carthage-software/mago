@@ -22,5 +22,6 @@ mago-ast-utils = { workspace = true }
 mago-walker = { workspace = true }
 mago-source = { workspace = true }
 mago-typing = { workspace = true }
+mago-reporting = { workspace = true }
 mago-reflection = { workspace = true }
 ahash = { workspace = true }

@@ -11,7 +11,7 @@ use mago_interner::ThreadedInterner;
 use mago_reporting::IssueCollection;
 use mago_source::SourceIdentifier;
 
-use crate::commands::lint::process_sources;
+use crate::commands::lint::lint_sources;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::source;
@@ -20,19 +20,28 @@ use crate::utils;
 #[derive(Parser, Debug)]
 #[command(
     name = "fix",
-    about = "Fix lint issues identified during the linting process",
+    about = "apply fixes for lint issues identified during linting",
     long_about = r#"
-Fix lint issues identified during the linting process.
+The `fix` command automatically applies fixes for issues identified during the linting process.
 
-Automatically applies fixes where possible, based on the rules in the `mago.toml` or the default settings.
-    "#
+This command streamlines the process of addressing lint issues, improving code quality and consistency.
+"#
 )]
 pub struct FixCommand {
-    #[arg(long, short, help = "Apply fixes that are marked as unsafe, including potentially unsafe fixes")]
+    /// Apply fixes that are marked as unsafe, including potentially unsafe fixes.
+    #[arg(
+        long,
+        short = 'u',
+        help = "apply fixes marked as unsafe, including those with potentially destructive changes"
+    )]
     pub r#unsafe: bool,
-    #[arg(long, short, help = "Apply fixes that are marked as potentially unsafe")]
+
+    /// Apply fixes that are marked as potentially unsafe.
+    #[arg(long, short = 'p', help = "apply fixes marked as potentially unsafe, which may require manual review")]
     pub potentially_unsafe: bool,
-    #[arg(long, short, help = "Run the command without writing any changes to disk")]
+
+    /// Run the command without writing any changes to disk.
+    #[arg(long, short = 'd', help = "preview the fixes without applying them, showing what changes would be made")]
     pub dry_run: bool,
 }
 
@@ -54,40 +63,42 @@ pub async fn execute(command: FixCommand, configuration: Configuration) -> Resul
     // Load sources
     let source_manager = source::load(&interner, &configuration.source, true).await?;
 
-    let issues = process_sources(&interner, &source_manager, &configuration.linter).await?;
+    let issues = lint_sources(&interner, &source_manager, &configuration.linter).await?;
     let (plans, skipped_unsafe, skipped_potentially_unsafe) =
         filter_fix_plans(&interner, issues, command.get_classification());
 
     let total = plans.len();
+    let progress_bar = create_progress_bar(total, "✨  Fixing", ProgressBarTheme::Magenta);
     let mut handles = Vec::with_capacity(total);
     for (source, plan) in plans.into_iter() {
         handles.push(tokio::spawn({
             let source_manager = source_manager.clone();
             let interner = interner.clone();
+            let progress_bar = progress_bar.clone();
 
             async move {
                 let source = source_manager.load(&source)?;
                 let source_content = interner.lookup(&source.content);
-
-                utils::apply_changes(
+                let result = utils::apply_changes(
                     &interner,
                     &source_manager,
                     &source,
                     plan.execute(source_content).get_fixed(),
                     command.dry_run,
-                )
+                );
+
+                progress_bar.inc(1);
+
+                result
             }
         }));
     }
 
-    let progress_bar = create_progress_bar(total, "✨  Fixing", ProgressBarTheme::Magenta);
     let mut changed = 0;
     for handle in handles {
         if handle.await?? {
             changed += 1;
         }
-
-        progress_bar.inc(1);
     }
 
     remove_progress_bar(progress_bar);

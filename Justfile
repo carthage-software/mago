@@ -20,10 +20,12 @@ fix:
 publish:
     # Note: the order of publishing is important, as some crates depend on others.
     cargo publish -p mago-casing --allow-dirty
+    cargo publish -p mago-fixer --allow-dirty
     cargo publish -p mago-trinary --allow-dirty
     cargo publish -p mago-interner --allow-dirty
     cargo publish -p mago-source --allow-dirty
     cargo publish -p mago-span --allow-dirty
+    cargo publish -p mago-reporting --allow-dirty
     cargo publish -p mago-reflection --allow-dirty
     cargo publish -p mago-token --allow-dirty
     cargo publish -p mago-ast --allow-dirty
@@ -33,11 +35,9 @@ publish:
     cargo publish -p mago-composer --allow-dirty
     cargo publish -p mago-docblock --allow-dirty
     cargo publish -p mago-feedback --allow-dirty
-    cargo publish -p mago-fixer --allow-dirty
-    cargo publish -p mago-reporting --allow-dirty
-    cargo publish -p mago-formatter --allow-dirty
     cargo publish -p mago-lexer --allow-dirty
     cargo publish -p mago-parser --allow-dirty
+    cargo publish -p mago-formatter --allow-dirty
     cargo publish -p mago-names --allow-dirty
     cargo publish -p mago-symbol-table --allow-dirty
     cargo publish -p mago-semantics --allow-dirty

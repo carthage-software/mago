@@ -268,9 +268,11 @@ pub(super) fn adjust_clause<'a>(
 pub(super) fn print_condition<'a>(f: &mut Formatter<'a>, condition: &'a Expression) -> Document<'a> {
     Document::Group(Group::new(vec![
         Document::String("("),
-        if f.settings.control_space_parens { Document::space() } else { Document::empty() },
-        condition.format(f),
-        if f.settings.control_space_parens { Document::space() } else { Document::empty() },
+        Document::Indent(vec![
+            Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::softline() }),
+            condition.format(f),
+        ]),
+        Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::softline() }),
         Document::String(")"),
     ]))
 }

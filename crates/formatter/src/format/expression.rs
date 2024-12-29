@@ -848,24 +848,25 @@ impl<'a> Format<'a> for Conditional {
             match &self.then {
                 Some(then) => Document::Group(Group::new(vec![
                     self.condition.format(f),
-                    Document::IndentIfBreak(IndentIfBreak::new(vec![
-                        Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())),
+                    Document::Indent(vec![
+                        Document::Line(Line::default()),
                         Document::String("? "),
-                    ])),
-                    then.format(f),
-                    Document::IndentIfBreak(IndentIfBreak::new(vec![
-                        Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())),
+                        then.format(f),
+                        Document::Line(Line::default()),
                         Document::String(": "),
-                    ])),
-                    self.r#else.format(f),
+                        self.r#else.format(f),
+                    ]),
                 ])),
                 None => Document::Group(Group::new(vec![
                     self.condition.format(f),
-                    Document::IndentIfBreak(IndentIfBreak::new(vec![
-                        Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())),
-                        Document::String("?: "),
-                    ])),
-                    self.r#else.format(f),
+                    Document::Indent(vec![
+                        Document::space(),
+                        Document::Group(Group::new(vec![
+                            Document::String("?:"),
+                            Document::Line(Line::default()),
+                            self.r#else.format(f),
+                        ])),
+                    ]),
                 ])),
             }
         })

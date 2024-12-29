@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use mago_source::SourceCategory;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -27,7 +28,7 @@ pub struct ExpandedSourceIdentifier {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     pub size: usize,
-    pub user_defined: bool,
+    pub category: SourceCategory,
 }
 
 /// Expanded representation of a position within a source file.
@@ -95,7 +96,7 @@ impl Expandable<ExpandedSourceIdentifier> for SourceIdentifier {
             identifier: interner.lookup(&source.identifier.0).to_string(),
             path: source.path.clone(),
             size: source.size,
-            user_defined: source.identifier.is_user_defined(),
+            category: source.identifier.category(),
         })
     }
 }

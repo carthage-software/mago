@@ -362,26 +362,6 @@ pub struct FormatSettings {
     #[serde(default)]
     pub null_type_hint: NullTypeHint,
 
-    /// How many spaces to add around binary operators.
-    ///
-    /// Example:
-    ///
-    /// ```php
-    /// $foo = $bar + $baz;
-    ///
-    /// // or
-    ///
-    /// $foo = $bar+$baz;
-    ///
-    /// // or
-    ///
-    /// $foo = $bar  +  $baz;
-    /// ```
-    ///
-    /// Default: 1
-    #[serde(default = "default_binary_op_spacing")]
-    pub binary_op_spacing: usize,
-
     /// How many spaces to add around type operators.
     ///
     /// Example:
@@ -451,16 +431,6 @@ pub struct FormatSettings {
     #[serde(default = "default_true")]
     pub space_concatenation: bool,
 
-    /// Whether to preserve binary operations that are already broken into multiple lines.
-    ///
-    /// If enabled, binary operations that span multiple lines will remain in multiple lines,
-    /// even if they can fit into a single line. This gives users the option to
-    /// manually decide when a binary operation should use a multi-line format for readability.
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub preserve_multiline_binary_operations: bool,
-
     /// How to format broken method/property chains.
     ///
     /// When breaking a method or property chain, this option determines whether the
@@ -482,6 +452,40 @@ pub struct FormatSettings {
     /// Default: NextLine
     #[serde(default)]
     pub method_chain_breaking_style: MethodChainBreakingStyle,
+
+    /// Whether to add a line before binary operators or after when breaking.
+    ///
+    /// Note: This setting will always be false if the rhs of the binary operator has a leading comment.
+    ///
+    /// Example:
+    ///
+    /// ```php
+    /// // line_before_binary_operator = true
+    /// $foo = 'Hello, '
+    ///     . 'world!';
+    ///
+    /// // line_before_binary_operator = true
+    /// $foo = 'Hello, ' .
+    ///     /**
+    ///      * Comment
+    ///      */
+    ///     'world!';
+    ///
+    /// // line_before_binary_operator = false
+    /// $foo = 'Hello, ' .
+    ///     'world!';
+    ///
+    /// // line_before_binary_operator = false
+    /// $foo = 'Hello, ' .
+    ///     /**
+    ///      * Comment
+    ///      */
+    ///     'world!';
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub line_before_binary_operator: bool,
 }
 
 impl Default for FormatSettings {
@@ -508,13 +512,12 @@ impl Default for FormatSettings {
             space_before_arrow_function_params: false,
             static_before_visibility: false,
             null_type_hint: NullTypeHint::default(),
-            binary_op_spacing: default_binary_op_spacing(),
             type_spacing: default_type_spacing(),
             method_chain_break_threshold: default_method_chain_break_threshold(),
             break_promoted_properties_list: true,
             space_concatenation: true,
-            preserve_multiline_binary_operations: true,
             method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
+            line_before_binary_operator: false,
         }
     }
 }
@@ -629,10 +632,6 @@ fn default_print_width() -> usize {
 
 fn default_tab_width() -> usize {
     4
-}
-
-fn default_binary_op_spacing() -> usize {
-    1
 }
 
 fn default_type_spacing() -> usize {

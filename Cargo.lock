@@ -1660,6 +1660,7 @@ version = "0.0.15"
 dependencies = [
  "ahash",
  "mago-interner",
+ "mago-reporting",
  "mago-source",
  "mago-span",
  "mago-trinary",
@@ -1678,6 +1679,7 @@ dependencies = [
  "mago-names",
  "mago-parser",
  "mago-reflection",
+ "mago-reporting",
  "mago-source",
  "mago-span",
  "mago-typing",

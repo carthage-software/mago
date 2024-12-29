@@ -28,17 +28,14 @@ mod printer;
 mod utils;
 
 pub fn format<'a>(
-    settings: FormatSettings,
     interner: &'a ThreadedInterner,
     source: &'a Source,
     program: &'a Program,
+    settings: FormatSettings,
 ) -> String {
     let mut formatter = Formatter::new(interner, source, settings);
-    let document = formatter.format(program);
 
-    let printer = Printer::new(document, formatter.source, formatter.settings);
-
-    printer.build()
+    formatter.format(program)
 }
 
 struct ArgumentState {
@@ -73,48 +70,63 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    pub fn format(&mut self, program: &'a Program) -> Document<'a> {
+    pub fn format(&mut self, program: &'a Program) -> String {
+        let document = self.build(program);
+
+        let printer = Printer::new(document, self.source, self.settings);
+
+        printer.build()
+    }
+
+    fn build(&mut self, program: &'a Program) -> Document<'a> {
         self.comments =
             program.trivia.iter().filter(|t| t.kind.is_comment()).copied().collect::<Vec<_>>().into_iter().peekable();
 
         program.format(self)
     }
 
-    pub(crate) fn next_id(&mut self) -> GroupIdentifier {
+    fn next_id(&mut self) -> GroupIdentifier {
         self.id_builder.next_id()
     }
 
-    pub(crate) fn lookup(&self, string: &StringIdentifier) -> &'a str {
+    fn lookup(&self, string: &StringIdentifier) -> &'a str {
         self.interner.lookup(string)
     }
 
-    pub(crate) fn as_str(&self, string: impl AsRef<str>) -> &'a str {
+    fn as_str(&self, string: impl AsRef<str>) -> &'a str {
         self.interner.interned_str(string)
     }
 
-    pub(crate) fn enter_node(&mut self, node: Node<'a>) {
+    fn enter_node(&mut self, node: Node<'a>) {
         self.stack.push(node);
     }
 
-    pub(crate) fn leave_node(&mut self) {
+    fn leave_node(&mut self) {
         self.stack.pop();
     }
 
-    pub(crate) fn current_node(&self) -> Node<'a> {
+    fn current_node(&self) -> Node<'a> {
         self.stack[self.stack.len() - 1]
     }
 
-    pub(crate) fn parent_node(&self) -> Node<'a> {
+    fn parent_node(&self) -> Node<'a> {
         self.stack[self.stack.len() - 2]
     }
 
-    pub(crate) fn grandparent_node(&self) -> Option<Node<'a>> {
+    fn grandparent_node(&self) -> Option<Node<'a>> {
         let len = self.stack.len();
+
         (len > 2).then(|| self.stack[len - 2 - 1])
     }
 
-    pub(crate) fn nth_parent_kind(&self, n: usize) -> Option<Node<'a>> {
+    fn great_grandparent_node(&self) -> Option<Node<'a>> {
         let len = self.stack.len();
+        (len > 3).then(|| self.stack[len - 3 - 1])
+    }
+
+    fn nth_parent_kind(&self, n: usize) -> Option<Node<'a>> {
+        let len = self.stack.len();
+
         (len > n).then(|| self.stack[len - n - 1])
     }
 
@@ -127,11 +139,11 @@ impl<'a> Formatter<'a> {
         idx != idx2
     }
 
-    pub(crate) fn is_next_line_empty(&self, span: Span) -> bool {
+    fn is_next_line_empty(&self, span: Span) -> bool {
         self.is_next_line_empty_after_index(span.end.offset)
     }
 
-    pub(crate) fn is_next_line_empty_after_index(&self, start_index: usize) -> bool {
+    fn is_next_line_empty_after_index(&self, start_index: usize) -> bool {
         let mut old_idx = None;
         let mut idx = Some(start_index);
         while idx != old_idx {
@@ -146,7 +158,7 @@ impl<'a> Formatter<'a> {
         idx.is_some_and(|idx| self.has_newline(idx, /* backwards */ false))
     }
 
-    pub(crate) fn skip_trailing_comment(&self, start_index: Option<usize>) -> Option<usize> {
+    fn skip_trailing_comment(&self, start_index: Option<usize>) -> Option<usize> {
         let start_index = start_index?;
         let mut bytes = self.source_text[start_index..].bytes();
 
@@ -168,28 +180,28 @@ impl<'a> Formatter<'a> {
         self.skip_everything_but_new_line(Some(start_index), /* backwards */ false)
     }
 
-    pub(crate) fn skip_inline_comment(&self, start_index: Option<usize>) -> Option<usize> {
+    fn skip_inline_comment(&self, start_index: Option<usize>) -> Option<usize> {
         let start_index = start_index?;
         Some(start_index)
     }
 
-    pub(crate) fn skip_to_line_end(&self, start_index: Option<usize>) -> Option<usize> {
+    fn skip_to_line_end(&self, start_index: Option<usize>) -> Option<usize> {
         self.skip(start_index, false, |c| matches!(c, b' ' | b'\t' | b',' | b';'))
     }
 
-    pub(crate) fn skip_spaces(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
+    fn skip_spaces(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
         self.skip(start_index, backwards, |c| matches!(c, b' ' | b'\t'))
     }
 
-    pub(crate) fn skip_spaces_and_new_lines(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
+    fn skip_spaces_and_new_lines(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
         self.skip(start_index, backwards, |c| matches!(c, b' ' | b'\t' | b'\r' | b'\n'))
     }
 
-    pub(crate) fn skip_everything_but_new_line(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
+    fn skip_everything_but_new_line(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
         self.skip(start_index, backwards, |c| !matches!(c, b'\r' | b'\n'))
     }
 
-    pub(crate) fn skip<F>(&self, start_index: Option<usize>, backwards: bool, f: F) -> Option<usize>
+    fn skip<F>(&self, start_index: Option<usize>, backwards: bool, f: F) -> Option<usize>
     where
         F: Fn(u8) -> bool,
     {
@@ -215,7 +227,7 @@ impl<'a> Formatter<'a> {
         None
     }
 
-    pub(crate) fn skip_newline(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
+    fn skip_newline(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
         let start_index = start_index?;
         let c = if backwards {
             self.source_text[..=start_index].bytes().next_back()
@@ -230,7 +242,7 @@ impl<'a> Formatter<'a> {
         Some(start_index)
     }
 
-    pub(crate) fn has_newline(&self, start_index: usize, backwards: bool) -> bool {
+    fn has_newline(&self, start_index: usize, backwards: bool) -> bool {
         if (backwards && start_index == 0) || (!backwards && start_index == self.source_text.len()) {
             return false;
         }
@@ -240,7 +252,7 @@ impl<'a> Formatter<'a> {
         idx != idx2
     }
 
-    pub(crate) fn split_lines(slice: &'a str) -> Vec<&'a str> {
+    fn split_lines(slice: &'a str) -> Vec<&'a str> {
         let bytes = slice.as_bytes();
         let mut lines = Vec::new();
 
@@ -271,7 +283,7 @@ impl<'a> Formatter<'a> {
         lines
     }
 
-    pub(crate) fn skip_leading_whitespace_up_to(s: &'a str, indent: usize) -> &'a str {
+    fn skip_leading_whitespace_up_to(s: &'a str, indent: usize) -> &'a str {
         let mut position = 0;
         for (count, (i, b)) in s.bytes().enumerate().enumerate() {
             // Check if the current byte represents whitespace

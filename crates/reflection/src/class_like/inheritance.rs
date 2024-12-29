@@ -2,11 +2,14 @@ use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_interner::StringIdentifier;
+use mago_interner::ThreadedInterner;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::identifier::ClassLikeName;
 use crate::identifier::Name;
+
+use super::ClassLikeReflection;
 
 /// Represents the inheritance details of a class-like entity, including implemented interfaces,
 /// extended classes or interfaces, and any required inheritance constraints.
@@ -59,5 +62,44 @@ impl InheritanceReflection {
 
     pub fn has_children(&self) -> bool {
         !self.children.is_empty()
+    }
+
+    pub fn extends_class(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
+        let Some(name) = other.name.inner() else {
+            return false; // we can't extend a class have a name, i.e. anonymous class
+        };
+
+        let identifier = interner.lowered(&name.value);
+        let Some(other) = self.names.get(&identifier) else {
+            return false; // the other class is not in the inheritance chain
+        };
+
+        self.all_extended_classes.contains(other)
+    }
+
+    pub fn extends_interface(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
+        let Some(name) = other.name.inner() else {
+            return false;
+        };
+
+        let identifier = interner.lowered(&name.value);
+        let Some(other) = self.names.get(&identifier) else {
+            return false;
+        };
+
+        self.all_extended_interfaces.contains(other)
+    }
+
+    pub fn implements_interface(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
+        let Some(name) = other.name.inner() else {
+            return false;
+        };
+
+        let identifier = interner.lowered(&name.value);
+        let Some(other) = self.names.get(&identifier) else {
+            return false;
+        };
+
+        self.all_implemented_interfaces.contains(other)
     }
 }

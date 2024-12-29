@@ -51,14 +51,14 @@ impl Assertion {
             Assertion::Any => "any".to_string(),
             Assertion::Falsy => "falsy".to_string(),
             Assertion::Truthy => "truthy".to_string(),
-            Assertion::IsType(atomic) => atomic.get_key(interner),
-            Assertion::IsNotType(atomic) => "!".to_string() + &atomic.get_key(interner),
-            Assertion::IsEqual(atomic) => "=".to_string() + &atomic.get_key(interner),
-            Assertion::IsNotEqual(atomic) => "!=".to_string() + &atomic.get_key(interner),
-            Assertion::IsGreaterThan(atomic) => ">".to_string() + &atomic.get_key(interner),
-            Assertion::IsGreaterThanOrEqual(atomic) => ">=".to_string() + &atomic.get_key(interner),
-            Assertion::IsLessThan(atomic) => "<".to_string() + &atomic.get_key(interner),
-            Assertion::IsLessThanOrEqual(atomic) => "<=".to_string() + &atomic.get_key(interner),
+            Assertion::IsType(kind) => kind.get_key(interner),
+            Assertion::IsNotType(kind) => "!".to_string() + &kind.get_key(interner),
+            Assertion::IsEqual(kind) => "=".to_string() + &kind.get_key(interner),
+            Assertion::IsNotEqual(kind) => "!=".to_string() + &kind.get_key(interner),
+            Assertion::IsGreaterThan(kind) => ">".to_string() + &kind.get_key(interner),
+            Assertion::IsGreaterThanOrEqual(kind) => ">=".to_string() + &kind.get_key(interner),
+            Assertion::IsLessThan(kind) => "<".to_string() + &kind.get_key(interner),
+            Assertion::IsLessThanOrEqual(kind) => "<=".to_string() + &kind.get_key(interner),
             Assertion::IsEqualIsset => "=isset".to_string(),
             Assertion::IsIsset => "isset".to_string(),
             Assertion::IsNotIsset => "!isset".to_string(),
@@ -161,36 +161,36 @@ impl Assertion {
             Assertion::Any => false,
             Assertion::Falsy => matches!(other, Assertion::Truthy),
             Assertion::Truthy => matches!(other, Assertion::Falsy),
-            Assertion::IsType(atomic) => match other {
-                Assertion::IsNotType(other_atomic) => other_atomic == atomic,
+            Assertion::IsType(kind) => match other {
+                Assertion::IsNotType(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsNotType(atomic) => match other {
-                Assertion::IsType(other_atomic) => other_atomic == atomic,
+            Assertion::IsNotType(kind) => match other {
+                Assertion::IsType(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsEqual(atomic) => match other {
-                Assertion::IsNotEqual(other_atomic) => other_atomic == atomic,
+            Assertion::IsEqual(kind) => match other {
+                Assertion::IsNotEqual(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsNotEqual(atomic) => match other {
-                Assertion::IsEqual(other_atomic) => other_atomic == atomic,
+            Assertion::IsNotEqual(kind) => match other {
+                Assertion::IsEqual(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsGreaterThan(atomic) => match other {
-                Assertion::IsLessThanOrEqual(other_atomic) => other_atomic == atomic,
+            Assertion::IsGreaterThan(kind) => match other {
+                Assertion::IsLessThanOrEqual(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsLessThanOrEqual(atomic) => match other {
-                Assertion::IsGreaterThan(other_atomic) => other_atomic == atomic,
+            Assertion::IsLessThanOrEqual(kind) => match other {
+                Assertion::IsGreaterThan(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsGreaterThanOrEqual(atomic) => match other {
-                Assertion::IsLessThan(other_atomic) => other_atomic == atomic,
+            Assertion::IsGreaterThanOrEqual(kind) => match other {
+                Assertion::IsLessThan(other_kind) => other_kind == kind,
                 _ => false,
             },
-            Assertion::IsLessThan(atomic) => match other {
-                Assertion::IsGreaterThanOrEqual(other_atomic) => other_atomic == atomic,
+            Assertion::IsLessThan(kind) => match other {
+                Assertion::IsGreaterThanOrEqual(other_kind) => other_kind == kind,
                 _ => false,
             },
             Assertion::IsEqualIsset => false,
@@ -247,15 +247,15 @@ impl Assertion {
         match self {
             Assertion::Any => Assertion::Any,
             Assertion::Falsy => Assertion::Truthy,
-            Assertion::IsType(atomic) => Assertion::IsNotType(atomic.clone()),
-            Assertion::IsNotType(atomic) => Assertion::IsType(atomic.clone()),
+            Assertion::IsType(kind) => Assertion::IsNotType(kind.clone()),
+            Assertion::IsNotType(kind) => Assertion::IsType(kind.clone()),
             Assertion::Truthy => Assertion::Falsy,
-            Assertion::IsEqual(atomic) => Assertion::IsNotEqual(atomic.clone()),
-            Assertion::IsNotEqual(atomic) => Assertion::IsEqual(atomic.clone()),
-            Assertion::IsGreaterThan(atomic) => Assertion::IsLessThanOrEqual(atomic.clone()),
-            Assertion::IsLessThanOrEqual(atomic) => Assertion::IsGreaterThan(atomic.clone()),
-            Assertion::IsGreaterThanOrEqual(atomic) => Assertion::IsLessThan(atomic.clone()),
-            Assertion::IsLessThan(atomic) => Assertion::IsGreaterThanOrEqual(atomic.clone()),
+            Assertion::IsEqual(kind) => Assertion::IsNotEqual(kind.clone()),
+            Assertion::IsNotEqual(kind) => Assertion::IsEqual(kind.clone()),
+            Assertion::IsGreaterThan(kind) => Assertion::IsLessThanOrEqual(kind.clone()),
+            Assertion::IsLessThanOrEqual(kind) => Assertion::IsGreaterThan(kind.clone()),
+            Assertion::IsGreaterThanOrEqual(kind) => Assertion::IsLessThan(kind.clone()),
+            Assertion::IsLessThan(kind) => Assertion::IsGreaterThanOrEqual(kind.clone()),
             Assertion::IsIsset => Assertion::IsNotIsset,
             Assertion::IsNotIsset => Assertion::IsIsset,
             Assertion::NonEmptyCountable(negatable) => {

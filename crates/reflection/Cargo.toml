@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 mago-interner = { workspace = true }
+mago-reporting = { workspace = true }
 mago-span = { workspace = true }
 mago-source = { workspace = true }
 mago-trinary = { workspace = true }

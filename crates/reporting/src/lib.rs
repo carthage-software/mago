@@ -157,6 +157,42 @@ impl Annotation {
     }
 }
 
+impl Level {
+    /// Downgrades the level to the next lower severity.
+    ///
+    /// This function maps levels to their less severe counterparts:
+    ///
+    /// - `Error` becomes `Warning`
+    /// - `Warning` becomes `Help`
+    /// - `Help` becomes `Note`
+    /// - `Note` remains as `Note`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mago::reporting::Level;
+    ///
+    /// let level = Level::Error;
+    /// assert_eq!(level.downgrade(), Level::Warning);
+    ///
+    /// let level = Level::Warning;
+    /// assert_eq!(level.downgrade(), Level::Help);
+    ///
+    /// let level = Level::Help;
+    /// assert_eq!(level.downgrade(), Level::Note);
+    ///
+    /// let level = Level::Note;
+    /// assert_eq!(level.downgrade(), Level::Note);
+    /// ```
+    pub fn downgrade(&self) -> Self {
+        match self {
+            Level::Error => Level::Warning,
+            Level::Warning => Level::Help,
+            Level::Help | Level::Note => Level::Note,
+        }
+    }
+}
+
 impl Issue {
     /// Creates a new issue with the given level and message.
     ///

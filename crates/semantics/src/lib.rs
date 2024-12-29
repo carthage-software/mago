@@ -25,6 +25,7 @@ use mago_names::Names;
 use mago_parser::error::ParseError;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
+use mago_source::SourceCategory;
 use mago_walker::Walker;
 
 use crate::context::Context;
@@ -113,8 +114,8 @@ impl Semantics {
         !self.issues.is_empty()
     }
 
-    /// Checks if the source code is external, i.e., not a user-defined file.
-    pub fn is_external(&self) -> bool {
-        self.source.identifier.is_external()
+    /// Retrieves the category of the source code.
+    pub fn category(&self) -> SourceCategory {
+        self.source.identifier.category()
     }
 }

@@ -13,9 +13,33 @@ use crate::error::SourceError;
 
 pub mod error;
 
+/// Represents the category of the source for a PHP construct.
+///
+/// This enum categorizes the origin of a source, based on where it is are defined.
+/// The categories are useful for distinguishing between user-written code, vendor-provided libraries,
+/// and built-in PHP features.
+///
+/// # Variants
+///
+/// - `BuiltIn`: Represents a construct that is part of PHP's core or extension libraries.
+/// - `External`: Represents a construct defined in a vendor-provided or third-party library.
+/// - `UserDefined`: Represents a construct written by the user or part of the current project.
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum SourceCategory {
+    /// Represents a PHP construct that is part of the PHP core or extension libraries.
+    BuiltIn,
+
+    /// Represents a PHP construct defined in vendor-provided or third-party libraries.
+    External,
+
+    /// Represents a PHP construct written by the user or part of the current project.
+    #[default]
+    UserDefined,
+}
+
 /// A unique identifier for a source, consisting of a string identifier and a user-defined flag.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct SourceIdentifier(pub StringIdentifier, pub bool);
+pub struct SourceIdentifier(pub StringIdentifier, pub SourceCategory);
 
 /// Represents a source file with an identifier, optional path, content, and line information.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -51,9 +75,23 @@ pub struct SourceManager {
     sources: Arc<DashMap<SourceIdentifier, SourceEntry>>,
 }
 
+impl SourceCategory {
+    pub fn is_built_in(&self) -> bool {
+        matches!(self, Self::BuiltIn)
+    }
+
+    pub fn is_external(&self) -> bool {
+        matches!(self, Self::External)
+    }
+
+    pub fn is_user_defined(&self) -> bool {
+        matches!(self, Self::UserDefined)
+    }
+}
+
 impl SourceIdentifier {
     pub fn dummy() -> Self {
-        Self(StringIdentifier::empty(), true)
+        Self(StringIdentifier::empty(), SourceCategory::UserDefined)
     }
 
     /// Returns the string identifier of the source.
@@ -62,15 +100,8 @@ impl SourceIdentifier {
         self.0
     }
 
-    /// Returns whether the source is external.
     #[inline(always)]
-    pub const fn is_external(&self) -> bool {
-        !self.1
-    }
-
-    /// Returns whether the source is user-defined.
-    #[inline(always)]
-    pub const fn is_user_defined(&self) -> bool {
+    pub const fn category(&self) -> SourceCategory {
         self.1
     }
 }
@@ -125,14 +156,14 @@ impl SourceManager {
     ///
     /// - `name`: The name of the source.
     /// - `path`: The path to the source.
-    /// - `user_defined`: Whether the source is user-defined.
+    /// - `category`: The category of the source.
     ///
     /// # Returns
     ///
     /// The identifier of the inserted source.
-    pub fn insert_path(&self, name: String, path: PathBuf, user_defined: bool) -> SourceIdentifier {
+    pub fn insert_path(&self, name: String, path: PathBuf, category: SourceCategory) -> SourceIdentifier {
         let string_id = self.interner.intern(&name);
-        let source_id = SourceIdentifier(string_id, user_defined);
+        let source_id = SourceIdentifier(string_id, category);
 
         if self.sources.contains_key(&source_id) {
             return source_id;
@@ -149,17 +180,17 @@ impl SourceManager {
     ///
     /// - `name`: The name of the source.
     /// - `content`: The content of the source.
-    /// - `user_defined`: Whether the source is user-defined.
+    /// - `category`: The category of the source.
     ///
     /// # Returns
     ///
     /// The identifier of the inserted source.
-    pub fn insert_content(&self, name: String, content: String, user_defined: bool) -> SourceIdentifier {
+    pub fn insert_content(&self, name: String, content: String, category: SourceCategory) -> SourceIdentifier {
         if let Some(entry) = self.sources.iter().find(|entry| entry.name == name) {
             return *entry.key();
         }
 
-        let source_id = SourceIdentifier(self.interner.intern(&name), user_defined);
+        let source_id = SourceIdentifier(self.interner.intern(&name), category);
         let lines = line_starts(&content).collect();
         let size = content.len();
         let content = self.interner.intern(content);
@@ -187,14 +218,14 @@ impl SourceManager {
         self.sources.iter().map(|entry| *entry.key())
     }
 
-    /// Retrieve an iterator over all user-defined source identifiers in the manager.
-    pub fn user_defined_source_ids(&self) -> impl Iterator<Item = SourceIdentifier> + '_ {
-        self.sources.iter().filter(|entry| entry.key().is_user_defined()).map(|entry| *entry.key())
+    /// Retrieve an iterator over all source identifiers in the manager for the given category.
+    pub fn source_ids_for_category(&self, category: SourceCategory) -> impl Iterator<Item = SourceIdentifier> + '_ {
+        self.sources.iter().filter(move |entry| entry.key().category() == category).map(|entry| *entry.key())
     }
 
-    /// Retrieve an iterator over all external source identifiers in the manager.
-    pub fn external_source_ids(&self) -> impl Iterator<Item = SourceIdentifier> + '_ {
-        self.sources.iter().filter(|entry| entry.key().is_external()).map(|entry| *entry.key())
+    /// Retrieve an iterator over all source identifiers in the manager for categories other than the given category.
+    pub fn source_ids_except_category(&self, category: SourceCategory) -> impl Iterator<Item = SourceIdentifier> + '_ {
+        self.sources.iter().filter(move |entry| entry.key().category() != category).map(|entry| *entry.key())
     }
 
     /// Retrieve the source with the given identifier from the manager.
