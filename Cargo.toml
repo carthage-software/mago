@@ -138,6 +138,7 @@ config = { workspace = true }
 toml = { workspace = true }
 num_cpus = { workspace = true }
 diffy = { workspace = true }
+jwalk = "0.8.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }
