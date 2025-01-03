@@ -82,7 +82,7 @@ final readonly class MagoPlugin implements PluginInterface, EventSubscriberInter
             (new PhpExecutableFinder())->find(),
             ...array_map(static fn(string $argument): string => ProcessExecutor::escape($argument), [
                 getenv('COMPOSER_BINARY') ?: 'composer',
-                'mago:install-assets',
+                'mago:install-binary',
             ]),
         ]));
     }

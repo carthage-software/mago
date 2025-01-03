@@ -14,6 +14,6 @@ final class MagoCommandProvider implements CommandProvider
      */
     public function getCommands(): array
     {
-        return [new InstallMagoAssetsCommand()];
+        return [new InstallMagoBinaryCommand()];
     }
 }
