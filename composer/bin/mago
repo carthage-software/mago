@@ -5,98 +5,14 @@ declare(strict_types=1);
 
 (function() {
     // Guess executable path
-    $versionFile = __DIR__ . '/version';
-    if (!file_exists($versionFile)) {
-        throw new \RuntimeException('Unable to detect curent mago version. Please run "composer mago:install-assets"');
+    $platformFile = __DIR__ . '/.platform';
+    if (!file_exists($platformFile)) {
+        throw new \RuntimeException('Unable to detect curent mago version. Please run "composer mago:install-binary"');
     }
 
-    $version = file_get_contents(__DIR__ . '/version');
-    $arch_name = php_uname('m');
-    $arch = match($arch_name) {
-        'x86_64', 'amd64' => 'x86_64',
-        'arm64', 'aarch64' => 'aarch64',
-        'armv7l' => 'armv7',
-        'i386', 'i486', 'i586', 'i686' => 'i686',
-        'ppc' => 'powerpc',
-        'ppc64' => 'powerpc64',
-        'ppc64le' => 'powerpc64le',
-        's390x' => 's390x',
-        default => throw new \RuntimeException("Unsupported machine architecture: {$arch_name}. Please open an issue on GitHub."),
-    };
-
-    $os = strtolower(php_uname('s'));
-    $vendor = 'unknown';
-    $os_suffix = '';
-    $executable_extension = '';
-
-    switch ($os) {
-        case 'windows':
-            $vendor = 'pc';
-            $os_suffix = 'msvc';
-            $executable_extension = '.exe';
-            break;
-        case 'darwin':
-            $vendor = 'apple';
-            break;
-        case 'linux':
-            if (shell_exec('command -v ldd')) {
-                $ldd_version = shell_exec('ldd --version 2>&1');
-                if (strpos($ldd_version, 'musl') !== false) {
-                    switch ($arch) {
-                        case 'x86_64':
-                        case 'aarch64':
-                        case 'i686':
-                            $os_suffix = 'musl';
-                            break;
-                        case 'arm':
-                        case 'armv7':
-                            if (strpos(file_get_contents('/proc/cpuinfo'), 'hard') !== false) {
-                                $os_suffix = 'musleabihf';
-                            } else {
-                                $os_suffix = 'musleabi';
-                            }
-                            break;
-                        default:
-                            throw new \RuntimeException("Unsupported architecture for musl: {$arch_name}");
-                    }
-                } else {
-                    switch ($arch) {
-                        case 'x86_64':
-                        case 'aarch64':
-                        case 'i686':
-                        case 'powerpc':
-                        case 'powerpc64':
-                        case 'powerpc64le':
-                        case 's390x':
-                            $os_suffix = 'gnu';
-                            break;
-                        case 'arm':
-                        case 'armv7':
-                            if (strpos(file_get_contents('/proc/cpuinfo'), 'hard') !== false) {
-                                $os_suffix = 'gnueabihf';
-                            } else {
-                                $os_suffix = 'gnueabi';
-                            }
-                            break;
-                        default:
-                            throw new \RuntimeException("Unsupported architecture for glibc: {$arch_name}");
-                    }
-                }
-            } else {
-                $os_suffix = 'musl';
-            }
-            break;
-        case 'freebsd':
-            break;
-        default:
-            throw new \RuntimeException("Unsupported operating system: {$os}. Please open an issue on GitHub.");
-    }
-
-    $target_triple = $os_suffix ? "{$arch}-{$vendor}-{$os}-{$os_suffix}" : "{$arch}-{$vendor}-{$os}";
-    $executable = __DIR__ . "/{$version}/mago-{$version}-{$target_triple}/mago{$executable_extension}";
-
+    $executable = __DIR__ . '/'.file_get_contents($platformFile);
     if (!file_exists($executable)) {
-        throw new \RuntimeException("Unable to find mago executable at {$executable}. Please run 'composer mago:install-assets'");
+        throw new \RuntimeException("Unable to find mago executable at {$executable}. Please run 'composer mago:install-binary'");
     }
 
     $args = $_SERVER['argv'];

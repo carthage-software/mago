@@ -2,7 +2,8 @@
     "name": "carthage-software/mago",
     "description": "Mago is a toolchain for PHP that aims to provide a set of tools to help developers write better code.",
     "type": "composer-plugin",
-    "license": "MIT",
+    "license": "MIT OR Apache-2.0",
+    "keywords": ["dev"],
     "bin": [
         "composer/bin/mago"
     ],
