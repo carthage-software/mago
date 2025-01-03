@@ -43,3 +43,22 @@ jobs:
       - name: cargo build
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: cargo build --workspace --release --locked --all-targets
+
+      - name: Install PHP
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        uses: shivammathur/setup-php@master
+        with:
+          php-version: "8.3"
+          tools: 'composer:v2'
+
+      - name: Install composer dependencies
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: composer install
+
+      - name: Validate composer code format
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: ./target/release/mago format --dry-run
+
+      - name: Lint composer code
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: ./target/release/mago lint --reporting-format=github

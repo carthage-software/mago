@@ -1,0 +1,18 @@
+[source]
+paths = ["composer"]
+includes = ["vendor"]
+excludes = []
+
+[linter]
+default_plugins = false
+plugins = [
+    "analysis",
+    "symfony",
+    "best-practices",
+    "comment",
+    "consistency",
+    "naming",
+    "redundancy",
+    "safety",
+    "strictness",
+]

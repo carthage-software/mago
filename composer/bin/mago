@@ -1,0 +1,53 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+(function() {
+    // Guess executable path
+    $platformFile = __DIR__ . '/.platform';
+    if (!file_exists($platformFile)) {
+        throw new \RuntimeException('Unable to detect curent mago version. Please run "composer mago:install-binary"');
+    }
+
+    $executable = __DIR__ . '/'.file_get_contents($platformFile);
+    if (!file_exists($executable)) {
+        throw new \RuntimeException("Unable to find mago executable at {$executable}. Please run 'composer mago:install-binary'");
+    }
+
+    $args = $_SERVER['argv'];
+    array_shift($args);
+
+    $command = escapeshellcmd($executable);
+    if ($args) {
+        $command .= ' ' . implode(' ', array_map(escapeshellarg(...), $args));
+    }
+
+    // Run command
+    $pipes = [];
+    $process = @proc_open(
+        $command,
+        // Map process to current io
+        $descriptorspec = array(
+            0 => array('file', 'php://stdin', 'r'),
+            1 => array('file', 'php://stdout', 'w'),
+            2 => array('file', 'php://stderr', 'w'),
+        ),
+        $pipes
+    );
+
+    if (!is_resource($process)) {
+        echo('Unable to start mago process');
+        exit(1);
+    }
+
+    // Loop on process until it exits normally.
+    do {
+        $status = proc_get_status($process);
+    } while ($status['running']);
+
+    $exitCode = $status['exitcode'] ?? -1;
+    proc_close($process);
+
+    exit($exitCode);
+})();
