@@ -163,4 +163,4 @@ name = "safety/no-ffi"
 level = "off"
 ```
 
-For more information on the available plugins and rules, see the [Linter Plugins](/linter/plugins.md) page.
+For more information on the available plugins and rules, see the [Linter Plugins](/linter/plugins/) page.
