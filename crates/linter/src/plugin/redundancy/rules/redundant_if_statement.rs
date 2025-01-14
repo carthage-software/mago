@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,39 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantIfStatementRule;
 
 impl Rule for RedundantIfStatementRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-if-statement"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant If Statement", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant `if` statements where the condition always evaluates to true or false.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `if` statement with a condition that always evaluates to true",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    if (true) {
+                        echo "Hello, world!";
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `if` statement with a condition that always evaluates to false",
+                indoc! {r#"
+                    <?php
+
+                    if (false) {
+                        echo "Hello, world!";
+                    }
+                "#},
+            ))
     }
 }
 

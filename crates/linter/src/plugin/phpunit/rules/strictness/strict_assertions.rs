@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,6 +7,8 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::plugin::phpunit::rules::utils::find_assertion_references_in_method;
 use crate::rule::Rule;
 
@@ -16,12 +20,49 @@ const NON_STRICT_ASSERTIONS: [&str; 4] =
 pub struct StrictAssertionsRule;
 
 impl Rule for StrictAssertionsRule {
-    fn get_name(&self) -> &'static str {
-        "strict-assertions"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Strict Assertions", Level::Warning)
+            .with_description(indoc! {"
+                Detects non-strict assertions in test methods.
+                Assertions should use strict comparison methods, such as `assertSame` or `assertNotSame`
+                instead of `assertEquals` or `assertNotEquals`.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A strict assertion using the `assertSame` method",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    declare(strict_types=1);
+
+                    use PHPUnit\Framework\TestCase;
+
+                    final class SomeTest extends TestCase
+                    {
+                        public function testSomething(): void
+                        {
+                            $this->assertSame(42, 42);
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A non-strict assertion using the `assertEquals` method",
+                indoc! {r#"
+                    <?php
+
+                    declare(strict_types=1);
+
+                    use PHPUnit\Framework\TestCase;
+
+                    final class SomeTest extends TestCase
+                    {
+                        public function testSomething(): void
+                        {
+                            $this->assertEquals(42, 42);
+                        }
+                    }
+                "#},
+            ))
     }
 }
 

@@ -17,7 +17,7 @@ pub fn resolve_name<'i>(
 
     if value.contains('\\') {
         // take the last part of the path
-        let short_value: &'i str = unsafe { value.split('\\').last().unwrap_unchecked() };
+        let short_value: &'i str = unsafe { value.split('\\').next_back().unwrap_unchecked() };
 
         (value_id, interner.intern(short_value))
     } else {

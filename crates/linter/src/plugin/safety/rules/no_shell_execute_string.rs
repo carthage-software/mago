@@ -1,21 +1,32 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoShellExecuteStringRule;
 
 impl Rule for NoShellExecuteStringRule {
-    fn get_name(&self) -> &'static str {
-        "no-shell-execute-string"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Shell Execute String", Level::Error)
+            .with_description(indoc! {"
+                Detects the use of shell execute strings (`...`) in PHP code.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "Using a shell execute string",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                    $output = `ls -l`;
+                "#},
+            ))
     }
 }
 

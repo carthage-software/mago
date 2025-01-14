@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,18 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct UseWhileInsteadOfForRule;
 
 impl Rule for UseWhileInsteadOfForRule {
-    fn get_name(&self) -> &'static str {
-        "use-while-instead-of-for"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Use While Instead Of For", Level::Note).with_description(indoc! {"
+            Suggests using a `while` loop instead of a `for` loop when the `for` loop does not have any
+            initializations or increments. This can make the code more readable and concise.
+        "})
     }
 }
 

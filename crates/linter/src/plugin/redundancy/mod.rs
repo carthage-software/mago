@@ -1,5 +1,6 @@
 use rules::redundant_write_visibility::RedundantWriteVisibilityRule;
 
+use crate::definition::PluginDefinition;
 use crate::plugin::redundancy::rules::redundant_block::RedundantBlockRule;
 use crate::plugin::redundancy::rules::redundant_closing_tag::RedudnantClosingTagRule;
 use crate::plugin::redundancy::rules::redundant_continue::RedundantContinueRule;
@@ -19,12 +20,12 @@ pub mod rules;
 pub struct RedundancyPlugin;
 
 impl Plugin for RedundancyPlugin {
-    fn get_name(&self) -> &'static str {
-        "redundancy"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Redundancy",
+            description: "Provides rules that detect redundant code constructs.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

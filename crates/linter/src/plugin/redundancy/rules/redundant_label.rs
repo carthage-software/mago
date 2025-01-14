@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,28 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantLabelRule;
 
 impl Rule for RedundantLabelRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-label"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Label", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant `goto` labels that are declared but not used.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `goto` label",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    label:
+                    echo "Hello, world!";
+                "#},
+            ))
     }
 }
 

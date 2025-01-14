@@ -1,3 +1,6 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +8,77 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
+
+const FINAL_ONLY: &str = "final-only";
+const FINAL_ONLY_DEFAULT: bool = false;
 
 #[derive(Clone, Debug)]
 pub struct ReadonlyClassPromotionRule;
 
 impl Rule for ReadonlyClassPromotionRule {
-    fn get_name(&self) -> &'static str {
-        "readonly-class-promotion"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Readonly Class Promotion", Level::Warning)
+            .with_description(indoc! {"
+                Detects classes that contain only readonly properties and suggests promoting them to readonly classes.
+                Promoting classes to readonly classes can improve code readability and intent clarity.
+            "})
+            .with_option(RuleOptionDefinition {
+                name: FINAL_ONLY,
+                r#type: "boolean",
+                description: "Only promote final classes",
+                default: Value::Boolean(FINAL_ONLY_DEFAULT),
+            })
+            .with_example(RuleUsageExample::valid(
+                "Class is already readonly",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    readonly class Foo {
+                        public int $a;
+                        public int $b;
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::valid(
+                "Class does not contain all readonly properties",
+                indoc! {r#"
+                    <?php
+
+                    class Foo {
+                        public readonly int $a;
+                        public int $b;
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Class contains only readonly properties, but is not marked as readonly",
+                indoc! {r#"
+                    <?php
+
+                    class Foo {
+                        public readonly int $a;
+                        public readonly int $b;
+                    }
+                "#},
+            ))
+            .with_example(
+                RuleUsageExample::valid(
+                    "Class contains only readonly properties, but is not final, and final-only option is enabled",
+                    indoc! {r#"
+                    <?php
+
+                    class Foo {
+                        public readonly int $a;
+                        public readonly int $b;
+                    }
+                "#},
+                )
+                .with_option(FINAL_ONLY, Value::Boolean(true)),
+            )
     }
 }
 
@@ -32,7 +94,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
             return;
         }
 
-        if !reflection.is_final && context.option("final-only").and_then(|c| c.as_bool()).unwrap_or(false) {
+        if !reflection.is_final && context.option(FINAL_ONLY).and_then(|c| c.as_bool()).unwrap_or(FINAL_ONLY_DEFAULT) {
             return;
         }
 
@@ -72,7 +134,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
             .filter_map(|member| {
                 if let ClassLikeMember::Property(property) = member {
                     property.modifiers().get_readonly().map(|modifier| {
-                        Annotation::secondary(modifier.span()).with_message("property is marked as readonly")
+                        Annotation::secondary(modifier.span()).with_message("Property is marked as readonly.")
                     })
                 } else {
                     None

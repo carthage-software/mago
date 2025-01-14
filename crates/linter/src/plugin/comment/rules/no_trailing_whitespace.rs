@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::Program;
 use mago_fixer::FixPlan;
 use mago_fixer::SafetyClassification;
@@ -7,20 +9,18 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoTrailingWhitespaceRule;
 
 impl Rule for NoTrailingWhitespaceRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "no-trailing-whitespace"
-    }
-
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Level::Note.into()
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Trailing Whitespace", Level::Note).with_description(indoc! {"
+            Detects trailing whitespace at the end of comments. Trailing whitespace can cause unnecessary
+            diffs and formatting issues, so it is recommended to remove it.
+        "})
     }
 }
 

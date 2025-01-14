@@ -1,21 +1,41 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct OptionalParameterBeforeRequiredRule;
 
 impl Rule for OptionalParameterBeforeRequiredRule {
-    fn get_name(&self) -> &'static str {
-        "optional-parameter-before-required"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Optional Parameter Before Required", Level::Warning)
+            .with_description(indoc! {"
+                Detects optional parameters defined before required parameters in function-like declarations.
+                Such parameter order is considered deprecated; required parameters should precede optional parameters.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Required parameters precede optional parameters",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    function foo(string $required, ?string $optional = null): void {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Optional parameters precede required parameters",
+                indoc! {r#"
+                    <?php
+
+                    function foo(?string $optional = null, string $required): void {}
+                "#},
+            ))
     }
 }
 

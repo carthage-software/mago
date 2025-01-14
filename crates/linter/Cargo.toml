@@ -32,3 +32,7 @@ serde = { workspace = true }
 tracing = { workspace = true }
 regex = { workspace = true }
 toml = { workspace = true }
+indoc = { workspace = true }
+
+[dev-dependencies]
+mago-reflector = { workspace = true }

@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,10 +7,29 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantParenthesesRule;
+
+impl Rule for RedundantParenthesesRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Parentheses", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant parentheses around expressions.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant parentheses around an expression",
+                indoc! {r#"
+                    <?php
+
+                    $foo = (42);
+                "#},
+            ))
+    }
+}
 
 impl RedundantParenthesesRule {
     fn report(&self, parenthesized: &Parenthesized, context: &mut LintContext<'_>) {
@@ -23,16 +44,6 @@ impl RedundantParenthesesRule {
             plan.delete(parenthesized.left_parenthesis.to_range(), SafetyClassification::Safe);
             plan.delete(parenthesized.right_parenthesis.to_range(), SafetyClassification::Safe);
         });
-    }
-}
-
-impl Rule for RedundantParenthesesRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-parentheses"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
     }
 }
 

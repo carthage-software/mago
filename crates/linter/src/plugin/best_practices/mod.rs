@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::best_practices::rules::combine_consecutive_issets::CombineConsecutiveIssetsRule;
 use crate::plugin::best_practices::rules::disallowed_functions::DisallowedFunctionsRule;
 use crate::plugin::best_practices::rules::excessive_nesting::ExcessiveNesting;
@@ -18,12 +19,12 @@ pub mod rules;
 pub struct BestPracticesPlugin;
 
 impl Plugin for BestPracticesPlugin {
-    fn get_name(&self) -> &'static str {
-        "best-practices"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Best Practices",
+            description: "Provides rules that enforce best practices and idiomatic PHP.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

@@ -1,21 +1,23 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoMultiAssignmentsRule;
 
 impl Rule for NoMultiAssignmentsRule {
-    fn get_name(&self) -> &'static str {
-        "no-multi-assignments"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Multi Assignments", Level::Warning).with_description(indoc! {"
+            Flags any instances of multiple assignments in a single statement. This can lead to confusion
+            and unexpected behavior, and is generally considered poor practice.
+        "})
     }
 }
 

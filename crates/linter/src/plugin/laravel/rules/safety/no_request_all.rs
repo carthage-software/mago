@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_ast_utils::reference::*;
 use mago_reporting::*;
@@ -5,6 +7,8 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const REQUEST_CLASS: &str = "Request";
@@ -18,12 +22,85 @@ const ALL_METHOD: &str = "all";
 pub struct NoRequestAllRule;
 
 impl Rule for NoRequestAllRule {
-    fn get_name(&self) -> &'static str {
-        "no-request-all"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Request All", Level::Warning)
+            .with_description(indoc! {"
+                Detects the use of `$request->all()` or `Request::all()` in Laravel applications.
+                Such calls retrieve all input values, including ones you might not expect or intend to handle.
+                It is recommended to use `$request->only([...])` to specify the inputs you need explicitly, ensuring better security and validation.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using `$request->only([...])` instead of `$request->all()`",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    namespace App\Http\Controllers;
+
+                    use Illuminate\Http\RedirectResponse;
+                    use Illuminate\Http\Request;
+
+                    class UserController extends Controller
+                    {
+                        /**
+                         * Store a new user.
+                         */
+                        public function store(Request $request): RedirectResponse
+                        {
+                            $data = $request->only(['name', 'email', 'password']);
+
+                            // ...
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `$request->all()`",
+                indoc! {r#"
+                    <?php
+
+                    namespace App\Http\Controllers;
+
+                    use Illuminate\Http\RedirectResponse;
+                    use Illuminate\Support\Facades\Request;
+
+                    class UserController extends Controller
+                    {
+                        /**
+                         * Store a new user.
+                         */
+                        public function store(Request $request): RedirectResponse
+                        {
+                            $data = $request->all();
+
+                            // ...
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `Request::all()`",
+                indoc! {r#"
+                    <?php
+
+                    namespace App\Http\Controllers;
+
+                    use Illuminate\Http\RedirectResponse;
+                    use Illuminate\Http\Request;
+
+                    class UserController extends Controller
+                    {
+                        /**
+                         * Store a new user.
+                         */
+                        public function store(): RedirectResponse
+                        {
+                            $data = Request::all();
+
+                            // ...
+                        }
+                    }
+                "#},
+            ))
     }
 }
 

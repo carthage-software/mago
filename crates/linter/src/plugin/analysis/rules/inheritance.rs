@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
@@ -5,18 +7,96 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct InheritanceRule;
 
 impl Rule for InheritanceRule {
-    fn get_name(&self) -> &'static str {
-        "inheritance"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Inheritance", Level::Error)
+            .with_description(indoc! {"
+                Checks for invalid inheritance relationships, such as extending a final class,
+                referencing non-existent classes/interfaces, or creating circular inheritance.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Extending a class",
+                indoc! {"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                    abstract class AbstractFoo {}
+
+                    class Foo extends AbstractFoo {}
+                "},
+            ))
+            .with_example(RuleUsageExample::valid(
+                "Implementing an interface",
+                indoc! {"
+                    <?php
+
+                    interface FooInterface {}
+
+                    class Foo implements FooInterface {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Extending a final class",
+                indoc! {"
+                    <?php
+
+                    final class Foo {}
+
+                    class Bar extends Foo {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Extending a non-existent class",
+                indoc! {"
+                    <?php
+
+                    class Foo extends Bar {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Extending a class with circular inheritance",
+                indoc! {"
+                    <?php
+
+                    class Foo extends Bar {}
+
+                    class Bar extends Foo {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Extending a readonly class from a non-readonly class",
+                indoc! {"
+                    <?php
+
+                    readonly class Foo {}
+
+                    class Bar extends Foo {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Extending a non-readonly class from a readonly class",
+                indoc! {"
+                    <?php
+
+                    class Foo {}
+
+                    readonly class Bar extends Foo {}
+                "},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Implementing a non-existent interface",
+                indoc! {"
+                    <?php
+
+                    class Foo implements BarInterface {}
+                "},
+            ))
     }
 }
 

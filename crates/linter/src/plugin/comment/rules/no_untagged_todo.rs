@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use indoc::indoc;
 use regex::Regex;
 
 use mago_ast::Program;
@@ -7,6 +8,7 @@ use mago_reporting::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::plugin::comment::rules::utils::comment_content;
 use crate::rule::Rule;
 
@@ -16,14 +18,12 @@ static TAGGED_TODO_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"todo\(
 pub struct NoUntaggedTodoRule;
 
 impl Rule for NoUntaggedTodoRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "no-untagged-todo"
-    }
-
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Level::Warning.into()
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Untagged TODO", Level::Warning).with_description(indoc! {"
+            Detects TODO comments that are not tagged with a user or issue reference. Untagged TODOs
+            can be difficult to track and may be forgotten. Tagging TODOs with a user or issue reference
+            makes it easier to track progress and ensures that tasks are not forgotten.
+        "})
     }
 }
 

@@ -1,23 +1,48 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequireIdentityComparisonRule;
 
 impl Rule for RequireIdentityComparisonRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-identity-comparison"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Identity Comparison", Level::Warning)
+            .with_description(indoc! {"
+                Detects equality and inequality comparisons that should use identity comparison operators.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "An identity comparison operator",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    // ...
+
+                    if ($a === $b) {
+                        echo '$a is same as $b';
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An equality comparison operator",
+                indoc! {r#"
+                    <?php
+
+                    // ...
+
+                    if ($a == $b) {
+                        echo '$a is same as $b';
+                    }
+                "#},
+            ))
     }
 }
 

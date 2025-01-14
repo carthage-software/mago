@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,73 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct CombineConsecutiveIssetsRule;
 
 impl Rule for CombineConsecutiveIssetsRule {
-    fn get_name(&self) -> &'static str {
-        "combine-consecutive-issets"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Combine Consecutive Issets", Level::Warning)
+            .with_description(indoc! {"
+                Suggests combining consecutive calls to `isset()` when they are joined by a logical AND.
+                For example, `isset($a) && isset($b)` can be turned into `isset($a, $b)`, which is more concise
+                and avoids repeated function calls. If one or both `isset()` calls are wrapped in parentheses,
+                the rule will still warn, but it will not attempt an automated fix.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using `isset()` with multiple variables in a single call",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    if (isset($a, $b)) {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::valid(
+                "Calls to `isset()` separated by other expressions",
+                indoc! {r#"
+                    <?php
+
+                    // This won't be flagged, because the isset() calls are not consecutive:
+                    if (isset($a) && $b && isset($c)) {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Two consecutive `isset()` calls using `&&`",
+                indoc! {r#"
+                    <?php
+
+                    if (isset($a) && isset($b)) {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Parenthesized `isset()` on one side",
+                indoc! {r#"
+                    <?php
+
+                    if ((isset($a)) && isset($b)) {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Three consecutive `isset()` calls using `&&`",
+                indoc! {r#"
+                    <?php
+
+                    if ((isset($a)) && isset($b) && isset($c)) {
+                        // ...
+                    }
+                "#},
+            ))
     }
 }
 

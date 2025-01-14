@@ -1,3 +1,6 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::*;
 use mago_ast_utils::reference::MethodReference;
 use mago_fixer::SafetyClassification;
@@ -6,6 +9,9 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::plugin::phpunit::rules::utils::find_testing_or_assertion_references_in_method;
 use crate::rule::Rule;
 
@@ -15,16 +21,79 @@ const THIS_STYLES: &str = "this";
 
 const STYLES: [&str; 3] = [STATIC_STYLES, SELF_STYLES, THIS_STYLES];
 
+const STYLE: &str = "style";
+const STYLE_DEFAULT: &str = STATIC_STYLES;
+
 #[derive(Clone, Debug)]
 pub struct AssertionsStyleRule;
 
 impl Rule for AssertionsStyleRule {
-    fn get_name(&self) -> &'static str {
-        "assertions-style"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Assertions Style", Level::Warning)
+            .with_description(indoc! {"
+                Detects inconsistent assertions style in test methods.
+                Assertions should use the same style, either `static::`, `self::`, or `$this->`.
+            "})
+            .with_option(RuleOptionDefinition {
+                name: STYLE,
+                r#type: "string",
+                description: "The desired assertions style, either `static`, `self`, or `this`.",
+                default: Value::String(STYLE_DEFAULT.to_string()),
+            })
+            .with_example(RuleUsageExample::valid(
+                "An assertion using the `static::` style",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    declare(strict_types=1);
+
+                    use PHPUnit\Framework\TestCase;
+
+                    final class SomeTest extends TestCase
+                    {
+                        public function testSomething(): void
+                        {
+                            static::assertTrue(true);
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An assertion using the `$this->` style",
+                indoc! {r#"
+                    <?php
+
+                    declare(strict_types=1);
+
+                    use PHPUnit\Framework\TestCase;
+
+                    final class SomeTest extends TestCase
+                    {
+                        public function testSomething(): void
+                        {
+                            $this->assertTrue(true);
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An assertion using the `self::` style",
+                indoc! {r#"
+                    <?php
+
+                    declare(strict_types=1);
+
+                    use PHPUnit\Framework\TestCase;
+
+                    final class SomeTest extends TestCase
+                    {
+                        public function testSomething(): void
+                        {
+                            self::assertTrue(true);
+                        }
+                    }
+                "#},
+            ))
     }
 }
 
@@ -36,10 +105,10 @@ impl<'a> Walker<LintContext<'a>> for AssertionsStyleRule {
         }
 
         let desired_style = context
-            .option("style")
+            .option(STYLE)
             .and_then(|o| o.as_str())
             .filter(|s| STYLES.contains(&s.to_ascii_lowercase().as_str()))
-            .unwrap_or(STATIC_STYLES)
+            .unwrap_or(STYLE_DEFAULT)
             .to_string();
 
         let desired_syntax = match desired_style.as_str() {

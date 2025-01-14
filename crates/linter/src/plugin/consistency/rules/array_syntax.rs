@@ -1,3 +1,6 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,24 +8,86 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct ArraySyntaxRule;
 
-impl Rule for ArraySyntaxRule {
-    fn get_name(&self) -> &'static str {
-        "array-syntax"
-    }
+const SYNTAX_OPTION: &str = "syntax";
+const SYNTAX_OPTION_LONG: &str = "long";
+const SYNTAX_OPTION_SHORT: &str = "short";
+const SYNTAX_OPTION_DEFAULT: &str = SYNTAX_OPTION_SHORT;
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+impl Rule for ArraySyntaxRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Array Syntax", Level::Note)
+            .with_description(indoc! {"
+            Suggests using the short array syntax `[..]` instead of the long array syntax `array(..)`,
+            or vice versa, depending on the configuration. The short array syntax is more concise and
+            is the preferred way to define arrays in PHP.
+        "})
+            .with_option(RuleOptionDefinition {
+                name: SYNTAX_OPTION,
+                r#type: "string",
+                description: "The array syntax to enforce. Can be either `short` or `long`.",
+                default: Value::String(SYNTAX_OPTION_DEFAULT.to_string()),
+            })
+            .with_example({
+                RuleUsageExample::valid(
+                    "Using short array syntax by default",
+                    indoc! {"
+                        <?php
+
+                        // By default, `syntax` is 'short', so this snippet is valid:
+                        $arr = [1, 2, 3];
+                    "},
+                )
+            })
+            .with_example(
+                RuleUsageExample::valid(
+                    "Using long array syntax when configured",
+                    indoc! {r#"
+                        <?php
+
+                        // If we set `syntax = "long"`, then array(...) is correct:
+                        $arr = array(1, 2, 3);
+                    "#},
+                )
+                .with_option(SYNTAX_OPTION, Value::String(SYNTAX_OPTION_LONG.to_string())),
+            )
+            .with_example({
+                RuleUsageExample::invalid(
+                    "Using long array syntax when `syntax=short` is the default",
+                    indoc! {r#"
+                        <?php
+
+                        // By default, 'short' is enforced, so array(...) triggers a warning:
+                        $arr = array(1, 2, 3);
+                    "#},
+                )
+            })
+            .with_example(
+                RuleUsageExample::invalid(
+                    "Using short array syntax when `syntax=long` is configured",
+                    indoc! {r#"
+                        <?php
+
+                        // If we set `syntax = "long"`, [..] is disallowed:
+                        $arr = [1, 2, 3];
+                    "#},
+                )
+                .with_option(SYNTAX_OPTION, Value::String(SYNTAX_OPTION_LONG.to_string())),
+            )
     }
 }
 
 impl<'a> Walker<LintContext<'a>> for ArraySyntaxRule {
     fn walk_in_legacy_array<'ast>(&self, arr: &'ast LegacyArray, context: &mut LintContext<'a>) {
-        if context.option("syntax").and_then(|o| o.as_str()).map(|v| v.to_lowercase().eq("long")).unwrap_or(false) {
+        let preferred_syntax = context.option(SYNTAX_OPTION).and_then(|o| o.as_str()).unwrap_or(SYNTAX_OPTION_DEFAULT);
+        if !preferred_syntax.eq_ignore_ascii_case(SYNTAX_OPTION_SHORT) {
             return;
         }
 
@@ -39,7 +104,8 @@ impl<'a> Walker<LintContext<'a>> for ArraySyntaxRule {
     }
 
     fn walk_in_array<'ast>(&self, arr: &'ast Array, context: &mut LintContext<'a>) {
-        if !context.option("syntax").and_then(|o| o.as_str()).map(|v| v.to_lowercase().eq("long")).unwrap_or(false) {
+        let preferred_syntax = context.option(SYNTAX_OPTION).and_then(|o| o.as_str()).unwrap_or(SYNTAX_OPTION_DEFAULT);
+        if !preferred_syntax.eq_ignore_ascii_case(SYNTAX_OPTION_LONG) {
             return;
         }
 

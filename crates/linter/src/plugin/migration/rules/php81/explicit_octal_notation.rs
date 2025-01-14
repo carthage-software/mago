@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,35 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct ExplicitOctalNotationRule;
 
 impl Rule for ExplicitOctalNotationRule {
-    fn get_name(&self) -> &'static str {
-        "explicit-octal-notation"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Explicit Octal Notation", Level::Warning)
+            .with_description(indoc! {"
+                Detects implicit octal numeral notation and suggests replacing it with explicit octal numeral notation.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using explicit octal numeral notation",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    $a = 0o123;
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using implicit octal numeral notation",
+                indoc! {r#"
+                    <?php
+
+                    $a = 0123;
+                "#},
+            ))
     }
 }
 

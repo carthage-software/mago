@@ -1,25 +1,85 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct InstantiationRule;
 
 impl Rule for InstantiationRule {
-    fn get_name(&self) -> &'static str {
-        "instantiation"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Instantiation", Level::Error)
+            .with_description(indoc! {"
+                Ensures that only valid, concrete classes are instantiated. Flags attempts to instantiate
+                non-existent classes, interfaces, traits, enums, or abstract classes.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Simple class instantiation",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                    class Foo {}
+
+                    $instance = new Foo();  // Valid instantiation
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Instantiating a non-existent class",
+                indoc! {r#"
+                    <?php
+
+                    $instance = new Foo(); // Error: Class `Foo` does not exist.
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Instantiating an interface",
+                indoc! {r#"
+                    <?php
+
+                    interface FooInterface {}
+
+                    $instance = new FooInterface(); // Error: Cannot instantiate an interface
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Instantiating a trait",
+                indoc! {r#"
+                    <?php
+
+                    trait FooTrait {}
+
+                    $instance = new FooTrait(); // Error: Cannot instantiate a trait
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Instantiating an enum",
+                indoc! {r#"
+                    <?php
+
+                    enum Foo {}
+
+                    $instance = new Foo(); // Error: Cannot instantiate an enum
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Instantiating an abstract class",
+                indoc! {r#"
+                    <?php
+
+                    abstract class AbstractFoo {}
+
+                    $instance = new AbstractFoo(); // Error: Cannot instantiate an abstract class
+                "#},
+            ))
     }
 }
-
-impl InstantiationRule {}
 
 impl<'a> Walker<LintContext<'a>> for InstantiationRule {
     fn walk_in_instantiation(&self, instantiation: &Instantiation, context: &mut LintContext<'a>) {

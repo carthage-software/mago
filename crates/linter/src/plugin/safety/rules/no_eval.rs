@@ -1,21 +1,34 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoEvalRule;
 
 impl Rule for NoEvalRule {
-    fn get_name(&self) -> &'static str {
-        "no-eval"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Eval", Level::Error)
+            .with_description(indoc! {"
+                Detects unsafe uses of the `eval` construct.
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                The `eval` construct executes arbitrary code, which can be a major security risk if not used carefully.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "An unsafe use of the `eval` construct",
+                indoc! {r#"
+                    <?php
+
+                    eval('echo "Hello, world!";');
+                "#},
+            ))
     }
 }
 

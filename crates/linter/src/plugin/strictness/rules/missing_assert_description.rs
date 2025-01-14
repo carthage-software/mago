@@ -1,23 +1,45 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct MissingAssertDescriptionRule;
 
 impl Rule for MissingAssertDescriptionRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "missing-assert-description"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Missing Assert Description", Level::Warning)
+            .with_description(indoc! {"
+                Detects assert functions that do not have a description.
+                Assert functions should have a description to make it easier to understand the purpose of the assertion.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "An assert function with a description",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    // ...
+
+                    assert($user->isActivated(), 'User MUST be activated at this point.');
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An assert function without a description",
+                indoc! {r#"
+                    <?php
+
+                    // ...
+
+                    assert($user->isActivated());
+                "#},
+            ))
     }
 }
 

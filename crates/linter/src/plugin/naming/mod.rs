@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::naming::rules::class::ClassRule;
 use crate::plugin::naming::rules::constant::ConstantRule;
 use crate::plugin::naming::rules::function::FunctionRule;
@@ -14,12 +15,12 @@ pub mod rules;
 pub struct NamingPlugin;
 
 impl Plugin for NamingPlugin {
-    fn get_name(&self) -> &'static str {
-        "naming"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Naming",
+            description: "Provides rules that enforce naming conventions.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

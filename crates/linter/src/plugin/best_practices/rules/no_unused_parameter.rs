@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,6 +7,7 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::plugin::best_practices::rules::utils::expression_potentially_contains_function_call;
 use crate::plugin::best_practices::rules::utils::get_foreign_variable_names;
 use crate::plugin::best_practices::rules::utils::is_variable_used_in_expression;
@@ -17,12 +20,11 @@ const FUNC_GET_ARGS: &str = "func_get_args";
 pub struct NoUnusedParameterRule;
 
 impl Rule for NoUnusedParameterRule {
-    fn get_name(&self) -> &'static str {
-        "no-unused-parameter"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Unused Parameter", Level::Note).with_description(indoc! {"
+            Detects parameters that are declared but never used within a function, method, or closure.
+            Unused parameters are a sign of dead code and can be safely removed to improve code clarity.
+        "})
     }
 }
 

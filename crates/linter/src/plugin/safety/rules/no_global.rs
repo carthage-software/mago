@@ -1,9 +1,13 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const GLOBALS_VARIABLE: &str = "$GLOBALS";
@@ -12,12 +16,39 @@ const GLOBALS_VARIABLE: &str = "$GLOBALS";
 pub struct NoGlobalRule;
 
 impl Rule for NoGlobalRule {
-    fn get_name(&self) -> &'static str {
-        "no-global"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Global", Level::Error)
+            .with_description(indoc! {"
+                Detects the use of the `global` keyword and the `$GLOBALS` variable.
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                The `global` keyword introduces global state into your function, making it harder to reason about and test.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "Using the `global` keyword",
+                indoc! {r#"
+                    <?php
+
+                    function foo(): void
+                    {
+                        global $bar;
+
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using the `$GLOBALS` variable",
+                indoc! {r#"
+                    <?php
+
+                    function foo(): void
+                    {
+                        // ...
+
+                        $GLOBALS['bar'] = $value;
+                    }
+                "#},
+            ))
     }
 }
 

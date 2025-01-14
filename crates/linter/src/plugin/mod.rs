@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::definition::PluginDefinition;
 use crate::rule::Rule;
 
 pub mod analysis;
@@ -39,19 +40,7 @@ macro_rules! foreach_plugin {
 ///
 /// A plugin is a collection of rules that are applied to the codebase.
 pub trait Plugin: Send + Sync + Debug {
-    /// Returns the name of the plugin.
-    ///
-    /// # Returns
-    ///
-    /// A static string slice representing the name of the plugin.
-    ///
-    /// This name is used in configurations to enable or disable the entire plugin.
-    fn get_name(&self) -> &'static str;
-
-    /// Return wheather this plugin is enabled by default.
-    fn is_enabled_by_default(&self) -> bool {
-        false
-    }
+    fn get_definition(&self) -> PluginDefinition;
 
     /// Retrieves the list of rules associated with this plugin.
     ///
@@ -65,12 +54,8 @@ impl<T> Plugin for Box<T>
 where
     T: Plugin,
 {
-    fn get_name(&self) -> &'static str {
-        self.as_ref().get_name()
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        self.as_ref().is_enabled_by_default()
+    fn get_definition(&self) -> PluginDefinition {
+        self.as_ref().get_definition()
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

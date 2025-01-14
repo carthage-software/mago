@@ -270,7 +270,7 @@ impl LintContext<'_> {
     }
 
     pub fn report(&mut self, issue: Issue) {
-        self.issues.push(issue);
+        self.issues.push(issue.with_code(&self.rule.slug));
     }
 
     pub fn report_with_fix<F>(&mut self, issue: Issue, f: F)

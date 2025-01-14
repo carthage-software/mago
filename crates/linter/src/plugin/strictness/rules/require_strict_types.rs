@@ -1,3 +1,6 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::ast::*;
 use mago_ast::Program;
 use mago_reporting::*;
@@ -5,7 +8,13 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
+
+const ALLOW_DISABLING: &str = "allow-disabling";
+const ALLOW_DISABLING_DEFAULT: bool = false;
 
 const STRICT_TYPES_DIRECTIVE: &str = "strict_types";
 
@@ -13,14 +22,58 @@ const STRICT_TYPES_DIRECTIVE: &str = "strict_types";
 pub struct RequireStrictTypesRule;
 
 impl Rule for RequireStrictTypesRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-strict-types"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Strict Types", Level::Warning)
+            .with_description(indoc! {"
+                Detects missing `declare(strict_types=1);` statement at the beginning of the file.
+            "})
+            .with_option(RuleOptionDefinition {
+                name: ALLOW_DISABLING,
+                r#type: "boolean",
+                description: "Whether to allow disabling the `strict_types` directive.",
+                default: Value::Boolean(ALLOW_DISABLING_DEFAULT),
+            })
+            .with_example(RuleUsageExample::valid(
+                "A program with a `declare(strict_types=1);` statement",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    declare(strict_types=1);
+
+                    echo "Hello, World!";
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A program that is missing a `declare(strict_types=1);` statement",
+                indoc! {r#"
+                    <?php
+
+                    echo "Hello, World!";
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A program with a disabled `strict_types` directive",
+                indoc! {r#"
+                    <?php
+
+                    declare(strict_types=0);
+
+                    echo "Hello, World!";
+                "#},
+            ))
+            .with_example(
+                RuleUsageExample::valid(
+                    "A program with an allowed disabled `strict_types` directive",
+                    indoc! {r#"
+                    <?php
+
+                    declare(strict_types=0);
+
+                    echo "Hello, World!";
+                "#},
+                )
+                .with_option(ALLOW_DISABLING, Value::Boolean(true)),
+            )
     }
 }
 
@@ -52,7 +105,11 @@ impl<'a> Walker<LintContext<'a>> for RequireStrictTypesRule {
                                 }
                             };
 
-                            if disabled && !context.option("allow-disabling").and_then(|o| o.as_bool()).unwrap_or(false)
+                            if disabled
+                                && !context
+                                    .option(ALLOW_DISABLING)
+                                    .and_then(|o| o.as_bool())
+                                    .unwrap_or(ALLOW_DISABLING_DEFAULT)
                             {
                                 context.report(
                                     Issue::new(context.level(), "The `strict_types` directive is disabled.")

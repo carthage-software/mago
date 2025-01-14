@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::safety::rules::no_error_control_operator::NoErrorControlOperatorRule;
 use crate::plugin::safety::rules::no_eval::NoEvalRule;
 use crate::plugin::safety::rules::no_ffi::NoFFIRule;
@@ -15,12 +16,12 @@ pub mod rules;
 pub struct SafetyPlugin;
 
 impl Plugin for SafetyPlugin {
-    fn get_name(&self) -> &'static str {
-        "safety"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Safety",
+            description: "Provides rules that enforce best practices for safe code.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

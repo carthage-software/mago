@@ -55,3 +55,33 @@ pub fn apply_changes(
 
     Ok(true)
 }
+
+/// Indents each line of `text` by `indent_str`, optionally indenting the first line.
+///
+/// # Arguments
+///
+/// * `text` - The text to indent.
+/// * `indent_str` - The string to use for indentation.
+/// * `indent_first_line` - Whether to indent the first line.
+///
+/// # Returns
+///
+/// * `String` - The indented text.
+#[inline(always)]
+pub fn indent_multiline(text: &str, indent_str: &str, indent_first_line: bool) -> String {
+    text.lines()
+        .enumerate()
+        .map(|(i, line)| {
+            if i == 0 {
+                if indent_first_line {
+                    format!("{}{}", indent_str, line)
+                } else {
+                    line.to_string()
+                }
+            } else {
+                format!("{}{}", indent_str, line)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}

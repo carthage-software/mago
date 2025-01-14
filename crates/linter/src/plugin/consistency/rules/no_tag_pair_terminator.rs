@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,36 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoTagPairTerminatorRule;
 
 impl Rule for NoTagPairTerminatorRule {
-    fn get_name(&self) -> &'static str {
-        "no-tag-pair-terminator"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Tag Pair Terminator", Level::Note)
+            .with_description(indoc! {"
+                   Discourages the use of `?><?php` as a statement terminator. Recommends using a semicolon
+                   (`;`) instead for clarity and consistency.
+               "})
+            .with_example(RuleUsageExample::valid(
+                "Using semicolon to terminate statements",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+                    echo "Hello World";
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `?><?php` to terminate statements",
+                indoc! {r#"
+                    <?php
+
+                    echo "Hello World" ?><?php
+                "#},
+            ))
     }
 }
 

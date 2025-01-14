@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::Modifier;
 use mago_ast::Property;
 use mago_fixer::SafetyClassification;
@@ -8,25 +10,36 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantWriteVisibilityRule;
 
 impl Rule for RedundantWriteVisibilityRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-write-visibility"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Write Visibility", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant write visibility modifiers on properties.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant write visibility modifier",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    final class User
+                    {
+                        public public(set) $name;
+                    }
+                "#},
+            ))
     }
 }
 
 impl<'a> Walker<LintContext<'a>> for RedundantWriteVisibilityRule {
     fn walk_in_property(&self, property: &Property, context: &mut LintContext<'a>) {
         let modifiers = property.modifiers();
-
         if modifiers.is_empty() {
             return;
         }

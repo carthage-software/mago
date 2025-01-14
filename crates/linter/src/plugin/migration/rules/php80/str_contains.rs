@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,6 +7,8 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const STR_CONTAINS: &str = "str_contains";
@@ -14,12 +18,38 @@ const STRPOS: &str = "strpos";
 pub struct StrContainsRule;
 
 impl Rule for StrContainsRule {
-    fn get_name(&self) -> &'static str {
-        "str-contains"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Str Contains", Level::Warning)
+            .with_description(indoc! {"
+                Detects `strpos($a, $b) !== false` comparisons and suggests replacing them with `str_contains($a, $b)`
+                for improved readability and intent clarity.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using `str_contains` instead of `strpos`",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    $a = 'hello world';
+                    $b = 'world';
+
+                    if (str_contains($a, $b)) {
+                        echo 'Found';
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `strpos` comparison",
+                indoc! {r#"
+                    <?php
+
+                    $a = 'hello world';
+                    $b = 'world';
+
+                    if (strpos($a, $b) !== false) {
+                        echo 'Found';
+                    }
+                "#},
+            ))
     }
 }
 

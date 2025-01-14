@@ -1,21 +1,77 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
+
+const PSR: &str = "psr";
+const PSR_DEFAULT: bool = true;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ClassRule;
 
 impl Rule for ClassRule {
-    fn get_name(&self) -> &'static str {
-        "class"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Class", Level::Help)
+            .with_description(indoc! {"
+                Detects class declarations that do not follow class naming convention.
+                Class names should be in class case, also known as PascalCase.
+            "})
+            .with_option(RuleOptionDefinition {
+                name: PSR,
+                r#type: "boolean",
+                description:
+                    "Enforce PSR naming convention, which requires abstract classes to be prefixed with `Abstract`.",
+                default: Value::Boolean(PSR_DEFAULT),
+            })
+            .with_example(RuleUsageExample::valid(
+                "A class name in class case",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    class MyClass {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A class name not in class case",
+                indoc! {r#"
+                    <?php
+
+                    class my_class {}
+                    class myClass {}
+                    class MY_CLASS {}
+                "#},
+            ))
+            .with_example(
+                RuleUsageExample::valid(
+                    "An abstract class name not prefixed with `Abstract`, with PSR option disabled",
+                    indoc! {r#"
+                    <?php
+
+                    abstract class MyClass {}
+                "#},
+                )
+                .with_option(PSR, Value::Boolean(false)),
+            )
+            .with_example(
+                RuleUsageExample::invalid(
+                    "An abstract class name not prefixed with `Abstract`, with PSR option enabled",
+                    indoc! {r#"
+                    <?php
+
+                    abstract class MyClass {}
+                "#},
+                )
+                .with_option(PSR, Value::Boolean(true)),
+            )
     }
 }
 
@@ -40,7 +96,7 @@ impl<'a> Walker<LintContext<'a>> for ClassRule {
         }
 
         if class.modifiers.contains_abstract()
-            && context.option("psr").and_then(|o| o.as_bool()).unwrap_or(true)
+            && context.option(PSR).and_then(|o| o.as_bool()).unwrap_or(PSR_DEFAULT)
             && !name.starts_with("Abstract")
         {
             let suggested_name = format!("Abstract{}", mago_casing::to_class_case(name));

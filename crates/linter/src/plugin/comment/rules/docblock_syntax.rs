@@ -1,9 +1,12 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 /// TODO(azjezz): Enable this rule by default once we have improved the linting experience.
@@ -11,14 +14,11 @@ use crate::rule::Rule;
 pub struct DocblockSyntaxRule;
 
 impl Rule for DocblockSyntaxRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "docblock-syntax"
-    }
-
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        None
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::disabled("Docblock Syntax").with_description(indoc! {"
+            Checks for syntax errors in docblock comments. This rule is disabled by default because
+            it can be noisy and may not be relevant to all codebases.
+        "})
     }
 }
 

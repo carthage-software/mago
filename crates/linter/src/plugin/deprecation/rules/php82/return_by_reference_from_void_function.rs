@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,89 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ReturnByReferenceFromVoidFunctionRule;
 
 impl Rule for ReturnByReferenceFromVoidFunctionRule {
-    fn get_name(&self) -> &'static str {
-        "return-by-reference-from-void-function"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Return By Reference From Void Function", Level::Warning)
+            .with_description(indoc! {"
+                Detects functions, methods, closures, arrow functions, and set property hooks that return by reference from a void function.
+                Such functions are considered deprecated; returning by reference from a void function is deprecated since PHP 8.0.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Returning by reference from a non-void function",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    function &foo(): string
+                    {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Returning by reference from a void function",
+                indoc! {r#"
+                    <?php
+
+                    function &foo(): void
+                    {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Returning by reference from a void method",
+                indoc! {r#"
+                    <?php
+
+                    class MyClass
+                    {
+                        public function &foo(): void
+                        {
+                            // ...
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Returning by reference from a void closure",
+                indoc! {r#"
+                    <?php
+
+                    $fun = function &(): void {
+                        // ...
+                    };
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Returning by reference from a void arrow function",
+                indoc! {r#"
+                    <?php
+
+                    $fun = fn &(): void => throw new Exception();
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Returning by reference from a property set hook",
+                indoc! {r#"
+                    <?php
+
+                    class MyClass
+                    {
+                        public string $property {
+                            &set(string $value) {
+                                // ...
+                            }
+                        }
+                    }
+                "#},
+            ))
     }
 }
 

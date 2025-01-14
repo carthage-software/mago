@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use indoc::indoc;
 use regex::Regex;
 
 use mago_ast::Program;
@@ -7,6 +8,8 @@ use mago_reporting::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::plugin::comment::rules::utils::comment_content;
 use crate::rule::Rule;
 
@@ -16,14 +19,31 @@ static TAGGED_FIXME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"fixme
 pub struct NoUntaggedFixmeRule;
 
 impl Rule for NoUntaggedFixmeRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "no-untagged-fixme"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Untagged FIXME", Level::Warning)
+            .with_description(indoc! {"
+            Detects FIXME comments that are not tagged with a user or issue reference. Untagged FIXME comments
+            are not actionable and can be easily missed by the team. Tagging the FIXME comment with a user or
+            issue reference ensures that the issue is tracked and resolved.
+        "})
+            .with_example(RuleUsageExample::valid(
+                "Correctly tagged FIXME comment",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Level::Warning.into()
+                    // FIXME(@azjezz) This is a valid FIXME comment.
+                    // FIXME(azjezz) This is a valid FIXME comment.
+                    // FIXME(#123) This is a valid FIXME comment.
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Untagged FIXME comment",
+                indoc! {r#"
+                    <?php
+
+                    // FIXME: This is an invalid FIXME comment.
+                "#},
+            ))
     }
 }
 

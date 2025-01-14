@@ -1,8 +1,12 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const REQUEST_VARIABLE: &str = "$_REQUEST";
@@ -11,12 +15,21 @@ const REQUEST_VARIABLE: &str = "$_REQUEST";
 pub struct NoRequestVariableRule;
 
 impl Rule for NoRequestVariableRule {
-    fn get_name(&self) -> &'static str {
-        "no-request-variable"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Request Variable", Level::Error)
+            .with_description(indoc! {"
+                Detects the use of the `$_REQUEST` variable, which is considered unsafe.
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                Use `$_GET`, `$_POST`, or `$_COOKIE` instead for better clarity.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "Using the `$_REQUEST` variable",
+                indoc! {r#"
+                    <?php
+
+                    $identifier = $_REQUEST['id'];
+                "#},
+            ))
     }
 }
 

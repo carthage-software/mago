@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,65 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct InterfaceShouldBeUsed;
 
 impl Rule for InterfaceShouldBeUsed {
-    fn get_name(&self) -> &'static str {
-        "interface-should-be-used"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Interface Should Be Used", Level::Note)
+            .with_description(indoc! {"
+                Detects when an implementation class is used instead of the interface.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A controller that uses the interface instead of the implementation",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+                    namespace App\Controller;
+
+                    use Symfony\Component\HttpFoundation\Request;
+                    use Symfony\Component\HttpFoundation\Response;
+                    use Symfony\Component\Routing\Annotation\Route;
+                    use Symfony\Component\Serializer\SerializerInterface;
+
+                    class UserController
+                    {
+                        public function __construct(SerializerInterface $serializer)
+                        {
+                            $this->serializer = $serializer;
+                        }
+
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A controller that uses the implementation instead of the interface",
+                indoc! {r#"
+                    <?php
+
+                    namespace App\Controller;
+
+                    use Symfony\Component\HttpFoundation\Request;
+                    use Symfony\Component\HttpFoundation\Response;
+                    use Symfony\Component\Routing\Annotation\Route;
+                    use Symfony\Component\Serializer\Serializer;
+
+                    class UserController
+                    {
+                        public function __construct(Serializer $serializer)
+                        {
+                            $this->serializer = $serializer;
+                        }
+
+                        // ...
+                    }
+                "#},
+            ))
     }
 }
 

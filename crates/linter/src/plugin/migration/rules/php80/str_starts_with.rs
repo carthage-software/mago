@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,6 +7,8 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const STR_STARTS_WITH: &str = "str_starts_with";
@@ -14,12 +18,38 @@ const STRPOS: &str = "strpos";
 pub struct StrStartsWithRule;
 
 impl Rule for StrStartsWithRule {
-    fn get_name(&self) -> &'static str {
-        "str-starts-with"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Str Starts With", Level::Warning)
+            .with_description(indoc! {"
+                Detects `strpos($a, $b) === 0` comparisons and suggests replacing them with `str_starts_with($a, $b)`
+                for improved readability and intent clarity.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using `str_starts_with` instead of `strpos`",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    $a = 'hello world';
+                    $b = 'hello';
+
+                    if (str_starts_with($a, $b)) {
+                        echo 'Found';
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `strpos` comparison",
+                indoc! {r#"
+                    <?php
+
+                    $a = 'hello world';
+                    $b = 'hello';
+
+                    if (strpos($a, $b) === 0) {
+                        echo 'Found';
+                    }
+                "#},
+            ))
     }
 }
 

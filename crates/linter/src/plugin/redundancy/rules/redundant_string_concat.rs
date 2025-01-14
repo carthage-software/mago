@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -6,18 +8,27 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantStringConcatRule;
 
 impl Rule for RedundantStringConcatRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-string-concat"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant String Concat", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant string concatenation expressions.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant string concatenation expression",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    $foo = "Hello" . " World";
+                "#},
+            ))
     }
 }
 

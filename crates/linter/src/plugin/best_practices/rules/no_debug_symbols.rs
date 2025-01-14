@@ -1,9 +1,12 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 const DEBUG_FUNCTIONS: [&str; 50] = [
@@ -67,12 +70,12 @@ const DEBUG_FUNCTIONS: [&str; 50] = [
 pub struct NoDebugSymbolsRule;
 
 impl Rule for NoDebugSymbolsRule {
-    fn get_name(&self) -> &'static str {
-        "no-debug-symbols"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Debug Symbols", Level::Note).with_description(indoc! {"
+            Flags calls to debug functions like `var_dump`, `print_r`, `debug_backtrace`, etc.
+            in production code. Debug functions are useful for debugging, but they can expose
+            sensitive information or degrade performance in production environments.
+        "})
     }
 }
 

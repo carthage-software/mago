@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,10 +7,29 @@ use mago_span::Span;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantNoopRule;
+
+impl Rule for RedundantNoopRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Noop", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant `noop` statements.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `noop` statement",
+                indoc! {r#"
+                    <?php
+
+                    ;
+                "#},
+            ))
+    }
+}
 
 impl RedundantNoopRule {
     fn report(&self, noop: &Span, context: &mut LintContext<'_>) {
@@ -17,16 +38,6 @@ impl RedundantNoopRule {
             .with_help("Remove the redundant `;`");
 
         context.report_with_fix(issue, |plan| plan.delete(noop.to_range(), SafetyClassification::Safe));
-    }
-}
-
-impl Rule for RedundantNoopRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-noop"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
     }
 }
 

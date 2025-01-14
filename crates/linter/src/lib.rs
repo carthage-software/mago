@@ -1,9 +1,11 @@
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::sync::RwLockReadGuard;
 
 use mago_interner::ThreadedInterner;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
+use mago_reporting::Level;
 use mago_semantics::Semantics;
 
 use crate::context::Context;
@@ -15,6 +17,7 @@ use crate::settings::Settings;
 
 pub mod consts;
 pub mod context;
+pub mod definition;
 pub mod plugin;
 pub mod rule;
 pub mod settings;
@@ -76,27 +79,28 @@ impl Linter {
     ///
     /// - `plugin`: The plugin to add to the linter.
     pub fn add_plugin(&mut self, plugin: impl Plugin) {
-        let name = plugin.get_name();
+        let plugin_definition = plugin.get_definition();
+        let plugin_slug = plugin_definition.get_slug();
 
-        tracing::debug!("Adding plugin `{name}`...");
+        tracing::debug!("Adding plugin `{plugin_slug}`...");
 
-        let enabled = self.settings.plugins.iter().any(|p| p.eq(name));
+        let enabled = self.settings.plugins.iter().any(|p| p.eq(&plugin_slug));
         if !enabled {
-            if self.settings.default_plugins && plugin.is_enabled_by_default() {
-                tracing::debug!("Enabling default plugin `{name}`.");
+            if self.settings.default_plugins && plugin_definition.enabled_by_default {
+                tracing::debug!("Enabling default plugin `{plugin_slug}`.");
             } else {
                 tracing::debug!(
-                    "Plugin `{name}` is not enabled in the configuration and is not a default plugin. Skipping."
+                    "Plugin `{plugin_slug}` is not enabled in the configuration and is not a default plugin. Skipping."
                 );
 
                 return;
             }
         } else {
-            tracing::debug!("Enabling plugin `{name}`.");
+            tracing::debug!("Enabling plugin `{plugin_slug}`.");
         }
 
         for rule in plugin.get_rules() {
-            self.add_rule(name, rule);
+            self.add_rule(&plugin_slug, rule);
         }
     }
 
@@ -106,47 +110,80 @@ impl Linter {
     ///
     /// # Parameters
     ///
-    /// - `plugin`: The name of the plugin that the rule belongs to.
+    /// - `plugin_slug`: The slug of the plugin that the rule belongs to.
     /// - `rule`: The rule to add to the linter.
-    pub fn add_rule(&mut self, plugin: impl Into<String>, rule: Box<dyn Rule>) {
-        let plugin = plugin.into();
-        let rule_name = rule.get_name();
-        let full_name = format!("{}/{}", plugin, rule_name);
+    pub fn add_rule(&mut self, plugin_slug: impl Into<String>, rule: Box<dyn Rule>) {
+        let rule_definition = rule.get_definition();
 
-        tracing::debug!("Adding rule `{full_name}`...");
+        let plugin_slug = plugin_slug.into();
+        let slug = format!("{}/{}", plugin_slug, rule_definition.get_slug());
 
-        let settings = self.settings.get_rule_settings(full_name.as_str()).cloned().unwrap_or_else(|| {
-            tracing::debug!("No configuration found for rule `{full_name}`, using default.");
+        tracing::debug!("Adding rule `{slug}`...");
 
-            RuleSettings::from_level(rule.get_default_level())
+        let settings = self.settings.get_rule_settings(slug.as_str()).cloned().unwrap_or_else(|| {
+            tracing::debug!("No configuration found for rule `{slug}`, using default.");
+
+            RuleSettings::from_level(rule_definition.level)
         });
 
         if !settings.enabled {
-            tracing::debug!("Rule `{full_name}` is configured to be off. Skipping.");
+            tracing::debug!("Rule `{slug}` is configured to be off. Skipping.");
 
             return;
         }
 
         let level = match settings.level {
             Some(level) => level,
-            None => match rule.get_default_level() {
+            None => match rule_definition.level {
                 Some(level) => level,
                 None => {
-                    tracing::debug!("Rule `{full_name}` does not have a default level. Skipping.");
+                    tracing::debug!("Rule `{slug}` does not have a default level. Skipping.");
 
                     return;
                 }
             },
         };
 
-        tracing::debug!("Enabling rule `{full_name}` with level `{level:?}`.");
+        tracing::debug!("Enabling rule `{slug}` with level `{level:?}`.");
 
         self.rules.write().expect("Unable to add rule: poisoned lock").push(ConfiguredRule {
+            slug,
             level,
             settings,
-            plugin,
             rule,
         });
+    }
+
+    /// Returns a read lock for the vector of [`ConfiguredRule`] instances maintained by the linter.
+    ///
+    /// This method provides direct, read-only access to all currently configured rules.
+    /// You can iterate over them or inspect their fields (e.g., `slug`, `level`, etc.).
+    ///
+    /// # Panics
+    ///
+    /// If the underlying `RwLock` is poisoned (e.g. another thread panicked while holding
+    /// the lock), this method will panic with `"Unable to get rule: poisoned lock"`.
+    pub fn get_configured_rules(&self) -> RwLockReadGuard<'_, Vec<ConfiguredRule>> {
+        self.rules.read().expect("Unable to get rule: poisoned lock")
+    }
+
+    /// Retrieves the **level** of a rule by its fully qualified slug.
+    ///
+    /// This method looks up a configured rule by its slug (e.g., `"plugin-slug/rule-slug"`)
+    /// and returns the rule’s current level (e.g., `Level::Warning`).
+    ///
+    /// # Parameters
+    ///
+    /// - `slug`: The fully qualified slug of the rule (e.g. `"best-practices/excessive-nesting"`).
+    ///
+    /// # Returns
+    ///
+    /// An [`Option<Level>`]. Returns `Some(Level)` if the slug is found among the currently
+    /// configured rules, or `None` if no matching rule is found.
+    pub fn get_rule_level(&self, slug: &str) -> Option<Level> {
+        let configured_rules = self.rules.read().expect("Unable to get rule: poisoned lock");
+
+        configured_rules.iter().find(|r| r.slug == slug).map(|r| r.level)
     }
 
     /// Lints the given semantics.
@@ -168,11 +205,16 @@ impl Linter {
         let mut context = Context::new(&self.interner, &self.codebase, semantics);
 
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
+        if configured_rules.is_empty() {
+            tracing::warn!("No rules configured. Skipping linting.");
+
+            return IssueCollection::new();
+        }
 
         tracing::debug!("Linting source `{}` with {} rules...", source_name, configured_rules.len());
 
         for configured_rule in configured_rules.iter() {
-            tracing::trace!("Running rule `{}`...", configured_rule.rule.get_name());
+            tracing::trace!("Running rule `{}`...", configured_rule.rule.get_definition().name);
 
             let mut lint_context = context.for_rule(configured_rule);
 

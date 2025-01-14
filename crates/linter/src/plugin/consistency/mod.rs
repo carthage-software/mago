@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::consistency::rules::array_syntax::ArraySyntaxRule;
 use crate::plugin::consistency::rules::lowercase_hint::LowercaseHintRule;
 use crate::plugin::consistency::rules::lowercase_keyword::LowercaseKeywordRule;
@@ -14,12 +15,12 @@ pub mod rules;
 pub struct ConsistencyPlugin;
 
 impl Plugin for ConsistencyPlugin {
-    fn get_name(&self) -> &'static str {
-        "consistency"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Consistency",
+            description: "Provides rules that enforce consistent coding standards.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

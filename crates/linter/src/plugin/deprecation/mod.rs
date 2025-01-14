@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::deprecation::rules::php80::optional_parameter_before_required::OptionalParameterBeforeRequiredRule;
 use crate::plugin::deprecation::rules::php82::return_by_reference_from_void_function::ReturnByReferenceFromVoidFunctionRule;
 use crate::plugin::deprecation::rules::php84::implicitly_nullable_parameter::ImplicitlyNullableParameterRule;
@@ -12,12 +13,12 @@ pub mod rules;
 pub struct DeprecationPlugin;
 
 impl Plugin for DeprecationPlugin {
-    fn get_name(&self) -> &'static str {
-        "deprecation"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Deprecation",
+            description: "Provides rules that detect deprecated features in PHP code.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
@@ -5,20 +7,41 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequireParameterTypeRule;
 
 impl Rule for RequireParameterTypeRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-parameter-type"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Parameter Type", Level::Warning)
+            .with_description(indoc! {"
+                Detects parameters that are missing a type hint.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A function with a parameter that has a type hint",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    function foo(string $bar): void
+                    {
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A function with a parameter that is missing a type hint",
+                indoc! {r#"
+                    <?php
+
+                    function foo($bar): void
+                    {
+                        // ...
+                    }
+                "#},
+            ))
     }
 }
 

@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,18 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoEmptyLoopRule;
 
 impl Rule for NoEmptyLoopRule {
-    fn get_name(&self) -> &'static str {
-        "no-empty-loop"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Empty Loop", Level::Note).with_description(indoc! {"
+            Detects loops (for, foreach, while, do-while) that have an empty body. An empty loop body
+            does not perform any actions and is likely a mistake or a sign of redundant code.
+        "})
     }
 }
 

@@ -1,21 +1,43 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EnumRule;
 
 impl Rule for EnumRule {
-    fn get_name(&self) -> &'static str {
-        "enum"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Enum", Level::Help)
+            .with_description(indoc! {"
+                Detects enum declarations that do not follow class naming convention.
+                Enum names should be in class case, also known as PascalCase.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "An enum name in class case",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    enum MyEnum {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An enum name not in class case",
+                indoc! {r#"
+                    <?php
+
+                    enum my_enum {}
+                    enum myEnum {}
+                    enum MY_ENUM {}
+                "#},
+            ))
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::phpunit::rules::consistency::assertions_style::AssertionsStyleRule;
 use crate::plugin::phpunit::rules::strictness::strict_assertions::StrictAssertionsRule;
 
@@ -10,12 +11,12 @@ pub mod rules;
 pub struct PHPUnitPlugin;
 
 impl Plugin for PHPUnitPlugin {
-    fn get_name(&self) -> &'static str {
-        "phpunit"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        false
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "PHPUnit",
+            description: "Provides rules that enforce best practices for PHPUnit tests.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,44 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ImplicitlyNullableParameterRule;
 
 impl Rule for ImplicitlyNullableParameterRule {
-    fn get_name(&self) -> &'static str {
-        "implicitly-nullable-parameter"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Implicitly Nullable Parameter", Level::Warning)
+            .with_description(indoc! {"
+                Detects parameters that are implicitly nullable and rely on a deprecated feature.
+                Such parameters are considered deprecated; an explicit nullable type hint is recommended.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using an explicit nullable type hint",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    function foo(?string $param) {}
+
+                    function bar(null|string $param) {}
+
+                    function baz(null|object $param = null) {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using an implicit nullable parameter",
+                indoc! {r#"
+                    <?php
+
+                    function foo(string $param = null) {}
+
+                    function bar(string $param = NULL) {}
+
+                    function baz(object $param = null) {}
+                "#},
+            ))
     }
 }
 

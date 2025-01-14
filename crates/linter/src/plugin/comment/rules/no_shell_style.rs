@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,20 +7,18 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoShellStyleRule;
 
 impl Rule for NoShellStyleRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "no-shell-style"
-    }
-
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Level::Warning.into()
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Shell Style", Level::Warning).with_description(indoc! {"
+            Detects shell-style comments ('#') in PHP code. Double slash comments ('//') are preferred
+            in PHP, as they are more consistent with the language's syntax and are easier to read.
+        "})
     }
 }
 

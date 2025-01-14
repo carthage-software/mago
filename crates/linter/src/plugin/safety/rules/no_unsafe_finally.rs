@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_ast_utils::control_flow::find_control_flows_in_block;
 use mago_ast_utils::control_flow::ControlFlow;
@@ -6,18 +8,37 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoUnsafeFinallyRule;
 
 impl Rule for NoUnsafeFinallyRule {
-    fn get_name(&self) -> &'static str {
-        "no-unsafe-finally"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Unsafe Finally", Level::Error)
+            .with_description(indoc! {"
+                Detects control flow statements in `finally` blocks.
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                Control flow statements in `finally` blocks override control flows from `try` and `catch` blocks,
+                leading to unexpected behavior.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A control flow statement in a `finally` block",
+                indoc! {r#"
+                    <?php
+
+                    function example(): int
+                    {
+                        try {
+                            return 1;
+                        } finally {
+                            throw new Exception();
+                        }
+                    }
+                "#},
+            ))
     }
 }
 

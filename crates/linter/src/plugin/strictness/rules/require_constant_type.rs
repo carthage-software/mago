@@ -1,23 +1,70 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequireConstantTypeRule;
 
 impl Rule for RequireConstantTypeRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-constant-type"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Constant Type", Level::Warning)
+            .with_description(indoc! {"
+                Detects class constants that are missing a type hint.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A class constant with a type hint",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    declare(strict_types=1);
+
+                    namespace Psl\IO\Internal;
+
+                    use Psl\IO;
+
+                    class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface
+                    {
+                        use IO\ReadHandleConvenienceMethodsTrait;
+                        use IO\WriteHandleConvenienceMethodsTrait;
+
+                        public const int DEFAULT_READ_BUFFER_SIZE = 4096;
+                        public const int MAXIMUM_READ_BUFFER_SIZE = 786432;
+
+                        // ...
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A class constant without a type hint",
+                indoc! {r#"
+                    <?php
+
+                    declare(strict_types=1);
+
+                    namespace Psl\IO\Internal;
+
+                    use Psl\IO;
+
+                    class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface
+                    {
+                        use IO\ReadHandleConvenienceMethodsTrait;
+                        use IO\WriteHandleConvenienceMethodsTrait;
+
+                        public const DEFAULT_READ_BUFFER_SIZE = 4096;
+                        public const MAXIMUM_READ_BUFFER_SIZE = 786432;
+
+                        // ...
+                    }
+                "#},
+            ))
     }
 }
 

@@ -1,21 +1,77 @@
+use indoc::indoc;
+use toml::Value;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleOptionDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
+
+const PSR: &str = "psr";
+const PSR_DEFAULT: bool = true;
 
 #[derive(Clone, Copy, Debug)]
 pub struct InterfaceRule;
 
 impl Rule for InterfaceRule {
-    fn get_name(&self) -> &'static str {
-        "interface"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Interface", Level::Help)
+            .with_description(indoc! {"
+                Detects interface declarations that do not follow class naming convention.
+                Interface names should be in class case and suffixed with `Interface`, depending on the configuration.
+            "})
+            .with_option(RuleOptionDefinition {
+                name: PSR,
+                r#type: "boolean",
+                description:
+                    "Enforce PSR naming convention, which requires interface names to be suffixed with `Interface`.",
+                default: Value::Boolean(PSR_DEFAULT),
+            })
+            .with_example(RuleUsageExample::valid(
+                "An interface name in class case",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    interface MyInterface {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "An interface name not in class case",
+                indoc! {r#"
+                    <?php
+
+                    interface myInterface {}
+                    interface my_interface {}
+                    interface MY_INTERFACE {}
+                "#},
+            ))
+            .with_example(
+                RuleUsageExample::valid(
+                    "An interface not suffixed with `Interface`, with PSR option disabled",
+                    indoc! {r#"
+                    <?php
+
+                    interface My {}
+                "#},
+                )
+                .with_option(PSR, Value::Boolean(false)),
+            )
+            .with_example(
+                RuleUsageExample::invalid(
+                    "An interface not suffixed with `Interface`, with PSR option enabled",
+                    indoc! {r#"
+                    <?php
+
+                    interface My {}
+                "#},
+                )
+                .with_option(PSR, Value::Boolean(true)),
+            )
     }
 }
 
@@ -43,7 +99,7 @@ impl<'a> Walker<LintContext<'a>> for InterfaceRule {
             );
         }
 
-        if context.option("psr").and_then(|o| o.as_bool()).unwrap_or(true) && !name.ends_with("Interface") {
+        if context.option(PSR).and_then(|o| o.as_bool()).unwrap_or(PSR_DEFAULT) && !name.ends_with("Interface") {
             issues.push(
                 Issue::new(context.level(), format!("interface name `{}` should be suffixed with `Interface`.", name))
                     .with_annotations([

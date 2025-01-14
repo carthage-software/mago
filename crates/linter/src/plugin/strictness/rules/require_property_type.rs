@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
@@ -5,20 +7,41 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequirePropertyTypeRule;
 
 impl Rule for RequirePropertyTypeRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-property-type"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Property Type", Level::Warning)
+            .with_description(indoc! {"
+                Detects class-like properties that are missing a type hint.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A class property that has a type hint",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    class Foo
+                    {
+                        public int $bar;
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A class property that is missing a type hint",
+                indoc! {r#"
+                    <?php
+
+                    class Foo
+                    {
+                        public $bar;
+                    }
+                "#},
+            ))
     }
 }
 

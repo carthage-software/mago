@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::strictness::rules::missing_assert_description::MissingAssertDescriptionRule;
 use crate::plugin::strictness::rules::no_assignment_in_condition::NoAssignmentInConditionRule;
 use crate::plugin::strictness::rules::require_constant_type::RequireConstantTypeRule;
@@ -16,12 +17,12 @@ pub mod rules;
 pub struct StrictnessPlugin;
 
 impl Plugin for StrictnessPlugin {
-    fn get_name(&self) -> &'static str {
-        "strictness"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Strictness",
+            description: "Provides rules that enforce strictness in the codebase.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

@@ -5,17 +5,40 @@ use toml::value::Value;
 
 use mago_reporting::Level;
 
+/// `Settings` is a struct that holds all the configuration options for the linter.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
+    /// Indicates whether all plugins that mark themselves as "default" are automatically enabled,
+    /// in addition to those explicitly listed in [`plugins`].
     pub default_plugins: bool,
+
+    /// A list of plugin slugs (e.g., `"analysis"`, `"migration"`) that are explicitly enabled.
+    ///
+    /// If `default_plugins` is `true`, those “default” plugins also become enabled,
+    /// even if not listed here.
     pub plugins: Vec<String>,
+
+    /// A map of `rule_slug -> RuleSettings`, where `rule_slug` might look like `"analysis/instantiation"`.
+    ///
+    /// This allows fine-grained control (e.g. enabling or disabling a particular rule, or overriding
+    /// its default level) on a rule-by-rule basis.
     pub rules: HashMap<String, RuleSettings>,
 }
 
+/// Specifies how a single rule is configured in user settings, such as whether it’s enabled,
+/// which severity level applies, and any custom options specific to that rule.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct RuleSettings {
+    /// If `false`, the rule is disabled entirely.
     pub enabled: bool,
+
+    /// The severity level set by the user (e.g., `Level::Error` or `Level::Warning`).
+    ///
+    /// If `None`, the rule uses its default level.
     pub level: Option<Level>,
+
+    /// A map of additional **rule-specific** configuration options (e.g., a threshold or a
+    /// boolean toggle), stored as a [`toml::Value`]. If none are needed, this may be empty.
     pub options: HashMap<String, Value>,
 }
 

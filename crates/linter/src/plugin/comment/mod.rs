@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::comment::rules::docblock_syntax::DocblockSyntaxRule;
 use crate::plugin::comment::rules::no_empty_comments::NoEmptyCommentsRule;
 use crate::plugin::comment::rules::no_shell_style::NoShellStyleRule;
@@ -14,12 +15,12 @@ pub mod rules;
 pub struct CommentPlugin;
 
 impl Plugin for CommentPlugin {
-    fn get_name(&self) -> &'static str {
-        "comment"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Comment",
+            description: "Provides rules that enforce best practices for comments.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,18 +7,41 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LowercaseHintRule;
 
 impl Rule for LowercaseHintRule {
-    fn get_name(&self) -> &'static str {
-        "lowercase-hint"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Lowercase Hint", Level::Help)
+            .with_description(indoc! {"
+                    Enforces that PHP type hints (like `void`, `bool`, `int`, `float`, etc.) be written
+                    in lowercase. Using uppercase or mixed case is discouraged for consistency
+                    and readability.
+                "})
+            .with_example(RuleUsageExample::valid(
+                "Using lowercase type hints",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    function example(int $param): void {
+                        return;
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using uppercase or mixed case type hints",
+                indoc! {r#"
+                    <?php
+
+                    function example(Int $param): VOID {
+                        return;
+                    }
+                "#},
+            ))
     }
 }
 

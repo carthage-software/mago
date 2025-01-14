@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,10 +7,31 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantBlockRule;
+
+impl Rule for RedundantBlockRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Block", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant blocks around statements.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant block around a statement",
+                indoc! {r#"
+                    <?php
+
+                    {
+                        echo "Hello, world!";
+                    }
+                "#},
+            ))
+    }
+}
 
 impl RedundantBlockRule {
     fn report(&self, block: &Block, context: &mut LintContext<'_>) {
@@ -22,16 +45,6 @@ impl RedundantBlockRule {
             plan.delete(block.left_brace.to_range(), SafetyClassification::Safe);
             plan.delete(block.right_brace.to_range(), SafetyClassification::Safe);
         });
-    }
-}
-
-impl Rule for RedundantBlockRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-block"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
     }
 }
 

@@ -1,21 +1,54 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct UndefinedConstantRule;
 
 impl Rule for UndefinedConstantRule {
-    fn get_name(&self) -> &'static str {
-        "undefined-constant"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Undefined Constant", Level::Error)
+            .with_description(indoc! {"
+                Checks for usage of constants that have not been defined. This typically occurs
+                when a constant is referenced by name (e.g., `FOO`) without being declared via
+                `define` or `const` in the same namespace, or imported from another namespace.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Defining a constant via `const`",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Error)
+                    const GREETING = 'Hello, world!';
+
+                    echo GREETING; // Valid
+                "#},
+            ))
+            .with_example(RuleUsageExample::valid(
+                "Defining a constant via `define()`",
+                indoc! {r#"
+                    <?php
+
+                    define('GREETING', 'Hello, world!');
+
+                    echo GREETING; // Valid
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Accessing an undefined constant",
+                indoc! {r#"
+                    <?php
+
+                    echo GREETING; // Error: Undefined constant `GREETING`
+                "#},
+            ))
     }
 }
 

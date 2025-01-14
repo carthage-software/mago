@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::laravel::rules::safety::no_request_all::NoRequestAllRule;
 
 use crate::plugin::Plugin;
@@ -9,12 +10,12 @@ pub mod rules;
 pub struct LaravelPlugin;
 
 impl Plugin for LaravelPlugin {
-    fn get_name(&self) -> &'static str {
-        "laravel"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        false
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Laravel",
+            description: "Provides rules that enforce best practices for Laravel applications.",
+            enabled_by_default: false,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {

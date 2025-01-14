@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,10 +7,52 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantFinalMethodModifierRule;
+
+impl Rule for RedundantFinalMethodModifierRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Final Method Modifier", Level::Help)
+            .with_description(indoc! {"
+                Detects redundant `final` modifiers on methods in final classes or enum methods.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `final` modifier on a method in a final class",
+                indoc! {r#"
+                    <?php
+
+                    final class Foo
+                    {
+                        final public function bar(): void
+                        {
+                            // ...
+                        }
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A redundant `final` modifier on a method in an enum",
+                indoc! {r#"
+                    <?php
+
+                    enum Foo
+                    {
+                        case Bar;
+                        case Baz;
+
+                        final public function qux(): void
+                        {
+                            // ...
+                        }
+                    }
+                "#},
+            ))
+    }
+}
 
 impl RedundantFinalMethodModifierRule {
     fn report(&self, method: &Method, context: &mut LintContext<'_>, in_enum: bool) {
@@ -32,16 +76,6 @@ impl RedundantFinalMethodModifierRule {
 
         context
             .report_with_fix(issue, |plan| plan.delete(final_modifier.span().to_range(), SafetyClassification::Safe));
-    }
-}
-
-impl Rule for RedundantFinalMethodModifierRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-final-method-modifier"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
     }
 }
 

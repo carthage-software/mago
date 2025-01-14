@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_ast_utils::assignment::get_assignment_from_expression;
 use mago_reporting::*;
@@ -5,10 +7,32 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoAssignmentInConditionRule;
+
+impl Rule for NoAssignmentInConditionRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Assignment In Condition", Level::Warning)
+            .with_description(indoc! {"
+                Detects assignments in conditions which can lead to unexpected behavior and make the code harder
+                to read and understand.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "An assignment in a condition",
+                indoc! {r#"
+                    <?php
+
+                    if ($x = 1) {
+                        // ...
+                    }
+                "#},
+            ))
+    }
+}
 
 impl NoAssignmentInConditionRule {
     fn report<'ast>(&self, condition: &'ast Expression, assignment: &'ast Assignment, context: &mut LintContext) {
@@ -22,18 +46,6 @@ impl NoAssignmentInConditionRule {
         }
 
         context.report(issue);
-    }
-}
-
-impl Rule for NoAssignmentInConditionRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "no-assignment-in-condition"
-    }
-
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
     }
 }
 

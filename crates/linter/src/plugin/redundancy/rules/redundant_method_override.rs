@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_interner::StringIdentifier;
@@ -6,18 +8,41 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RedundantMethodOverrideRule;
 
 impl Rule for RedundantMethodOverrideRule {
-    fn get_name(&self) -> &'static str {
-        "redundant-method-override"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Redundant Method Override", Level::Help)
+            .with_description(indoc! {"
+                Detects methods that override a parent method but only call the parent method with the same arguments.
+            "})
+            .with_example(RuleUsageExample::invalid(
+                "A method that overrides a parent method but only calls the parent method with the same arguments",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    class Parent
+                    {
+                        public function foo(): void
+                        {
+                            // ...
+                        }
+                    }
+
+                    class Child extends Parent
+                    {
+                        public function foo(): void
+                        {
+                            parent::foo();
+                        }
+                    }
+                "#},
+            ))
     }
 }
 

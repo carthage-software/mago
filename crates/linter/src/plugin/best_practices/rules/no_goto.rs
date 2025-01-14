@@ -1,21 +1,24 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct NoGotoRule;
 
 impl Rule for NoGotoRule {
-    fn get_name(&self) -> &'static str {
-        "no-goto"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No GOTO", Level::Note).with_description(indoc! {"
+            Detects the use of `goto` statements in code. The `goto` statement can make code harder to read,
+            understand, and maintain. It can lead to spaghetti code and make it difficult to follow the flow
+            of execution.
+        "})
     }
 }
 

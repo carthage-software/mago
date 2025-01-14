@@ -1,23 +1,44 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequireReturnTypeRule;
 
 impl Rule for RequireReturnTypeRule {
-    #[inline]
-    fn get_name(&self) -> &'static str {
-        "require-return-type"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Return Type", Level::Warning)
+            .with_description(indoc! {"
+                Detects functions, methods, closures, and arrow functions that are missing a return type hint.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A closure with a return type hint",
+                indoc! {r#"
+                    <?php
 
-    #[inline]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    $func = function(): int {
+                        return 42;
+                    };
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A closure without a return type hint",
+                indoc! {r#"
+                    <?php
+
+                    $func = function() {
+                        return 42;
+                    };
+                "#},
+            ))
     }
 }
 

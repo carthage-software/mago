@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,10 +7,49 @@ use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct RequireBlockStatementBodyRule;
+
+impl Rule for RequireBlockStatementBodyRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Require Block Statement Body", Level::Note)
+            .with_description(indoc! {"
+                Enforces that loop bodies (`for`, `while`, `foreach`) are enclosed in braces `{}`.
+                Using single statements without braces can lead to confusion or errors if new
+                statements are later inserted.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using braces around a loop body",
+                indoc! {r#"
+                    <?php
+
+                    for ($i = 0; $i < 5; $i++) {
+                        echo $i;
+                    }
+
+                    while ($condition) {
+                        doSomething();
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Loop body without braces",
+                indoc! {r#"
+                    <?php
+
+                    for ($i = 0; $i < 5; $i++)
+                        echo $i; // Error: Should be wrapped in {}
+
+                    while ($condition)
+                        doSomething(); // Error: Should be wrapped in {}
+                "#},
+            ))
+    }
+}
 
 impl RequireBlockStatementBodyRule {
     fn report(&self, r#loop: &impl HasSpan, statement: &Statement, context: &mut LintContext<'_>) {
@@ -34,17 +75,6 @@ impl RequireBlockStatementBodyRule {
         });
     }
 }
-
-impl Rule for RequireBlockStatementBodyRule {
-    fn get_name(&self) -> &'static str {
-        "require-block-statement-body"
-    }
-
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
-    }
-}
-
 impl<'a> Walker<LintContext<'a>> for RequireBlockStatementBodyRule {
     fn walk_in_for<'ast>(&self, r#for: &'ast For, context: &mut LintContext<'a>) {
         let ForBody::Statement(statement) = &r#for.body else {

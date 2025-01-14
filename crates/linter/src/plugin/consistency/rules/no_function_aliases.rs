@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -5,6 +7,8 @@ use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 const ALIAS_TO_FUNCTION: [(&str, &str); 68] = [
@@ -96,14 +100,31 @@ const ALIAS_TO_FUNCTION: [(&str, &str); 68] = [
 pub struct NoFunctionAliasesRule;
 
 impl Rule for NoFunctionAliasesRule {
-    #[inline(always)]
-    fn get_name(&self) -> &'static str {
-        "no-function-aliases"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Function Aliases", Level::Note)
+            .with_description(indoc! {"
+                Detects usage of function aliases (e.g., `diskfreespace` instead of `disk_free_space`)
+                and suggests calling the canonical (original) function name instead.
+                This is primarily for consistency and clarity.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using canonical function names",
+                indoc! {r#"
+                    <?php
 
-    #[inline(always)]
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Note)
+                    // 'disk_free_space' is the proper name instead of 'diskfreespace'
+                    $freeSpace = disk_free_space("/");
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using an aliased function",
+                indoc! {r#"
+                    <?php
+
+                    // 'diskfreespace' is an alias for 'disk_free_space'
+                    $freeSpace = diskfreespace("/");
+                "#},
+            ))
     }
 }
 

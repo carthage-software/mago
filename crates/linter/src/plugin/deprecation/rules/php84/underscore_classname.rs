@@ -1,21 +1,41 @@
+use indoc::indoc;
+
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
 pub struct UnderscoreClassNameRule;
 
 impl Rule for UnderscoreClassNameRule {
-    fn get_name(&self) -> &'static str {
-        "underscore-class-name"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Underscore Class Name", Level::Warning)
+            .with_description(indoc! {"
+                    Detects class, interface, trait, or enum declarations named `_`.
+                    Such names are considered deprecated; a more descriptive identifier is recommended.
+                "})
+            .with_example(RuleUsageExample::valid(
+                "Using a meaningful class name",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Warning)
+                    class MyService {}
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using `_` as a class name",
+                indoc! {r#"
+                    <?php
+
+                    class _ {}
+                "#},
+            ))
     }
 }
 

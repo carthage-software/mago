@@ -1,21 +1,53 @@
+use indoc::indoc;
+
 use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::definition::RuleDefinition;
+use crate::definition::RuleUsageExample;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ConstantRule;
 
 impl Rule for ConstantRule {
-    fn get_name(&self) -> &'static str {
-        "constant"
-    }
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("Constant", Level::Help)
+            .with_description(indoc! {"
+                Detects constant declarations that do not follow constant naming convention.
+                Constant names should be in constant case, also known as UPPER_SNAKE_CASE.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "A constant name in constant case",
+                indoc! {r#"
+                    <?php
 
-    fn get_default_level(&self) -> Option<Level> {
-        Some(Level::Help)
+                    const MY_CONSTANT = 42;
+
+                    class MyClass {
+                        public const int MY_CONSTANT = 42;
+                    }
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "A constant name not in constant case",
+                indoc! {r#"
+                    <?php
+
+                    const myConstant = 42;
+                    const my_constant = 42;
+                    const My_Constant = 42;
+
+                    class MyClass {
+                        public const int myConstant = 42;
+                        public const int my_constant = 42;
+                        public const int My_Constant = 42;
+                    }
+                "#},
+            ))
     }
 }
 

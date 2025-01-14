@@ -1,3 +1,4 @@
+use crate::definition::PluginDefinition;
 use crate::plugin::analysis::rules::inheritance::InheritanceRule;
 use crate::plugin::analysis::rules::instantiation::InstantiationRule;
 use crate::plugin::analysis::rules::undefined_constant::UndefinedConstantRule;
@@ -12,12 +13,12 @@ pub mod rules;
 pub struct AnalysisPlugin;
 
 impl Plugin for AnalysisPlugin {
-    fn get_name(&self) -> &'static str {
-        "analysis"
-    }
-
-    fn is_enabled_by_default(&self) -> bool {
-        true
+    fn get_definition(&self) -> PluginDefinition {
+        PluginDefinition {
+            name: "Analysis",
+            description: "Provides rules that analyze the codebase for potential runtime issues.",
+            enabled_by_default: true,
+        }
     }
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {
