@@ -1,3 +1,7 @@
+pub mod php56 {
+    pub mod variadic_functions_feature;
+}
+
 pub mod php74 {
     pub mod null_coalesce_assignment_feature;
 }

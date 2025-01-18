@@ -31,6 +31,9 @@ pub mod feature;
 pub struct PHPVersion(u32);
 
 impl PHPVersion {
+    /// The PHP 5.5 version.
+    pub const PHP55: PHPVersion = PHPVersion::new(5, 5, 0);
+
     /// The PHP 7.0 version.
     pub const PHP70: PHPVersion = PHPVersion::new(7, 0, 0);
 
