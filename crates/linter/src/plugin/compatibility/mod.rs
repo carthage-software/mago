@@ -1,4 +1,5 @@
 use crate::definition::PluginDefinition;
+use crate::plugin::compatibility::rules::php55::finally_feature::FinallyFeatureRule;
 use crate::plugin::compatibility::rules::php56::variadic_functions_feature::VariadicFunctionsFeatureRule;
 use crate::plugin::compatibility::rules::php74::null_coalesce_assignment_feature::NullCoalesceAssignmentFeatureRule;
 use crate::plugin::compatibility::rules::php80::named_arguments_feature::NamedArgumentsFeatureRule;
@@ -26,6 +27,8 @@ impl Plugin for CompatibilityPlugin {
 
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
+            // PHP 5.5
+            Box::new(FinallyFeatureRule),
             // PHP 5.6
             Box::new(VariadicFunctionsFeatureRule),
             // PHP 7.4

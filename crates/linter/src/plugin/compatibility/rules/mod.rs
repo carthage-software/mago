@@ -1,3 +1,7 @@
+pub mod php55 {
+    pub mod finally_feature;
+}
+
 pub mod php56 {
     pub mod variadic_functions_feature;
 }
