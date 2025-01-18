@@ -1,4 +1,5 @@
 pub mod php74 {
+    pub mod arrow_functions_feature;
     pub mod null_coalesce_assignment_feature;
 }
 

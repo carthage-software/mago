@@ -1,4 +1,5 @@
 use crate::definition::PluginDefinition;
+use crate::plugin::compatibility::rules::php74::arrow_functions_feature::ArrowFunctionsFeatureRule;
 use crate::plugin::compatibility::rules::php74::null_coalesce_assignment_feature::NullCoalesceAssignmentFeatureRule;
 use crate::plugin::compatibility::rules::php80::named_arguments_feature::NamedArgumentsFeatureRule;
 use crate::plugin::compatibility::rules::php80::promoted_properties_feature::PromotedPropertiesFeatureRule;
@@ -26,6 +27,7 @@ impl Plugin for CompatibilityPlugin {
     fn get_rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
             // PHP 7.4
+            Box::new(ArrowFunctionsFeatureRule),
             Box::new(NullCoalesceAssignmentFeatureRule),
             // PHP 8.0
             Box::new(NamedArgumentsFeatureRule),

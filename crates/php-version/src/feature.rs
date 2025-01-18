@@ -63,4 +63,5 @@ pub enum Feature {
     PropertyHooks,
     JsonValidate,
     ClosureInConstantExpressions,
+    ArrowFunctions,
 }
