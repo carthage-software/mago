@@ -179,6 +179,7 @@ pub(super) fn explain_rule(
     println!("{}", rule_definition.description);
 
     println!("{}:", "## PHP Version".bold().underline());
+    println!();
     if let Some(minimum_supported_php_version) = rule_definition.minimum_supported_php_version {
         println!(
             "{} {} {}",

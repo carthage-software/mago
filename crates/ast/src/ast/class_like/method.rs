@@ -68,7 +68,8 @@ impl Method {
     }
 
     /// Returns `true` if the method is abstract.
-    pub fn is_abstract(&self) -> bool {
+    #[inline]
+    pub const fn is_abstract(&self) -> bool {
         matches!(self.body, MethodBody::Abstract(_))
     }
 }

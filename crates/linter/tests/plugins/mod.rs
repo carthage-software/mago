@@ -5,6 +5,7 @@ pub mod compatibility;
 pub mod consistency;
 pub mod deprecation;
 pub mod laravel;
+pub mod maintainability;
 pub mod migration;
 pub mod naming;
 pub mod phpunit;
