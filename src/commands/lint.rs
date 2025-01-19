@@ -59,6 +59,9 @@ pub struct LintCommand {
     #[arg(long, help = "List all the enabled rules alongside their descriptions")]
     pub list_rules: bool,
 
+    #[arg(long, help = "Sort the reported issues by level, code, and location")]
+    pub sort: bool,
+
     /// Specify where the results should be reported.
     #[arg(
         long,
@@ -93,7 +96,7 @@ pub async fn execute(command: LintCommand, configuration: Configuration) -> Resu
         return list_rules(&interner, &configuration);
     }
 
-    let issues = if command.semantics_only {
+    let mut issues = if command.semantics_only {
         check_sources(&interner, &source_manager).await?
     } else {
         lint_sources(&interner, &source_manager, &configuration).await?
@@ -102,6 +105,10 @@ pub async fn execute(command: LintCommand, configuration: Configuration) -> Resu
     let issues_contain_errors = issues.get_highest_level().is_some_and(|level| level <= Level::Error);
 
     let reporter = Reporter::new(interner, source_manager, command.reporting_target);
+
+    if command.sort {
+        issues = issues.sorted();
+    }
 
     if command.fixable_only {
         reporter.report(issues.only_fixable(), command.reporting_format)?;

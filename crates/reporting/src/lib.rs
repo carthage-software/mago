@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::iter::Once;
 
@@ -435,6 +436,45 @@ impl IssueCollection {
 
     pub fn only_fixable(self) -> impl Iterator<Item = Issue> {
         self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty())
+    }
+
+    /// Sorts the issues in the collection.
+    ///
+    /// The issues are sorted by severity level in descending order,
+    /// then by code in ascending order, and finally by the primary annotation span.
+    pub fn sorted(self) -> Self {
+        let mut issues = self.issues;
+
+        issues.sort_by(|a, b| match a.level.cmp(&b.level) {
+            Ordering::Less => Ordering::Greater,
+            Ordering::Greater => Ordering::Less,
+            Ordering::Equal => match a.code.as_deref().cmp(&b.code.as_deref()) {
+                Ordering::Less => Ordering::Less,
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Equal => {
+                    let a_span = a
+                        .annotations
+                        .iter()
+                        .find(|annotation| annotation.is_primary())
+                        .map(|annotation| annotation.span);
+
+                    let b_span = b
+                        .annotations
+                        .iter()
+                        .find(|annotation| annotation.is_primary())
+                        .map(|annotation| annotation.span);
+
+                    match (a_span, b_span) {
+                        (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
+                        (Some(_), None) => Ordering::Less,
+                        (None, Some(_)) => Ordering::Greater,
+                        (None, None) => Ordering::Equal,
+                    }
+                }
+            },
+        });
+
+        Self { issues }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Issue> {
