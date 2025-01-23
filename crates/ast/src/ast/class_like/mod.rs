@@ -34,7 +34,7 @@ pub mod trait_use;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Interface {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub interface: Keyword,
     pub name: LocalIdentifier,
     pub extends: Option<Extends>,
@@ -59,7 +59,7 @@ pub struct Interface {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Class {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub class: Keyword,
     pub name: LocalIdentifier,
@@ -87,7 +87,7 @@ pub struct Class {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct AnonymousClass {
     pub new: Keyword,
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub class: Keyword,
     pub arguments: Option<ArgumentList>,
@@ -113,7 +113,7 @@ pub struct AnonymousClass {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Trait {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub r#trait: Keyword,
     pub name: LocalIdentifier,
     pub left_brace: Span,
@@ -137,7 +137,7 @@ pub struct Trait {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Enum {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub r#enum: Keyword,
     pub name: LocalIdentifier,
     pub backing_type_hint: Option<EnumBackingTypeHint>,
@@ -174,7 +174,7 @@ pub struct EnumBackingTypeHint {
 
 impl HasSpan for Interface {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
         }
 
@@ -184,7 +184,7 @@ impl HasSpan for Interface {
 
 impl HasSpan for Class {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
         }
 
@@ -204,7 +204,7 @@ impl HasSpan for AnonymousClass {
 
 impl HasSpan for Trait {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
         }
 
@@ -214,7 +214,7 @@ impl HasSpan for Trait {
 
 impl HasSpan for Enum {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
         }
 

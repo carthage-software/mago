@@ -14,7 +14,7 @@ pub fn parse_enum_case_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<EnumCase, ParseError> {
     Ok(EnumCase {
-        attributes,
+        attribute_lists: attributes,
         case: utils::expect_keyword(stream, T!["case"])?,
         item: parse_enum_case_item(stream)?,
         terminator: parse_terminator(stream)?,

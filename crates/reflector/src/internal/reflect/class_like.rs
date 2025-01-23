@@ -26,7 +26,7 @@ use super::r#type::reflect_hint;
 
 pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
-        attribute_reflections: reflect_attributes(&class.attributes, context),
+        attribute_reflections: reflect_attributes(&class.attribute_lists, context),
         name: ClassLikeName::Class(Name::new(*context.names.get(&class.name), class.name.span)),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
@@ -80,7 +80,7 @@ pub fn reflect_anonymous_class<'ast>(
     context: &'ast mut Context<'_>,
 ) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
-        attribute_reflections: reflect_attributes(&class.attributes, context),
+        attribute_reflections: reflect_attributes(&class.attribute_lists, context),
         name: ClassLikeName::AnonymousClass(class.span()),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
@@ -130,7 +130,7 @@ pub fn reflect_anonymous_class<'ast>(
 
 pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
-        attribute_reflections: reflect_attributes(&interface.attributes, context),
+        attribute_reflections: reflect_attributes(&interface.attribute_lists, context),
         name: ClassLikeName::Interface(Name::new(*context.names.get(&interface.name), interface.name.span())),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
@@ -170,7 +170,7 @@ pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Co
 
 pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
-        attribute_reflections: reflect_attributes(&r#trait.attributes, context),
+        attribute_reflections: reflect_attributes(&r#trait.attribute_lists, context),
         name: ClassLikeName::Trait(Name::new(*context.names.get(&r#trait.name), r#trait.name.span())),
         inheritance: InheritanceReflection::default(),
         backing_type: None,
@@ -195,7 +195,7 @@ pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>)
 
 pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
-        attribute_reflections: reflect_attributes(&r#enum.attributes, context),
+        attribute_reflections: reflect_attributes(&r#enum.attribute_lists, context),
         name: ClassLikeName::Enum(Name::new(*context.names.get(&r#enum.name), r#enum.name.span())),
         inheritance: {
             let mut reflection = InheritanceReflection::default();
@@ -295,7 +295,7 @@ fn reflect_class_like_constant<'ast>(
     constant: &'ast ClassLikeConstant,
     context: &'ast mut Context<'_>,
 ) -> Vec<ClassLikeConstantReflection> {
-    let attribute_reflections = reflect_attributes(&constant.attributes, context);
+    let attribute_reflections = reflect_attributes(&constant.attribute_lists, context);
     let visibility_reflection = if let Some(m) = constant.modifiers.get_public() {
         Some(ClassLikeMemberVisibilityReflection::Public { span: m.span() })
     } else if let Some(m) = constant.modifiers.get_protected() {
@@ -352,7 +352,7 @@ fn reflect_class_like_enum_case<'ast>(
     };
 
     EnumCaseReflection {
-        attribut_reflections: reflect_attributes(&case.attributes, context),
+        attribut_reflections: reflect_attributes(&case.attribute_lists, context),
         name: identifier,
         type_reflection,
         is_backed,
@@ -385,12 +385,12 @@ fn reflect_class_like_method<'ast>(
     (
         name,
         FunctionLikeReflection {
-            attribute_reflections: reflect_attributes(&method.attributes, context),
+            attribute_reflections: reflect_attributes(&method.attribute_lists, context),
             visibility_reflection,
             name: FunctionLikeName::Method(class_like.name, name),
             // TODO: parse docblock to get the template list
             templates: vec![],
-            parameters: reflect_function_like_parameter_list(&method.parameters, context, Some(class_like)),
+            parameters: reflect_function_like_parameter_list(&method.parameter_list, context, Some(class_like)),
             return_type_reflection: reflect_function_like_return_type_hint(
                 &method.return_type_hint,
                 context,
@@ -422,7 +422,7 @@ fn reflect_class_like_property<'ast>(
 
     match &property {
         Property::Plain(plain_property) => {
-            let attribut_reflections = reflect_attributes(&plain_property.attributes, context);
+            let attribut_reflections = reflect_attributes(&plain_property.attribute_lists, context);
             let read_visibility_reflection = if let Some(m) = plain_property.modifiers.get_public() {
                 Some(ClassLikeMemberVisibilityReflection::Public { span: m.span() })
             } else if let Some(m) = plain_property.modifiers.get_protected() {
@@ -526,7 +526,7 @@ fn reflect_class_like_property<'ast>(
             };
 
             reflections.push(PropertyReflection {
-                attribut_reflections: reflect_attributes(&hooked_property.attributes, context),
+                attribut_reflections: reflect_attributes(&hooked_property.attribute_lists, context),
                 read_visibility_reflection,
                 write_visibility_reflection,
                 name,
@@ -556,7 +556,7 @@ fn reflect_class_like_property<'ast>(
                         map.insert(
                             hook_name.value,
                             FunctionLikeReflection {
-                                attribute_reflections: reflect_attributes(&hook.attributes, context),
+                                attribute_reflections: reflect_attributes(&hook.attribute_lists, context),
                                 name: function_like_name,
                                 // TODO: parse docblock to get the template list
                                 templates: vec![],

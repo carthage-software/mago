@@ -126,8 +126,8 @@ impl<'a> Walker<LintContext<'a>> for RedundantInstanceOfRule {
 
         for reference in find_assertion_references_in_method(method, context, &["assertInstanceOf"]) {
             let arguments = match reference {
-                MethodReference::MethodCall(method_call) => &method_call.arguments.arguments,
-                MethodReference::StaticMethodCall(static_method_call) => &static_method_call.arguments.arguments,
+                MethodReference::MethodCall(method_call) => &method_call.argument_list.arguments,
+                MethodReference::StaticMethodCall(static_method_call) => &static_method_call.argument_list.arguments,
                 _ => continue,
             };
 
@@ -204,12 +204,12 @@ fn get_class_name<'a>(expression: &Expression, context: &'a LintContext) -> Opti
     };
 
     // Is this a class constant access?
-    let Access::ClassConstant(class_constant_access) = access.as_ref() else {
+    let Access::ClassConstant(class_constant_access) = access else {
         return None;
     };
 
     // Is the LHS an identifier?
-    let Expression::Identifier(class_name) = &class_constant_access.class else {
+    let Expression::Identifier(class_name) = class_constant_access.class.as_ref() else {
         return None;
     };
 
@@ -244,7 +244,7 @@ fn get_object_name<'a>(expression: &Expression, context: &'a LintContext) -> Opt
         return None;
     };
 
-    let Expression::Identifier(class_name) = &instantiation.class else {
+    let Expression::Identifier(class_name) = instantiation.class.as_ref() else {
         return None;
     };
 

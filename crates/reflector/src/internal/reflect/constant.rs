@@ -33,7 +33,7 @@ pub fn reflect_defined_constant(define: &FunctionCall, context: &mut Context<'_>
         return None;
     }
 
-    let arguments = define.arguments.arguments.as_slice();
+    let arguments = define.argument_list.arguments.as_slice();
     if arguments.len() != 2 {
         return None;
     }

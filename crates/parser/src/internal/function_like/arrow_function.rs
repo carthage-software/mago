@@ -14,13 +14,13 @@ pub fn parse_arrow_function_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<ArrowFunction, ParseError> {
     Ok(ArrowFunction {
-        attributes,
+        attribute_lists: attributes,
         r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
         r#fn: utils::expect_keyword(stream, T!["fn"])?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
-        parameters: parse_function_like_parameter_list(stream)?,
+        parameter_list: parse_function_like_parameter_list(stream)?,
         return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: parse_expression(stream)?,
+        expression: Box::new(parse_expression(stream)?),
     })
 }

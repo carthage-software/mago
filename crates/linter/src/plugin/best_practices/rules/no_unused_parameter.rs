@@ -81,7 +81,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
 
         let foreign_variables = get_foreign_variable_names(&function.body, context);
 
-        for parameter in function.parameters.parameters.iter() {
+        for parameter in function.parameter_list.parameters.iter() {
             if foreign_variables.contains(&parameter.variable.name) {
                 continue;
             }
@@ -100,7 +100,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
 
         let foreign_variables = get_foreign_variable_names(&closure.body, context);
 
-        for parameter in closure.parameters.parameters.iter() {
+        for parameter in closure.parameter_list.parameters.iter() {
             if foreign_variables.contains(&parameter.variable.name) {
                 continue;
             }
@@ -141,7 +141,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
 
             let foreign_variables = get_foreign_variable_names(block, context);
 
-            for parameter in method.parameters.parameters.iter() {
+            for parameter in method.parameter_list.parameters.iter() {
                 // Skip promoted properties
                 if parameter.is_promoted_property() {
                     continue;
@@ -188,7 +188,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
 
             let foreign_variables = get_foreign_variable_names(block, context);
 
-            for parameter in method.parameters.parameters.iter() {
+            for parameter in method.parameter_list.parameters.iter() {
                 // Skip promoted properties
                 if parameter.is_promoted_property() {
                     continue;
@@ -235,7 +235,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
 
             let foreign_variables = get_foreign_variable_names(block, context);
 
-            for parameter in method.parameters.parameters.iter() {
+            for parameter in method.parameter_list.parameters.iter() {
                 // Skip promoted properties
                 if parameter.is_promoted_property() {
                     continue;
@@ -258,7 +258,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnusedParameterRule {
             return;
         }
 
-        for parameter in arrow_function.parameters.parameters.iter() {
+        for parameter in arrow_function.parameter_list.parameters.iter() {
             if !is_variable_used_in_expression(&arrow_function.expression, context, parameter.variable.name) {
                 self.report(parameter, arrow_function, context, "arrow function", true);
             }

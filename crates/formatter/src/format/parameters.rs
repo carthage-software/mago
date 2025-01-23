@@ -27,7 +27,7 @@ pub(super) fn should_hug_the_only_parameter<'a>(
     // property hook list.
     //
     // TODO: maybe hug the parameter if it has a single attribute and no hooks?
-    if !parameter.attributes.is_empty() || parameter.hooks.is_some() {
+    if !parameter.attribute_lists.is_empty() || parameter.hooks.is_some() {
         return false;
     }
 

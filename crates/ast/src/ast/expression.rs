@@ -67,24 +67,24 @@ pub enum Expression {
     List(List),
     ArrayAccess(ArrayAccess),
     ArrayAppend(ArrayAppend),
-    AnonymousClass(Box<AnonymousClass>),
-    Closure(Box<Closure>),
-    ArrowFunction(Box<ArrowFunction>),
+    AnonymousClass(AnonymousClass),
+    Closure(Closure),
+    ArrowFunction(ArrowFunction),
     Variable(Variable),
     ConstantAccess(ConstantAccess),
     Identifier(Identifier),
-    Match(Box<Match>),
-    Yield(Box<Yield>),
-    Construct(Box<Construct>),
-    Throw(Box<Throw>),
-    Clone(Box<Clone>),
+    Match(Match),
+    Yield(Yield),
+    Construct(Construct),
+    Throw(Throw),
+    Clone(Clone),
     Call(Call),
-    Access(Box<Access>),
-    ClosureCreation(Box<ClosureCreation>),
+    Access(Access),
+    ClosureCreation(ClosureCreation),
     Parent(Keyword),
     Static(Keyword),
     Self_(Keyword),
-    Instantiation(Box<Instantiation>),
+    Instantiation(Instantiation),
     MagicConstant(MagicConstant),
 }
 
@@ -110,7 +110,7 @@ impl Expression {
             Self::Parent(_) => true,
             Self::Static(_) => true,
             Self::Parenthesized(expression) => expression.expression.is_constant(initilization),
-            Self::Access(access) => match access.as_ref() {
+            Self::Access(access) => match access {
                 Access::ClassConstant(ClassConstantAccess { class, constant, .. }) => {
                     matches!(constant, ClassLikeConstantSelector::Identifier(_)) && class.is_constant(initilization)
                 }

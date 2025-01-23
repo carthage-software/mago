@@ -14,7 +14,7 @@ use crate::sequence::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct EnumCase {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub case: Keyword,
     pub item: EnumCaseItem,
     pub terminator: Terminator,
@@ -49,7 +49,7 @@ impl EnumCaseItem {
 
 impl HasSpan for EnumCase {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.terminator.span());
         }
 

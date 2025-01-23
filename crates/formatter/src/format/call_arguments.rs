@@ -283,10 +283,10 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
     match node {
         Expression::Call(call) => {
             let argument_list = match call {
-                Call::Function(function_call) => &function_call.arguments,
-                Call::Method(method_call) => &method_call.arguments,
-                Call::NullSafeMethod(null_safe_method_call) => &null_safe_method_call.arguments,
-                Call::StaticMethod(static_method_call) => &static_method_call.arguments,
+                Call::Function(function_call) => &function_call.argument_list,
+                Call::Method(method_call) => &method_call.argument_list,
+                Call::NullSafeMethod(null_safe_method_call) => &null_safe_method_call.argument_list,
+                Call::StaticMethod(static_method_call) => &static_method_call.argument_list,
             };
 
             argument_list.arguments.len() < 2
@@ -343,28 +343,28 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
                         return false;
                     }
 
-                    &function_call.arguments
+                    &function_call.argument_list
                 }
                 Call::Method(method_call) => {
                     if !is_simple_call_argument(&method_call.object, depth) {
                         return false;
                     }
 
-                    &method_call.arguments
+                    &method_call.argument_list
                 }
                 Call::NullSafeMethod(null_safe_method_call) => {
                     if !is_simple_call_argument(&null_safe_method_call.object, depth) {
                         return false;
                     }
 
-                    &null_safe_method_call.arguments
+                    &null_safe_method_call.argument_list
                 }
                 Call::StaticMethod(static_method_call) => {
                     if !is_simple_call_argument(&static_method_call.class, depth) {
                         return false;
                     }
 
-                    &static_method_call.arguments
+                    &static_method_call.argument_list
                 }
             };
 
@@ -372,7 +372,7 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
                 && argument_list.arguments.iter().map(|a| a.value()).all(is_child_simple)
         }
         Expression::Access(access) => {
-            let object_or_class = match access.as_ref() {
+            let object_or_class = match access {
                 Access::Property(property_access) => &property_access.object,
                 Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
                 Access::StaticProperty(static_property_access) => &static_property_access.class,
@@ -408,7 +408,7 @@ fn could_expand_argument_value(argument_value: &Expression, arrow_chain_recursio
         Expression::List(expr) => !expr.elements.is_empty(),
         Expression::Closure(_) => true,
         Expression::Binary(operation) => could_expand_argument_value(&operation.lhs, arrow_chain_recursion),
-        Expression::ArrowFunction(arrow_function) => match &arrow_function.expression {
+        Expression::ArrowFunction(arrow_function) => match arrow_function.expression.as_ref() {
             Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {
                 could_expand_argument_value(&arrow_function.expression, true)
             }

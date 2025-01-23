@@ -303,7 +303,7 @@ mod internal {
             arrow_function: &'ast ArrowFunction,
             context: &mut (Vec<VariableReference>, &'a LintContext<'a>),
         ) {
-            for parameter in arrow_function.parameters.parameters.iter() {
+            for parameter in arrow_function.parameter_list.parameters.iter() {
                 context.0.push(VariableReference::Assign(parameter.variable.name));
             }
         }
@@ -313,7 +313,7 @@ mod internal {
             arrow_function: &'ast ArrowFunction,
             context: &mut (Vec<VariableReference>, &'a LintContext<'a>),
         ) {
-            for parameter in arrow_function.parameters.parameters.iter() {
+            for parameter in arrow_function.parameter_list.parameters.iter() {
                 context.0.push(VariableReference::Unset(parameter.variable.name));
             }
         }

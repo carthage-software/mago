@@ -16,11 +16,11 @@ pub fn parse_closure_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<Closure, ParseError> {
     Ok(Closure {
-        attributes,
+        attribute_lists: attributes,
         r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
         function: utils::expect_keyword(stream, T!["function"])?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
-        parameters: parse_function_like_parameter_list(stream)?,
+        parameter_list: parse_function_like_parameter_list(stream)?,
         use_clause: parse_optional_closure_use_clause(stream)?,
         return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
         body: parse_block(stream)?,

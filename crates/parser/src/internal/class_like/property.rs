@@ -29,7 +29,7 @@ pub fn parse_property_with_attributes_and_modifiers(
     let next = utils::peek(stream)?.kind;
     if matches!(next, T!["{"]) {
         return Ok(Property::Hooked(HookedProperty {
-            attributes,
+            attribute_lists: attributes,
             modifiers,
             var,
             hint,
@@ -39,7 +39,7 @@ pub fn parse_property_with_attributes_and_modifiers(
     }
 
     Ok(Property::Plain(PlainProperty {
-        attributes,
+        attribute_lists: attributes,
         modifiers,
         var,
         hint,
@@ -123,7 +123,7 @@ pub fn parse_property_hook_list(stream: &mut TokenStream<'_, '_>) -> Result<Prop
 
 pub fn parse_property_hook(stream: &mut TokenStream<'_, '_>) -> Result<PropertyHook, ParseError> {
     Ok(PropertyHook {
-        attributes: attribute::parse_attribute_list_sequence(stream)?,
+        attribute_lists: attribute::parse_attribute_list_sequence(stream)?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
         modifiers: parse_modifier_sequence(stream)?,
         name: identifier::parse_local_identifier(stream)?,

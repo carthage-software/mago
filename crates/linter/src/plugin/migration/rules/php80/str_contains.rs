@@ -67,12 +67,12 @@ impl<'a> Walker<LintContext<'a>> for StrContainsRule {
 
         let (left, call) = match (binary.lhs.as_ref(), binary.rhs.as_ref()) {
             (
-                Expression::Call(Call::Function(call @ FunctionCall { arguments, .. })),
+                Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
                 Expression::Literal(Literal::False(_)),
             ) if arguments.arguments.len() == 2 => (true, call),
             (
                 Expression::Literal(Literal::False(_)),
-                Expression::Call(Call::Function(call @ FunctionCall { arguments, .. })),
+                Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
             ) if arguments.arguments.len() == 2 => (false, call),
             _ => {
                 return;

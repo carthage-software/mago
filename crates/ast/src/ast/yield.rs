@@ -43,7 +43,7 @@ pub enum Yield {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct YieldValue {
     pub r#yield: Keyword,
-    pub value: Option<Expression>,
+    pub value: Option<Box<Expression>>,
 }
 
 /// Represents a PHP `yield` expression with a key-value pair.
@@ -60,9 +60,9 @@ pub struct YieldValue {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct YieldPair {
     pub r#yield: Keyword,
-    pub key: Expression,
+    pub key: Box<Expression>,
     pub arrow: Span,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 /// Represents a PHP `yield from` expression.
@@ -80,7 +80,7 @@ pub struct YieldPair {
 pub struct YieldFrom {
     pub r#yield: Keyword,
     pub from: Keyword,
-    pub iterator: Expression,
+    pub iterator: Box<Expression>,
 }
 
 impl HasSpan for Yield {

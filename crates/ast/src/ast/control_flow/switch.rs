@@ -16,7 +16,7 @@ use crate::sequence::Sequence;
 pub struct Switch {
     pub switch: Keyword,
     pub left_parenthesis: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub right_parenthesis: Span,
     pub body: SwitchBody,
 }
@@ -60,7 +60,7 @@ pub enum SwitchCase {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct SwitchExpressionCase {
     pub case: Keyword,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub separator: SwitchCaseSeparator,
     pub statements: Sequence<Statement>,
 }

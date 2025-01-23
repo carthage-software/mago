@@ -83,7 +83,7 @@ impl Rule for InstantiationRule {
 
 impl<'a> Walker<LintContext<'a>> for InstantiationRule {
     fn walk_in_instantiation(&self, instantiation: &Instantiation, context: &mut LintContext<'a>) {
-        let Expression::Identifier(class_identifier) = &instantiation.class else {
+        let Expression::Identifier(class_identifier) = instantiation.class.as_ref() else {
             return;
         };
 

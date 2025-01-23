@@ -39,7 +39,7 @@ pub struct For {
 /// Represents the body of a for statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum ForBody {
-    Statement(Statement),
+    Statement(Box<Statement>),
     ColonDelimited(ForColonDelimitedBody),
 }
 

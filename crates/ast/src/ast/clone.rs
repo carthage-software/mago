@@ -10,7 +10,7 @@ use crate::ast::keyword::Keyword;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Clone {
     pub clone: Keyword,
-    pub object: Expression,
+    pub object: Box<Expression>,
 }
 
 impl HasSpan for Clone {

@@ -16,12 +16,12 @@ pub fn parse_method_with_attributes_and_modifiers(
     modifiers: Sequence<Modifier>,
 ) -> Result<Method, ParseError> {
     Ok(Method {
-        attributes,
+        attribute_lists: attributes,
         modifiers,
         function: utils::expect_keyword(stream, T!["function"])?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
         name: parse_local_identifier(stream)?,
-        parameters: parse_function_like_parameter_list(stream)?,
+        parameter_list: parse_function_like_parameter_list(stream)?,
         return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
         body: parse_method_body(stream)?,
     })

@@ -96,8 +96,8 @@ fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, 
 
     if matches!(token.kind, T!["#["]) {
         return parse_arrow_function_or_closure(stream).map(|e| match e {
-            Either::Left(arrow_function) => Expression::ArrowFunction(Box::new(arrow_function)),
-            Either::Right(closure) => Expression::Closure(Box::new(closure)),
+            Either::Left(arrow_function) => Expression::ArrowFunction(arrow_function),
+            Either::Right(closure) => Expression::Closure(closure),
         });
     }
 
@@ -105,8 +105,8 @@ fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, 
         || matches!((token.kind, next), (T!["static"], Some(T!["function" | "fn"])))
     {
         return parse_arrow_function_or_closure(stream).map(|e| match e {
-            Either::Left(arrow_function) => Expression::ArrowFunction(Box::new(arrow_function)),
-            Either::Right(closure) => Expression::Closure(Box::new(closure)),
+            Either::Left(arrow_function) => Expression::ArrowFunction(arrow_function),
+            Either::Right(closure) => Expression::Closure(closure),
         });
     }
 
@@ -114,17 +114,15 @@ fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, 
         (T!["static"], _) => Expression::Static(utils::expect_any_keyword(stream)?),
         (T!["self"], _) => Expression::Self_(utils::expect_any_keyword(stream)?),
         (T!["parent"], _) => Expression::Parent(utils::expect_any_keyword(stream)?),
-        (kind, _) if kind.is_construct() => Expression::Construct(Box::new(parse_construct(stream)?)),
+        (kind, _) if kind.is_construct() => Expression::Construct(parse_construct(stream)?),
         (T!["list"], Some(T!["("])) => Expression::List(parse_list(stream)?),
-        (T!["new"], Some(T!["class" | "#["])) => Expression::AnonymousClass(Box::new(parse_anonymous_class(stream)?)),
-        (T!["new"], Some(T!["static"])) => Expression::Instantiation(Box::new(parse_instantiation(stream)?)),
-        (T!["new"], Some(kind)) if kind.is_modifier() => {
-            Expression::AnonymousClass(Box::new(parse_anonymous_class(stream)?))
-        }
-        (T!["new"], _) => Expression::Instantiation(Box::new(parse_instantiation(stream)?)),
-        (T!["throw"], _) => Expression::Throw(Box::new(parse_throw(stream)?)),
-        (T!["yield"], _) => Expression::Yield(Box::new(parse_yield(stream)?)),
-        (T!["clone"], _) => Expression::Clone(Box::new(parse_clone(stream)?)),
+        (T!["new"], Some(T!["class" | "#["])) => Expression::AnonymousClass(parse_anonymous_class(stream)?),
+        (T!["new"], Some(T!["static"])) => Expression::Instantiation(parse_instantiation(stream)?),
+        (T!["new"], Some(kind)) if kind.is_modifier() => Expression::AnonymousClass(parse_anonymous_class(stream)?),
+        (T!["new"], _) => Expression::Instantiation(parse_instantiation(stream)?),
+        (T!["throw"], _) => Expression::Throw(parse_throw(stream)?),
+        (T!["yield"], _) => Expression::Yield(parse_yield(stream)?),
+        (T!["clone"], _) => Expression::Clone(parse_clone(stream)?),
         (T!["\""] | T!["<<<"] | T!["`"], ..) => Expression::CompositeString(parse_string(stream)?),
         (T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "enum" | "from"], ..) => {
             Expression::Identifier(identifier::parse_identifier(stream)?)
@@ -134,7 +132,7 @@ fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, 
             expression: Box::new(parse_expression(stream)?),
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
-        (T!["match"], _) => Expression::Match(Box::new(parse_match(stream)?)),
+        (T!["match"], _) => Expression::Match(parse_match(stream)?),
         (T!["array"], Some(T!["("])) => Expression::LegacyArray(parse_legacy_array(stream)?),
         (T!["["], _) => Expression::Array(parse_array(stream)?),
         (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(parse_magic_constant(stream)?),
@@ -175,16 +173,16 @@ fn parse_postfix_expression(
                 (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)),
                 (Some(T!["..."]), Some(T![")"])),
             ) {
-                Expression::ClosureCreation(Box::new(ClosureCreation::Function(FunctionClosureCreation {
-                    function: lhs,
+                Expression::ClosureCreation(ClosureCreation::Function(FunctionClosureCreation {
+                    function: Box::new(lhs),
                     left_parenthesis: utils::expect_any(stream)?.span,
                     ellipsis: utils::expect_any(stream)?.span,
                     right_parenthesis: utils::expect_any(stream)?.span,
-                })))
+                }))
             } else {
                 Expression::Call(Call::Function(FunctionCall {
                     function: Box::new(lhs),
-                    arguments: argument::parse_argument_list(stream)?,
+                    argument_list: argument::parse_argument_list(stream)?,
                 }))
             }
         }
@@ -227,14 +225,14 @@ fn parse_postfix_expression(
                     ),
                     (Some(T!["..."]), Some(T![")"]))
                 ) {
-                    Expression::ClosureCreation(Box::new(ClosureCreation::StaticMethod(StaticMethodClosureCreation {
-                        class: lhs,
+                    Expression::ClosureCreation(ClosureCreation::StaticMethod(StaticMethodClosureCreation {
+                        class: Box::new(lhs),
                         double_colon,
                         method,
                         left_parenthesis: utils::expect_any(stream)?.span,
                         ellipsis: utils::expect_any(stream)?.span,
                         right_parenthesis: utils::expect_any(stream)?.span,
-                    })))
+                    }))
                 } else {
                     let arguments = argument::parse_argument_list(stream)?;
 
@@ -242,25 +240,21 @@ fn parse_postfix_expression(
                         class: Box::new(lhs),
                         double_colon,
                         method,
-                        arguments,
+                        argument_list: arguments,
                     }))
                 }
             } else {
                 match selector_or_variable {
-                    Either::Left(selector) => {
-                        Expression::Access(Box::new(Access::ClassConstant(ClassConstantAccess {
-                            class: lhs,
-                            double_colon,
-                            constant: selector,
-                        })))
-                    }
-                    Either::Right(variable) => {
-                        Expression::Access(Box::new(Access::StaticProperty(StaticPropertyAccess {
-                            class: lhs,
-                            double_colon,
-                            property: variable,
-                        })))
-                    }
+                    Either::Left(selector) => Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                        class: Box::new(lhs),
+                        double_colon,
+                        constant: selector,
+                    })),
+                    Either::Right(variable) => Expression::Access(Access::StaticProperty(StaticPropertyAccess {
+                        class: Box::new(lhs),
+                        double_colon,
+                        property: variable,
+                    })),
                 }
             }
         }
@@ -276,28 +270,28 @@ fn parse_postfix_expression(
                     ),
                     (Some(T!["..."]), Some(T![")"]))
                 ) {
-                    Expression::ClosureCreation(Box::new(ClosureCreation::Method(MethodClosureCreation {
-                        object: lhs,
+                    Expression::ClosureCreation(ClosureCreation::Method(MethodClosureCreation {
+                        object: Box::new(lhs),
                         arrow,
                         method: selector,
                         left_parenthesis: utils::expect_any(stream)?.span,
                         ellipsis: utils::expect_any(stream)?.span,
                         right_parenthesis: utils::expect_any(stream)?.span,
-                    })))
+                    }))
                 } else {
                     Expression::Call(Call::Method(MethodCall {
                         object: Box::new(lhs),
                         arrow,
                         method: selector,
-                        arguments: argument::parse_argument_list(stream)?,
+                        argument_list: argument::parse_argument_list(stream)?,
                     }))
                 }
             } else {
-                Expression::Access(Box::new(Access::Property(PropertyAccess {
-                    object: lhs,
+                Expression::Access(Access::Property(PropertyAccess {
+                    object: Box::new(lhs),
                     arrow,
                     property: selector,
-                })))
+                }))
             }
         }
         T!["?->"] => {
@@ -309,14 +303,14 @@ fn parse_postfix_expression(
                     object: Box::new(lhs),
                     question_mark_arrow,
                     method: selector,
-                    arguments: argument::parse_argument_list(stream)?,
+                    argument_list: argument::parse_argument_list(stream)?,
                 }))
             } else {
-                Expression::Access(Box::new(Access::NullSafeProperty(NullSafePropertyAccess {
-                    object: lhs,
+                Expression::Access(Access::NullSafeProperty(NullSafePropertyAccess {
+                    object: Box::new(lhs),
                     question_mark_arrow,
                     property: selector,
-                })))
+                }))
             }
         }
         T!["++"] => Expression::UnaryPostfix(UnaryPostfix {

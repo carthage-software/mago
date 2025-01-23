@@ -17,7 +17,7 @@ use crate::sequence::TokenSeparatedSequence;
 /// Represents a class-like constant in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ClassLikeConstant {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub r#const: Keyword,
     pub hint: Option<Hint>,

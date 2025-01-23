@@ -44,7 +44,7 @@ pub struct DeclareItem {
 /// Represents the body of a declare statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum DeclareBody {
-    Statement(Statement),
+    Statement(Box<Statement>),
     ColonDelimited(DeclareColonDelimitedBody),
 }
 

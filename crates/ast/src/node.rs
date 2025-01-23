@@ -825,31 +825,31 @@ impl<'a> Node<'a> {
                 Call::StaticMethod(node) => vec![Node::StaticMethodCall(node)],
             },
             Node::FunctionCall(node) => {
-                vec![Node::Expression(&node.function), Node::ArgumentList(&node.arguments)]
+                vec![Node::Expression(&node.function), Node::ArgumentList(&node.argument_list)]
             }
             Node::MethodCall(node) => {
                 vec![
                     Node::Expression(&node.object),
                     Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.arguments),
+                    Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::NullSafeMethodCall(node) => {
                 vec![
                     Node::Expression(&node.object),
                     Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.arguments),
+                    Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::StaticMethodCall(node) => {
                 vec![
                     Node::Expression(&node.class),
                     Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.arguments),
+                    Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::ClassLikeConstant(node) => {
-                let mut children: Vec<_> = node.attributes.iter().map(Node::AttributeList).collect();
+                let mut children: Vec<_> = node.attribute_lists.iter().map(Node::AttributeList).collect();
 
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::Keyword(&node.r#const));
@@ -866,7 +866,7 @@ impl<'a> Node<'a> {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
             Node::EnumCase(node) => {
-                let mut children: Vec<_> = node.attributes.iter().map(Node::AttributeList).collect();
+                let mut children: Vec<_> = node.attribute_lists.iter().map(Node::AttributeList).collect();
 
                 children.push(Node::Keyword(&node.case));
                 children.push(Node::EnumCaseItem(&node.item));
@@ -920,11 +920,11 @@ impl<'a> Node<'a> {
             Node::Method(node) => {
                 let mut children: Vec<Node> = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::Keyword(&node.function));
                 children.push(Node::LocalIdentifier(&node.name));
-                children.push(Node::FunctionLikeParameterList(&node.parameters));
+                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
                 children.extend(node.return_type_hint.iter().map(Node::FunctionLikeReturnTypeHint));
                 children.push(Node::MethodBody(&node.body));
 
@@ -938,7 +938,7 @@ impl<'a> Node<'a> {
             Node::HookedProperty(node) => {
                 let mut children: Vec<Node> = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.var.iter().map(Node::Keyword));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.extend(node.hint.iter().map(Node::Hint));
@@ -950,7 +950,7 @@ impl<'a> Node<'a> {
             Node::PlainProperty(node) => {
                 let mut children: Vec<Node> = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.var.iter().map(Node::Keyword));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.extend(node.hint.iter().map(Node::Hint));
@@ -971,7 +971,7 @@ impl<'a> Node<'a> {
             Node::PropertyHook(node) => {
                 let mut children: Vec<Node> = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::LocalIdentifier(&node.name));
                 children.extend(node.parameters.iter().map(Node::FunctionLikeParameterList));
@@ -1084,7 +1084,7 @@ impl<'a> Node<'a> {
             },
             Node::AnonymousClass(node) => {
                 let mut children = vec![Node::Keyword(&node.new)];
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::Keyword(&node.class));
                 if let Some(arguments) = &node.arguments {
@@ -1098,7 +1098,7 @@ impl<'a> Node<'a> {
             }
             Node::Class(node) => {
                 let mut children = vec![];
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::Keyword(&node.class));
                 children.push(Node::LocalIdentifier(&node.name));
@@ -1110,7 +1110,7 @@ impl<'a> Node<'a> {
             }
             Node::Enum(node) => {
                 let mut children = vec![];
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.push(Node::Keyword(&node.r#enum));
                 children.push(Node::LocalIdentifier(&node.name));
                 children.extend(node.backing_type_hint.iter().map(Node::EnumBackingTypeHint));
@@ -1124,7 +1124,7 @@ impl<'a> Node<'a> {
             }
             Node::Interface(node) => {
                 let mut children = vec![];
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.push(Node::Keyword(&node.interface));
                 children.push(Node::LocalIdentifier(&node.name));
                 children.extend(node.extends.iter().map(Node::Extends));
@@ -1134,7 +1134,7 @@ impl<'a> Node<'a> {
             }
             Node::Trait(node) => {
                 let mut children = vec![];
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.push(Node::Keyword(&node.r#trait));
                 children.push(Node::LocalIdentifier(&node.name));
                 children.extend(node.members.iter().map(Node::ClassLikeMember));
@@ -1475,12 +1475,12 @@ impl<'a> Node<'a> {
             Node::ArrowFunction(node) => {
                 let mut children = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 if let Some(r#static) = &node.r#static {
                     children.push(Node::Keyword(r#static));
                 }
                 children.push(Node::Keyword(&node.r#fn));
-                children.push(Node::FunctionLikeParameterList(&node.parameters));
+                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
                     children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
@@ -1491,9 +1491,9 @@ impl<'a> Node<'a> {
             Node::Closure(node) => {
                 let mut children = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.push(Node::Keyword(&node.function));
-                children.push(Node::FunctionLikeParameterList(&node.parameters));
+                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(use_clause) = &node.use_clause {
                     children.push(Node::ClosureUseClause(use_clause));
                 }
@@ -1514,10 +1514,10 @@ impl<'a> Node<'a> {
             Node::Function(node) => {
                 let mut children = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.push(Node::Keyword(&node.function));
                 children.push(Node::LocalIdentifier(&node.name));
-                children.push(Node::FunctionLikeParameterList(&node.parameters));
+                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
                     children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
@@ -1530,7 +1530,7 @@ impl<'a> Node<'a> {
             Node::FunctionLikeParameter(node) => {
                 let mut children = vec![];
 
-                children.extend(node.attributes.iter().map(Node::AttributeList));
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 if let Some(hint) = &node.hint {
                     children.push(Node::Hint(hint));

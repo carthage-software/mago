@@ -354,7 +354,7 @@ where
 
             references
         }
-        Expression::Yield(r#yield) => match r#yield.as_ref() {
+        Expression::Yield(r#yield) => match r#yield {
             Yield::Value(yield_value) => match &yield_value.value {
                 Some(value) => find_method_references_in_expression(value, predicate),
                 None => vec![],
@@ -375,7 +375,7 @@ where
                 let mut references = vec![];
 
                 references.extend(find_method_references_in_expression(&function_call.function, predicate));
-                references.extend(find_references_in_argument_list(&function_call.arguments, predicate));
+                references.extend(find_references_in_argument_list(&function_call.argument_list, predicate));
                 references
             }
             Call::Method(method_call) => {
@@ -383,14 +383,14 @@ where
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
                 references.extend(find_method_references_in_expression(&method_call.object, predicate));
-                references.extend(find_references_in_argument_list(&method_call.arguments, predicate));
+                references.extend(find_references_in_argument_list(&method_call.argument_list, predicate));
                 references
             }
             Call::NullSafeMethod(null_safe_method_call) => {
                 let mut references = vec![];
 
                 references.extend(find_method_references_in_expression(&null_safe_method_call.object, predicate));
-                references.extend(find_references_in_argument_list(&null_safe_method_call.arguments, predicate));
+                references.extend(find_references_in_argument_list(&null_safe_method_call.argument_list, predicate));
                 references
             }
             Call::StaticMethod(static_method_call) => {
@@ -398,11 +398,11 @@ where
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
                 references.extend(find_method_references_in_expression(&static_method_call.class, predicate));
-                references.extend(find_references_in_argument_list(&static_method_call.arguments, predicate));
+                references.extend(find_references_in_argument_list(&static_method_call.argument_list, predicate));
                 references
             }
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation.as_ref() {
+        Expression::ClosureCreation(closure_creation) => match closure_creation {
             ClosureCreation::Method(method_closure_creation) => {
                 let reference = MethodReference::MethodClosureCreation(method_closure_creation);
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };

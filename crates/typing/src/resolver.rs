@@ -117,7 +117,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                     union_kind(kinds.into_iter().collect())
                 }
             }
-            Expression::Construct(construct) => match construct.as_ref() {
+            Expression::Construct(construct) => match construct {
                 Construct::Isset(_) => bool_kind(),
                 Construct::Empty(_) => bool_kind(),
                 Construct::Eval(_) => mixed_kind(false),
@@ -257,7 +257,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                     mixed_kind(false)
                 }
             },
-            Expression::Access(access) => match access.as_ref() {
+            Expression::Access(access) => match access {
                 Access::Property(property_access) => {
                     let object_kind = self.resolve(&property_access.object);
 
@@ -351,7 +351,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 Access::StaticProperty(static_property_access) => {
                     if let Some(codebase) = self.codebase {
                         if let (Expression::Identifier(name), Variable::Direct(variable)) =
-                            (&static_property_access.class, &static_property_access.property)
+                            (static_property_access.class.as_ref(), &static_property_access.property)
                         {
                             let class_name = self.names.get(name);
 
@@ -378,7 +378,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 Access::ClassConstant(class_constant_access) => {
                     if let Some(codebase) = self.codebase {
                         if let (Expression::Identifier(name), ClassLikeConstantSelector::Identifier(constant)) =
-                            (&class_constant_access.class, &class_constant_access.constant)
+                            (class_constant_access.class.as_ref(), &class_constant_access.constant)
                         {
                             let class_name = self.names.get(name);
 
@@ -401,10 +401,10 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                     mixed_kind(false)
                 }
             },
-            Expression::ClosureCreation(closure_creation) => match closure_creation.as_ref() {
+            Expression::ClosureCreation(closure_creation) => match closure_creation {
                 ClosureCreation::Function(function_closure_creation) => {
                     if let Some(codebase) = &self.codebase {
-                        if let Expression::Identifier(name) = &function_closure_creation.function {
+                        if let Expression::Identifier(name) = function_closure_creation.function.as_ref() {
                             let (full_name, short_name) = resolve_name(self.interner, name.value());
 
                             if let Some(function) = codebase.get_function(self.interner, &full_name) {
@@ -482,7 +482,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                 }
                 ClosureCreation::StaticMethod(static_method_closure_creation) => {
                     if let Some(codebase) = &self.codebase {
-                        let Expression::Identifier(class_name) = &static_method_closure_creation.class else {
+                        let Expression::Identifier(class_name) = static_method_closure_creation.class.as_ref() else {
                             return any_closure_kind();
                         };
 
@@ -510,7 +510,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::Static(_) => TypeKind::Scalar(ScalarTypeKind::ClassString(None)),
             Expression::Self_(_) => TypeKind::Scalar(ScalarTypeKind::ClassString(None)),
             Expression::Instantiation(instantiation) => {
-                let Expression::Identifier(class_name) = &instantiation.class else {
+                let Expression::Identifier(class_name) = instantiation.class.as_ref() else {
                     return any_object_kind();
                 };
 

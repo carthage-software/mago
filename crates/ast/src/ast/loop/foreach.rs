@@ -26,7 +26,7 @@ use crate::sequence::Sequence;
 pub struct Foreach {
     pub foreach: Keyword,
     pub left_parenthesis: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub r#as: Keyword,
     pub target: ForeachTarget,
     pub right_parenthesis: Span,
@@ -54,7 +54,7 @@ pub enum ForeachTarget {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ForeachValueTarget {
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 /// Represents the target of a foreach statement that assigns both the key and value.
@@ -70,16 +70,16 @@ pub struct ForeachValueTarget {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ForeachKeyValueTarget {
-    pub key: Expression,
+    pub key: Box<Expression>,
     pub double_arrow: Span,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 /// Represents the body of a foreach statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum ForeachBody {
     /// The body is a statement.
-    Statement(Statement),
+    Statement(Box<Statement>),
     /// The body is a colon-delimited body.
     ColonDelimited(ForeachColonDelimitedBody),
 }

@@ -33,13 +33,13 @@ pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
             Call::NullSafeMethod(null_safe_method_call) => &null_safe_method_call.object,
             Call::StaticMethod(static_method_call) => &static_method_call.class,
         }),
-        Expression::Access(access) => Some(match &**access {
+        Expression::Access(access) => Some(match access {
             Access::Property(property_access) => &property_access.object,
             Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
             Access::StaticProperty(static_property_access) => &static_property_access.class,
             Access::ClassConstant(class_constant_access) => &class_constant_access.class,
         }),
-        Expression::ClosureCreation(closure_creation) => Some(match &**closure_creation {
+        Expression::ClosureCreation(closure_creation) => Some(match closure_creation {
             ClosureCreation::Function(function_closure_creation) => &function_closure_creation.function,
             ClosureCreation::Method(method_closure_creation) => &method_closure_creation.object,
             ClosureCreation::StaticMethod(static_method_closure_creation) => &static_method_closure_creation.class,
@@ -92,9 +92,9 @@ pub fn is_at_callee(f: &Formatter<'_>) -> bool {
         Node::MethodCall(call) => call.object.as_ref() == expression,
         Node::StaticMethodCall(call) => call.class.as_ref() == expression,
         Node::NullSafeMethodCall(call) => call.object.as_ref() == expression,
-        Node::FunctionClosureCreation(closure) => &closure.function == expression,
-        Node::MethodClosureCreation(closure) => &closure.object == expression,
-        Node::StaticMethodClosureCreation(closure) => &closure.class == expression,
+        Node::FunctionClosureCreation(closure) => closure.function.as_ref() == expression,
+        Node::MethodClosureCreation(closure) => closure.object.as_ref() == expression,
+        Node::StaticMethodClosureCreation(closure) => closure.class.as_ref() == expression,
         _ => false,
     }
 }

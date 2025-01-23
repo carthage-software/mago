@@ -26,7 +26,7 @@ pub struct FunctionLikeParameterList {
 /// Example: `int $foo`, `string &$bar`, `bool ...$baz`, `mixed $qux = null`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct FunctionLikeParameter {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub hint: Option<Hint>,
     pub ampersand: Option<Span>,
@@ -69,7 +69,7 @@ impl HasSpan for FunctionLikeParameter {
             self.default_value.as_ref().map_or_else(|| self.variable.span(), |default_value| default_value.span())
         });
 
-        if let Some(attribute) = self.attributes.first() {
+        if let Some(attribute) = self.attribute_lists.first() {
             return Span::between(attribute.span(), right);
         }
 

@@ -44,34 +44,34 @@ pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, Pa
         T!["empty"] => Construct::Empty(EmptyConstruct {
             empty: utils::expect_keyword(stream, T!["empty"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
         T!["eval"] => Construct::Eval(EvalConstruct {
             eval: utils::expect_keyword(stream, T!["eval"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
         T!["print"] => Construct::Print(PrintConstruct {
             print: utils::expect_keyword(stream, T!["print"])?,
-            value: parse_expression_with_precedence(stream, Precedence::Print)?,
+            value: Box::new(parse_expression_with_precedence(stream, Precedence::Print)?),
         }),
         T!["require"] => Construct::Require(RequireConstruct {
             require: utils::expect_any_keyword(stream)?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
         }),
         T!["require_once"] => Construct::RequireOnce(RequireOnceConstruct {
             require_once: utils::expect_any_keyword(stream)?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
         }),
         T!["include"] => Construct::Include(IncludeConstruct {
             include: utils::expect_any_keyword(stream)?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
         }),
         T!["include_once"] => Construct::IncludeOnce(IncludeOnceConstruct {
             include_once: utils::expect_any_keyword(stream)?,
-            value: parse_expression(stream)?,
+            value: Box::new(parse_expression(stream)?),
         }),
         T!["exit"] => Construct::Exit(ExitConstruct {
             exit: utils::expect_any_keyword(stream)?,

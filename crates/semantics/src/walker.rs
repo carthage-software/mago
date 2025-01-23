@@ -1171,7 +1171,7 @@ impl SemanticsWalker {
                 if let Some(count) = parameter_count {
                     let mut found_count = 0;
                     let mut found_variadic = false;
-                    for param in method.parameters.parameters.iter() {
+                    for param in method.parameter_list.parameters.iter() {
                         found_count += 1;
 
                         if param.ellipsis.is_some() {
@@ -1197,7 +1197,7 @@ impl SemanticsWalker {
 
                         context.report(
                             Issue::error(message)
-                                .with_annotation(Annotation::primary(method.parameters.span()))
+                                .with_annotation(Annotation::primary(method.parameter_list.span()))
                                 .with_annotation(Annotation::secondary(method.span()).with_message(format!(
                                     "method `{}::{}` defined here.",
                                     class_like_name, method_name,
@@ -1549,7 +1549,7 @@ impl SemanticsWalker {
                     }
 
                     if method_name.eq_ignore_ascii_case(CONSTRUCTOR_MAGIC_METHOD) {
-                        for parameter in method.parameters.parameters.iter() {
+                        for parameter in method.parameter_list.parameters.iter() {
                             if parameter.is_promoted_property() {
                                 let item_name_id = parameter.variable.name;
                                 let item_name = context.interner.lookup(&item_name_id);
@@ -2246,13 +2246,13 @@ impl Walker<Context<'_>> for SemanticsWalker {
     fn walk_in_method(&self, method: &Method, context: &mut Context<'_>) {
         let name = context.interner.lookup(&method.name.value);
         if name != "__construct" {
-            self.process_promoted_properties_outside_constructor(&method.parameters, context);
+            self.process_promoted_properties_outside_constructor(&method.parameter_list, context);
 
             return;
         }
 
         if let Some(abstract_modifier) = method.modifiers.get_abstract() {
-            for parameter in method.parameters.parameters.iter() {
+            for parameter in method.parameter_list.parameters.iter() {
                 if parameter.is_promoted_property() {
                     context.report(
                         Issue::error("Promoted properties are not allowed in abstract constructors.")
@@ -3342,7 +3342,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
     }
 
     fn walk_in_function(&self, function: &Function, context: &mut Context<'_>) {
-        self.process_promoted_properties_outside_constructor(&function.parameters, context);
+        self.process_promoted_properties_outside_constructor(&function.parameter_list, context);
 
         let name = context.interner.lookup(&function.name.value);
         let fqfn = context.lookup_name(&function.name.span.start);
@@ -3571,7 +3571,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
     }
 
     fn walk_in_closure(&self, closure: &Closure, context: &mut Context<'_>) {
-        self.process_promoted_properties_outside_constructor(&closure.parameters, context);
+        self.process_promoted_properties_outside_constructor(&closure.parameter_list, context);
 
         let hint = if let Some(return_hint) = &closure.return_type_hint {
             &return_hint.hint
@@ -3640,7 +3640,7 @@ impl Walker<Context<'_>> for SemanticsWalker {
     }
 
     fn walk_in_arrow_function(&self, arrow_function: &ArrowFunction, context: &mut Context<'_>) {
-        self.process_promoted_properties_outside_constructor(&arrow_function.parameters, context);
+        self.process_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
 
         if let Some(return_hint) = &arrow_function.return_type_hint {
             // while technically valid, it is not possible to return `void` from an arrow function

@@ -13,7 +13,7 @@ pub fn parse_if(stream: &mut TokenStream<'_, '_>) -> Result<If, ParseError> {
     Ok(If {
         r#if: utils::expect_keyword(stream, T!["if"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: parse_expression(stream)?,
+        condition: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         body: parse_if_body(stream)?,
     })
@@ -28,7 +28,7 @@ pub fn parse_if_body(stream: &mut TokenStream<'_, '_>) -> Result<IfBody, ParseEr
 
 pub fn parse_if_statement_body(stream: &mut TokenStream<'_, '_>) -> Result<IfStatementBody, ParseError> {
     Ok(IfStatementBody {
-        statement: parse_statement(stream)?,
+        statement: Box::new(parse_statement(stream)?),
         else_if_clauses: {
             let mut else_if_clauses = vec![];
             while let Some(else_if_clause) = parse_optional_if_statement_body_else_if_clause(stream)? {
@@ -56,9 +56,9 @@ pub fn parse_if_statement_body_else_if_clause(
     Ok(IfStatementBodyElseIfClause {
         elseif: utils::expect_keyword(stream, T!["elseif"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: parse_expression(stream)?,
+        condition: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
-        statement: parse_statement(stream)?,
+        statement: Box::new(parse_statement(stream)?),
     })
 }
 
@@ -76,7 +76,7 @@ pub fn parse_if_statement_body_else_clause(
 ) -> Result<IfStatementBodyElseClause, ParseError> {
     Ok(IfStatementBodyElseClause {
         r#else: utils::expect_keyword(stream, T!["else"])?,
-        statement: parse_statement(stream)?,
+        statement: Box::new(parse_statement(stream)?),
     })
 }
 
@@ -124,7 +124,7 @@ pub fn parse_if_colon_delimited_body_else_if_clause(
     Ok(IfColonDelimitedBodyElseIfClause {
         r#elseif: utils::expect_keyword(stream, T!["elseif"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: parse_expression(stream)?,
+        condition: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         colon: utils::expect_span(stream, T![":"])?,
         statements: {

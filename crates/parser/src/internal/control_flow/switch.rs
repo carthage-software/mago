@@ -11,13 +11,13 @@ use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
 pub fn parse_switch(stream: &mut TokenStream<'_, '_>) -> Result<Switch, ParseError> {
-    let switch = utils::expect_keyword(stream, T!["switch"])?;
-    let left_parenthesis = utils::expect_span(stream, T!["("])?;
-    let expression = parse_expression(stream)?;
-    let right_parenthesis = utils::expect_span(stream, T![")"])?;
-    let body = parse_switch_body(stream)?;
-
-    Ok(Switch { switch, left_parenthesis, expression, right_parenthesis, body })
+    Ok(Switch {
+        switch: utils::expect_keyword(stream, T!["switch"])?,
+        left_parenthesis: utils::expect_span(stream, T!["("])?,
+        expression: Box::new(parse_expression(stream)?),
+        right_parenthesis: utils::expect_span(stream, T![")"])?,
+        body: parse_switch_body(stream)?,
+    })
 }
 
 pub fn parse_switch_body(stream: &mut TokenStream<'_, '_>) -> Result<SwitchBody, ParseError> {
@@ -78,7 +78,7 @@ pub fn parse_switch_case(stream: &mut TokenStream<'_, '_>) -> Result<SwitchCase,
 pub fn parse_switch_expression_case(stream: &mut TokenStream<'_, '_>) -> Result<SwitchExpressionCase, ParseError> {
     Ok(SwitchExpressionCase {
         case: utils::expect_keyword(stream, T!["case"])?,
-        expression: parse_expression(stream)?,
+        expression: Box::new(parse_expression(stream)?),
         separator: parse_switch_case_separator(stream)?,
         statements: parse_switch_statements(stream)?,
     })

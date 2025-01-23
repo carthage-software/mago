@@ -58,7 +58,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantMethodOverrideRule {
 
         let name = method.name.value;
         let parameters = method
-            .parameters
+            .parameter_list
             .parameters
             .iter()
             .map(|parameter| (parameter.ellipsis.is_some(), parameter.variable.name))
@@ -99,7 +99,9 @@ fn matches_method(
     parameters: &[(bool, StringIdentifier)],
     expression: &Expression,
 ) -> bool {
-    let Expression::Call(Call::StaticMethod(StaticMethodCall { class, method, arguments, .. })) = expression else {
+    let Expression::Call(Call::StaticMethod(StaticMethodCall { class, method, argument_list: arguments, .. })) =
+        expression
+    else {
         return false;
     };
 

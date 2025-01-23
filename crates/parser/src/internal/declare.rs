@@ -54,7 +54,7 @@ pub fn parse_declare_body(stream: &mut TokenStream<'_, '_>) -> Result<DeclareBod
 
     Ok(match next.kind {
         T![":"] => DeclareBody::ColonDelimited(parse_declare_colon_delimited_body(stream)?),
-        _ => DeclareBody::Statement(parse_statement(stream)?),
+        _ => DeclareBody::Statement(Box::new(parse_statement(stream)?)),
     })
 }
 

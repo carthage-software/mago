@@ -17,7 +17,7 @@ pub fn parse_class_like_constant_with_attributes_and_modifiers(
     modifiers: Sequence<Modifier>,
 ) -> Result<ClassLikeConstant, ParseError> {
     Ok(ClassLikeConstant {
-        attributes,
+        attribute_lists: attributes,
         modifiers,
         r#const: utils::expect_keyword(stream, T!["const"])?,
         hint: match utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind) {

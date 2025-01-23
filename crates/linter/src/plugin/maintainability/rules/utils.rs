@@ -17,7 +17,7 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
     };
 
     match statement {
-        Statement::Return(return_statement) if method.parameters.parameters.is_empty() => {
+        Statement::Return(return_statement) if method.parameter_list.parameters.is_empty() => {
             let Some(expression) = &return_statement.value else {
                 return false;
             };
@@ -28,8 +28,8 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
 
             statements_len == 1
         }
-        Statement::Expression(expression_statement) if method.parameters.parameters.len() == 1 => {
-            let Expression::AssignmentOperation(assignment) = &expression_statement.expression else {
+        Statement::Expression(expression_statement) if method.parameter_list.parameters.len() == 1 => {
+            let Expression::AssignmentOperation(assignment) = expression_statement.expression.as_ref() else {
                 return false;
             };
 
@@ -60,7 +60,7 @@ fn is_accessing_property_of_this(expression: &Expression, context: &LintContext<
         return false;
     };
 
-    let Access::Property(property_access) = access.as_ref() else {
+    let Access::Property(property_access) = access else {
         return false;
     };
 

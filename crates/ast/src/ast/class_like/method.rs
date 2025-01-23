@@ -27,12 +27,12 @@ use crate::sequence::Sequence;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Method {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub function: Keyword,
     pub ampersand: Option<Span>,
     pub name: LocalIdentifier,
-    pub parameters: FunctionLikeParameterList,
+    pub parameter_list: FunctionLikeParameterList,
     pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
     pub body: MethodBody,
 }
@@ -64,7 +64,7 @@ pub struct MethodAbstractBody {
 impl Method {
     /// Returns `true` if the method contains any promoted properties.
     pub fn has_promoted_properties(&self) -> bool {
-        self.parameters.parameters.iter().any(|parameter| parameter.is_promoted_property())
+        self.parameter_list.parameters.iter().any(|parameter| parameter.is_promoted_property())
     }
 
     /// Returns `true` if the method is abstract.
@@ -76,7 +76,7 @@ impl Method {
 
 impl HasSpan for Method {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return Span::between(attribute_list.span(), self.body.span());
         }
 

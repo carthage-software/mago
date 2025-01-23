@@ -11,10 +11,10 @@ use crate::internal::utils;
 pub fn parse_do_while(stream: &mut TokenStream<'_, '_>) -> Result<DoWhile, ParseError> {
     Ok(DoWhile {
         r#do: utils::expect_keyword(stream, T!["do"])?,
-        statement: parse_statement(stream)?,
+        statement: Box::new(parse_statement(stream)?),
         r#while: utils::expect_keyword(stream, T!["while"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: parse_expression(stream)?,
+        condition: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         terminator: parse_terminator(stream)?,
     })

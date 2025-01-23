@@ -697,14 +697,14 @@ pub enum ComposerPackageRepositories {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum ComposerPackageRepositoriesArrayItem {
-    Repository(Repository),
+    Repository(Box<Repository>),
     Map(HashMap<String, bool>),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum ComposerPackageRepositoriesObjectValue {
-    Repository(Repository),
+    Repository(Box<Repository>),
     Enabled(bool),
 }
 

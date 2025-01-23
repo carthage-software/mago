@@ -112,7 +112,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
                     }
                 }
                 ClassLikeMember::Method(method) => {
-                    for param in method.parameters.parameters.iter() {
+                    for param in method.parameter_list.parameters.iter() {
                         if param.is_promoted_property() {
                             property_count += 1;
                             if !param.modifiers.contains_readonly() {
@@ -163,7 +163,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
                         }
                     }
                     ClassLikeMember::Method(method) => {
-                        for param in method.parameters.parameters.iter() {
+                        for param in method.parameter_list.parameters.iter() {
                             if param.is_promoted_property() {
                                 if let Some(readonly) = param.modifiers.get_readonly() {
                                     plan.delete(readonly.span().to_range(), SafetyClassification::Safe);

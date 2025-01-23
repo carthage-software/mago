@@ -15,11 +15,11 @@ use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Closure {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub r#static: Option<Keyword>,
     pub function: Keyword,
     pub ampersand: Option<Span>,
-    pub parameters: FunctionLikeParameterList,
+    pub parameter_list: FunctionLikeParameterList,
     pub use_clause: Option<ClosureUseClause>,
     pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
     pub body: Block,
@@ -41,7 +41,7 @@ pub struct ClosureUseClauseVariable {
 
 impl HasSpan for Closure {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.body.span());
         }
 

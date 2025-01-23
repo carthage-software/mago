@@ -20,12 +20,12 @@ pub fn reflect_function<'ast>(
     let name = Name::new(*context.names.get(&function.name), function.name.span);
 
     FunctionLikeReflection {
-        attribute_reflections: reflect_attributes(&function.attributes, context),
+        attribute_reflections: reflect_attributes(&function.attribute_lists, context),
         visibility_reflection: None,
         name: FunctionLikeName::Function(name),
         // TODO: parse docblock to get the template list
         templates: vec![],
-        parameters: reflect_function_like_parameter_list(&function.parameters, context, scope),
+        parameters: reflect_function_like_parameter_list(&function.parameter_list, context, scope),
         return_type_reflection: reflect_function_like_return_type_hint(&function.return_type_hint, context, scope),
         returns_by_reference: function.ampersand.is_some(),
         has_yield: mago_ast_utils::block_has_yield(&function.body),
@@ -49,12 +49,12 @@ pub fn reflect_closure<'ast>(
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeReflection {
     FunctionLikeReflection {
-        attribute_reflections: reflect_attributes(&closure.attributes, context),
+        attribute_reflections: reflect_attributes(&closure.attribute_lists, context),
         visibility_reflection: None,
         name: FunctionLikeName::Closure(closure.span()),
         // TODO: parse docblock to get the template list
         templates: vec![],
-        parameters: reflect_function_like_parameter_list(&closure.parameters, context, scope),
+        parameters: reflect_function_like_parameter_list(&closure.parameter_list, context, scope),
         return_type_reflection: reflect_function_like_return_type_hint(&closure.return_type_hint, context, scope),
         returns_by_reference: closure.ampersand.is_some(),
         has_yield: mago_ast_utils::block_has_yield(&closure.body),
@@ -78,12 +78,12 @@ pub fn reflect_arrow_function<'ast>(
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeReflection {
     FunctionLikeReflection {
-        attribute_reflections: reflect_attributes(&arrow_function.attributes, context),
+        attribute_reflections: reflect_attributes(&arrow_function.attribute_lists, context),
         visibility_reflection: None,
         name: FunctionLikeName::ArrowFunction(arrow_function.span()),
         // TODO: parse docblock to get the template list
         templates: vec![],
-        parameters: reflect_function_like_parameter_list(&arrow_function.parameters, context, scope),
+        parameters: reflect_function_like_parameter_list(&arrow_function.parameter_list, context, scope),
         return_type_reflection: reflect_function_like_return_type_hint(
             &arrow_function.return_type_hint,
             context,
@@ -124,7 +124,7 @@ pub fn reflect_function_like_parameter<'ast>(
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeParameterReflection {
     FunctionLikeParameterReflection {
-        attribute_reflections: reflect_attributes(&parameter.attributes, context),
+        attribute_reflections: reflect_attributes(&parameter.attribute_lists, context),
         type_reflection: maybe_reflect_hint(&parameter.hint, context, scope),
         name: parameter.variable.name,
         is_variadic: parameter.ellipsis.is_some(),

@@ -369,7 +369,7 @@ generate_ast_walker! {
     }
 
     Class as class => {
-        for attribute_list in class.attributes.iter() {
+        for attribute_list in class.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -393,7 +393,7 @@ generate_ast_walker! {
     }
 
     Interface as interface => {
-        for attribute_list in interface.attributes.iter() {
+        for attribute_list in interface.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -410,7 +410,7 @@ generate_ast_walker! {
     }
 
     Trait as r#trait => {
-        for attribute_list in r#trait.attributes.iter() {
+        for attribute_list in r#trait.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -423,7 +423,7 @@ generate_ast_walker! {
     }
 
     Enum as r#enum => {
-        for attribute_list in r#enum.attributes.iter() {
+        for attribute_list in r#enum.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -566,7 +566,7 @@ generate_ast_walker! {
     }
 
     ClassLikeConstant as class_like_constant => {
-        for attribute_list in class_like_constant.attributes.iter() {
+        for attribute_list in class_like_constant.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -604,7 +604,7 @@ generate_ast_walker! {
     }
 
     PlainProperty as plain_property => {
-        for attribute_list in plain_property.attributes.iter() {
+        for attribute_list in plain_property.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -648,7 +648,7 @@ generate_ast_walker! {
     }
 
     HookedProperty as hooked_property => {
-        for attribute_list in hooked_property.attributes.iter() {
+        for attribute_list in hooked_property.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -675,7 +675,7 @@ generate_ast_walker! {
     }
 
     PropertyHook as property_hook => {
-        for attribute_list in property_hook.attributes.iter() {
+        for attribute_list in property_hook.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -728,7 +728,7 @@ generate_ast_walker! {
     }
 
     FunctionLikeParameter as function_like_parameter => {
-        for attribute_list in function_like_parameter.attributes.iter() {
+        for attribute_list in function_like_parameter.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -755,7 +755,7 @@ generate_ast_walker! {
     }
 
     EnumCase as enum_case => {
-        for attribute_list in enum_case.attributes.iter() {
+        for attribute_list in enum_case.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -785,7 +785,7 @@ generate_ast_walker! {
     }
 
     Method as method => {
-        for attribute_list in method.attributes.iter() {
+        for attribute_list in method.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -795,7 +795,7 @@ generate_ast_walker! {
 
         walker.walk_keyword(&method.function, context);
         walker.walk_local_identifier(&method.name, context);
-        walker.walk_function_like_parameter_list(&method.parameters, context);
+        walker.walk_function_like_parameter_list(&method.parameter_list, context);
         if let Some(hint) = &method.return_type_hint {
             walker.walk_function_like_return_type_hint(hint, context);
         }
@@ -843,13 +843,13 @@ generate_ast_walker! {
     }
 
     Function as function => {
-        for attribute_list in function.attributes.iter() {
+        for attribute_list in function.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
         walker.walk_keyword(&function.function, context);
         walker.walk_local_identifier(&function.name, context);
-        walker.walk_function_like_parameter_list(&function.parameters, context);
+        walker.walk_function_like_parameter_list(&function.parameter_list, context);
         if let Some(hint) = &function.return_type_hint {
             walker.walk_function_like_return_type_hint(hint, context);
         }
@@ -1303,27 +1303,27 @@ generate_ast_walker! {
             Expression::ArrayAccess(array_access) => walker.walk_array_access(array_access, context),
             Expression::ArrayAppend(array_append) => walker.walk_array_append(array_append, context),
             Expression::AnonymousClass(anonymous_class) => {
-                walker.walk_anonymous_class(anonymous_class.as_ref(), context)
+                walker.walk_anonymous_class(anonymous_class, context)
             }
-            Expression::Closure(closure) => walker.walk_closure(closure.as_ref(), context),
-            Expression::ArrowFunction(arrow_function) => walker.walk_arrow_function(arrow_function.as_ref(), context),
+            Expression::Closure(closure) => walker.walk_closure(closure, context),
+            Expression::ArrowFunction(arrow_function) => walker.walk_arrow_function(arrow_function, context),
             Expression::Variable(variable) => walker.walk_variable(variable, context),
             Expression::Identifier(identifier) => walker.walk_identifier(identifier, context),
-            Expression::Match(r#match) => walker.walk_match(r#match.as_ref(), context),
-            Expression::Yield(r#yield) => walker.walk_yield(r#yield.as_ref(), context),
-            Expression::Construct(construct) => walker.walk_construct(construct.as_ref(), context),
-            Expression::Throw(throw) => walker.walk_throw(throw.as_ref(), context),
-            Expression::Clone(clone) => walker.walk_clone(clone.as_ref(), context),
+            Expression::Match(r#match) => walker.walk_match(r#match, context),
+            Expression::Yield(r#yield) => walker.walk_yield(r#yield, context),
+            Expression::Construct(construct) => walker.walk_construct(construct, context),
+            Expression::Throw(throw) => walker.walk_throw(throw, context),
+            Expression::Clone(clone) => walker.walk_clone(clone, context),
             Expression::Call(call) => walker.walk_call(call, context),
-            Expression::Access(access) => walker.walk_access(access.as_ref(), context),
+            Expression::Access(access) => walker.walk_access(access, context),
             Expression::ConstantAccess(expr) => walker.walk_constant_access(expr, context),
             Expression::ClosureCreation(closure_creation) => {
-                walker.walk_closure_creation(closure_creation.as_ref(), context)
+                walker.walk_closure_creation(closure_creation, context)
             }
             Expression::Parent(keyword) => walker.walk_parent_keyword(keyword, context),
             Expression::Static(keyword) => walker.walk_static_keyword(keyword, context),
             Expression::Self_(keyword) => walker.walk_self_keyword(keyword, context),
-            Expression::Instantiation(instantiation) => walker.walk_instantiation(instantiation.as_ref(), context),
+            Expression::Instantiation(instantiation) => walker.walk_instantiation(instantiation, context),
             Expression::MagicConstant(magic_constant) => walker.walk_magic_constant(magic_constant, context),
         }
     }
@@ -1531,7 +1531,7 @@ generate_ast_walker! {
     }
 
     AnonymousClass as anonymous_class => {
-        for attribute_list in anonymous_class.attributes.iter() {
+        for attribute_list in anonymous_class.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -1559,7 +1559,7 @@ generate_ast_walker! {
     }
 
     Closure as closure => {
-        for attribute_list in closure.attributes.iter() {
+        for attribute_list in closure.attribute_lists.iter() {
                 walker.walk_attribute_list(attribute_list, context);
             }
 
@@ -1568,7 +1568,7 @@ generate_ast_walker! {
         }
 
         walker.walk_keyword(&closure.function, context);
-        walker.walk_function_like_parameter_list(&closure.parameters, context);
+        walker.walk_function_like_parameter_list(&closure.parameter_list, context);
         if let Some(use_clause) = &closure.use_clause {
             walker.walk_closure_use_clause(use_clause, context);
         }
@@ -1591,7 +1591,7 @@ generate_ast_walker! {
     }
 
     ArrowFunction as arrow_function => {
-        for attribute_list in arrow_function.attributes.iter() {
+        for attribute_list in arrow_function.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -1600,7 +1600,7 @@ generate_ast_walker! {
         }
 
         walker.walk_keyword(&arrow_function.r#fn, context);
-        walker.walk_function_like_parameter_list(&arrow_function.parameters, context);
+        walker.walk_function_like_parameter_list(&arrow_function.parameter_list, context);
 
         if let Some(return_type_hint) = &arrow_function.return_type_hint {
             walker.walk_function_like_return_type_hint(return_type_hint, context);
@@ -1841,25 +1841,25 @@ generate_ast_walker! {
 
     FunctionCall as function_call => {
         walker.walk_expression(&function_call.function, context);
-        walker.walk_argument_list(&function_call.arguments, context);
+        walker.walk_argument_list(&function_call.argument_list, context);
     }
 
     MethodCall as method_call => {
         walker.walk_expression(&method_call.object, context);
         walker.walk_class_like_member_selector(&method_call.method, context);
-        walker.walk_argument_list(&method_call.arguments, context);
+        walker.walk_argument_list(&method_call.argument_list, context);
     }
 
     NullSafeMethodCall as null_safe_method_call => {
         walker.walk_expression(&null_safe_method_call.object, context);
         walker.walk_class_like_member_selector(&null_safe_method_call.method, context);
-        walker.walk_argument_list(&null_safe_method_call.arguments, context);
+        walker.walk_argument_list(&null_safe_method_call.argument_list, context);
     }
 
     StaticMethodCall as static_method_call => {
         walker.walk_expression(&static_method_call.class, context);
         walker.walk_class_like_member_selector(&static_method_call.method, context);
-        walker.walk_argument_list(&static_method_call.arguments, context);
+        walker.walk_argument_list(&static_method_call.argument_list, context);
     }
 
     ClassLikeMemberSelector as class_like_member_selector => {

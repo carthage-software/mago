@@ -28,7 +28,7 @@ use crate::sequence::Sequence;
 pub struct While {
     pub r#while: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub right_parenthesis: Span,
     pub body: WhileBody,
 }
@@ -36,7 +36,7 @@ pub struct While {
 /// Represents the body of a while statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum WhileBody {
-    Statement(Statement),
+    Statement(Box<Statement>),
     ColonDelimited(WhileColonDelimitedBody),
 }
 

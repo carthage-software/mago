@@ -27,28 +27,28 @@ pub enum Access {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct PropertyAccess {
-    pub object: Expression,
+    pub object: Box<Expression>,
     pub arrow: Span,
     pub property: ClassLikeMemberSelector,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct NullSafePropertyAccess {
-    pub object: Expression,
+    pub object: Box<Expression>,
     pub question_mark_arrow: Span,
     pub property: ClassLikeMemberSelector,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct StaticPropertyAccess {
-    pub class: Expression,
+    pub class: Box<Expression>,
     pub double_colon: Span,
     pub property: Variable,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ClassConstantAccess {
-    pub class: Expression,
+    pub class: Box<Expression>,
     pub double_colon: Span,
     pub constant: ClassLikeConstantSelector,
 }

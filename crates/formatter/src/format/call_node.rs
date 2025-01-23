@@ -19,10 +19,10 @@ impl<'a> CallLikeNode<'a> {
     pub fn arguments(&self) -> Option<&'a ArgumentList> {
         match self {
             CallLikeNode::Call(call) => Some(match call {
-                Call::Function(c) => &c.arguments,
-                Call::Method(c) => &c.arguments,
-                Call::NullSafeMethod(c) => &c.arguments,
-                Call::StaticMethod(c) => &c.arguments,
+                Call::Function(c) => &c.argument_list,
+                Call::Method(c) => &c.argument_list,
+                Call::NullSafeMethod(c) => &c.argument_list,
+                Call::StaticMethod(c) => &c.argument_list,
             }),
             CallLikeNode::Instantiation(new) => new.arguments.as_ref(),
             CallLikeNode::Attribute(attr) => attr.arguments.as_ref(),

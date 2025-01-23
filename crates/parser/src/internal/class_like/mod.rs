@@ -27,7 +27,7 @@ pub fn parse_interface_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<Interface, ParseError> {
     Ok(Interface {
-        attributes,
+        attribute_lists: attributes,
         interface: utils::expect_keyword(stream, T!["interface"])?,
         name: parse_local_identifier(stream)?,
         extends: parse_optional_extends(stream)?,
@@ -63,7 +63,7 @@ pub fn parse_class_with_attributes_and_modifiers(
     modifiers: Sequence<Modifier>,
 ) -> Result<Class, ParseError> {
     Ok(Class {
-        attributes,
+        attribute_lists: attributes,
         modifiers,
         class: utils::expect_keyword(stream, T!["class"])?,
         name: parse_local_identifier(stream)?,
@@ -89,7 +89,7 @@ pub fn parse_class_with_attributes_and_modifiers(
 pub fn parse_anonymous_class(stream: &mut TokenStream<'_, '_>) -> Result<AnonymousClass, ParseError> {
     Ok(AnonymousClass {
         new: utils::expect_keyword(stream, T!["new"])?,
-        attributes: parse_attribute_list_sequence(stream)?,
+        attribute_lists: parse_attribute_list_sequence(stream)?,
         modifiers: parse_modifier_sequence(stream)?,
         class: utils::expect_keyword(stream, T!["class"])?,
         arguments: parse_optional_argument_list(stream)?,
@@ -117,7 +117,7 @@ pub fn parse_trait_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<Trait, ParseError> {
     Ok(Trait {
-        attributes,
+        attribute_lists: attributes,
         r#trait: utils::expect_keyword(stream, T!["trait"])?,
         name: parse_local_identifier(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
@@ -141,7 +141,7 @@ pub fn parse_enum_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<Enum, ParseError> {
     Ok(Enum {
-        attributes,
+        attribute_lists: attributes,
         r#enum: utils::expect_keyword(stream, T!["enum"])?,
         name: parse_local_identifier(stream)?,
         backing_type_hint: parse_optional_enum_backing_type_hint(stream)?,

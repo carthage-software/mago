@@ -20,7 +20,6 @@ package.rust-version = "1.84.0"
 members = ["crates/*"]
 
 [workspace.lints.clippy]
-# ast nodes are large enums, we want to keep them as is ( for now )
 large_enum_variant = { level = "allow" }
 
 [workspace.dependencies]

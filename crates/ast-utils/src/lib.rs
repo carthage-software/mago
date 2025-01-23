@@ -257,7 +257,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
                     MatchArm::Default(match_default_arm) => expression_has_yield(&match_default_arm.expression),
                 })
         }
-        Expression::Construct(construct) => match construct.as_ref() {
+        Expression::Construct(construct) => match construct {
             Construct::Isset(isset_construct) => isset_construct.values.iter().any(expression_has_yield),
             Construct::Empty(empty_construct) => expression_has_yield(&empty_construct.value),
             Construct::Eval(eval_construct) => expression_has_yield(&eval_construct.value),
@@ -292,7 +292,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
         Expression::Call(call) => match call {
             Call::Function(function_call) => {
                 expression_has_yield(&function_call.function)
-                    || function_call.arguments.arguments.iter().any(|argument| match argument {
+                    || function_call.argument_list.arguments.iter().any(|argument| match argument {
                         Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
                         Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                     })
@@ -300,7 +300,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Call::Method(method_call) => {
                 expression_has_yield(&method_call.object)
                     || matches!(&method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(&selector.expression))
-                    || method_call.arguments.arguments.iter().any(|argument| match argument {
+                    || method_call.argument_list.arguments.iter().any(|argument| match argument {
                         Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
                         Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                     })
@@ -308,7 +308,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Call::NullSafeMethod(null_safe_method_call) => {
                 expression_has_yield(&null_safe_method_call.object)
                     || matches!(&null_safe_method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(&selector.expression))
-                    || null_safe_method_call.arguments.arguments.iter().any(|argument| match argument {
+                    || null_safe_method_call.argument_list.arguments.iter().any(|argument| match argument {
                         Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
                         Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                     })
@@ -316,13 +316,13 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Call::StaticMethod(static_method_call) => {
                 expression_has_yield(&static_method_call.class)
                     || matches!(&static_method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(&selector.expression))
-                    || static_method_call.arguments.arguments.iter().any(|argument| match argument {
+                    || static_method_call.argument_list.arguments.iter().any(|argument| match argument {
                         Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
                         Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                     })
             }
         },
-        Expression::Access(access) => match access.as_ref() {
+        Expression::Access(access) => match access {
             Access::Property(property_access) => {
                 expression_has_yield(&property_access.object)
                     || matches!(&property_access.property, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(&selector.expression))
@@ -337,7 +337,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
                     || matches!(&class_constant_access.constant, ClassLikeConstantSelector::Expression(selector) if expression_has_yield(&selector.expression))
             }
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation.as_ref() {
+        Expression::ClosureCreation(closure_creation) => match closure_creation {
             ClosureCreation::Function(function_closure_creation) => {
                 expression_has_yield(&function_closure_creation.function)
             }

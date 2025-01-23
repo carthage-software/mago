@@ -68,7 +68,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     fn walk_in_namespace<'ast>(&self, namespace: &'ast Namespace, context: &mut LintContext<'a>) {
         for statement in namespace.statements().iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -80,7 +80,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in declare_colon_delimited_body.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -92,7 +92,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in switch_expression_case.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -104,7 +104,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in switch_default_case.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -116,7 +116,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in foreach_colon_delimited_body.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -128,7 +128,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in while_colon_delimited_body.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -140,7 +140,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in for_colon_delimited_body.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -152,7 +152,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in if_colon_delimited_body.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -164,7 +164,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in if_colon_delimited_body_else_if_clause.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }
@@ -176,7 +176,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantBlockRule {
     ) {
         for statement in if_colon_delimited_body_else_clause.statements.iter() {
             if let Statement::Block(inner) = statement {
-                self.report(inner.as_ref(), context);
+                self.report(inner, context);
             }
         }
     }

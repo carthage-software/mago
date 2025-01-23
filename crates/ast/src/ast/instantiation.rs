@@ -11,7 +11,7 @@ use crate::ast::keyword::Keyword;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Instantiation {
     pub new: Keyword,
-    pub class: Expression,
+    pub class: Box<Expression>,
     pub arguments: Option<ArgumentList>,
 }
 

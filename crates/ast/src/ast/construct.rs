@@ -37,7 +37,7 @@ pub struct IssetConstruct {
 pub struct EmptyConstruct {
     pub empty: Keyword,
     pub left_parenthesis: Span,
-    pub value: Expression,
+    pub value: Box<Expression>,
     pub right_parenthesis: Span,
 }
 
@@ -45,38 +45,38 @@ pub struct EmptyConstruct {
 pub struct EvalConstruct {
     pub eval: Keyword,
     pub left_parenthesis: Span,
-    pub value: Expression,
+    pub value: Box<Expression>,
     pub right_parenthesis: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct IncludeConstruct {
     pub include: Keyword,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct IncludeOnceConstruct {
     pub include_once: Keyword,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct RequireConstruct {
     pub require: Keyword,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct RequireOnceConstruct {
     pub require_once: Keyword,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct PrintConstruct {
     pub print: Keyword,
-    pub value: Expression,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]

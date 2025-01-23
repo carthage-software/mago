@@ -81,7 +81,7 @@ impl<'a> Walker<LintContext<'a>> for NoFFIRule {
         class_constant_access: &'ast ClassConstantAccess,
         context: &mut LintContext<'a>,
     ) {
-        let Expression::Identifier(class_identifier) = &class_constant_access.class else {
+        let Expression::Identifier(class_identifier) = class_constant_access.class.as_ref() else {
             return;
         };
 
@@ -89,7 +89,7 @@ impl<'a> Walker<LintContext<'a>> for NoFFIRule {
     }
 
     fn walk_in_instantiation<'ast>(&self, instantiation: &'ast Instantiation, context: &mut LintContext<'a>) {
-        let Expression::Identifier(class_identifier) = &instantiation.class else {
+        let Expression::Identifier(class_identifier) = instantiation.class.as_ref() else {
             return;
         };
 

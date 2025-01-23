@@ -539,7 +539,7 @@ impl<'a> Format<'a> for Closure {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Closure, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
                 attributes.push(Document::BreakParent);
@@ -560,7 +560,7 @@ impl<'a> Format<'a> for Closure {
                 signature.push(Document::String("&"));
             }
 
-            signature.push(self.parameters.format(f));
+            signature.push(self.parameter_list.format(f));
             if let Some(u) = &self.use_clause {
                 signature.push(Document::space());
                 signature.push(u.format(f));
@@ -593,7 +593,7 @@ impl<'a> Format<'a> for Closure {
 impl<'a> Format<'a> for ArrowFunction {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, ArrowFunction, {
-            let attributes = print_attribute_list_sequence(f, &self.attributes, true);
+            let attributes = print_attribute_list_sequence(f, &self.attribute_lists, true);
 
             let mut contents = vec![];
             if let Some(s) = &self.r#static {
@@ -610,7 +610,7 @@ impl<'a> Format<'a> for ArrowFunction {
                 contents.push(Document::String("&"));
             }
 
-            contents.push(self.parameters.format(f));
+            contents.push(self.parameter_list.format(f));
             if let Some(h) = &self.return_type_hint {
                 contents.push(h.format(f));
             }
@@ -1131,7 +1131,7 @@ impl<'a> Format<'a> for AnonymousClass {
         wrap!(f, self, AnonymousClass, {
             let initialization = {
                 let mut contents = vec![Document::BreakParent, self.new.format(f)];
-                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attributes, true) {
+                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists, true) {
                     contents.push(Document::Line(Line::default()));
                     contents.push(attributes);
                 } else {

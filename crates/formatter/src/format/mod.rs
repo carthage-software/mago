@@ -583,11 +583,12 @@ impl<'a> Format<'a> for TraitUseAliasAdaptation {
 impl<'a> Format<'a> for ClassLikeConstant {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, ClassLikeConstant, {
-            let attributes = if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attributes, false) {
-                attributes
-            } else {
-                Document::empty()
-            };
+            let attributes =
+                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists, false) {
+                    attributes
+                } else {
+                    Document::empty()
+                };
 
             let constant = {
                 let mut contents = print_modifiers(f, &self.modifiers);
@@ -645,7 +646,7 @@ impl<'a> Format<'a> for EnumCase {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, EnumCase, {
             let mut parts = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 parts.push(attribute_list.format(f));
                 parts.push(Document::Line(Line::hardline()));
             }
@@ -702,7 +703,7 @@ impl<'a> Format<'a> for Property {
 impl<'a> Format<'a> for PlainProperty {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, PlainProperty, {
-            let attributes = misc::print_attribute_list_sequence(f, &self.attributes, false);
+            let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let property = {
                 let mut contents = print_modifiers(f, &self.modifiers);
                 if let Some(var) = &self.var {
@@ -758,7 +759,7 @@ impl<'a> Format<'a> for PlainProperty {
 impl<'a> Format<'a> for HookedProperty {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, HookedProperty, {
-            let attributes = misc::print_attribute_list_sequence(f, &self.attributes, false);
+            let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
 
             let property = {
                 let mut contents = print_modifiers(f, &self.modifiers);
@@ -829,7 +830,7 @@ impl<'a> Format<'a> for Method {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Method, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
             }
@@ -846,7 +847,7 @@ impl<'a> Format<'a> for Method {
             }
 
             signature.push(self.name.format(f));
-            signature.push(self.parameters.format(f));
+            signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
             }
@@ -974,7 +975,7 @@ impl<'a> Format<'a> for Interface {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Interface, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
             }
@@ -1020,7 +1021,7 @@ impl<'a> Format<'a> for EnumBackingTypeHint {
 impl<'a> Format<'a> for Class {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Class, {
-            let attributes = misc::print_attribute_list_sequence(f, &self.attributes, false);
+            let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let mut signature = print_modifiers(f, &self.modifiers);
             if !signature.is_empty() {
                 signature.push(Document::space());
@@ -1066,7 +1067,7 @@ impl<'a> Format<'a> for Trait {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Trait, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
             }
@@ -1095,7 +1096,7 @@ impl<'a> Format<'a> for Enum {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Enum, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
             }
@@ -1566,7 +1567,7 @@ impl<'a> Format<'a> for PropertyHookBody {
 impl<'a> Format<'a> for PropertyHook {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, PropertyHook, {
-            let attributes = misc::print_attribute_list_sequence(f, &self.attributes, false);
+            let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let hook = {
                 let mut contents = print_modifiers(f, &self.modifiers);
                 if !contents.is_empty() {
@@ -1623,7 +1624,7 @@ impl<'a> Format<'a> for FunctionLikeParameterDefaultValue {
 impl<'a> Format<'a> for FunctionLikeParameter {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, FunctionLikeParameter, {
-            let attributes = print_attribute_list_sequence(f, &self.attributes, true);
+            let attributes = print_attribute_list_sequence(f, &self.attribute_lists, true);
             let parameter = {
                 let mut contents = print_modifiers(f, &self.modifiers);
                 if let Some(hint) = &self.hint {
@@ -1687,7 +1688,7 @@ impl<'a> Format<'a> for Function {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Function, {
             let mut attributes = vec![];
-            for attribute_list in self.attributes.iter() {
+            for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hardline()));
             }
@@ -1700,7 +1701,7 @@ impl<'a> Format<'a> for Function {
             }
 
             signature.push(self.name.format(f));
-            signature.push(self.parameters.format(f));
+            signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
             }

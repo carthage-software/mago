@@ -188,7 +188,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
 
         context: &mut NameContext<'a>,
     ) {
-        if let Expression::Identifier(identifier) = &function_closure_creation.function {
+        if let Expression::Identifier(identifier) = function_closure_creation.function.as_ref() {
             let (name, imported) = context.resolve_name(NameKind::Function, identifier.value());
 
             self.resolved_names.insert_at(identifier.span().start, name, imported);
@@ -196,7 +196,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
     }
 
     fn walk_in_instantiation<'ast>(&mut self, instantiation: &'ast Instantiation, context: &mut NameContext<'a>) {
-        if let Expression::Identifier(identifier) = &instantiation.class {
+        if let Expression::Identifier(identifier) = instantiation.class.as_ref() {
             let (name, imported) = context.resolve_name(NameKind::Default, identifier.value());
 
             self.resolved_names.insert_at(identifier.span().start, name, imported);
@@ -222,7 +222,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
 
         context: &mut NameContext<'a>,
     ) {
-        if let Expression::Identifier(identifier) = &static_method_closure_creation.class {
+        if let Expression::Identifier(identifier) = static_method_closure_creation.class.as_ref() {
             let (name, imported) = context.resolve_name(NameKind::Default, identifier.value());
 
             self.resolved_names.insert_at(identifier.span().start, name, imported);
@@ -235,7 +235,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
 
         context: &mut NameContext<'a>,
     ) {
-        if let Expression::Identifier(identifier) = &static_property_access.class {
+        if let Expression::Identifier(identifier) = static_property_access.class.as_ref() {
             let (name, imported) = context.resolve_name(NameKind::Default, identifier.value());
 
             self.resolved_names.insert_at(identifier.span().start, name, imported);
@@ -248,7 +248,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
 
         context: &mut NameContext<'a>,
     ) {
-        if let Expression::Identifier(identifier) = &class_constant_access.class {
+        if let Expression::Identifier(identifier) = class_constant_access.class.as_ref() {
             let (name, imported) = context.resolve_name(NameKind::Default, identifier.value());
 
             self.resolved_names.insert_at(identifier.span().start, name, imported);

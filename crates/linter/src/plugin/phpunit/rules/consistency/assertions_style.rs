@@ -126,7 +126,7 @@ impl<'a> Walker<LintContext<'a>> for AssertionsStyleRule {
                     class,
                     double_colon,
                     ..
-                }) => match class {
+                }) => match class.as_ref() {
                     Expression::Static(_) => (class.span().join(*double_colon), STATIC_STYLES),
                     Expression::Self_(_) => (class.span().join(*double_colon), SELF_STYLES),
                     _ => continue,

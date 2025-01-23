@@ -15,11 +15,11 @@ pub fn parse_function_with_attributes(
     attributes: Sequence<AttributeList>,
 ) -> Result<Function, ParseError> {
     Ok(Function {
-        attributes,
+        attribute_lists: attributes,
         function: utils::expect_keyword(stream, T!["function"])?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
         name: parse_local_identifier(stream)?,
-        parameters: parse_function_like_parameter_list(stream)?,
+        parameter_list: parse_function_like_parameter_list(stream)?,
         return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
         body: parse_block(stream)?,
     })

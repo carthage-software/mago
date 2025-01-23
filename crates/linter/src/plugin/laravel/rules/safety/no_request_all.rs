@@ -120,7 +120,7 @@ impl<'a> Walker<LintContext<'a>> for NoRequestAllRule {
                     Expression::Variable(Variable::Direct(variable)) => {
                         context.lookup(&variable.name).eq_ignore_ascii_case(REQUEST_VAR)
                     }
-                    Expression::Call(Call::Function(FunctionCall { function, arguments }))
+                    Expression::Call(Call::Function(FunctionCall { function, argument_list: arguments }))
                         if arguments.arguments.is_empty() =>
                     {
                         let Expression::Identifier(identifier) = function.as_ref() else {

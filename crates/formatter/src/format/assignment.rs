@@ -138,7 +138,7 @@ fn choose_layout<'a, 'b>(
         if !is_tail {
             return Layout::Chain;
         } else if let Expression::ArrowFunction(arrow_function) = rhs_expression {
-            if let Expression::ArrowFunction(_) = &arrow_function.expression {
+            if let Expression::ArrowFunction(_) = arrow_function.expression.as_ref() {
                 return Layout::ChainTailArrowChain;
             }
         }
@@ -152,7 +152,7 @@ fn choose_layout<'a, 'b>(
 
     if let Expression::Construct(construct) = rhs_expression {
         if matches!(
-            construct.as_ref(),
+            construct,
             Construct::Require(_) | Construct::RequireOnce(_) | Construct::Include(_) | Construct::IncludeOnce(_)
         ) {
             // special case for require/include constructs.
@@ -285,7 +285,7 @@ fn should_break_after_operator<'a>(f: &Formatter<'a>, rhs_expression: &'a Expres
             return condition.is_binary() && !should_inline_logical_or_coalesce_expression(condition);
         }
         Expression::AnonymousClass(anonymous_class) => {
-            if !anonymous_class.attributes.is_empty() {
+            if !anonymous_class.attribute_lists.is_empty() {
                 return true;
             }
         }
@@ -326,22 +326,22 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &Formatter<'a>, rhs_expressio
 
                 Some(match call {
                     Call::Function(function_call) => {
-                        call_argument_lists.push(&function_call.arguments);
+                        call_argument_lists.push(&function_call.argument_list);
 
                         function_call.function.as_ref()
                     }
                     Call::Method(method_call) => {
-                        call_argument_lists.push(&method_call.arguments);
+                        call_argument_lists.push(&method_call.argument_list);
 
                         method_call.object.as_ref()
                     }
                     Call::NullSafeMethod(null_safe_method_call) => {
-                        call_argument_lists.push(&null_safe_method_call.arguments);
+                        call_argument_lists.push(&null_safe_method_call.argument_list);
 
                         null_safe_method_call.object.as_ref()
                     }
                     Call::StaticMethod(static_method_call) => {
-                        call_argument_lists.push(&static_method_call.arguments);
+                        call_argument_lists.push(&static_method_call.argument_list);
 
                         static_method_call.class.as_ref()
                     }
@@ -350,7 +350,7 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &Formatter<'a>, rhs_expressio
             Expression::Access(access) => {
                 is_chain_expression = true;
 
-                Some(match access.as_ref() {
+                Some(match access {
                     Access::Property(property_access) => &property_access.object,
                     Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
                     Access::StaticProperty(static_property_access) => &static_property_access.class,

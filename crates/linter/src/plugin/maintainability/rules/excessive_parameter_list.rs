@@ -38,11 +38,11 @@ impl Rule for ExcessiveParameterListRule {
 
 impl<'a> Walker<LintContext<'a>> for ExcessiveParameterListRule {
     fn walk_in_method(&self, method: &Method, context: &mut LintContext<'a>) {
-        check("Method", Node::Method(method), &method.parameters, context);
+        check("Method", Node::Method(method), &method.parameter_list, context);
     }
 
     fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        check("Function", Node::Function(function), &function.parameters, context);
+        check("Function", Node::Function(function), &function.parameter_list, context);
     }
 
     fn walk_in_property_hook(&self, property_hook: &PropertyHook, context: &mut LintContext<'a>) {
@@ -52,11 +52,11 @@ impl<'a> Walker<LintContext<'a>> for ExcessiveParameterListRule {
     }
 
     fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        check("Closure", Node::Closure(closure), &closure.parameters, context);
+        check("Closure", Node::Closure(closure), &closure.parameter_list, context);
     }
 
     fn walk_in_arrow_function(&self, arrow_function: &ArrowFunction, context: &mut LintContext<'a>) {
-        check("Arrow function", Node::ArrowFunction(arrow_function), &arrow_function.parameters, context);
+        check("Arrow function", Node::ArrowFunction(arrow_function), &arrow_function.parameter_list, context);
     }
 }
 

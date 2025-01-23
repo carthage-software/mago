@@ -55,13 +55,13 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
     }
 
     fn walk_in_statement_expression(&self, statement_expression: &ExpressionStatement, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(parenthesized) = &statement_expression.expression {
+        if let Expression::Parenthesized(parenthesized) = statement_expression.expression.as_ref() {
             self.report(parenthesized, context);
 
             return;
         }
 
-        if let Expression::AssignmentOperation(assignment) = &statement_expression.expression {
+        if let Expression::AssignmentOperation(assignment) = statement_expression.expression.as_ref() {
             if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
                 self.report(rhs, context);
             }
@@ -85,7 +85,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
     }
 
     fn walk_in_if<'ast>(&self, r#if: &'ast If, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(condition) = &r#if.condition {
+        if let Expression::Parenthesized(condition) = r#if.condition.as_ref() {
             self.report(condition, context);
         }
     }
@@ -95,7 +95,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
         if_statement_body_else_if_clause: &'ast IfStatementBodyElseIfClause,
         context: &mut LintContext<'a>,
     ) {
-        if let Expression::Parenthesized(condition) = &if_statement_body_else_if_clause.condition {
+        if let Expression::Parenthesized(condition) = if_statement_body_else_if_clause.condition.as_ref() {
             self.report(condition, context);
         }
     }
@@ -105,7 +105,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
         if_colon_delimited_body_else_if_clause: &'ast IfColonDelimitedBodyElseIfClause,
         context: &mut LintContext<'a>,
     ) {
-        if let Expression::Parenthesized(condition) = &if_colon_delimited_body_else_if_clause.condition {
+        if let Expression::Parenthesized(condition) = if_colon_delimited_body_else_if_clause.condition.as_ref() {
             self.report(condition, context);
         }
     }

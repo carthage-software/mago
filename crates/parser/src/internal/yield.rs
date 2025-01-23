@@ -15,19 +15,20 @@ pub fn parse_yield(stream: &mut TokenStream<'_, '_>) -> Result<Yield, ParseError
         T!["from"] => Yield::From(YieldFrom {
             r#yield,
             from: utils::expect_keyword(stream, T!["from"])?,
-            iterator: parse_expression_with_precedence(stream, Precedence::YieldFrom)?,
+            iterator: Box::new(parse_expression_with_precedence(stream, Precedence::YieldFrom)?),
         }),
         _ => {
             let key_or_value = parse_expression_with_precedence(stream, Precedence::Yield)?;
 
             if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["=>"])) {
-                let key = key_or_value;
-                let arrow = utils::expect_span(stream, T!["=>"])?;
-                let value = parse_expression_with_precedence(stream, Precedence::Yield)?;
-
-                Yield::Pair(YieldPair { r#yield, key, arrow, value })
+                Yield::Pair(YieldPair {
+                    r#yield,
+                    key: Box::new(key_or_value),
+                    arrow: utils::expect_span(stream, T!["=>"])?,
+                    value: Box::new(parse_expression_with_precedence(stream, Precedence::Yield)?),
+                })
             } else {
-                Yield::Value(YieldValue { r#yield, value: Some(key_or_value) })
+                Yield::Value(YieldValue { r#yield, value: Some(Box::new(key_or_value)) })
             }
         }
     })

@@ -90,7 +90,7 @@ pub fn parse_for(stream: &mut TokenStream<'_, '_>) -> Result<For, ParseError> {
 pub fn parse_for_body(stream: &mut TokenStream<'_, '_>) -> Result<ForBody, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => ForBody::ColonDelimited(parse_for_colon_delimited_body(stream)?),
-        _ => ForBody::Statement(parse_statement(stream)?),
+        _ => ForBody::Statement(Box::new(parse_statement(stream)?)),
     })
 }
 

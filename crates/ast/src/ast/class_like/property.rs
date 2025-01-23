@@ -40,7 +40,7 @@ pub enum Property {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct PlainProperty {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub var: Option<Keyword>,
     pub hint: Option<Hint>,
@@ -70,7 +70,7 @@ pub struct PlainProperty {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct HookedProperty {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub var: Option<Keyword>,
     pub hint: Option<Hint>,
@@ -162,7 +162,7 @@ pub struct PropertyHookList {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct PropertyHook {
-    pub attributes: Sequence<AttributeList>,
+    pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
     pub ampersand: Option<Span>,
     pub name: LocalIdentifier,
@@ -254,7 +254,7 @@ impl HasSpan for Property {
 
 impl HasSpan for PlainProperty {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.terminator.span());
         }
 
@@ -285,7 +285,7 @@ impl HasSpan for PlainProperty {
 
 impl HasSpan for HookedProperty {
     fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attributes.first() {
+        if let Some(attribute_list) = self.attribute_lists.first() {
             return Span::between(attribute_list.span(), self.hooks.span());
         }
 
@@ -339,7 +339,7 @@ impl HasSpan for PropertyHookList {
 
 impl HasSpan for PropertyHook {
     fn span(&self) -> Span {
-        if let Some(attributes) = self.attributes.first() {
+        if let Some(attributes) = self.attribute_lists.first() {
             return Span::between(attributes.span(), self.body.span());
         }
 

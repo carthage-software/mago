@@ -83,7 +83,7 @@ impl RequireParameterTypeRule {
                 continue;
             }
 
-            for parameter in method.parameters.parameters.iter() {
+            for parameter in method.parameter_list.parameters.iter() {
                 Self::report(parameter, context);
             }
         }
@@ -92,19 +92,19 @@ impl RequireParameterTypeRule {
 
 impl<'a> Walker<LintContext<'a>> for RequireParameterTypeRule {
     fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        for parameter in function.parameters.parameters.iter() {
+        for parameter in function.parameter_list.parameters.iter() {
             Self::report(parameter, context);
         }
     }
 
     fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        for parameter in closure.parameters.parameters.iter() {
+        for parameter in closure.parameter_list.parameters.iter() {
             Self::report(parameter, context);
         }
     }
 
     fn walk_in_arrow_function(&self, arrow_function: &ArrowFunction, context: &mut LintContext<'a>) {
-        for parameter in arrow_function.parameters.parameters.iter() {
+        for parameter in arrow_function.parameter_list.parameters.iter() {
             Self::report(parameter, context);
         }
     }

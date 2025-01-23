@@ -14,7 +14,7 @@ use crate::sequence::TokenSeparatedSequence;
 pub struct Match {
     pub r#match: Keyword,
     pub left_parenthesis: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
     pub right_parenthesis: Span,
     pub left_brace: Span,
     pub arms: TokenSeparatedSequence<MatchArm>,
@@ -33,7 +33,7 @@ pub enum MatchArm {
 pub struct MatchExpressionArm {
     pub conditions: TokenSeparatedSequence<Expression>,
     pub arrow: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
 }
 
 /// Represents the default arm within a match statement.
@@ -41,7 +41,7 @@ pub struct MatchExpressionArm {
 pub struct MatchDefaultArm {
     pub default: Keyword,
     pub arrow: Span,
-    pub expression: Expression,
+    pub expression: Box<Expression>,
 }
 
 impl HasSpan for Match {

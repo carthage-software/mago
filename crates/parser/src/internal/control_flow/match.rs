@@ -11,7 +11,7 @@ pub fn parse_match(stream: &mut TokenStream<'_, '_>) -> Result<Match, ParseError
     Ok(Match {
         r#match: utils::expect_keyword(stream, T!["match"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        expression: parse_expression(stream)?,
+        expression: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         arms: {
@@ -72,7 +72,7 @@ pub fn parse_match_expression_arm(stream: &mut TokenStream<'_, '_>) -> Result<Ma
             TokenSeparatedSequence::new(conditions, commas)
         },
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: parse_expression(stream)?,
+        expression: Box::new(parse_expression(stream)?),
     })
 }
 
@@ -80,6 +80,6 @@ pub fn parse_match_default_arm(stream: &mut TokenStream<'_, '_>) -> Result<Match
     Ok(MatchDefaultArm {
         default: utils::expect_keyword(stream, T!["default"])?,
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: parse_expression(stream)?,
+        expression: Box::new(parse_expression(stream)?),
     })
 }

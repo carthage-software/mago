@@ -69,10 +69,10 @@ impl<'a> Walker<LintContext<'a>> for StrStartsWithRule {
         let (left, call) = match (binary.lhs.as_ref(), binary.rhs.as_ref()) {
             (
                 Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
-                Expression::Call(Call::Function(call @ FunctionCall { arguments, .. })),
+                Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
             ) if arguments.arguments.len() == 2 => (false, call),
             (
-                Expression::Call(Call::Function(call @ FunctionCall { arguments, .. })),
+                Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
                 Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
             ) if arguments.arguments.len() == 2 => (true, call),
             _ => {

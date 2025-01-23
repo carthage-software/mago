@@ -28,7 +28,7 @@ use crate::sequence::Sequence;
 pub struct If {
     pub r#if: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub right_parenthesis: Span,
     pub body: IfBody,
 }
@@ -45,7 +45,7 @@ pub enum IfBody {
 /// Represents the body of an `if` statement when it is a statement body.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct IfStatementBody {
-    pub statement: Statement,
+    pub statement: Box<Statement>,
     pub else_if_clauses: Sequence<IfStatementBodyElseIfClause>,
     pub else_clause: Option<IfStatementBodyElseClause>,
 }
@@ -55,16 +55,16 @@ pub struct IfStatementBody {
 pub struct IfStatementBodyElseIfClause {
     pub elseif: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub right_parenthesis: Span,
-    pub statement: Statement,
+    pub statement: Box<Statement>,
 }
 
 /// Represents an `else` clause in a statement body of an `if` statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct IfStatementBodyElseClause {
     pub r#else: Keyword,
-    pub statement: Statement,
+    pub statement: Box<Statement>,
 }
 
 /// Represents a colon-delimited body of an `if` statement.
@@ -83,7 +83,7 @@ pub struct IfColonDelimitedBody {
 pub struct IfColonDelimitedBodyElseIfClause {
     pub elseif: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub right_parenthesis: Span,
     pub colon: Span,
     pub statements: Sequence<Statement>,

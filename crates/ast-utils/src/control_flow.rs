@@ -327,7 +327,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                 }
             }
         }
-        Expression::Yield(r#yield) => match r#yield.as_ref() {
+        Expression::Yield(r#yield) => match r#yield {
             Yield::Value(yield_value) => {
                 if let Some(value) = &yield_value.value {
                     controls.extend(find_control_flows_in_expression(value));
@@ -341,7 +341,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                 controls.extend(find_control_flows_in_expression(&yield_from.iterator));
             }
         },
-        Expression::Construct(construct) => match construct.as_ref() {
+        Expression::Construct(construct) => match construct {
             Construct::Isset(isset_construct) => {
                 for expression in isset_construct.values.iter() {
                     controls.extend(find_control_flows_in_expression(expression));
@@ -392,7 +392,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
         Expression::Call(call) => match call {
             Call::Function(function_call) => {
                 controls.extend(find_control_flows_in_expression(&function_call.function));
-                for argument in function_call.arguments.arguments.iter() {
+                for argument in function_call.argument_list.arguments.iter() {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -410,7 +410,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                     _ => {}
                 }
 
-                for argument in method_call.arguments.arguments.iter() {
+                for argument in method_call.argument_list.arguments.iter() {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -428,7 +428,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                     _ => {}
                 }
 
-                for argument in null_safe_method_call.arguments.arguments.iter() {
+                for argument in null_safe_method_call.argument_list.arguments.iter() {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -446,12 +446,12 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                     _ => {}
                 }
 
-                for argument in static_method_call.arguments.arguments.iter() {
+                for argument in static_method_call.argument_list.arguments.iter() {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
         },
-        Expression::Access(access) => match access.as_ref() {
+        Expression::Access(access) => match access {
             Access::Property(property_access) => {
                 controls.extend(find_control_flows_in_expression(&property_access.object));
                 match &property_access.property {
@@ -497,7 +497,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
         Expression::Variable(variable) => {
             controls.extend(find_control_flows_in_variable(variable));
         }
-        Expression::ClosureCreation(closure_creation) => match closure_creation.as_ref() {
+        Expression::ClosureCreation(closure_creation) => match closure_creation {
             ClosureCreation::Function(function_closure_creation) => {
                 controls.extend(find_control_flows_in_expression(&function_closure_creation.function));
             }

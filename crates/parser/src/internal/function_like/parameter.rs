@@ -55,7 +55,7 @@ pub fn parse_function_like_parameter_list(
 
 pub fn parse_function_like_parameter(stream: &mut TokenStream<'_, '_>) -> Result<FunctionLikeParameter, ParseError> {
     Ok(FunctionLikeParameter {
-        attributes: attribute::parse_attribute_list_sequence(stream)?,
+        attribute_lists: attribute::parse_attribute_list_sequence(stream)?,
         modifiers: modifier::parse_modifier_sequence(stream)?,
         hint: type_hint::parse_optional_type_hint(stream)?,
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|token| token.span),

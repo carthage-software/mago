@@ -21,7 +21,7 @@ pub enum Call {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct FunctionCall {
     pub function: Box<Expression>,
-    pub arguments: ArgumentList,
+    pub argument_list: ArgumentList,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -29,7 +29,7 @@ pub struct MethodCall {
     pub object: Box<Expression>,
     pub arrow: Span,
     pub method: ClassLikeMemberSelector,
-    pub arguments: ArgumentList,
+    pub argument_list: ArgumentList,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -37,7 +37,7 @@ pub struct NullSafeMethodCall {
     pub object: Box<Expression>,
     pub question_mark_arrow: Span,
     pub method: ClassLikeMemberSelector,
-    pub arguments: ArgumentList,
+    pub argument_list: ArgumentList,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -45,7 +45,7 @@ pub struct StaticMethodCall {
     pub class: Box<Expression>,
     pub double_colon: Span,
     pub method: ClassLikeMemberSelector,
-    pub arguments: ArgumentList,
+    pub argument_list: ArgumentList,
 }
 
 impl HasSpan for Call {
@@ -61,24 +61,24 @@ impl HasSpan for Call {
 
 impl HasSpan for FunctionCall {
     fn span(&self) -> Span {
-        self.function.span().join(self.arguments.span())
+        self.function.span().join(self.argument_list.span())
     }
 }
 
 impl HasSpan for MethodCall {
     fn span(&self) -> Span {
-        self.object.span().join(self.arguments.span())
+        self.object.span().join(self.argument_list.span())
     }
 }
 
 impl HasSpan for NullSafeMethodCall {
     fn span(&self) -> Span {
-        self.object.span().join(self.arguments.span())
+        self.object.span().join(self.argument_list.span())
     }
 }
 
 impl HasSpan for StaticMethodCall {
     fn span(&self) -> Span {
-        self.class.span().join(self.arguments.span())
+        self.class.span().join(self.argument_list.span())
     }
 }

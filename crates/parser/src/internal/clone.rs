@@ -10,6 +10,6 @@ use crate::internal::utils;
 pub fn parse_clone(stream: &mut TokenStream<'_, '_>) -> Result<Clone, ParseError> {
     Ok(Clone {
         clone: utils::expect_keyword(stream, T!["clone"])?,
-        object: parse_expression_with_precedence(stream, Precedence::Clone)?,
+        object: Box::new(parse_expression_with_precedence(stream, Precedence::Clone)?),
     })
 }

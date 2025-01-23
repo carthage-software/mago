@@ -65,7 +65,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                 MatchArm::Default(match_default_arm) => get_assignment_from_expression(&match_default_arm.expression),
             })
         }),
-        Expression::Yield(r#yield) => match r#yield.as_ref() {
+        Expression::Yield(r#yield) => match r#yield {
             Yield::Value(yield_value) => {
                 yield_value.value.as_ref().and_then(|value| get_assignment_from_expression(value))
             }
@@ -73,7 +73,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                 .or_else(|| get_assignment_from_expression(&yield_pair.value)),
             Yield::From(yield_from) => get_assignment_from_expression(&yield_from.iterator),
         },
-        Expression::Construct(construct) => match construct.as_ref() {
+        Expression::Construct(construct) => match construct {
             Construct::Isset(isset_construct) => {
                 isset_construct.values.iter().find_map(|v| get_assignment_from_expression(v))
             }
@@ -109,7 +109,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
         Expression::Clone(clone) => get_assignment_from_expression(&clone.object),
         Expression::Call(call) => match &call {
             Call::Function(function_call) => get_assignment_from_expression(&function_call.function).or_else(|| {
-                function_call.arguments.arguments.iter().find_map(|argument| match &argument {
+                function_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                     Argument::Positional(positional_argument) => {
                         get_assignment_from_expression(&positional_argument.value)
                     }
@@ -124,7 +124,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                     _ => None,
                 })
                 .or_else(|| {
-                    method_call.arguments.arguments.iter().find_map(|argument| match &argument {
+                    method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                         Argument::Positional(positional_argument) => {
                             get_assignment_from_expression(&positional_argument.value)
                         }
@@ -140,7 +140,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                         _ => None,
                     })
                     .or_else(|| {
-                        null_safe_method_call.arguments.arguments.iter().find_map(|argument| match &argument {
+                        null_safe_method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                             Argument::Positional(positional_argument) => {
                                 get_assignment_from_expression(&positional_argument.value)
                             }
@@ -156,7 +156,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                     _ => None,
                 })
                 .or_else(|| {
-                    static_method_call.arguments.arguments.iter().find_map(|argument| match &argument {
+                    static_method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                         Argument::Positional(positional_argument) => {
                             get_assignment_from_expression(&positional_argument.value)
                         }
@@ -164,7 +164,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                     })
                 }),
         },
-        Expression::Access(access) => match access.as_ref() {
+        Expression::Access(access) => match access {
             Access::Property(property_access) => {
                 get_assignment_from_expression(&property_access.object).or_else(|| match &property_access.property {
                     ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
@@ -197,7 +197,7 @@ pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assign
                 })
             }
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation.as_ref() {
+        Expression::ClosureCreation(closure_creation) => match closure_creation {
             ClosureCreation::Function(function_closure_creation) => {
                 get_assignment_from_expression(&function_closure_creation.function)
             }

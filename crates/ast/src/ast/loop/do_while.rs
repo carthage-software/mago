@@ -25,10 +25,10 @@ use crate::ast::terminator::Terminator;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct DoWhile {
     pub r#do: Keyword,
-    pub statement: Statement,
+    pub statement: Box<Statement>,
     pub r#while: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub right_parenthesis: Span,
     pub terminator: Terminator,
 }

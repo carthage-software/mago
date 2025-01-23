@@ -13,7 +13,7 @@ pub fn parse_while(stream: &mut TokenStream<'_, '_>) -> Result<While, ParseError
     Ok(While {
         r#while: utils::expect_keyword(stream, T!["while"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: parse_expression(stream)?,
+        condition: Box::new(parse_expression(stream)?),
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         body: parse_while_body(stream)?,
     })
@@ -22,7 +22,7 @@ pub fn parse_while(stream: &mut TokenStream<'_, '_>) -> Result<While, ParseError
 pub fn parse_while_body(stream: &mut TokenStream<'_, '_>) -> Result<WhileBody, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => WhileBody::ColonDelimited(parse_while_colon_delimited_body(stream)?),
-        _ => WhileBody::Statement(parse_statement(stream)?),
+        _ => WhileBody::Statement(Box::new(parse_statement(stream)?)),
     })
 }
 

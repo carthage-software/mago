@@ -123,7 +123,7 @@ fn get_isset_construct(mut expression: &Expression, select_binary_rhs: bool) -> 
 
     match expression {
         Expression::Construct(construct) => {
-            if let Construct::Isset(isset) = construct.as_ref() {
+            if let Construct::Isset(isset) = construct {
                 Some((between_parentheses, isset))
             } else {
                 None
