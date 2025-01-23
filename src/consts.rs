@@ -49,7 +49,7 @@ pub const MAXIMUM_STACK_SIZE: usize = 256 * 1024 * 1024;
 pub const DEFAULT_PHP_VERSION: PHPVersion = PHPVersion::PHP83;
 
 /// The minimum supported PHP version.
-pub const MINIMUM_PHP_VERSION: PHPVersion = PHPVersion::PHP74;
+pub const MINIMUM_PHP_VERSION: PHPVersion = PHPVersion::PHP54;
 
 /// The maximum supported PHP version.
 pub const MAXIMUM_PHP_VERSION: PHPVersion = PHPVersion::PHP84;
