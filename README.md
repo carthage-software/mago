@@ -22,7 +22,7 @@ Visit our documentation website to learn how to install, configure, and use Mago
 
 [Mago Documentation](https://mago.carthage.software/):
 
-- [Getting Started](https://mago.carthage.software/#/getting-started)
+- [Getting Started](https://mago.carthage.software/#/getting-started/)
 - [Installation Guide](https://mago.carthage.software/#/getting-started/installation)
 - [Configuration Guide](https://mago.carthage.software/#/getting-started/configuration)
 - [CLI Commands](https://mago.carthage.software/#/getting-started/cli)
