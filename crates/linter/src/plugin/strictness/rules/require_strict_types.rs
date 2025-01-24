@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_php_version::PHPVersion;
 use toml::Value;
 
 use mago_ast::ast::*;
@@ -27,6 +28,7 @@ impl Rule for RequireStrictTypesRule {
             .with_description(indoc! {"
                 Detects missing `declare(strict_types=1);` statement at the beginning of the file.
             "})
+            .with_minimum_supported_php_version(PHPVersion::PHP70)
             .with_option(RuleOptionDefinition {
                 name: ALLOW_DISABLING,
                 r#type: "boolean",

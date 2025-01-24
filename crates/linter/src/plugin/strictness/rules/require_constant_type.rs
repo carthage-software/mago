@@ -1,6 +1,7 @@
 use indoc::indoc;
 
 use mago_ast::ast::*;
+use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
@@ -19,6 +20,7 @@ impl Rule for RequireConstantTypeRule {
             .with_description(indoc! {"
                 Detects class constants that are missing a type hint.
             "})
+            .with_minimum_supported_php_version(PHPVersion::PHP83)
             .with_example(RuleUsageExample::valid(
                 "A class constant with a type hint",
                 indoc! {r#"

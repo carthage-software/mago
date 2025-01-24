@@ -1,6 +1,7 @@
 use indoc::indoc;
 
 use mago_ast::ast::*;
+use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
 use mago_walker::Walker;
@@ -16,6 +17,7 @@ pub struct RequireReturnTypeRule;
 impl Rule for RequireReturnTypeRule {
     fn get_definition(&self) -> RuleDefinition {
         RuleDefinition::enabled("Require Return Type", Level::Warning)
+            .with_minimum_supported_php_version(PHPVersion::PHP70)
             .with_description(indoc! {"
                 Detects functions, methods, closures, and arrow functions that are missing a return type hint.
             "})

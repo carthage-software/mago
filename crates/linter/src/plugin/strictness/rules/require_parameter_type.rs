@@ -1,6 +1,7 @@
 use indoc::indoc;
 
 use mago_ast::ast::*;
+use mago_php_version::PHPVersion;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
 use mago_span::HasSpan;
@@ -17,6 +18,7 @@ pub struct RequireParameterTypeRule;
 impl Rule for RequireParameterTypeRule {
     fn get_definition(&self) -> RuleDefinition {
         RuleDefinition::enabled("Require Parameter Type", Level::Warning)
+            .with_minimum_supported_php_version(PHPVersion::PHP70)
             .with_description(indoc! {"
                 Detects parameters that are missing a type hint.
             "})

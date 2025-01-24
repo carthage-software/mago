@@ -1,6 +1,7 @@
 use indoc::indoc;
 
 use mago_ast::ast::*;
+use mago_php_version::PHPVersion;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
 use mago_span::HasSpan;
@@ -20,6 +21,7 @@ impl Rule for RequirePropertyTypeRule {
             .with_description(indoc! {"
                 Detects class-like properties that are missing a type hint.
             "})
+            .with_minimum_supported_php_version(PHPVersion::PHP74)
             .with_example(RuleUsageExample::valid(
                 "A class property that has a type hint",
                 indoc! {r#"
