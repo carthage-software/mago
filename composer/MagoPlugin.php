@@ -16,9 +16,9 @@ use Composer\Plugin\PluginInterface;
 use Composer\Util\ProcessExecutor;
 use Symfony\Component\Process\PhpExecutableFinder;
 
-final readonly class MagoPlugin implements PluginInterface, EventSubscriberInterface, Capable
+final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
-    public const string PACKAGE_NAME = 'carthage-software/mago';
+    public const PACKAGE_NAME = 'carthage-software/mago';
 
     /**
      * @inheritDoc
