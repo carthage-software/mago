@@ -829,6 +829,10 @@ generate_ast_walker! {
     }
 
     Constant as constant => {
+        for attribute_list in constant.attribute_lists.iter() {
+            walker.walk_attribute_list(attribute_list, context);
+        }
+
         walker.walk_keyword(&constant.r#const, context);
         for item in constant.items.iter() {
             walker.walk_constant_item(item, context);

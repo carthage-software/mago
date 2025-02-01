@@ -1157,8 +1157,9 @@ impl<'a> Node<'a> {
                 vec![Node::Expression(&node.class), Node::ClassLikeMemberSelector(&node.method)]
             }
             Node::Constant(node) => {
-                let mut children = vec![Node::Keyword(&node.r#const)];
-
+                let mut children = vec![];
+                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
+                children.push(Node::Keyword(&node.r#const));
                 children.extend(node.items.iter().map(Node::ConstantItem));
                 children.push(Node::Terminator(&node.terminator));
 

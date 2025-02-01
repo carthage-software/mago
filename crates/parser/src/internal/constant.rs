@@ -1,5 +1,6 @@
 use mago_ast::ast::*;
 use mago_ast::sequence::TokenSeparatedSequence;
+use mago_ast::Sequence;
 use mago_token::T;
 
 use crate::error::ParseError;
@@ -11,6 +12,7 @@ use crate::internal::utils;
 
 pub fn parse_constant(stream: &mut TokenStream<'_, '_>) -> Result<Constant, ParseError> {
     Ok(Constant {
+        attribute_lists: Sequence::new(vec![]),
         r#const: utils::expect_keyword(stream, T!["const"])?,
         items: {
             let mut items = vec![];
