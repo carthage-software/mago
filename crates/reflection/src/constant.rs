@@ -8,6 +8,7 @@ use mago_source::SourceIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::attribute::AttributeReflection;
 use crate::identifier::Name;
 use crate::r#type::TypeReflection;
 use crate::Reflection;
@@ -19,6 +20,9 @@ use crate::Reflection;
 /// and separated even when declared in a single statement, such as `const A = 1, B = 2;`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ConstantReflection {
+    /// Collection of attributes applied to the constant.
+    pub attribute_reflections: Vec<AttributeReflection>,
+
     /// The name of the constant.
     pub name: Name,
 

@@ -11,6 +11,7 @@ pub fn reflect_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<C
         let name = context.names.get(&item.name);
 
         reflections.push(ConstantReflection {
+            attribute_reflections: Default::default(),
             name: Name::new(*name, item.name.span),
             type_reflection: mago_typing::infere(context.interner, context.source, context.names, &item.value),
             item_span: item.span(),
@@ -48,6 +49,7 @@ pub fn reflect_defined_constant(define: &FunctionCall, context: &mut Context<'_>
     let name = context.interner.intern(name);
 
     Some(ConstantReflection {
+        attribute_reflections: Default::default(),
         name: Name::new(name, name_span),
         type_reflection: mago_typing::infere(context.interner, context.source, context.names, arguments[1].value()),
         item_span: define.span(),
