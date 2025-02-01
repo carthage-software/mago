@@ -3551,15 +3551,19 @@ impl Walker<Context<'_>> for SemanticsWalker {
         }
     }
 
-    fn walk_in_attribute(&self, attribute: &Attribute, context: &mut Context<'_>) {
+    fn walk_in_attribute_list(&self, attribute_list: &AttributeList, context: &mut Context<'_>) {
         if !context.version.is_supported(Feature::Attribute) {
             context.report(
                 Issue::error("Attributes are only available in PHP 8.0 and above.")
-                    .with_annotation(Annotation::primary(attribute.span()).with_message("Attribute defined here."))
+                    .with_annotation(
+                        Annotation::primary(attribute_list.span()).with_message("Attribute list used here."),
+                    )
                     .with_help("Upgrade to PHP 8.0 or above to use attributes."),
             );
         }
+    }
 
+    fn walk_in_attribute(&self, attribute: &Attribute, context: &mut Context<'_>) {
         let name = context.interner.lookup(&attribute.name.value());
         if let Some(list) = &attribute.arguments {
             for argument in list.arguments.iter() {
@@ -3876,7 +3880,6 @@ impl Walker<Context<'_>> for SemanticsWalker {
     fn walk_in_function_like_parameter_list(
         &self,
         function_like_parameter_list: &FunctionLikeParameterList,
-
         context: &mut Context<'_>,
     ) {
         let mut last_variadic = None;
@@ -4452,6 +4455,32 @@ impl Walker<Context<'_>> for SemanticsWalker {
                 )
                 .with_help("Use `get_class($object)` instead to make the code compatible with PHP 7.4 and earlier versions, or upgrade to PHP 8.0 or later."),
         );
+    }
+
+    fn walk_in_constant(&self, constant: &Constant, context: &mut Context<'_>) {
+        if !context.version.is_supported(Feature::ConstantAttribute) {
+            for attribute_list in constant.attribute_lists.iter() {
+                context.report(
+                    Issue::error("Constant attributes are only available in PHP 8.5 and above.")
+                        .with_annotation(
+                            Annotation::primary(attribute_list.span()).with_message("Attribute list used here."),
+                        )
+                        .with_help("Upgrade to PHP 8.5 or later to use constant attributes."),
+                );
+            }
+        }
+
+        for item in constant.items.iter() {
+            if !item.value.is_constant(context.version, true) {
+                context.report(
+                    Issue::error("Constant value must be a constant expression.")
+                        .with_annotation(
+                            Annotation::primary(item.value.span()).with_message("This is not a constant expression."),
+                        )
+                        .with_help("Ensure the constant value is a constant expression."),
+                );
+            }
+        }
     }
 }
 
