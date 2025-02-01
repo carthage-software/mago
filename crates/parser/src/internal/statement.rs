@@ -9,7 +9,7 @@ use crate::internal::class_like::parse_class_with_attributes;
 use crate::internal::class_like::parse_enum_with_attributes;
 use crate::internal::class_like::parse_interface_with_attributes;
 use crate::internal::class_like::parse_trait_with_attributes;
-use crate::internal::constant::parse_constant;
+use crate::internal::constant::parse_constant_with_attributes;
 use crate::internal::control_flow::r#if::parse_if;
 use crate::internal::control_flow::switch::parse_switch;
 use crate::internal::declare::parse_declare;
@@ -60,6 +60,7 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
                 T!["trait"] => Statement::Trait(parse_trait_with_attributes(stream, attributes)?),
                 T!["enum"] => Statement::Enum(parse_enum_with_attributes(stream, attributes)?),
                 T!["class"] => Statement::Class(parse_class_with_attributes(stream, attributes)?),
+                T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, attributes)?),
                 T!["function"] => {
                     // unlike when we have modifiers, here, we don't know if this is meant to be a closure or a function
                     parse_closure_or_function(stream, attributes)?
@@ -120,7 +121,7 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
         }
         T!["__halt_compiler"] => Statement::HaltCompiler(parse_halt_compiler(stream)?),
         T![";"] => Statement::Noop(utils::expect(stream, T![";"])?.span),
-        T!["const"] => Statement::Constant(parse_constant(stream)?),
+        T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, Sequence::empty())?),
         T!["if"] => Statement::If(parse_if(stream)?),
         T!["switch"] => Statement::Switch(parse_switch(stream)?),
         T!["foreach"] => Statement::Foreach(parse_foreach(stream)?),

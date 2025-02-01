@@ -10,9 +10,12 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_constant(stream: &mut TokenStream<'_, '_>) -> Result<Constant, ParseError> {
+pub fn parse_constant_with_attributes(
+    stream: &mut TokenStream<'_, '_>,
+    attribute_lists: Sequence<AttributeList>,
+) -> Result<Constant, ParseError> {
     Ok(Constant {
-        attribute_lists: Sequence::new(vec![]),
+        attribute_lists,
         r#const: utils::expect_keyword(stream, T!["const"])?,
         items: {
             let mut items = vec![];
