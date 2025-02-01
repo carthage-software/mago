@@ -1247,24 +1247,35 @@ impl<'a> Format<'a> for ConstantItem {
 impl<'a> Format<'a> for Constant {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, Constant, {
-            let mut contents = vec![self.r#const.format(f)];
+            let attributes =
+                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists, false) {
+                    attributes
+                } else {
+                    Document::empty()
+                };
 
-            if self.items.len() == 1 {
-                contents.push(Document::space());
-                contents.push(self.items.as_slice()[0].format(f));
-            } else if !self.items.is_empty() {
-                contents.push(Document::Indent(vec![Document::Line(Line::default())]));
+            let constant = {
+                let mut contents = vec![self.r#const.format(f)];
 
-                contents.push(Document::Indent(Document::join(
-                    self.items.iter().map(|v| v.format(f)).collect(),
-                    Separator::CommaLine,
-                )));
-                contents.push(Document::Line(Line::softline()));
-            }
+                if self.items.len() == 1 {
+                    contents.push(Document::space());
+                    contents.push(self.items.as_slice()[0].format(f));
+                } else if !self.items.is_empty() {
+                    contents.push(Document::Indent(vec![Document::Line(Line::default())]));
 
-            contents.push(self.terminator.format(f));
+                    contents.push(Document::Indent(Document::join(
+                        self.items.iter().map(|v| v.format(f)).collect(),
+                        Separator::CommaLine,
+                    )));
+                    contents.push(Document::Line(Line::softline()));
+                }
 
-            Document::Group(Group::new(contents))
+                contents.push(self.terminator.format(f));
+
+                Document::Group(Group::new(contents))
+            };
+
+            Document::Group(Group::new(vec![attributes, constant]))
         })
     }
 }

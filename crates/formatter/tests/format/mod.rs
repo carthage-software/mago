@@ -61,3 +61,22 @@ pub fn test_inline_html() {
 
     test_format(code, expected, FormatSettings::default())
 }
+
+#[test]
+pub fn test_php_85_constant_attributes() {
+    let code = indoc! {r#"
+        <?php
+
+        #[Deprecated]
+        const FOO = 'foo';
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        #[Deprecated]
+        const FOO = 'foo';
+    "#};
+
+    test_format(code, expected, FormatSettings::default())
+}
