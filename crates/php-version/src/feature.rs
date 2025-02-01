@@ -86,4 +86,5 @@ pub enum Feature {
     TrailingCommaInFunctionCalls,
     TrailingCommaInClosureUseList,
     NewInInitializers,
+    ConstantAttribute,
 }

@@ -248,7 +248,7 @@ impl PHPVersion {
             | Feature::HighlightStringDoesNotReturnFalse
             | Feature::PropertyHooks
             | Feature::NewWithoutParentheses => self.0 >= 0x08_04_00,
-            Feature::ClosureInConstantExpressions => self.0 >= 0x08_05_00,
+            Feature::ClosureInConstantExpressions | Feature::ConstantAttribute => self.0 >= 0x08_05_00,
             Feature::CallableInstanceMethods
             | Feature::LegacyConstructor
             | Feature::UnsetCast
