@@ -22,20 +22,7 @@ fn test_shebang() -> Result<(), SyntaxError> {
 #[test]
 fn test_emoji_attribute() -> Result<(), SyntaxError> {
     let code = "<?php #️⃣[Foo] class Bar {}".as_bytes();
-    let expected = vec![
-        TokenKind::OpenTag,
-        TokenKind::Whitespace,
-        TokenKind::HashLeftBracket,
-        TokenKind::Identifier,
-        TokenKind::RightBracket,
-        TokenKind::Whitespace,
-        TokenKind::Class,
-        TokenKind::Whitespace,
-        TokenKind::Identifier,
-        TokenKind::Whitespace,
-        TokenKind::LeftBrace,
-        TokenKind::RightBrace,
-    ];
+    let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::HashComment];
 
     test_lexer(code, expected).map_err(|err| {
         panic!("unexpected error: {}", err);

@@ -10,8 +10,6 @@ use mago_token::TokenKind;
 
 use crate::error::SyntaxError;
 use crate::input::Input;
-use crate::internal::consts::HASH_EMOJI_BYTES;
-use crate::internal::consts::HASH_EMOJI_LEN;
 use crate::internal::macros::float_exponent;
 use crate::internal::macros::float_separator;
 use crate::internal::macros::number_separator;
@@ -395,31 +393,25 @@ impl<'a, 'i> Lexer<'a, 'i> {
                         (TokenKind::LeftParenthesis, 1)
                     }
                     [b'#', ..] => {
-                        if self.input.is_at(&HASH_EMOJI_BYTES, false)
-                            && matches!(self.input.peek(HASH_EMOJI_LEN, 1), [b'['])
-                        {
-                            (TokenKind::HashLeftBracket, HASH_EMOJI_LEN + 1)
-                        } else {
-                            let mut length = 1;
-                            loop {
-                                match self.input.peek(length, 3) {
-                                    [b'\n' | b'\r', ..] => {
-                                        break;
-                                    }
-                                    [w, b'?', b'>'] if w.is_ascii_whitespace() => {
-                                        break;
-                                    }
-                                    [b'?', b'>', ..] | [] => {
-                                        break;
-                                    }
-                                    [_, ..] => {
-                                        length += 1;
-                                    }
+                        let mut length = 1;
+                        loop {
+                            match self.input.peek(length, 3) {
+                                [b'\n' | b'\r', ..] => {
+                                    break;
+                                }
+                                [w, b'?', b'>'] if w.is_ascii_whitespace() => {
+                                    break;
+                                }
+                                [b'?', b'>', ..] | [] => {
+                                    break;
+                                }
+                                [_, ..] => {
+                                    length += 1;
                                 }
                             }
-
-                            (TokenKind::HashComment, length)
                         }
+
+                        (TokenKind::HashComment, length)
                     }
                     [b'\\', ..] => (TokenKind::NamespaceSeparator, 1),
                     [start_of_identifier!(), ..] => 'identifier: {
