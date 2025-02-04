@@ -4,12 +4,14 @@ use clap::builder::Styles;
 use clap::Parser;
 
 use crate::commands::ast::AstCommand;
+use crate::commands::find::FindCommand;
 use crate::commands::fix::FixCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 
 pub mod ast;
+pub mod find;
 pub mod fix;
 pub mod format;
 pub mod lint;
@@ -56,6 +58,8 @@ pub enum MagoCommand {
     Fix(FixCommand),
     #[command(name = "format")]
     Format(FormatCommand),
+    #[command(name = "find")]
+    Find(FindCommand),
     #[command(name = "self-update")]
     SelfUpdate(SelfUpdateCommand),
 }

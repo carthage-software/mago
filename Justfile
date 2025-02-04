@@ -49,6 +49,7 @@ publish:
     cargo publish -p mago-names --allow-dirty
     cargo publish -p mago-symbol-table --allow-dirty
     cargo publish -p mago-semantics --allow-dirty
+    cargo publish -p mago-reference --allow-dirty
     cargo publish -p mago-typing --allow-dirty
     cargo publish -p mago-reflector --allow-dirty
     cargo publish -p mago-linter --allow-dirty

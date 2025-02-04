@@ -1,13 +1,13 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use consts::MAXIMUM_PHP_VERSION;
-use consts::MINIMUM_PHP_VERSION;
 use tokio::runtime::Builder;
 use tracing::level_filters::LevelFilter;
 
 use crate::commands::MagoCommand;
 use crate::config::Configuration;
+use crate::consts::MAXIMUM_PHP_VERSION;
+use crate::consts::MINIMUM_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::logger::initialize_logger;
 
@@ -60,6 +60,7 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::Fix(cmd) => runtime.block_on(commands::fix::execute(cmd, configuration)),
         MagoCommand::Format(cmd) => runtime.block_on(commands::format::execute(cmd, configuration)),
         MagoCommand::Ast(cmd) => runtime.block_on(commands::ast::execute(cmd)),
+        MagoCommand::Find(find) => runtime.block_on(commands::find::execute(find, configuration)),
         MagoCommand::SelfUpdate(cmd) => commands::self_update::execute(cmd),
     }
 }

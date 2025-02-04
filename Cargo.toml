@@ -49,6 +49,7 @@ mago-typing = { path = "crates/typing", version = "0.8.1" }
 mago-walker = { path = "crates/walker", version = "0.8.1" }
 mago-wasm = { path = "crates/wasm", version = "0.8.1" }
 mago-php-version = { path = "crates/php-version", version = "0.8.1" }
+mago-reference = { path = "crates/reference", version = "0.8.1" }
 dashmap = { version = "6.1.0" }
 tracing = { version = "0.1.40" }
 ahash = { version = "0.8.11" }
@@ -107,6 +108,7 @@ mago-formatter = { workspace = true }
 mago-parser = { workspace = true }
 mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
+mago-reference = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "time"] }
 clap = { workspace = true }

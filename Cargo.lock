@@ -1531,6 +1531,7 @@ dependencies = [
  "mago-names",
  "mago-parser",
  "mago-php-version",
+ "mago-reference",
  "mago-reflection",
  "mago-reflector",
  "mago-reporting",
@@ -1720,6 +1721,18 @@ version = "0.8.1"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "mago-reference"
+version = "0.8.1"
+dependencies = [
+ "mago-ast",
+ "mago-interner",
+ "mago-semantics",
+ "mago-span",
+ "mago-walker",
+ "serde",
 ]
 
 [[package]]
