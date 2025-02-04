@@ -4,13 +4,13 @@ use toml::Value;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::consts::EXTENSION_FUNCTIONS;
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const FUNCTIONS: &str = "functions";
@@ -93,12 +93,12 @@ impl Rule for DisallowedFunctionsRule {
                 ).with_option(EXTENSIONS, Value::Array(vec![Value::String("curl".to_owned())]))
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for DisallowedFunctionsRule {
-    fn walk_in_function_call<'ast>(&self, function_call: &'ast FunctionCall, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionCall(function_call) = node else { return LintDirective::default() };
+
         let Expression::Identifier(identifier) = function_call.function.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let function_name = context.resolve_function_name(identifier);
@@ -116,11 +116,9 @@ impl<'a> Walker<LintContext<'a>> for DisallowedFunctionsRule {
 
                 context.report(issue);
 
-                return;
+                return LintDirective::default();
             }
-        } else {
-            tracing::trace!("No disallowed functions found in configuration.");
-        };
+        }
 
         // Check if the function is part of a disallowed extension
         if let Some(disallowed_extensions) = context.option(EXTENSIONS).and_then(|o| o.as_array()) {
@@ -132,8 +130,7 @@ impl<'a> Walker<LintContext<'a>> for DisallowedFunctionsRule {
                 }
             }) else {
                 // not an extension function
-
-                return;
+                return LintDirective::default();
             };
 
             if disallowed_extensions.iter().any(|e| e.as_str().is_some_and(|e| e.eq(extension))) {
@@ -153,8 +150,8 @@ impl<'a> Walker<LintContext<'a>> for DisallowedFunctionsRule {
 
                 context.report(issue);
             }
-        } else {
-            tracing::trace!("No disallowed extensions found in configuration.");
         }
+
+        LintDirective::default()
     }
 }

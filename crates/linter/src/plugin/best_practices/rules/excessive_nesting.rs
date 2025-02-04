@@ -6,12 +6,12 @@ use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_walker::walk_block_mut;
 use mago_walker::MutWalker;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const THRESHOLD: &str = "threshold";
@@ -100,15 +100,17 @@ impl Rule for ExcessiveNesting {
                 .with_option(THRESHOLD, Value::Integer(2)),
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for ExcessiveNesting {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::default() };
+
         let threshold = context.option(THRESHOLD).and_then(|value| value.as_integer()).unwrap_or(THRESHOLD_DEFAULT);
 
         let mut walker = NestingWalker { threshold: threshold as usize, level: 0 };
 
         walker.walk_program(program, context);
+
+        LintDirective::Abort
     }
 }
 

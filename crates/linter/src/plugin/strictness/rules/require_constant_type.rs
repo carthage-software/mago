@@ -1,14 +1,14 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -68,16 +68,12 @@ impl Rule for RequireConstantTypeRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RequireConstantTypeRule {
-    fn walk_class_like_constant<'ast>(
-        &self,
-        class_like_constant: &'ast ClassLikeConstant,
-        context: &mut LintContext<'a>,
-    ) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::ClassLikeConstant(class_like_constant) = node else { return LintDirective::default() };
+
         if class_like_constant.hint.is_some() {
-            return;
+            return LintDirective::Prune;
         }
 
         let item = class_like_constant.first_item();
@@ -93,5 +89,7 @@ impl<'a> Walker<LintContext<'a>> for RequireConstantTypeRule {
                 .with_note("Adding a type hint to constants improves code readability and helps prevent type errors.")
                 .with_help(format!("Consider specifying a type hint for `{}`.", constant_name)),
         );
+
+        LintDirective::Prune
     }
 }

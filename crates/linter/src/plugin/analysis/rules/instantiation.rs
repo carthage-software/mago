@@ -3,11 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -79,12 +79,14 @@ impl Rule for InstantiationRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for InstantiationRule {
-    fn walk_in_instantiation(&self, instantiation: &Instantiation, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Instantiation(instantiation) = node else {
+            return LintDirective::Continue;
+        };
+
         let Expression::Identifier(class_identifier) = instantiation.class.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let class_name_identifier = context.semantics.names.get(class_identifier);
@@ -104,7 +106,7 @@ impl<'a> Walker<LintContext<'a>> for InstantiationRule {
 
             context.report(issue);
 
-            return;
+            return LintDirective::default();
         };
 
         if reflection.is_interface() {
@@ -118,7 +120,7 @@ impl<'a> Walker<LintContext<'a>> for InstantiationRule {
 
             context.report(issue);
 
-            return;
+            return LintDirective::default();
         }
 
         if reflection.is_trait() {
@@ -132,7 +134,7 @@ impl<'a> Walker<LintContext<'a>> for InstantiationRule {
 
             context.report(issue);
 
-            return;
+            return LintDirective::default();
         }
 
         if reflection.is_enum() {
@@ -146,7 +148,7 @@ impl<'a> Walker<LintContext<'a>> for InstantiationRule {
 
             context.report(issue);
 
-            return;
+            return LintDirective::default();
         }
 
         if reflection.is_abstract {
@@ -160,5 +162,7 @@ impl<'a> Walker<LintContext<'a>> for InstantiationRule {
 
             context.report(issue);
         }
+
+        LintDirective::default()
     }
 }

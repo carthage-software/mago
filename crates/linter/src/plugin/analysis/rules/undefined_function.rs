@@ -3,11 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -58,18 +58,18 @@ impl Rule for UndefinedFunctionRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for UndefinedFunctionRule {
-    fn walk_in_function_call(&self, function_call: &FunctionCall, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionCall(function_call) = node else { return LintDirective::default() };
+
         let Expression::Identifier(identifier) = function_call.function.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let function_name = context.resolve_function_name(identifier);
         let function_name_id = context.interner.intern(function_name);
         if context.codebase.function_exists(context.interner, &function_name_id) {
-            return;
+            return LintDirective::default();
         }
 
         let issue = Issue::error(format!("Call to undefined function `{}`.", function_name))
@@ -80,5 +80,7 @@ impl<'a> Walker<LintContext<'a>> for UndefinedFunctionRule {
             .with_help(format!("Ensure the function `{}` is defined or imported before calling it.", function_name));
 
         context.report(issue);
+
+        LintDirective::Continue
     }
 }

@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_ast_utils::reference::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const REQUEST_CLASS: &str = "Request";
@@ -102,10 +102,10 @@ impl Rule for NoRequestAllRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoRequestAllRule {
-    fn walk_block(&self, block: &Block, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Block(block) = node else { return LintDirective::default() };
+
         let request_all_references = find_method_references_in_block(block, &|reference| {
             let ClassLikeMemberSelector::Identifier(method) = reference.get_selector() else {
                 return false;
@@ -161,5 +161,7 @@ impl<'a> Walker<LintContext<'a>> for NoRequestAllRule {
 
             context.report(issue);
         }
+
+        LintDirective::Prune
     }
 }

@@ -6,12 +6,12 @@ use mago_ast_utils::reference::MethodReference;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::plugin::phpunit::rules::utils::find_testing_or_assertion_references_in_method;
 use crate::rule::Rule;
 
@@ -95,13 +95,13 @@ impl Rule for AssertionsStyleRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for AssertionsStyleRule {
-    fn walk_in_method(&self, method: &Method, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Method(method) = node else { return LintDirective::default() };
+
         let name = context.lookup(&method.name.value);
         if !name.starts_with("test") || name.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase()) {
-            return;
+            return LintDirective::Prune;
         }
 
         let desired_style = context
@@ -168,5 +168,7 @@ impl<'a> Walker<LintContext<'a>> for AssertionsStyleRule {
                 );
             });
         }
+
+        LintDirective::Prune
     }
 }

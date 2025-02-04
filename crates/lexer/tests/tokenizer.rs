@@ -10,6 +10,16 @@ use mago_lexer::error::SyntaxError;
 use mago_lexer::Lexer;
 
 #[test]
+fn test_shebang() -> Result<(), SyntaxError> {
+    let code = b"#!/usr/bin/env php\n<?php";
+    let expected = vec![TokenKind::InlineShebang, TokenKind::OpenTag];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {}", err);
+    })
+}
+
+#[test]
 fn test_casts() -> Result<(), SyntaxError> {
     let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) &&  ?> world";
     let expected = vec![

@@ -3,10 +3,10 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 /// TODO(azjezz): Enable this rule by default once we have improved the linting experience.
@@ -20,10 +20,10 @@ impl Rule for DocblockSyntaxRule {
             it can be noisy and may not be relevant to all codebases.
         "})
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for DocblockSyntaxRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::Abort };
+
         for trivia in program.trivia.iter() {
             if let TriviaKind::DocBlockComment = trivia.kind {
                 let Err(parse_error) = mago_docblock::parse_trivia(context.interner, trivia) else {
@@ -39,5 +39,7 @@ impl<'a> Walker<LintContext<'a>> for DocblockSyntaxRule {
                 context.report(issue);
             }
         }
+
+        LintDirective::Abort
     }
 }

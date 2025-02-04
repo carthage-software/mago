@@ -9,7 +9,7 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
         expression,
         Expression::Binary(_)
             | Expression::UnaryPostfix(_)
-            | Expression::AssignmentOperation(_)
+            | Expression::Assignment(_)
             | Expression::Conditional(_)
             | Expression::ArrayAccess(_)
             | Expression::ArrayAppend(_)
@@ -23,7 +23,7 @@ pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
     match expression {
         Expression::Binary(binary) => Some(&binary.lhs),
         Expression::UnaryPostfix(unary) => Some(&unary.operand),
-        Expression::AssignmentOperation(assignment) => Some(&assignment.lhs),
+        Expression::Assignment(assignment) => Some(&assignment.lhs),
         Expression::Conditional(conditional) => Some(&conditional.condition),
         Expression::ArrayAccess(array_access) => Some(&array_access.array),
         Expression::ArrayAppend(array_append) => Some(&array_append.array),

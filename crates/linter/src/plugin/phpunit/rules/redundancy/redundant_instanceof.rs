@@ -7,11 +7,11 @@ use mago_interner::StringIdentifier;
 use mago_reporting::*;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::plugin::phpunit::rules::utils::find_assertion_references_in_method;
 use crate::rule::Rule;
 
@@ -115,13 +115,13 @@ impl Rule for RedundantInstanceOfRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantInstanceOfRule {
-    fn walk_in_method(&self, method: &Method, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Method(method) = node else { return LintDirective::default() };
+
         let name = context.lookup(&method.name.value);
         if !name.starts_with("test") || name.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase()) {
-            return;
+            return LintDirective::Prune;
         }
 
         for reference in find_assertion_references_in_method(method, context, &["assertInstanceOf"]) {
@@ -148,9 +148,6 @@ impl<'a> Walker<LintContext<'a>> for RedundantInstanceOfRule {
             let Some(object_reflection) = context.codebase.get_named_class_like(context.interner, object_name) else {
                 continue;
             };
-
-            println!("class_reflection: {:#?}", class_reflection);
-            println!("object_reflection: {:#?}", object_reflection);
 
             if object_reflection.inheritance.is_instance_of(context.interner, class_reflection) {
                 let issue = Issue::new(context.level(), "Redundant `instanceof` assertion.")
@@ -181,6 +178,8 @@ impl<'a> Walker<LintContext<'a>> for RedundantInstanceOfRule {
                 });
             }
         }
+
+        LintDirective::Prune
     }
 }
 

@@ -1295,7 +1295,7 @@ generate_ast_walker! {
             Expression::UnaryPostfix(operation) => walker.walk_unary_postfix(operation, context),
             Expression::Literal(literal) => walker.walk_literal_expression(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string, context),
-            Expression::AssignmentOperation(assignment) => {
+            Expression::Assignment(assignment) => {
                 walker.walk_assignment(assignment, context)
             }
             Expression::Conditional(conditional) => {

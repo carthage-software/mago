@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -98,203 +98,215 @@ impl Rule for InheritanceRule {
                 "},
             ))
     }
+
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        match node {
+            Node::Interface(interface) => {
+                let name_identifier = context.semantics.names.get(&interface.name);
+                let Some(reflection) = context.codebase.get_interface(context.interner, name_identifier) else {
+                    return LintDirective::default();
+                };
+
+                if let Some(extends) = interface.extends.as_ref() {
+                    for extended_interface in extends.types.iter() {
+                        check_interface_extension(reflection, extended_interface, context);
+                    }
+                }
+            }
+            Node::Class(class) => {
+                let name_identifier = context.semantics.names.get(&class.name);
+                let Some(reflection) = context.codebase.get_class(context.interner, name_identifier) else {
+                    return LintDirective::default();
+                };
+
+                if let Some(extends) = class.extends.as_ref() {
+                    for extended_class in extends.types.iter() {
+                        check_class_extension(reflection, extended_class, context);
+                    }
+                }
+
+                if let Some(implements) = class.implements.as_ref() {
+                    for implemented_interface in implements.types.iter() {
+                        check_interface_implementation(implemented_interface, context);
+                    }
+                }
+            }
+            Node::AnonymousClass(anonymous_class) => {
+                let Some(reflection) = context.codebase.get_anonymous_class(&anonymous_class) else {
+                    return LintDirective::default();
+                };
+
+                if let Some(extends) = anonymous_class.extends.as_ref() {
+                    for extended_class in extends.types.iter() {
+                        check_class_extension(reflection, extended_class, context);
+                    }
+                }
+
+                if let Some(implements) = anonymous_class.implements.as_ref() {
+                    for implemented_interface in implements.types.iter() {
+                        check_interface_implementation(implemented_interface, context);
+                    }
+                }
+            }
+            Node::Enum(r#enum) => {
+                if let Some(implements) = r#enum.implements.as_ref() {
+                    for implemented_interface in implements.types.iter() {
+                        check_interface_implementation(implemented_interface, context);
+                    }
+                }
+            }
+            _ => (),
+        };
+
+        LintDirective::default()
+    }
 }
 
-impl InheritanceRule {
-    fn extend_class(this: &ClassLikeReflection, other_identifier: &Identifier, context: &mut LintContext<'_>) {
-        let other_name_identifier = context.semantics.names.get(other_identifier);
-        let other_name = context.lookup(&other_identifier.value()).to_string();
-        let other_fqcn = context.lookup(other_name_identifier).to_string();
+#[inline]
+fn check_class_extension(
+    extender: &ClassLikeReflection,
+    extended_identifier: &Identifier,
+    context: &mut LintContext<'_>,
+) {
+    let extended_name_identifier = context.semantics.names.get(extended_identifier);
+    let extended_name = context.lookup(&extended_identifier.value()).to_string();
+    let extended_fqcn = context.lookup(extended_name_identifier).to_string();
 
-        let Some(other) = context.codebase.get_class(context.interner, other_name_identifier) else {
-            let issue = Issue::error(format!("Extended class `{}` does not exist.", other_name))
-                .with_annotation(
-                    Annotation::primary(other_identifier.span())
-                        .with_message(format!("Class `{}` does not exist.", other_fqcn)),
-                )
-                .with_help(format!("Ensure the class `{}` is defined or imported before extending it.", other_fqcn));
-
-            context.report(issue);
-
-            return;
-        };
-
-        let this_name = this.name.get_key(context.interner);
-
-        if other.is_final {
-            let issue = Issue::error(format!("Cannot extend final class `{}` from `{}`.", other_name, this_name))
-                .with_annotation(
-                    Annotation::primary(other_identifier.span())
-                        .with_message(format!("Class `{}` is final.", other_fqcn)),
-                )
-                .with_help(format!("Ensure the class `{}` is not final or remove the `extends` clause.", other_fqcn));
-
-            context.report(issue);
-        }
-
-        if this.is_readonly && !other.is_readonly {
-            let issue = Issue::error(format!(
-                "Cannot extend non-readonly class `{}` from readonly class `{}`.",
-                other_name, this_name
-            ))
+    let Some(extended) = context.codebase.get_class(context.interner, extended_name_identifier) else {
+        let issue = Issue::error(format!("Extended class `{}` does not exist.", extended_name))
             .with_annotation(
-                Annotation::primary(other_identifier.span())
-                    .with_message(format!("Class `{}` is not readonly.", other_fqcn)),
+                Annotation::primary(extended_identifier.span())
+                    .with_message(format!("Class `{}` does not exist.", extended_fqcn)),
             )
+            .with_help(format!("Ensure the class `{}` is defined or imported before extending it.", extended_fqcn));
+
+        context.report(issue);
+
+        return;
+    };
+
+    let extender_name = extender.name.get_key(context.interner);
+
+    if extended.is_final {
+        let issue = Issue::error(format!("Cannot extend final class `{}` from `{}`.", extended_name, extender_name))
             .with_annotation(
-                Annotation::secondary(this.name.span()).with_message(format!("Class `{}` is readonly.", this_name)),
+                Annotation::primary(extended_identifier.span())
+                    .with_message(format!("Class `{}` is final.", extended_fqcn)),
             )
-            .with_help(format!("Ensure the class `{}` is readonly or remove the `extends` clause.", other_fqcn));
+            .with_help(format!("Ensure the class `{}` is not final or remove the `extends` clause.", extended_fqcn));
 
-            context.report(issue);
-        } else if !this.is_readonly && other.is_readonly {
-            let issue = Issue::new(
-                context.level(),
-                format!("Extending readonly class `{}` from non-readonly class `{}`.", other_name, this_name),
-            )
-            .with_annotation(
-                Annotation::primary(other_identifier.span())
-                    .with_message(format!("Class `{}` is readonly.", other_fqcn)),
-            )
-            .with_annotation(
-                Annotation::secondary(this.name.span()).with_message(format!("Class `{}` is not readonly.", this_name)),
-            )
-            .with_help(format!("Mark the class `{}` as readonly or remove the `extends` clause.", this_name));
-
-            context.report(issue);
-        }
-
-        if other.inheritance.extends_class(context.interner, this) {
-            let issue =
-                Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", this_name, other_name))
-                    .with_annotation(
-                        Annotation::primary(other_identifier.span())
-                            .with_message(format!("Class `{}` already extends `{}`.", other_fqcn, this_name)),
-                    )
-                    .with_help(format!(
-                        "Ensure there is no circular inheritance between `{}` and `{}`.",
-                        this_name, other_name
-                    ));
-
-            context.report(issue);
-        }
+        context.report(issue);
     }
 
-    fn extend_interface(this: &ClassLikeReflection, other_identifier: &Identifier, context: &mut LintContext<'_>) {
-        let other_name_identifier = context.semantics.names.get(other_identifier);
-        let other_name = context.lookup(&other_identifier.value());
-        let other_fqcn = context.lookup(other_name_identifier);
+    if extender.is_readonly && !extended.is_readonly {
+        let issue = Issue::error(format!(
+            "Cannot extend non-readonly class `{}` from readonly class `{}`.",
+            extended_name, extender_name
+        ))
+        .with_annotation(
+            Annotation::primary(extended_identifier.span())
+                .with_message(format!("Class `{}` is not readonly.", extended_fqcn)),
+        )
+        .with_annotation(
+            Annotation::secondary(extender.name.span()).with_message(format!("Class `{}` is readonly.", extender_name)),
+        )
+        .with_help(format!("Ensure the class `{}` is readonly or remove the `extends` clause.", extended_fqcn));
 
-        let Some(other) = context.codebase.get_interface(context.interner, other_name_identifier) else {
-            let issue = Issue::error(format!("Extended interface `{}` does not exist.", other_name))
+        context.report(issue);
+    } else if !extender.is_readonly && extended.is_readonly {
+        let issue = Issue::new(
+            context.level(),
+            format!("Extending readonly class `{}` from non-readonly class `{}`.", extended_name, extender_name),
+        )
+        .with_annotation(
+            Annotation::primary(extended_identifier.span())
+                .with_message(format!("Class `{}` is readonly.", extended_fqcn)),
+        )
+        .with_annotation(
+            Annotation::secondary(extender.name.span())
+                .with_message(format!("Class `{}` is not readonly.", extender_name)),
+        )
+        .with_help(format!("Mark the class `{}` as readonly or remove the `extends` clause.", extender_name));
+
+        context.report(issue);
+    }
+
+    if extended.inheritance.extends_class(context.interner, extender) {
+        let issue =
+            Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name))
                 .with_annotation(
-                    Annotation::primary(other_identifier.span())
-                        .with_message(format!("Interface `{}` does not exist.", other_fqcn)),
+                    Annotation::primary(extended_identifier.span())
+                        .with_message(format!("Class `{}` already extends `{}`.", extended_fqcn, extender_name)),
                 )
                 .with_help(format!(
-                    "Ensure the interface `{}` is defined or imported before extending it.",
-                    other_fqcn
+                    "Ensure there is no circular inheritance between `{}` and `{}`.",
+                    extender_name, extended_name
                 ));
-
-            context.report(issue);
-
-            return;
-        };
-
-        if other.inheritance.extends_interface(context.interner, this) {
-            let this_name = this.name.get_key(context.interner);
-
-            let issue =
-                Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", this_name, other_name))
-                    .with_annotation(
-                        Annotation::primary(other_identifier.span())
-                            .with_message(format!("Interface `{}` already extends `{}`.", other_fqcn, this_name)),
-                    )
-                    .with_help(format!(
-                        "Ensure there is no circular inheritance between `{}` and `{}`.",
-                        this_name, other_name
-                    ));
-
-            context.report(issue);
-        }
-    }
-
-    fn implement_interface(other_identifier: &Identifier, context: &mut LintContext<'_>) {
-        let other_name_identifier = context.semantics.names.get(other_identifier);
-        let other_name = context.lookup(&other_identifier.value());
-        let other_fqcn = context.lookup(other_name_identifier);
-
-        if context.codebase.interface_exists(context.interner, other_name_identifier) {
-            return;
-        }
-
-        let issue = Issue::error(format!("Implemented interface `{}` does not exist.", other_name))
-            .with_annotation(
-                Annotation::primary(other_identifier.span())
-                    .with_message(format!("Interface `{}` does not exist.", other_fqcn)),
-            )
-            .with_help(format!("Ensure the interface `{}` is defined or imported before implementing it.", other_fqcn));
 
         context.report(issue);
     }
 }
 
-impl<'a> Walker<LintContext<'a>> for InheritanceRule {
-    fn walk_in_interface(&self, interface: &Interface, context: &mut LintContext<'a>) {
-        let name_identifier = context.semantics.names.get(&interface.name);
-        let Some(reflection) = context.codebase.get_interface(context.interner, name_identifier) else {
-            return;
-        };
+#[inline]
+fn check_interface_extension(
+    extender: &ClassLikeReflection,
+    extended_identifier: &Identifier,
+    context: &mut LintContext<'_>,
+) {
+    let extended_name_identifier = context.semantics.names.get(extended_identifier);
+    let extended_name = context.lookup(&extended_identifier.value());
+    let extended_fqcn = context.lookup(extended_name_identifier);
 
-        if let Some(extends) = interface.extends.as_ref() {
-            for extended_interface in extends.types.iter() {
-                Self::extend_interface(reflection, extended_interface, context);
-            }
-        }
+    let Some(extended) = context.codebase.get_interface(context.interner, extended_name_identifier) else {
+        let issue = Issue::error(format!("Extended interface `{}` does not exist.", extended_name))
+            .with_annotation(
+                Annotation::primary(extended_identifier.span())
+                    .with_message(format!("Interface `{}` does not exist.", extended_fqcn)),
+            )
+            .with_help(format!("Ensure the interface `{}` is defined or imported before extending it.", extended_fqcn));
+
+        context.report(issue);
+
+        return;
+    };
+
+    if extended.inheritance.extends_interface(context.interner, extender) {
+        let extender_name = extender.name.get_key(context.interner);
+
+        let issue =
+            Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name))
+                .with_annotation(
+                    Annotation::primary(extended_identifier.span())
+                        .with_message(format!("Interface `{}` already extends `{}`.", extended_fqcn, extender_name)),
+                )
+                .with_help(format!(
+                    "Ensure there is no circular inheritance between `{}` and `{}`.",
+                    extender_name, extended_name
+                ));
+
+        context.report(issue);
+    }
+}
+
+#[inline]
+fn check_interface_implementation(implemented_identifier: &Identifier, context: &mut LintContext<'_>) {
+    let implemented_name_identifier = context.semantics.names.get(implemented_identifier);
+    let implemented_name = context.lookup(&implemented_identifier.value());
+    let implemented_fqcn = context.lookup(implemented_name_identifier);
+
+    if context.codebase.interface_exists(context.interner, implemented_name_identifier) {
+        return;
     }
 
-    fn walk_in_class(&self, class: &Class, context: &mut LintContext<'a>) {
-        let name_identifier = context.semantics.names.get(&class.name);
-        let Some(reflection) = context.codebase.get_class(context.interner, name_identifier) else {
-            return;
-        };
+    let issue = Issue::error(format!("Implemented interface `{}` does not exist.", implemented_name))
+        .with_annotation(
+            Annotation::primary(implemented_identifier.span())
+                .with_message(format!("Interface `{}` does not exist.", implemented_fqcn)),
+        )
+        .with_help(format!(
+            "Ensure the interface `{}` is defined or imported before implementing it.",
+            implemented_fqcn
+        ));
 
-        if let Some(extends) = class.extends.as_ref() {
-            for extended_class in extends.types.iter() {
-                Self::extend_class(reflection, extended_class, context);
-            }
-        }
-
-        if let Some(implements) = class.implements.as_ref() {
-            for implemented_interface in implements.types.iter() {
-                Self::implement_interface(implemented_interface, context);
-            }
-        }
-    }
-
-    fn walk_in_anonymous_class(&self, anonymous_class: &AnonymousClass, context: &mut LintContext<'a>) {
-        let Some(reflection) = context.codebase.get_anonymous_class(&anonymous_class) else {
-            return;
-        };
-
-        if let Some(extends) = anonymous_class.extends.as_ref() {
-            for extended_class in extends.types.iter() {
-                Self::extend_class(reflection, extended_class, context);
-            }
-        }
-
-        if let Some(implements) = anonymous_class.implements.as_ref() {
-            for implemented_interface in implements.types.iter() {
-                Self::implement_interface(implemented_interface, context);
-            }
-        }
-    }
-
-    fn walk_in_enum(&self, r#enum: &Enum, context: &mut LintContext<'a>) {
-        if let Some(implements) = r#enum.implements.as_ref() {
-            for implemented_interface in implements.types.iter() {
-                Self::implement_interface(implemented_interface, context);
-            }
-        }
-    }
+    context.report(issue);
 }

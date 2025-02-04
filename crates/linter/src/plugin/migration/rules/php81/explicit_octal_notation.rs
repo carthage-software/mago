@@ -5,11 +5,11 @@ use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -39,20 +39,19 @@ impl Rule for ExplicitOctalNotationRule {
                 "#},
             ))
     }
-}
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::LiteralInteger(literal_integer) = node else { return LintDirective::default() };
 
-impl<'a> Walker<LintContext<'a>> for ExplicitOctalNotationRule {
-    fn walk_in_literal_integer(&self, literal_integer: &LiteralInteger, context: &mut LintContext<'a>) {
         let literal_text = context.lookup(&literal_integer.raw);
         if !literal_text.starts_with('0') {
-            return;
+            return LintDirective::Prune;
         }
 
         if !literal_text.as_bytes().get(1).copied().is_some_and(|c| {
             // check for `0o`, `0x`, or `0b` prefix
             c != b'o' && c != b'O' && c != b'x' && c != b'X' && c != b'b' && c != b'B'
         }) {
-            return;
+            return LintDirective::Prune;
         }
 
         let issue = Issue::new(context.level(), "Use explicit octal numeral notation.")
@@ -70,5 +69,7 @@ impl<'a> Walker<LintContext<'a>> for ExplicitOctalNotationRule {
         context.report_with_fix(issue, |plan| {
             plan.replace(literal_integer.span().to_range(), replacement, SafetyClassification::Safe);
         });
+
+        LintDirective::Prune
     }
 }

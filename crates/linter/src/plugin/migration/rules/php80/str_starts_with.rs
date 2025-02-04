@@ -5,11 +5,11 @@ use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const STR_STARTS_WITH: &str = "str_starts_with";
@@ -53,15 +53,15 @@ impl Rule for StrStartsWithRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for StrStartsWithRule {
-    fn walk_in_binary(&self, binary: &Binary, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Binary(binary) = node else { return LintDirective::default() };
+
         let equal = match binary.operator {
             BinaryOperator::Identical(_) | BinaryOperator::Equal(_) => true,
             BinaryOperator::AngledNotEqual(_) | BinaryOperator::NotEqual(_) | BinaryOperator::NotIdentical(_) => false,
             _ => {
-                return;
+                return LintDirective::default();
             }
         };
 
@@ -76,17 +76,17 @@ impl<'a> Walker<LintContext<'a>> for StrStartsWithRule {
                 Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
             ) if arguments.arguments.len() == 2 => (true, call),
             _ => {
-                return;
+                return LintDirective::default();
             }
         };
 
         let Expression::Identifier(function_identifier) = call.function.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let function_name = context.resolve_function_name(function_identifier);
         if !function_name.eq_ignore_ascii_case(STRPOS) {
-            return;
+            return LintDirective::default();
         }
 
         let issue = Issue::new(
@@ -114,5 +114,7 @@ impl<'a> Walker<LintContext<'a>> for StrStartsWithRule {
                 plan.delete(binary.lhs.span().join(binary.operator.span()).to_range(), SafetyClassification::Safe);
             }
         });
+
+        LintDirective::Prune
     }
 }

@@ -131,7 +131,7 @@ fn choose_layout<'a, 'b>(
     let is_tail = !is_assignment(rhs_expression);
 
     let should_use_chain_formatting = matches!(assignment_like_node, AssignmentLikeNode::AssignmentOperation(_))
-        && matches!(f.parent_node(), Node::AssignmentOperation(_))
+        && matches!(f.parent_node(), Node::Assignment(_))
         && (!is_tail || !matches!(f.grandparent_node(), Some(Node::ExpressionStatement(_))));
 
     if should_use_chain_formatting {
@@ -187,7 +187,7 @@ fn choose_layout<'a, 'b>(
 }
 
 fn is_assignment(expression: &Expression) -> bool {
-    matches!(expression, Expression::AssignmentOperation(_))
+    matches!(expression, Expression::Assignment(_))
 }
 
 /// Returns whether the given assignment-like node is complex destruction assignment.

@@ -1,17 +1,16 @@
 use indoc::indoc;
-use mago_php_version::PHPVersion;
 use toml::Value;
 
-use mago_ast::ast::*;
-use mago_ast::Program;
+use mago_ast::*;
+use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const ALLOW_DISABLING: &str = "allow-disabling";
@@ -77,12 +76,12 @@ impl Rule for RequireStrictTypesRule {
                 .with_option(ALLOW_DISABLING, Value::Boolean(true)),
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RequireStrictTypesRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::default() };
+
         if program.statements.len() < 2 {
-            return;
+            return LintDirective::Abort;
         }
 
         let mut found = false;
@@ -145,5 +144,7 @@ impl<'a> Walker<LintContext<'a>> for RequireStrictTypesRule {
                 .with_help("Add `declare(strict_types=1);` at the top of your file."),
             );
         }
+
+        LintDirective::Abort
     }
 }

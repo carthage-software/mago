@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -31,10 +31,10 @@ impl Rule for NoErrorControlOperatorRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoErrorControlOperatorRule {
-    fn walk_in_unary_prefix<'ast>(&self, unary_prefix: &'ast UnaryPrefix, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::UnaryPrefix(unary_prefix) = node else { return LintDirective::default() };
+
         if let UnaryPrefixOperator::ErrorControl(_) = unary_prefix.operator {
             let issue = Issue::new(context.level(), "Unsafe use of error control operator `@`.")
                 .with_annotation(
@@ -51,5 +51,7 @@ impl<'a> Walker<LintContext<'a>> for NoErrorControlOperatorRule {
                 plan.delete(unary_prefix.operator.span().to_range(), SafetyClassification::Safe)
             });
         }
+
+        LintDirective::default()
     }
 }

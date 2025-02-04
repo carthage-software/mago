@@ -9,7 +9,7 @@ use mago_ast::*;
 #[inline]
 pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assignment> {
     match &expression {
-        Expression::AssignmentOperation(assignment_operation) => Some(assignment_operation),
+        Expression::Assignment(assignment_operation) => Some(assignment_operation),
         Expression::Parenthesized(parenthesized) => get_assignment_from_expression(&parenthesized.expression),
         Expression::Binary(operation) => {
             get_assignment_from_expression(&operation.lhs).or_else(|| get_assignment_from_expression(&operation.rhs))

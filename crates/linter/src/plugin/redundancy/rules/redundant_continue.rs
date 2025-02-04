@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -33,66 +33,54 @@ impl Rule for RedundantContinueRule {
                 "#},
             ))
     }
-}
 
-impl RedundantContinueRule {
-    fn report(&self, r#continue: &Continue, r#loop: impl HasSpan, context: &mut LintContext<'_>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let r#continue = match node {
+            Node::Foreach(foreach) => match &foreach.body {
+                ForeachBody::Statement(stmt) => get_continue_from_statement(stmt),
+                ForeachBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
+            },
+            Node::For(r#for) => match &r#for.body {
+                ForBody::Statement(stmt) => get_continue_from_statement(stmt),
+                ForBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
+            },
+            Node::While(r#while) => match &r#while.body {
+                WhileBody::Statement(stmt) => get_continue_from_statement(stmt),
+                WhileBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
+            },
+            Node::DoWhile(do_while) => get_continue_from_statement(&do_while.statement),
+            _ => None,
+        };
+
+        let Some(r#continue) = r#continue else {
+            return LintDirective::default();
+        };
+
         let issue = Issue::new(context.level(), "Redundant continue statement in loop body.")
             .with_annotations([
                 Annotation::primary(r#continue.span()).with_message(
                     "This `continue` statement is redundant because it is the last statement in the loop body.",
                 ),
-                Annotation::secondary(r#loop.span()),
+                Annotation::secondary(node.span()),
             ])
             .with_help("Remove this `continue` statement, as it does not affect the loop's behavior.");
 
         context.report_with_fix(issue, |plan| {
             plan.delete(r#continue.span().to_range(), SafetyClassification::Safe);
         });
+
+        LintDirective::default()
     }
 }
 
-impl<'a> Walker<LintContext<'a>> for RedundantContinueRule {
-    fn walk_in_foreach(&self, foreach: &Foreach, context: &mut LintContext<'a>) {
-        if let Some(cont) = match &foreach.body {
-            ForeachBody::Statement(stmt) => get_continue_from_statement(stmt),
-            ForeachBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
-        } {
-            self.report(cont, foreach, context);
-        }
-    }
-
-    fn walk_in_for(&self, r#for: &For, context: &mut LintContext<'a>) {
-        if let Some(cont) = match &r#for.body {
-            ForBody::Statement(stmt) => get_continue_from_statement(stmt),
-            ForBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
-        } {
-            self.report(cont, r#for, context);
-        }
-    }
-
-    fn walk_in_while(&self, r#while: &While, context: &mut LintContext<'a>) {
-        if let Some(cont) = match &r#while.body {
-            WhileBody::Statement(stmt) => get_continue_from_statement(stmt),
-            WhileBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
-        } {
-            self.report(cont, r#while, context);
-        }
-    }
-
-    fn walk_in_do_while(&self, do_while: &DoWhile, context: &mut LintContext<'a>) {
-        if let Some(cont) = get_continue_from_statement(&do_while.statement) {
-            self.report(cont, do_while, context);
-        }
-    }
-}
-
+#[inline]
 fn get_continue_from_last_statement(statements: &[Statement]) -> Option<&Continue> {
     let last = statements.last()?;
 
     get_continue_from_statement(last)
 }
 
+#[inline]
 fn get_continue_from_statement(statement: &Statement) -> Option<&Continue> {
     match statement {
         Statement::Block(block) => get_continue_from_statement(block.statements.last()?),

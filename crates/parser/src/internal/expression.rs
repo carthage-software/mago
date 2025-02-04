@@ -720,20 +720,16 @@ fn create_assignment_expression(lhs: Expression, operator: AssignmentOperator, r
                 Expression::Binary(Binary {
                     lhs: binary_lhs,
                     operator: binary_operator,
-                    rhs: Box::new(Expression::AssignmentOperation(Assignment {
-                        lhs: binary_rhs,
-                        operator,
-                        rhs: Box::new(rhs),
-                    })),
+                    rhs: Box::new(Expression::Assignment(Assignment { lhs: binary_rhs, operator, rhs: Box::new(rhs) })),
                 })
             } else {
-                Expression::AssignmentOperation(Assignment {
+                Expression::Assignment(Assignment {
                     lhs: Box::new(Expression::Binary(operation)),
                     operator,
                     rhs: Box::new(rhs),
                 })
             }
         }
-        _ => Expression::AssignmentOperation(Assignment { lhs: Box::new(lhs), operator, rhs: Box::new(rhs) }),
+        _ => Expression::Assignment(Assignment { lhs: Box::new(lhs), operator, rhs: Box::new(rhs) }),
     }
 }

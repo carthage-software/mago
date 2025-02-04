@@ -62,7 +62,7 @@ pub enum Expression {
     Parenthesized(Parenthesized),
     Literal(Literal),
     CompositeString(CompositeString),
-    AssignmentOperation(Assignment),
+    Assignment(Assignment),
     Conditional(Conditional),
     Array(Array),
     LegacyArray(LegacyArray),
@@ -154,7 +154,7 @@ impl Expression {
                     && conditional.then.as_ref().map(|e| e.is_constant(version, initilization)).unwrap_or(true)
                     && conditional.r#else.is_constant(version, initilization)
             }
-            Self::Array(array) => array.elements.inner.iter().all(|element| match &element {
+            Self::Array(array) => array.elements.nodes.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {
                     key_value_array_element.key.is_constant(version, initilization)
                         && key_value_array_element.value.is_constant(version, initilization)
@@ -167,7 +167,7 @@ impl Expression {
                 }
                 ArrayElement::Missing(_) => false,
             }),
-            Self::LegacyArray(array) => array.elements.inner.iter().all(|element| match &element {
+            Self::LegacyArray(array) => array.elements.nodes.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {
                     key_value_array_element.key.is_constant(version, initilization)
                         && key_value_array_element.value.is_constant(version, initilization)
@@ -213,16 +213,17 @@ impl Expression {
     }
 
     #[inline]
-    pub fn is_literal(&self) -> bool {
+    pub const fn is_literal(&self) -> bool {
         matches!(self, Expression::Literal(_))
     }
 
     #[inline]
-    pub fn is_string_literal(&self) -> bool {
+    pub const fn is_string_literal(&self) -> bool {
         matches!(self, Expression::Literal(Literal::String(_)))
     }
 
-    pub fn node_kind(&self) -> NodeKind {
+    #[inline]
+    pub const fn node_kind(&self) -> NodeKind {
         match &self {
             Expression::Binary(_) => NodeKind::Binary,
             Expression::ConstantAccess(_) => NodeKind::ConstantAccess,
@@ -231,7 +232,7 @@ impl Expression {
             Expression::Parenthesized(_) => NodeKind::Parenthesized,
             Expression::Literal(_) => NodeKind::Literal,
             Expression::CompositeString(_) => NodeKind::CompositeString,
-            Expression::AssignmentOperation(_) => NodeKind::Assignment,
+            Expression::Assignment(_) => NodeKind::Assignment,
             Expression::Conditional(_) => NodeKind::Conditional,
             Expression::Array(_) => NodeKind::Array,
             Expression::LegacyArray(_) => NodeKind::LegacyArray,
@@ -276,7 +277,7 @@ impl HasSpan for Expression {
             Expression::Parenthesized(expression) => expression.span(),
             Expression::Literal(expression) => expression.span(),
             Expression::CompositeString(expression) => expression.span(),
-            Expression::AssignmentOperation(expression) => expression.span(),
+            Expression::Assignment(expression) => expression.span(),
             Expression::Conditional(expression) => expression.span(),
             Expression::Array(expression) => expression.span(),
             Expression::LegacyArray(expression) => expression.span(),

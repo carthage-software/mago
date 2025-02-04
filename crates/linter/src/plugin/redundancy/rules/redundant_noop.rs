@@ -3,12 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
-use mago_span::Span;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -29,148 +28,44 @@ impl Rule for RedundantNoopRule {
                 "#},
             ))
     }
-}
 
-impl RedundantNoopRule {
-    fn report(&self, noop: &Span, context: &mut LintContext<'_>) {
-        let issue = Issue::new(context.level(), "Redundant noop statement.")
-            .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement."))
-            .with_help("Remove the redundant `;`");
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let statements = match node {
+            Node::Program(program) => program.statements.as_slice(),
+            Node::Block(block) => block.statements.as_slice(),
+            Node::Namespace(namespace) => namespace.statements().as_slice(),
+            Node::DeclareColonDelimitedBody(declare_colon_delimited_body) => {
+                declare_colon_delimited_body.statements.as_slice()
+            }
+            Node::SwitchExpressionCase(switch_expression_case) => switch_expression_case.statements.as_slice(),
+            Node::SwitchDefaultCase(switch_default_case) => switch_default_case.statements.as_slice(),
+            Node::ForeachColonDelimitedBody(foreach_colon_delimited_body) => {
+                foreach_colon_delimited_body.statements.as_slice()
+            }
+            Node::WhileColonDelimitedBody(while_colon_delimited_body) => {
+                while_colon_delimited_body.statements.as_slice()
+            }
+            Node::ForColonDelimitedBody(for_colon_delimited_body) => for_colon_delimited_body.statements.as_slice(),
+            Node::IfColonDelimitedBody(if_colon_delimited_body) => if_colon_delimited_body.statements.as_slice(),
+            Node::IfColonDelimitedBodyElseIfClause(if_colon_delimited_body_else_if_clause) => {
+                if_colon_delimited_body_else_if_clause.statements.as_slice()
+            }
+            Node::IfColonDelimitedBodyElseClause(if_colon_delimited_body_else_clause) => {
+                if_colon_delimited_body_else_clause.statements.as_slice()
+            }
+            _ => return LintDirective::default(),
+        };
 
-        context.report_with_fix(issue, |plan| plan.delete(noop.to_range(), SafetyClassification::Safe));
-    }
-}
-
-impl<'a> Walker<LintContext<'a>> for RedundantNoopRule {
-    fn walk_in_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
-        for statement in program.statements.iter() {
+        for statement in statements {
             if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
+                let issue = Issue::new(context.level(), "Redundant noop statement.")
+                    .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement."))
+                    .with_help("Remove the redundant `;`");
+
+                context.report_with_fix(issue, |plan| plan.delete(noop.to_range(), SafetyClassification::Safe));
             }
         }
-    }
 
-    fn walk_in_block<'ast>(&self, block: &'ast Block, context: &mut LintContext<'a>) {
-        for statement in block.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_namespace<'ast>(&self, namespace: &'ast Namespace, context: &mut LintContext<'a>) {
-        for statement in namespace.statements().iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_declare_colon_delimited_body<'ast>(
-        &self,
-        declare_colon_delimited_body: &'ast DeclareColonDelimitedBody,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in declare_colon_delimited_body.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_switch_expression_case<'ast>(
-        &self,
-        switch_expression_case: &'ast SwitchExpressionCase,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in switch_expression_case.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_switch_default_case<'ast>(
-        &self,
-        switch_default_case: &'ast SwitchDefaultCase,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in switch_default_case.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_foreach_colon_delimited_body<'ast>(
-        &self,
-        foreach_colon_delimited_body: &'ast ForeachColonDelimitedBody,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in foreach_colon_delimited_body.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_in_while_colon_delimited_body<'ast>(
-        &self,
-        while_colon_delimited_body: &'ast WhileColonDelimitedBody,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in while_colon_delimited_body.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_for_colon_delimited_body<'ast>(
-        &self,
-        for_colon_delimited_body: &'ast ForColonDelimitedBody,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in for_colon_delimited_body.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_if_colon_delimited_body<'ast>(
-        &self,
-        if_colon_delimited_body: &'ast IfColonDelimitedBody,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in if_colon_delimited_body.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_if_colon_delimited_body_else_if_clause<'ast>(
-        &self,
-        if_colon_delimited_body_else_if_clause: &'ast IfColonDelimitedBodyElseIfClause,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in if_colon_delimited_body_else_if_clause.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
-    }
-
-    fn walk_if_colon_delimited_body_else_clause<'ast>(
-        &self,
-        if_colon_delimited_body_else_clause: &'ast IfColonDelimitedBodyElseClause,
-        context: &mut LintContext<'a>,
-    ) {
-        for statement in if_colon_delimited_body_else_clause.statements.iter() {
-            if let Statement::Noop(noop) = statement {
-                self.report(noop, context);
-            }
-        }
+        LintDirective::default()
     }
 }

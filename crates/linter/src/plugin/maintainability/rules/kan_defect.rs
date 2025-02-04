@@ -1,15 +1,14 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
-use mago_ast::Node;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const THRESHOLD: &str = "threshold";
@@ -39,63 +38,45 @@ impl Rule for KanDefectRule {
                 default: Value::Float(THRESHOLD_DEFAULT ),
             })
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for KanDefectRule {
-    fn walk_in_class(&self, class: &Class, context: &mut LintContext<'a>) {
-        check("Class", Node::Class(class), context);
-    }
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let kind = match node {
+            Node::Class(_) => "Class",
+            Node::Trait(_) => "Trait",
+            Node::AnonymousClass(_) => "Class",
+            Node::Enum(_) => "Enum",
+            Node::Interface(_) => "Interface",
+            Node::Function(_) => "Function",
+            Node::Closure(_) => "Closure",
+            _ => return LintDirective::default(),
+        };
 
-    fn walk_in_trait(&self, r#trait: &Trait, context: &mut LintContext<'a>) {
-        check("Trait", Node::Trait(r#trait), context);
-    }
+        let threshold = context
+            .option(THRESHOLD)
+            .and_then(|o| if o.is_integer() { o.as_integer().map(|i| i as f64) } else { o.as_float() })
+            .unwrap_or(THRESHOLD_DEFAULT);
 
-    fn walk_in_anonymous_class(&self, anonymous_class: &AnonymousClass, context: &mut LintContext<'a>) {
-        check("Class", Node::AnonymousClass(anonymous_class), context);
-    }
+        let kan_defect = get_kan_defect_of_node(node);
+        if kan_defect > threshold {
+            let issue = Issue::new(context.level(), format!("{kind} has a high kan defect score ({kan_defect})."))
+                .with_annotation(Annotation::primary(node.span()).with_message(format!(
+                    "{kind} has a kan defect score of {kan_defect}, which exceeds the threshold of {threshold}.",
+                )))
+                .with_note("Kan defect is a heuristic used by phpmetrics to estimate defect-proneness based on control-flow statements.")
+                .with_help("Try reducing the number of loops, switch statements, or if statements.")
+                .with_help("You can also consider splitting large units of code into smaller, more focused units.");
 
-    fn walk_in_enum(&self, r#enum: &Enum, context: &mut LintContext<'a>) {
-        check("Enum", Node::Enum(r#enum), context);
-    }
+            context.report(issue);
+        }
 
-    fn walk_in_interface(&self, interface: &Interface, context: &mut LintContext<'a>) {
-        check("Interface", Node::Interface(interface), context);
-    }
-
-    fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        check("Function", Node::Function(function), context);
-    }
-
-    fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        check("Closure", Node::Closure(closure), context);
-    }
-}
-
-#[inline]
-fn check(kind: &'static str, node: Node<'_>, context: &mut LintContext<'_>) {
-    let threshold = context
-        .option(THRESHOLD)
-        .and_then(|o| if o.is_integer() { o.as_integer().map(|i| i as f64) } else { o.as_float() })
-        .unwrap_or(THRESHOLD_DEFAULT);
-
-    let kan_defect = get_kan_defect_of_node(node);
-    if kan_defect > threshold {
-        let issue = Issue::new(context.level(), format!("{kind} has a high kan defect score ({kan_defect})."))
-            .with_annotation(Annotation::primary(node.span()).with_message(format!(
-                "{} has a kan defect score of {}, which exceeds the threshold of {}.",
-                kind, kan_defect, threshold
-            )))
-            .with_note("Kan defect is a heuristic used by phpmetrics to estimate defect-proneness based on control-flow statements.")
-            .with_help("Try reducing the number of loops, switch statements, or if statements.")
-            .with_help("You can also consider splitting large units of code into smaller, more focused units.");
-
-        context.report(issue);
+        LintDirective::Prune
     }
 }
 
 /// Returns the *Kan Defect* value for a given AST node by counting
 /// the number of select statements, loop statements, and `if` statements,
 /// then applying the **Kan Defect** formula.
+#[inline]
 fn get_kan_defect_of_node(node: Node<'_>) -> f64 {
     let (select_count, while_count, if_count) = collect_defect_factors(node);
     calculate_kan_defect(select_count, while_count, if_count)
@@ -118,6 +99,7 @@ fn get_kan_defect_of_node(node: Node<'_>) -> f64 {
 /// and are not part of a standard software metric outside phpmetrics.
 ///
 /// See: https://github.com/phpmetrics/PhpMetrics/blob/c43217cd7783bbd54d0b8c1dd43f697bc36ef79d/src/Hal/Metric/Class_/Complexity/KanDefectVisitor.php#L60C13-L60C76
+#[inline]
 fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
     let select = select as f64;
     let r#while = r#while as f64;
@@ -135,6 +117,7 @@ fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
 /// Returns a tuple `(select_count, while_count, if_count)` representing
 /// how many of each type of statement appear under the given node and all
 /// its descendants.
+#[inline]
 fn collect_defect_factors(node: Node<'_>) -> (usize, usize, usize) {
     let mut select_count = 0;
     let mut while_count = 0;

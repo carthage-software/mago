@@ -1,17 +1,16 @@
 use indoc::indoc;
 
-use mago_ast::Modifier;
-use mago_ast::Property;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -35,21 +34,21 @@ impl Rule for RedundantWriteVisibilityRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantWriteVisibilityRule {
-    fn walk_in_property(&self, property: &Property, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Property(property) = node else { return LintDirective::default() };
+
         let modifiers = property.modifiers();
         if modifiers.is_empty() {
-            return;
+            return LintDirective::default();
         }
 
         let Some(write_visibility) = modifiers.get_first_write_visibility() else {
-            return;
+            return LintDirective::default();
         };
 
         let Some(read_visibility) = modifiers.get_first_read_visibility() else {
-            return;
+            return LintDirective::default();
         };
 
         match (read_visibility, write_visibility) {
@@ -71,5 +70,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantWriteVisibilityRule {
             }
             _ => {}
         }
+
+        LintDirective::Prune
     }
 }

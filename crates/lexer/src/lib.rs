@@ -147,6 +147,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
     ///
     /// - [`Token`]: Represents a lexical token with its kind, value, and span.
     /// - [`SyntaxError`]: Represents errors that can occur during lexing.
+    #[inline]
     pub fn advance(&mut self) -> Option<Result<Token, SyntaxError>> {
         if self.input.has_reached_eof() {
             return None;
@@ -173,7 +174,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
                 }
 
                 if self.input.is_at(b"#!", true) {
-                    let buffer = self.input.consume_until_inclusive(b"\n", false);
+                    let buffer = self.input.consume_through(b'\n');
                     let end = self.input.position();
 
                     self.token(TokenKind::InlineShebang, buffer, start, end)
@@ -935,6 +936,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
         }
     }
 
+    #[inline]
     fn token(
         &mut self,
         kind: TokenKind,
@@ -945,6 +947,7 @@ impl<'a, 'i> Lexer<'a, 'i> {
         Some(Ok(Token { kind, value: self.interner.intern(String::from_utf8_lossy(value)), span: Span::new(from, to) }))
     }
 
+    #[inline]
     fn interpolation(&mut self, until: usize, next_mode: LexerMode<'a>) -> Option<Result<Token, SyntaxError>> {
         let mut mode = LexerMode::Script;
 
@@ -967,245 +970,309 @@ impl<'a, 'i> Lexer<'a, 'i> {
     }
 }
 
+#[inline]
+fn is_start_of_identifier(byte: u8) -> bool {
+    byte.is_ascii_lowercase() || byte.is_ascii_uppercase() || (byte == b'_')
+}
+
+#[inline]
+fn is_part_of_identifier(byte: u8) -> bool {
+    byte.is_ascii_digit() || byte.is_ascii_lowercase() || byte.is_ascii_uppercase() || (byte == b'_') || (byte >= 0x80)
+}
+
+#[inline]
 fn matches_start_of_heredoc_document(input: &Input) -> bool {
+    // Cache input values for performance.
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // Start after the fixed opener (3 bytes).
     let mut length = 3;
-    let mut whitespaces = 0;
-    loop {
-        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
-            whitespaces += 1;
-        } else {
-            break;
-        }
+    // Consume any following whitespace.
+    while base + length < total && bytes[base + length].is_ascii_whitespace() {
+        length += 1;
     }
 
-    length += whitespaces;
-
-    if !matches!(input.peek(length, 1), [start_of_identifier!(), ..]) {
+    // The next byte must be a valid start-of-identifier.
+    if base + length >= total || !is_start_of_identifier(bytes[base + length]) {
         return false;
     }
+    length += 1; // Include that identifier start.
 
-    length += 1;
+    // Now continue reading identifier characters until a newline is found.
     loop {
-        match input.peek(length, 2) {
-            [b'\n', ..] => {
-                return true;
-            }
-            [part_of_identifier!(), ..] => {
-                length += 1;
-            }
-            [..] => {
-                return false;
-            }
+        let pos = base + length;
+        if pos >= total {
+            return false; // Unexpected EOF
+        }
+        if bytes[pos] == b'\n' {
+            return true; // Newline found: valid heredoc opener.
+        } else if is_part_of_identifier(bytes[pos]) {
+            length += 1;
+        } else {
+            return false; // Unexpected character.
         }
     }
 }
 
+#[inline]
 fn matches_start_of_double_quote_heredoc_document(input: &Input) -> bool {
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // Start after the fixed opener (3 bytes), then skip any whitespace.
     let mut length = 3;
-    let mut whitespaces = 0;
-    loop {
-        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
-            whitespaces += 1;
-        } else {
-            break;
-        }
+    while base + length < total && bytes[base + length].is_ascii_whitespace() {
+        length += 1;
     }
 
-    length += whitespaces;
-
-    if !matches!(input.peek(length, 1), [b'"', ..]) {
+    // Next, expect an opening double quote.
+    if base + length >= total || bytes[base + length] != b'"' {
         return false;
     }
-
     length += 1;
 
-    if !matches!(input.peek(length, 1), [start_of_identifier!(), ..]) {
+    // The following byte must be a valid start-of-identifier.
+    if base + length >= total || !is_start_of_identifier(bytes[base + length]) {
         return false;
     }
-
     length += 1;
 
+    // Now scan the label. For double‑quoted heredoc, a terminating double quote is required.
     let mut terminated = false;
     loop {
-        match input.peek(length, 2) {
-            [b'\n', ..] => {
-                return terminated;
-            }
-            [part_of_identifier!(), ..] if !terminated => {
-                length += 1;
-            }
-            [b'"', ..] if !terminated => {
-                terminated = true;
-                length += 1;
-            }
-            [..] => {
-                return false;
-            }
+        let pos = base + length;
+        if pos >= total {
+            return false;
+        }
+        let byte = bytes[pos];
+        if byte == b'\n' {
+            // End of line: valid only if a closing double quote was encountered.
+            return terminated;
+        } else if !terminated && is_part_of_identifier(byte) {
+            length += 1;
+        } else if !terminated && byte == b'"' {
+            terminated = true;
+            length += 1;
+        } else {
+            return false;
         }
     }
 }
 
+#[inline]
 fn matches_start_of_nowdoc_document(input: &Input) -> bool {
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // Start after the fixed opener (3 bytes) and skip whitespace.
     let mut length = 3;
-    let mut whitespaces = 0;
-    loop {
-        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
-            whitespaces += 1;
-        } else {
-            break;
-        }
+    while base + length < total && bytes[base + length].is_ascii_whitespace() {
+        length += 1;
     }
 
-    length += whitespaces;
-
-    if !matches!(input.peek(length, 1), [b'\'', ..]) {
+    // Now, the next byte must be a single quote.
+    if base + length >= total || bytes[base + length] != b'\'' {
         return false;
     }
-
     length += 1;
 
-    if !matches!(input.peek(length, 1), [start_of_identifier!(), ..]) {
+    // The following byte must be a valid start-of-identifier.
+    if base + length >= total || !is_start_of_identifier(bytes[base + length]) {
         return false;
     }
-
     length += 1;
 
+    // Read the label until a newline. A terminating single quote is required.
     let mut terminated = false;
     loop {
-        match input.peek(length, 2) {
-            [b'\n', ..] => {
-                return terminated;
-            }
-            [part_of_identifier!(), ..] if !terminated => {
-                length += 1;
-            }
-            [b'\'', ..] if !terminated => {
-                terminated = true;
-                length += 1;
-            }
-            [..] => {
-                return false;
-            }
+        let pos = base + length;
+        if pos >= total {
+            return false;
+        }
+        let byte = bytes[pos];
+        if byte == b'\n' {
+            return terminated;
+        } else if !terminated && is_part_of_identifier(byte) {
+            length += 1;
+        } else if !terminated && byte == b'\'' {
+            terminated = true;
+            length += 1;
+        } else {
+            return false;
         }
     }
 }
 
+#[inline]
 fn matches_literal_double_quote_string(input: &Input) -> bool {
-    let mut length = 1;
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // Start after the initial double-quote (assumed consumed).
+    let mut pos = base + 1;
     loop {
-        match input.peek(length, 2) {
-            [b'"', ..] => {
-                return true;
+        if pos >= total {
+            // Reached EOF: assume literal is complete.
+            return true;
+        }
+        let byte = bytes[pos];
+        if byte == b'"' {
+            // Encounter a closing double quote.
+            return true;
+        } else if byte == b'\\' {
+            // Skip an escape sequence: assume that the backslash and the escaped character form a pair.
+            pos += 2;
+            continue;
+        } else {
+            // Check for variable interpolation or complex expression start:
+            // If two-byte sequences match either "$" followed by a start-of-identifier or "{" and "$", then return false.
+            if pos + 1 < total {
+                let next = bytes[pos + 1];
+                if (byte == b'$' && (is_start_of_identifier(next) || next == b'{')) || (byte == b'{' && next == b'$') {
+                    return false;
+                }
             }
-            [b'\\', ..] => {
-                length += 2;
-            }
-            [b'$', start_of_identifier!() | b'{'] | [b'{', b'$'] => {
-                return false;
-            }
-            [_, ..] => {
-                length += 1;
-            }
-            [] => {
-                return true;
-            }
+            pos += 1;
         }
     }
 }
 
+#[inline]
 fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize, usize, usize) {
-    let mut length = 3;
+    // Cache the underlying slice, total length, and the current absolute offset.
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // --- Block 1: Consume Whitespace ---
+    // Start reading at offset base+3 (the fixed opener length).
+    let mut pos = base + 3;
     let mut whitespaces = 0;
-    loop {
-        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
-            whitespaces += 1;
-        } else {
-            break;
-        }
+    while pos < total && bytes[pos].is_ascii_whitespace() {
+        whitespaces += 1;
+        pos += 1;
     }
 
-    length += whitespaces + if double_quoted { 2 } else { 1 };
-    let mut label_length = 1;
-    let mut terminated = false;
-    loop {
-        match input.peek(length, 2) {
-            [b'\n', ..] => {
-                length += 1;
+    // --- Block 2: Calculate Initial Label Offset ---
+    // The label (or delimiter) starts after:
+    //   3 bytes + whitespace bytes + an extra offset:
+    //      if double-quoted: 2 bytes (opening and closing quotes around the label)
+    //      else: 1 byte.
+    let mut length = 3 + whitespaces + if double_quoted { 2 } else { 1 };
 
-                return (length, whitespaces, label_length);
-            }
-            [part_of_identifier!(), ..] if !double_quoted || !terminated => {
-                length += 1;
-                label_length += 1;
-            }
-            [b'"', ..] if double_quoted && !terminated => {
-                length += 1;
-                terminated = true;
-            }
-            [..] => unreachable!(),
+    // --- Block 3: Read the Label ---
+    let mut label_length = 1; // Start with at least one byte for the label.
+    let mut terminated = false; // For double-quoted heredoc, to track the closing quote.
+    loop {
+        let pos = base + length;
+        // Ensure we haven't run past the input.
+        if pos >= total {
+            unreachable!("Unexpected end of input while reading heredoc label");
+        }
+
+        let byte = bytes[pos];
+
+        if byte == b'\n' {
+            // Newline ends the label.
+            length += 1;
+            return (length, whitespaces, label_length);
+        } else if is_part_of_identifier(byte) && (!double_quoted || !terminated) {
+            // For both unquoted and double-quoted (before the closing quote) heredoc,
+            // a valid identifier character is part of the label.
+            length += 1;
+            label_length += 1;
+        } else if double_quoted && !terminated && byte == b'"' {
+            // In a double-quoted heredoc, a double quote terminates the label.
+            length += 1;
+            terminated = true;
+        } else {
+            unreachable!("Unexpected character encountered in heredoc label");
         }
     }
 }
 
+#[inline]
 fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
-    let mut length = 3;
+    // Cache the underlying slice, total length, and the current absolute offset.
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+
+    // --- Block 1: Consume Whitespace ---
+    let mut pos = base + 3;
     let mut whitespaces = 0;
-    loop {
-        if input.peek(length + whitespaces, 1).first().map(|t| t.is_ascii_whitespace()).unwrap_or(false) {
-            whitespaces += 1;
-        } else {
-            break;
-        }
+    while pos < total && bytes[pos].is_ascii_whitespace() {
+        whitespaces += 1;
+        pos += 1;
     }
 
-    length += whitespaces + 2;
+    // --- Block 2: Calculate Initial Label Offset ---
+    // For nowdoc, the fixed extra offset is always 2.
+    let mut length = 3 + whitespaces + 2;
+
+    // --- Block 3: Read the Label ---
     let mut label_length = 1;
     let mut terminated = false;
     loop {
-        match input.peek(length, 2) {
-            [b'\n', ..] => {
-                length += 1;
+        let pos = base + length;
+        if pos >= total {
+            unreachable!("Unexpected end of input while reading nowdoc label");
+        }
+        let byte = bytes[pos];
 
-                return (length, whitespaces, label_length);
-            }
-            [part_of_identifier!(), ..] if !terminated => {
-                length += 1;
-                label_length += 1;
-            }
-            [b'\'', ..] if !terminated => {
-                length += 1;
-                terminated = true;
-            }
-            [..] => unreachable!(),
+        if byte == b'\n' {
+            // A newline indicates the end of the label.
+            length += 1;
+            return (length, whitespaces, label_length);
+        } else if is_part_of_identifier(byte) && !terminated {
+            // For nowdoc, identifier characters contribute to the label until terminated.
+            length += 1;
+            label_length += 1;
+        } else if !terminated && byte == b'\'' {
+            // A single quote terminates the nowdoc label.
+            length += 1;
+            terminated = true;
+        } else {
+            unreachable!("Unexpected character encountered in nowdoc label");
         }
     }
 }
 
+#[inline]
 fn read_literal_string(input: &Input, quote: &u8) -> (TokenKind, usize) {
-    let mut length = 1;
+    let bytes = input.bytes;
+    let total = input.length;
+    let start = input.position.offset; // Absolute starting position.
+    let mut length = 1; // We assume the opening quote is already consumed.
     let mut last_was_backslash = false;
     let mut partial = false;
+
     loop {
-        match input.peek(length, 1) {
-            [b'\\', ..] => {
-                length += 1;
-                last_was_backslash = !last_was_backslash;
-            }
-            [byte, ..] => {
-                if byte == quote && !last_was_backslash {
-                    length += 1;
+        let pos = start + length;
+        if pos >= total {
+            // Reached EOF before closing quote.
+            partial = true;
+            break;
+        }
 
-                    break;
-                }
-
-                length += 1;
-                last_was_backslash = false;
-            }
-            [] => {
-                partial = true;
-
+        let byte = bytes[pos];
+        if byte == b'\\' {
+            // Toggle the backslash flag.
+            last_was_backslash = !last_was_backslash;
+            length += 1;
+        } else {
+            // If we see the closing quote and the previous byte was not an escape.
+            if byte == *quote && !last_was_backslash {
+                length += 1; // Include the closing quote.
                 break;
             }
+            length += 1;
+            last_was_backslash = false;
         }
     }
 
@@ -1216,138 +1283,157 @@ fn read_literal_string(input: &Input, quote: &u8) -> (TokenKind, usize) {
     }
 }
 
+#[inline]
 fn read_digits_of_base(input: &Input, offset: usize, base: u8) -> usize {
-    if 16 == base {
+    if base == 16 {
         read_digits_with(input, offset, u8::is_ascii_hexdigit)
     } else {
         let max = b'0' + base;
-        let range = b'0'..max;
 
-        read_digits_with(input, offset, |byte| range.contains(byte))
+        read_digits_with(input, offset, |b| b >= &b'0' && b < &max)
     }
 }
 
+#[inline]
 fn read_digits_with<F: Fn(&u8) -> bool>(input: &Input, offset: usize, is_digit: F) -> usize {
-    let mut length = offset;
-    loop {
-        match input.peek(length, 2) {
-            [b, ..] if is_digit(b) => {
-                length += 1;
-            }
-            [number_separator!(), b] if is_digit(b) => {
-                length += 2;
-            }
-            _ => {
-                break;
-            }
+    let bytes = input.bytes;
+    let total = input.length;
+    let start = input.position.offset;
+    let mut pos = start + offset; // Compute the absolute position.
+
+    while pos < total {
+        let current = bytes[pos];
+        if is_digit(&current) {
+            pos += 1;
+        } else if pos + 1 < total && bytes[pos] == number_separator!() && is_digit(&bytes[pos + 1]) {
+            pos += 2; // Skip the separator and the digit.
+        } else {
+            break;
         }
     }
 
-    length
+    // Return the relative length from the start of the current position.
+    pos - start
 }
-
+#[inline]
 fn read_until_end_of_variable_interpolation(input: &Input, from: usize) -> usize {
-    let mut until_offset = from;
+    // Cache the underlying slice, total length, and absolute starting offset.
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+    // `offset` is relative to the current position.
+    let mut offset = from;
+
     loop {
-        match input.peek(until_offset, 4) {
-            [part_of_identifier!(), ..] => {
-                until_offset += 1;
-            }
-            [b'[', ..] => {
-                until_offset += 1;
-
-                let mut nesting = 0;
-                loop {
-                    match input.peek(until_offset, 1) {
-                        [b']', ..] => {
-                            until_offset += 1;
-
-                            if nesting == 0 {
-                                break;
-                            } else {
-                                nesting -= 1;
-                            }
-                        }
-                        [b'[', ..] => {
-                            until_offset += 1;
-                            nesting += 1;
-                        }
-                        [byte, ..] => {
-                            if byte.is_ascii_whitespace() {
-                                // we don't want to include whitespaces in here
-                                // see: https://3v4l.org/7Cp3H
-                                break;
-                            }
-
-                            until_offset += 1;
-                        }
-                        [] => {
-                            break;
-                        }
-                    }
-                }
-
-                break;
-            }
-            [b'-', b'>', start_of_identifier!(), ..] => {
-                until_offset += 3;
-                loop {
-                    if matches!(input.peek(until_offset, 1), [part_of_identifier!()]) {
-                        until_offset += 1;
-                    } else {
-                        break;
-                    }
-                }
-
-                break;
-            }
-            [b'?', b'-', b'>', start_of_identifier!(), ..] => {
-                until_offset += 4;
-                loop {
-                    if matches!(input.peek(until_offset, 1), [part_of_identifier!()]) {
-                        until_offset += 1;
-                    } else {
-                        break;
-                    }
-                }
-
-                break;
-            }
-            [..] => {
-                break;
-            }
+        let abs = base + offset;
+        if abs >= total {
+            // End of input.
+            break;
         }
+
+        // Pattern 1: If the current byte is part of an identifier, simply advance.
+        if is_part_of_identifier(bytes[abs]) {
+            offset += 1;
+            continue;
+        }
+
+        // Pattern 2: If the current byte is a '[' then we enter a bracketed interpolation.
+        if bytes[abs] == b'[' {
+            offset += 1;
+            let mut nesting = 0;
+            loop {
+                let abs_inner = base + offset;
+                if abs_inner >= total {
+                    break;
+                }
+                let b = bytes[abs_inner];
+                if b == b']' {
+                    offset += 1;
+                    if nesting == 0 {
+                        break;
+                    } else {
+                        nesting -= 1;
+                    }
+                } else if b == b'[' {
+                    offset += 1;
+                    nesting += 1;
+                } else if b.is_ascii_whitespace() {
+                    // Do not include whitespace.
+                    break;
+                } else {
+                    offset += 1;
+                }
+            }
+            // When bracketed interpolation is processed, exit the loop.
+            break;
+        }
+
+        // Pattern 3: Check for "->" followed by a valid identifier start.
+        if base + offset + 2 < total
+            && bytes[abs] == b'-'
+            && bytes[base + offset + 1] == b'>'
+            && is_start_of_identifier(bytes[base + offset + 2])
+        {
+            offset += 3;
+            // Consume any following identifier characters.
+            while base + offset < total && is_part_of_identifier(bytes[base + offset]) {
+                offset += 1;
+            }
+            break;
+        }
+
+        // Pattern 4: Check for "?->" followed by a valid identifier start.
+        if base + offset + 3 < total
+            && bytes[abs] == b'?'
+            && bytes[base + offset + 1] == b'-'
+            && bytes[base + offset + 2] == b'>'
+            && is_start_of_identifier(bytes[base + offset + 3])
+        {
+            offset += 4;
+            while base + offset < total && is_part_of_identifier(bytes[base + offset]) {
+                offset += 1;
+            }
+            break;
+        }
+
+        // None of the expected patterns matched: exit the loop.
+        break;
     }
 
-    until_offset
+    offset
 }
 
+#[inline]
 fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> usize {
-    let mut until_offset = from;
+    let bytes = input.bytes;
+    let total = input.length;
+    let base = input.position.offset;
+    let mut offset = from;
     let mut nesting = 0;
-    loop {
-        match input.peek(until_offset, 1) {
-            [b'}', ..] => {
-                until_offset += 1;
 
+    loop {
+        let abs = base + offset;
+        if abs >= total {
+            break;
+        }
+        match bytes[abs] {
+            b'}' => {
+                offset += 1;
                 if nesting == 0 {
                     break;
                 } else {
                     nesting -= 1;
                 }
             }
-            [b'{', ..] => {
-                until_offset += 1;
+            b'{' => {
+                offset += 1;
                 nesting += 1;
             }
-            [_, ..] => {
-                until_offset += 1;
-            }
-            [] => {
-                break;
+            _ => {
+                offset += 1;
             }
         }
     }
 
-    until_offset
+    offset
 }

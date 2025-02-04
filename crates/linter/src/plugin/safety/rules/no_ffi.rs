@@ -3,14 +3,12 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
-
-const FFI_CLASSES: [&str; 3] = ["FFI", "FFI\\Cdata", "FFI\\Ctype"];
 
 #[derive(Clone, Debug)]
 pub struct NoFFIRule;
@@ -36,71 +34,56 @@ impl Rule for NoFFIRule {
                 "#},
             ))
     }
-}
 
-impl NoFFIRule {
-    fn report(&self, identifier: &Identifier, node: Option<&impl HasSpan>, context: &mut LintContext<'_>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let identifier = match node {
+            Node::StaticMethodCall(static_method_call) => {
+                if let Expression::Identifier(identifier) = static_method_call.class.as_ref() {
+                    identifier
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::ClassConstantAccess(class_constant_access) => {
+                if let Expression::Identifier(identifier) = class_constant_access.class.as_ref() {
+                    identifier
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::Instantiation(instantiation) => {
+                if let Expression::Identifier(identifier) = instantiation.class.as_ref() {
+                    identifier
+                } else {
+                    return LintDirective::default();
+                }
+            }
+
+            Node::Hint(Hint::Identifier(identifier)) => identifier,
+            _ => return LintDirective::default(),
+        };
+
         let class_name = context.lookup_name(identifier);
 
         if FFI_CLASSES.iter().any(|ffi| ffi.eq_ignore_ascii_case(class_name)) {
-            let mut issue = Issue::new(
-               context.level(),
-               format!("Potentionally unsafe use of FFI class `{}`.", class_name),
-            )
-            .with_annotation(Annotation::primary(identifier.span()))
-            .with_note("FFI (Foreign Function Interface) allows interaction with code written in other languages such as C, C++, and Rust.")
-            .with_note("This can introduce potential security risks and stability issues if not handled carefully.")
-            .with_note("Make sure you understand the implications and potential vulnerabilities before using FFI in production.")
-            .with_note("If you are confident in your use of FFI and understand the risks, you can disable this rule in your Mago configuration.")
-            .with_help("If possible, consider using alternative solutions within PHP to avoid relying on FFI.");
+            context.report(
+                Issue::new(
+                   context.level(),
+                   format!("Potentionally unsafe use of FFI class `{}`.", class_name),
+                )
+                .with_annotation(Annotation::primary(identifier.span()).with_message("This class is part of the FFI extension."))
+                .with_note("FFI (Foreign Function Interface) allows interaction with code written in other languages such as C, C++, and Rust.")
+                .with_note("This can introduce potential security risks and stability issues if not handled carefully.")
+                .with_note("Make sure you understand the implications and potential vulnerabilities before using FFI in production.")
+                .with_note("If you are confident in your use of FFI and understand the risks, you can disable this rule in your Mago configuration.")
+                .with_help("If possible, consider using alternative solutions within PHP to avoid relying on FFI.")
+            );
 
-            if let Some(node) = node {
-                issue = issue.with_annotation(Annotation::secondary(node.span()));
-            }
-
-            context.report(issue);
+            LintDirective::Prune
+        } else {
+            LintDirective::Continue
         }
     }
 }
 
-impl<'a> Walker<LintContext<'a>> for NoFFIRule {
-    fn walk_in_static_method_call<'ast>(
-        &self,
-        static_method_call: &'ast StaticMethodCall,
-        context: &mut LintContext<'a>,
-    ) {
-        let Expression::Identifier(class_identifier) = static_method_call.class.as_ref() else {
-            return;
-        };
-
-        self.report(class_identifier, Some(static_method_call), context);
-    }
-
-    fn walk_in_class_constant_access<'ast>(
-        &self,
-        class_constant_access: &'ast ClassConstantAccess,
-        context: &mut LintContext<'a>,
-    ) {
-        let Expression::Identifier(class_identifier) = class_constant_access.class.as_ref() else {
-            return;
-        };
-
-        self.report(class_identifier, Some(class_constant_access), context);
-    }
-
-    fn walk_in_instantiation<'ast>(&self, instantiation: &'ast Instantiation, context: &mut LintContext<'a>) {
-        let Expression::Identifier(class_identifier) = instantiation.class.as_ref() else {
-            return;
-        };
-
-        self.report(class_identifier, Some(instantiation), context);
-    }
-
-    fn walk_in_hint<'ast>(&self, hint: &'ast Hint, context: &mut LintContext<'a>) {
-        let Hint::Identifier(identifier) = &hint else {
-            return;
-        };
-
-        self.report(identifier, Option::<&Hint>::None, context);
-    }
-}
+const FFI_CLASSES: [&str; 3] = ["FFI", "FFI\\Cdata", "FFI\\Ctype"];

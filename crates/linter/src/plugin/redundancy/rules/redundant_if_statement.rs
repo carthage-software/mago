@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -41,10 +41,10 @@ impl Rule for RedundantIfStatementRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantIfStatementRule {
-    fn walk_in_if<'ast>(&self, r#if: &'ast If, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::If(r#if) = node else { return LintDirective::default() };
+
         if mago_ast_utils::condition::is_truthy(&r#if.condition) {
             // this condition always evaluates, given:
             //
@@ -96,7 +96,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantIfStatementRule {
                 }
             });
 
-            return;
+            return LintDirective::default();
         }
 
         if mago_ast_utils::condition::is_falsy(&r#if.condition) {
@@ -115,7 +115,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantIfStatementRule {
                         && if_statement_body.else_clause.is_none()
                         && mago_ast_utils::definition::statement_contains_only_definitions(&if_statement_body.statement)
                     {
-                        return;
+                        return LintDirective::Prune;
                     }
                 }
                 IfBody::ColonDelimited(if_colon_delimited_body) => {
@@ -125,7 +125,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantIfStatementRule {
                             &if_colon_delimited_body.statements,
                         )
                     {
-                        return;
+                        return LintDirective::Prune;
                     }
                 }
             }
@@ -184,5 +184,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantIfStatementRule {
                 }
             });
         }
+
+        LintDirective::default()
     }
 }

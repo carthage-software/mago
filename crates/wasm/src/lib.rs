@@ -171,7 +171,7 @@ pub fn mago_format(code: String, format_settings: JsValue) -> Result<JsValue, Js
     // Prepare interner and source manager
     let interner = ThreadedInterner::new();
     let manager = SourceManager::new(interner.clone());
-    let source_id = manager.insert_content("code.php".to_string(), code, SourceCategory::UserDefined);
+    let source_id = manager.insert_content("code.php", code, SourceCategory::UserDefined);
 
     let source = manager.load(&source_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
 

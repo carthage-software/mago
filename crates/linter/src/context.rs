@@ -16,41 +16,6 @@ use mago_span::HasPosition;
 use crate::rule::ConfiguredRule;
 
 #[derive(Debug)]
-pub struct Context<'a> {
-    pub php_version: PHPVersion,
-    pub interner: &'a ThreadedInterner,
-    pub codebase: &'a CodebaseReflection,
-    pub semantics: &'a Semantics,
-    pub issues: IssueCollection,
-}
-
-impl<'a> Context<'a> {
-    pub fn new(
-        php_version: PHPVersion,
-        interner: &'a ThreadedInterner,
-        codebase: &'a CodebaseReflection,
-        semantics: &'a Semantics,
-    ) -> Self {
-        Self { php_version, interner, codebase, semantics, issues: IssueCollection::default() }
-    }
-
-    pub fn for_rule<'b>(&'b mut self, rule: &'b ConfiguredRule) -> LintContext<'b> {
-        LintContext {
-            php_version: self.php_version,
-            rule,
-            interner: self.interner,
-            codebase: self.codebase,
-            semantics: self.semantics,
-            issues: &mut self.issues,
-        }
-    }
-
-    pub fn take_issue_collection(self) -> IssueCollection {
-        self.issues
-    }
-}
-
-#[derive(Debug)]
 pub struct LintContext<'a> {
     pub php_version: PHPVersion,
     pub rule: &'a ConfiguredRule,

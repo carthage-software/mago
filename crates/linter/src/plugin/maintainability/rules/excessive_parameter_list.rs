@@ -1,15 +1,14 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
-use mago_ast::Node;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const THRESHOLD: &str = "threshold";
@@ -34,53 +33,26 @@ impl Rule for ExcessiveParameterListRule {
                 default: Value::Integer(THRESHOLD_DEFAULT),
             })
     }
-}
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionLikeParameterList(parameter_list) = node else {
+            return LintDirective::default();
+        };
 
-impl<'a> Walker<LintContext<'a>> for ExcessiveParameterListRule {
-    fn walk_in_method(&self, method: &Method, context: &mut LintContext<'a>) {
-        check("Method", Node::Method(method), &method.parameter_list, context);
-    }
+        let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
 
-    fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        check("Function", Node::Function(function), &function.parameter_list, context);
-    }
+        if parameter_list.parameters.len() > threshold {
+            let issue = Issue::new(context.level(), "Parameter list is too long.".to_string())
+                .with_annotation(Annotation::primary(parameter_list.span()).with_message(format!(
+                    "This list has {} parameters, which exceeds the threshold of {}.",
+                    parameter_list.parameters.len(),
+                    threshold
+                )))
+                .with_note("Having a large number of parameters can make functions harder to understand and maintain.")
+                .with_help("Try reducing the number of parameters, or consider passing an object or a shape instead.");
 
-    fn walk_in_property_hook(&self, property_hook: &PropertyHook, context: &mut LintContext<'a>) {
-        if let Some(parameters) = &property_hook.parameters {
-            check("Hook", Node::PropertyHook(property_hook), parameters, context);
+            context.report(issue);
         }
-    }
 
-    fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        check("Closure", Node::Closure(closure), &closure.parameter_list, context);
-    }
-
-    fn walk_in_arrow_function(&self, arrow_function: &ArrowFunction, context: &mut LintContext<'a>) {
-        check("Arrow function", Node::ArrowFunction(arrow_function), &arrow_function.parameter_list, context);
-    }
-}
-
-#[inline]
-fn check(
-    kind: &'static str,
-    node: Node<'_>,
-    parameter_list: &FunctionLikeParameterList,
-    context: &mut LintContext<'_>,
-) {
-    let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
-
-    if parameter_list.parameters.len() > threshold {
-        let issue = Issue::new(context.level(), format!("{} parameter list is too long.", kind))
-            .with_annotation(Annotation::primary(parameter_list.span()).with_message(format!(
-                "{} has {} parameters, which exceeds the threshold of {}.",
-                kind,
-                parameter_list.parameters.len(),
-                threshold
-            )))
-            .with_annotation(Annotation::secondary(node.span()).with_message(format!("{} is defined here", kind)))
-            .with_note("Having a large number of parameters can make functions harder to understand and maintain.")
-            .with_help("Try reducing the number of parameters, or consider passing an object or a shape instead.");
-
-        context.report(issue);
+        LintDirective::Abort
     }
 }

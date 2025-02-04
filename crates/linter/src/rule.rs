@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use mago_ast::Program;
+use mago_ast::Node;
 use mago_reporting::Level;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::settings::RuleSettings;
 
 /// A `ConfiguredRule` is created after the user’s configuration is applied. If the user
@@ -48,7 +48,7 @@ pub struct ConfiguredRule {
 /// for specific patterns or issues and reporting diagnostics if any are found.
 ///
 /// Implementors of this trait should provide the rule's definition and the logic for checking programs and nodes.
-pub trait Rule: for<'a> Walker<LintContext<'a>> + Send + Sync + Debug {
+pub trait Rule: Send + Sync + Debug {
     /// Retrieves the definition of this rule.
     ///
     /// # Returns
@@ -56,19 +56,41 @@ pub trait Rule: for<'a> Walker<LintContext<'a>> + Send + Sync + Debug {
     /// A [`RuleDefinition`] object representing the rule.
     fn get_definition(&self) -> RuleDefinition;
 
-    /// Lint the entire program for this rule.
+    /// Inspects a single AST node and determines how the linting process should proceed.
     ///
-    /// This method is called to apply the rule to the whole [`Program`] AST.
+    /// This method is called for each node encountered during the linting process. The implementation
+    /// should analyze the provided node, report any issues via the supplied context, and then return a
+    /// [`LintDirective`] that instructs the linter on how to continue:
     ///
-    /// Note: the default implementation skips linting for non-user-defined programs, if a rule needs to lint
-    /// non-user-defined programs, it should override this method.
+    /// - **`LintDirective::Continue`**:
+    ///   Process the current node as usual and then inspect its children. This is the default behavior.
+    ///
+    /// - **`LintDirective::Prune`**:
+    ///   Process the current node but do not inspect its children. Use this when the rule has fully
+    ///   handled the node and further analysis of its descendants is unnecessary.
+    ///
+    /// - **`LintDirective::Abort`**:
+    ///   Immediately stop the entire linting process. Use this when a critical condition is met and
+    ///   no further linting is required.
     ///
     /// # Arguments
     ///
-    /// * `program` - The abstract syntax tree (AST) of the program to be linted.
-    /// * `configuration` - The configuration for this specific rule.
-    /// * `context` - The context for the linting process, which may contain shared state.
-    fn lint(&self, program: &Program, context: &mut LintContext<'_>) {
-        self.walk_program(program, context);
+    /// * `node` - The AST node to be inspected.
+    /// * `context` - The linting context.
+    ///
+    /// # Returns
+    ///
+    /// A [`LintDirective`] that determines how the linter should proceed after processing this node.
+    #[allow(unused_variables)]
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective;
+}
+
+impl Rule for Box<dyn Rule> {
+    fn get_definition(&self) -> RuleDefinition {
+        self.as_ref().get_definition()
+    }
+
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        self.as_ref().lint_node(node, context)
     }
 }

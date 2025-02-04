@@ -1647,6 +1647,7 @@ dependencies = [
  "mago-source",
  "mago-span",
  "mago-token",
+ "memchr",
  "pretty_assertions",
  "serde",
  "strum",

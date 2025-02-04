@@ -118,7 +118,7 @@ fn base_needs_parerns(base: &Expression) -> bool {
         Expression::Binary(_)
         | Expression::UnaryPrefix(_)
         | Expression::UnaryPostfix(_)
-        | Expression::AssignmentOperation(_)
+        | Expression::Assignment(_)
         | Expression::Conditional(_)
         | Expression::AnonymousClass(_)
         | Expression::Closure(_)

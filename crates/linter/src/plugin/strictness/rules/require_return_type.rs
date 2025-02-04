@@ -1,16 +1,16 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 pub const IGNORE_RETURN_TYPE_FOR_CLOSURE: &str = "ignore_closure";
@@ -101,92 +101,95 @@ impl Rule for RequireReturnTypeRule {
                 .with_option(IGNORE_RETURN_TYPE_FOR_ARROW_FUNCTION, Value::Boolean(true)),
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RequireReturnTypeRule {
-    fn walk_in_function<'ast>(&self, function: &'ast Function, context: &mut LintContext<'a>) {
-        if function.return_type_hint.is_some() {
-            return;
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        match node {
+            Node::Function(function) => {
+                if function.return_type_hint.is_some() {
+                    return LintDirective::default();
+                }
+
+                let function_name = context.lookup(&function.name.value);
+                let function_fqn = context.lookup_name(&function.name);
+
+                context.report(
+                    Issue::new(context.level(), format!("Function `{}` is missing a return type hint.", function_name))
+                        .with_annotation(
+                            Annotation::primary(function.span())
+                                .with_message(format!("Function `{}` defined here.", function_fqn)),
+                        )
+                        .with_note("Type hints improve code readability and help prevent type-related errors.")
+                        .with_help(format!("Consider adding a return type hint to function `{}`.", function_name)),
+                );
+            }
+            Node::Closure(closure) => {
+                if closure.return_type_hint.is_some() {
+                    return LintDirective::default();
+                }
+
+                let ignore_return_type_for_closure = context
+                    .option(IGNORE_RETURN_TYPE_FOR_CLOSURE)
+                    .and_then(|o| o.as_bool())
+                    .unwrap_or(IGNORE_RETURN_TYPE_FOR_CLOSURE_DEFAULT);
+
+                if ignore_return_type_for_closure {
+                    return LintDirective::default();
+                }
+
+                context.report(
+                    Issue::new(context.level(), "Closure is missing a return type hint")
+                        .with_annotation(Annotation::primary(closure.span()).with_message("Closure defined here."))
+                        .with_note("Type hints improve code readability and help prevent type-related errors.")
+                        .with_help("Consider adding a return type hint to the closure."),
+                );
+            }
+            Node::ArrowFunction(arrow_function) => {
+                if arrow_function.return_type_hint.is_some() {
+                    return LintDirective::default();
+                }
+
+                let ignore_return_type_for_arrow_function = context
+                    .option(IGNORE_RETURN_TYPE_FOR_ARROW_FUNCTION)
+                    .and_then(|o| o.as_bool())
+                    .unwrap_or(IGNORE_RETURN_TYPE_FOR_ARROW_FUNCTION_DEFAULT);
+
+                if ignore_return_type_for_arrow_function {
+                    return LintDirective::default();
+                }
+
+                context.report(
+                    Issue::new(context.level(), "Arrow function is missing a return type hint.")
+                        .with_annotation(
+                            Annotation::primary(arrow_function.span()).with_message("Arrow function defined here."),
+                        )
+                        .with_note("Type hints improve code readability and help prevent type-related errors.")
+                        .with_help("Consider adding a return type hint to the arrow function."),
+                );
+            }
+            Node::Method(method) => {
+                if method.return_type_hint.is_some() {
+                    return LintDirective::default();
+                }
+
+                let method_name = context.lookup(&method.name.value);
+                if "__construct" == method_name || "__destruct" == method_name {
+                    // constructors and destructors cannot have return types.
+                    return LintDirective::default();
+                }
+
+                context.report(
+                    Issue::new(context.level(), format!("Method `{}` is missing a return type hint.", method_name))
+                        .with_annotation(
+                            Annotation::primary(method.span())
+                                .with_message(format!("Method `{}` defined here", method_name)),
+                        )
+                        .with_note("Type hints improve code readability and help prevent type-related errors.")
+                        .with_help(format!("Consider adding a return type hint to method `{}`.", method_name)),
+                );
+            }
+            _ => (),
         }
 
-        let function_name = context.lookup(&function.name.value);
-        let function_fqn = context.lookup_name(&function.name);
-
-        context.report(
-            Issue::new(context.level(), format!("Function `{}` is missing a return type hint.", function_name))
-                .with_annotation(
-                    Annotation::primary(function.span())
-                        .with_message(format!("Function `{}` defined here.", function_fqn)),
-                )
-                .with_note("Type hints improve code readability and help prevent type-related errors.")
-                .with_help(format!("Consider adding a return type hint to function `{}`.", function_name)),
-        );
-    }
-
-    fn walk_in_closure<'ast>(&self, closure: &'ast Closure, context: &mut LintContext<'a>) {
-        if closure.return_type_hint.is_some() {
-            return;
-        }
-
-        let ignore_return_type_for_closure = context
-            .option(IGNORE_RETURN_TYPE_FOR_CLOSURE)
-            .and_then(|o| o.as_bool())
-            .unwrap_or(IGNORE_RETURN_TYPE_FOR_CLOSURE_DEFAULT);
-
-        if ignore_return_type_for_closure {
-            return;
-        }
-
-        context.report(
-            Issue::new(context.level(), "Closure is missing a return type hint")
-                .with_annotation(Annotation::primary(closure.span()).with_message("Closure defined here."))
-                .with_note("Type hints improve code readability and help prevent type-related errors.")
-                .with_help("Consider adding a return type hint to the closure."),
-        );
-    }
-
-    fn walk_in_arrow_function<'ast>(&self, arrow_function: &'ast ArrowFunction, context: &mut LintContext<'a>) {
-        if arrow_function.return_type_hint.is_some() {
-            return;
-        }
-
-        let ignore_return_type_for_arrow_function = context
-            .option(IGNORE_RETURN_TYPE_FOR_ARROW_FUNCTION)
-            .and_then(|o| o.as_bool())
-            .unwrap_or(IGNORE_RETURN_TYPE_FOR_ARROW_FUNCTION_DEFAULT);
-
-        if ignore_return_type_for_arrow_function {
-            return;
-        }
-
-        context.report(
-            Issue::new(context.level(), "Arrow function is missing a return type hint.")
-                .with_annotation(
-                    Annotation::primary(arrow_function.span()).with_message("Arrow function defined here."),
-                )
-                .with_note("Type hints improve code readability and help prevent type-related errors.")
-                .with_help("Consider adding a return type hint to the arrow function."),
-        );
-    }
-
-    fn walk_in_method<'ast>(&self, method: &'ast Method, context: &mut LintContext<'a>) {
-        if method.return_type_hint.is_some() {
-            return;
-        }
-
-        let method_name = context.lookup(&method.name.value);
-        if "__construct" == method_name || "__destruct" == method_name {
-            // constructors and destructors cannot have return types.
-            return;
-        }
-
-        context.report(
-            Issue::new(context.level(), format!("Method `{}` is missing a return type hint.", method_name))
-                .with_annotation(
-                    Annotation::primary(method.span()).with_message(format!("Method `{}` defined here", method_name)),
-                )
-                .with_note("Type hints improve code readability and help prevent type-related errors.")
-                .with_help(format!("Consider adding a return type hint to method `{}`.", method_name)),
-        );
+        LintDirective::default()
     }
 }

@@ -265,7 +265,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
                 }
             }
         }
-        Expression::AssignmentOperation(assignment) => {
+        Expression::Assignment(assignment) => {
             controls.extend(find_control_flows_in_expression(&assignment.lhs));
             controls.extend(find_control_flows_in_expression(&assignment.rhs));
         }

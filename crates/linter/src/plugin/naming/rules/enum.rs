@@ -1,13 +1,13 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
@@ -39,10 +39,10 @@ impl Rule for EnumRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for EnumRule {
-    fn walk_in_enum<'ast>(&self, r#enum: &'ast Enum, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Enum(r#enum) = node else { return LintDirective::default() };
+
         let name = context.lookup(&r#enum.name.value);
         let fqcn = context.lookup_name(&r#enum.name);
 
@@ -62,6 +62,14 @@ impl<'a> Walker<LintContext<'a>> for EnumRule {
                         mago_casing::to_class_case(name)
                     )),
             );
+        }
+
+        if r#enum.members.contains_methods() {
+            // Continue checking nested enums, if any.
+            LintDirective::Continue
+        } else {
+            // If this enum has no methods, there can't be any nested enums.
+            LintDirective::Prune
         }
     }
 }

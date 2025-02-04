@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -67,13 +67,9 @@ impl Rule for InterfaceShouldBeUsed {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for InterfaceShouldBeUsed {
-    fn walk_in_hint<'ast>(&self, hint: &'ast Hint, context: &mut LintContext<'a>) {
-        let Hint::Identifier(identifier) = hint else {
-            return;
-        };
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Hint(Hint::Identifier(identifier)) = node else { return LintDirective::default() };
 
         let fqcn = context.lookup_name(identifier);
         for (implementation, interface) in IMPLEMENTATION_TO_INTERFACE.iter() {
@@ -98,9 +94,11 @@ impl<'a> Walker<LintContext<'a>> for InterfaceShouldBeUsed {
                     )
                 });
 
-                return;
+                return LintDirective::Prune;
             }
         }
+
+        LintDirective::Prune
     }
 }
 

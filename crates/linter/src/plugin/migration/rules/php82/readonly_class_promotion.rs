@@ -6,12 +6,12 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const FINAL_ONLY: &str = "final-only";
@@ -82,22 +82,22 @@ impl Rule for ReadonlyClassPromotionRule {
                 .with_option(FINAL_ONLY, Value::Boolean(true)),
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
-    fn walk_in_class(&self, class: &Class, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Class(class) = node else { return LintDirective::default() };
+
         let name = context.semantics.names.get(&class.name);
         let Some(reflection) = context.codebase.get_class(context.interner, name) else {
-            return;
+            return LintDirective::default();
         };
 
         // If the class is readonly, extends another class or has children, we can't promote it.
         if reflection.is_readonly || reflection.inheritance.extends_classes() || reflection.inheritance.has_children() {
-            return;
+            return LintDirective::default();
         }
 
         if !reflection.is_final && context.option(FINAL_ONLY).and_then(|c| c.as_bool()).unwrap_or(FINAL_ONLY_DEFAULT) {
-            return;
+            return LintDirective::default();
         }
 
         let mut all_properties_readonly = true;
@@ -127,7 +127,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
         }
 
         if !all_properties_readonly || property_count == 0 {
-            return;
+            return LintDirective::default();
         }
 
         let annotations = class
@@ -178,5 +178,7 @@ impl<'a> Walker<LintContext<'a>> for ReadonlyClassPromotionRule {
             // Add readonly keyword to the class
             plan.insert(class.class.span.start_position().offset, "readonly ", SafetyClassification::Safe);
         });
+
+        LintDirective::default()
     }
 }

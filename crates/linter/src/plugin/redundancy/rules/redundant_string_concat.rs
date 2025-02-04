@@ -5,11 +5,11 @@ use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -30,20 +30,20 @@ impl Rule for RedundantStringConcatRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
-    fn walk_in_binary<'ast>(&self, binary: &'ast Binary, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Binary(binary) = node else { return LintDirective::default() };
+
         let Binary { lhs, operator, rhs } = binary;
 
         if !operator.is_concatenation() {
-            return;
+            return LintDirective::default();
         }
 
         let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) =
             (lhs.as_ref(), rhs.as_ref())
         else {
-            return;
+            return LintDirective::default();
         };
 
         if left.kind == right.kind {
@@ -51,7 +51,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
                 != context.semantics.source.line_number(right.offset())
             {
                 // strings are on different lines
-                return;
+                return LintDirective::Prune;
             }
 
             let dangerous = matches!(&context.interner.lookup(&right.value).as_bytes()[1..], [b'{', ..]);
@@ -59,7 +59,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
                 // $a = "\u" . "{1F418}";
                 // $b = "\u{1F418}";
 
-                return;
+                return LintDirective::Prune;
             }
 
             let issue = Issue::new(context.level(), "String concatenation can be simplified.")
@@ -76,5 +76,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantStringConcatRule {
                 plan.delete(range, SafetyClassification::Safe)
             });
         }
+
+        LintDirective::default()
     }
 }

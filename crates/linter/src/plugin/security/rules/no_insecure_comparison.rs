@@ -5,11 +5,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::plugin::security::rules::utils::get_password;
 use crate::rule::Rule;
 
@@ -85,12 +85,12 @@ impl Rule for NoInsecureComparisonRule {
                 "#},
             ))
     }
-}
 
-impl Walker<LintContext<'_>> for NoInsecureComparisonRule {
-    fn walk_in_binary(&self, binary: &Binary, context: &mut LintContext<'_>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Binary(binary) = node else { return LintDirective::default() };
+
         if !binary.operator.is_equality() {
-            return;
+            return LintDirective::default();
         }
 
         let lhs = get_password(context, &binary.lhs);
@@ -99,15 +99,17 @@ impl Walker<LintContext<'_>> for NoInsecureComparisonRule {
         let is_lhs_like_password = lhs.is_some();
         let is_rhs_like_password = rhs.is_some();
 
-        // Skip the check if:
-        //
-        // 1. neither side is a password-like value
-        // 2. one side is a password-like value and the other side is a simple literal (e.g. a number, a boolean, null)
-        if (!is_lhs_like_password && !is_rhs_like_password)
-            || (is_lhs_like_password && is_simple_literal(context, &binary.rhs))
+        // Skip the check if neither side is a password-like value
+        if !is_lhs_like_password && !is_rhs_like_password {
+            return LintDirective::default();
+        }
+
+        // Skip the check if  one side is a password-like value and the other side
+        //  is a simple literal (e.g. a number, a boolean, null)
+        if (is_lhs_like_password && is_simple_literal(context, &binary.rhs))
             || (is_rhs_like_password && is_simple_literal(context, &binary.lhs))
         {
-            return;
+            return LintDirective::Prune;
         }
 
         let mut issue = Issue::new(context.level(), "Insecure comparison of sensitive data.")
@@ -126,6 +128,8 @@ impl Walker<LintContext<'_>> for NoInsecureComparisonRule {
         }
 
         context.report(issue);
+
+        LintDirective::Prune
     }
 }
 

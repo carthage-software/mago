@@ -13,6 +13,7 @@ use crate::ast::class_like::trait_use::TraitUse;
 use crate::ast::expression::Expression;
 use crate::ast::identifier::LocalIdentifier;
 use crate::ast::variable::Variable;
+use crate::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum ClassLikeMember {
@@ -43,6 +44,28 @@ pub struct ClassLikeMemberExpressionSelector {
     pub left_brace: Span,
     pub expression: Box<Expression>,
     pub right_brace: Span,
+}
+
+impl Sequence<ClassLikeMember> {
+    pub fn contains_trait_uses(&self) -> bool {
+        self.iter().any(|member| matches!(member, ClassLikeMember::TraitUse(_)))
+    }
+
+    pub fn contains_constants(&self) -> bool {
+        self.iter().any(|member| matches!(member, ClassLikeMember::Constant(_)))
+    }
+
+    pub fn contains_properties(&self) -> bool {
+        self.iter().any(|member| matches!(member, ClassLikeMember::Property(_)))
+    }
+
+    pub fn contains_enum_cases(&self) -> bool {
+        self.iter().any(|member| matches!(member, ClassLikeMember::EnumCase(_)))
+    }
+
+    pub fn contains_methods(&self) -> bool {
+        self.iter().any(|member| matches!(member, ClassLikeMember::Method(_)))
+    }
 }
 
 impl HasSpan for ClassLikeMember {

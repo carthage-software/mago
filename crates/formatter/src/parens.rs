@@ -33,7 +33,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
-        if !matches!(node, Node::AssignmentOperation(_) | Node::Conditional(_)) {
+        if !matches!(node, Node::Assignment(_) | Node::Conditional(_)) {
             return false;
         }
 

@@ -4,10 +4,10 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -20,10 +20,10 @@ impl Rule for NoShellStyleRule {
             in PHP, as they are more consistent with the language's syntax and are easier to read.
         "})
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoShellStyleRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::Abort };
+
         for trivia in program.trivia.iter() {
             if let TriviaKind::HashComment = trivia.kind {
                 let comment_span = trivia.span();
@@ -38,5 +38,7 @@ impl<'a> Walker<LintContext<'a>> for NoShellStyleRule {
                 });
             }
         }
+
+        LintDirective::Abort
     }
 }

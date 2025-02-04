@@ -3,11 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -50,15 +50,15 @@ impl Rule for UndefinedConstantRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for UndefinedConstantRule {
-    fn walk_in_constant_access(&self, constant_access: &ConstantAccess, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::ConstantAccess(constant_access) = node else { return LintDirective::default() };
+
         let identifier = &constant_access.name;
         let constant_name = context.resolve_constant_name(identifier);
         let constant_name_id = context.interner.intern(constant_name);
         if context.codebase.constant_exists(context.interner, &constant_name_id) {
-            return;
+            return LintDirective::default();
         }
 
         let issue = Issue::error(format!("Use of undefined constant `{}`.", constant_name))
@@ -69,5 +69,7 @@ impl<'a> Walker<LintContext<'a>> for UndefinedConstantRule {
             .with_help(format!("Ensure the constant `{}` is defined or imported before using it.", constant_name));
 
         context.report(issue);
+
+        LintDirective::Prune
     }
 }

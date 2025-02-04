@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use lasso::Key;
@@ -13,6 +14,7 @@ pub struct StringIdentifier(pub(crate) usize);
 
 impl StringIdentifier {
     /// Creates a new empty `StringIdentifier`.
+    #[inline(always)]
     pub const fn empty() -> Self {
         Self(0)
     }
@@ -22,8 +24,9 @@ impl StringIdentifier {
     /// # Arguments
     ///
     /// * `val` - The value of the string identifier.
-    pub const fn new(val: usize) -> Self {
-        Self(val)
+    #[inline(always)]
+    pub const fn new(val: NonZeroUsize) -> Self {
+        Self(val.get())
     }
 
     /// Returns `true` if the string is empty.
@@ -40,12 +43,14 @@ impl StringIdentifier {
 }
 
 unsafe impl Key for StringIdentifier {
+    #[inline(always)]
     fn into_usize(self) -> usize {
         self.0 - 1
     }
 
+    #[inline(always)]
     fn try_from_usize(int: usize) -> Option<Self> {
-        Some(Self(int + 1))
+        Some(Self::new(NonZeroUsize::new(int + 1)?))
     }
 }
 
@@ -62,11 +67,13 @@ impl Interner {
     }
 
     /// Returns the number of strings stored in the interner.
+    #[inline]
     pub fn len(&self) -> usize {
         self.rodeo.len()
     }
 
     /// Returns `true` if the interner is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.rodeo.is_empty()
     }
@@ -76,6 +83,7 @@ impl Interner {
     /// # Arguments
     ///
     /// * string - The interned string.
+    #[inline]
     pub fn get(&self, string: impl AsRef<str>) -> Option<StringIdentifier> {
         let str = string.as_ref();
         if str.is_empty() {
@@ -92,6 +100,7 @@ impl Interner {
     /// # Arguments
     ///
     /// * string - The string to intern.
+    #[inline]
     pub fn intern(&mut self, string: impl AsRef<str>) -> StringIdentifier {
         let str = string.as_ref();
         if str.is_empty() {
@@ -118,6 +127,7 @@ impl Interner {
     /// This method will panic if it encounters an invalid identifier. This should never
     /// occur unless there is an issue with the identifier or the interner is used
     /// incorrectly.
+    #[inline]
     pub fn interned_str(&mut self, string: impl AsRef<str>) -> &str {
         let str = string.as_ref();
         if str.is_empty() {
@@ -142,6 +152,7 @@ impl Interner {
     /// # Returns
     ///
     /// The identifier of the string with all characters in lowercase.
+    #[inline]
     pub fn lowered(&mut self, identifier: &StringIdentifier) -> StringIdentifier {
         let string = self.lookup(identifier);
 
@@ -157,6 +168,7 @@ impl Interner {
     /// # Panics
     ///
     /// Panics if the identifier is invalid
+    #[inline]
     pub fn lookup(&self, identifier: &StringIdentifier) -> &str {
         if identifier.is_empty() {
             return "";
@@ -177,16 +189,19 @@ pub struct ThreadedInterner {
 
 impl ThreadedInterner {
     /// Creates a new `ThreadedInterner`.
+    #[inline]
     pub fn new() -> Self {
         Self { rodeo: Arc::new(ThreadedRodeo::new()) }
     }
 
     /// Returns the number of strings stored in the interner.
+    #[inline]
     pub fn len(&self) -> usize {
         self.rodeo.len()
     }
 
     /// Returns `true` if the interner is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.rodeo.is_empty()
     }
@@ -198,6 +213,7 @@ impl ThreadedInterner {
     /// # Arguments
     ///
     /// * `string` - The string to intern.
+    #[inline]
     pub fn intern(&self, string: impl AsRef<str>) -> StringIdentifier {
         let str = string.as_ref();
         if str.is_empty() {
@@ -224,6 +240,7 @@ impl ThreadedInterner {
     /// This method will panic if it encounters an invalid identifier. This should never
     /// occur unless there is an issue with the identifier or the interner is used
     /// incorrectly.
+    #[inline]
     pub fn interned_str(&self, string: impl AsRef<str>) -> &str {
         let str = string.as_ref();
         if str.is_empty() {
@@ -248,6 +265,7 @@ impl ThreadedInterner {
     /// # Returns
     ///
     /// The identifier of the string with all characters in lowercase.
+    #[inline]
     pub fn lowered(&self, identifier: &StringIdentifier) -> StringIdentifier {
         let string = self.lookup(identifier);
 
@@ -265,6 +283,7 @@ impl ThreadedInterner {
     /// This method will panic if it encounters an invalid identifier. This should never
     /// occur unless there is an issue with the identifier or the interner is used
     /// incorrectly.
+    #[inline]
     pub fn lookup(&self, identifier: &StringIdentifier) -> &str {
         if identifier.is_empty() {
             return "";
@@ -277,6 +296,7 @@ impl ThreadedInterner {
     }
 
     /// Returns all interned strings and their identifiers as a hashmap.
+    #[inline]
     pub fn all(&self) -> HashSet<(StringIdentifier, &str)> {
         self.rodeo.iter().collect()
     }
@@ -292,12 +312,14 @@ unsafe impl Send for ThreadedInterner {}
 unsafe impl Sync for ThreadedInterner {}
 
 impl std::default::Default for Interner {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl std::default::Default for ThreadedInterner {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

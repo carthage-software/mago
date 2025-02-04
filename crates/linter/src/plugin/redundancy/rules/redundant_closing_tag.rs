@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -31,15 +31,17 @@ impl Rule for RedudnantClosingTagRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedudnantClosingTagRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
-        walk_sequence(&program.statements, context);
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::Abort };
+
+        check_statements(&program.statements, context);
+
+        LintDirective::Abort
     }
 }
 
-fn walk_sequence(sequence: &Sequence<Statement>, context: &mut LintContext<'_>) {
+fn check_statements(sequence: &Sequence<Statement>, context: &mut LintContext<'_>) {
     let Some(last_statement) = sequence.last() else {
         return;
     };
@@ -84,7 +86,7 @@ fn walk_sequence(sequence: &Sequence<Statement>, context: &mut LintContext<'_>) 
     if let Statement::Namespace(namespace) = last_statement {
         match &namespace.body {
             NamespaceBody::Implicit(namespace_implicit_body) => {
-                walk_sequence(&namespace_implicit_body.statements, context);
+                check_statements(&namespace_implicit_body.statements, context);
             }
             NamespaceBody::BraceDelimited(_) => {}
         }

@@ -29,7 +29,7 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
             statements_len == 1
         }
         Statement::Expression(expression_statement) if method.parameter_list.parameters.len() == 1 => {
-            let Expression::AssignmentOperation(assignment) = expression_statement.expression.as_ref() else {
+            let Expression::Assignment(assignment) = expression_statement.expression.as_ref() else {
                 return false;
             };
 

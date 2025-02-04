@@ -20,6 +20,7 @@ mago-reporting = { workspace = true }
 mago-interner = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

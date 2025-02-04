@@ -1,14 +1,14 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
@@ -39,7 +39,7 @@ impl Rule for LowercaseKeywordRule {
                 indoc! {r#"
                     <?PHP
 
-                    IF (true) {
+                    IF (TRUE) {
                         ECHO "Keywords not in lowercase";
                     } ELSE {
                         RETURN;
@@ -47,10 +47,9 @@ impl Rule for LowercaseKeywordRule {
                "#},
             ))
     }
-}
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Keyword(keyword) = node else { return LintDirective::default() };
 
-impl<'a> Walker<LintContext<'a>> for LowercaseKeywordRule {
-    fn walk_in_keyword<'ast>(&self, keyword: &'ast Keyword, context: &mut LintContext<'a>) {
         let name = context.lookup(&keyword.value);
         let lowered = name.to_ascii_lowercase();
         if !lowered.eq(&name) {
@@ -61,5 +60,7 @@ impl<'a> Walker<LintContext<'a>> for LowercaseKeywordRule {
 
             context.report_with_fix(issue, |p| p.replace(keyword.span.to_range(), lowered, SafetyClassification::Safe));
         }
+
+        LintDirective::Prune
     }
 }

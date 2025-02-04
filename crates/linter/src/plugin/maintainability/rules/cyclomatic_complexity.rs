@@ -1,15 +1,14 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
-use mago_ast::Node;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::plugin::maintainability::rules::utils::is_method_setter_or_getter;
 use crate::rule::Rule;
 
@@ -36,35 +35,22 @@ impl Rule for CyclomaticComplexityRule {
                 default: Value::Integer(THRESHOLD_DEFAULT as i64),
             })
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for CyclomaticComplexityRule {
-    fn walk_in_class(&self, class: &Class, context: &mut LintContext<'a>) {
-        check_class_like("Class", class, class.members.as_slice(), context);
-    }
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        match node {
+            Node::Class(node) => check_class_like("Class", node, node.members.as_slice(), context),
+            Node::Trait(node) => check_class_like("Trait", node, node.members.as_slice(), context),
+            Node::AnonymousClass(node) => check_class_like("Class", node, node.members.as_slice(), context),
+            Node::Enum(node) => check_class_like("Enum", node, node.members.as_slice(), context),
+            Node::Interface(node) => check_class_like("Interface", node, node.members.as_slice(), context),
+            Node::Function(node) => check_function_like("Function", node, &node.body, context),
+            Node::Closure(node) => check_function_like("Closure", node, &node.body, context),
+            _ => {
+                return LintDirective::Continue;
+            }
+        }
 
-    fn walk_in_trait(&self, r#trait: &Trait, context: &mut LintContext<'a>) {
-        check_class_like("Trait", r#trait, r#trait.members.as_slice(), context);
-    }
-
-    fn walk_in_anonymous_class(&self, anonymous_class: &AnonymousClass, context: &mut LintContext<'a>) {
-        check_class_like("Class", anonymous_class, anonymous_class.members.as_slice(), context);
-    }
-
-    fn walk_in_enum(&self, r#enum: &Enum, context: &mut LintContext<'a>) {
-        check_class_like("Enum", r#enum, r#enum.members.as_slice(), context);
-    }
-
-    fn walk_in_interface(&self, interface: &Interface, context: &mut LintContext<'a>) {
-        check_class_like("Interface", interface, interface.members.as_slice(), context);
-    }
-
-    fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        check_function_like("Function", function, &function.body, context);
-    }
-
-    fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        check_function_like("Closure", closure, &closure.body, context);
+        LintDirective::Prune
     }
 }
 
@@ -107,6 +93,7 @@ fn check_function_like(kind: &'static str, function_like: impl HasSpan, body: &B
     }
 }
 
+#[inline]
 fn get_cyclomatic_complexity_of_class_like_members(
     class_like_members: &[ClassLikeMember],
     context: &LintContext<'_>,
@@ -127,6 +114,7 @@ fn get_cyclomatic_complexity_of_class_like_members(
     cyclomatic_complexity
 }
 
+#[inline]
 fn get_cyclomatic_complexity_of_method(method: &Method, context: &LintContext<'_>) -> Option<usize> {
     if is_method_setter_or_getter(method, context) {
         return None;
@@ -135,6 +123,7 @@ fn get_cyclomatic_complexity_of_method(method: &Method, context: &LintContext<'_
     Some(if method.is_abstract() { 1 } else { get_cyclomatic_complexity_of_node(Node::Method(method)) + 1 })
 }
 
+#[inline]
 fn get_cyclomatic_complexity_of_node(node: Node<'_>) -> usize {
     let mut number = 0;
 

@@ -4,10 +4,10 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -20,12 +20,12 @@ impl Rule for UseWhileInsteadOfForRule {
             initializations or increments. This can make the code more readable and concise.
         "})
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for UseWhileInsteadOfForRule {
-    fn walk_in_for<'ast>(&self, r#for: &'ast For, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::For(r#for) = node else { return LintDirective::default() };
+
         if !r#for.initializations.is_empty() || !r#for.increments.is_empty() {
-            return;
+            return LintDirective::default();
         }
 
         let issue = Issue::new(
@@ -54,5 +54,7 @@ impl<'a> Walker<LintContext<'a>> for UseWhileInsteadOfForRule {
                 plan.replace(for_colon_delimited_body.end_for.span.to_range(), "endwhile", SafetyClassification::Safe);
             }
         });
+
+        LintDirective::default()
     }
 }

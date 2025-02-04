@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 
 use ahash::RandomState;
@@ -185,18 +183,20 @@ impl<'a> NameContext<'a> {
 
                 return Some(self.interner.intern(resolved));
             }
-        } else {
-            let alias = match kind {
-                NameKind::Default => context.default_aliases.get(first_part_lower.as_str()),
-                NameKind::Function => context.function_aliases.get(first_part_lower.as_str()),
-                NameKind::Constant => context.constant_aliases.get(first_part_lower.as_str()),
-            };
 
-            if let Some(resolved) = alias {
-                return Some(self.interner.intern(resolved));
-            }
+            return None;
         }
 
-        None
+        match kind {
+            NameKind::Default => {
+                context.default_aliases.get(first_part_lower.as_str()).map(|resolved| self.interner.intern(resolved))
+            }
+            NameKind::Function => {
+                context.function_aliases.get(first_part_lower.as_str()).map(|resolved| self.interner.intern(resolved))
+            }
+            NameKind::Constant => {
+                context.constant_aliases.get(first_part_lower.as_str()).map(|resolved| self.interner.intern(resolved))
+            }
+        }
     }
 }

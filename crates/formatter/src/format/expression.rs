@@ -42,7 +42,7 @@ impl<'a> Format<'a> for Expression {
                 Expression::UnaryPostfix(op) => op.format(f),
                 Expression::Literal(literal) => literal.format(f),
                 Expression::CompositeString(c) => c.format(f),
-                Expression::AssignmentOperation(op) => op.format(f),
+                Expression::Assignment(op) => op.format(f),
                 Expression::Conditional(op) => op.format(f),
                 Expression::Array(array) => array.format(f),
                 Expression::LegacyArray(legacy_array) => legacy_array.format(f),
@@ -462,7 +462,7 @@ impl<'a> Format<'a> for NamedArgument {
 
 impl<'a> Format<'a> for Assignment {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        wrap!(f, self, AssignmentOperation, {
+        wrap!(f, self, Assignment, {
             let lhs = self.lhs.format(f);
 
             let operator = match self.operator {

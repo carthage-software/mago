@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -38,12 +38,11 @@ impl Rule for NoTagPairTerminatorRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoTagPairTerminatorRule {
-    fn walk_terminator<'ast>(&self, terminator: &'ast Terminator, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Terminator(terminator) = node else { return LintDirective::default() };
         let Terminator::TagPair(close, open) = terminator else {
-            return;
+            return LintDirective::default();
         };
 
         let issue = Issue::new(context.level(), "Semicolon terminator is preferred over tag-pair terminator")
@@ -56,5 +55,7 @@ impl<'a> Walker<LintContext<'a>> for NoTagPairTerminatorRule {
         context.report_with_fix(issue, |plan| {
             plan.replace(close.span().join(open.span()).to_range(), ";", SafetyClassification::Safe)
         });
+
+        LintDirective::default()
     }
 }

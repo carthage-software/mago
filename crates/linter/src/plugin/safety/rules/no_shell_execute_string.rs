@@ -3,11 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -28,14 +28,10 @@ impl Rule for NoShellExecuteStringRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoShellExecuteStringRule {
-    fn walk_in_shell_execute_string<'ast>(
-        &self,
-        shell_execute_string: &'ast ShellExecuteString,
-        context: &mut LintContext<'a>,
-    ) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::ShellExecuteString(shell_execute_string) = node else { return LintDirective::default() };
+
         let mut is_interpolated = false;
         for part in shell_execute_string.parts.iter() {
             if !matches!(part, StringPart::Literal(..)) {
@@ -47,11 +43,11 @@ impl<'a> Walker<LintContext<'a>> for NoShellExecuteStringRule {
 
         let issue = if is_interpolated {
             Issue::new(context.level(), "Unsafe use of interpolated shell execute string.")
-                    .with_annotation(Annotation::primary(shell_execute_string.span()).with_message("This shell execute string is interpolated."))
-                    .with_note("Interpolating shell execute strings (`...`) is a potential security vulnerability, as it allows executing arbitrary shell commands.")
-                    .with_help(
-                        "Consider using `shell_exec()` along with `escapeshellarg()` or `escapeshellcmd()` to escape arguments instead."
-                    )
+                        .with_annotation(Annotation::primary(shell_execute_string.span()).with_message("This shell execute string is interpolated."))
+                        .with_note("Interpolating shell execute strings (`...`) is a potential security vulnerability, as it allows executing arbitrary shell commands.")
+                        .with_help(
+                            "Consider using `shell_exec()` along with `escapeshellarg()` or `escapeshellcmd()` to escape arguments instead."
+                        )
         } else {
             Issue::new(context.level(), "Potentilly unsafe use of shell execute string.")
                 .with_annotation(
@@ -62,5 +58,7 @@ impl<'a> Walker<LintContext<'a>> for NoShellExecuteStringRule {
         };
 
         context.report(issue);
+
+        LintDirective::Abort
     }
 }

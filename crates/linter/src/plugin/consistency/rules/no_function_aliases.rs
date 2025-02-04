@@ -1,15 +1,82 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
+
+#[derive(Clone, Copy, Debug)]
+pub struct NoFunctionAliasesRule;
+
+impl Rule for NoFunctionAliasesRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Function Aliases", Level::Note)
+            .with_description(indoc! {"
+                Detects usage of function aliases (e.g., `diskfreespace` instead of `disk_free_space`)
+                and suggests calling the canonical (original) function name instead.
+                This is primarily for consistency and clarity.
+            "})
+            .with_example(RuleUsageExample::valid(
+                "Using canonical function names",
+                indoc! {r#"
+                    <?php
+
+                    // 'disk_free_space' is the proper name instead of 'diskfreespace'
+                    $freeSpace = disk_free_space("/");
+                "#},
+            ))
+            .with_example(RuleUsageExample::invalid(
+                "Using an aliased function",
+                indoc! {r#"
+                    <?php
+
+                    // 'diskfreespace' is an alias for 'disk_free_space'
+                    $freeSpace = diskfreespace("/");
+                "#},
+            ))
+    }
+
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionCall(function_call) = node else { return LintDirective::default() };
+
+        let Expression::Identifier(identifier) = function_call.function.as_ref() else {
+            return LintDirective::default();
+        };
+
+        let function_name = context.resolve_function_name(identifier);
+
+        let original_name = ALIAS_TO_FUNCTION.iter().find_map(|&(alias, original)| {
+            if alias.eq_ignore_ascii_case(function_name) {
+                Some(original)
+            } else {
+                None
+            }
+        });
+
+        if let Some(original_name) = original_name {
+            // Build the diagnostic message
+            let issue = Issue::new(context.level(), format!("Function alias `{}` should not be used.", function_name))
+                .with_annotation(
+                    Annotation::primary(identifier.span())
+                        .with_message(format!("This function is an alias of `{}`.", original_name)),
+                )
+                .with_note(format!("The function `{}` is an alias of `{}`.", function_name, original_name))
+                .with_help(format!("Consider using the function `{}` instead.", original_name));
+
+            context.report_with_fix(issue, |p| {
+                p.replace(identifier.span().into(), format!("\\{}", original_name), SafetyClassification::Safe)
+            });
+        }
+
+        LintDirective::default()
+    }
+}
 
 const ALIAS_TO_FUNCTION: [(&str, &str); 68] = [
     // @internal aliases
@@ -95,68 +162,3 @@ const ALIAS_TO_FUNCTION: [(&str, &str); 68] = [
     // @pcntl aliases
     ("pcntl_errno", "pcntl_get_last_error"),
 ];
-
-#[derive(Clone, Copy, Debug)]
-pub struct NoFunctionAliasesRule;
-
-impl Rule for NoFunctionAliasesRule {
-    fn get_definition(&self) -> RuleDefinition {
-        RuleDefinition::enabled("No Function Aliases", Level::Note)
-            .with_description(indoc! {"
-                Detects usage of function aliases (e.g., `diskfreespace` instead of `disk_free_space`)
-                and suggests calling the canonical (original) function name instead.
-                This is primarily for consistency and clarity.
-            "})
-            .with_example(RuleUsageExample::valid(
-                "Using canonical function names",
-                indoc! {r#"
-                    <?php
-
-                    // 'disk_free_space' is the proper name instead of 'diskfreespace'
-                    $freeSpace = disk_free_space("/");
-                "#},
-            ))
-            .with_example(RuleUsageExample::invalid(
-                "Using an aliased function",
-                indoc! {r#"
-                    <?php
-
-                    // 'diskfreespace' is an alias for 'disk_free_space'
-                    $freeSpace = diskfreespace("/");
-                "#},
-            ))
-    }
-}
-
-impl<'a> Walker<LintContext<'a>> for NoFunctionAliasesRule {
-    fn walk_in_function_call<'ast>(&self, function_call: &'ast FunctionCall, context: &mut LintContext<'a>) {
-        let Expression::Identifier(identifier) = function_call.function.as_ref() else {
-            return;
-        };
-
-        let function_name = context.resolve_function_name(identifier);
-
-        let original_name = ALIAS_TO_FUNCTION.iter().find_map(|&(alias, original)| {
-            if alias.eq_ignore_ascii_case(function_name) {
-                Some(original)
-            } else {
-                None
-            }
-        });
-
-        if let Some(original_name) = original_name {
-            // Build the diagnostic message
-            let issue = Issue::new(context.level(), format!("Function alias `{}` should not be used.", function_name))
-                .with_annotation(
-                    Annotation::primary(identifier.span())
-                        .with_message(format!("This function is an alias of `{}`.", original_name)),
-                )
-                .with_note(format!("The function `{}` is an alias of `{}`.", function_name, original_name))
-                .with_help(format!("Consider using the function `{}` instead.", original_name));
-
-            context.report_with_fix(issue, |p| {
-                p.replace(identifier.span().into(), format!("\\{}", original_name), SafetyClassification::Safe)
-            });
-        }
-    }
-}

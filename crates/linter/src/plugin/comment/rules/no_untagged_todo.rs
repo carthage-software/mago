@@ -3,12 +3,12 @@ use std::sync::LazyLock;
 use indoc::indoc;
 use regex::Regex;
 
-use mago_ast::Program;
+use mago_ast::*;
 use mago_reporting::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::plugin::comment::rules::utils::comment_content;
 use crate::rule::Rule;
 
@@ -25,38 +25,42 @@ impl Rule for NoUntaggedTodoRule {
             makes it easier to track progress and ensures that tasks are not forgotten.
         "})
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoUntaggedTodoRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::Abort };
+
         for trivia in program.trivia.iter() {
-            if let Some(content) = comment_content(trivia, context) {
-                let content = content.to_ascii_lowercase();
-                if !content.contains("todo") {
+            let Some(content) = comment_content(trivia, context) else {
+                continue;
+            };
+
+            let content = content.to_ascii_lowercase();
+            if !content.contains("todo") {
+                continue;
+            }
+
+            for line in content.lines() {
+                let trimmied = line.trim_start();
+                if !trimmied.starts_with("todo") {
                     continue;
                 }
 
-                for line in content.lines() {
-                    let trimmied = line.trim_start();
-                    if !trimmied.starts_with("todo") {
-                        continue;
-                    }
-
-                    if (*TAGGED_TODO_REGEX).is_match(trimmied) {
-                        continue;
-                    }
-
-                    context.report(
-                        Issue::new(context.level(), "TODO should be tagged with (@username) or (#issue).")
-                            .with_annotation(Annotation::primary(trivia.span))
-                            .with_help(
-                                "Add a user tag or issue reference to the TODO comment, e.g. TODO(@azjezz), TODO(azjezz), TODO(#123).",
-                            )
-                    );
-
-                    break;
+                if (*TAGGED_TODO_REGEX).is_match(trimmied) {
+                    continue;
                 }
+
+                context.report(
+                    Issue::new(context.level(), "TODO should be tagged with (@username) or (#issue).")
+                        .with_annotation(Annotation::primary(trivia.span))
+                        .with_help(
+                            "Add a user tag or issue reference to the TODO comment, e.g. TODO(@azjezz), TODO(azjezz), TODO(#123).",
+                        )
+                );
+
+                break;
             }
         }
+
+        LintDirective::Abort
     }
 }

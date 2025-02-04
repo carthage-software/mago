@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -75,20 +75,20 @@ impl Rule for CombineConsecutiveIssetsRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for CombineConsecutiveIssetsRule {
-    fn walk_in_binary(&self, binary: &Binary, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Binary(binary) = node else { return LintDirective::default() };
+
         let BinaryOperator::And(_) = binary.operator else {
-            return;
+            return LintDirective::default();
         };
 
         let Some((left_parenthesized, left_isset)) = get_isset_construct(binary.lhs.as_ref(), true) else {
-            return;
+            return LintDirective::default();
         };
 
         let Some((right_parenthesized, right_isset)) = get_isset_construct(binary.rhs.as_ref(), false) else {
-            return;
+            return LintDirective::default();
         };
 
         let issue = Issue::new(context.level(), "Consecutive isset calls can be combined.")
@@ -100,7 +100,9 @@ impl<'a> Walker<LintContext<'a>> for CombineConsecutiveIssetsRule {
         // don't bother fixing if either of the isset calls is already parenthesized
         // this can be messy to fix and is not worth the effort.
         if left_parenthesized || right_parenthesized {
-            return context.report(issue);
+            context.report(issue);
+
+            return LintDirective::default();
         }
 
         context.report_with_fix(issue, |plan| {
@@ -110,6 +112,8 @@ impl<'a> Walker<LintContext<'a>> for CombineConsecutiveIssetsRule {
             plan.replace(to_replace.to_range(), ",".to_string(), SafetyClassification::Safe);
             plan.delete(to_delete.to_range(), SafetyClassification::Safe);
         });
+
+        LintDirective::default()
     }
 }
 

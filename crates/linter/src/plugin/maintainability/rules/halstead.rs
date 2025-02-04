@@ -1,17 +1,15 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
-use mago_ast::node::NodeKind;
-use mago_ast::Node;
+use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 /// volume (V)
@@ -60,43 +58,30 @@ impl Rule for HalsteadRule {
                 default: Value::Float(EFFORT_THRESHOLD_DEFAULT),
             })
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for HalsteadRule {
-    fn walk_in_property_hook_concrete_body(
-        &self,
-        property_hook_concrete_body: &PropertyHookConcreteBody,
-        context: &mut LintContext<'a>,
-    ) {
-        check("Hook", Node::PropertyHookConcreteBody(property_hook_concrete_body), context);
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let kind = match node {
+            Node::PropertyHookConcreteBody(_) => "Hook",
+            Node::Method(_) => "Method",
+            Node::Function(_) => "Function",
+            Node::Closure(_) => "Closure",
+            Node::ArrowFunction(_) => "Arrow function",
+            _ => return LintDirective::Continue,
+        };
+
+        // Gather operators/operands, compute Halstead
+        let halstead = gather_and_compute_halstead(node);
+
+        // Compare results with thresholds
+        check_against_thresholds(kind, &halstead, &node, context);
+
+        LintDirective::Prune
     }
-
-    fn walk_in_method(&self, method: &Method, context: &mut LintContext<'a>) {
-        check("Method", Node::Method(method), context);
-    }
-
-    fn walk_in_function(&self, function: &Function, context: &mut LintContext<'a>) {
-        check("Function", Node::Function(function), context);
-    }
-
-    fn walk_in_closure(&self, closure: &Closure, context: &mut LintContext<'a>) {
-        check("Closure", Node::Closure(closure), context);
-    }
-
-    fn walk_in_arrow_function(&self, arrow_function: &ArrowFunction, context: &mut LintContext<'a>) {
-        check("Arrow function", Node::ArrowFunction(arrow_function), context);
-    }
-}
-
-fn check(kind: &'static str, node: Node<'_>, context: &mut LintContext<'_>) {
-    // Gather operators/operands, compute Halstead
-    let halstead = gather_and_compute_halstead(node);
-    // Compare results with thresholds
-    check_against_thresholds(kind, &halstead, &node, context);
 }
 
 /// Compares each metric to the user-configured thresholds. If any metric
 /// exceeds its threshold, we report an error.
+#[inline]
 fn check_against_thresholds(
     kind: &'static str,
     halstead: &HalsteadMetrics,
@@ -159,6 +144,7 @@ struct HalsteadMetrics {
     pub effort: f64,     // E
 }
 
+#[inline]
 fn gather_and_compute_halstead(node: Node<'_>) -> HalsteadMetrics {
     let (operators, operands) = gather_operators_and_operands(node);
 
@@ -171,6 +157,7 @@ struct Operator(NodeKind);
 #[derive(Debug, Hash, Eq, PartialEq)]
 struct Operand(StringIdentifier);
 
+#[inline]
 fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>) {
     let mut operators = Vec::new();
     let mut operands = Vec::new();
@@ -196,10 +183,11 @@ fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>
 
 /// Check if the node is considered an operator or operand in Halstead terms
 /// and record a textual representation.
+#[inline]
 fn categorize_node(node: Node<'_>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand>) {
     match node {
         Node::Binary(_)
-        | Node::AssignmentOperation(_)
+        | Node::Assignment(_)
         | Node::If(_)
         | Node::IfStatementBodyElseIfClause(_)
         | Node::IfColonDelimitedBodyElseIfClause(_)
@@ -234,6 +222,7 @@ fn categorize_node(node: Node<'_>, operators: &mut Vec<Operator>, operands: &mut
 ///
 /// **Important**: if `n2 == 0` or `N2 == 0`, we set all metrics to 0
 /// (mirroring the original phpmetrics approach).
+#[inline]
 fn compute_halstead_metrics(operators: &[Operator], operands: &[Operand]) -> HalsteadMetrics {
     use std::collections::HashSet;
 

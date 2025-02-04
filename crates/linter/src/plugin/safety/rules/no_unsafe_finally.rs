@@ -5,11 +5,11 @@ use mago_ast_utils::control_flow::find_control_flows_in_block;
 use mago_ast_utils::control_flow::ControlFlow;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -40,12 +40,12 @@ impl Rule for NoUnsafeFinallyRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoUnsafeFinallyRule {
-    fn walk_in_try(&self, r#try: &Try, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Try(r#try) = node else { return LintDirective::default() };
+
         let Some(finally) = r#try.finally_clause.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         for control_flow in find_control_flows_in_block(&finally.block) {
@@ -72,5 +72,7 @@ impl<'a> Walker<LintContext<'a>> for NoUnsafeFinallyRule {
 
             context.report(issue);
         }
+
+        LintDirective::default()
     }
 }

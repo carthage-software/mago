@@ -47,7 +47,7 @@ pub async fn from_paths(
 
     if include_stubs {
         for (stub, content) in PHP_STUBS {
-            manager.insert_content(stub.to_owned(), content.to_owned(), SourceCategory::BuiltIn);
+            manager.insert_content(stub, content, SourceCategory::BuiltIn);
         }
     }
 
@@ -102,7 +102,7 @@ pub async fn load(
 
     if include_stubs {
         for (stub, content) in PHP_STUBS {
-            manager.insert_content(stub.to_owned(), content.to_owned(), SourceCategory::BuiltIn);
+            manager.insert_content(stub, content, SourceCategory::BuiltIn);
         }
     }
 

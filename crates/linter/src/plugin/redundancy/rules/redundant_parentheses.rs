@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -29,10 +29,113 @@ impl Rule for RedundantParenthesesRule {
                 "#},
             ))
     }
-}
 
-impl RedundantParenthesesRule {
-    fn report(&self, parenthesized: &Parenthesized, context: &mut LintContext<'_>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let parenthesized = match node {
+            Node::Parenthesized(parenthesized) => {
+                if let Expression::Parenthesized(inner) = parenthesized.expression.as_ref() {
+                    inner
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::ExpressionStatement(expression_statement) => match expression_statement.expression.as_ref() {
+                Expression::Parenthesized(parenthesized) => parenthesized,
+                Expression::Assignment(assignment) => {
+                    if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
+                        if rhs.expression.is_binary() {
+                            return LintDirective::default(); // Allow parentheses around binary expressions on the right-hand side of an assignment.
+                        }
+
+                        rhs
+                    } else {
+                        return LintDirective::default();
+                    }
+                }
+                _ => return LintDirective::default(),
+            },
+            Node::PositionalArgument(positional_argument) => {
+                if positional_argument.ellipsis.is_some() {
+                    return LintDirective::default();
+                }
+
+                if let Expression::Parenthesized(value) = &positional_argument.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::NamedArgument(named_argument) => {
+                if named_argument.ellipsis.is_some() {
+                    return LintDirective::default();
+                }
+
+                if let Expression::Parenthesized(value) = &named_argument.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::If(r#if) => {
+                if let Expression::Parenthesized(condition) = r#if.condition.as_ref() {
+                    condition
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::IfStatementBodyElseIfClause(if_statement_body_else_if_clause) => {
+                if let Expression::Parenthesized(condition) = if_statement_body_else_if_clause.condition.as_ref() {
+                    condition
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::IfColonDelimitedBodyElseIfClause(if_colon_delimited_body_else_if_clause) => {
+                if let Expression::Parenthesized(condition) = if_colon_delimited_body_else_if_clause.condition.as_ref()
+                {
+                    condition
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::FunctionLikeParameterDefaultValue(function_like_parameter_default_value) => {
+                if let Expression::Parenthesized(value) = &function_like_parameter_default_value.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::EnumCaseBackedItem(enum_case_backed_item) => {
+                if let Expression::Parenthesized(value) = &enum_case_backed_item.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::PropertyConcreteItem(property_concrete_item) => {
+                if let Expression::Parenthesized(value) = &property_concrete_item.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::ConstantItem(constant_item) => {
+                if let Expression::Parenthesized(value) = &constant_item.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            Node::ClassLikeConstantItem(class_like_constant_item) => {
+                if let Expression::Parenthesized(value) = &class_like_constant_item.value {
+                    value
+                } else {
+                    return LintDirective::default();
+                }
+            }
+            _ => return LintDirective::default(),
+        };
+
         let issue = Issue::new(context.level(), "Redundant parentheses around expression.")
             .with_annotation(
                 Annotation::primary(parenthesized.expression.span())
@@ -44,123 +147,7 @@ impl RedundantParenthesesRule {
             plan.delete(parenthesized.left_parenthesis.to_range(), SafetyClassification::Safe);
             plan.delete(parenthesized.right_parenthesis.to_range(), SafetyClassification::Safe);
         });
-    }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantParenthesesRule {
-    fn walk_in_parenthesized<'ast>(&self, parenthesized: &'ast Parenthesized, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(inner) = parenthesized.expression.as_ref() {
-            self.report(inner, context);
-        }
-    }
-
-    fn walk_in_statement_expression(&self, statement_expression: &ExpressionStatement, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(parenthesized) = statement_expression.expression.as_ref() {
-            self.report(parenthesized, context);
-
-            return;
-        }
-
-        if let Expression::AssignmentOperation(assignment) = statement_expression.expression.as_ref() {
-            if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
-                if rhs.expression.is_binary() {
-                    return; // Allow parentheses around binary expressions on the right-hand side of an assignment.
-                }
-
-                self.report(rhs, context);
-            }
-        }
-    }
-
-    fn walk_in_positional_argument<'ast>(
-        &self,
-        positional_argument: &'ast PositionalArgument,
-        context: &mut LintContext<'a>,
-    ) {
-        if positional_argument.ellipsis.is_some() {
-            return;
-        }
-
-        if let Expression::Parenthesized(value) = &positional_argument.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_named_argument<'ast>(&self, named_argument: &'ast NamedArgument, context: &mut LintContext<'a>) {
-        if named_argument.ellipsis.is_some() {
-            return;
-        }
-
-        if let Expression::Parenthesized(value) = &named_argument.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_if<'ast>(&self, r#if: &'ast If, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(condition) = r#if.condition.as_ref() {
-            self.report(condition, context);
-        }
-    }
-
-    fn walk_in_if_statement_body_else_if_clause<'ast>(
-        &self,
-        if_statement_body_else_if_clause: &'ast IfStatementBodyElseIfClause,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(condition) = if_statement_body_else_if_clause.condition.as_ref() {
-            self.report(condition, context);
-        }
-    }
-
-    fn walk_in_if_colon_delimited_body_else_if_clause<'ast>(
-        &self,
-        if_colon_delimited_body_else_if_clause: &'ast IfColonDelimitedBodyElseIfClause,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(condition) = if_colon_delimited_body_else_if_clause.condition.as_ref() {
-            self.report(condition, context);
-        }
-    }
-
-    fn walk_in_function_like_parameter_default_value(
-        &self,
-        function_like_parameter_default_value: &FunctionLikeParameterDefaultValue,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(value) = &function_like_parameter_default_value.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_enum_case_backed_item(&self, enum_case_backed_item: &EnumCaseBackedItem, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(value) = &enum_case_backed_item.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_property_concrete_item(
-        &self,
-        property_concrete_item: &PropertyConcreteItem,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(value) = &property_concrete_item.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_constant_item(&self, constant_item: &ConstantItem, context: &mut LintContext<'a>) {
-        if let Expression::Parenthesized(value) = &constant_item.value {
-            self.report(value, context);
-        }
-    }
-
-    fn walk_in_class_like_constant_item(
-        &self,
-        class_like_constant_item: &ClassLikeConstantItem,
-        context: &mut LintContext<'a>,
-    ) {
-        if let Expression::Parenthesized(value) = &class_like_constant_item.value {
-            self.report(value, context);
-        }
+        LintDirective::default()
     }
 }

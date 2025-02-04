@@ -3,11 +3,11 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -124,68 +124,73 @@ impl Rule for LoopDoesNotIterateRule {
                 "#},
             ))
     }
-}
 
-impl LoopDoesNotIterateRule {
-    fn report(&self, r#loop: impl HasSpan, terminator: LoopTerminator<'_>, context: &mut LintContext<'_>) {
-        let loop_span = r#loop.span();
-        let terminator_span = match terminator {
-            LoopTerminator::Break(break_stmt) => break_stmt.span(),
-            LoopTerminator::Return(return_stmt) => return_stmt.span(),
-        };
-
-        let issue = Issue::new(context.level(), "Loop does not iterate.")
-            .with_annotations([
-                Annotation::primary(loop_span).with_message("This loop does not iterate."),
-                Annotation::secondary(terminator_span)
-                    .with_message("This statement unconditionally terminates the loop."),
-            ])
-            .with_help("Remove or refactor the loop to avoid redundant or misleading code.");
-
-        context.report(issue);
-    }
-}
-
-impl<'a> Walker<LintContext<'a>> for LoopDoesNotIterateRule {
-    fn walk_in_foreach(&self, foreach: &Foreach, context: &mut LintContext<'a>) {
-        if let Some(terminator) = match &foreach.body {
-            ForeachBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
-            ForeachBody::ColonDelimited(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
-        } {
-            self.report(foreach, terminator, context);
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        match node {
+            Node::Foreach(foreach) => {
+                if let Some(terminator) = match &foreach.body {
+                    ForeachBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
+                    ForeachBody::ColonDelimited(block) => {
+                        get_loop_terminator_from_statements(block.statements.as_slice())
+                    }
+                } {
+                    check_loop(foreach, terminator, context);
+                }
+            }
+            Node::For(for_loop) => {
+                if let Some(terminator) = match &for_loop.body {
+                    ForBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
+                    ForBody::ColonDelimited(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
+                } {
+                    check_loop(for_loop, terminator, context);
+                }
+            }
+            Node::While(while_loop) => {
+                if let Some(terminator) = match &while_loop.body {
+                    WhileBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
+                    WhileBody::ColonDelimited(block) => {
+                        get_loop_terminator_from_statements(block.statements.as_slice())
+                    }
+                } {
+                    check_loop(while_loop, terminator, context);
+                }
+            }
+            Node::DoWhile(do_while) => {
+                if let Some(terminator) = get_loop_terminator_from_statement(&do_while.statement) {
+                    check_loop(do_while, terminator, context);
+                }
+            }
+            _ => {}
         }
-    }
 
-    fn walk_in_for(&self, for_loop: &For, context: &mut LintContext<'a>) {
-        if let Some(terminator) = match &for_loop.body {
-            ForBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
-            ForBody::ColonDelimited(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
-        } {
-            self.report(for_loop, terminator, context);
-        }
-    }
-
-    fn walk_in_while(&self, while_loop: &While, context: &mut LintContext<'a>) {
-        if let Some(terminator) = match &while_loop.body {
-            WhileBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
-            WhileBody::ColonDelimited(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
-        } {
-            self.report(while_loop, terminator, context);
-        }
-    }
-
-    fn walk_in_do_while(&self, do_while: &DoWhile, context: &mut LintContext<'a>) {
-        if let Some(terminator) = get_loop_terminator_from_statement(&do_while.statement) {
-            self.report(do_while, terminator, context);
-        }
+        LintDirective::default()
     }
 }
 
+fn check_loop(r#loop: impl HasSpan, terminator: LoopTerminator<'_>, context: &mut LintContext<'_>) {
+    let loop_span = r#loop.span();
+    let terminator_span = match terminator {
+        LoopTerminator::Break(break_stmt) => break_stmt.span(),
+        LoopTerminator::Return(return_stmt) => return_stmt.span(),
+    };
+
+    let issue = Issue::new(context.level(), "Loop does not iterate.")
+        .with_annotations([
+            Annotation::primary(loop_span).with_message("This loop does not iterate."),
+            Annotation::secondary(terminator_span).with_message("This statement unconditionally terminates the loop."),
+        ])
+        .with_help("Remove or refactor the loop to avoid redundant or misleading code.");
+
+    context.report(issue);
+}
+
+#[derive(Debug)]
 enum LoopTerminator<'a> {
     Break(&'a Break),
     Return(&'a Return),
 }
 
+#[inline]
 fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopTerminator<'_>> {
     for statement in statements.iter() {
         if might_skip_terminator(statement) {
@@ -200,6 +205,7 @@ fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopT
     None
 }
 
+#[inline]
 fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTerminator<'_>> {
     match statement {
         Statement::Block(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
@@ -214,6 +220,7 @@ fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTermi
     }
 }
 
+#[inline]
 fn might_skip_terminator(statement: &Statement) -> bool {
     match statement {
         Statement::Continue(_) | Statement::Goto(_) => true,

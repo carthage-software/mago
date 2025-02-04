@@ -87,6 +87,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 tempfile = "3.15.0"
 colored = "3.0.0"
 blake3 = "1.5.5"
+memchr = "2.7.4"
 
 [lints]
 workspace = true

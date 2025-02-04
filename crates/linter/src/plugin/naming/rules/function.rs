@@ -1,15 +1,15 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const CAMEL: &str = "camel";
@@ -91,10 +91,10 @@ impl Rule for FunctionRule {
                 .with_option(CAMEL, Value::Boolean(true)),
             )
     }
-}
 
-impl Walker<LintContext<'_>> for FunctionRule {
-    fn walk_in_function(&self, function: &Function, context: &mut LintContext) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Function(function) = node else { return LintDirective::default() };
+
         let name = context.lookup(&function.name.value);
         let fqfn = context.lookup_name(&function.name);
         let camel_case = context.option(CAMEL).and_then(|v| v.as_bool()).unwrap_or(CAMEL_DEFAULT);
@@ -126,11 +126,7 @@ impl Walker<LintContext<'_>> for FunctionRule {
                     )),
                 );
             }
-
-            return;
-        }
-
-        if camel_case {
+        } else if camel_case {
             if !mago_casing::is_camel_case(name) {
                 context.report(
                     Issue::new(context.level(), format!("Function name `{}` should be in camel case.", name))
@@ -149,11 +145,7 @@ impl Walker<LintContext<'_>> for FunctionRule {
                         )),
                 );
             }
-
-            return;
-        }
-
-        if !mago_casing::is_snake_case(name) {
+        } else if !mago_casing::is_snake_case(name) {
             context.report(
                 Issue::new(context.level(), format!("Function name `{}` should be in snake case.", name))
                     .with_annotation(
@@ -171,5 +163,7 @@ impl Walker<LintContext<'_>> for FunctionRule {
                     )),
             );
         }
+
+        LintDirective::default()
     }
 }

@@ -68,7 +68,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
             Expression::CompositeString(composite_string) => {
                 get_composite_string_kind(composite_string, |e| self.resolve(e))
             }
-            Expression::AssignmentOperation(assignment_operation) => self.resolve(&assignment_operation.rhs),
+            Expression::Assignment(assignment_operation) => self.resolve(&assignment_operation.rhs),
             Expression::Conditional(conditional) => get_conditional_kind(conditional, |e| self.resolve(e)),
             Expression::Array(array) => get_array_kind(&array.elements, |e| self.resolve(e)),
             Expression::LegacyArray(legacy_array) => get_array_kind(&legacy_array.elements, |e| self.resolve(e)),

@@ -1,14 +1,14 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::Program;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::plugin::comment::rules::utils::comment_content;
 use crate::rule::Rule;
 
@@ -32,10 +32,10 @@ impl Rule for NoEmptyCommentsRule {
                 default: Value::Boolean(PRESERVE_SINGLE_LINE_DEFAULT),
             })
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for NoEmptyCommentsRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(program) = node else { return LintDirective::Abort };
+
         let preseve_single_line =
             context.option(PRESERVE_SINGLE_LINE).and_then(|c| c.as_bool()).unwrap_or(PRESERVE_SINGLE_LINE_DEFAULT);
 
@@ -59,5 +59,7 @@ impl<'a> Walker<LintContext<'a>> for NoEmptyCommentsRule {
                 });
             }
         }
+
+        LintDirective::Abort
     }
 }

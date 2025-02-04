@@ -4,11 +4,11 @@ use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -30,11 +30,9 @@ impl Rule for RedundantLabelRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantLabelRule {
-    fn walk_program<'ast>(&self, program: &'ast Program, context: &mut LintContext<'a>) {
-        let node = Node::Program(program);
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Program(_) = node else { return LintDirective::Abort };
 
         let labels =
             node.filter_map(
@@ -63,5 +61,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantLabelRule {
 
             context.report_with_fix(issue, |plan| plan.delete(label_span.to_range(), SafetyClassification::Safe));
         }
+
+        LintDirective::Abort
     }
 }

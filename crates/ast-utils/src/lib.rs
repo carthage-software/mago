@@ -208,7 +208,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
         Expression::Binary(operation) => expression_has_yield(&operation.lhs) || expression_has_yield(&operation.rhs),
         Expression::UnaryPrefix(operation) => expression_has_yield(&operation.operand),
         Expression::UnaryPostfix(operation) => expression_has_yield(&operation.operand),
-        Expression::AssignmentOperation(assignment_operation) => {
+        Expression::Assignment(assignment_operation) => {
             expression_has_yield(&assignment_operation.lhs) || expression_has_yield(&assignment_operation.rhs)
         }
         Expression::Conditional(conditional) => {

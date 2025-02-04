@@ -1,13 +1,13 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -41,26 +41,30 @@ impl Rule for MissingAssertDescriptionRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for MissingAssertDescriptionRule {
-    fn walk_in_function_call(&self, function_call: &FunctionCall, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionCall(function_call) = node else {
+            return LintDirective::default();
+        };
+
         let Expression::Identifier(identifier) = function_call.function.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let function_name = context.resolve_function_name(identifier);
         // we only care about the "assert" function
         if !function_name.eq_ignore_ascii_case("assert") {
-            return;
+            return LintDirective::default();
         }
 
         if function_call.argument_list.arguments.get(1).is_none() {
-            let issue = Issue::new(context.level(), "Missing description in assert function.")
-                .with_annotation(Annotation::primary(function_call.span()).with_message("`assert` function is called here."))
-                .with_help("Add a description to the assert function to make it easier to understand the purpose of the assertion.");
-
-            context.report(issue);
+            context.report(
+                Issue::new(context.level(), "Missing description in assert function.")
+                    .with_annotation(Annotation::primary(function_call.span()).with_message("`assert` function is called here."))
+                    .with_help("Add a description to the assert function to make it easier to understand the purpose of the assertion.")
+            );
         }
+
+        LintDirective::default()
     }
 }

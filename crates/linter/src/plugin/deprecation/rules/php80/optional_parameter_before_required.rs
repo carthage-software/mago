@@ -1,14 +1,14 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
@@ -39,19 +39,16 @@ impl Rule for OptionalParameterBeforeRequiredRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for OptionalParameterBeforeRequiredRule {
-    fn walk_function_like_parameter_list(
-        &self,
-        function_like_parameter_list: &FunctionLikeParameterList,
-        context: &mut LintContext<'a>,
-    ) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionLikeParameterList(function_like_parameter_list) = node else {
+            return LintDirective::default();
+        };
+
         let mut optional_parameters = Vec::new();
 
         for parameter in function_like_parameter_list.parameters.iter() {
             let name = context.lookup(&parameter.variable.name);
-
             if parameter.default_value.is_some() || parameter.ellipsis.is_some() {
                 // Store optional parameters along with their spans
                 optional_parameters.push((parameter.variable.name, parameter.variable.span()));
@@ -87,5 +84,8 @@ impl<'a> Walker<LintContext<'a>> for OptionalParameterBeforeRequiredRule {
                 optional_parameters.clear();
             }
         }
+
+        // There is no need to lint the children of a function-like parameter list.
+        LintDirective::Prune
     }
 }

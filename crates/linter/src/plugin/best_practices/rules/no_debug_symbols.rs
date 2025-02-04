@@ -3,11 +3,48 @@ use indoc::indoc;
 use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
+
+#[derive(Clone, Debug)]
+pub struct NoDebugSymbolsRule;
+
+impl Rule for NoDebugSymbolsRule {
+    fn get_definition(&self) -> RuleDefinition {
+        RuleDefinition::enabled("No Debug Symbols", Level::Note).with_description(indoc! {"
+            Flags calls to debug functions like `var_dump`, `print_r`, `debug_backtrace`, etc.
+            in production code. Debug functions are useful for debugging, but they can expose
+            sensitive information or degrade performance in production environments.
+        "})
+    }
+
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionCall(function_call) = node else { return LintDirective::default() };
+
+        let Expression::Identifier(function_identifier) = function_call.function.as_ref() else {
+            return LintDirective::default();
+        };
+
+        let function_name = context.resolve_function_name(function_identifier);
+
+        if DEBUG_FUNCTIONS.contains(&function_name) {
+            let issue = Issue::new(context.level(), format!("Usage of debug function `{}` detected.", function_name))
+                .with_annotation(
+                    Annotation::primary(function_call.span())
+                        .with_message(format!("Function `{}` is called here.", function_name)),
+                )
+                .with_note("Avoid using debug functions like `var_dump`, `print_r`, etc. in production code.")
+                .with_help("Remove the debug function call.");
+
+            context.report(issue);
+        }
+
+        LintDirective::default()
+    }
+}
 
 const DEBUG_FUNCTIONS: [&str; 50] = [
     // PHP built-in debug functions
@@ -65,38 +102,3 @@ const DEBUG_FUNCTIONS: [&str; 50] = [
     "xdebug_time_index",
     "xdebug_var_dump",
 ];
-
-#[derive(Clone, Debug)]
-pub struct NoDebugSymbolsRule;
-
-impl Rule for NoDebugSymbolsRule {
-    fn get_definition(&self) -> RuleDefinition {
-        RuleDefinition::enabled("No Debug Symbols", Level::Note).with_description(indoc! {"
-            Flags calls to debug functions like `var_dump`, `print_r`, `debug_backtrace`, etc.
-            in production code. Debug functions are useful for debugging, but they can expose
-            sensitive information or degrade performance in production environments.
-        "})
-    }
-}
-
-impl<'a> Walker<LintContext<'a>> for NoDebugSymbolsRule {
-    fn walk_in_function_call<'ast>(&self, function_call: &'ast FunctionCall, context: &mut LintContext<'a>) {
-        let Expression::Identifier(function_identifier) = function_call.function.as_ref() else {
-            return;
-        };
-
-        let function_name = context.resolve_function_name(function_identifier);
-
-        if DEBUG_FUNCTIONS.contains(&function_name) {
-            let issue = Issue::new(context.level(), format!("Usage of debug function `{}` detected.", function_name))
-                .with_annotation(
-                    Annotation::primary(function_call.span())
-                        .with_message(format!("Function `{}` is called here.", function_name)),
-                )
-                .with_note("Avoid using debug functions like `var_dump`, `print_r`, etc. in production code.")
-                .with_help("Remove the debug function call.");
-
-            context.report(issue);
-        }
-    }
-}

@@ -9,7 +9,7 @@ use mago_span::Position;
 use mago_span::Span;
 
 pub use crate::ast::*;
-pub use crate::node::Node;
+pub use crate::node::*;
 pub use crate::sequence::Sequence;
 pub use crate::trivia::Trivia;
 pub use crate::trivia::TriviaKind;

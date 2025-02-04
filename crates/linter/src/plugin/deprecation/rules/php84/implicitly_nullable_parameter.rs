@@ -1,15 +1,15 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
@@ -48,28 +48,23 @@ impl Rule for ImplicitlyNullableParameterRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for ImplicitlyNullableParameterRule {
-    fn walk_function_like_parameter(
-        &self,
-        function_like_parameter: &FunctionLikeParameter,
-        context: &mut LintContext<'a>,
-    ) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::FunctionLikeParameter(function_like_parameter) = node else { return LintDirective::default() };
         let Some(hint) = function_like_parameter.hint.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         if hint.contains_null() {
-            return;
+            return LintDirective::default();
         }
 
         let Some(default_value) = function_like_parameter.default_value.as_ref() else {
-            return;
+            return LintDirective::default();
         };
 
         let Expression::Literal(Literal::Null(_)) = default_value.value else {
-            return;
+            return LintDirective::default();
         };
 
         let parameter_name = context.lookup(&function_like_parameter.variable.name);
@@ -98,5 +93,7 @@ impl<'a> Walker<LintContext<'a>> for ImplicitlyNullableParameterRule {
         context.report_with_fix(issue, |plan| {
             plan.insert(hint.span().start_position().offset, prefix, SafetyClassification::Safe);
         });
+
+        LintDirective::default()
     }
 }

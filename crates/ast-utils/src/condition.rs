@@ -32,7 +32,7 @@ pub fn is_truthy(expression: &Expression) -> bool {
             UnaryPrefixOperator::Not(_) => is_falsy(&operation.operand),
             _ => false,
         },
-        Expression::AssignmentOperation(assignment) => is_truthy(&assignment.rhs),
+        Expression::Assignment(assignment) => is_truthy(&assignment.rhs),
         _ => false,
     }
 }
@@ -50,7 +50,7 @@ pub fn is_falsy(expression: &Expression) -> bool {
         Expression::Literal(Literal::False(_) | Literal::Null(_)) => true,
         Expression::Array(array) => array.elements.is_empty(),
         Expression::LegacyArray(array) => array.elements.is_empty(),
-        Expression::AssignmentOperation(assignment) => is_falsy(&assignment.rhs),
+        Expression::Assignment(assignment) => is_falsy(&assignment.rhs),
         Expression::Binary(operation) => match operation.operator {
             BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_falsy(&operation.lhs) && is_falsy(&operation.rhs),
             BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => is_falsy(&operation.lhs) || is_falsy(&operation.rhs),

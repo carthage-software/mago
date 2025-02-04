@@ -1,15 +1,15 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const PSR: &str = "psr";
@@ -72,10 +72,10 @@ impl Rule for TraitRule {
                 .with_option(PSR, Value::Boolean(true)),
             )
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for TraitRule {
-    fn walk_in_trait<'ast>(&self, r#trait: &'ast Trait, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Trait(r#trait) = node else { return LintDirective::default() };
+
         let mut issues = vec![];
 
         let name = context.lookup(&r#trait.name.value);
@@ -115,5 +115,7 @@ impl<'a> Walker<LintContext<'a>> for TraitRule {
         for issue in issues {
             context.report(issue);
         }
+
+        LintDirective::default()
     }
 }

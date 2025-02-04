@@ -275,7 +275,7 @@ where
         Expression::Parenthesized(parenthesized) => {
             find_method_references_in_expression(parenthesized.expression.as_ref(), predicate)
         }
-        Expression::AssignmentOperation(assignment) => {
+        Expression::Assignment(assignment) => {
             let mut references = vec![];
             references.extend(find_method_references_in_expression(assignment.lhs.as_ref(), predicate));
             references.extend(find_method_references_in_expression(assignment.rhs.as_ref(), predicate));

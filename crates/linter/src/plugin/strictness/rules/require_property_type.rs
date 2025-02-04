@@ -1,15 +1,14 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_php_version::PHPVersion;
-use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -45,10 +44,28 @@ impl Rule for RequirePropertyTypeRule {
                 "#},
             ))
     }
-}
 
-impl RequirePropertyTypeRule {
-    fn report(reflection: &ClassLikeReflection, members: &[ClassLikeMember], context: &mut LintContext<'_>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let (reflection, members) = match node {
+            Node::Class(class) => {
+                let name = context.semantics.names.get(&class.name);
+                let Some(reflection) = context.codebase.get_class(context.interner, name) else {
+                    return LintDirective::default();
+                };
+
+                (reflection, class.members.as_slice())
+            }
+            Node::Trait(r#trait) => {
+                let name = context.semantics.names.get(&r#trait.name);
+                let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
+                    return LintDirective::default();
+                };
+
+                (reflection, r#trait.members.as_slice())
+            }
+            _ => return LintDirective::default(),
+        };
+
         for member in members {
             let ClassLikeMember::Property(property) = member else {
                 continue;
@@ -83,25 +100,7 @@ impl RequirePropertyTypeRule {
                 );
             }
         }
-    }
-}
 
-impl<'a> Walker<LintContext<'a>> for RequirePropertyTypeRule {
-    fn walk_in_class(&self, class: &Class, context: &mut LintContext<'a>) {
-        let name = context.semantics.names.get(&class.name);
-        let Some(reflection) = context.codebase.get_class(context.interner, name) else {
-            return;
-        };
-
-        Self::report(reflection, class.members.as_slice(), context);
-    }
-
-    fn walk_in_trait(&self, r#trait: &Trait, context: &mut LintContext<'a>) {
-        let name = context.semantics.names.get(&r#trait.name);
-        let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
-            return;
-        };
-
-        Self::report(reflection, r#trait.members.as_slice(), context);
+        LintDirective::default()
     }
 }

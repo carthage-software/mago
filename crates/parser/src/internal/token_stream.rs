@@ -44,7 +44,6 @@ impl<'a, 'i> TokenStream<'a, 'i> {
             Ok(Some(_)) => {
                 if let Some(token) = self.buffer.pop_front() {
                     self.position = token.span.end;
-
                     Some(Ok(token))
                 } else {
                     None
@@ -83,22 +82,21 @@ impl<'a, 'i> TokenStream<'a, 'i> {
     /// If the lexer has already read the entire input source code, this method will return `None`.
     #[inline]
     pub fn peek_nth(&mut self, n: usize) -> Option<Result<Token, SyntaxError>> {
-        let index = match self.fill_buffer(n + 1) {
-            Ok(index) => index?,
-            Err(error) => {
-                return Some(Err(error));
+        // Ensure the buffer has at least n+1 tokens.
+        match self.fill_buffer(n + 1) {
+            Ok(Some(_)) => {
+                // Return the nth token (0-indexed) if available.
+                self.buffer.get(n).cloned().map(Ok)
             }
-        };
-
-        Some(Ok(self.buffer[index - 1]))
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
+        }
     }
 
     /// Consumes the comments collected by the lexer and returns them.
     #[inline]
     pub fn get_trivia(&mut self) -> Sequence<Trivia> {
-        let mut tokens = Vec::new();
-
-        std::mem::swap(&mut tokens, &mut self.trivia);
+        let tokens = std::mem::take(&mut self.trivia);
 
         tokens
             .into_iter()
@@ -121,29 +119,25 @@ impl<'a, 'i> TokenStream<'a, 'i> {
             .collect()
     }
 
-    /// Fills the token buffer with at least `n` tokens.
+    /// Fills the token buffer until at least `n` tokens are available, unless the lexer returns EOF.
+    ///
+    /// Trivia tokens are collected separately and are not stored in the main token buffer.
     #[inline]
     fn fill_buffer(&mut self, n: usize) -> Result<Option<usize>, SyntaxError> {
-        loop {
-            if self.buffer.len() >= n {
-                break;
-            }
-
+        while self.buffer.len() < n {
             match self.lexer.advance() {
                 Some(result) => match result {
                     Ok(token) => {
                         if token.kind.is_trivia() {
                             self.trivia.push(token);
-
                             continue;
                         }
-
                         self.buffer.push_back(token);
                     }
                     Err(error) => return Err(error),
                 },
                 None => return Ok(None),
-            };
+            }
         }
 
         Ok(Some(n))

@@ -3,6 +3,7 @@ use mago_interner::StringIdentifier;
 use mago_walker::Walker;
 
 use crate::context::LintContext;
+use crate::plugin::best_practices::rules::utils::internal::FunctionCallWalker;
 
 /// Determine if a variable is a super global variable.
 pub fn is_super_global_variable(name: &str) -> bool {
@@ -58,8 +59,6 @@ pub fn is_predefined_variable(name: &str) -> bool {
 ///
 /// This function will return true when called with `baz` as the function name.
 pub fn potentially_contains_function_call(block: &Block, function_name: &str, context: &LintContext<'_>) -> bool {
-    use crate::plugin::best_practices::rules::utils::internal::FunctionCallWalker;
-
     let mut context = (false, context);
 
     FunctionCallWalker(function_name).walk_block(block, &mut context);
@@ -75,8 +74,6 @@ pub fn expression_potentially_contains_function_call(
     function_name: &str,
     context: &LintContext<'_>,
 ) -> bool {
-    use crate::plugin::best_practices::rules::utils::internal::FunctionCallWalker;
-
     let mut context = (false, context);
 
     FunctionCallWalker(function_name).walk_expression(expression, &mut context);

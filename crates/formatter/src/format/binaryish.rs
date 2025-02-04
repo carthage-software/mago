@@ -68,7 +68,7 @@ pub(super) fn print_binaryish_expression<'a>(
             && !is_at_call_like_expression(f));
 
     let should_indent_if_inlining =
-        matches!(grandparent, Some(Node::AssignmentOperation(_) | Node::PropertyItem(_) | Node::ConstantItem(_)))
+        matches!(grandparent, Some(Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)))
             || matches!(grandparent, Some(Node::KeyValueArrayElement(_)));
 
     let same_precedence_sub_expression =

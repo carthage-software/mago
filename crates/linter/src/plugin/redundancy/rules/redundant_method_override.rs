@@ -5,11 +5,11 @@ use mago_fixer::SafetyClassification;
 use mago_interner::StringIdentifier;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -44,16 +44,16 @@ impl Rule for RedundantMethodOverrideRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RedundantMethodOverrideRule {
-    fn walk_in_method<'ast>(&self, method: &'ast Method, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Method(method) = node else { return LintDirective::default() };
+
         let MethodBody::Concrete(block) = &method.body else {
-            return;
+            return LintDirective::Prune;
         };
 
         if block.statements.len() != 1 {
-            return;
+            return LintDirective::default();
         }
 
         let name = method.name.value;
@@ -72,7 +72,7 @@ impl<'a> Walker<LintContext<'a>> for RedundantMethodOverrideRule {
         let expression = match &statement {
             Statement::Return(Return { value: Some(expression), .. }) => expression,
             Statement::Expression(ExpressionStatement { expression, .. }) => expression,
-            _ => return,
+            _ => return LintDirective::default(),
         };
 
         if matches_method(&name, &parameters, expression) {
@@ -91,6 +91,8 @@ impl<'a> Walker<LintContext<'a>> for RedundantMethodOverrideRule {
                 plan.delete(method.span().to_range(), SafetyClassification::PotentiallyUnsafe)
             });
         }
+
+        LintDirective::Prune
     }
 }
 

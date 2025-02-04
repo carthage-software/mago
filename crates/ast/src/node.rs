@@ -386,7 +386,7 @@ pub enum Node<'a> {
     Namespace(&'a Namespace),
     NamespaceBody(&'a NamespaceBody),
     NamespaceImplicitBody(&'a NamespaceImplicitBody),
-    AssignmentOperation(&'a Assignment),
+    Assignment(&'a Assignment),
     AssignmentOperator(&'a AssignmentOperator),
     Conditional(&'a Conditional),
     DoWhile(&'a DoWhile),
@@ -684,7 +684,7 @@ impl<'a> Node<'a> {
             Self::Namespace(_) => NodeKind::Namespace,
             Self::NamespaceBody(_) => NodeKind::NamespaceBody,
             Self::NamespaceImplicitBody(_) => NodeKind::NamespaceImplicitBody,
-            Self::AssignmentOperation(_) => NodeKind::Assignment,
+            Self::Assignment(_) => NodeKind::Assignment,
             Self::AssignmentOperator(_) => NodeKind::AssignmentOperator,
             Self::Conditional(_) => NodeKind::Conditional,
             Self::DoWhile(_) => NodeKind::DoWhile,
@@ -1380,7 +1380,7 @@ impl<'a> Node<'a> {
                 Expression::Parenthesized(node) => Node::Parenthesized(node),
                 Expression::Literal(node) => Node::Literal(node),
                 Expression::CompositeString(node) => Node::CompositeString(node),
-                Expression::AssignmentOperation(node) => Node::AssignmentOperation(node),
+                Expression::Assignment(node) => Node::Assignment(node),
                 Expression::Conditional(node) => Node::Conditional(node),
                 Expression::Array(node) => Node::Array(node),
                 Expression::LegacyArray(node) => Node::LegacyArray(node),
@@ -1444,35 +1444,10 @@ impl<'a> Node<'a> {
             Node::UnaryPrefix(node) => {
                 vec![Node::UnaryPrefixOperator(&node.operator), Node::Expression(&node.operand)]
             }
-            Node::UnaryPrefixOperator(operator) => match operator {
-                UnaryPrefixOperator::ErrorControl(_) => vec![],
-                UnaryPrefixOperator::Reference(_) => vec![],
-                UnaryPrefixOperator::ArrayCast(_, _) => vec![],
-                UnaryPrefixOperator::BoolCast(_, _) => vec![],
-                UnaryPrefixOperator::BooleanCast(_, _) => vec![],
-                UnaryPrefixOperator::DoubleCast(_, _) => vec![],
-                UnaryPrefixOperator::RealCast(_, _) => vec![],
-                UnaryPrefixOperator::FloatCast(_, _) => vec![],
-                UnaryPrefixOperator::IntCast(_, _) => vec![],
-                UnaryPrefixOperator::IntegerCast(_, _) => vec![],
-                UnaryPrefixOperator::ObjectCast(_, _) => vec![],
-                UnaryPrefixOperator::UnsetCast(_, _) => vec![],
-                UnaryPrefixOperator::StringCast(_, _) => vec![],
-                UnaryPrefixOperator::BinaryCast(_, _) => vec![],
-                UnaryPrefixOperator::BitwiseNot(_) => vec![],
-                UnaryPrefixOperator::Not(_) => vec![],
-                UnaryPrefixOperator::PreIncrement(_) => vec![],
-                UnaryPrefixOperator::PreDecrement(_) => vec![],
-                UnaryPrefixOperator::Plus(_) => vec![],
-                UnaryPrefixOperator::Negation(_) => vec![],
-            },
             Node::UnaryPostfix(node) => {
                 vec![Node::Expression(&node.operand), Node::UnaryPostfixOperator(&node.operator)]
             }
-            Node::UnaryPostfixOperator(operator) => match operator {
-                UnaryPostfixOperator::PostIncrement(_) => vec![],
-                UnaryPostfixOperator::PostDecrement(_) => vec![],
-            },
+            Node::UnaryPrefixOperator(_) | Node::UnaryPostfixOperator(_) => vec![],
             Node::ArrowFunction(node) => {
                 let mut children = vec![];
 
@@ -1643,7 +1618,7 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::AssignmentOperation(node) => {
+            Node::Assignment(node) => {
                 vec![Node::Expression(&node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(&node.rhs)]
             }
             Node::AssignmentOperator(_) => vec![],
@@ -1716,12 +1691,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::While(node) => {
-                let mut children = vec![Node::Keyword(&node.r#while)];
-
-                children.push(Node::Expression(&node.condition));
-                children.push(Node::WhileBody(&node.body));
-
-                children
+                vec![Node::Keyword(&node.r#while), Node::Expression(&node.condition), Node::WhileBody(&node.body)]
             }
             Node::WhileBody(node) => match node {
                 WhileBody::Statement(statement) => vec![Node::Statement(statement)],
@@ -1800,9 +1770,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::TryCatchClause(node) => {
-                let mut children = vec![Node::Keyword(&node.r#catch)];
-
-                children.push(Node::Hint(&node.hint));
+                let mut children = vec![Node::Keyword(&node.r#catch), Node::Hint(&node.hint)];
                 if let Some(variable) = &node.variable {
                     children.push(Node::DirectVariable(variable));
                 }
@@ -2156,7 +2124,7 @@ impl HasSpan for Node<'_> {
             Self::Namespace(node) => node.span(),
             Self::NamespaceBody(node) => node.span(),
             Self::NamespaceImplicitBody(node) => node.span(),
-            Self::AssignmentOperation(node) => node.span(),
+            Self::Assignment(node) => node.span(),
             Self::AssignmentOperator(node) => node.span(),
             Self::Conditional(node) => node.span(),
             Self::DoWhile(node) => node.span(),

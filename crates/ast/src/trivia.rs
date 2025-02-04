@@ -30,7 +30,8 @@ pub struct Trivia {
 
 impl TriviaKind {
     /// Returns `true` if the trivia kind is a comment.
-    pub fn is_comment(&self) -> bool {
+    #[inline]
+    pub const fn is_comment(&self) -> bool {
         matches!(
             self,
             TriviaKind::SingleLineComment
@@ -40,11 +41,13 @@ impl TriviaKind {
         )
     }
 
-    pub fn is_block_comment(&self) -> bool {
+    #[inline]
+    pub const fn is_block_comment(&self) -> bool {
         matches!(self, TriviaKind::MultiLineComment | TriviaKind::DocBlockComment)
     }
 
-    pub fn is_single_line_comment(&self) -> bool {
+    #[inline]
+    pub const fn is_single_line_comment(&self) -> bool {
         matches!(self, TriviaKind::HashComment | TriviaKind::SingleLineComment)
     }
 }

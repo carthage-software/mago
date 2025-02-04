@@ -1,13 +1,13 @@
 use indoc::indoc;
 
-use mago_ast::ast::*;
+use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
@@ -44,10 +44,10 @@ impl Rule for RequireIdentityComparisonRule {
                 "#},
             ))
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
-    fn walk_in_binary<'ast>(&self, binary: &'ast Binary, context: &mut LintContext<'a>) {
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Binary(binary) = node else { return LintDirective::default() };
+
         match &binary.operator {
             // `==` -> `===`
             BinaryOperator::Equal(span) => {
@@ -95,5 +95,7 @@ impl<'a> Walker<LintContext<'a>> for RequireIdentityComparisonRule {
             }
             _ => {}
         }
+
+        LintDirective::default()
     }
 }

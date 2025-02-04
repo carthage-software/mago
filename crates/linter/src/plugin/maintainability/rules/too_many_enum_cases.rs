@@ -1,14 +1,15 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::ast::*;
+use mago_ast::Node;
+use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleOptionDefinition;
+use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 const THRESHOLD: &str = "threshold";
@@ -32,11 +33,9 @@ impl Rule for TooManyEnumCasesRule {
                 default: Value::Integer(THRESHOLD_DEFAULT),
             })
     }
-}
 
-impl<'a> Walker<LintContext<'a>> for TooManyEnumCasesRule {
-    fn walk_in_enum(&self, r#enum: &Enum, context: &mut LintContext<'a>) {
-        let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
+    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+        let Node::Enum(r#enum) = node else { return LintDirective::default() };
 
         let mut cases = 0;
         for member in r#enum.members.iter() {
@@ -45,6 +44,7 @@ impl<'a> Walker<LintContext<'a>> for TooManyEnumCasesRule {
             }
         }
 
+        let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
         if cases > threshold {
             let issue =
                 Issue::new(context.level(), "Enum has too many cases.")
@@ -58,6 +58,15 @@ impl<'a> Walker<LintContext<'a>> for TooManyEnumCasesRule {
                     );
 
             context.report(issue);
+
+            // If this enum has too many cases, we don't need to check the nested enums.
+            LintDirective::Prune
+        } else if r#enum.members.contains_methods() {
+            // Continue checking nested enums, if any.
+            LintDirective::Continue
+        } else {
+            // If this enum has no methods, there can't be any nested enums.
+            LintDirective::Prune
         }
     }
 }

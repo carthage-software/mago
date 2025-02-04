@@ -8,19 +8,22 @@ use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_semantics::Semantics;
 
-use crate::context::Context;
 use crate::plugin::Plugin;
 use crate::rule::ConfiguredRule;
 use crate::rule::Rule;
+use crate::runner::Runner;
 use crate::settings::RuleSettings;
 use crate::settings::Settings;
 
 pub mod consts;
 pub mod context;
 pub mod definition;
+pub mod directive;
 pub mod plugin;
 pub mod rule;
 pub mod settings;
+
+mod runner;
 
 #[derive(Debug, Clone)]
 pub struct Linter {
@@ -218,12 +221,6 @@ impl Linter {
     ///
     /// A collection of issues.
     pub fn lint(&self, semantics: &Semantics) -> IssueCollection {
-        let source_name = self.interner.lookup(&semantics.source.identifier.value());
-
-        tracing::debug!("Initializing lint process for source: {}", source_name);
-
-        let mut context = Context::new(self.settings.php_version, &self.interner, &self.codebase, semantics);
-
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
         if configured_rules.is_empty() {
             tracing::warn!("Linting aborted - no rules configured.");
@@ -231,19 +228,11 @@ impl Linter {
             return IssueCollection::new();
         }
 
-        tracing::debug!("Loaded {} linting rules for source: {}", configured_rules.len(), source_name);
-
+        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, semantics);
         for configured_rule in configured_rules.iter() {
-            let rule_name = configured_rule.rule.get_definition().name;
-            tracing::trace!("Executing rule: {}", rule_name);
-
-            let mut lint_context = context.for_rule(configured_rule);
-
-            configured_rule.rule.as_ref().lint(&semantics.program, &mut lint_context);
+            runner.run(configured_rule);
         }
 
-        tracing::debug!("Completed linting source: {}", source_name);
-
-        context.take_issue_collection()
+        runner.finish()
     }
 }

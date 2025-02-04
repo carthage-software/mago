@@ -1,3 +1,6 @@
+use memchr::memchr;
+use memchr::memmem::find;
+
 use mago_source::SourceIdentifier;
 use mago_span::Position;
 
@@ -7,9 +10,9 @@ use mago_span::Position;
 /// from the bytes input code while keeping track of the current position (line, column, offset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Input<'a> {
-    bytes: &'a [u8],
-    length: usize,
-    position: Position,
+    pub(crate) bytes: &'a [u8],
+    pub(crate) length: usize,
+    pub(crate) position: Position,
 }
 
 impl<'a> Input<'a> {
@@ -132,26 +135,45 @@ impl<'a> Input<'a> {
     /// A byte slice containing the consumed characters.
     #[inline]
     pub fn consume_until(&mut self, search: &[u8], ignore_ascii_case: bool) -> &'a [u8] {
-        let from = self.position.offset;
-        while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
-            self.position.offset += 1;
-        }
+        let start = self.position.offset;
+        if !ignore_ascii_case {
+            // For a single-byte search, use memchr.
+            if search.len() == 1 {
+                if let Some(pos) = memchr(search[0], &self.bytes[self.position.offset..]) {
+                    self.position.offset += pos;
+                    &self.bytes[start..self.position.offset]
+                } else {
+                    self.position.offset = self.length;
+                    &self.bytes[start..self.length]
+                }
+            } else if let Some(pos) = find(&self.bytes[self.position.offset..], search) {
+                self.position.offset += pos;
+                &self.bytes[start..self.position.offset]
+            } else {
+                self.position.offset = self.length;
+                &self.bytes[start..self.length]
+            }
+        } else {
+            while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
+                self.position.offset += 1;
+            }
 
-        &self.bytes[from..self.position.offset]
+            &self.bytes[start..self.position.offset]
+        }
     }
 
     #[inline]
-    pub fn consume_until_inclusive(&mut self, search: &[u8], ignore_ascii_case: bool) -> &'a [u8] {
-        let from = self.position.offset;
-        while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
-            self.position.offset += 1;
-        }
+    pub fn consume_through(&mut self, search: u8) -> &'a [u8] {
+        let start = self.position.offset;
+        if let Some(pos) = memchr::memchr(search, &self.bytes[self.position.offset..]) {
+            self.position.offset += pos + 1;
 
-        if self.is_at(search, ignore_ascii_case) {
-            self.position.offset += search.len();
-        }
+            &self.bytes[start..self.position.offset]
+        } else {
+            self.position.offset = self.length;
 
-        &self.bytes[from..self.position.offset]
+            &self.bytes[start..self.length]
+        }
     }
 
     /// Consumes whitespaces until a non-whitespace character is found.
@@ -161,20 +183,14 @@ impl<'a> Input<'a> {
     /// A byte slice containing the consumed whitespaces.
     #[inline]
     pub fn consume_whitespaces(&mut self) -> &'a [u8] {
-        let from = self.position.offset;
-        loop {
-            if self.has_reached_eof() {
-                break;
-            }
-
-            if self.bytes[self.position.offset].is_ascii_whitespace() {
-                self.position.offset += 1;
-            } else {
-                break;
-            }
+        let start = self.position.offset;
+        let bytes = self.bytes;
+        let len = self.length;
+        while self.position.offset < len && bytes[self.position.offset].is_ascii_whitespace() {
+            self.position.offset += 1;
         }
 
-        &self.bytes[from..self.position.offset]
+        &bytes[start..self.position.offset]
     }
 
     /// Reads the next `n` characters without advancing the position.
@@ -272,22 +288,21 @@ impl<'a> Input<'a> {
         let mut offset = self.position.offset;
         let mut search_offset = 0;
         let mut length = 0;
-
+        let bytes = self.bytes;
+        let total = self.length;
         while search_offset < search.len() {
-            // Skip whitespace in input
-            while offset < self.length && self.bytes[offset].is_ascii_whitespace() {
+            // Skip whitespace in the input.
+            while offset < total && bytes[offset].is_ascii_whitespace() {
                 offset += 1;
                 length += 1;
             }
 
-            if offset >= self.length {
-                // Reached EOF before matching all of 'search'
+            if offset >= total {
                 return None;
             }
 
-            let input_byte = self.bytes[offset];
+            let input_byte = bytes[offset];
             let search_byte = search[search_offset];
-
             let matched = if ignore_ascii_case {
                 input_byte.eq_ignore_ascii_case(&search_byte)
             } else {
@@ -299,7 +314,6 @@ impl<'a> Input<'a> {
                 length += 1;
                 search_offset += 1;
             } else {
-                // No match
                 return None;
             }
         }

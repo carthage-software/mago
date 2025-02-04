@@ -10,7 +10,7 @@ use crate::context::LintContext;
 pub fn is_user_input(context: &LintContext, expression: &Expression) -> bool {
     match expression {
         Expression::Parenthesized(parenthesized) => is_user_input(context, &parenthesized.expression),
-        Expression::AssignmentOperation(assignment) => is_user_input(context, &assignment.rhs),
+        Expression::Assignment(assignment) => is_user_input(context, &assignment.rhs),
         Expression::Conditional(conditional) => match conditional.then.as_ref() {
             Some(then) => is_user_input(context, then) || is_user_input(context, &conditional.r#else),
             None => is_user_input(context, &conditional.condition) || is_user_input(context, &conditional.r#else),
@@ -61,7 +61,7 @@ pub fn get_password(context: &LintContext, expr: &Expression) -> Option<Span> {
         Expression::Literal(Literal::String(literal_string)) if is_password_literal(context, literal_string) => {
             Some(literal_string.span())
         }
-        Expression::AssignmentOperation(assignment) => {
+        Expression::Assignment(assignment) => {
             get_password(context, &assignment.lhs).or_else(|| get_password(context, &assignment.rhs))
         }
         Expression::ArrayAccess(array_access) => get_password(context, &array_access.index),
