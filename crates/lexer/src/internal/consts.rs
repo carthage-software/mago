@@ -1,5 +1,8 @@
 use mago_token::TokenKind;
 
+pub const HASH_EMOJI_LEN: usize = 7;
+pub const HASH_EMOJI_BYTES: [u8; 7] = [35, 239, 184, 143, 226, 131, 163];
+
 pub const CAST_TYPES: [(&[u8], TokenKind); 12] = [
     (b"(int)", TokenKind::IntCast),
     (b"(integer)", TokenKind::IntegerCast),
