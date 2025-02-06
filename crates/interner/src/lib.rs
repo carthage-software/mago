@@ -40,6 +40,12 @@ impl StringIdentifier {
     pub const fn value(&self) -> usize {
         self.0
     }
+
+    /// Returns `true` if the string identifier is the same as the other.
+    #[inline(always)]
+    pub const fn is_same_as(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
 }
 
 unsafe impl Key for StringIdentifier {

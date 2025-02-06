@@ -283,7 +283,7 @@ impl PHPVersion {
     /// ```
     pub const fn is_deprecated(&self, feature: Feature) -> bool {
         match feature {
-            Feature::DynamicProperties => self.0 >= 0x08_02_00,
+            Feature::DynamicProperties | Feature::CallStaticMethodOnTrait => self.0 >= 0x08_02_00,
             Feature::ImplicitlyNullableParameterTypes => self.0 >= 0x08_04_00,
             Feature::RequiredParameterAfterOptionalUnionOrMixed => self.0 >= 0x08_03_00,
             Feature::RequiredParameterAfterOptionalNullableAndDefaultNull => self.0 >= 0x08_01_00,

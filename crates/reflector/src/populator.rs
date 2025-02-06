@@ -122,6 +122,8 @@ fn populate_class_like_reflection(
         return;
     }
 
+    implement_magic_interfaces(interner, codebase, &mut reflection);
+
     for property_id in reflection.properties.members.keys() {
         reflection.properties.appering_members.insert(*property_id, reflection.name);
         reflection.properties.declaring_members.insert(*property_id, reflection.name);
@@ -141,11 +143,11 @@ fn populate_class_like_reflection(
     }
 
     for parent_interface in reflection.inheritance.direct_extended_interfaces.clone() {
-        populate_interface_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
+        populate_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
     }
 
     for parent_interface in reflection.inheritance.direct_implemented_interfaces.clone() {
-        populate_interface_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
+        populate_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
     }
 
     reflection.inheritance.all_extended_classes.shrink_to_fit();
@@ -166,7 +168,63 @@ fn populate_class_like_reflection(
 }
 
 #[inline]
-fn populate_interface_data_from_parent_interface(
+fn implement_magic_interfaces(
+    interner: &ThreadedInterner,
+    codebase: &mut CodebaseReflection,
+    reflection: &mut ClassLikeReflection,
+) {
+    const UNIT_ENUM_INTERFACE: &str = "unitenum";
+    const BACKED_ENUM_INTERFACE: &str = "backedenum";
+    const STRINGABLE_INTERFACE: &str = "stringable";
+    const TO_STRING_METHOD: &str = "__toString";
+
+    let implement_interface = |reflection: &mut ClassLikeReflection, interface_name| {
+        // Check if the interface is already implemented.
+        if reflection.inheritance.implements_interface_with_name(interner, &interface_name) {
+            return;
+        }
+
+        // The interface does not exist in the codebase, ignore it.
+        let Some(interface) = codebase.get_interface(interner, &interface_name) else {
+            return;
+        };
+
+        let interface = *interface.name.inner_unchecked();
+        reflection.inheritance.direct_implemented_interfaces.insert(interface);
+        reflection.inheritance.all_implemented_interfaces.insert(interface);
+        reflection.inheritance.names.insert(interface.value, interface);
+        reflection.inheritance.names.insert(interface_name, interface);
+    };
+
+    // Add auto-implemented interfaces for enums
+    'enum_interface: {
+        if !reflection.is_enum() {
+            break 'enum_interface;
+        }
+
+        implement_interface(
+            reflection,
+            if reflection.backing_type.is_some() {
+                interner.intern(BACKED_ENUM_INTERFACE)
+            } else {
+                interner.intern(UNIT_ENUM_INTERFACE)
+            },
+        );
+    }
+
+    'stringable_interface: {
+        let to_string_method = interner.intern(TO_STRING_METHOD);
+
+        if !reflection.has_method(&to_string_method) {
+            break 'stringable_interface;
+        }
+
+        implement_interface(reflection, interner.intern(STRINGABLE_INTERFACE));
+    }
+}
+
+#[inline]
+fn populate_data_from_parent_interface(
     interner: &ThreadedInterner,
     codebase: &mut CodebaseReflection,
     reflection: &mut ClassLikeReflection,
@@ -380,8 +438,8 @@ fn inherit_methods_from_parent(reflection: &mut ClassLikeReflection, parent_refl
 
         reflection.methods.declaring_members.insert(*method_name, *declaring_class);
 
-        if !reflection.is_trait()
-            || !reflection.inheritance.require_extensions.contains(&parent_reflection.name.inner().unwrap().value)
+        if !class_is_trait
+            || !reflection.inheritance.require_extensions.contains(&parent_reflection.name.inner_unchecked().value)
         {
             reflection.methods.inheritable_members.insert(*method_name, *declaring_class);
         }

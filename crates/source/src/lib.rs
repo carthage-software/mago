@@ -76,6 +76,26 @@ pub struct SourceManager {
     sources_by_name: Arc<DashMap<StringIdentifier, SourceIdentifier>>,
 }
 
+impl SourceCategory {
+    /// Returns whether the source category is `BuiltIn`.
+    #[inline(always)]
+    pub const fn is_built_in(&self) -> bool {
+        matches!(self, Self::BuiltIn)
+    }
+
+    /// Returns whether the source category is `External`.
+    #[inline(always)]
+    pub const fn is_external(&self) -> bool {
+        matches!(self, Self::External)
+    }
+
+    /// Returns whether the source category is `UserDefined`.
+    #[inline(always)]
+    pub const fn is_user_defined(&self) -> bool {
+        matches!(self, Self::UserDefined)
+    }
+}
+
 impl SourceIdentifier {
     #[inline(always)]
     pub fn dummy() -> Self {

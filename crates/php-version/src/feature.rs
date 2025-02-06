@@ -89,4 +89,5 @@ pub enum Feature {
     TrailingCommaInClosureUseList,
     NewInInitializers,
     ConstantAttribute,
+    CallStaticMethodOnTrait,
 }

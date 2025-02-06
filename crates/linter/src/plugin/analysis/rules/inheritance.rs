@@ -173,7 +173,7 @@ fn check_class_extension(
     let extended_fqcn = context.lookup(extended_name_identifier).to_string();
 
     let Some(extended) = context.codebase.get_class(context.interner, extended_name_identifier) else {
-        let issue = Issue::error(format!("Extended class `{}` does not exist.", extended_name))
+        let issue = Issue::new(context.level(), format!("Extended class `{}` does not exist.", extended_name))
             .with_annotation(
                 Annotation::primary(extended_identifier.span())
                     .with_message(format!("Class `{}` does not exist.", extended_fqcn)),
@@ -188,21 +188,24 @@ fn check_class_extension(
     let extender_name = extender.name.get_key(context.interner);
 
     if extended.is_final {
-        let issue = Issue::error(format!("Cannot extend final class `{}` from `{}`.", extended_name, extender_name))
-            .with_annotation(
-                Annotation::primary(extended_identifier.span())
-                    .with_message(format!("Class `{}` is final.", extended_fqcn)),
-            )
-            .with_help(format!("Ensure the class `{}` is not final or remove the `extends` clause.", extended_fqcn));
+        let issue = Issue::new(
+            context.level(),
+            format!("Cannot extend final class `{}` from `{}`.", extended_name, extender_name),
+        )
+        .with_annotation(
+            Annotation::primary(extended_identifier.span())
+                .with_message(format!("Class `{}` is final.", extended_fqcn)),
+        )
+        .with_help(format!("Ensure the class `{}` is not final or remove the `extends` clause.", extended_fqcn));
 
         context.report(issue);
     }
 
     if extender.is_readonly && !extended.is_readonly {
-        let issue = Issue::error(format!(
-            "Cannot extend non-readonly class `{}` from readonly class `{}`.",
-            extended_name, extender_name
-        ))
+        let issue = Issue::new(
+            context.level(),
+            format!("Cannot extend non-readonly class `{}` from readonly class `{}`.", extended_name, extender_name),
+        )
         .with_annotation(
             Annotation::primary(extended_identifier.span())
                 .with_message(format!("Class `{}` is not readonly.", extended_fqcn)),
@@ -232,16 +235,18 @@ fn check_class_extension(
     }
 
     if extended.inheritance.extends_class(context.interner, extender) {
-        let issue =
-            Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name))
-                .with_annotation(
-                    Annotation::primary(extended_identifier.span())
-                        .with_message(format!("Class `{}` already extends `{}`.", extended_fqcn, extender_name)),
-                )
-                .with_help(format!(
-                    "Ensure there is no circular inheritance between `{}` and `{}`.",
-                    extender_name, extended_name
-                ));
+        let issue = Issue::new(
+            context.level(),
+            format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name),
+        )
+        .with_annotation(
+            Annotation::primary(extended_identifier.span())
+                .with_message(format!("Class `{}` already extends `{}`.", extended_fqcn, extender_name)),
+        )
+        .with_help(format!(
+            "Ensure there is no circular inheritance between `{}` and `{}`.",
+            extender_name, extended_name
+        ));
 
         context.report(issue);
     }
@@ -258,7 +263,7 @@ fn check_interface_extension(
     let extended_fqcn = context.lookup(extended_name_identifier);
 
     let Some(extended) = context.codebase.get_interface(context.interner, extended_name_identifier) else {
-        let issue = Issue::error(format!("Extended interface `{}` does not exist.", extended_name))
+        let issue = Issue::new(context.level(), format!("Extended interface `{}` does not exist.", extended_name))
             .with_annotation(
                 Annotation::primary(extended_identifier.span())
                     .with_message(format!("Interface `{}` does not exist.", extended_fqcn)),
@@ -273,16 +278,18 @@ fn check_interface_extension(
     if extended.inheritance.extends_interface(context.interner, extender) {
         let extender_name = extender.name.get_key(context.interner);
 
-        let issue =
-            Issue::error(format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name))
-                .with_annotation(
-                    Annotation::primary(extended_identifier.span())
-                        .with_message(format!("Interface `{}` already extends `{}`.", extended_fqcn, extender_name)),
-                )
-                .with_help(format!(
-                    "Ensure there is no circular inheritance between `{}` and `{}`.",
-                    extender_name, extended_name
-                ));
+        let issue = Issue::new(
+            context.level(),
+            format!("Circular inheritance detected between `{}` and `{}`.", extender_name, extended_name),
+        )
+        .with_annotation(
+            Annotation::primary(extended_identifier.span())
+                .with_message(format!("Interface `{}` already extends `{}`.", extended_fqcn, extender_name)),
+        )
+        .with_help(format!(
+            "Ensure there is no circular inheritance between `{}` and `{}`.",
+            extender_name, extended_name
+        ));
 
         context.report(issue);
     }
@@ -298,7 +305,7 @@ fn check_interface_implementation(implemented_identifier: &Identifier, context: 
         return;
     }
 
-    let issue = Issue::error(format!("Implemented interface `{}` does not exist.", implemented_name))
+    let issue = Issue::new(context.level(), format!("Implemented interface `{}` does not exist.", implemented_name))
         .with_annotation(
             Annotation::primary(implemented_identifier.span())
                 .with_message(format!("Interface `{}` does not exist.", implemented_fqcn)),

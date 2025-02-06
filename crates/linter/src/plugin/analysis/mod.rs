@@ -1,8 +1,8 @@
 use crate::definition::PluginDefinition;
 use crate::plugin::analysis::rules::inheritance::InheritanceRule;
 use crate::plugin::analysis::rules::instantiation::InstantiationRule;
-use crate::plugin::analysis::rules::undefined_constant::UndefinedConstantRule;
-use crate::plugin::analysis::rules::undefined_function::UndefinedFunctionRule;
+use crate::plugin::analysis::rules::undefined_constant_or_case::UndefinedConstantOrCaseRule;
+use crate::plugin::analysis::rules::undefined_function_or_method::UndefinedFunctionOrMethodRule;
 
 use crate::plugin::Plugin;
 use crate::rule::Rule;
@@ -25,8 +25,8 @@ impl Plugin for AnalysisPlugin {
         vec![
             Box::new(InheritanceRule),
             Box::new(InstantiationRule),
-            Box::new(UndefinedConstantRule),
-            Box::new(UndefinedFunctionRule),
+            Box::new(UndefinedConstantOrCaseRule),
+            Box::new(UndefinedFunctionOrMethodRule),
         ]
     }
 }

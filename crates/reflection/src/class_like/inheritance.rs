@@ -52,18 +52,22 @@ pub struct InheritanceReflection {
 }
 
 impl InheritanceReflection {
+    #[inline]
     pub fn implements_interfaces(&self) -> bool {
         !self.all_implemented_interfaces.is_empty()
     }
 
+    #[inline]
     pub fn extends_classes(&self) -> bool {
         !self.all_extended_classes.is_empty()
     }
 
+    #[inline]
     pub fn has_children(&self) -> bool {
         !self.children.is_empty()
     }
 
+    #[inline]
     pub fn is_instance_of(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
         let Some(other_name) = other.name.inner() else {
             return false;
@@ -86,25 +90,37 @@ impl InheritanceReflection {
             || self.all_extended_interfaces.contains(other_fqcn)
     }
 
+    #[inline]
     pub fn extends_class(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
         let Some(name) = other.name.inner() else {
             return false; // we can't extend a class that does not have a name, i.e. anonymous class
         };
 
-        let identifier = interner.lowered(&name.value);
+        self.extends_class_with_name(interner, &name.value)
+    }
+
+    #[inline]
+    pub fn extends_class_with_name(&self, interner: &ThreadedInterner, other: &StringIdentifier) -> bool {
+        let identifier = interner.lowered(other);
         let Some(other) = self.names.get(&identifier) else {
-            return false; // the other class is not in the inheritance chain
+            return false;
         };
 
         self.all_extended_classes.contains(other)
     }
 
+    #[inline]
     pub fn extends_interface(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
         let Some(name) = other.name.inner() else {
             return false;
         };
 
-        let identifier = interner.lowered(&name.value);
+        self.extends_interface_with_name(interner, &name.value)
+    }
+
+    #[inline]
+    pub fn extends_interface_with_name(&self, interner: &ThreadedInterner, other: &StringIdentifier) -> bool {
+        let identifier = interner.lowered(other);
         let Some(other) = self.names.get(&identifier) else {
             return false;
         };
@@ -112,12 +128,18 @@ impl InheritanceReflection {
         self.all_extended_interfaces.contains(other)
     }
 
+    #[inline]
     pub fn implements_interface(&self, interner: &ThreadedInterner, other: &ClassLikeReflection) -> bool {
         let Some(name) = other.name.inner() else {
             return false;
         };
 
-        let identifier = interner.lowered(&name.value);
+        self.implements_interface_with_name(interner, &name.value)
+    }
+
+    #[inline]
+    pub fn implements_interface_with_name(&self, interner: &ThreadedInterner, other: &StringIdentifier) -> bool {
+        let identifier = interner.lowered(other);
         let Some(other) = self.names.get(&identifier) else {
             return false;
         };

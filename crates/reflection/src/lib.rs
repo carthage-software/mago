@@ -54,7 +54,7 @@ pub trait Reflection: HasSpan + HasSource {
     /// - `true` if the entity's `SourceCategory` is `UserDefined`.
     /// - `false` otherwise.
     fn is_user_defined(&self) -> bool {
-        self.get_category() == SourceCategory::UserDefined
+        self.get_category().is_user_defined()
     }
 
     /// Indicates whether the entity originates from an external source (e.g., vendor libraries).
@@ -64,7 +64,7 @@ pub trait Reflection: HasSpan + HasSource {
     /// - `true` if the entity's `SourceCategory` is `Vendor` or similar external categories.
     /// - `false` otherwise.
     fn is_external(&self) -> bool {
-        self.get_category() == SourceCategory::External
+        self.get_category().is_external()
     }
 
     /// Indicates whether the entity is a built-in PHP construct.
@@ -77,8 +77,8 @@ pub trait Reflection: HasSpan + HasSource {
     /// - `true` if the entity's `SourceCategory` is `BuiltIn`.
     /// - `false` otherwise.
     #[inline(always)]
-    fn is_builtin(&self) -> bool {
-        self.get_category() == SourceCategory::BuiltIn
+    fn is_built_in(&self) -> bool {
+        self.get_category().is_built_in()
     }
 
     /// Indicates whether the entity has been fully populated with metadata.
@@ -611,6 +611,33 @@ impl CodebaseReflection {
     /// - `None` otherwise.
     pub fn get_anonymous_class(&self, node: &impl HasSpan) -> Option<&ClassLikeReflection> {
         self.class_like_reflections.get(&ClassLikeName::AnonymousClass(node.span()))
+    }
+
+    /// Retrieves a method reflection from a class-like entity by its name, if it exists.
+    ///
+    /// This method first checks the class-like entity for the method. If the method is not found,
+    /// it checks the class-like entity's ancestors for the method.
+    ///
+    /// # Arguments
+    ///
+    /// - `class`: The class-like reflection to search for the method.
+    /// - `method`: The name of the method to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(&FunctionLikeReflection)` if the method exists.
+    /// - `None` otherwise.
+    pub fn get_method<'a>(
+        &'a self,
+        class: &'a ClassLikeReflection,
+        method: &StringIdentifier,
+    ) -> Option<&'a FunctionLikeReflection> {
+        class.methods.members.get(method).or_else(|| {
+            let appering_in_class = class.methods.appering_members.get(method)?;
+            let class = self.class_like_reflections.get(appering_in_class)?;
+
+            class.get_method(method)
+        })
     }
 
     /// Returns the function-like reflection (function, closure, etc.) that encloses the given offset.

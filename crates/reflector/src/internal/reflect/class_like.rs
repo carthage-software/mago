@@ -18,11 +18,10 @@ use mago_span::*;
 
 use crate::internal::context::Context;
 use crate::internal::reflect::attribute::reflect_attributes;
-
-use super::function_like::reflect_function_like_parameter_list;
-use super::function_like::reflect_function_like_return_type_hint;
-use super::r#type::maybe_reflect_hint;
-use super::r#type::reflect_hint;
+use crate::internal::reflect::function_like::reflect_function_like_parameter_list;
+use crate::internal::reflect::function_like::reflect_function_like_return_type_hint;
+use crate::internal::reflect::r#type::maybe_reflect_hint;
+use crate::internal::reflect::r#type::reflect_hint;
 
 pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -> ClassLikeReflection {
     let mut reflection = ClassLikeReflection {
@@ -61,7 +60,7 @@ pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -
         is_abstract: class.modifiers.contains_abstract(),
         span: class.span(),
         constants: Default::default(),
-        cases: MemeberCollection::empty(),
+        cases: Default::default(),
         properties: MemeberCollection::empty(),
         methods: MemeberCollection::empty(),
         used_traits: Default::default(),
@@ -114,7 +113,7 @@ pub fn reflect_anonymous_class<'ast>(
         is_abstract: class.modifiers.contains_abstract(),
         span: class.span(),
         constants: Default::default(),
-        cases: MemeberCollection::empty(),
+        cases: Default::default(),
         properties: MemeberCollection::empty(),
         methods: MemeberCollection::empty(),
         used_traits: Default::default(),
@@ -154,7 +153,7 @@ pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Co
         is_abstract: true,
         span: interface.span(),
         constants: Default::default(),
-        cases: MemeberCollection::empty(),
+        cases: Default::default(),
         properties: MemeberCollection::empty(),
         methods: MemeberCollection::empty(),
         used_traits: Default::default(),
@@ -179,7 +178,7 @@ pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>)
         is_abstract: true,
         span: r#trait.span(),
         constants: Default::default(),
-        cases: MemeberCollection::empty(),
+        cases: Default::default(),
         properties: MemeberCollection::empty(),
         methods: MemeberCollection::empty(),
         used_traits: Default::default(),
@@ -222,7 +221,7 @@ pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) ->
         is_abstract: false,
         span: r#enum.span(),
         constants: Default::default(),
-        cases: MemeberCollection::empty(),
+        cases: Default::default(),
         properties: MemeberCollection::empty(),
         methods: MemeberCollection::empty(),
         used_traits: Default::default(),
@@ -259,7 +258,7 @@ fn reflect_class_like_members<'ast>(
             ClassLikeMember::EnumCase(enum_case) => {
                 let case_ref = reflect_class_like_enum_case(reflection, enum_case, context);
 
-                reflection.cases.members.insert(case_ref.name.member.value, case_ref);
+                reflection.cases.insert(case_ref.name.member.value, case_ref);
             }
             ClassLikeMember::Method(method) => {
                 let (name, meth_ref) = reflect_class_like_method(reflection, method, context);
@@ -306,10 +305,10 @@ fn reflect_class_like_constant<'ast>(
     let type_reflection = maybe_reflect_hint(&constant.hint, context, Some(class_like));
     let is_final = constant.modifiers.contains_final();
 
-    let mut reflections = vec![];
-
-    for item in constant.items.iter() {
-        reflections.push(ClassLikeConstantReflection {
+    constant
+        .items
+        .iter()
+        .map(|item| ClassLikeConstantReflection {
             attribute_reflections: attribute_reflections.clone(),
             visibility_reflection,
             type_reflection: type_reflection.clone(),
@@ -321,10 +320,8 @@ fn reflect_class_like_constant<'ast>(
             inferred_type_reflection: mago_typing::infere(context.interner, context.source, context.names, &item.value),
             item_span: item.span(),
             definition_span: constant.span(),
-        });
-    }
-
-    reflections
+        })
+        .collect()
 }
 
 fn reflect_class_like_enum_case<'ast>(

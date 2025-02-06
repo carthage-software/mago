@@ -44,7 +44,7 @@ pub struct ClassLikeReflection {
     pub constants: HashMap<StringIdentifier, ClassLikeConstantReflection>,
 
     /// Enum cases defined in the class-like entity, if it is an enum.
-    pub cases: MemeberCollection<EnumCaseReflection>,
+    pub cases: HashMap<StringIdentifier, EnumCaseReflection>,
 
     /// Properties defined in the class-like entity.
     pub properties: MemeberCollection<PropertyReflection>,
@@ -82,86 +82,115 @@ pub struct ClassLikeReflection {
 
 impl ClassLikeReflection {
     /// Checks if this class-like entity is a trait.
-    pub fn is_trait(&self) -> bool {
+    #[inline]
+    pub const fn is_trait(&self) -> bool {
         matches!(self.name, ClassLikeName::Trait(_))
     }
 
     /// Checks if this class-like entity is an interface.
-    pub fn is_interface(&self) -> bool {
+    #[inline]
+    pub const fn is_interface(&self) -> bool {
         matches!(self.name, ClassLikeName::Interface(_))
     }
 
     /// Checks if this class-like entity is a class.
-    pub fn is_class(&self) -> bool {
+    #[inline]
+    pub const fn is_class(&self) -> bool {
         matches!(self.name, ClassLikeName::Class(_))
     }
 
     /// Checks if this class-like entity is an enum.
-    pub fn is_enum(&self) -> bool {
+    #[inline]
+    pub const fn is_enum(&self) -> bool {
         matches!(self.name, ClassLikeName::Enum(_))
     }
 
+    /// Checks if this class-like entity is a unit enum.
+    #[inline]
+    pub const fn is_unit_enum(&self) -> bool {
+        matches!(self.name, ClassLikeName::Enum(_)) && self.backing_type.is_none()
+    }
+
+    /// Checks if this class-like entity is a backed enum.
+    #[inline]
+    pub const fn is_backed_enum(&self) -> bool {
+        matches!(self.name, ClassLikeName::Enum(_)) && self.backing_type.is_some()
+    }
+
     /// Checks if this class-like entity is a trait.
-    pub fn is_anonymous_class(&self) -> bool {
+    #[inline]
+    pub const fn is_anonymous_class(&self) -> bool {
         matches!(self.name, ClassLikeName::AnonymousClass(_))
     }
 
     /// Checks if this class-like entity extends the given class.
+    #[inline]
     pub fn extends_class(&self, class_like_identifier: &Name) -> bool {
         self.inheritance.all_extended_classes.contains(class_like_identifier)
     }
 
     /// Checks if this class-like entity implements the given interface.
+    #[inline]
     pub fn implements_interface(&self, interface_identifier: &Name) -> bool {
         self.inheritance.all_implemented_interfaces.contains(interface_identifier)
     }
 
     /// Checks if this interface extends the given interface.
+    #[inline]
     pub fn extends_interface(&self, interface_identifier: &Name) -> bool {
         self.inheritance.all_extended_interfaces.contains(interface_identifier)
     }
 
     /// Checks if this class-like entity uses the given trait.
+    #[inline]
     pub fn uses_trait(&self, trait_identifier: &StringIdentifier) -> bool {
         self.used_traits.contains(trait_identifier)
     }
 
     /// Checks if this class-like entity contains a constant with the given name.
+    #[inline]
     pub fn has_constant(&self, constant_name: &StringIdentifier) -> bool {
         self.constants.contains_key(constant_name)
     }
 
     /// Checks if this class-like entity contains an enum case with the given name.
+    #[inline]
     pub fn has_enum_case(&self, case_name: &StringIdentifier) -> bool {
-        self.cases.appering_members.contains_key(case_name)
+        self.cases.contains_key(case_name)
     }
 
     /// Checks if this class-like entity has a property with the given name.
+    #[inline]
     pub fn has_property(&self, property_name: &StringIdentifier) -> bool {
         self.properties.appering_members.contains_key(property_name)
     }
 
     /// Checks if this class-like entity has a method with the given name.
+    #[inline]
     pub fn has_method(&self, method_name: &StringIdentifier) -> bool {
         self.methods.appering_members.contains_key(method_name)
     }
 
     /// Retrieves a constant by name, if it exists.
+    #[inline]
     pub fn get_constant(&self, constant_name: &StringIdentifier) -> Option<&ClassLikeConstantReflection> {
         self.constants.get(constant_name)
     }
 
     /// Retrieves an enum case by name, if it exists.
+    #[inline]
     pub fn get_enum_case(&self, case_name: &StringIdentifier) -> Option<&EnumCaseReflection> {
-        self.cases.members.get(case_name)
+        self.cases.get(case_name)
     }
 
     /// Retrieves a property by name, if it exists.
+    #[inline]
     pub fn get_property(&self, property_name: &StringIdentifier) -> Option<&PropertyReflection> {
         self.properties.members.get(property_name)
     }
 
     /// Retrieves a method by name, if it exists.
+    #[inline]
     pub fn get_method(&self, method_name: &StringIdentifier) -> Option<&FunctionLikeReflection> {
         self.methods.members.get(method_name)
     }

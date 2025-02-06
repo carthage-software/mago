@@ -37,13 +37,15 @@ pub enum FunctionLikeName {
 }
 
 impl Name {
-    pub fn new(value: StringIdentifier, span: Span) -> Self {
+    #[inline]
+    pub const fn new(value: StringIdentifier, span: Span) -> Self {
         Name { value, span }
     }
 }
 
 impl ClassLikeName {
-    pub fn inner(&self) -> Option<&Name> {
+    #[inline]
+    pub const fn inner(&self) -> Option<&Name> {
         match self {
             ClassLikeName::Class(name) => Some(name),
             ClassLikeName::Interface(name) => Some(name),
@@ -53,6 +55,18 @@ impl ClassLikeName {
         }
     }
 
+    #[inline]
+    pub const fn inner_unchecked(&self) -> &Name {
+        match self {
+            ClassLikeName::Class(name) => name,
+            ClassLikeName::Interface(name) => name,
+            ClassLikeName::Enum(name) => name,
+            ClassLikeName::Trait(name) => name,
+            ClassLikeName::AnonymousClass(_) => unreachable!(),
+        }
+    }
+
+    #[inline]
     pub fn get_key(&self, interner: &ThreadedInterner) -> String {
         match self {
             ClassLikeName::Class(name)
@@ -72,6 +86,7 @@ impl ClassLikeName {
 }
 
 impl ClassLikeMemberName {
+    #[inline]
     pub fn get_key(&self, interner: &ThreadedInterner) -> String {
         let class_name = self.class_like.get_key(interner);
         let member_name = interner.lookup(&self.member.value);
@@ -81,10 +96,17 @@ impl ClassLikeMemberName {
 }
 
 impl FunctionLikeName {
-    pub fn is_function(&self) -> bool {
+    #[inline]
+    pub const fn is_function(&self) -> bool {
         matches!(self, FunctionLikeName::Function(_))
     }
 
+    #[inline]
+    pub const fn is_method_named(&self, value: &StringIdentifier) -> bool {
+        matches!(self, FunctionLikeName::Method(_, name) if name.value.is_same_as(value))
+    }
+
+    #[inline]
     pub fn get_key(&self, interner: &ThreadedInterner) -> String {
         match self {
             FunctionLikeName::Function(name) => interner.lookup(&name.value).to_string(),
