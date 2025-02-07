@@ -158,7 +158,7 @@ impl Rule for RedundantInstanceOfRule {
                     )))
                     .with_help("Remove this `instanceof` assertion because it is redundant and always true.");
 
-                context.report_with_fix(issue, |fix| {
+                context.propose(issue, |fix| {
                     fix.delete(reference.span().to_range(), SafetyClassification::Safe);
                 });
             } else {
@@ -170,7 +170,7 @@ impl Rule for RedundantInstanceOfRule {
                     )))
                     .with_help("Remove this `instanceof` assertion because it is redundant and always false.");
 
-                context.report_with_fix(issue, |fix| {
+                context.propose(issue, |fix| {
                     // we consider this to be potentially unsafe because this
                     // change can alter the behavior of the result of the test
                     // (e.g. if the test is expecting an exception to be thrown)

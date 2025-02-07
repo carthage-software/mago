@@ -87,9 +87,8 @@ impl Rule for RedundantMethodOverrideRule {
                 )
                 .with_help("Remove this redundant method override.");
 
-            context.report_with_fix(issue, |plan| {
-                plan.delete(method.span().to_range(), SafetyClassification::PotentiallyUnsafe)
-            });
+            context
+                .propose(issue, |plan| plan.delete(method.span().to_range(), SafetyClassification::PotentiallyUnsafe));
         }
 
         LintDirective::Prune

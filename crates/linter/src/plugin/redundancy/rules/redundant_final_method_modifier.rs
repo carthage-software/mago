@@ -96,9 +96,8 @@ impl Rule for RedundantFinalMethodModifierRule {
                     ])
                     .with_help("Remove the redundant `final` modifier.");
 
-                context.report_with_fix(issue, |plan| {
-                    plan.delete(final_modifier.span().to_range(), SafetyClassification::Safe)
-                });
+                context
+                    .propose(issue, |plan| plan.delete(final_modifier.span().to_range(), SafetyClassification::Safe));
             }
         }
 

@@ -58,7 +58,7 @@ impl Rule for LowercaseKeywordRule {
                 .with_note(format!("The keyword `{}` does not follow lowercase convention.", name))
                 .with_help(format!("Consider using `{}` instead of `{}`.", lowered, name));
 
-            context.report_with_fix(issue, |p| p.replace(keyword.span.to_range(), lowered, SafetyClassification::Safe));
+            context.propose(issue, |p| p.replace(keyword.span.to_range(), lowered, SafetyClassification::Safe));
         }
 
         LintDirective::Prune

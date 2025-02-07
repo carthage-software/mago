@@ -10,8 +10,8 @@ use crate::context::LintContext;
 use crate::definition::RuleDefinition;
 use crate::definition::RuleUsageExample;
 use crate::directive::LintDirective;
-use crate::plugin::comment::rules::utils::comment_content;
 use crate::rule::Rule;
+use crate::utils::comment_lines;
 
 static TAGGED_FIXME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"fixme\((#|@)?\S+\)").unwrap());
 
@@ -50,22 +50,17 @@ impl Rule for NoUntaggedFixmeRule {
         let Node::Program(program) = node else { return LintDirective::Abort };
 
         for trivia in program.trivia.iter() {
-            let Some(content) = comment_content(trivia, context) else {
-                continue;
-            };
-
-            let content = content.to_lowercase();
-            if !content.contains("fixme") {
+            if !trivia.kind.is_comment() {
                 continue;
             }
 
-            for line in content.lines() {
-                let trimmied = line.trim_start();
+            for line in comment_lines(trivia, context.interner) {
+                let trimmied = line.trim_start().to_lowercase();
                 if !trimmied.starts_with("fixme") {
                     continue;
                 }
 
-                if (*TAGGED_FIXME_REGEX).is_match(trimmied) {
+                if (*TAGGED_FIXME_REGEX).is_match(&trimmied) {
                     continue;
                 }
 

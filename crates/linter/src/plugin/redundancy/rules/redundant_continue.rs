@@ -65,7 +65,7 @@ impl Rule for RedundantContinueRule {
             ])
             .with_help("Remove this `continue` statement, as it does not affect the loop's behavior.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.delete(r#continue.span().to_range(), SafetyClassification::Safe);
         });
 

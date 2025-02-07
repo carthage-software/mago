@@ -33,7 +33,7 @@ impl Rule for NoShellStyleRule {
                     .with_annotation(Annotation::primary(comment_span).with_message("This is a shell-style comment."))
                     .with_help("Consider using double slash comments ('//') instead.");
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     plan.replace(comment_pos.range_for(1), "//", SafetyClassification::Safe);
                 });
             }

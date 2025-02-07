@@ -143,7 +143,7 @@ impl Rule for RedundantParenthesesRule {
             )
             .with_help("Remove the redundant inner parentheses.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.delete(parenthesized.left_parenthesis.to_range(), SafetyClassification::Safe);
             plan.delete(parenthesized.right_parenthesis.to_range(), SafetyClassification::Safe);
         });

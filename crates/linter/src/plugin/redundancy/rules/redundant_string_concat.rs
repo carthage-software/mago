@@ -70,7 +70,7 @@ impl Rule for RedundantStringConcatRule {
                     Annotation::secondary(right.span()).with_message("Right string"),
                 ]);
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 let range = (left.span.end.offset - 1)..(right.span.start.offset + 1);
 
                 plan.delete(range, SafetyClassification::Safe)

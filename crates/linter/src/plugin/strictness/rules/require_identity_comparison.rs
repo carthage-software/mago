@@ -60,8 +60,7 @@ impl Rule for RequireIdentityComparisonRule {
                         )
                         .with_help("Use `===` to ensure both value and type are equal.");
 
-                context
-                    .report_with_fix(issue, |plan| plan.replace(span.to_range(), "===", SafetyClassification::Unsafe));
+                context.propose(issue, |plan| plan.replace(span.to_range(), "===", SafetyClassification::Unsafe));
             }
             // `!=` -> `!==`
             BinaryOperator::NotEqual(span) => {
@@ -74,8 +73,7 @@ impl Rule for RequireIdentityComparisonRule {
                         )
                         .with_help("Use `!==` to ensure both value and type are different.");
 
-                context
-                    .report_with_fix(issue, |plan| plan.replace(span.to_range(), "!==", SafetyClassification::Unsafe));
+                context.propose(issue, |plan| plan.replace(span.to_range(), "!==", SafetyClassification::Unsafe));
             }
             // `<>` -> `!==`
             BinaryOperator::AngledNotEqual(span) => {
@@ -90,8 +88,7 @@ impl Rule for RequireIdentityComparisonRule {
                 )
                 .with_help("Use `!==` to ensure both value and type are different.");
 
-                context
-                    .report_with_fix(issue, |plan| plan.replace(span.to_range(), "!==", SafetyClassification::Unsafe));
+                context.propose(issue, |plan| plan.replace(span.to_range(), "!==", SafetyClassification::Unsafe));
             }
             _ => {}
         }

@@ -160,7 +160,7 @@ impl Rule for AssertionsStyleRule {
                     desired_syntax, current_syntax, desired_style,
                 ));
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 plan.replace(
                     to_replace.to_range(),
                     desired_syntax.to_string(),

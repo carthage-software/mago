@@ -92,7 +92,7 @@ impl Rule for StrictAssertionsRule {
                         name, strict_name
                     ));
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     plan.replace(
                         reference.get_selector().span().to_range(),
                         strict_name,

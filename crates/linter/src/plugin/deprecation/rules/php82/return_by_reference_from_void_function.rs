@@ -190,7 +190,7 @@ fn report(context: &mut LintContext<'_>, kind: &'static str, span: Span, ampersa
         .with_annotation(Annotation::secondary(span))
         .with_help("Consider removing the `&` to comply with PHP 8.0 standards and avoid future issues.".to_string());
 
-    context.report_with_fix(issue, |plan| {
+    context.propose(issue, |plan| {
         plan.delete(ampersand.to_range(), SafetyClassification::Safe);
     });
 }

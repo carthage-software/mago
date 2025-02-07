@@ -62,7 +62,7 @@ impl Rule for RedundantNoopRule {
                     .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement."))
                     .with_help("Remove the redundant `;`");
 
-                context.report_with_fix(issue, |plan| plan.delete(noop.to_range(), SafetyClassification::Safe));
+                context.propose(issue, |plan| plan.delete(noop.to_range(), SafetyClassification::Safe));
             }
         }
 

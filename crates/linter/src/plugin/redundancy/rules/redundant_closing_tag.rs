@@ -51,7 +51,7 @@ fn check_statements(sequence: &Sequence<Statement>, context: &mut LintContext<'_
             .with_annotation(Annotation::primary(closing_tag.span()).with_message("This closing tag is redundant."))
             .with_help("Remove the redundant closing tag ( `?>` ).");
 
-        context.report_with_fix(issue, |plan| plan.delete(closing_tag.span().to_range(), SafetyClassification::Safe));
+        context.propose(issue, |plan| plan.delete(closing_tag.span().to_range(), SafetyClassification::Safe));
 
         return;
     }
@@ -76,7 +76,7 @@ fn check_statements(sequence: &Sequence<Statement>, context: &mut LintContext<'_
                 )
                 .with_help("Remove the redundant closing tag ( `?>` ) and trailing whitespace.");
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 plan.delete(inline.span().to_range(), SafetyClassification::Safe);
                 plan.delete(tag.span().to_range(), SafetyClassification::Safe);
             });

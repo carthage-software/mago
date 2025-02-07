@@ -90,7 +90,7 @@ impl Rule for ImplicitlyNullableParameterRule {
         ))
         .with_note("Updating this will future-proof your code and align it with PHP 8.4 standards.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.insert(hint.span().start_position().offset, prefix, SafetyClassification::Safe);
         });
 

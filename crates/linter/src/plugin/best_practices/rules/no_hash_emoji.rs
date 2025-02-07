@@ -73,7 +73,7 @@ impl Rule for NoHashEmojiRule {
                 issue = issue.with_note("`#️⃣[` does not parse as an attribute in PHP; use `#[` instead.");
             }
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 plan.replace(
                     trivia.span().start.offset..(trivia.span().start.offset + "#️⃣".len()),
                     "#".to_string(),

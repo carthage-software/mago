@@ -47,7 +47,7 @@ impl Rule for NoErrorControlOperatorRule {
                 .with_note("Error control operator hide potential errors and make debugging more difficult.")
                 .with_help("Remove the `@` and use `set_error_handler` to handle errors instead.");
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 plan.delete(unary_prefix.operator.span().to_range(), SafetyClassification::Safe)
             });
         }

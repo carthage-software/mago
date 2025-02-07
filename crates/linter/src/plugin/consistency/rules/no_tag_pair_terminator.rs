@@ -52,7 +52,7 @@ impl Rule for NoTagPairTerminatorRule {
             )
             .with_help("Replace `?><?php` with a `;`");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.replace(close.span().join(open.span()).to_range(), ";", SafetyClassification::Safe)
         });
 

@@ -157,6 +157,19 @@ impl Source {
         self.lines.binary_search(&offset).unwrap_or_else(|next_line| next_line - 1)
     }
 
+    /// Retrieve the byte offset for the start of the given line.
+    ///
+    /// # Parameters
+    ///
+    /// - `line`: The line number to retrieve the start offset for.
+    ///
+    /// # Returns
+    ///
+    /// The byte offset for the start of the given line (0-based index).
+    pub fn get_line_start_offset(&self, line: usize) -> Option<usize> {
+        self.lines.get(line).copied()
+    }
+
     /// Retrieve the column number for the given byte offset.
     ///
     /// # Parameters

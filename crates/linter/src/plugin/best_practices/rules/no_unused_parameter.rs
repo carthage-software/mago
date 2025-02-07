@@ -175,7 +175,7 @@ fn check_parameter(
         .with_note(format!("This parameter is declared but not used within the {}.", kind))
         .with_help("Consider prefixing the parameter with an underscore (`_`) to indicate that it is intentionally unused, or remove it if it is not needed.");
 
-    context.report_with_fix(issue, |plan| {
+    context.propose(issue, |plan| {
         plan.insert(
             parameter.variable.span().start.offset + 1, // skip the leading `$`
             "_",

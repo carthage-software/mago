@@ -83,7 +83,7 @@ impl Rule for InterfaceShouldBeUsed {
                         .with_message("This uses the implementation instead of the interface."),
                 );
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     // the change is potentially unsafe because we don't
                     // know if the user is using implementation-specific methods/properties
                     // that are not part of the interface

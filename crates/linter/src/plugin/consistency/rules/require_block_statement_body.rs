@@ -94,7 +94,7 @@ fn check_loop(r#loop: &impl HasSpan, statement: &Statement, context: &mut LintCo
         )
         .with_help("Enclose the loop body in a block for clarity and error prevention.");
 
-    context.report_with_fix(issue, |plan| {
+    context.propose(issue, |plan| {
         if matches!(statement, Statement::Noop(_)) {
             plan.replace(statement.span().to_range(), "{}", SafetyClassification::Safe);
         } else {

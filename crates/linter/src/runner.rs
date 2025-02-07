@@ -5,10 +5,11 @@ use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
 use mago_semantics::Semantics;
 
+use crate::ast::AstNode;
 use crate::context::LintContext;
-use crate::directive::LintDirective;
+use crate::ignore::get_ignores;
+use crate::ignore::IgnoreDirective;
 use crate::rule::ConfiguredRule;
-use crate::rule::Rule;
 
 /// The `Runner` is responsible for executing a lint rule on the AST of a PHP program.
 ///
@@ -26,8 +27,9 @@ pub struct Runner<'a> {
     interner: &'a ThreadedInterner,
     codebase: &'a CodebaseReflection,
     semantics: &'a Semantics,
-    ast: AstNode<'a>,
     issues: IssueCollection,
+    ast: AstNode<'a>,
+    ignores: Vec<IgnoreDirective<'a>>,
 }
 
 impl<'a> Runner<'a> {
@@ -52,32 +54,73 @@ impl<'a> Runner<'a> {
         codebase: &'a CodebaseReflection,
         semantics: &'a Semantics,
     ) -> Self {
-        // Precompute the AST tree from the semantics program.
-        let ast = AstNode::from(Node::Program(&semantics.program));
-
-        Self { php_version, interner, codebase, semantics, issues: IssueCollection::default(), ast }
+        Self {
+            php_version,
+            interner,
+            codebase,
+            semantics,
+            ast: AstNode::from(Node::Program(&semantics.program)),
+            ignores: get_ignores(semantics, interner),
+            issues: IssueCollection::default(),
+        }
     }
 
-    /// Executes the specified lint rule on the precomputed AST.
+    /// Executes the specified lint rule on the precomputed AST and reports unused ignore comments.
     ///
     /// This method creates a [`LintContext`] for the given rule and recursively lints the AST starting
-    /// from the root node. The rule's `lint_node` method is applied at each node, and any issues reported
-    /// are added to the runner's issue collection.
+    /// from the root node. During the linting process, the rule's `lint_node` method is applied to each node,
+    /// and any issues discovered are added to the runner's issue collection. Prior to linting, the method filters
+    /// the list of available ignore comments to include only those whose directives match the rule's slug (case-insensitively).
+    ///
+    /// After linting, any ignore comments that remain in the context (i.e. they were not consumed by any node)
+    /// are reported as unused ignores. This helps users identify ignore directives that have no effect and may be
+    /// safely removed.
     ///
     /// # Parameters
     ///
-    /// - `configured_rule`: The lint rule configuration to be executed.
+    /// - `configured_rule`: The lint rule configuration to execute. This configuration contains the rule's slug,
+    ///   which is used to match against ignore directive rules.
+    ///
+    /// # Behavior
+    ///
+    /// 1. **Filtering Ignores:**
+    ///    The method first filters the runner's list of ignore comments to retain only those whose directives
+    ///    match the rule's slug. These are then passed into the [`LintContext`].
+    ///
+    /// 2. **Linting the AST:**
+    ///    The AST is recursively traversed. If an ignore comment applies to a node, it is consumed and removed
+    ///    from the context to ensure it is not applied multiple times.
+    ///
+    /// 3. **Reporting Unused Ignores:**
+    ///    After linting, any ignore comments remaining in the context (i.e. unused) are reported as issues.
+    ///    These issues include annotations pointing to the ignore's source span along with help notes suggesting
+    ///    that the ignore directive be removed.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// // Assume `runner` is an instance of the lint runner,
+    /// // and `configured_rule` is a configured lint rule.
+    /// runner.run(&configured_rule);
+    /// // After running, any unused ignore comments will have been added to the issue collection.
+    /// ```
     pub fn run(&mut self, configured_rule: &ConfiguredRule) {
-        let mut context = LintContext {
-            php_version: self.php_version,
-            rule: configured_rule,
-            interner: self.interner,
-            codebase: self.codebase,
-            semantics: self.semantics,
-            issues: &mut self.issues,
-        };
+        let mut context = LintContext::new(
+            self.php_version,
+            configured_rule,
+            self.interner,
+            self.codebase,
+            self.semantics,
+            // Filter the ignores to only those that are relevant to this rule.
+            self.ignores
+                .iter()
+                .filter(|directive| configured_rule.slug.eq_ignore_ascii_case(directive.rule))
+                .collect::<Vec<_>>(),
+        );
 
-        lint_ast_node(&configured_rule.rule, &self.ast, &mut context);
+        context.lint(&self.ast);
+
+        self.issues.extend(context.finish());
     }
 
     /// Finalizes the linting process and returns the collection of reported issues.
@@ -87,77 +130,5 @@ impl<'a> Runner<'a> {
     /// An [`IssueCollection`] containing all issues reported during linting.
     pub fn finish(self) -> IssueCollection {
         self.issues
-    }
-}
-
-/// Recursively applies a lint rule to the precomputed AST.
-///
-/// For each node, this function calls the rule's [`Rule::lint_node`] method and then recurses
-/// into the node's children based on the returned [`LintDirective`]:
-///
-/// - **`LintDirective::Continue`**: Lint the children of the node.
-/// - **`LintDirective::Prune`**: Skip linting the node's children.
-/// - **`LintDirective::Abort`**: Immediately stop linting the current branch.
-///
-/// # Parameters
-///
-/// - `rule`: The lint rule to apply.
-/// - `ast_node`: The current node in the precomputed AST.
-/// - `context`: The linting context for reporting issues and providing additional data.
-///
-/// # Returns
-///
-/// Returns `true` if the linting process should be aborted for the current branch;
-/// otherwise, returns `false`.
-#[inline]
-fn lint_ast_node<'a, R: Rule>(rule: &R, ast_node: &AstNode<'a>, context: &mut LintContext<'a>) -> bool {
-    let directive = rule.lint_node(ast_node.node, context);
-
-    match directive {
-        LintDirective::Continue => {
-            // Recurse into each child node.
-            for child in &ast_node.children {
-                if lint_ast_node(rule, child, context) {
-                    return true;
-                }
-            }
-            false
-        }
-        LintDirective::Prune => false, // Skip children.
-        LintDirective::Abort => true,  // Abort the current branch.
-    }
-}
-
-/// A precomputed tree node for the AST.
-///
-/// `AstNode` wraps a [`Node`] from the AST and precomputes its children into a vector of [`AstNode`]
-/// structures. This avoids multiple calls to [`Node::children()`] during linting, thereby optimizing
-/// traversal performance.
-#[derive(Debug)]
-struct AstNode<'a> {
-    /// The wrapped AST node.
-    node: Node<'a>,
-    /// The precomputed child nodes.
-    children: Vec<AstNode<'a>>,
-}
-
-impl<'a> From<Node<'a>> for AstNode<'a> {
-    /// Recursively converts a [`Node`] into an [`AstNode`], precomputing its children.
-    ///
-    /// # Parameters
-    ///
-    /// - `node`: The AST node to be converted.
-    ///
-    /// # Returns
-    ///
-    /// An [`AstNode`] representing the given node and its descendants.
-    fn from(node: Node<'a>) -> Self {
-        let node_children = node.children();
-        let mut children = Vec::with_capacity(node_children.len());
-        for child in node_children {
-            children.push(AstNode::from(child));
-        }
-
-        Self { node, children }
     }
 }

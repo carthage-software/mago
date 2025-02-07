@@ -97,7 +97,7 @@ impl Rule for StrStartsWithRule {
         .with_help("`strpos($a, $b) === 0` can be simplified to `str_starts_with($a, $b)`.")
         .with_note("Using `str_starts_with` makes the code easier to understand and more expressive.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             if !equal {
                 plan.insert(binary.span().start_position().offset, "!", SafetyClassification::Safe);
             }

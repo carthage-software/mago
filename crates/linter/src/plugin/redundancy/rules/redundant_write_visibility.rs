@@ -62,7 +62,7 @@ impl Rule for RedundantWriteVisibilityRule {
                         Annotation::secondary(read_visibility.span()).with_message("Read visibility."),
                     ]);
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     let range = write_visibility.span().to_range();
 
                     plan.delete(range, SafetyClassification::PotentiallyUnsafe)

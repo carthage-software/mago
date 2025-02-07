@@ -54,7 +54,7 @@ impl Rule for NoEmptyLoopRule {
             )
             .with_help("Consider removing this loop or adding meaningful logic to its body.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.delete(loop_span.to_range(), SafetyClassification::PotentiallyUnsafe);
         });
 

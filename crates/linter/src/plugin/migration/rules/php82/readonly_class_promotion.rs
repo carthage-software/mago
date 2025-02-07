@@ -153,7 +153,7 @@ impl Rule for ReadonlyClassPromotionRule {
             .with_note("Classes that contains only readonly properties can be marked readonly themselves.")
             .with_help("Add the `readonly` modifier to the class and remove `readonly` from all properties");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             // Remove readonly from all properties
             for member in class.members.iter() {
                 match member {

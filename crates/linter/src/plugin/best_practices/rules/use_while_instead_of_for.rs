@@ -36,7 +36,7 @@ impl Rule for UseWhileInsteadOfForRule {
         .with_note("This `for` loop can be simplified to a `while` loop since it doesn't have initializations or increments.")
         .with_help("Use a `while` loop instead of a `for` loop.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.delete(r#for.r#for.span.to_range(), SafetyClassification::Safe);
             plan.insert(r#for.r#for.span.start.offset, "while", SafetyClassification::Safe);
 

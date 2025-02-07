@@ -96,7 +96,7 @@ impl Rule for StrContainsRule {
         .with_help("`strpos($a, $b) !== false` can be simplified to `str_contains($a, $b)`.")
         .with_note("Using `str_contains` makes the code easier to understand and more expressive.");
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             let function_span = function_identifier.span();
 
             // Replace `strpos` with `str_contains`

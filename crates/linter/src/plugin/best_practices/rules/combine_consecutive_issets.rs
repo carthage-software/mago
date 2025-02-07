@@ -105,7 +105,7 @@ impl Rule for CombineConsecutiveIssetsRule {
             return LintDirective::default();
         }
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             let to_replace = left_isset.right_parenthesis.join(binary.operator.span());
             let to_delete = right_isset.isset.span.join(right_isset.left_parenthesis);
 

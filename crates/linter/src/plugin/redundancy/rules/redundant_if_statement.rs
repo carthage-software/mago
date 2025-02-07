@@ -66,7 +66,7 @@ impl Rule for RedundantIfStatementRule {
                 .with_note("The `if` statement can be removed, and its body can be executed unconditionally.")
                 .with_help("Remove the unnecessary `if` statement and execute its body directly.");
 
-            context.report_with_fix(issue, |plan| {
+            context.propose(issue, |plan| {
                 plan.delete(r#if.r#if.span.join(r#if.right_parenthesis).to_range(), SafetyClassification::Safe);
 
                 match &r#if.body {
@@ -152,7 +152,7 @@ impl Rule for RedundantIfStatementRule {
                 .with_note("The `if` statement can be removed, and its body can be skipped.")
                 .with_help("Remove the unnecessary `if` statement and skip its body.");
 
-            context.report_with_fix(issue, |plan| match &r#if.body {
+            context.propose(issue, |plan| match &r#if.body {
                 IfBody::Statement(if_statement_body) => {
                     if let Some(else_if_clause) = if_statement_body.else_if_clauses.first() {
                         let span = r#if.r#if.span.join(else_if_clause.elseif.span());

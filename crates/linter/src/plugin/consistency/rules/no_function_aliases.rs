@@ -69,7 +69,7 @@ impl Rule for NoFunctionAliasesRule {
                 .with_note(format!("The function `{}` is an alias of `{}`.", function_name, original_name))
                 .with_help(format!("Consider using the function `{}` instead.", original_name));
 
-            context.report_with_fix(issue, |p| {
+            context.propose(issue, |p| {
                 p.replace(identifier.span().into(), format!("\\{}", original_name), SafetyClassification::Safe)
             });
         }

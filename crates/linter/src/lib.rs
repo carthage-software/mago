@@ -23,7 +23,10 @@ pub mod plugin;
 pub mod rule;
 pub mod settings;
 
+mod ast;
+mod ignore;
 mod runner;
+mod utils;
 
 #[derive(Debug, Clone)]
 pub struct Linter {

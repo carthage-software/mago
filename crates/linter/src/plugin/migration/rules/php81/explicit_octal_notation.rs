@@ -66,7 +66,7 @@ impl Rule for ExplicitOctalNotationRule {
 
         let replacement = format!("0o{}", &literal_text[1..]);
 
-        context.report_with_fix(issue, |plan| {
+        context.propose(issue, |plan| {
             plan.replace(literal_integer.span().to_range(), replacement, SafetyClassification::Safe);
         });
 

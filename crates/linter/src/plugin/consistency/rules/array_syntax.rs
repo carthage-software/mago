@@ -98,7 +98,7 @@ impl Rule for ArraySyntaxRule {
                     )
                     .with_help("Use the short array syntax `[..]` instead");
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     plan.replace(arr.array.span.join(arr.left_parenthesis).to_range(), "[", SafetyClassification::Safe);
                     plan.replace(arr.right_parenthesis.to_range(), "]", SafetyClassification::Safe);
                 });
@@ -115,7 +115,7 @@ impl Rule for ArraySyntaxRule {
                     )
                     .with_help("Use the long array syntax `array(..)` instead");
 
-                context.report_with_fix(issue, |plan| {
+                context.propose(issue, |plan| {
                     plan.replace(arr.left_bracket.to_range(), "array(", SafetyClassification::Safe);
                     plan.replace(arr.right_bracket.to_range(), ")", SafetyClassification::Safe)
                 });

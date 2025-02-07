@@ -59,7 +59,7 @@ impl Rule for RedundantLabelRule {
                 .with_note(format!("Label `{}` is declared but not used by any `goto` statement.", label_name))
                 .with_help("Remove the redundant label.");
 
-            context.report_with_fix(issue, |plan| plan.delete(label_span.to_range(), SafetyClassification::Safe));
+            context.propose(issue, |plan| plan.delete(label_span.to_range(), SafetyClassification::Safe));
         }
 
         LintDirective::Abort

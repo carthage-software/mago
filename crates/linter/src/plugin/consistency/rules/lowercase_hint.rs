@@ -64,9 +64,8 @@ impl Rule for LowercaseHintRule {
                         .with_annotation(Annotation::primary(identifier.span()))
                         .with_help(format!("Consider using `{}` instead of `{}`.", lowered, name));
 
-                    context.report_with_fix(issue, |p| {
-                        p.replace(identifier.span.to_range(), lowered, SafetyClassification::Safe)
-                    });
+                    context
+                        .propose(issue, |p| p.replace(identifier.span.to_range(), lowered, SafetyClassification::Safe));
                 }
 
                 // No need to continue linting the children of this node.
