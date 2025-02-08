@@ -149,44 +149,35 @@ impl<'a> Formatter<'a> {
         while idx != old_idx {
             old_idx = idx;
             idx = self.skip_to_line_end(idx);
-            idx = self.skip_inline_comment(idx);
+            idx = self.skip_single_line_comments(idx);
             idx = self.skip_spaces(idx, /* backwards */ false);
         }
 
-        idx = self.skip_trailing_comment(idx);
+        idx = self.skip_single_line_comments(idx);
         idx = self.skip_newline(idx, /* backwards */ false);
         idx.is_some_and(|idx| self.has_newline(idx, /* backwards */ false))
     }
 
-    fn skip_trailing_comment(&self, start_index: Option<usize>) -> Option<usize> {
+    fn skip_single_line_comments(&self, start_index: Option<usize>) -> Option<usize> {
         let start_index = start_index?;
-        let mut bytes = self.source_text[start_index..].bytes();
-
-        match bytes.next()? {
-            b'/' => {
-                let c = bytes.next()?;
-                if c != b'/' {
-                    return Some(start_index);
-                }
-            }
-            b'#' => {
-                if let Some(b'#') = bytes.next() {
-                    return Some(start_index);
-                }
-            }
-            _ => return Some(start_index),
+        if start_index + 1 >= self.source_text.len() {
+            return Some(start_index); // Not enough characters to check for comment
         }
 
-        self.skip_everything_but_new_line(Some(start_index), /* backwards */ false)
-    }
-
-    fn skip_inline_comment(&self, start_index: Option<usize>) -> Option<usize> {
-        let start_index = start_index?;
-        Some(start_index)
+        if self.source_text[start_index..].starts_with("//")
+            || (self.source_text[start_index..].starts_with("#")
+                && !self.source_text[start_index + 1..].starts_with("["))
+        {
+            self.skip_everything_but_new_line(Some(start_index), false)
+        } else {
+            Some(start_index)
+        }
     }
 
     fn skip_to_line_end(&self, start_index: Option<usize>) -> Option<usize> {
-        self.skip(start_index, false, |c| matches!(c, b' ' | b'\t' | b',' | b';'))
+        let mut index = self.skip(start_index, false, |c| matches!(c, b' ' | b'\t' | b',' | b';'));
+        index = self.skip_single_line_comments(index);
+        index
     }
 
     fn skip_spaces(&self, start_index: Option<usize>, backwards: bool) -> Option<usize> {
@@ -201,6 +192,7 @@ impl<'a> Formatter<'a> {
         self.skip(start_index, backwards, |c| !matches!(c, b'\r' | b'\n'))
     }
 
+    #[inline]
     fn skip<F>(&self, start_index: Option<usize>, backwards: bool, f: F) -> Option<usize>
     where
         F: Fn(u8) -> bool,
@@ -215,11 +207,12 @@ impl<'a> Formatter<'a> {
                 index -= 1;
             }
         } else {
-            for c in self.source_text[start_index..].bytes() {
-                if !f(c) {
+            let source_bytes = self.source_text.as_bytes();
+            let text_len = source_bytes.len();
+            while index < text_len {
+                if !f(source_bytes[index]) {
                     return Some(index);
                 }
-
                 index += 1;
             }
         }
@@ -253,34 +246,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn split_lines(slice: &'a str) -> Vec<&'a str> {
-        let bytes = slice.as_bytes();
-        let mut lines = Vec::new();
-
-        let mut start = 0;
-        let mut i = 0;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'\n' => {
-                    lines.push(&slice[start..i]);
-                    start = i + 1;
-                }
-                b'\r' => {
-                    lines.push(&slice[start..i]);
-                    start = i + 1;
-                    if i + 1 < bytes.len() && bytes[i + 1] == b'\n' {
-                        i += 1;
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-
-        if start < bytes.len() {
-            lines.push(&slice[start..]);
-        }
-
-        lines
+        slice.split_inclusive('\n').map(|line| line.trim_end_matches('\n').trim_end_matches('\r')).collect()
     }
 
     fn skip_leading_whitespace_up_to(s: &'a str, indent: usize) -> &'a str {

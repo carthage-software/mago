@@ -1,5 +1,7 @@
 use config::builder::BuilderState;
 use config::ConfigBuilder;
+use config::Value;
+use config::ValueKind;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -174,6 +176,6 @@ impl FormatterConfiguration {
 
 impl ConfigurationEntry for FormatterConfiguration {
     fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
-        Ok(builder)
+        builder.set_default("format.excludes", Value::new(None, ValueKind::Array(vec![]))).map_err(Error::from)
     }
 }
