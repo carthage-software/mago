@@ -89,6 +89,7 @@ tempfile = "3.15.0"
 colored = "3.0.0"
 blake3 = "1.5.5"
 memchr = "2.7.4"
+tower-lsp = "0.20.0"
 
 [lints]
 workspace = true
@@ -110,7 +111,7 @@ mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
 mago-reference = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "time"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "time", "io-std"] }
 clap = { workspace = true }
 ahash = { workspace = true }
 termtree = { workspace = true }
@@ -129,6 +130,7 @@ tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
+tower-lsp = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }
