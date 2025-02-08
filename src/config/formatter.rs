@@ -12,6 +12,11 @@ use crate::error::Error;
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FormatterConfiguration {
+    /// A list of patterns to exclude from formatting.
+    ///
+    /// Defaults to `[]`.
+    pub excludes: Vec<String>,
+
     /// Specify the maximum line length that the printer will wrap on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub print_width: Option<usize>,

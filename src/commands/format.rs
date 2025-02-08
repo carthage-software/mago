@@ -52,9 +52,11 @@ pub struct FormatCommand {
 /// # Returns
 ///
 /// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
-pub async fn execute(command: FormatCommand, configuration: Configuration) -> Result<ExitCode, Error> {
+pub async fn execute(command: FormatCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
     // Initialize the interner for managing identifiers.
     let interner = ThreadedInterner::new();
+
+    configuration.source.excludes.extend(std::mem::take(&mut configuration.format.excludes));
 
     // Load sources
     let source_manager = if !command.path.is_empty() {

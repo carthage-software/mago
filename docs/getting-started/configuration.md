@@ -132,6 +132,8 @@ The extensions option specifies the file extensions to include in the search.
 ### Formatter Configuration
 
 The `[format]` section customizes how Mago formats your PHP code, including settings like line width, tab width, and indentation style.
+In addition to common formatting options, you can specify an optional `excludes` key to define patterns that should be excluded from formatting.
+This allows you to, for example, skip formatting for generated files or other patterns while still processing them for linting.
 
 For more details on the available formatter settings, see the [Formatter Settings](/formatter/settings.md) page.
 
@@ -141,6 +143,7 @@ For more details on the available formatter settings, see the [Formatter Setting
 
   ```toml
   [format]
+  excludes = ["**/src/**/*.generated.php"]
   print_width = 80
   tab_width = 2
   ```
