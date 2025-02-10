@@ -187,7 +187,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             };
 
                             if let Some(class_reflection) = class_like_reflection {
-                                if let Some(method) = class_reflection.get_method(&method.value) {
+                                if let Some(method) = class_reflection.methods.members.get(&method.value) {
                                     return method.return_type_reflection.as_ref().map_or_else(
                                         || mixed_kind(false),
                                         |return_type| return_type.type_reflection.kind.clone(),
@@ -224,7 +224,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             };
 
                             if let Some(class_reflection) = class_like_reflection {
-                                if let Some(method) = class_reflection.get_method(&method.value) {
+                                if let Some(method) = class_reflection.methods.members.get(&method.value) {
                                     return method.return_type_reflection.as_ref().map_or_else(
                                         || mixed_kind(false),
                                         |return_type| return_type.type_reflection.kind.clone(),
@@ -244,7 +244,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(self.interner, class_name) {
-                                if let Some(method) = class_reflection.get_method(&method.value) {
+                                if let Some(method) = class_reflection.methods.members.get(&method.value) {
                                     return method.return_type_reflection.as_ref().map_or_else(
                                         || mixed_kind(false),
                                         |return_type| return_type.type_reflection.kind.clone(),
@@ -284,7 +284,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
 
                             let property = self.interner.intern(format!("${}", self.interner.lookup(&property.value)));
                             if let Some(class_reflection) = class_like_reflection {
-                                if let Some(property) = class_reflection.get_property(&property) {
+                                if let Some(property) = class_reflection.properties.members.get(&property) {
                                     return property
                                         .type_reflection
                                         .as_ref()
@@ -329,7 +329,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
 
                             let property = self.interner.intern(format!("${}", self.interner.lookup(&property.value)));
                             if let Some(class_reflection) = class_like_reflection {
-                                if let Some(property) = class_reflection.get_property(&property) {
+                                if let Some(property) = class_reflection.properties.members.get(&property) {
                                     return property
                                         .type_reflection
                                         .as_ref()
@@ -356,7 +356,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(self.interner, class_name) {
-                                if let Some(property) = class_reflection.get_property(&variable.name) {
+                                if let Some(property) = class_reflection.properties.members.get(&variable.name) {
                                     return property
                                         .type_reflection
                                         .as_ref()
@@ -383,7 +383,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             let class_name = self.names.get(name);
 
                             if let Some(class_reflection) = codebase.get_named_class_like(self.interner, class_name) {
-                                if let Some(constant) = class_reflection.get_constant(&constant.value) {
+                                if let Some(constant) = class_reflection.constants.get(&constant.value) {
                                     return constant
                                         .type_reflection
                                         .as_ref()
@@ -391,7 +391,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                                         .unwrap_or_else(|| constant.inferred_type_reflection.kind.clone());
                                 }
 
-                                if class_reflection.is_enum() && class_reflection.has_enum_case(&constant.value) {
+                                if class_reflection.is_enum() && class_reflection.cases.contains_key(&constant.value) {
                                     return enum_case_kind(*class_name, constant.value);
                                 }
                             }
@@ -471,7 +471,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             _ => return any_closure_kind(),
                         };
 
-                        if let Some(method) = class_reflection.get_method(&method_name.value) {
+                        if let Some(method) = class_reflection.methods.members.get(&method_name.value) {
                             return TypeKind::from(method);
                         } else {
                             return any_closure_kind();
@@ -496,7 +496,7 @@ impl<'i, 'c> TypeResolver<'i, 'c> {
                             return any_closure_kind();
                         };
 
-                        if let Some(method) = class_reflection.get_method(&method_name.value) {
+                        if let Some(method) = class_reflection.methods.members.get(&method_name.value) {
                             return TypeKind::from(method);
                         } else {
                             return any_closure_kind();

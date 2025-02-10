@@ -1,30 +1,46 @@
-use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reflection::identifier::ClassLikeName;
 use mago_reflection::identifier::FunctionLikeName;
 use mago_reflection::identifier::Name;
 use mago_reflection::CodebaseReflection;
+use mago_reflection::Reflection;
+
+use crate::internal::report;
 
 #[inline(always)]
-pub fn populate(interner: &ThreadedInterner, codebase: &mut CodebaseReflection) {
+pub fn populate(interner: &ThreadedInterner, codebase: &mut CodebaseReflection, populate_non_user_defined: bool) {
     if codebase.populated {
         return;
     }
 
-    populate_all_class_like_reflections(interner, codebase);
-    populate_all_function_like_reflections(codebase);
-    populate_all_constant_reflections(codebase);
+    populate_all_class_like_reflections(interner, codebase, populate_non_user_defined);
+    populate_all_function_like_reflections(codebase, populate_non_user_defined);
+    populate_all_constant_reflections(codebase, populate_non_user_defined);
 
     codebase.populated = true;
 }
 
 #[inline]
-fn populate_all_class_like_reflections(interner: &ThreadedInterner, codebase: &mut CodebaseReflection) {
+fn populate_all_class_like_reflections(
+    interner: &ThreadedInterner,
+    codebase: &mut CodebaseReflection,
+    populate_non_user_defined: bool,
+) {
     let unpopulated_classlike_names = codebase
         .class_like_reflections
         .iter()
-        .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
+        .filter_map(|(name, reflection)| {
+            if !populate_non_user_defined && !reflection.is_user_defined() {
+                return None;
+            }
+
+            if !reflection.is_populated {
+                Some(*name)
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>();
 
     for classlike_name in &unpopulated_classlike_names {
@@ -37,7 +53,7 @@ fn populate_all_class_like_reflections(interner: &ThreadedInterner, codebase: &m
     }
 
     for classlike_name in &unpopulated_classlike_names {
-        populate_class_like_reflection(interner, codebase, *classlike_name);
+        populate_class_like_reflection(interner, codebase, *classlike_name, populate_non_user_defined);
     }
 
     for (classlike_name, classlike_reflection) in &codebase.class_like_reflections {
@@ -51,16 +67,16 @@ fn populate_all_class_like_reflections(interner: &ThreadedInterner, codebase: &m
             codebase.direct_classlike_descendants.entry(parent_class).or_default().insert(classlike_name);
         }
 
-        for parent_class in &classlike_reflection.inheritance.all_extended_classes {
-            let parent_class = interner.lowered(&parent_class.value);
-
-            codebase.all_classlike_descendants.entry(parent_class).or_default().insert(classlike_name);
-        }
-
         for parent_interface in &classlike_reflection.inheritance.direct_implemented_interfaces {
             let parent_interface = interner.lowered(&parent_interface.value);
 
             codebase.direct_classlike_descendants.entry(parent_interface).or_default().insert(classlike_name);
+        }
+
+        for parent_class in &classlike_reflection.inheritance.all_extended_classes {
+            let parent_class = interner.lowered(&parent_class.value);
+
+            codebase.all_classlike_descendants.entry(parent_class).or_default().insert(classlike_name);
         }
 
         for parent_interface in &classlike_reflection.inheritance.all_extended_interfaces {
@@ -70,22 +86,27 @@ fn populate_all_class_like_reflections(interner: &ThreadedInterner, codebase: &m
         }
 
         for used_trait in &classlike_reflection.used_traits {
-            let used_trait = interner.lowered(used_trait);
-
-            codebase.all_classlike_descendants.entry(used_trait).or_default().insert(classlike_name);
+            codebase.all_classlike_descendants.entry(used_trait.value).or_default().insert(classlike_name);
         }
     }
-
-    codebase.all_classlike_descendants.shrink_to_fit();
-    codebase.direct_classlike_descendants.shrink_to_fit();
 }
 
 #[inline]
-fn populate_all_function_like_reflections(codebase: &mut CodebaseReflection) {
+fn populate_all_function_like_reflections(codebase: &mut CodebaseReflection, populate_non_user_defined: bool) {
     let unpopulated_function_like_names = codebase
         .function_like_reflections
         .iter()
-        .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
+        .filter_map(|(name, reflection)| {
+            if !populate_non_user_defined && !reflection.is_user_defined() {
+                return None;
+            }
+
+            if !reflection.is_populated {
+                Some(*name)
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>();
 
     for function_like_name in &unpopulated_function_like_names {
@@ -94,11 +115,21 @@ fn populate_all_function_like_reflections(codebase: &mut CodebaseReflection) {
 }
 
 #[inline]
-fn populate_all_constant_reflections(codebase: &mut CodebaseReflection) {
+fn populate_all_constant_reflections(codebase: &mut CodebaseReflection, populate_non_user_defined: bool) {
     let unpopulated_constant_names = codebase
         .constant_reflections
         .iter()
-        .filter_map(|(name, reflection)| if !reflection.is_populated { Some(*name) } else { None })
+        .filter_map(|(name, reflection)| {
+            if !populate_non_user_defined && !reflection.is_user_defined() {
+                return None;
+            }
+
+            if !reflection.is_populated {
+                Some(*name)
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>();
 
     for constant_name in &unpopulated_constant_names {
@@ -111,10 +142,17 @@ fn populate_class_like_reflection(
     interner: &ThreadedInterner,
     codebase: &mut CodebaseReflection,
     class_like_name: ClassLikeName,
+    populate_non_user_defined: bool,
 ) {
     let Some(mut reflection) = codebase.class_like_reflections.remove(&class_like_name) else {
         return;
     };
+
+    if !populate_non_user_defined && !reflection.is_user_defined() {
+        codebase.class_like_reflections.insert(class_like_name, reflection);
+
+        return;
+    }
 
     if reflection.is_populated {
         codebase.class_like_reflections.insert(class_like_name, reflection);
@@ -135,33 +173,41 @@ fn populate_class_like_reflection(
     }
 
     for trait_name in reflection.used_traits.clone() {
-        populate_data_from_trait(interner, codebase, &mut reflection, trait_name);
+        populate_data_from_trait(interner, codebase, &mut reflection, trait_name, populate_non_user_defined);
     }
 
     if let Some(parent_classname) = reflection.inheritance.direct_extended_class {
-        populate_data_from_parent_classlike(interner, codebase, &mut reflection, parent_classname.value);
+        populate_data_from_parent_class(
+            interner,
+            codebase,
+            &mut reflection,
+            &parent_classname,
+            populate_non_user_defined,
+        );
     }
 
     for parent_interface in reflection.inheritance.direct_extended_interfaces.clone() {
-        populate_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
+        populate_data_from_parent_interface(
+            interner,
+            codebase,
+            &mut reflection,
+            &parent_interface,
+            false,
+            populate_non_user_defined,
+        );
     }
 
     for parent_interface in reflection.inheritance.direct_implemented_interfaces.clone() {
-        populate_data_from_parent_interface(interner, codebase, &mut reflection, parent_interface.value);
+        populate_data_from_parent_interface(
+            interner,
+            codebase,
+            &mut reflection,
+            &parent_interface,
+            true,
+            populate_non_user_defined,
+        );
     }
 
-    reflection.inheritance.all_extended_classes.shrink_to_fit();
-    reflection.inheritance.all_implemented_interfaces.shrink_to_fit();
-    reflection.inheritance.names.shrink_to_fit();
-    reflection.inheritance.require_extensions.shrink_to_fit();
-    reflection.inheritance.require_implementations.shrink_to_fit();
-    reflection.constants.shrink_to_fit();
-    reflection.properties.members.shrink_to_fit();
-    reflection.properties.appering_members.shrink_to_fit();
-    reflection.properties.declaring_members.shrink_to_fit();
-    reflection.methods.members.shrink_to_fit();
-    reflection.methods.appering_members.shrink_to_fit();
-    reflection.methods.declaring_members.shrink_to_fit();
     reflection.is_populated = true;
 
     codebase.class_like_reflections.insert(class_like_name, reflection);
@@ -215,7 +261,7 @@ fn implement_magic_interfaces(
     'stringable_interface: {
         let to_string_method = interner.intern(TO_STRING_METHOD);
 
-        if !reflection.has_method(&to_string_method) {
+        if !reflection.methods.appering_members.contains_key(&to_string_method) {
             break 'stringable_interface;
         }
 
@@ -228,18 +274,34 @@ fn populate_data_from_parent_interface(
     interner: &ThreadedInterner,
     codebase: &mut CodebaseReflection,
     reflection: &mut ClassLikeReflection,
-    parent_name_id: StringIdentifier,
+    parent_name: &Name,
+    implemented: bool,
+    populate_non_user_defined: bool,
 ) {
-    let parent_name_id = interner.lowered(&parent_name_id);
-    let Some(parent_name) = codebase.class_like_names.get(&parent_name_id).cloned() else {
+    let parent_name_id = interner.lowered(&parent_name.value);
+    let Some(interface_name) = codebase.class_like_names.get(&parent_name_id).cloned() else {
+        report::report_missing_parent_interface(interner, reflection, parent_name, implemented);
+
         return;
     };
 
-    populate_class_like_reflection(interner, codebase, parent_name);
+    populate_class_like_reflection(interner, codebase, interface_name, populate_non_user_defined);
 
-    let Some(parent_reflection) = codebase.class_like_reflections.get_mut(&parent_name) else {
+    let Some(parent_reflection) = codebase.class_like_reflections.get_mut(&interface_name) else {
+        report::report_missing_parent_interface(interner, reflection, parent_name, implemented);
+
         return;
     };
+
+    if !parent_reflection.is_interface() {
+        report::report_parent_not_interface(interner, reflection, parent_name, implemented);
+
+        return;
+    }
+
+    if parent_reflection.inheritance.implements_interface(interner, reflection) {
+        report::report_parent_interface_circular_reference(interner, reflection, parent_name, implemented);
+    }
 
     for (constant_name, constant) in parent_reflection.constants.iter() {
         if reflection.constants.contains_key(constant_name) {
@@ -261,22 +323,49 @@ fn populate_data_from_parent_interface(
 }
 
 #[inline]
-fn populate_data_from_parent_classlike(
+fn populate_data_from_parent_class(
     interner: &ThreadedInterner,
     codebase: &mut CodebaseReflection,
     reflection: &mut ClassLikeReflection,
-    parent_name_id: StringIdentifier,
+    parent_name: &Name,
+    populate_non_user_defined: bool,
 ) {
-    let parent_name_id = interner.lowered(&parent_name_id);
-    let Some(parent_name) = codebase.class_like_names.get(&parent_name_id).cloned() else {
+    let parent_name_id = interner.lowered(&parent_name.value);
+    let Some(parent_classname) = codebase.class_like_names.get(&parent_name_id).cloned() else {
+        report::report_missing_parent_class(interner, reflection, parent_name);
+
         return;
     };
 
-    populate_class_like_reflection(interner, codebase, parent_name);
+    populate_class_like_reflection(interner, codebase, parent_classname, populate_non_user_defined);
 
-    let Some(parent_reflection) = codebase.class_like_reflections.get_mut(&parent_name) else {
+    let Some(parent_reflection) = codebase.class_like_reflections.get_mut(&parent_classname) else {
+        report::report_missing_parent_class(interner, reflection, parent_name);
+
         return;
     };
+
+    if !parent_reflection.is_class() {
+        report::report_parent_not_class(interner, reflection, parent_name);
+
+        return;
+    }
+
+    if parent_reflection.is_final {
+        report::report_parent_class_is_final(interner, reflection, parent_name);
+    }
+
+    if parent_reflection.is_readonly && !reflection.is_readonly {
+        report::report_parent_class_is_readonly(interner, reflection, parent_name);
+    } else if !parent_reflection.is_readonly && reflection.is_readonly {
+        report::report_parent_class_is_not_readonly(interner, reflection, parent_name);
+    }
+
+    if parent_reflection.inheritance.extends_class(interner, reflection) {
+        report::report_parent_class_circular_reference(interner, reflection, parent_name);
+
+        return;
+    }
 
     for extended_class in &parent_reflection.inheritance.all_extended_classes {
         if reflection.inheritance.all_extended_classes.contains(extended_class) {
@@ -306,6 +395,7 @@ fn populate_data_from_parent_classlike(
         }
 
         reflection.used_traits.insert(*used_trait);
+        reflection.used_trait_names.insert(used_trait.value, *used_trait);
     }
 
     for (constant_name, constant) in &parent_reflection.constants {
@@ -327,18 +417,35 @@ fn populate_data_from_trait(
     interner: &ThreadedInterner,
     codebase: &mut CodebaseReflection,
     reflection: &mut ClassLikeReflection,
-    trait_name_id: StringIdentifier,
+    trait_name: Name,
+    populate_non_user_defined: bool,
 ) {
-    let trait_name_id = interner.lowered(&trait_name_id);
-    let Some(trait_name) = codebase.class_like_names.get(&trait_name_id).cloned() else {
+    let Some(trait_class_like_name) = codebase.class_like_names.get(&trait_name.value).cloned() else {
+        report::report_missing_trait(interner, reflection, &trait_name);
+
         return;
     };
 
-    populate_class_like_reflection(interner, codebase, trait_name);
+    populate_class_like_reflection(interner, codebase, trait_class_like_name, populate_non_user_defined);
 
-    let Some(trait_reflection) = codebase.class_like_reflections.get(&trait_name) else {
+    let Some(trait_reflection) = codebase.class_like_reflections.get(&trait_class_like_name) else {
+        report::report_missing_trait(interner, reflection, &trait_name);
+
         return;
     };
+
+    if !trait_reflection.is_trait() {
+        report::report_not_trait(interner, reflection, &trait_name);
+
+        return;
+    }
+
+    if reflection.is_trait() {
+        let class_like_name_id = &reflection.name.inner_unchecked().value;
+        if trait_reflection.used_trait_names.contains_key(class_like_name_id) {
+            report::report_trait_circular_reference(interner, reflection, &trait_name);
+        }
+    }
 
     inherit_properties_from_parent(reflection, trait_reflection);
     inherit_methods_from_parent(reflection, trait_reflection);
@@ -356,7 +463,7 @@ fn inherit_properties_from_parent(reflection: &mut ClassLikeReflection, parent_r
         }
 
         if !parent_is_trait {
-            if let Some(parent_property_storage) = parent_reflection.get_property(property_name) {
+            if let Some(parent_property_storage) = parent_reflection.properties.members.get(property_name) {
                 if parent_property_storage.write_visibility_reflection.map(|v| v.is_private()).unwrap_or(false) {
                     continue;
                 }
@@ -379,7 +486,7 @@ fn inherit_properties_from_parent(reflection: &mut ClassLikeReflection, parent_r
         }
 
         if !parent_is_trait {
-            if let Some(parent_property_storage) = parent_reflection.get_property(property_name) {
+            if let Some(parent_property_storage) = parent_reflection.properties.members.get(property_name) {
                 if parent_property_storage.write_visibility_reflection.map(|v| v.is_private()).unwrap_or(false) {
                     continue;
                 }
@@ -392,7 +499,7 @@ fn inherit_properties_from_parent(reflection: &mut ClassLikeReflection, parent_r
     // register inheritance
     for (property_name, inheritable_classlike) in &parent_reflection.properties.inheritable_members {
         if !parent_is_trait {
-            if let Some(parent_property_storage) = parent_reflection.get_property(property_name) {
+            if let Some(parent_property_storage) = parent_reflection.properties.members.get(property_name) {
                 if parent_property_storage.write_visibility_reflection.map(|v| v.is_private()).unwrap_or(false) {
                     continue;
                 }

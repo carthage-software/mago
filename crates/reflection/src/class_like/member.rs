@@ -14,7 +14,7 @@ use crate::identifier::ClassLikeName;
 ///
 /// This structure maintains the details of each member, such as their identifiers and inheritance information,
 /// allowing reflection on declared, inherited, overridden, and inheritable members.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MemeberCollection<T: Eq + PartialEq> {
     pub members: HashMap<StringIdentifier, T>,
     pub appering_members: HashMap<StringIdentifier, ClassLikeName>,
@@ -23,8 +23,8 @@ pub struct MemeberCollection<T: Eq + PartialEq> {
     pub inheritable_members: HashMap<StringIdentifier, ClassLikeName>,
 }
 
-impl<T: Eq + PartialEq> MemeberCollection<T> {
-    pub fn empty() -> Self {
+impl<T: Eq + PartialEq> Default for MemeberCollection<T> {
+    fn default() -> Self {
         Self {
             members: Default::default(),
             appering_members: Default::default(),

@@ -159,7 +159,7 @@ impl Rule for UndefinedConstantOrCaseRule {
                 }
 
                 // For a valid class, check if the constant exists.
-                if class_reflection.has_constant(&constant_identifier.value) {
+                if class_reflection.constants.contains_key(&constant_identifier.value) {
                     // Class constant is defined, so no issue.
                     return LintDirective::Prune;
                 }
@@ -167,7 +167,7 @@ impl Rule for UndefinedConstantOrCaseRule {
                 // If the class is an enum:
                 if class_reflection.is_enum() {
                     // Check if the enum case exists.
-                    if class_reflection.has_enum_case(&constant_identifier.value) {
+                    if class_reflection.cases.contains_key(&constant_identifier.value) {
                         return LintDirective::Prune;
                     }
 

@@ -83,10 +83,11 @@ pub fn merge(
 ///
 /// - `interner`: The `ThreadedInterner` instance used for string interning.
 /// - `result`: The mutable `ReflectionResult` to populate with additional data.
+/// - `populate_non_user_defined`: Whether to populate non-user-defined symbols.
 ///
 /// This function is useful for supplementing a `ReflectionResult` with more comprehensive
 /// information after initial reflection or to populate unresolved details.
 #[inline]
-pub fn populate(interner: &ThreadedInterner, reflection: &mut CodebaseReflection) {
-    populator::populate(interner, reflection);
+pub fn populate(interner: &ThreadedInterner, reflection: &mut CodebaseReflection, populate_non_user_defined: bool) {
+    populator::populate(interner, reflection, populate_non_user_defined);
 }

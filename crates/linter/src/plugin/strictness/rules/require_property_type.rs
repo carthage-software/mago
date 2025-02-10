@@ -76,12 +76,12 @@ impl Rule for RequirePropertyTypeRule {
             }
 
             for variable in property.variables() {
-                let Some(property_reflection) = reflection.get_property(&variable.name) else {
+                let Some(property_reflection) = reflection.properties.members.get(&variable.name) else {
                     continue;
                 };
 
                 if property_reflection.is_overriding {
-                    // This property is overriding a method from a parent class.
+                    // This property is overriding a property from a parent class.
                     continue;
                 }
 

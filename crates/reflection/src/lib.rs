@@ -2,12 +2,12 @@ use std::collections::hash_map::Entry;
 
 use ahash::HashMap;
 use ahash::HashSet;
-use mago_reporting::IssueCollection;
 use serde::Deserialize;
 use serde::Serialize;
 
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_reporting::IssueCollection;
 use mago_source::HasSource;
 use mago_source::SourceCategory;
 use mago_span::HasPosition;
@@ -92,7 +92,7 @@ pub trait Reflection: HasSpan + HasSource {
     /// - `false` if additional processing is needed to populate the metadata.
     fn is_populated(&self) -> bool;
 
-    /// Retrieves any issues found during the population of the reflection.
+    /// Take any issues found during the population of the reflection.
     ///
     /// The returned `IssueCollection` contains errors, warnings, or notices
     /// related to the metadata of the entity.
@@ -103,7 +103,7 @@ pub trait Reflection: HasSpan + HasSource {
     /// # Returns
     ///
     /// - A reference to an `IssueCollection` containing all detected issues.
-    fn get_issues(&self) -> &IssueCollection;
+    fn take_issues(&mut self) -> IssueCollection;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
@@ -224,52 +224,45 @@ impl CodebaseReflection {
     /// - `true` if the entity was successfully registered.
     /// - `false` if the entity already exists.
     pub fn register_class_like(&mut self, interner: &ThreadedInterner, reflection: ClassLikeReflection) -> bool {
-        let mut exists = false;
-
         match reflection.name {
             ClassLikeName::Class(name) => {
-                let lowercase_name = interner.lowered(&name.value);
+                let Entry::Vacant(e) = self.class_like_names.entry(interner.lowered(&name.value)) else {
+                    return false;
+                };
 
-                if let Entry::Vacant(e) = self.class_like_names.entry(lowercase_name) {
-                    e.insert(reflection.name);
-                } else {
-                    exists = true;
-                }
+                e.insert(reflection.name);
+                self.class_like_reflections.insert(reflection.name, reflection);
             }
             ClassLikeName::Enum(name) => {
-                let lowercase_name = interner.lowered(&name.value);
-                if let Entry::Vacant(e) = self.class_like_names.entry(lowercase_name) {
-                    e.insert(reflection.name);
-                } else {
-                    exists = true;
-                }
+                let Entry::Vacant(e) = self.class_like_names.entry(interner.lowered(&name.value)) else {
+                    return false;
+                };
+
+                e.insert(reflection.name);
+                self.class_like_reflections.insert(reflection.name, reflection);
             }
             ClassLikeName::Interface(name) => {
-                let lowercase_name = interner.lowered(&name.value);
+                let Entry::Vacant(e) = self.class_like_names.entry(interner.lowered(&name.value)) else {
+                    return false;
+                };
 
-                if let Entry::Vacant(e) = self.class_like_names.entry(lowercase_name) {
-                    e.insert(reflection.name);
-                } else {
-                    exists = true;
-                }
+                e.insert(reflection.name);
+                self.class_like_reflections.insert(reflection.name, reflection);
             }
             ClassLikeName::Trait(name) => {
-                let lowercase_name = interner.lowered(&name.value);
+                let Entry::Vacant(e) = self.class_like_names.entry(interner.lowered(&name.value)) else {
+                    return false;
+                };
 
-                if let Entry::Vacant(e) = self.class_like_names.entry(lowercase_name) {
-                    e.insert(reflection.name);
-                } else {
-                    exists = true;
-                }
+                e.insert(reflection.name);
+                self.class_like_reflections.insert(reflection.name, reflection);
             }
-            _ => {}
+            _ => {
+                self.class_like_reflections.insert(reflection.name, reflection);
+            }
         }
 
-        if !exists {
-            self.class_like_reflections.insert(reflection.name, reflection);
-        }
-
-        exists
+        true
     }
 
     /// Checks if a constant exists in the codebase.
@@ -634,9 +627,8 @@ impl CodebaseReflection {
     ) -> Option<&'a FunctionLikeReflection> {
         class.methods.members.get(method).or_else(|| {
             let appering_in_class = class.methods.appering_members.get(method)?;
-            let class = self.class_like_reflections.get(appering_in_class)?;
 
-            class.get_method(method)
+            self.class_like_reflections.get(appering_in_class)?.methods.members.get(method)
         })
     }
 
@@ -682,6 +674,25 @@ impl CodebaseReflection {
             .filter(|(_, class_like)| class_like.span.has_offset(has_position.offset()))
             .max_by_key(|(_, class_like)| class_like.span.start.offset)
             .map(|(_, class_like)| class_like)
+    }
+
+    /// Takes all issues from the codebase reflection and its children.
+    ///
+    /// This method iterates over all constant, function-like, and class-like reflections
+    /// in the codebase, collecting all issues found during the population of the metadata.
+    ///
+    /// # Returns
+    ///
+    /// - An `IssueCollection` containing all issues found in the codebase and its children.
+    pub fn take_issues(&mut self) -> IssueCollection {
+        let issues = self
+            .constant_reflections
+            .iter_mut()
+            .flat_map(|(_, constant)| constant.take_issues())
+            .chain(self.function_like_reflections.iter_mut().flat_map(|(_, function_like)| function_like.take_issues()))
+            .chain(self.class_like_reflections.iter_mut().flat_map(|(_, class_like)| class_like.take_issues()));
+
+        IssueCollection::from(issues)
     }
 }
 

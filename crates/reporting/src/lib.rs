@@ -396,6 +396,10 @@ impl IssueCollection {
         self.issues.extend(issues);
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.issues.shrink_to_fit();
+    }
+
     pub fn is_empty(&self) -> bool {
         self.issues.is_empty()
     }

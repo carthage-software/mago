@@ -42,8 +42,11 @@ The `lint` command is a powerful tool for analyzing your PHP codebase. By defaul
 a full analysis, including parsing, semantic checks, and linting based on customizable rules.
 
 This command is ideal for enforcing code quality standards, debugging issues, and maintaining
-a consistent, clean codebase. Use `--semantics-only` for a quick validation of code correctness
-or the default mode for a comprehensive analysis.
+a consistent, clean codebase.
+
+- Use no flags for a full lint check (parsing, semantic checks, reflection, compilation issues, and linting).
+- Use `--semantics-only` or `-s` for a quick semantic check (parsing and semantic checks).
+- Use `--compilation` or `-c` to include reflection and compilation issue checks in addition to semantic checks.
 "#
 )]
 pub struct LintCommand {
@@ -52,26 +55,86 @@ pub struct LintCommand {
     pub path: Vec<PathBuf>,
 
     /// Filter the output to only show issues that can be automatically fixed with `mago fix`.
-    #[arg(long, short = 'f', help = "Filter the output to only show fixable issues", default_value_t = false)]
+    #[arg(
+        long,
+        short = 'f',
+        help = "Filter the output to only show fixable issues",
+        default_value_t = false,
+        conflicts_with = "semantics_only",
+        conflicts_with = "compilation"
+    )]
     pub fixable_only: bool,
 
-    /// Perform only semantic analysis (parsing and semantic checks).
-    #[arg(long, short = 's', help = "Only perform parsing and semantic checks", default_value_t = false)]
+    /// Perform only parsing and semantic checks.
+    #[arg(
+        long,
+        short = 's',
+        help = "Perform only parsing and semantic checks",
+        default_value_t = false,
+        conflicts_with = "compilation"
+    )]
     pub semantics_only: bool,
 
-    #[arg(long, help = "Provide documentation for a specific linter rule, e.g. 'consistency/lowercase-hint'")]
+    /// Perform parsing, semantic checks, reflection and compilation issue checks.
+    #[arg(
+        long,
+        short = 'c',
+        help = "Perform parsing, semantic checks, reflection and compilation issue checks",
+        default_value_t = false,
+        conflicts_with = "semantics_only"
+    )]
+    pub compilation: bool,
+
+    #[arg(
+        long,
+        help = "Provide documentation for a specific linter rule, e.g. 'consistency/lowercase-hint'",
+        conflicts_with = "list_rules",
+        conflicts_with = "sort",
+        conflicts_with = "fixable_only",
+        conflicts_with = "semantics_only",
+        conflicts_with = "compilation",
+        conflicts_with = "reporting_target",
+        conflicts_with = "reporting_format"
+    )]
     pub explain: Option<String>,
 
-    #[arg(long, help = "List all the enabled rules alongside their descriptions")]
+    #[arg(
+        long,
+        help = "List all the enabled rules alongside their descriptions",
+        conflicts_with = "list_rules",
+        conflicts_with = "sort",
+        conflicts_with = "fixable_only",
+        conflicts_with = "semantics_only",
+        conflicts_with = "compilation",
+        conflicts_with = "reporting_target",
+        conflicts_with = "reporting_format"
+    )]
     pub list_rules: bool,
 
-    #[arg(long, help = "Sort the reported issues by level, code, and location")]
+    #[arg(
+        long,
+        help = "Sort the reported issues by level, code, and location",
+        conflicts_with = "explain",
+        conflicts_with = "list_rules"
+    )]
     pub sort: bool,
 
-    #[arg(short, long, help = "Do not load default plugins, only load the ones specified in the configuration.")]
+    #[arg(
+        short,
+        long,
+        help = "Do not load default plugins, only load the ones specified in the configuration.",
+        conflicts_with = "compilation",
+        conflicts_with = "semantics_only"
+    )]
     pub no_default_plugins: bool,
 
-    #[arg(short, long, help = "Specify plugins to load, overriding the configuration.")]
+    #[arg(
+        short,
+        long,
+        help = "Specify plugins to load, overriding the configuration.",
+        conflicts_with = "compilation",
+        conflicts_with = "semantics_only"
+    )]
     pub plugins: Vec<String>,
 
     /// Specify where the results should be reported.
@@ -122,9 +185,11 @@ pub async fn execute(command: LintCommand, mut configuration: Configuration) -> 
     };
 
     let mut issues = if command.semantics_only {
-        check_sources(&interner, &source_manager, configuration.php_version).await?
+        semantics_check(&interner, &source_manager, configuration.php_version).await?
+    } else if command.compilation {
+        compilation_check(&interner, &source_manager, configuration.php_version).await?
     } else {
-        lint_sources(&interner, &source_manager, &configuration).await?
+        lint_check(&interner, &source_manager, &configuration).await?
     };
 
     let issues_contain_errors = issues.has_minimum_level(Level::Error);
@@ -356,7 +421,7 @@ pub(super) fn list_rules(interner: &ThreadedInterner, configuration: &Configurat
 }
 
 #[inline]
-pub(super) async fn lint_sources(
+pub(super) async fn lint_check(
     interner: &ThreadedInterner,
     manager: &SourceManager,
     configuration: &Configuration,
@@ -396,10 +461,12 @@ pub(super) async fn lint_sources(
         semantics.push(semantic);
     }
 
-    mago_reflector::populate(interner, &mut codebase);
+    mago_reflector::populate(interner, &mut codebase, true);
 
     remove_progress_bar(progress_bar);
 
+    let mut results = Vec::with_capacity(length + 1);
+    results.push(codebase.take_issues());
     let linter = create_linter(interner, configuration, codebase);
     let progress_bar = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
     let mut handles = Vec::with_capacity(length);
@@ -422,7 +489,6 @@ pub(super) async fn lint_sources(
         }));
     }
 
-    let mut results = Vec::with_capacity(length);
     for handle in handles {
         results.push(handle.await??);
     }
@@ -433,7 +499,7 @@ pub(super) async fn lint_sources(
 }
 
 #[inline]
-pub(super) async fn check_sources(
+pub(super) async fn semantics_check(
     interner: &ThreadedInterner,
     manager: &SourceManager,
     php_version: PHPVersion,
@@ -443,6 +509,7 @@ pub(super) async fn check_sources(
     let length = sources.len();
 
     let progress_bar = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Magenta);
+
     let mut handles = Vec::with_capacity(length);
     for source_id in sources {
         handles.push(tokio::spawn({
@@ -461,6 +528,7 @@ pub(super) async fn check_sources(
     }
 
     let mut results = Vec::with_capacity(length);
+
     for handle in handles {
         let semantic = handle.await??;
 
@@ -469,6 +537,61 @@ pub(super) async fn check_sources(
         }
 
         results.extend(semantic.issues);
+    }
+
+    remove_progress_bar(progress_bar);
+
+    Ok(IssueCollection::from(results.into_iter()))
+}
+
+#[inline]
+pub(super) async fn compilation_check(
+    interner: &ThreadedInterner,
+    manager: &SourceManager,
+    php_version: PHPVersion,
+) -> Result<IssueCollection, Error> {
+    // Collect all user-defined sources.
+    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined).collect();
+    let length = sources.len();
+
+    let progress_bar = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Magenta);
+
+    let mut codebase = reflect_all_non_user_defined_sources(interner, manager).await?;
+    let mut handles = Vec::with_capacity(length);
+    for source_id in sources {
+        handles.push(tokio::spawn({
+            let interner = interner.clone();
+            let manager = manager.clone();
+            let progress_bar = progress_bar.clone();
+
+            async move {
+                let source = manager.load(&source_id)?;
+                let semantics = Semantics::build(&interner, php_version, source);
+                let reflections = reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
+                progress_bar.inc(1);
+
+                Result::<_, Error>::Ok((semantics, reflections))
+            }
+        }));
+    }
+
+    let mut results = Vec::with_capacity(length);
+
+    for handle in handles {
+        let (semantic, reflections) = handle.await??;
+
+        if let Some(error) = &semantic.parse_error {
+            results.push(Into::<Issue>::into(error));
+        }
+
+        results.extend(semantic.issues);
+
+        codebase = mago_reflector::merge(interner, codebase, reflections);
+    }
+
+    mago_reflector::populate(interner, &mut codebase, false);
+    for issue in codebase.take_issues() {
+        results.push(issue);
     }
 
     remove_progress_bar(progress_bar);

@@ -83,6 +83,16 @@ impl ClassLikeName {
             }
         }
     }
+
+    #[inline]
+    pub const fn get_kind(&self) -> &'static str {
+        match self {
+            ClassLikeName::AnonymousClass(_) | ClassLikeName::Class(_) => "Class",
+            ClassLikeName::Interface(_) => "Interface",
+            ClassLikeName::Enum(_) => "Enum",
+            ClassLikeName::Trait(_) => "Trait",
+        }
+    }
 }
 
 impl ClassLikeMemberName {

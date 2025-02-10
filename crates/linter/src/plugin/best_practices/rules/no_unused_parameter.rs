@@ -117,7 +117,7 @@ impl Rule for NoUnusedParameterRule {
                 continue;
             };
 
-            let Some(method_reflection) = reflection.get_method(&method.name.value) else {
+            let Some(method_reflection) = reflection.methods.members.get(&method.name.value) else {
                 continue;
             };
 

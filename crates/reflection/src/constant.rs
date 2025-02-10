@@ -78,8 +78,7 @@ impl Reflection for ConstantReflection {
         self.is_populated
     }
 
-    /// Returns the issues encountered while processing the constant.
-    fn get_issues(&self) -> &IssueCollection {
-        &self.issues
+    fn take_issues(&mut self) -> IssueCollection {
+        std::mem::take(&mut self.issues)
     }
 }

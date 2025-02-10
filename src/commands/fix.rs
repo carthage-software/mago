@@ -9,7 +9,7 @@ use mago_interner::ThreadedInterner;
 use mago_reporting::IssueCollection;
 use mago_source::SourceIdentifier;
 
-use crate::commands::lint::lint_sources;
+use crate::commands::lint::lint_check;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::source;
@@ -90,7 +90,7 @@ pub async fn execute(command: FixCommand, mut configuration: Configuration) -> R
         source::load(&interner, &configuration.source, true, true).await?
     };
 
-    let issues = lint_sources(&interner, &source_manager, &configuration).await?;
+    let issues = lint_check(&interner, &source_manager, &configuration).await?;
     let (plans, skipped_unsafe, skipped_potentially_unsafe) = filter_fix_plans(&interner, issues, classification);
 
     let total = plans.len();
