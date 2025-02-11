@@ -37,6 +37,7 @@ use crate::ast::tag::ClosingTag;
 use crate::ast::tag::OpeningTag;
 use crate::ast::terminator::Terminator;
 use crate::ast::unset::Unset;
+use crate::ast::using::Using;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ExpressionStatement {
@@ -78,6 +79,7 @@ pub enum Statement {
     Global(Global),
     Static(Static),
     HaltCompiler(HaltCompiler),
+    Using(Using),
     Unset(Unset),
     Noop(Span),
 }
@@ -121,6 +123,7 @@ impl HasSpan for Statement {
             Statement::Global(statement) => statement.span(),
             Statement::Static(statement) => statement.span(),
             Statement::Unset(statement) => statement.span(),
+            Statement::Using(statement) => statement.span(),
             Statement::HaltCompiler(statement) => statement.span(),
             Statement::Noop(span) => *span,
         }

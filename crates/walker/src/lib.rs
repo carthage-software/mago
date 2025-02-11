@@ -151,6 +151,7 @@ generate_ast_walker! {
             Statement::Static(r#static) => walker.walk_static(r#static, context),
             Statement::HaltCompiler(halt_compiler) => walker.walk_halt_compiler(halt_compiler, context),
             Statement::Unset(unset) => walker.walk_unset(unset, context),
+            Statement::Using(using) => walker.walk_using(using, context),
             Statement::Noop(_) => {
                 // Do nothing by default
             },
@@ -306,6 +307,27 @@ generate_ast_walker! {
         }
 
         walker.walk_use_item(&maybe_typed_use_item.item, context);
+    }
+
+    Using as using => {
+        walker.walk_keyword(&using.using, context);
+        for item in using.items.iter() {
+            walker.walk_using_item(item, context);
+        }
+
+        walker.walk_statement(&using.statement, context);
+    }
+
+    UsingItem as using_item => {
+        match using_item {
+            UsingItem::Abstract(direct_variable) => {
+                walker.walk_direct_variable(direct_variable, context);
+            }
+            UsingItem::Concrete(direct_variable, _, expression) => {
+                walker.walk_direct_variable(direct_variable, context);
+                walker.walk_expression(expression, context);
+            }
+        }
     }
 
     AttributeList as attribute_list => {

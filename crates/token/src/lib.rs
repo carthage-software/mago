@@ -247,6 +247,7 @@ pub enum TokenKind {
     True,                        // `true`
     Try,                         // `try`
     Use,                         // `use`
+    Using,                       // `using`
     Var,                         // `var`
     Variable,                    // `$name`
     Yield,                       // `yield`
@@ -532,7 +533,17 @@ impl TokenKind {
     pub const fn is_soft_reserved_identifier(&self) -> bool {
         matches!(
             self,
-            T!["parent" | "self" | "true" | "false" | "list" | "null" | "enum" | "from" | "readonly" | "match"]
+            T!["parent"
+                | "self"
+                | "true"
+                | "false"
+                | "list"
+                | "null"
+                | "enum"
+                | "from"
+                | "readonly"
+                | "match"
+                | "using"]
         )
     }
 
@@ -586,6 +597,7 @@ impl TokenKind {
                 | "finally"
                 | "throw"
                 | "use"
+                | "using"
                 | "insteadof"
                 | "global"
                 | "var"
@@ -1242,6 +1254,9 @@ macro_rules! T {
     };
     ("use") => {
         $crate::TokenKind::Use
+    };
+    ("using") => {
+        $crate::TokenKind::Using
     };
     ("var") => {
         $crate::TokenKind::Var

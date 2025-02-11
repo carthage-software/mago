@@ -199,6 +199,8 @@ pub enum NodeKind {
     UseItemAlias,
     UseItemSequence,
     UseItems,
+    Using,
+    UsingItem,
     UseType,
     Yield,
     YieldFrom,
@@ -421,6 +423,8 @@ pub enum Node<'a> {
     UseItemAlias(&'a UseItemAlias),
     UseItemSequence(&'a UseItemSequence),
     UseItems(&'a UseItems),
+    Using(&'a Using),
+    UsingItem(&'a UsingItem),
     UseType(&'a UseType),
     Yield(&'a Yield),
     YieldFrom(&'a YieldFrom),
@@ -527,6 +531,7 @@ impl<'a> Node<'a> {
                 | Self::Static(_)
                 | Self::HaltCompiler(_)
                 | Self::Unset(_)
+                | Self::Using(_)
         )
     }
 
@@ -719,6 +724,8 @@ impl<'a> Node<'a> {
             Self::UseItemAlias(_) => NodeKind::UseItemAlias,
             Self::UseItemSequence(_) => NodeKind::UseItemSequence,
             Self::UseItems(_) => NodeKind::UseItems,
+            Self::Using(_) => NodeKind::Using,
+            Self::UsingItem(_) => NodeKind::UsingItem,
             Self::UseType(_) => NodeKind::UseType,
             Self::Yield(_) => NodeKind::Yield,
             Self::YieldFrom(_) => NodeKind::YieldFrom,
@@ -1837,6 +1844,20 @@ impl<'a> Node<'a> {
                 UseType::Const(node) => Node::Keyword(node),
                 UseType::Function(node) => Node::Keyword(node),
             }],
+            Node::Using(node) => {
+                let mut children = vec![Node::Keyword(&node.using)];
+
+                children.extend(node.items.iter().map(Node::UsingItem));
+                children.push(Node::Statement(&node.statement));
+
+                children
+            }
+            Node::UsingItem(node) => match node {
+                UsingItem::Abstract(direct_variable) => vec![Node::DirectVariable(direct_variable)],
+                UsingItem::Concrete(direct_variable, _, expression) => {
+                    vec![Node::DirectVariable(direct_variable), Node::Expression(expression)]
+                }
+            },
             Node::Yield(node) => vec![match node {
                 Yield::Value(node) => Node::YieldValue(node),
                 Yield::Pair(node) => Node::YieldPair(node),
@@ -1883,6 +1904,7 @@ impl<'a> Node<'a> {
                 Statement::Global(node) => vec![Node::Global(node)],
                 Statement::Static(node) => vec![Node::Static(node)],
                 Statement::HaltCompiler(node) => vec![Node::HaltCompiler(node)],
+                Statement::Using(node) => vec![Node::Using(node)],
                 Statement::Unset(node) => vec![Node::Unset(node)],
                 Statement::Noop(_) => vec![],
             },
@@ -2160,6 +2182,8 @@ impl HasSpan for Node<'_> {
             Self::UseItemSequence(node) => node.span(),
             Self::UseItems(node) => node.span(),
             Self::UseType(node) => node.span(),
+            Self::Using(node) => node.span(),
+            Self::UsingItem(node) => node.span(),
             Self::Yield(node) => node.span(),
             Self::YieldFrom(node) => node.span(),
             Self::YieldPair(node) => node.span(),

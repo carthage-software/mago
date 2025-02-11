@@ -35,6 +35,7 @@ pub(crate) mod r#try;
 pub(crate) mod type_hint;
 pub(crate) mod unset;
 pub(crate) mod r#use;
+pub(crate) mod using;
 pub(crate) mod utils;
 pub(crate) mod variable;
 pub(crate) mod r#yield;
