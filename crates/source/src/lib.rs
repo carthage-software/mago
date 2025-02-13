@@ -74,6 +74,8 @@ pub struct SourceManager {
     sources: Arc<DashMap<SourceIdentifier, SourceEntry>>,
     /// Auxiliary index from interned name to SourceIdentifier.
     sources_by_name: Arc<DashMap<StringIdentifier, SourceIdentifier>>,
+    /// Auxiliary index from path to SourceIdentifier.
+    sources_by_path: Arc<DashMap<PathBuf, SourceIdentifier>>,
 }
 
 impl SourceCategory {
@@ -191,7 +193,12 @@ impl SourceManager {
     /// Creates a new source manager.
     #[inline(always)]
     pub fn new(interner: ThreadedInterner) -> Self {
-        Self { interner, sources: Arc::new(DashMap::new()), sources_by_name: Arc::new(DashMap::new()) }
+        Self {
+            interner,
+            sources: Arc::new(DashMap::new()),
+            sources_by_name: Arc::new(DashMap::new()),
+            sources_by_path: Arc::new(DashMap::new()),
+        }
     }
 
     /// Inserts a source with the given name and path.
@@ -204,8 +211,9 @@ impl SourceManager {
             return source_id;
         }
 
-        self.sources.insert(source_id, SourceEntry { path: Some(path), content: None });
+        self.sources.insert(source_id, SourceEntry { path: Some(path.clone()), content: None });
         self.sources_by_name.insert(name_id, source_id);
+        self.sources_by_path.insert(path, source_id);
         source_id
     }
 
@@ -253,6 +261,12 @@ impl SourceManager {
     #[inline(always)]
     pub fn source_ids_except_category(&self, category: SourceCategory) -> impl Iterator<Item = SourceIdentifier> + '_ {
         self.sources.iter().filter(move |entry| entry.key().category() != category).map(|entry| *entry.key())
+    }
+
+    /// Returns `Some(SourceIdentifier)` if a source with the given path is found, `None` otherwise.
+    #[inline(always)]
+    pub fn get_source_id_by_path(&self, path: &PathBuf) -> Option<SourceIdentifier> {
+        self.sources_by_path.get(path).map(|entry| *entry.value())
     }
 
     /// Loads the source with the given identifier.

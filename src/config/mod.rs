@@ -57,19 +57,23 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn load() -> Result<Configuration, Error> {
+    pub fn load_from(root: PathBuf) -> Result<Configuration, Error> {
+        let configuration_file = root.join(CONFIGURATION_FILE);
+
         let builder = Config::builder()
-            .add_source(File::with_name(CONFIGURATION_FILE).required(false).format(FileFormat::Toml))
+            .add_source(File::from(configuration_file).required(false).format(FileFormat::Toml))
             .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX));
 
-        let mut configuration = Configuration::from_root(CURRENT_DIR.to_path_buf())
-            .configure(builder)?
-            .build()?
-            .try_deserialize::<Configuration>()?;
+        let mut configuration =
+            Configuration::from_root(root).configure(builder)?.build()?.try_deserialize::<Configuration>()?;
 
         configuration.normalize()?;
 
         Ok(configuration)
+    }
+
+    pub fn load() -> Result<Configuration, Error> {
+        Self::load_from(CURRENT_DIR.to_path_buf())
     }
 
     /// Creates a new `Configuration` with the given root directory.

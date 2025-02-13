@@ -8,6 +8,7 @@ use crate::commands::find::FindCommand;
 use crate::commands::fix::FixCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::lint::LintCommand;
+use crate::commands::lsp::LspCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 
 pub mod ast;
@@ -15,6 +16,7 @@ pub mod find;
 pub mod fix;
 pub mod format;
 pub mod lint;
+pub mod lsp;
 pub mod self_update;
 
 pub const CLAP_STYLING: Styles = Styles::styled()
@@ -60,6 +62,8 @@ pub enum MagoCommand {
     Format(FormatCommand),
     #[command(name = "find")]
     Find(FindCommand),
+    #[command(name = "lsp")]
+    Lsp(LspCommand),
     #[command(name = "self-update")]
     SelfUpdate(SelfUpdateCommand),
 }
