@@ -13,6 +13,7 @@ use crate::ast::terminator::Terminator;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Use {
     pub r#use: Keyword,
     pub items: UseItems,
@@ -21,6 +22,7 @@ pub struct Use {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum UseItems {
     Sequence(UseItemSequence),
     TypedSequence(TypedUseItemSequence),
@@ -30,24 +32,28 @@ pub enum UseItems {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum UseType {
     Function(Keyword),
     Const(Keyword),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UseItemSequence {
     pub start: Position,
     pub items: TokenSeparatedSequence<UseItem>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TypedUseItemSequence {
     pub r#type: UseType,
     pub items: TokenSeparatedSequence<UseItem>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TypedUseItemList {
     pub r#type: UseType,
     pub namespace: Identifier,
@@ -58,6 +64,7 @@ pub struct TypedUseItemList {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MixedUseItemList {
     pub namespace: Identifier,
     pub namespace_separator: Span,
@@ -67,18 +74,21 @@ pub struct MixedUseItemList {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MaybeTypedUseItem {
     pub r#type: Option<UseType>,
     pub item: UseItem,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UseItem {
     pub name: Identifier,
     pub alias: Option<UseItemAlias>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UseItemAlias {
     pub r#as: Keyword,
     pub identifier: LocalIdentifier,

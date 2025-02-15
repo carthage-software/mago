@@ -33,6 +33,7 @@ pub mod trait_use;
 /// interface Foo {}
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Interface {
     pub attribute_lists: Sequence<AttributeList>,
     pub interface: Keyword,
@@ -58,6 +59,7 @@ pub struct Interface {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Class {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -85,6 +87,7 @@ pub struct Class {
 /// };
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct AnonymousClass {
     pub new: Keyword,
     pub attribute_lists: Sequence<AttributeList>,
@@ -112,6 +115,7 @@ pub struct AnonymousClass {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Trait {
     pub attribute_lists: Sequence<AttributeList>,
     pub r#trait: Keyword,
@@ -136,6 +140,7 @@ pub struct Trait {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Enum {
     pub attribute_lists: Sequence<AttributeList>,
     pub r#enum: Keyword,
@@ -167,6 +172,7 @@ pub struct Enum {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct EnumBackingTypeHint {
     pub colon: Span,
     pub hint: Hint,

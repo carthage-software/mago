@@ -11,6 +11,7 @@ use crate::sequence::TokenSeparatedSequence;
 
 /// Represents a PHP match expression.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Match {
     pub r#match: Keyword,
     pub left_parenthesis: Span,
@@ -23,6 +24,8 @@ pub struct Match {
 
 /// Represents a single arm within a match expression.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum MatchArm {
     Expression(MatchExpressionArm),
     Default(MatchDefaultArm),
@@ -30,6 +33,7 @@ pub enum MatchArm {
 
 /// Represents a single arm within a match statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MatchExpressionArm {
     pub conditions: TokenSeparatedSequence<Expression>,
     pub arrow: Span,
@@ -38,6 +42,7 @@ pub struct MatchExpressionArm {
 
 /// Represents the default arm within a match statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MatchDefaultArm {
     pub default: Keyword,
     pub arrow: Span,

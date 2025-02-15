@@ -5,7 +5,7 @@ use mago_linter::settings::RuleSettings;
 use mago_linter::settings::Settings;
 use mago_linter::Linter;
 use mago_php_version::PHPVersion;
-use mago_semantics::Semantics;
+use mago_project::module::Module;
 use mago_source::Source;
 
 pub mod plugins;
@@ -46,15 +46,14 @@ pub fn test_rule_usage_example(rule: Box<dyn Rule>, usage_example: &RuleUsageExa
         php_version = version;
     }
 
-    let semantics = Semantics::build(&interner, php_version, source);
-    let reflection = mago_reflector::reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
-
     let settings = Settings::new(php_version).with_rule(format!("test/{}", definition.get_slug()), rule_settings);
-    let mut linter = Linter::new(settings, interner.clone(), reflection);
+
+    let mut module = Module::build(&interner, php_version, source, Default::default());
+    let mut linter = Linter::new(settings, interner.clone(), module.reflection.take().unwrap_or_default());
 
     linter.add_rule("test", rule);
 
-    let issues = linter.lint(&semantics);
+    let issues = linter.lint(&module);
 
     if usage_example.valid {
         assert!(

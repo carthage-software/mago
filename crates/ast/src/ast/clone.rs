@@ -8,6 +8,7 @@ use crate::ast::expression::Expression;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Clone {
     pub clone: Keyword,
     pub object: Box<Expression>,

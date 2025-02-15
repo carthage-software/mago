@@ -13,6 +13,7 @@ use crate::ast::expression::Expression;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum UnaryPrefixOperator {
     ErrorControl(Span),                  // `@$expr`
     Reference(Span),                     // `&$expr`
@@ -38,18 +39,21 @@ pub enum UnaryPrefixOperator {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum UnaryPostfixOperator {
     PostIncrement(Span), // `$expr++`
     PostDecrement(Span), // `$expr--`
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UnaryPrefix {
     pub operator: UnaryPrefixOperator,
     pub operand: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UnaryPostfix {
     pub operand: Box<Expression>,
     pub operator: UnaryPostfixOperator,

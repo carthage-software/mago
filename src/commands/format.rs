@@ -109,7 +109,7 @@ async fn format_all(
     dry_run: bool,
 ) -> Result<usize, Error> {
     // Collect all user-defined sources.
-    let sources: Vec<_> = source_manager.source_ids_for_category(SourceCategory::UserDefined).collect();
+    let sources: Vec<_> = source_manager.source_ids_for_category(SourceCategory::UserDefined);
 
     let length = sources.len();
     let progress_bar = create_progress_bar(length, "✨ Formatting", ProgressBarTheme::Green);

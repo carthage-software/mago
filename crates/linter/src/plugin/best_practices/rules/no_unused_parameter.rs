@@ -82,7 +82,7 @@ impl Rule for NoUnusedParameterRule {
                 return LintDirective::default();
             }
             Node::Class(class) => {
-                let name = context.semantics.names.get(&class.name);
+                let name = context.module.names.get(&class.name);
                 let Some(reflection) = context.codebase.get_class(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -90,7 +90,7 @@ impl Rule for NoUnusedParameterRule {
                 (reflection, class.members.iter())
             }
             Node::Enum(r#enum) => {
-                let name = context.semantics.names.get(&r#enum.name);
+                let name = context.module.names.get(&r#enum.name);
                 let Some(reflection) = context.codebase.get_enum(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -98,7 +98,7 @@ impl Rule for NoUnusedParameterRule {
                 (reflection, r#enum.members.iter())
             }
             Node::Trait(r#trait) => {
-                let name = context.semantics.names.get(&r#trait.name);
+                let name = context.module.names.get(&r#trait.name);
                 let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
                     return LintDirective::default();
                 };

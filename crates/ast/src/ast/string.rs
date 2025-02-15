@@ -11,6 +11,7 @@ use crate::sequence::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum CompositeString {
     ShellExecute(ShellExecuteString),
     Interpolated(InterpolatedString),
@@ -18,6 +19,7 @@ pub enum CompositeString {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ShellExecuteString {
     pub left_backtick: Span,
     pub parts: Sequence<StringPart>,
@@ -25,6 +27,7 @@ pub struct ShellExecuteString {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct InterpolatedString {
     pub left_double_quote: Span,
     pub parts: Sequence<StringPart>,
@@ -33,6 +36,7 @@ pub struct InterpolatedString {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum DocumentKind {
     Heredoc,
     Nowdoc,
@@ -40,6 +44,7 @@ pub enum DocumentKind {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum DocumentIndentation {
     None,
     Whitespace(usize),
@@ -48,6 +53,7 @@ pub enum DocumentIndentation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct DocumentString {
     pub open: Span,
     pub kind: DocumentKind,
@@ -59,6 +65,7 @@ pub struct DocumentString {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum StringPart {
     Literal(LiteralStringPart),
     Expression(Box<Expression>),
@@ -66,12 +73,14 @@ pub enum StringPart {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct LiteralStringPart {
     pub span: Span,
     pub value: StringIdentifier,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct BracedExpressionStringPart {
     pub left_brace: Span,
     pub expression: Box<Expression>,

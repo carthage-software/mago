@@ -25,6 +25,7 @@ use crate::sequence::Sequence;
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Namespace {
     pub namespace: Keyword,
     pub name: Option<Identifier>,
@@ -33,6 +34,8 @@ pub struct Namespace {
 
 /// Represents the body of a PHP `namespace` declaration.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum NamespaceBody {
     Implicit(NamespaceImplicitBody),
     BraceDelimited(Block),
@@ -50,6 +53,7 @@ pub enum NamespaceBody {
 /// // ...
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct NamespaceImplicitBody {
     pub terminator: Terminator,
     pub statements: Sequence<Statement>,

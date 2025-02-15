@@ -13,6 +13,7 @@ use crate::sequence::Sequence;
 
 /// Represents a `switch` statement in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Switch {
     pub switch: Keyword,
     pub left_parenthesis: Span,
@@ -23,6 +24,8 @@ pub struct Switch {
 
 /// Represents the body of a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum SwitchBody {
     BraceDelimited(SwitchBraceDelimitedBody),
     ColonDelimited(SwitchColonDelimitedBody),
@@ -30,6 +33,7 @@ pub enum SwitchBody {
 
 /// Represents a brace-delimited body of a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct SwitchBraceDelimitedBody {
     pub left_brace: Span,
     pub optional_terminator: Option<Terminator>,
@@ -39,6 +43,7 @@ pub struct SwitchBraceDelimitedBody {
 
 /// Represents a colon-delimited body of a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct SwitchColonDelimitedBody {
     pub colon: Span,
     pub optional_terminator: Option<Terminator>,
@@ -49,6 +54,8 @@ pub struct SwitchColonDelimitedBody {
 
 /// Represents a single case within a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum SwitchCase {
     Expression(SwitchExpressionCase),
     Default(SwitchDefaultCase),
@@ -58,6 +65,7 @@ pub enum SwitchCase {
 ///
 /// Example: `case 1: echo "One";`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct SwitchExpressionCase {
     pub case: Keyword,
     pub expression: Box<Expression>,
@@ -69,6 +77,7 @@ pub struct SwitchExpressionCase {
 ///
 /// Example: `default: echo "Default";`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct SwitchDefaultCase {
     pub default: Keyword,
     pub separator: SwitchCaseSeparator,
@@ -77,6 +86,8 @@ pub struct SwitchDefaultCase {
 
 /// Represents the separator between a case and its statements.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum SwitchCaseSeparator {
     Colon(Span),
     SemiColon(Span),

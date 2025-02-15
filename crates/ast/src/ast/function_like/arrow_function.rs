@@ -21,6 +21,7 @@ use crate::sequence::Sequence;
 /// $fn = fn($x) => $x * 2;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ArrowFunction {
     pub attribute_lists: Sequence<AttributeList>,
     pub r#static: Option<Keyword>,

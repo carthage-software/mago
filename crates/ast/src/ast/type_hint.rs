@@ -20,6 +20,7 @@ use crate::ast::keyword::Keyword;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Hint {
     Identifier(Identifier),
     Parenthesized(ParenthesizedHint),
@@ -57,6 +58,7 @@ pub enum Hint {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ParenthesizedHint {
     pub left_parenthesis: Span,
     pub hint: Box<Hint>,
@@ -73,6 +75,7 @@ pub struct ParenthesizedHint {
 /// int|string
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct UnionHint {
     pub left: Box<Hint>,
     pub pipe: Span,
@@ -89,6 +92,7 @@ pub struct UnionHint {
 /// ArrayAccess&Countable
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct IntersectionHint {
     pub left: Box<Hint>,
     pub ampersand: Span,
@@ -105,6 +109,7 @@ pub struct IntersectionHint {
 /// ?string
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct NullableHint {
     pub question_mark: Span,
     pub hint: Box<Hint>,

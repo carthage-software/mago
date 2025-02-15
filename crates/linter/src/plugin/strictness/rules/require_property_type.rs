@@ -48,7 +48,7 @@ impl Rule for RequirePropertyTypeRule {
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let (reflection, members) = match node {
             Node::Class(class) => {
-                let name = context.semantics.names.get(&class.name);
+                let name = context.module.names.get(&class.name);
                 let Some(reflection) = context.codebase.get_class(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -56,7 +56,7 @@ impl Rule for RequirePropertyTypeRule {
                 (reflection, class.members.as_slice())
             }
             Node::Trait(r#trait) => {
-                let name = context.semantics.names.get(&r#trait.name);
+                let name = context.module.names.get(&r#trait.name);
                 let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
                     return LintDirective::default();
                 };

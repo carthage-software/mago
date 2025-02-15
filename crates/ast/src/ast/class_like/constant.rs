@@ -16,6 +16,7 @@ use crate::sequence::TokenSeparatedSequence;
 
 /// Represents a class-like constant in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ClassLikeConstant {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -27,6 +28,7 @@ pub struct ClassLikeConstant {
 
 /// Represents a single name-value pair within a constant statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ClassLikeConstantItem {
     pub name: LocalIdentifier,
     pub equals: Span,

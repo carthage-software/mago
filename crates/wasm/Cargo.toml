@@ -9,6 +9,9 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = ["getrandom"]
+
 [lints]
 workspace = true
 
@@ -19,8 +22,7 @@ crate-type = ["cdylib"]
 mago-ast = { workspace = true }
 mago-interner = { workspace = true }
 mago-reporting = { workspace = true }
-mago-semantics = { workspace = true }
-mago-reflector = { workspace = true }
+mago-project = { workspace = true }
 mago-source = { workspace = true }
 mago-parser = { workspace = true }
 mago-php-version = { workspace = true }

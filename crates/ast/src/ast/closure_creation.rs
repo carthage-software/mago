@@ -10,6 +10,7 @@ use crate::ast::expression::Expression;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ClosureCreation {
     Function(FunctionClosureCreation),
     Method(MethodClosureCreation),
@@ -17,6 +18,7 @@ pub enum ClosureCreation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct FunctionClosureCreation {
     pub function: Box<Expression>,
     pub left_parenthesis: Span,
@@ -25,6 +27,7 @@ pub struct FunctionClosureCreation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MethodClosureCreation {
     pub object: Box<Expression>,
     pub arrow: Span,
@@ -35,6 +38,7 @@ pub struct MethodClosureCreation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct StaticMethodClosureCreation {
     pub class: Box<Expression>,
     pub double_colon: Span,

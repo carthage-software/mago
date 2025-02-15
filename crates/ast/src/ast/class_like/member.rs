@@ -16,6 +16,8 @@ use crate::ast::variable::Variable;
 use crate::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ClassLikeMember {
     TraitUse(TraitUse),
     Constant(ClassLikeConstant),
@@ -26,6 +28,7 @@ pub enum ClassLikeMember {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ClassLikeMemberSelector {
     Identifier(LocalIdentifier),
     Variable(Variable),
@@ -34,12 +37,14 @@ pub enum ClassLikeMemberSelector {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ClassLikeConstantSelector {
     Identifier(LocalIdentifier),
     Expression(ClassLikeMemberExpressionSelector),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ClassLikeMemberExpressionSelector {
     pub left_brace: Span,
     pub expression: Box<Expression>,

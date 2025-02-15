@@ -1,9 +1,10 @@
 use mago_ast::Node;
+use mago_ast::Program;
 use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
+use mago_project::module::Module;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
-use mago_semantics::Semantics;
 
 use crate::ast::AstNode;
 use crate::context::LintContext;
@@ -13,7 +14,7 @@ use crate::rule::ConfiguredRule;
 
 /// The `Runner` is responsible for executing a lint rule on the AST of a PHP program.
 ///
-/// It holds contextual data such as the PHP version, interner, codebase, semantics, and a collection
+/// It holds contextual data such as the PHP version, interner, codebase, module, and a collection
 /// of issues discovered during linting. To optimize repeated calls to [`Node::children()`], the runner
 /// precomputes a tree representation of the AST using the [`AstNode`] structure.
 ///
@@ -26,7 +27,7 @@ pub struct Runner<'a> {
     php_version: PHPVersion,
     interner: &'a ThreadedInterner,
     codebase: &'a CodebaseReflection,
-    semantics: &'a Semantics,
+    module: &'a Module,
     issues: IssueCollection,
     ast: AstNode<'a>,
     ignores: Vec<IgnoreDirective<'a>>,
@@ -35,7 +36,7 @@ pub struct Runner<'a> {
 impl<'a> Runner<'a> {
     /// Creates a new `Runner` instance.
     ///
-    /// This method converts the program AST (found in `semantics`) into a precomputed tree
+    /// This method converts the program AST (found in `module`) into a precomputed tree
     /// representation to avoid repeated calls to [`Node::children()`] during linting.
     ///
     /// # Parameters
@@ -43,7 +44,7 @@ impl<'a> Runner<'a> {
     /// - `php_version`: The PHP version used during linting.
     /// - `interner`: A reference to the threaded interner for resolving interned strings.
     /// - `codebase`: A reference to the codebase reflection, providing additional context.
-    /// - `semantics`: The semantics of the program to be linted.
+    /// - `module`: The module of the program to be linted.
     ///
     /// # Returns
     ///
@@ -52,15 +53,16 @@ impl<'a> Runner<'a> {
         php_version: PHPVersion,
         interner: &'a ThreadedInterner,
         codebase: &'a CodebaseReflection,
-        semantics: &'a Semantics,
+        module: &'a Module,
+        program: &'a Program,
     ) -> Self {
         Self {
             php_version,
             interner,
             codebase,
-            semantics,
-            ast: AstNode::from(Node::Program(&semantics.program)),
-            ignores: get_ignores(semantics, interner),
+            module,
+            ast: AstNode::from(Node::Program(program)),
+            ignores: get_ignores(module, program, interner),
             issues: IssueCollection::default(),
         }
     }
@@ -76,7 +78,7 @@ impl<'a> Runner<'a> {
             configured_rule,
             self.interner,
             self.codebase,
-            self.semantics,
+            self.module,
             // Filter the ignores to only those that are relevant to this rule.
             self.ignores
                 .iter()

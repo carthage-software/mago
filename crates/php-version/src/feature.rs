@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Feature {
+    ShortOpenTag,
     NullCoalesceAssign,
     ParameterContravariance,
     ReturnCovariance,
@@ -90,4 +91,6 @@ pub enum Feature {
     NewInInitializers,
     ConstantAttribute,
     CallStaticMethodOnTrait,
+    CatchOptionalVariable,
+    CatchUnionType,
 }

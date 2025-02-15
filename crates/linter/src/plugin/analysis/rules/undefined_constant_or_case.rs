@@ -129,7 +129,7 @@ impl Rule for UndefinedConstantOrCaseRule {
                     return LintDirective::Prune;
                 };
 
-                let class_id = context.semantics.names.get(class_identifier);
+                let class_id = context.module.names.get(class_identifier);
                 let class_name = context.interner.lookup(class_id);
                 let constant_name = context.interner.lookup(&constant_identifier.value);
 

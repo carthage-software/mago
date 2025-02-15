@@ -7,12 +7,14 @@ use serde::Serialize;
 use mago_source::SourceIdentifier;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Position {
     pub source: SourceIdentifier,
     pub offset: usize,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Span {
     pub start: Position,
     pub end: Position,

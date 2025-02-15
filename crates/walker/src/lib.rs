@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use mago_ast::ast::*;
 use mago_ast::Program;
 
@@ -32,7 +34,7 @@ macro_rules! generate_ast_walker {
             $(
                 paste::paste! {
                     #[inline(always)]
-                    fn [<walk_in_ $var_name>](&mut self, [<_$var_name>]: &$node_type, _context: &mut C) {
+                    fn [<walk_in_ $var_name>](&mut self, $var_name: &$node_type, context: &mut C) {
                         // Do nothing by default
                     }
 
@@ -46,7 +48,7 @@ macro_rules! generate_ast_walker {
                     }
 
                     #[inline(always)]
-                    fn [<walk_out_ $var_name>](&mut self, [<_$var_name>]: &$node_type, _context: &mut C) {
+                    fn [<walk_out_ $var_name>](&mut self, $var_name: &$node_type, context: &mut C) {
                         // Do nothing by default
                     }
                 }
@@ -61,7 +63,7 @@ macro_rules! generate_ast_walker {
             $(
                 paste::paste! {
                     #[inline(always)]
-                    fn [<walk_in_ $var_name>](&self, [<_$var_name>]: &$node_type, _context: &mut C) {
+                    fn [<walk_in_ $var_name>](&self, $var_name: &$node_type, context: &mut C) {
                         // Do nothing by default
                     }
 
@@ -75,7 +77,7 @@ macro_rules! generate_ast_walker {
                     }
 
                     #[inline(always)]
-                    fn [<walk_out_ $var_name>](&self, [<_$var_name>]: &$node_type, _context: &mut C) {
+                    fn [<walk_out_ $var_name>](&self, $var_name: &$node_type, context: &mut C) {
                         // Do nothing by default
                     }
                 }

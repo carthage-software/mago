@@ -184,7 +184,8 @@ impl PHPVersion {
             Feature::NullableTypeHint
             | Feature::IterableTypeHint
             | Feature::VoidTypeHint
-            | Feature::ClassLikeConstantVisibilityModifiers => self.0 >= 0x07_01_00,
+            | Feature::ClassLikeConstantVisibilityModifiers
+            | Feature::CatchUnionType => self.0 >= 0x07_01_00,
             Feature::TrailingCommaInListSyntax
             | Feature::ParameterTypeWidening
             | Feature::AllUnicodeScalarCodePointsInMbSubstituteCharacter => self.0 >= 0x07_02_00,
@@ -220,7 +221,8 @@ impl PHPVersion {
             | Feature::NullSafeOperator
             | Feature::TrailingCommaInClosureUseList
             | Feature::FalseCompoundTypeHint
-            | Feature::NullCompoundTypeHint => self.0 >= 0x08_00_00,
+            | Feature::NullCompoundTypeHint
+            | Feature::CatchOptionalVariable => self.0 >= 0x08_00_00,
             Feature::FinalConstants
             | Feature::ReadonlyProperties
             | Feature::Enums
@@ -259,7 +261,8 @@ impl PHPVersion {
             | Feature::SubstrReturnFalseInsteadOfEmptyString
             | Feature::CurlUrlOptionCheckingFileSchemeWithOpenBasedir
             | Feature::EmptyStringValidAliasForNoneInMbSubstituteCharacter
-            | Feature::NumericStringValidArgInMbSubstituteCharacter => self.0 < 0x08_00_00,
+            | Feature::NumericStringValidArgInMbSubstituteCharacter
+            | Feature::ShortOpenTag => self.0 < 0x08_00_00,
             Feature::InterfaceConstantImplicitlyFinal => self.0 < 0x08_01_00,
             Feature::PassNoneEncodings => self.0 < 0x07_03_00,
             _ => true,

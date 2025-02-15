@@ -11,6 +11,7 @@ use mago_span::Span;
 /// An identifier can be a local, qualified, or fully qualified identifier.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Identifier {
     Local(LocalIdentifier),
     Qualified(QualifiedIdentifier),
@@ -21,6 +22,7 @@ pub enum Identifier {
 ///
 /// Example: `foo`, `Bar`, `BAZ`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct LocalIdentifier {
     pub span: Span,
     pub value: StringIdentifier,
@@ -30,6 +32,7 @@ pub struct LocalIdentifier {
 ///
 /// Example: `Foo\bar`, `Bar\Baz`, `Baz\QUX`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct QualifiedIdentifier {
     pub span: Span,
     pub value: StringIdentifier,
@@ -39,6 +42,7 @@ pub struct QualifiedIdentifier {
 ///
 /// Example: `\Foo\bar`, `\Bar\Baz`, `\Baz\QUX`
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct FullyQualifiedIdentifier {
     pub span: Span,
     pub value: StringIdentifier,

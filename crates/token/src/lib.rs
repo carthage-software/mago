@@ -7,6 +7,7 @@ use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum DocumentKind {
     Heredoc,
     Nowdoc,
@@ -14,6 +15,7 @@ pub enum DocumentKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum Associativity {
     NonAssociative,
     Left,
@@ -22,6 +24,7 @@ pub enum Associativity {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum Precedence {
     Lowest,
     LowLogicalOr,
@@ -64,6 +67,7 @@ pub trait GetPrecedence {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum TokenKind {
     Whitespace,                  // ` `
     Eval,                        // `eval`
@@ -257,6 +261,7 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Token {
     pub kind: TokenKind,
     pub value: StringIdentifier,

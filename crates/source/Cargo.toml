@@ -15,5 +15,7 @@ workspace = true
 [dependencies]
 mago-interner = { workspace = true }
 serde = { workspace = true }
+ahash = { workspace = true }
 tracing = { workspace = true }
-dashmap = { workspace = true }
+parking_lot = { workspace = true }
+memchr = { workspace = true }

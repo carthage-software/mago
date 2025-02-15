@@ -9,6 +9,7 @@ use crate::ast::expression::Expression;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Instantiation {
     pub new: Keyword,
     pub class: Box<Expression>,

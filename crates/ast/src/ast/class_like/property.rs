@@ -21,6 +21,7 @@ use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Property {
     Plain(PlainProperty),
     Hooked(HookedProperty),
@@ -39,6 +40,7 @@ pub enum Property {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PlainProperty {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -69,6 +71,7 @@ pub struct PlainProperty {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct HookedProperty {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -81,6 +84,7 @@ pub struct HookedProperty {
 /// Represents a property item in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum PropertyItem {
     Abstract(PropertyAbstractItem),
     Concrete(PropertyConcreteItem),
@@ -98,6 +102,7 @@ pub enum PropertyItem {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyAbstractItem {
     pub variable: DirectVariable,
 }
@@ -114,6 +119,7 @@ pub struct PropertyAbstractItem {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyConcreteItem {
     pub variable: DirectVariable,
     pub equals: Span,
@@ -139,6 +145,7 @@ pub struct PropertyConcreteItem {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyHookList {
     pub left_brace: Span,
     pub hooks: Sequence<PropertyHook>,
@@ -161,6 +168,7 @@ pub struct PropertyHookList {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyHook {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -172,6 +180,8 @@ pub struct PropertyHook {
 
 /// Represents the body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum PropertyHookBody {
     Abstract(PropertyHookAbstractBody),
     Concrete(PropertyHookConcreteBody),
@@ -179,12 +189,15 @@ pub enum PropertyHookBody {
 
 /// Represents an abstract body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyHookAbstractBody {
     pub semicolon: Span,
 }
 
 /// Represents a concrete body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum PropertyHookConcreteBody {
     Block(Block),
     Expression(PropertyHookConcreteExpressionBody),
@@ -192,6 +205,7 @@ pub enum PropertyHookConcreteBody {
 
 /// Represents an expression body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct PropertyHookConcreteExpressionBody {
     pub arrow: Span,
     pub expression: Expression,

@@ -27,7 +27,7 @@ impl Rule for NoMultiAssignmentsRule {
             return LintDirective::default();
         };
 
-        let code = context.lookup(&context.semantics.source.content);
+        let code = context.lookup(&context.module.source.content);
         let a = &code[assignment.lhs.span().to_range()];
         let b = &code[other_assignment.lhs.span().to_range()];
         let c = &code[other_assignment.rhs.span().to_range()];

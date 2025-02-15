@@ -12,6 +12,7 @@ use crate::Program;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C)]
 pub enum NodeKind {
     Program,
     ConstantAccess,
@@ -234,6 +235,7 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Node<'a> {
     Program(&'a Program),
     Access(&'a Access),

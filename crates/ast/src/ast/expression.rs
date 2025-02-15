@@ -47,6 +47,7 @@ use crate::ast::variable::Variable;
 use crate::node::NodeKind;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Parenthesized {
     pub left_parenthesis: Span,
     pub expression: Box<Expression>,
@@ -55,6 +56,7 @@ pub struct Parenthesized {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Expression {
     Binary(Binary),
     UnaryPrefix(UnaryPrefix),

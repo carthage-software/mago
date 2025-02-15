@@ -8,6 +8,7 @@ use crate::ast::type_hint::Hint;
 
 /// Represents a function-like return type hint in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct FunctionLikeReturnTypeHint {
     pub colon: Span,
     pub hint: Hint,

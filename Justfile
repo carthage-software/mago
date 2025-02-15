@@ -43,7 +43,6 @@ publish:
     cargo publish -p mago-token --allow-dirty
     cargo publish -p mago-ast --allow-dirty
     cargo publish -p mago-walker --allow-dirty
-    cargo publish -p mago-traverser --allow-dirty
     cargo publish -p mago-ast-utils --allow-dirty
     cargo publish -p mago-composer --allow-dirty
     cargo publish -p mago-docblock --allow-dirty
@@ -51,11 +50,9 @@ publish:
     cargo publish -p mago-parser --allow-dirty
     cargo publish -p mago-formatter --allow-dirty
     cargo publish -p mago-names --allow-dirty
-    cargo publish -p mago-symbol-table --allow-dirty
-    cargo publish -p mago-semantics --allow-dirty
     cargo publish -p mago-reference --allow-dirty
     cargo publish -p mago-typing --allow-dirty
-    cargo publish -p mago-reflector --allow-dirty
+    cargo publish -p mago-project --allow-dirty
     cargo publish -p mago-linter --allow-dirty
     cargo publish -p mago-wasm --allow-dirty
     cargo publish --allow-dirty

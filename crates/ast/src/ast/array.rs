@@ -9,6 +9,7 @@ use crate::ast::keyword::Keyword;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ArrayAccess {
     pub array: Box<Expression>,
     pub left_bracket: Span,
@@ -17,6 +18,7 @@ pub struct ArrayAccess {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ArrayAppend {
     pub array: Box<Expression>,
     pub left_bracket: Span,
@@ -33,6 +35,7 @@ pub struct ArrayAppend {
 /// list($a, 'b' => $c, /* missing */, ...$rest) = $arr;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct List {
     pub list: Keyword,
     pub left_parenthesis: Span,
@@ -50,6 +53,7 @@ pub struct List {
 /// $arr = ['apple', 'banana', 3 => 'orange'];
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Array {
     pub left_bracket: Span,
     pub elements: TokenSeparatedSequence<ArrayElement>,
@@ -66,6 +70,7 @@ pub struct Array {
 /// $arr = array('apple', 'banana', 3 => 'orange');
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct LegacyArray {
     pub array: Keyword,
     pub left_parenthesis: Span,
@@ -76,6 +81,7 @@ pub struct LegacyArray {
 /// Represents an array element.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ArrayElement {
     KeyValue(KeyValueArrayElement),
     Value(ValueArrayElement),
@@ -95,6 +101,7 @@ pub enum ArrayElement {
 /// ];
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct KeyValueArrayElement {
     pub key: Box<Expression>,
     pub double_arrow: Span,
@@ -113,6 +120,7 @@ pub struct KeyValueArrayElement {
 /// ];
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ValueArrayElement {
     pub value: Box<Expression>,
 }
@@ -129,6 +137,7 @@ pub struct ValueArrayElement {
 /// ];
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct VariadicArrayElement {
     pub ellipsis: Span,
     pub value: Box<Expression>,
@@ -147,6 +156,7 @@ pub struct VariadicArrayElement {
 ///   'third',
 /// ];
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MissingArrayElement {
     pub comma: Span,
 }

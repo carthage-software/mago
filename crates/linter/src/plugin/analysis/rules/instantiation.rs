@@ -89,7 +89,7 @@ impl Rule for InstantiationRule {
             return LintDirective::default();
         };
 
-        let class_name_identifier = context.semantics.names.get(class_identifier);
+        let class_name_identifier = context.module.names.get(class_identifier);
         let class_name = context.lookup(&class_identifier.value()).to_string();
         let class_fqcn = context.lookup(class_name_identifier).to_string();
 

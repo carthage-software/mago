@@ -10,6 +10,7 @@ use crate::ast::expression::Expression;
 /// Represents a PHP assignment operator.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum AssignmentOperator {
     Assign(Span),
     Addition(Span),
@@ -29,6 +30,7 @@ pub enum AssignmentOperator {
 
 /// Represents a PHP assignment operation
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Assignment {
     pub lhs: Box<Expression>,
     pub operator: AssignmentOperator,

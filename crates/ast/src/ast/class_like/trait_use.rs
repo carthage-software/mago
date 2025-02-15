@@ -14,6 +14,7 @@ use crate::sequence::Sequence;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUse {
     pub r#use: Keyword,
     pub trait_names: TokenSeparatedSequence<Identifier>,
@@ -21,15 +22,19 @@ pub struct TraitUse {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum TraitUseSpecification {
     Abstract(TraitUseAbstractSpecification),
     Concrete(TraitUseConcreteSpecification),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUseAbstractSpecification(pub Terminator);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUseConcreteSpecification {
     pub left_brace: Span,
     pub adaptations: Sequence<TraitUseAdaptation>,
@@ -37,12 +42,15 @@ pub struct TraitUseConcreteSpecification {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum TraitUseAdaptation {
     Precedence(TraitUsePrecedenceAdaptation),
     Alias(TraitUseAliasAdaptation),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUsePrecedenceAdaptation {
     pub method_reference: TraitUseAbsoluteMethodReference,
     pub insteadof: Keyword,
@@ -51,6 +59,7 @@ pub struct TraitUsePrecedenceAdaptation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUseAliasAdaptation {
     pub method_reference: TraitUseMethodReference,
     pub r#as: Keyword,
@@ -60,12 +69,15 @@ pub struct TraitUseAliasAdaptation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum TraitUseMethodReference {
     Identifier(LocalIdentifier),
     Absolute(TraitUseAbsoluteMethodReference),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct TraitUseAbsoluteMethodReference {
     pub trait_name: Identifier,
     pub double_colon: Span,

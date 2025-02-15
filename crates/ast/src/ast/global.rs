@@ -10,6 +10,7 @@ use crate::ast::variable::Variable;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Global {
     pub global: Keyword,
     pub variables: TokenSeparatedSequence<Variable>,

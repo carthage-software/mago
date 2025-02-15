@@ -10,6 +10,7 @@ use serde::Serialize;
 
 /// An string identifier that is used to represent an interned string.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct StringIdentifier(pub(crate) usize);
 
 impl StringIdentifier {
@@ -60,7 +61,7 @@ unsafe impl Key for StringIdentifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Interner {
     rodeo: Rodeo<StringIdentifier>,
 }
@@ -188,7 +189,7 @@ impl Interner {
 }
 
 /// A thread-safe interner, allowing multiple threads to concurrently intern strings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThreadedInterner {
     rodeo: Arc<ThreadedRodeo<StringIdentifier>>,
 }

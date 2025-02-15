@@ -18,6 +18,7 @@ use crate::sequence::TokenSeparatedSequence;
 /// final class Foo implements Bar, Baz {}
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Implements {
     pub implements: Keyword,
     pub types: TokenSeparatedSequence<Identifier>,
@@ -39,6 +40,7 @@ pub struct Implements {
 /// class Foo extends Bar {}
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Extends {
     pub extends: Keyword,
     pub types: TokenSeparatedSequence<Identifier>,

@@ -14,6 +14,7 @@ use crate::sequence::Sequence;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Closure {
     pub attribute_lists: Sequence<AttributeList>,
     pub r#static: Option<Keyword>,
@@ -26,6 +27,7 @@ pub struct Closure {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ClosureUseClause {
     pub r#use: Keyword,
     pub left_parenthesis: Span,
@@ -34,6 +36,7 @@ pub struct ClosureUseClause {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ClosureUseClauseVariable {
     pub ampersand: Option<Span>,
     pub variable: DirectVariable,

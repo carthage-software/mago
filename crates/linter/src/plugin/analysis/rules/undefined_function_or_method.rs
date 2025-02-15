@@ -131,7 +131,7 @@ impl Rule for UndefinedFunctionOrMethodRule {
                 };
 
                 // Resolve the class name from the interner
-                let class_id = context.semantics.names.get(class_identifier);
+                let class_id = context.module.names.get(class_identifier);
                 let class_name = context.interner.lookup(class_id);
 
                 // Check if this class/trait actually exists
@@ -295,7 +295,7 @@ impl Rule for UndefinedFunctionOrMethodRule {
                     return LintDirective::default();
                 };
 
-                let class_id = context.semantics.names.get(class_identifier);
+                let class_id = context.module.names.get(class_identifier);
                 let class_name = context.interner.lookup(class_id);
 
                 let Some(class_like) = context.codebase.get_named_class_like(context.interner, class_id) else {

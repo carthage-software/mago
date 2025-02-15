@@ -160,7 +160,7 @@ impl Rule for RequireParameterTypeRule {
                 }
             }
             Node::Interface(interface) => {
-                let name = context.semantics.names.get(&interface.name);
+                let name = context.module.names.get(&interface.name);
                 let Some(reflection) = context.codebase.get_interface(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -168,7 +168,7 @@ impl Rule for RequireParameterTypeRule {
                 check_class_like_members(reflection, interface.members.as_slice(), context);
             }
             Node::Class(class) => {
-                let name = context.semantics.names.get(&class.name);
+                let name = context.module.names.get(&class.name);
                 let Some(reflection) = context.codebase.get_class(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -176,7 +176,7 @@ impl Rule for RequireParameterTypeRule {
                 check_class_like_members(reflection, class.members.as_slice(), context);
             }
             Node::Enum(r#enum) => {
-                let name = context.semantics.names.get(&r#enum.name);
+                let name = context.module.names.get(&r#enum.name);
                 let Some(reflection) = context.codebase.get_enum(context.interner, name) else {
                     return LintDirective::default();
                 };
@@ -184,7 +184,7 @@ impl Rule for RequireParameterTypeRule {
                 check_class_like_members(reflection, r#enum.members.as_slice(), context);
             }
             Node::Trait(r#trait) => {
-                let name = context.semantics.names.get(&r#trait.name);
+                let name = context.module.names.get(&r#trait.name);
                 let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
                     return LintDirective::default();
                 };

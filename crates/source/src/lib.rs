@@ -1,8 +1,8 @@
-use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use dashmap::DashMap;
+use ahash::HashMap;
+use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -39,6 +39,7 @@ pub enum SourceCategory {
 
 /// A unique identifier for a source.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct SourceIdentifier(pub StringIdentifier, pub SourceCategory);
 
 /// Represents a source file.
@@ -61,59 +62,69 @@ pub trait HasSource {
 struct SourceEntry {
     /// The file path (if any).
     path: Option<PathBuf>,
-    /// The content, if already loaded, along with its size and line-starts.
+    /// The content, if already loaded, plus its size and line-start positions.
     content: Option<(StringIdentifier, usize, Vec<usize>)>,
 }
 
+/// Internal container for our maps. We keep two maps:
+///  - one from SourceIdentifier → SourceEntry
+///  - an auxiliary index from interned name → SourceIdentifier
+#[derive(Debug)]
+struct SourceManagerInner {
+    sources: HashMap<SourceIdentifier, SourceEntry>,
+    sources_by_name: HashMap<StringIdentifier, SourceIdentifier>,
+}
+
 /// A manager for sources.
+///
+/// This version replaces DashMap with a single inner structure protected by a
+/// high-performance `RwLock` (from the parking_lot crate) and uses AHashMap for speed.
 #[derive(Clone, Debug)]
 pub struct SourceManager {
     /// The interner used for source names and content.
     interner: ThreadedInterner,
-    /// Map of SourceIdentifier -> SourceEntry.
-    sources: Arc<DashMap<SourceIdentifier, SourceEntry>>,
-    /// Auxiliary index from interned name to SourceIdentifier.
-    sources_by_name: Arc<DashMap<StringIdentifier, SourceIdentifier>>,
+    /// Inner maps protected by a lock.
+    inner: Arc<RwLock<SourceManagerInner>>,
 }
 
+/// Methods for SourceCategory.
 impl SourceCategory {
-    /// Returns whether the source category is `BuiltIn`.
     #[inline(always)]
     pub const fn is_built_in(&self) -> bool {
         matches!(self, Self::BuiltIn)
     }
 
-    /// Returns whether the source category is `External`.
     #[inline(always)]
     pub const fn is_external(&self) -> bool {
         matches!(self, Self::External)
     }
 
-    /// Returns whether the source category is `UserDefined`.
     #[inline(always)]
     pub const fn is_user_defined(&self) -> bool {
         matches!(self, Self::UserDefined)
     }
 }
 
+/// Methods for SourceIdentifier.
 impl SourceIdentifier {
     #[inline(always)]
     pub fn dummy() -> Self {
         Self(StringIdentifier::empty(), SourceCategory::UserDefined)
     }
 
-    /// Returns the string identifier of the source.
+    /// Returns the interned string identifier.
     #[inline(always)]
     pub const fn value(&self) -> StringIdentifier {
         self.0
     }
 
+    /// Returns the source category.
     #[inline(always)]
     pub const fn category(&self) -> SourceCategory {
         self.1
     }
 }
-
+/// Methods for Source.
 impl Source {
     /// Creates a [`Source`] from a single piece of `content` without needing
     /// a full [`SourceManager`].
@@ -191,21 +202,36 @@ impl SourceManager {
     /// Creates a new source manager.
     #[inline(always)]
     pub fn new(interner: ThreadedInterner) -> Self {
-        Self { interner, sources: Arc::new(DashMap::new()), sources_by_name: Arc::new(DashMap::new()) }
+        Self {
+            interner,
+            inner: Arc::new(RwLock::new(SourceManagerInner {
+                sources: HashMap::default(),
+                sources_by_name: HashMap::default(),
+            })),
+        }
     }
 
-    /// Inserts a source with the given name and path.
+    /// Inserts a source with the given name and file path.
     #[inline(always)]
     pub fn insert_path(&self, name: impl AsRef<str>, path: PathBuf, category: SourceCategory) -> SourceIdentifier {
-        let name_id = self.interner.intern(&name);
+        let name_str = name.as_ref();
+        let name_id = self.interner.intern(name_str);
         let source_id = SourceIdentifier(name_id, category);
-        // Fast-path: if already present, return.
-        if self.sources.contains_key(&source_id) {
-            return source_id;
+
+        {
+            let inner = self.inner.read();
+            if inner.sources.contains_key(&source_id) {
+                return source_id;
+            }
         }
 
-        self.sources.insert(source_id, SourceEntry { path: Some(path), content: None });
-        self.sources_by_name.insert(name_id, source_id);
+        let mut inner = self.inner.write();
+        // Double-check to avoid duplicate insertion.
+        if inner.sources.contains_key(&source_id) {
+            return source_id;
+        }
+        inner.sources.insert(source_id, SourceEntry { path: Some(path), content: None });
+        inner.sources_by_name.insert(name_id, source_id);
         source_id
     }
 
@@ -217,103 +243,141 @@ impl SourceManager {
         content: impl AsRef<str>,
         category: SourceCategory,
     ) -> SourceIdentifier {
-        let name_id = self.interner.intern(&name);
-        // Try our auxiliary index first.
-        if let Some(source_id) = self.sources_by_name.get(&name_id).map(|v| *v) {
-            return source_id;
+        let name_str = name.as_ref();
+        let content_str = content.as_ref();
+        let name_id = self.interner.intern(name_str);
+
+        {
+            let inner = self.inner.read();
+            if let Some(&source_id) = inner.sources_by_name.get(&name_id) {
+                return source_id;
+            }
         }
+
+        let lines: Vec<_> = line_starts(content_str).collect();
+        let size = content_str.len();
+        let content_id = self.interner.intern(content_str);
         let source_id = SourceIdentifier(name_id, category);
-        let lines: Vec<_> = line_starts(content.as_ref()).collect();
-        let size = content.as_ref().len();
-        let content_id = self.interner.intern(content);
-        self.sources.insert(source_id, SourceEntry { path: None, content: Some((content_id, size, lines)) });
-        self.sources_by_name.insert(name_id, source_id);
+
+        let mut inner = self.inner.write();
+        if let Some(&existing) = inner.sources_by_name.get(&name_id) {
+            return existing;
+        }
+        inner.sources.insert(source_id, SourceEntry { path: None, content: Some((content_id, size, lines)) });
+        inner.sources_by_name.insert(name_id, source_id);
         source_id
     }
 
     /// Returns whether the manager contains a source with the given identifier.
     #[inline(always)]
     pub fn contains(&self, source_id: &SourceIdentifier) -> bool {
-        self.sources.contains_key(source_id)
+        let inner = self.inner.read();
+        inner.sources.contains_key(source_id)
     }
 
-    /// Returns an iterator over all source identifiers.
+    /// Returns all source identifiers.
     #[inline(always)]
-    pub fn source_ids(&self) -> impl Iterator<Item = SourceIdentifier> + '_ {
-        self.sources.iter().map(|entry| *entry.key())
+    pub fn source_ids(&self) -> Vec<SourceIdentifier> {
+        let inner = self.inner.read();
+        inner.sources.keys().cloned().collect()
     }
 
-    /// Returns an iterator over source identifiers for the given category.
+    /// Returns source identifiers for the given category.
     #[inline(always)]
-    pub fn source_ids_for_category(&self, category: SourceCategory) -> impl Iterator<Item = SourceIdentifier> + '_ {
-        self.sources.iter().filter(move |entry| entry.key().category() == category).map(|entry| *entry.key())
+    pub fn source_ids_for_category(&self, category: SourceCategory) -> Vec<SourceIdentifier> {
+        let inner = self.inner.read();
+        inner.sources.keys().filter(|id| id.category() == category).cloned().collect()
     }
 
-    /// Returns an iterator over source identifiers for categories other than the given category.
+    /// Returns source identifiers for categories other than the given one.
     #[inline(always)]
-    pub fn source_ids_except_category(&self, category: SourceCategory) -> impl Iterator<Item = SourceIdentifier> + '_ {
-        self.sources.iter().filter(move |entry| entry.key().category() != category).map(|entry| *entry.key())
+    pub fn source_ids_except_category(&self, category: SourceCategory) -> Vec<SourceIdentifier> {
+        let inner = self.inner.read();
+        inner.sources.keys().filter(|id| id.category() != category).cloned().collect()
     }
 
-    /// Loads the source with the given identifier.
+    /// Loads the source for the given identifier.
     ///
-    /// If the source content is already loaded, it is returned directly.
-    /// Otherwise, the file is read from disk, processed, and cached.
+    /// If the source content is already loaded, it is returned immediately.
+    /// Otherwise the file is read from disk, processed, and cached.
     #[inline(always)]
     pub fn load(&self, source_id: &SourceIdentifier) -> Result<Source, SourceError> {
-        // Try to get a mutable reference from the dashmap.
-        let mut entry = self.sources.get_mut(source_id).ok_or(SourceError::UnavailableSource(*source_id))?;
-        if let Some((content, size, ref lines)) = entry.content {
-            // Fast path: content is already loaded.
-            return Ok(Source {
-                identifier: *source_id,
-                path: entry.path.clone(),
-                content,
-                size,
-                lines: lines.clone(),
-            });
+        // First, try to read without locking for update.
+        {
+            let inner = self.inner.read();
+            if let Some(entry) = inner.sources.get(source_id) {
+                if let Some((content, size, ref lines)) = entry.content {
+                    return Ok(Source {
+                        identifier: *source_id,
+                        path: entry.path.clone(),
+                        content,
+                        size,
+                        lines: lines.clone(),
+                    });
+                }
+            }
         }
 
-        // Slow path: load from file.
-        let path = entry.path.clone().expect("Entry must have either content or path");
-        let bytes = std::fs::read(&path).map_err(SourceError::IOError)?;
-        let content = match String::from_utf8_lossy(&bytes) {
-            Cow::Borrowed(s) => s.to_owned(),
-            Cow::Owned(s) => {
-                tracing::warn!("Source '{}' contains invalid UTF-8 sequence, behavior is undefined.", path.display());
+        // Retrieve the file path (must exist if content is not loaded).
+        let path = {
+            let inner = self.inner.read();
+            let entry = inner.sources.get(source_id).ok_or(SourceError::UnavailableSource(*source_id))?;
 
+            entry.path.clone().ok_or(SourceError::UnavailableSource(*source_id))?
+        };
+
+        // Perform file I/O outside the lock.
+        let bytes = std::fs::read(&path).map_err(SourceError::IOError)?;
+        let content_str = match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(err) => {
+                let s = err.into_bytes();
+                let s = String::from_utf8_lossy(&s).into_owned();
+                tracing::warn!("Source '{}' contains invalid UTF-8 sequence; behavior is undefined.", path.display());
                 s
             }
         };
+        let lines: Vec<_> = line_starts(&content_str).collect();
+        let size = content_str.len();
+        let content_id = self.interner.intern(&content_str);
 
-        let lines: Vec<_> = line_starts(&content).collect();
-        let size = content.len();
-        let content_id = self.interner.intern(content);
-
-        // Update the entry.
-        entry.content = Some((content_id, size, lines.clone()));
-
-        Ok(Source { identifier: *source_id, path: Some(path), content: content_id, size, lines })
+        // Update the entry under a write lock.
+        {
+            let mut inner = self.inner.write();
+            if let Some(entry) = inner.sources.get_mut(source_id) {
+                // Check again in case another thread updated it meanwhile.
+                if entry.content.is_none() {
+                    entry.content = Some((content_id, size, lines.clone()));
+                }
+                Ok(Source { identifier: *source_id, path: entry.path.clone(), content: content_id, size, lines })
+            } else {
+                Err(SourceError::UnavailableSource(*source_id))
+            }
+        }
     }
 
     /// Writes updated content for the source with the given identifier.
     #[inline(always)]
     pub fn write(&self, source_id: SourceIdentifier, new_content: impl AsRef<str>) -> Result<(), SourceError> {
-        let mut entry = self.sources.get_mut(&source_id).ok_or(SourceError::UnavailableSource(source_id))?;
-        let new_content = new_content.as_ref();
-        let new_content_id = self.interner.intern(new_content);
-        // Check if content is unchanged.
-        if let Some((old_content, _, _)) = entry.content.as_ref() {
-            if *old_content == new_content_id {
-                return Ok(());
+        let new_content_str = new_content.as_ref();
+        let new_content_id = self.interner.intern(new_content_str);
+        let new_lines: Vec<_> = line_starts(new_content_str).collect();
+        let new_size = new_content_str.len();
+
+        let path_opt = {
+            let mut inner = self.inner.write();
+            let entry = inner.sources.get_mut(&source_id).ok_or(SourceError::UnavailableSource(source_id))?;
+            if let Some((old_content, _, _)) = entry.content {
+                if old_content == new_content_id {
+                    return Ok(());
+                }
             }
-        }
+            entry.content = Some((new_content_id, new_size, new_lines));
+            entry.path.clone()
+        };
 
-        let new_lines: Vec<_> = line_starts(new_content).collect();
-        let new_size = new_content.len();
-
-        entry.content = Some((new_content_id, new_size, new_lines.clone()));
-        if let Some(ref path) = entry.path {
+        // If the source has an associated file, update it on disk.
+        if let Some(ref path) = path_opt {
             std::fs::write(path, self.interner.lookup(&new_content_id)).map_err(SourceError::IOError)?;
         }
 
@@ -323,18 +387,17 @@ impl SourceManager {
     /// Returns the number of sources.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.sources.len()
+        let inner = self.inner.read();
+        inner.sources.len()
     }
 
     /// Returns true if there are no sources.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.sources.is_empty()
+        let inner = self.inner.read();
+        inner.sources.is_empty()
     }
 }
-
-unsafe impl Send for SourceManager {}
-unsafe impl Sync for SourceManager {}
 
 impl<T: HasSource> HasSource for Box<T> {
     #[inline(always)]
@@ -346,5 +409,5 @@ impl<T: HasSource> HasSource for Box<T> {
 /// Returns an iterator over the starting byte offsets of each line in `source`.
 #[inline(always)]
 fn line_starts(source: &str) -> impl Iterator<Item = usize> + '_ {
-    std::iter::once(0).chain(source.match_indices('\n').map(|(i, _)| i + 1))
+    std::iter::once(0).chain(memchr::memchr_iter(b'\n', source.as_bytes()).map(|i| i + 1))
 }

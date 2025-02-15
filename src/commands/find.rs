@@ -2,7 +2,10 @@ use std::process::ExitCode;
 use std::str::FromStr;
 
 use clap::Parser;
+
 use mago_interner::ThreadedInterner;
+use mago_project::module::Module;
+use mago_project::module::ModuleBuildOptions;
 use mago_reference::query::Query;
 use mago_reference::Reference;
 use mago_reference::ReferenceFinder;
@@ -12,7 +15,6 @@ use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
-use mago_semantics::Semantics;
 use mago_source::SourceCategory;
 use mago_source::SourceManager;
 
@@ -137,7 +139,7 @@ pub async fn execute(command: FindCommand, configuration: Configuration) -> Resu
 /// # Returns
 /// A list of all [`Reference`](mago_reference::Reference) matches discovered.
 ///
-/// This function spawns parallel tasks (one per source file) to build a [`Semantics`]
+/// This function spawns parallel tasks (one per source file) to build a [`Module`]
 /// and run the [`ReferenceFinder`].
 pub async fn find_references(
     interner: &ThreadedInterner,
@@ -150,9 +152,9 @@ pub async fn find_references(
 
     // Choose which sources to analyze
     let sources: Vec<_> = if include_externals {
-        manager.source_ids_for_category(SourceCategory::UserDefined).collect()
+        manager.source_ids_for_category(SourceCategory::UserDefined)
     } else {
-        manager.source_ids_except_category(SourceCategory::BuiltIn).collect()
+        manager.source_ids_except_category(SourceCategory::BuiltIn)
     };
 
     let length = sources.len();
@@ -169,10 +171,11 @@ pub async fn find_references(
         handles.push(tokio::spawn(async move {
             // 1) Load the source code
             let source = manager.load(&source_id)?;
-            // 2) Build semantics
-            let semantics = Semantics::build(&interner, php_version, source);
+            // 2) Build module
+            let (module, program) =
+                Module::build_with_ast(&interner, php_version, source, ModuleBuildOptions::new(false, false));
             // 3) Use the reference finder
-            let references = ReferenceFinder::new(&interner).find(&semantics, query);
+            let references = ReferenceFinder::new(&interner).find(&module, &program, query);
 
             // Increment progress after finishing this file
             progress_bar.inc(1);

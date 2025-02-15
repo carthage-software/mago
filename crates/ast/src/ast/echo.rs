@@ -20,6 +20,7 @@ use crate::sequence::TokenSeparatedSequence;
 /// echo $a, $b, $c;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Echo {
     pub echo: Keyword,
     pub values: TokenSeparatedSequence<Expression>,

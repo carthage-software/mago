@@ -9,10 +9,10 @@ use mago_ast::Identifier;
 use mago_fixer::FixPlan;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_project::module::Module;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_semantics::Semantics;
 use mago_span::HasPosition;
 
 use crate::ast::AstNode;
@@ -26,7 +26,7 @@ pub struct LintContext<'a> {
     pub rule: &'a ConfiguredRule,
     pub interner: &'a ThreadedInterner,
     pub codebase: &'a CodebaseReflection,
-    pub semantics: &'a Semantics,
+    pub module: &'a Module,
     pub ignores: Vec<&'a IgnoreDirective<'a>>,
 
     unused_ignores: Vec<&'a IgnoreDirective<'a>>,
@@ -39,7 +39,7 @@ impl LintContext<'_> {
         rule: &'a ConfiguredRule,
         interner: &'a ThreadedInterner,
         codebase: &'a CodebaseReflection,
-        semantics: &'a Semantics,
+        module: &'a Module,
         ignores: Vec<&'a IgnoreDirective<'a>>,
     ) -> LintContext<'a> {
         LintContext {
@@ -47,7 +47,7 @@ impl LintContext<'_> {
             rule,
             interner,
             codebase,
-            semantics,
+            module,
             ignores,
             unused_ignores: Vec::new(),
             issues: Vec::new(),
@@ -75,7 +75,7 @@ impl LintContext<'_> {
 
     /// Checks if a name at a given position is imported.
     pub fn is_name_imported(&self, position: &impl HasPosition) -> bool {
-        self.semantics.names.is_imported(&position.position())
+        self.module.names.is_imported(&position.position())
     }
 
     /// Retrieves the name associated with a given position in the code.
@@ -84,7 +84,7 @@ impl LintContext<'_> {
     ///
     /// Panics if no name is found at the specified position.
     pub fn lookup_name(&self, position: &impl HasPosition) -> &str {
-        let name_id = self.semantics.names.get(&position.position());
+        let name_id = self.module.names.get(&position.position());
 
         self.lookup(name_id)
     }
@@ -132,7 +132,7 @@ impl LintContext<'_> {
 
         // If no leading `\`, resolve based on the namespace hierarchy:
         // 1. Check if the fully qualified function name (FQFN) exists in the current context.
-        let fqfn_id = self.semantics.names.get(&identifier.position());
+        let fqfn_id = self.module.names.get(&identifier.position());
         if self.codebase.function_exists(self.interner, fqfn_id) {
             // The FQFN exists, so return it.
             return self.lookup(fqfn_id);
@@ -190,7 +190,7 @@ impl LintContext<'_> {
 
         // If no leading `\`, resolve based on the namespace hierarchy:
         // 1. Check if the fully qualified constant name (FQCN) exists in the current context.
-        let fqcn_id = self.semantics.names.get(&identifier.position());
+        let fqcn_id = self.module.names.get(&identifier.position());
         if self.codebase.constant_exists(self.interner, fqcn_id) {
             // The FQCN exists, so return it.
             return self.lookup(fqcn_id);
@@ -289,7 +289,7 @@ impl LintContext<'_> {
     /// and `false` otherwise.
     #[inline]
     fn ignores(&mut self, node: impl HasSpan) -> bool {
-        let node_start_line = self.semantics.source.line_number(node.span().start.offset);
+        let node_start_line = self.module.source.line_number(node.span().start.offset);
         let mut ignore_applied = false;
         // Pre-allocate capacity to avoid reallocations.
         let mut remaining = Vec::with_capacity(self.ignores.len());
@@ -389,7 +389,7 @@ impl LintContext<'_> {
         let mut plan = FixPlan::new();
         f(&mut plan);
 
-        let issue = issue.with_suggestion(self.semantics.source.identifier, plan);
+        let issue = issue.with_suggestion(self.module.source.identifier, plan);
 
         self.report(issue)
     }

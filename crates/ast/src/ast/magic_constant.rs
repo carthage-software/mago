@@ -9,6 +9,7 @@ use crate::ast::identifier::LocalIdentifier;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum MagicConstant {
     Line(LocalIdentifier),
     File(LocalIdentifier),

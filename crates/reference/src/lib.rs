@@ -1,9 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_ast::Program;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
-use mago_semantics::Semantics;
+use mago_project::module::Module;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_walker::Walker;
@@ -54,7 +55,7 @@ pub struct Reference {
 }
 
 /// Provides functionality for discovering references (imports, usages, definitions, etc.)
-/// of a symbol within a program’s semantics.
+/// of a symbol within a module.
 ///
 /// The [`ReferenceFinder`] can locate references by walking through the AST
 /// (via a [`Walker`]) and collecting relevant `Reference` items.
@@ -71,27 +72,21 @@ impl<'a> ReferenceFinder<'a> {
         Self { interner }
     }
 
-    /// Finds all references that match the given [`Query`] within the provided [`Semantics`].
+    /// Finds all references that match the given [`Query`] within the provided [`Module`].
     ///
     /// This method:
-    /// 1. Creates a [`Context`] that holds the interner, the query, and the current semantics.
+    ///
+    /// 1. Creates a [`Context`] that holds the interner, the query, and the current module.
     /// 2. Uses a specialized [`Walker`] (`ReferenceFindingWalker`) to traverse the AST of the program.
     /// 3. Gathers references (e.g., [`ReferenceKind::Usage`], [`ReferenceKind::Definition`]) in the context.
     /// 4. Returns all discovered references as a `Vec<Reference>`.
     ///
-    /// # Parameters
-    ///
-    /// - `semantics`: The [`Semantics`] representing the parsed and analyzed code.
-    /// - `query`: A [`Query`] describing what symbol or reference type we’re looking for.
-    ///
-    /// # Returns
-    ///
     /// A list of [`Reference`] objects describing where and how the symbol is referenced
     /// in the code.
-    pub fn find(&self, semantics: &Semantics, query: Query) -> Vec<Reference> {
-        let mut context = Context::new(self.interner, &query, semantics);
+    pub fn find(&self, module: &Module, program: &Program, query: Query) -> Vec<Reference> {
+        let mut context = Context::new(self.interner, &query, module);
 
-        ReferenceFindingWalker.walk_program(&semantics.program, &mut context);
+        ReferenceFindingWalker.walk_program(program, &mut context);
 
         context.take_references()
     }

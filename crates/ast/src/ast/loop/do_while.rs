@@ -23,6 +23,7 @@ use crate::ast::terminator::Terminator;
 /// } while ($i < 10);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct DoWhile {
     pub r#do: Keyword,
     pub statement: Box<Statement>,

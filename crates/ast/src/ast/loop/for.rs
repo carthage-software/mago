@@ -24,6 +24,7 @@ use crate::sequence::TokenSeparatedSequence;
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct For {
     pub r#for: Keyword,
     pub left_parenthesis: Span,
@@ -38,6 +39,8 @@ pub struct For {
 
 /// Represents the body of a for statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum ForBody {
     Statement(Box<Statement>),
     ColonDelimited(ForColonDelimitedBody),
@@ -55,6 +58,7 @@ pub enum ForBody {
 /// endfor;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ForColonDelimitedBody {
     pub colon: Span,
     pub statements: Sequence<Statement>,

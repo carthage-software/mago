@@ -26,6 +26,7 @@ use crate::sequence::Sequence;
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Method {
     pub attribute_lists: Sequence<AttributeList>,
     pub modifiers: Sequence<Modifier>,
@@ -39,6 +40,8 @@ pub struct Method {
 
 /// Represents the body of a method statement in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum MethodBody {
     Abstract(MethodAbstractBody),
     Concrete(Block),
@@ -57,6 +60,7 @@ pub enum MethodBody {
 ///
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MethodAbstractBody {
     pub semicolon: Span,
 }

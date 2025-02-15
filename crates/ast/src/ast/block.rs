@@ -8,6 +8,7 @@ use crate::ast::statement::Statement;
 use crate::sequence::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Block {
     pub left_brace: Span,
     pub statements: Sequence<Statement>,

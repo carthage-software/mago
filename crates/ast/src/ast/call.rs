@@ -11,6 +11,7 @@ use crate::ast::expression::Expression;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Call {
     Function(FunctionCall),
     Method(MethodCall),
@@ -19,12 +20,14 @@ pub enum Call {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct FunctionCall {
     pub function: Box<Expression>,
     pub argument_list: ArgumentList,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MethodCall {
     pub object: Box<Expression>,
     pub arrow: Span,
@@ -33,6 +36,7 @@ pub struct MethodCall {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct NullSafeMethodCall {
     pub object: Box<Expression>,
     pub question_mark_arrow: Span,
@@ -41,6 +45,7 @@ pub struct NullSafeMethodCall {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct StaticMethodCall {
     pub class: Box<Expression>,
     pub double_colon: Span,

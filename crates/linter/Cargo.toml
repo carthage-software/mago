@@ -14,7 +14,7 @@ workspace = true
 
 [dependencies]
 mago-fixer = { workspace = true }
-mago-semantics = { workspace = true }
+mago-project = { workspace = true }
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
 mago-interner = { workspace = true }
@@ -34,4 +34,3 @@ toml = { workspace = true }
 indoc = { workspace = true }
 
 [dev-dependencies]
-mago-reflector = { workspace = true }

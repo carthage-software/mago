@@ -12,6 +12,7 @@ use crate::ast::variable::DirectVariable;
 use crate::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Static {
     pub r#static: Keyword,
     pub items: TokenSeparatedSequence<StaticItem>,
@@ -20,17 +21,20 @@ pub struct Static {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum StaticItem {
     Abstract(StaticAbstractItem),
     Concrete(StaticConcreteItem),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct StaticAbstractItem {
     pub variable: DirectVariable,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct StaticConcreteItem {
     pub variable: DirectVariable,
     pub equals: Span,

@@ -9,15 +9,17 @@ use mago_linter::settings::RuleSettings;
 use mago_linter::settings::Settings;
 use mago_linter::Linter;
 use mago_php_version::PHPVersion;
+use mago_project::module::Module;
+use mago_project::module::ModuleBuildOptions;
+use mago_project::Project;
+use mago_project::ProjectBuilder;
 use mago_reflection::CodebaseReflection;
-use mago_reflector::reflect;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_semantics::Semantics;
 use mago_source::error::SourceError;
 use mago_source::SourceCategory;
 use mago_source::SourceManager;
@@ -26,7 +28,7 @@ use crate::config::linter::LinterLevel;
 use crate::config::Configuration;
 use crate::enum_variants;
 use crate::error::Error;
-use crate::reflection::reflect_all_non_user_defined_sources;
+use crate::reflection::reflect_non_user_sources;
 use crate::source;
 use crate::utils::indent_multiline;
 use crate::utils::progress::create_progress_bar;
@@ -426,63 +428,62 @@ pub(super) async fn lint_check(
     manager: &SourceManager,
     configuration: &Configuration,
 ) -> Result<IssueCollection, Error> {
-    // Collect all user-defined sources.
     let php_version = configuration.php_version;
-    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined).collect();
+    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
     let length = sources.len();
 
-    let progress_bar = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Yellow);
-    let mut codebase = reflect_all_non_user_defined_sources(interner, manager).await?;
+    let mut builder = ProjectBuilder::from_reflection(
+        interner.clone(),
+        reflect_non_user_sources(interner, php_version, manager).await?,
+    );
+
+    let scan_progress = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Yellow);
     let mut handles = Vec::with_capacity(length);
     for source_id in sources {
         handles.push(tokio::spawn({
             let interner = interner.clone();
             let manager = manager.clone();
-            let progress_bar = progress_bar.clone();
+            let scan_progress = scan_progress.clone();
 
             async move {
                 // Step 1: load the source
                 let source = manager.load(&source_id)?;
-                // Step 2: build semantics
-                let semantics = Semantics::build(&interner, php_version, source);
-                let reflections = reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
-                progress_bar.inc(1);
+                // Step 2: build module
+                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::default());
 
-                Result::<_, Error>::Ok((semantics, reflections))
+                scan_progress.inc(1);
+
+                Result::<_, Error>::Ok(module)
             }
         }));
     }
 
-    let mut semantics = Vec::with_capacity(length);
     for handle in handles {
-        let (semantic, reflections) = handle.await??;
-
-        codebase = mago_reflector::merge(interner, codebase, reflections);
-        semantics.push(semantic);
+        builder.add_module(handle.await??);
     }
 
-    mago_reflector::populate(interner, &mut codebase, true);
+    remove_progress_bar(scan_progress);
 
-    remove_progress_bar(progress_bar);
-
+    let Project { modules, mut reflection } = builder.build(true);
+    let length = modules.len();
     let mut results = Vec::with_capacity(length + 1);
-    results.push(codebase.take_issues());
-    let linter = create_linter(interner, configuration, codebase);
-    let progress_bar = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
+    results.push(reflection.take_issues());
+    let linter = create_linter(interner, configuration, reflection);
+    let lint_progress = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
     let mut handles = Vec::with_capacity(length);
-    for semantic in semantics {
+    for module in modules {
         handles.push(tokio::spawn({
             let linter = linter.clone();
-            let progress_bar = progress_bar.clone();
+            let lint_progress = lint_progress.clone();
 
             async move {
-                let mut issues = linter.lint(&semantic);
-                issues.extend(semantic.issues);
-                if let Some(error) = &semantic.parse_error {
+                let mut issues = linter.lint(&module);
+                issues.extend(module.issues);
+                if let Some(error) = &module.parse_error {
                     issues.push(Into::<Issue>::into(error));
                 }
 
-                progress_bar.inc(1);
+                lint_progress.inc(1);
 
                 Result::<_, SourceError>::Ok(issues)
             }
@@ -493,7 +494,7 @@ pub(super) async fn lint_check(
         results.push(handle.await??);
     }
 
-    remove_progress_bar(progress_bar);
+    remove_progress_bar(lint_progress);
 
     Ok(IssueCollection::from(results.into_iter().flatten()))
 }
@@ -505,7 +506,7 @@ pub(super) async fn semantics_check(
     php_version: PHPVersion,
 ) -> Result<IssueCollection, Error> {
     // Collect all user-defined sources.
-    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined).collect();
+    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
     let length = sources.len();
 
     let progress_bar = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Magenta);
@@ -519,10 +520,10 @@ pub(super) async fn semantics_check(
 
             async move {
                 let source = manager.load(&source_id)?;
-                let semantics = Semantics::build(&interner, php_version, source);
+                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::validation());
                 progress_bar.inc(1);
 
-                Result::<_, Error>::Ok(semantics)
+                Result::<_, Error>::Ok(module)
             }
         }));
     }
@@ -530,13 +531,13 @@ pub(super) async fn semantics_check(
     let mut results = Vec::with_capacity(length);
 
     for handle in handles {
-        let semantic = handle.await??;
+        let module = handle.await??;
 
-        if let Some(error) = &semantic.parse_error {
+        if let Some(error) = &module.parse_error {
             results.push(Into::<Issue>::into(error));
         }
 
-        results.extend(semantic.issues);
+        results.extend(module.issues);
     }
 
     remove_progress_bar(progress_bar);
@@ -550,51 +551,52 @@ pub(super) async fn compilation_check(
     manager: &SourceManager,
     php_version: PHPVersion,
 ) -> Result<IssueCollection, Error> {
-    // Collect all user-defined sources.
-    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined).collect();
+    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
     let length = sources.len();
 
-    let progress_bar = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Magenta);
+    let mut project_builder = ProjectBuilder::from_reflection(
+        interner.clone(),
+        reflect_non_user_sources(interner, php_version, manager).await?,
+    );
 
-    let mut codebase = reflect_all_non_user_defined_sources(interner, manager).await?;
+    let scan_progress = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Yellow);
     let mut handles = Vec::with_capacity(length);
     for source_id in sources {
         handles.push(tokio::spawn({
             let interner = interner.clone();
             let manager = manager.clone();
-            let progress_bar = progress_bar.clone();
+            let scan_progress = scan_progress.clone();
 
             async move {
+                // Step 1: load the source
                 let source = manager.load(&source_id)?;
-                let semantics = Semantics::build(&interner, php_version, source);
-                let reflections = reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
-                progress_bar.inc(1);
+                // Step 2: build module
+                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::default());
 
-                Result::<_, Error>::Ok((semantics, reflections))
+                scan_progress.inc(1);
+
+                Result::<_, Error>::Ok(module)
             }
         }));
     }
 
     let mut results = Vec::with_capacity(length);
-
     for handle in handles {
-        let (semantic, reflections) = handle.await??;
+        let mut module = handle.await??;
 
-        if let Some(error) = &semantic.parse_error {
+        if let Some(error) = &module.parse_error {
             results.push(Into::<Issue>::into(error));
         }
 
-        results.extend(semantic.issues);
+        results.extend(std::mem::take(&mut module.issues));
 
-        codebase = mago_reflector::merge(interner, codebase, reflections);
+        project_builder.add_module(module);
     }
 
-    mago_reflector::populate(interner, &mut codebase, false);
-    for issue in codebase.take_issues() {
-        results.push(issue);
-    }
+    let Project { mut reflection, .. } = project_builder.build(true);
+    results.extend(reflection.take_issues());
 
-    remove_progress_bar(progress_bar);
+    remove_progress_bar(scan_progress);
 
     Ok(IssueCollection::from(results.into_iter()))
 }

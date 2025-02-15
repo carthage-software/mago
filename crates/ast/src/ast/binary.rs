@@ -14,6 +14,7 @@ use crate::Keyword;
 /// Represents a PHP binary operator.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum BinaryOperator {
     Addition(Span),           // `+`
     Subtraction(Span),        // `-`
@@ -51,6 +52,7 @@ pub enum BinaryOperator {
 ///
 /// A binary operation is an operation that takes two operands, a left-hand side and a right-hand side.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct Binary {
     pub lhs: Box<Expression>,
     pub operator: BinaryOperator,

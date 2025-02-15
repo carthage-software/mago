@@ -17,10 +17,10 @@ use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_linter::settings::Settings;
 use mago_linter::Linter;
-use mago_reflector::reflect;
+use mago_project::module::Module;
+use mago_project::module::ModuleBuildOptions;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
-use mago_semantics::Semantics;
 use mago_source::Source;
 
 /// Represents the result of analyzing and formatting PHP code.
@@ -90,7 +90,7 @@ impl AnalysisResults {
     /// Analyzes and (optionally) formats the provided PHP `code`.
     ///
     /// This function performs the following steps:
-    /// 1. **Parsing** via [`Semantics::build`] to generate an AST and detect syntax errors.
+    /// 1. **Parsing** via [`Module::build`] to generate an AST and detect syntax errors.
     /// 2. **Semantic Analysis** to resolve names and check for issues (e.g. undefined variables).
     /// 3. **Linting** according to the specified [`Settings`](mago_linter::settings::Settings).
     /// 4. **Formatting** using [`FormatSettings`](mago_formatter::settings::FormatSettings),
@@ -106,33 +106,28 @@ impl AnalysisResults {
     ///
     /// Returns an [`AnalysisResults`] containing the AST, parse/semantic/linter issues,
     /// and formatted code (if no parse error).
-    pub fn analyze(code: String, linter_settings: Settings, format_settings: FormatSettings) -> Self {
+    pub fn analyze(code: String, lint_settings: Settings, format_settings: FormatSettings) -> Self {
         let interner = ThreadedInterner::new();
         let source = Source::standalone(&interner, "code.php", &code);
-        let semantics = Semantics::build(&interner, linter_settings.php_version, source);
-
+        let mut module = Module::build(&interner, lint_settings.php_version, source, ModuleBuildOptions::validation());
+        let program = module.parse(&interner);
         let mut formatted = None;
-        if semantics.parse_error.is_none() {
+        if module.parse_error.is_none() {
             // Only format if there are no parse errors
-            formatted = Some(mago_formatter::format(&interner, &semantics.source, &semantics.program, format_settings));
+            formatted = Some(mago_formatter::format(&interner, &module.source, &program, format_settings));
         }
 
-        let codebase = reflect(&interner, &semantics.source, &semantics.program, &semantics.names);
-        let linter = Linter::with_all_plugins(linter_settings, interner.clone(), codebase);
-        let linter_issues = linter.lint(&semantics);
+        let linter =
+            Linter::with_all_plugins(lint_settings, interner.clone(), module.reflection.take().unwrap_or_default());
+        let linter_issues = linter.lint(&module);
 
         Self {
             strings: interner.all().into_iter().map(|(id, value)| (id, value.to_string())).collect(),
-            program: semantics.program,
-            parse_error: semantics.parse_error.as_ref().map(|e| e.into()),
-            names: semantics
-                .names
-                .all()
-                .into_iter()
-                .map(|(offset, (id, imported))| (*offset, (*id, *imported)))
-                .collect(),
+            program,
+            parse_error: module.parse_error.as_ref().map(|e| e.into()),
+            names: module.names.all().into_iter().map(|(offset, (id, imported))| (*offset, (*id, *imported))).collect(),
             formatted,
-            semantic_issues: semantics.issues,
+            semantic_issues: module.issues,
             linter_issues,
         }
     }

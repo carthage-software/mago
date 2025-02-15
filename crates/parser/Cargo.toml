@@ -23,7 +23,6 @@ mago-lexer = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
 either = { workspace = true }
 serde = { workspace = true }
-strum = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

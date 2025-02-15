@@ -1,6 +1,7 @@
 use std::collections::hash_map::Entry;
 
 use ahash::HashMap;
+use ahash::HashMapExt;
 use ahash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
@@ -145,6 +146,83 @@ impl CodebaseReflection {
     /// and all internal collections initialized to their default states.
     pub fn new() -> Self {
         Self { populated: false, ..Default::default() }
+    }
+
+    /// Create a new `CodebaseReflection` with a specified capacity.
+    ///
+    /// # Arguments
+    ///
+    /// - `capacity`: The initial capacity for the internal collections.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `CodebaseReflection` with the internal collections pre-allocated
+    /// to the specified capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            populated: false,
+            constant_reflections: HashMap::with_capacity(capacity),
+            constant_names: HashMap::with_capacity(capacity),
+            function_like_reflections: HashMap::with_capacity(capacity),
+            function_names: HashMap::with_capacity(capacity),
+            class_like_reflections: HashMap::with_capacity(capacity),
+            class_like_names: HashMap::with_capacity(capacity),
+            direct_classlike_descendants: HashMap::with_capacity(capacity),
+            all_classlike_descendants: HashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Checks if the codebase reflection is empty.
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the codebase reflection is empty.
+    /// - `false` otherwise.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.constant_reflections.is_empty()
+            && self.function_like_reflections.is_empty()
+            && self.class_like_reflections.is_empty()
+    }
+
+    /// Merges another `CodebaseReflection` into this one.
+    ///
+    /// This method combines the codebase reflections and issues from two `CodebaseReflection` instances
+    /// into a single `CodebaseReflection`. If duplicates are found during merging (such as functions,
+    /// classes, or constants with identical names), they are ignored.
+    ///
+    /// # Arguments
+    ///
+    /// - `interner`: A `ThreadedInterner` instance for name handling.
+    /// - `other`: The `CodebaseReflection` to merge into this one.
+    ///
+    /// # Effects
+    ///
+    /// This method modifies the current `CodebaseReflection` instance in place.
+    ///
+    /// # Notes
+    ///
+    /// This method invalidates the `populated` flag, as the codebase may have changed,
+    /// unless the other reflection is empty, in which case no changes are made.
+    pub fn merge(&mut self, interner: &ThreadedInterner, other: CodebaseReflection) {
+        if other.is_empty() {
+            return;
+        }
+
+        for (_, reflection) in other.constant_reflections.into_iter() {
+            self.register_constant(interner, reflection);
+        }
+
+        for (_, reflection) in other.function_like_reflections.into_iter() {
+            self.register_function_like(interner, reflection);
+        }
+
+        for (_, reflection) in other.class_like_reflections.into_iter() {
+            self.register_class_like(interner, reflection);
+        }
+
+        self.populated = false;
     }
 
     /// Registers a new constant in the codebase.

@@ -3,10 +3,10 @@ use std::sync::RwLock;
 use std::sync::RwLockReadGuard;
 
 use mago_interner::ThreadedInterner;
+use mago_project::module::Module;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_semantics::Semantics;
 
 use crate::plugin::Plugin;
 use crate::rule::ConfiguredRule;
@@ -44,7 +44,7 @@ impl Linter {
     /// # Parameters
     ///
     /// - `settings`: The settings to use for the linter.
-    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the semantics.
+    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the module.
     /// - `codebase`: The codebase reflection to use for the linter.
     ///
     /// # Returns
@@ -62,7 +62,7 @@ impl Linter {
     /// # Parameters
     ///
     /// - `settings`: The settings to use for the linter.
-    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the semantics.
+    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the module.
     /// - `codebase`: The codebase reflection to use for the linter.
     ///
     /// # Returns
@@ -212,18 +212,18 @@ impl Linter {
         configured_rules.iter().find(|r| r.slug == slug).map(|r| r.level)
     }
 
-    /// Lints the given semantics.
+    /// Lints the given module.
     ///
-    /// This method will lint the given semantics and return a collection of issues.
+    /// This method will lint the given module and return a collection of issues.
     ///
     /// # Parameters
     ///
-    /// - `semantics`: The semantics to lint.
+    /// - `module`: The module to lint.
     ///
     /// # Returns
     ///
     /// A collection of issues.
-    pub fn lint(&self, semantics: &Semantics) -> IssueCollection {
+    pub fn lint(&self, module: &Module) -> IssueCollection {
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
         if configured_rules.is_empty() {
             tracing::warn!("Linting aborted - no rules configured.");
@@ -231,7 +231,8 @@ impl Linter {
             return IssueCollection::new();
         }
 
-        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, semantics);
+        let program = module.parse(&self.interner);
+        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, module, &program);
         for configured_rule in configured_rules.iter() {
             runner.run(configured_rule);
         }

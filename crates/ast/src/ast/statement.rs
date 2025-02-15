@@ -39,6 +39,7 @@ use crate::ast::terminator::Terminator;
 use crate::ast::unset::Unset;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct ExpressionStatement {
     pub expression: Box<Expression>,
     pub terminator: Terminator,
@@ -47,6 +48,7 @@ pub struct ExpressionStatement {
 /// Represents a PHP statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
+#[repr(C, u8)]
 pub enum Statement {
     OpeningTag(OpeningTag),
     ClosingTag(ClosingTag),

@@ -222,7 +222,7 @@ fn get_class_name<'a>(expression: &Expression, context: &'a LintContext) -> Opti
         return None;
     }
 
-    Some(context.semantics.names.get(&class_name.position()))
+    Some(context.module.names.get(&class_name.position()))
 }
 
 /// Returns the name of the object instantiated by the given expression.
@@ -247,5 +247,5 @@ fn get_object_name<'a>(expression: &Expression, context: &'a LintContext) -> Opt
         return None;
     };
 
-    Some(context.semantics.names.get(&class_name.position()))
+    Some(context.module.names.get(&class_name.position()))
 }

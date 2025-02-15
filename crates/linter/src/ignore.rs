@@ -1,5 +1,6 @@
+use mago_ast::Program;
 use mago_interner::ThreadedInterner;
-use mago_semantics::Semantics;
+use mago_project::module::Module;
 use mago_span::Span;
 
 use crate::utils::comment_lines;
@@ -21,7 +22,7 @@ pub struct IgnoreDirective<'a> {
     pub description: &'a str,
 }
 
-/// Extracts and returns all ignore comments from the given semantics.
+/// Extracts and returns all ignore comments from the given module.
 ///
 /// This function looks at every trivia (non-code) element in the AST, filtering for comments.
 /// For each comment, it:
@@ -37,19 +38,22 @@ pub struct IgnoreDirective<'a> {
 ///
 /// # Parameters
 ///
-/// - `semantics`: The semantics to inspect (which contains the AST trivia and source content).
+/// - `module`: The module to inspect (which contains the AST trivia and source content).
 /// - `interner`: The interner used to resolve the source code string.
 ///
 /// # Returns
 ///
 /// A vector of `Ignore` comments, each containing its parsed directives and location information.
 #[inline]
-pub fn get_ignores<'s, 'a>(semantics: &'s Semantics, interner: &'a ThreadedInterner) -> Vec<IgnoreDirective<'a>> {
+pub fn get_ignores<'s, 'a>(
+    module: &'s Module,
+    program: &'s Program,
+    interner: &'a ThreadedInterner,
+) -> Vec<IgnoreDirective<'a>> {
     // Get the full source code from the interner.
-    let source_code: &'a str = interner.lookup(&semantics.source.content);
+    let source_code: &'a str = interner.lookup(&module.source.content);
 
-    semantics
-        .program
+    program
         .trivia
         .iter()
         .filter(|trivia| trivia.kind.is_comment())
@@ -60,9 +64,9 @@ pub fn get_ignores<'s, 'a>(semantics: &'s Semantics, interner: &'a ThreadedInter
                 return None;
             }
 
-            let start_line = semantics.source.line_number(trivia.span.start.offset);
-            let end_line = semantics.source.line_number(trivia.span.end.offset);
-            let line_start = semantics.source.get_line_start_offset(start_line).unwrap_or(0);
+            let start_line = module.source.line_number(trivia.span.start.offset);
+            let end_line = module.source.line_number(trivia.span.end.offset);
+            let line_start = module.source.get_line_start_offset(start_line).unwrap_or(0);
             let prefix = &source_code[line_start..trivia.span.start.offset];
             let own_line = prefix.trim().is_empty();
 
