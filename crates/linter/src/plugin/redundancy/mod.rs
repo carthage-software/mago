@@ -11,6 +11,7 @@ use crate::plugin::redundancy::rules::redundant_method_override::RedundantMethod
 use crate::plugin::redundancy::rules::redundant_noop::RedundantNoopRule;
 use crate::plugin::redundancy::rules::redundant_parentheses::RedundantParenthesesRule;
 use crate::plugin::redundancy::rules::redundant_string_concat::RedundantStringConcatRule;
+use crate::plugin::redundancy::rules::redundant_using::RedundantUsingRule;
 use crate::plugin::Plugin;
 use crate::rule::Rule;
 
@@ -41,6 +42,7 @@ impl Plugin for RedundancyPlugin {
             Box::new(RedundantLabelRule),
             Box::new(RedundantIfStatementRule),
             Box::new(RedundantWriteVisibilityRule),
+            Box::new(RedundantUsingRule),
         ]
     }
 }

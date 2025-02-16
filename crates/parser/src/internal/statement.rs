@@ -39,6 +39,7 @@ use crate::internal::tag::parse_opening_tag;
 use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::unset::parse_unset;
+use crate::internal::using::parse_using;
 use crate::internal::utils;
 
 pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, ParseError> {
@@ -138,6 +139,7 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
         kind if kind.is_identifier_maybe_reserved() && matches!(utils::peek_nth(stream, 1)?.kind, T![":"]) => {
             Statement::Label(parse_label(stream)?)
         }
+        T!["using"] => Statement::Using(parse_using(stream)?),
         _ => Statement::Expression(ExpressionStatement {
             expression: Box::new(parse_expression(stream)?),
             terminator: parse_terminator(stream)?,

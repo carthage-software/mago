@@ -123,6 +123,7 @@ impl<'a> Format<'a> for Statement {
                 Statement::HaltCompiler(h) => h.format(f),
                 Statement::Unset(u) => u.format(f),
                 Statement::Noop(_) => Document::String(";"),
+                Statement::Using(_) => unimplemented!("formatting for the 'using' statement is not yet implemented."),
             }
         })
     }
