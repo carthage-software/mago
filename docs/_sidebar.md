@@ -19,6 +19,11 @@
     - [Analysis](linter/plugins/analysis.md)
     - [Best Practices](linter/plugins/best-practices.md)
 
+<!-- Recipes -->
+
+- [Recipes](recipes/)
+  - [CI](recipes/ci.md) 
+
 <!-- Contributing -->
 <!--
 
