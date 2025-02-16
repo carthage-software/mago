@@ -6,7 +6,7 @@ use crate::internal::checker::expression::check_for_new_without_parenthesis;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_call(call: &Call, context: &mut Context<'_>) {
+pub fn check_call(call: &Call, context: &mut Context<'_, '_>) {
     match call {
         Call::Method(method_call) => {
             check_for_new_without_parenthesis(&method_call.object, context, "method call");

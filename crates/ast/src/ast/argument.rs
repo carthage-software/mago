@@ -1,9 +1,9 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
+use strum::Display;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use strum::Display;
 
 use crate::ast::expression::Expression;
 use crate::ast::identifier::LocalIdentifier;
@@ -12,47 +12,47 @@ use crate::sequence::TokenSeparatedSequence;
 /// Represents a list of arguments.
 ///
 /// Example: `($bar, 42)` in `foo($bar, 42)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ArgumentList {
+pub struct ArgumentList<'a> {
     pub left_parenthesis: Span,
-    pub arguments: TokenSeparatedSequence<Argument>,
+    pub arguments: TokenSeparatedSequence<'a, Argument<'a>>,
     pub right_parenthesis: Span,
 }
 
 /// Represents an argument.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Argument {
-    Positional(PositionalArgument),
-    Named(NamedArgument),
+pub enum Argument<'a> {
+    Positional(PositionalArgument<'a>),
+    Named(NamedArgument<'a>),
 }
 
 /// Represents a positional argument.
 ///
 /// Example: `$foo` in `foo($foo)`, `...$bar` in `foo(...$bar)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct PositionalArgument {
+pub struct PositionalArgument<'a> {
     pub ellipsis: Option<Span>,
-    pub value: Expression,
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents a named argument.
 ///
 /// Example: `foo: 42` in `foo(foo: 42)`, `bar: ...$bar` in `foo(bar: ...$bar)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct NamedArgument {
+pub struct NamedArgument<'a> {
     pub name: LocalIdentifier,
     pub colon: Span,
     pub ellipsis: Option<Span>,
-    pub value: Expression,
+    pub value: Box<'a, Expression<'a>>,
 }
 
-impl Argument {
-    pub fn value(&self) -> &Expression {
+impl<'a> Argument<'a> {
+    pub fn value(&self) -> &Expression<'a> {
         match self {
             Argument::Positional(arg) => &arg.value,
             Argument::Named(arg) => &arg.value,
@@ -60,13 +60,13 @@ impl Argument {
     }
 }
 
-impl HasSpan for ArgumentList {
+impl HasSpan for ArgumentList<'_> {
     fn span(&self) -> Span {
         Span::between(self.left_parenthesis, self.right_parenthesis)
     }
 }
 
-impl HasSpan for Argument {
+impl HasSpan for Argument<'_> {
     fn span(&self) -> Span {
         match self {
             Argument::Positional(argument) => argument.span(),
@@ -75,7 +75,7 @@ impl HasSpan for Argument {
     }
 }
 
-impl HasSpan for PositionalArgument {
+impl HasSpan for PositionalArgument<'_> {
     fn span(&self) -> Span {
         if let Some(ellipsis) = &self.ellipsis {
             Span::between(*ellipsis, self.value.span())
@@ -85,7 +85,7 @@ impl HasSpan for PositionalArgument {
     }
 }
 
-impl HasSpan for NamedArgument {
+impl HasSpan for NamedArgument<'_> {
     fn span(&self) -> Span {
         Span::between(self.name.span(), self.value.span())
     }

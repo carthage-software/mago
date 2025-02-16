@@ -33,7 +33,7 @@ impl Rule for NoAssignmentInConditionRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let (condition, assignment) = match node {
             Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(&r#if.condition)),
             Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(&r#while.condition)),

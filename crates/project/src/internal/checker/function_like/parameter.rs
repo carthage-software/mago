@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameterList, context: &mut Context<'_>) {
+pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameterList, context: &mut Context<'_, '_>) {
     let mut last_variadic = None;
     let mut parameters_seen = vec![];
     for parameter in function_like_parameter_list.parameters.iter() {

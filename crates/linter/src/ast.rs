@@ -8,12 +8,12 @@ use mago_ast::Node;
 #[derive(Debug)]
 pub(crate) struct AstNode<'a> {
     /// The wrapped AST node.
-    pub node: Node<'a>,
+    pub node: Node<'a, 'a>,
     /// The precomputed child nodes.
     pub children: Vec<AstNode<'a>>,
 }
 
-impl<'a> From<Node<'a>> for AstNode<'a> {
+impl<'a> From<Node<'a, 'a>> for AstNode<'a> {
     /// Recursively converts a [`Node`] into an [`AstNode`], precomputing its children.
     ///
     /// # Parameters
@@ -23,7 +23,7 @@ impl<'a> From<Node<'a>> for AstNode<'a> {
     /// # Returns
     ///
     /// An [`AstNode`] representing the given node and its descendants.
-    fn from(node: Node<'a>) -> Self {
+    fn from(node: Node<'a, 'a>) -> Self {
         let node_children = node.children();
         let mut children = Vec::with_capacity(node_children.len());
         for child in node_children {

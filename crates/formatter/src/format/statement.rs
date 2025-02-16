@@ -6,7 +6,10 @@ use crate::document::Line;
 use crate::format::Format;
 use crate::Formatter;
 
-pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<Statement>) -> Vec<Document<'a>> {
+pub fn print_statement_sequence<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    stmts: &'a Sequence<'alloc, Statement<'alloc>>,
+) -> Vec<Document<'a>> {
     let mut parts = vec![];
 
     let last_non_noop_index = stmts.iter().rposition(|stmt| !matches!(stmt, Statement::Noop(_)));

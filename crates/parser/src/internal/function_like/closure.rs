@@ -11,10 +11,11 @@ use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 use crate::internal::variable::parse_direct_variable;
 
-pub fn parse_closure_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Closure, ParseError> {
+#[inline]
+pub fn parse_closure_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Closure<'i>, ParseError> {
     Ok(Closure {
         attribute_lists: attributes,
         r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
@@ -27,22 +28,24 @@ pub fn parse_closure_with_attributes(
     })
 }
 
-pub fn parse_optional_closure_use_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<ClosureUseClause>, ParseError> {
+#[inline]
+pub fn parse_optional_closure_use_clause<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<Option<ClosureUseClause<'i>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["use"]) => Some(parse_closure_use_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_closure_use_clause(stream: &mut TokenStream<'_, '_>) -> Result<ClosureUseClause, ParseError> {
+#[inline]
+pub fn parse_closure_use_clause<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ClosureUseClause<'i>, ParseError> {
     Ok(ClosureUseClause {
         r#use: utils::expect_keyword(stream, T!["use"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         variables: {
-            let mut variables = Vec::new();
-            let mut commas = Vec::new();
+            let mut variables = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 let token = utils::peek(stream)?;
                 if T![")"] == token.kind {
@@ -65,6 +68,7 @@ pub fn parse_closure_use_clause(stream: &mut TokenStream<'_, '_>) -> Result<Clos
     })
 }
 
+#[inline]
 pub fn parse_closure_use_clause_variable(
     stream: &mut TokenStream<'_, '_>,
 ) -> Result<ClosureUseClauseVariable, ParseError> {

@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_closure_creation(closure_creation: &ClosureCreation, context: &mut Context<'_>) {
+pub fn check_closure_creation(closure_creation: &ClosureCreation, context: &mut Context<'_, '_>) {
     if context.version.is_supported(Feature::ClosureCreation) {
         return;
     }

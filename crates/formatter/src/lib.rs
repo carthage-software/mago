@@ -43,19 +43,19 @@ struct ArgumentState {
     expand_last_argument: bool,
 }
 
-pub struct Formatter<'a> {
+pub struct Formatter<'a, 'alloc> {
     interner: &'a ThreadedInterner,
     source: &'a Source,
     source_text: &'a str,
     settings: FormatSettings,
-    stack: Vec<Node<'a>>,
+    stack: Vec<Node<'a, 'alloc>>,
     comments: Peekable<IntoIter<Trivia>>,
     scripting_mode: bool,
     id_builder: GroupIdentifierBuilder,
     argument_state: ArgumentState,
 }
 
-impl<'a> Formatter<'a> {
+impl<'a, 'alloc> Formatter<'a, 'alloc> {
     pub fn new(interner: &'a ThreadedInterner, source: &'a Source, settings: FormatSettings) -> Self {
         Self {
             interner,
@@ -70,7 +70,7 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    pub fn format(&mut self, program: &'a Program) -> String {
+    pub fn format(&mut self, program: &'a Program<'alloc>) -> String {
         let document = self.build(program);
 
         let printer = Printer::new(document, self.source, self.settings);
@@ -78,7 +78,7 @@ impl<'a> Formatter<'a> {
         printer.build()
     }
 
-    fn build(&mut self, program: &'a Program) -> Document<'a> {
+    fn build(&mut self, program: &'a Program<'alloc>) -> Document<'a> {
         self.comments =
             program.trivia.iter().filter(|t| t.kind.is_comment()).copied().collect::<Vec<_>>().into_iter().peekable();
 
@@ -97,7 +97,7 @@ impl<'a> Formatter<'a> {
         self.interner.interned_str(string)
     }
 
-    fn enter_node(&mut self, node: Node<'a>) {
+    fn enter_node(&mut self, node: Node<'a, 'alloc>) {
         self.stack.push(node);
     }
 
@@ -105,26 +105,26 @@ impl<'a> Formatter<'a> {
         self.stack.pop();
     }
 
-    fn current_node(&self) -> Node<'a> {
+    fn current_node(&self) -> Node<'a, 'alloc> {
         self.stack[self.stack.len() - 1]
     }
 
-    fn parent_node(&self) -> Node<'a> {
+    fn parent_node(&self) -> Node<'a, 'alloc> {
         self.stack[self.stack.len() - 2]
     }
 
-    fn grandparent_node(&self) -> Option<Node<'a>> {
+    fn grandparent_node(&self) -> Option<Node<'a, 'alloc>> {
         let len = self.stack.len();
 
         (len > 2).then(|| self.stack[len - 2 - 1])
     }
 
-    fn great_grandparent_node(&self) -> Option<Node<'a>> {
+    fn great_grandparent_node(&self) -> Option<Node<'a, 'alloc>> {
         let len = self.stack.len();
         (len > 3).then(|| self.stack[len - 3 - 1])
     }
 
-    fn nth_parent_kind(&self, n: usize) -> Option<Node<'a>> {
+    fn nth_parent_kind(&self, n: usize) -> Option<Node<'a, 'alloc>> {
         let len = self.stack.len();
 
         (len > n).then(|| self.stack[len - n - 1])

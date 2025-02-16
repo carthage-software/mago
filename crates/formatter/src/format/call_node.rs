@@ -7,16 +7,16 @@ use crate::format::call_arguments::print_call_arguments;
 use crate::format::Format;
 use crate::Formatter;
 
-pub(super) enum CallLikeNode<'a> {
-    Call(&'a Call),
-    Instantiation(&'a Instantiation),
-    Attribute(&'a Attribute),
-    DieConstruct(&'a DieConstruct),
-    ExitConstruct(&'a ExitConstruct),
+pub(super) enum CallLikeNode<'a, 'alloc> {
+    Call(&'a Call<'alloc>),
+    Instantiation(&'a Instantiation<'alloc>),
+    Attribute(&'a Attribute<'alloc>),
+    DieConstruct(&'a DieConstruct<'alloc>),
+    ExitConstruct(&'a ExitConstruct<'alloc>),
 }
 
-impl<'a> CallLikeNode<'a> {
-    pub fn arguments(&self) -> Option<&'a ArgumentList> {
+impl<'a, 'alloc> CallLikeNode<'a, 'alloc> {
+    pub fn arguments(&self) -> Option<&'a ArgumentList<'alloc>> {
         match self {
             CallLikeNode::Call(call) => Some(match call {
                 Call::Function(c) => &c.argument_list,
@@ -32,7 +32,7 @@ impl<'a> CallLikeNode<'a> {
     }
 }
 
-impl HasSpan for CallLikeNode<'_> {
+impl HasSpan for CallLikeNode<'_, '_> {
     fn span(&self) -> Span {
         match self {
             CallLikeNode::Call(call) => call.span(),
@@ -44,7 +44,10 @@ impl HasSpan for CallLikeNode<'_> {
     }
 }
 
-pub(super) fn print_call_like_node<'a>(f: &mut Formatter<'a>, node: CallLikeNode<'a>) -> Document<'a> {
+pub(super) fn print_call_like_node<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    node: CallLikeNode<'a, 'alloc>,
+) -> Document<'a> {
     let mut parts = vec![];
 
     // format the callee-like expression

@@ -20,7 +20,7 @@ impl Rule for NoMultiAssignmentsRule {
         "})
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Assignment(assignment) = node else { return LintDirective::default() };
 
         let Expression::Assignment(other_assignment) = assignment.rhs.as_ref() else {

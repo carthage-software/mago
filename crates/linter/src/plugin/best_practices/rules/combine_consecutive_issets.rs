@@ -76,7 +76,7 @@ impl Rule for CombineConsecutiveIssetsRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Binary(binary) = node else { return LintDirective::default() };
 
         let BinaryOperator::And(_) = binary.operator else {
@@ -117,7 +117,10 @@ impl Rule for CombineConsecutiveIssetsRule {
     }
 }
 
-fn get_isset_construct(mut expression: &Expression, select_binary_rhs: bool) -> Option<(bool, &IssetConstruct)> {
+fn get_isset_construct<'ast, 'alloc>(
+    mut expression: &'ast Expression<'alloc>,
+    select_binary_rhs: bool,
+) -> Option<(bool, &'ast IssetConstruct<'alloc>)> {
     let mut between_parentheses = false;
 
     while let Expression::Parenthesized(parenthesized) = expression {

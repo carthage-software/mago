@@ -1,16 +1,16 @@
 use mago_ast::*;
 use mago_span::*;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum MethodReference<'a> {
-    MethodCall(&'a MethodCall),
-    StaticMethodCall(&'a StaticMethodCall),
-    MethodClosureCreation(&'a MethodClosureCreation),
-    StaticMethodClosureCreation(&'a StaticMethodClosureCreation),
+#[derive(Debug, Clone, Copy, Hash)]
+pub enum MethodReference<'ast, 'alloc> {
+    MethodCall(&'ast MethodCall<'alloc>),
+    StaticMethodCall(&'ast StaticMethodCall<'alloc>),
+    MethodClosureCreation(&'ast MethodClosureCreation<'alloc>),
+    StaticMethodClosureCreation(&'ast StaticMethodClosureCreation<'alloc>),
 }
 
-impl MethodReference<'_> {
-    pub fn get_class_or_object(&self) -> &Expression {
+impl<'ast, 'alloc> MethodReference<'ast, 'alloc> {
+    pub fn get_class_or_object(&self) -> &'ast Expression<'alloc> {
         match self {
             MethodReference::MethodCall(call) => &call.object,
             MethodReference::StaticMethodCall(call) => &call.class,
@@ -19,7 +19,7 @@ impl MethodReference<'_> {
         }
     }
 
-    pub fn get_selector(&self) -> &ClassLikeMemberSelector {
+    pub fn get_selector(&self) -> &'ast ClassLikeMemberSelector<'alloc> {
         match self {
             MethodReference::MethodCall(call) => &call.method,
             MethodReference::StaticMethodCall(call) => &call.method,
@@ -29,7 +29,7 @@ impl MethodReference<'_> {
     }
 }
 
-impl HasSpan for MethodReference<'_> {
+impl HasSpan for MethodReference<'_, '_> {
     fn span(&self) -> Span {
         match self {
             MethodReference::MethodCall(call) => call.span(),
@@ -40,9 +40,12 @@ impl HasSpan for MethodReference<'_> {
     }
 }
 
-pub fn find_method_references_in_block<'a, F>(block: &'a Block, predicate: &F) -> Vec<MethodReference<'a>>
+pub fn find_method_references_in_block<'ast, 'alloc, F>(
+    block: &'ast Block<'alloc>,
+    predicate: &F,
+) -> Vec<MethodReference<'ast, 'alloc>>
 where
-    F: Fn(&MethodReference<'a>) -> bool,
+    F: Fn(&MethodReference<'ast, 'alloc>) -> bool,
 {
     let mut method_references = vec![];
     for statement in block.statements.iter() {
@@ -52,9 +55,12 @@ where
     method_references
 }
 
-pub fn find_method_references_in_statement<'a, F>(statement: &'a Statement, predicate: &F) -> Vec<MethodReference<'a>>
+pub fn find_method_references_in_statement<'ast, 'alloc, F>(
+    statement: &'ast Statement<'alloc>,
+    predicate: &F,
+) -> Vec<MethodReference<'ast, 'alloc>>
 where
-    F: Fn(&MethodReference<'a>) -> bool,
+    F: Fn(&MethodReference<'ast, 'alloc>) -> bool,
 {
     match statement {
         Statement::Block(block) => {
@@ -251,12 +257,12 @@ where
     }
 }
 
-pub fn find_method_references_in_expression<'a, F>(
-    expression: &'a Expression,
+pub fn find_method_references_in_expression<'ast, 'alloc, F>(
+    expression: &'ast Expression<'alloc>,
     predicate: &F,
-) -> Vec<MethodReference<'a>>
+) -> Vec<MethodReference<'ast, 'alloc>>
 where
-    F: Fn(&MethodReference<'a>) -> bool,
+    F: Fn(&MethodReference<'ast, 'alloc>) -> bool,
 {
     match expression {
         Expression::Binary(binary) => {
@@ -433,9 +439,12 @@ where
     }
 }
 
-fn find_references_in_argument_list<'a, F>(argument_list: &'a ArgumentList, predicate: &F) -> Vec<MethodReference<'a>>
+fn find_references_in_argument_list<'ast, 'alloc, F>(
+    argument_list: &'ast ArgumentList<'alloc>,
+    predicate: &F,
+) -> Vec<MethodReference<'ast, 'alloc>>
 where
-    F: Fn(&MethodReference<'a>) -> bool,
+    F: Fn(&MethodReference<'ast, 'alloc>) -> bool,
 {
     let mut references = vec![];
     for argument in argument_list.arguments.iter() {

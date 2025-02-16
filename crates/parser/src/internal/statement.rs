@@ -41,7 +41,8 @@ use crate::internal::token_stream::TokenStream;
 use crate::internal::unset::parse_unset;
 use crate::internal::utils;
 
-pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, ParseError> {
+#[inline]
+pub fn parse_statement<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Statement<'i>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![InlineText | InlineShebang] => Statement::Inline(parse_inline(stream)?),
         T!["<?php"] | T!["<?="] | T!["<?"] => Statement::OpeningTag(parse_opening_tag(stream)?),
@@ -65,22 +66,32 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
                     // unlike when we have modifiers, here, we don't know if this is meant to be a closure or a function
                     parse_closure_or_function(stream, attributes)?
                 }
-                T!["fn"] => Statement::Expression(ExpressionStatement {
-                    expression: Box::new(Expression::ArrowFunction(parse_arrow_function_with_attributes(
-                        stream, attributes,
-                    )?)),
-                    terminator: parse_terminator(stream)?,
-                }),
-                T!["static"] if maybe_after == Some(T!["fn"]) => Statement::Expression(ExpressionStatement {
-                    expression: Box::new(Expression::ArrowFunction(parse_arrow_function_with_attributes(
-                        stream, attributes,
-                    )?)),
-                    terminator: parse_terminator(stream)?,
-                }),
-                T!["static"] if maybe_after == Some(T!["function"]) => Statement::Expression(ExpressionStatement {
-                    expression: Box::new(Expression::Closure(parse_closure_with_attributes(stream, attributes)?)),
-                    terminator: parse_terminator(stream)?,
-                }),
+                T!["fn"] => {
+                    let arrow_function =
+                        Expression::ArrowFunction(parse_arrow_function_with_attributes(stream, attributes)?);
+
+                    Statement::Expression(ExpressionStatement {
+                        expression: stream.boxed(arrow_function),
+                        terminator: parse_terminator(stream)?,
+                    })
+                }
+                T!["static"] if maybe_after == Some(T!["fn"]) => {
+                    let arrow_function =
+                        Expression::ArrowFunction(parse_arrow_function_with_attributes(stream, attributes)?);
+
+                    Statement::Expression(ExpressionStatement {
+                        expression: stream.boxed(arrow_function),
+                        terminator: parse_terminator(stream)?,
+                    })
+                }
+                T!["static"] if maybe_after == Some(T!["function"]) => {
+                    let closure = Expression::Closure(parse_closure_with_attributes(stream, attributes)?);
+
+                    Statement::Expression(ExpressionStatement {
+                        expression: stream.boxed(closure),
+                        terminator: parse_terminator(stream)?,
+                    })
+                }
                 kind if kind.is_modifier() => Statement::Class(parse_class_with_attributes(stream, attributes)?),
                 _ => {
                     return Err(utils::unexpected(
@@ -102,13 +113,13 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
                 }
             }
         }
-        T!["interface"] => Statement::Interface(parse_interface_with_attributes(stream, Sequence::empty())?),
-        T!["trait"] => Statement::Trait(parse_trait_with_attributes(stream, Sequence::empty())?),
-        T!["enum"] => Statement::Enum(parse_enum_with_attributes(stream, Sequence::empty())?),
-        T!["class"] => Statement::Class(parse_class_with_attributes(stream, Sequence::empty())?),
+        T!["interface"] => Statement::Interface(parse_interface_with_attributes(stream, Sequence::new(stream.vec()))?),
+        T!["trait"] => Statement::Trait(parse_trait_with_attributes(stream, Sequence::new(stream.vec()))?),
+        T!["enum"] => Statement::Enum(parse_enum_with_attributes(stream, Sequence::new(stream.vec()))?),
+        T!["class"] => Statement::Class(parse_class_with_attributes(stream, Sequence::new(stream.vec()))?),
         T!["function"] => {
             // just like when we have attributes, we don't know if this is meant to be a closure or a function
-            parse_closure_or_function(stream, Sequence::empty())?
+            parse_closure_or_function(stream, Sequence::new(stream.vec()))?
         }
         T!["global"] => Statement::Global(parse_global(stream)?),
         T!["static"] if matches!(utils::peek_nth(stream, 1)?.kind, T!["$variable"]) => {
@@ -117,11 +128,11 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
         kind if kind.is_modifier()
             && !matches!(utils::peek_nth(stream, 1)?.kind, T!["::" | "(" | "->" | "?->" | "[" | "fn" | "function"]) =>
         {
-            Statement::Class(parse_class_with_attributes(stream, Sequence::empty())?)
+            Statement::Class(parse_class_with_attributes(stream, Sequence::new(stream.vec()))?)
         }
         T!["__halt_compiler"] => Statement::HaltCompiler(parse_halt_compiler(stream)?),
         T![";"] => Statement::Noop(utils::expect(stream, T![";"])?.span),
-        T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, Sequence::empty())?),
+        T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, Sequence::new(stream.vec()))?),
         T!["if"] => Statement::If(parse_if(stream)?),
         T!["switch"] => Statement::Switch(parse_switch(stream)?),
         T!["foreach"] => Statement::Foreach(parse_foreach(stream)?),
@@ -138,23 +149,31 @@ pub fn parse_statement(stream: &mut TokenStream<'_, '_>) -> Result<Statement, Pa
         kind if kind.is_identifier_maybe_reserved() && matches!(utils::peek_nth(stream, 1)?.kind, T![":"]) => {
             Statement::Label(parse_label(stream)?)
         }
-        _ => Statement::Expression(ExpressionStatement {
-            expression: Box::new(parse_expression(stream)?),
-            terminator: parse_terminator(stream)?,
-        }),
+        _ => {
+            let expression = parse_expression(stream)?;
+
+            Statement::Expression(ExpressionStatement {
+                expression: stream.boxed(expression),
+                terminator: parse_terminator(stream)?,
+            })
+        }
     })
 }
 
-fn parse_closure_or_function(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Statement, ParseError> {
+fn parse_closure_or_function<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Statement<'i>, ParseError> {
     Ok(match (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)) {
         // if the next token is `(` or `&` followed by `(`, then we know this is a closure
-        (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(ExpressionStatement {
-            expression: Box::new(Expression::Closure(parse_closure_with_attributes(stream, attributes)?)),
-            terminator: parse_terminator(stream)?,
-        }),
+        (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => {
+            let closure = Expression::Closure(parse_closure_with_attributes(stream, attributes)?);
+
+            Statement::Expression(ExpressionStatement {
+                expression: stream.boxed(closure),
+                terminator: parse_terminator(stream)?,
+            })
+        }
         _ => {
             // otherwise, we know this is a function
             Statement::Function(parse_function_with_attributes(stream, attributes)?)

@@ -50,7 +50,7 @@ impl Rule for RequireBlockStatementBodyRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::For(r#for) => {
                 let ForBody::Statement(statement) = &r#for.body else {

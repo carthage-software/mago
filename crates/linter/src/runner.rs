@@ -54,7 +54,7 @@ impl<'a> Runner<'a> {
         interner: &'a ThreadedInterner,
         codebase: &'a CodebaseReflection,
         module: &'a Module,
-        program: &'a Program,
+        program: &'a Program<'a>,
     ) -> Self {
         Self {
             php_version,

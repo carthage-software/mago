@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use bumpalo::Bump;
 use serde::Serialize;
 
 use mago_ast::Program;
@@ -40,7 +41,7 @@ use mago_source::Source;
 /// WebAssembly and browser environments. For direct Rust usage, it can be
 /// used as-is in a native context.
 #[derive(Debug, Clone, Serialize)]
-pub struct AnalysisResults {
+pub struct AnalysisResults<'alloc> {
     /// A set of interned strings used in the source code.
     ///
     /// Each string is represented as a tuple containing a [`StringIdentifier`]
@@ -50,7 +51,7 @@ pub struct AnalysisResults {
     /// The abstract syntax tree (AST) resulting from parsing the source code.
     ///
     /// If [`parse_error`](Self::parse_error) is `Some`, this AST may be incomplete or invalid.
-    pub program: Program,
+    pub program: &'alloc Program<'alloc>,
 
     /// An optional parse error, if one occurred during parsing.
     ///
@@ -86,7 +87,7 @@ pub struct AnalysisResults {
     pub linter_issues: IssueCollection,
 }
 
-impl AnalysisResults {
+impl<'alloc> AnalysisResults<'alloc> {
     /// Analyzes and (optionally) formats the provided PHP `code`.
     ///
     /// This function performs the following steps:
@@ -106,15 +107,15 @@ impl AnalysisResults {
     ///
     /// Returns an [`AnalysisResults`] containing the AST, parse/semantic/linter issues,
     /// and formatted code (if no parse error).
-    pub fn analyze(code: String, lint_settings: Settings, format_settings: FormatSettings) -> Self {
+    pub fn analyze(bump: &'alloc Bump, code: String, lint_settings: Settings, format_settings: FormatSettings) -> Self {
         let interner = ThreadedInterner::new();
         let source = Source::standalone(&interner, "code.php", &code);
         let mut module = Module::build(&interner, lint_settings.php_version, source, ModuleBuildOptions::validation());
-        let program = module.parse(&interner);
+        let program = module.parse(&interner, bump);
         let mut formatted = None;
         if module.parse_error.is_none() {
             // Only format if there are no parse errors
-            formatted = Some(mago_formatter::format(&interner, &module.source, &program, format_settings));
+            formatted = Some(mago_formatter::format(&interner, &module.source, program, format_settings));
         }
 
         let linter =

@@ -21,7 +21,7 @@ impl Rule for NoEmptyLoopRule {
         "})
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let empty_loop = match node {
             Node::Foreach(foreach) => match &foreach.body {
                 ForeachBody::Statement(stmt) => is_statement_empty(stmt),

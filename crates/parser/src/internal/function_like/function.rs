@@ -10,10 +10,11 @@ use crate::internal::identifier::parse_local_identifier;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_function_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Function, ParseError> {
+#[inline]
+pub fn parse_function_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Function<'i>, ParseError> {
     Ok(Function {
         attribute_lists: attributes,
         function: utils::expect_keyword(stream, T!["function"])?,

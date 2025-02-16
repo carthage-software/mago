@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -13,52 +12,52 @@ use crate::ast::terminator::Terminator;
 use crate::sequence::Sequence;
 use crate::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct TraitUse {
+pub struct TraitUse<'a> {
     pub r#use: Keyword,
-    pub trait_names: TokenSeparatedSequence<Identifier>,
-    pub specification: TraitUseSpecification,
+    pub trait_names: TokenSeparatedSequence<'a, Identifier>,
+    pub specification: TraitUseSpecification<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum TraitUseSpecification {
+pub enum TraitUseSpecification<'a> {
     Abstract(TraitUseAbstractSpecification),
-    Concrete(TraitUseConcreteSpecification),
+    Concrete(TraitUseConcreteSpecification<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct TraitUseAbstractSpecification(pub Terminator);
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct TraitUseConcreteSpecification {
+pub struct TraitUseConcreteSpecification<'a> {
     pub left_brace: Span,
-    pub adaptations: Sequence<TraitUseAdaptation>,
+    pub adaptations: Sequence<'a, TraitUseAdaptation<'a>>,
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum TraitUseAdaptation {
-    Precedence(TraitUsePrecedenceAdaptation),
+pub enum TraitUseAdaptation<'a> {
+    Precedence(TraitUsePrecedenceAdaptation<'a>),
     Alias(TraitUseAliasAdaptation),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct TraitUsePrecedenceAdaptation {
+pub struct TraitUsePrecedenceAdaptation<'a> {
     pub method_reference: TraitUseAbsoluteMethodReference,
     pub insteadof: Keyword,
-    pub trait_names: TokenSeparatedSequence<Identifier>,
+    pub trait_names: TokenSeparatedSequence<'a, Identifier>,
     pub terminator: Terminator,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct TraitUseAliasAdaptation {
     pub method_reference: TraitUseMethodReference,
@@ -68,7 +67,7 @@ pub struct TraitUseAliasAdaptation {
     pub terminator: Terminator,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum TraitUseMethodReference {
@@ -76,7 +75,7 @@ pub enum TraitUseMethodReference {
     Absolute(TraitUseAbsoluteMethodReference),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct TraitUseAbsoluteMethodReference {
     pub trait_name: Identifier,
@@ -84,13 +83,13 @@ pub struct TraitUseAbsoluteMethodReference {
     pub method_name: LocalIdentifier,
 }
 
-impl HasSpan for TraitUse {
+impl HasSpan for TraitUse<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#use.span(), self.specification.span())
     }
 }
 
-impl HasSpan for TraitUseSpecification {
+impl HasSpan for TraitUseSpecification<'_> {
     fn span(&self) -> Span {
         match self {
             TraitUseSpecification::Abstract(specification) => specification.span(),
@@ -105,13 +104,13 @@ impl HasSpan for TraitUseAbstractSpecification {
     }
 }
 
-impl HasSpan for TraitUseConcreteSpecification {
+impl HasSpan for TraitUseConcreteSpecification<'_> {
     fn span(&self) -> Span {
         Span::between(self.left_brace, self.right_brace)
     }
 }
 
-impl HasSpan for TraitUseAdaptation {
+impl HasSpan for TraitUseAdaptation<'_> {
     fn span(&self) -> Span {
         match self {
             TraitUseAdaptation::Precedence(adaptation) => adaptation.span(),
@@ -120,7 +119,7 @@ impl HasSpan for TraitUseAdaptation {
     }
 }
 
-impl HasSpan for TraitUsePrecedenceAdaptation {
+impl HasSpan for TraitUsePrecedenceAdaptation<'_> {
     fn span(&self) -> Span {
         Span::between(self.method_reference.span(), self.terminator.span())
     }

@@ -8,14 +8,23 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_do_while(stream: &mut TokenStream<'_, '_>) -> Result<DoWhile, ParseError> {
+#[inline]
+pub fn parse_do_while<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<DoWhile<'i>, ParseError> {
+    let r#do = utils::expect_keyword(stream, T!["do"])?;
+    let statement = parse_statement(stream)?;
+    let r#while = utils::expect_keyword(stream, T!["while"])?;
+    let left_parenthesis = utils::expect_span(stream, T!["("])?;
+    let condition = parse_expression(stream)?;
+    let right_parenthesis = utils::expect_span(stream, T![")"])?;
+    let terminator = parse_terminator(stream)?;
+
     Ok(DoWhile {
-        r#do: utils::expect_keyword(stream, T!["do"])?,
-        statement: Box::new(parse_statement(stream)?),
-        r#while: utils::expect_keyword(stream, T!["while"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: Box::new(parse_expression(stream)?),
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        terminator: parse_terminator(stream)?,
+        r#do,
+        statement: stream.boxed(statement),
+        r#while,
+        left_parenthesis,
+        condition: stream.boxed(condition),
+        right_parenthesis,
+        terminator,
     })
 }

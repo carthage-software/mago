@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -17,11 +16,11 @@ use crate::sequence::TokenSeparatedSequence;
 ///
 /// final class Foo implements Bar, Baz {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Implements {
+pub struct Implements<'a> {
     pub implements: Keyword,
-    pub types: TokenSeparatedSequence<Identifier>,
+    pub types: TokenSeparatedSequence<'a, Identifier>,
 }
 
 /// Represents `extends` keyword with one or more types.
@@ -39,14 +38,14 @@ pub struct Implements {
 ///
 /// class Foo extends Bar {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Extends {
+pub struct Extends<'a> {
     pub extends: Keyword,
-    pub types: TokenSeparatedSequence<Identifier>,
+    pub types: TokenSeparatedSequence<'a, Identifier>,
 }
 
-impl HasSpan for Implements {
+impl HasSpan for Implements<'_> {
     fn span(&self) -> Span {
         let span = self.implements.span();
 
@@ -54,7 +53,7 @@ impl HasSpan for Implements {
     }
 }
 
-impl HasSpan for Extends {
+impl HasSpan for Extends<'_> {
     fn span(&self) -> Span {
         let span = self.extends.span();
 

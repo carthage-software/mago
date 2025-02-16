@@ -27,7 +27,7 @@ impl Rule for NoUnusedParameterRule {
         "})
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let (reflection, members) = match node {
             Node::Function(function) => {
                 if potentially_contains_function_call(&function.body, FUNC_GET_ARGS, context) {

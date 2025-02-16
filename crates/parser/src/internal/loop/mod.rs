@@ -12,7 +12,8 @@ pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-pub fn parse_continue(stream: &mut TokenStream<'_, '_>) -> Result<Continue, ParseError> {
+#[inline]
+pub fn parse_continue<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Continue<'i>, ParseError> {
     Ok(Continue {
         r#continue: utils::expect_keyword(stream, T!["continue"])?,
         level: if !matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {
@@ -24,7 +25,8 @@ pub fn parse_continue(stream: &mut TokenStream<'_, '_>) -> Result<Continue, Pars
     })
 }
 
-pub fn parse_break(stream: &mut TokenStream<'_, '_>) -> Result<Break, ParseError> {
+#[inline]
+pub fn parse_break<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Break<'i>, ParseError> {
     Ok(Break {
         r#break: utils::expect_keyword(stream, T!["break"])?,
         level: if !matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {

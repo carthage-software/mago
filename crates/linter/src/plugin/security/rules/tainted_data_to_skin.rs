@@ -57,7 +57,7 @@ impl Rule for TaintedDataToSinkRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Echo(echo) => {
                 for value in echo.values.iter() {
@@ -88,7 +88,7 @@ impl Rule for TaintedDataToSinkRule {
 
                 // If it is indeed a known sink, check each argument
                 for argument in function_call.argument_list.arguments.iter() {
-                    check_tainted_data_to_sink(context, &function_call.function, argument.value());
+                    check_tainted_data_to_sink(context, function_call.function.as_ref(), argument.value());
                 }
             }
             _ => (),

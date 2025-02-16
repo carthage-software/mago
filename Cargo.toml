@@ -88,6 +88,7 @@ colored = "3.0.0"
 blake3 = "1.5.5"
 memchr = "2.7.4"
 parking_lot = "0.12.3"
+bumpalo = { version = "3", features = ["collections", "boxed", "serde"] }
 
 [lints]
 workspace = true
@@ -126,6 +127,7 @@ tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
+bumpalo = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }

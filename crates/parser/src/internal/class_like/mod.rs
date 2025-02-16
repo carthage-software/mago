@@ -22,10 +22,11 @@ pub mod method;
 pub mod property;
 pub mod trait_use;
 
-pub fn parse_interface_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Interface, ParseError> {
+#[inline]
+pub fn parse_interface_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Interface<'i>, ParseError> {
     Ok(Interface {
         attribute_lists: attributes,
         interface: utils::expect_keyword(stream, T!["interface"])?,
@@ -33,7 +34,7 @@ pub fn parse_interface_with_attributes(
         extends: parse_optional_extends(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         members: {
-            let mut members = Vec::new();
+            let mut members = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
                     break;
@@ -48,20 +49,22 @@ pub fn parse_interface_with_attributes(
     })
 }
 
-pub fn parse_class_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Class, ParseError> {
+#[inline]
+pub fn parse_class_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Class<'i>, ParseError> {
     let modifiers = parse_modifier_sequence(stream)?;
 
     parse_class_with_attributes_and_modifiers(stream, attributes, modifiers)
 }
 
-pub fn parse_class_with_attributes_and_modifiers(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-    modifiers: Sequence<Modifier>,
-) -> Result<Class, ParseError> {
+#[inline]
+pub fn parse_class_with_attributes_and_modifiers<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+    modifiers: Sequence<'i, Modifier>,
+) -> Result<Class<'i>, ParseError> {
     Ok(Class {
         attribute_lists: attributes,
         modifiers,
@@ -71,7 +74,7 @@ pub fn parse_class_with_attributes_and_modifiers(
         implements: parse_optional_implements(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         members: {
-            let mut members = Vec::new();
+            let mut members = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
                     break;
@@ -86,7 +89,8 @@ pub fn parse_class_with_attributes_and_modifiers(
     })
 }
 
-pub fn parse_anonymous_class(stream: &mut TokenStream<'_, '_>) -> Result<AnonymousClass, ParseError> {
+#[inline]
+pub fn parse_anonymous_class<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<AnonymousClass<'i>, ParseError> {
     Ok(AnonymousClass {
         new: utils::expect_keyword(stream, T!["new"])?,
         attribute_lists: parse_attribute_list_sequence(stream)?,
@@ -97,7 +101,7 @@ pub fn parse_anonymous_class(stream: &mut TokenStream<'_, '_>) -> Result<Anonymo
         implements: parse_optional_implements(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         members: {
-            let mut members = Vec::new();
+            let mut members = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
                     break;
@@ -112,17 +116,18 @@ pub fn parse_anonymous_class(stream: &mut TokenStream<'_, '_>) -> Result<Anonymo
     })
 }
 
-pub fn parse_trait_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Trait, ParseError> {
+#[inline]
+pub fn parse_trait_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Trait<'i>, ParseError> {
     Ok(Trait {
         attribute_lists: attributes,
         r#trait: utils::expect_keyword(stream, T!["trait"])?,
         name: parse_local_identifier(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         members: {
-            let mut members = Vec::new();
+            let mut members = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
                     break;
@@ -136,10 +141,11 @@ pub fn parse_trait_with_attributes(
     })
 }
 
-pub fn parse_enum_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Enum, ParseError> {
+#[inline]
+pub fn parse_enum_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attributes: Sequence<'i, AttributeList<'i>>,
+) -> Result<Enum<'i>, ParseError> {
     Ok(Enum {
         attribute_lists: attributes,
         r#enum: utils::expect_keyword(stream, T!["enum"])?,
@@ -148,7 +154,7 @@ pub fn parse_enum_with_attributes(
         implements: parse_optional_implements(stream)?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         members: {
-            let mut members = Vec::new();
+            let mut members = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
                     break;
@@ -162,9 +168,10 @@ pub fn parse_enum_with_attributes(
     })
 }
 
-pub fn parse_optional_enum_backing_type_hint(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<EnumBackingTypeHint>, ParseError> {
+#[inline]
+pub fn parse_optional_enum_backing_type_hint<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<Option<EnumBackingTypeHint<'i>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T![":"]) => {
             Some(EnumBackingTypeHint { colon: utils::expect_any(stream)?.span, hint: parse_type_hint(stream)? })

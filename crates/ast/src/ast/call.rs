@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -9,51 +9,51 @@ use crate::ast::argument::ArgumentList;
 use crate::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Call {
-    Function(FunctionCall),
-    Method(MethodCall),
-    NullSafeMethod(NullSafeMethodCall),
-    StaticMethod(StaticMethodCall),
+pub enum Call<'a> {
+    Function(FunctionCall<'a>),
+    Method(MethodCall<'a>),
+    NullSafeMethod(NullSafeMethodCall<'a>),
+    StaticMethod(StaticMethodCall<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct FunctionCall {
-    pub function: Box<Expression>,
-    pub argument_list: ArgumentList,
+pub struct FunctionCall<'a> {
+    pub function: Box<'a, Expression<'a>>,
+    pub argument_list: ArgumentList<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct MethodCall {
-    pub object: Box<Expression>,
+pub struct MethodCall<'a> {
+    pub object: Box<'a, Expression<'a>>,
     pub arrow: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'a>,
+    pub argument_list: ArgumentList<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct NullSafeMethodCall {
-    pub object: Box<Expression>,
+pub struct NullSafeMethodCall<'a> {
+    pub object: Box<'a, Expression<'a>>,
     pub question_mark_arrow: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'a>,
+    pub argument_list: ArgumentList<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct StaticMethodCall {
-    pub class: Box<Expression>,
+pub struct StaticMethodCall<'a> {
+    pub class: Box<'a, Expression<'a>>,
     pub double_colon: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'a>,
+    pub argument_list: ArgumentList<'a>,
 }
 
-impl HasSpan for Call {
+impl HasSpan for Call<'_> {
     fn span(&self) -> Span {
         match self {
             Call::Function(f) => f.span(),
@@ -64,25 +64,25 @@ impl HasSpan for Call {
     }
 }
 
-impl HasSpan for FunctionCall {
+impl HasSpan for FunctionCall<'_> {
     fn span(&self) -> Span {
         self.function.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for MethodCall {
+impl HasSpan for MethodCall<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for NullSafeMethodCall {
+impl HasSpan for NullSafeMethodCall<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for StaticMethodCall {
+impl HasSpan for StaticMethodCall<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.argument_list.span())
     }

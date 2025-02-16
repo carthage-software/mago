@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+use bumpalo::Bump;
 use clap::Parser;
 use serde_json::json;
 use termtree::Tree;
@@ -93,6 +94,9 @@ pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
         return Ok(ExitCode::FAILURE);
     }
 
+    // Create a bump allocator for temporary memory allocation.
+    let bump = Bump::new();
+
     // Initialize interner and source manager.
     let interner = ThreadedInterner::new();
     let source_manager = SourceManager::new(interner.clone());
@@ -102,7 +106,7 @@ pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
     let source = source_manager.load(&source_id)?;
 
     // Parse the source file into an AST.
-    let (ast, error) = parse_source(&interner, &source);
+    let (ast, error) = parse_source(&interner, &bump, &source);
 
     let has_error = error.is_some();
     if command.json {
@@ -116,12 +120,12 @@ pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
         println!("{}", serde_json::to_string_pretty(&result)?);
     } else {
         // Display the AST as a tree.
-        let tree = node_to_tree(Node::Program(&ast));
+        let tree = node_to_tree(Node::Program(ast));
 
         println!("{tree}");
 
         if command.include_names {
-            let names = Names::resolve(&interner, &ast);
+            let names = Names::resolve(&interner, ast);
 
             for (position, (value, is_imported)) in names.all() {
                 let name = interner.lookup(value);
@@ -151,7 +155,7 @@ pub async fn execute(command: AstCommand) -> Result<ExitCode, Error> {
 /// # Returns
 ///
 /// A `Tree` representation of the AST node and its children.
-fn node_to_tree(node: Node<'_>) -> Tree<NodeKind> {
+fn node_to_tree(node: Node<'_, '_>) -> Tree<NodeKind> {
     let mut tree = Tree::new(node.kind());
     for child in node.children() {
         tree.push(node_to_tree(child));

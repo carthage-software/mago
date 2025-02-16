@@ -16,6 +16,7 @@
 //! See each function’s documentation below for details on usage and
 //! return values.
 
+use bumpalo::Bump;
 use wasm_bindgen::prelude::*;
 
 use mago_formatter::settings::FormatSettings;
@@ -109,6 +110,8 @@ pub fn mago_get_definitions() -> Result<JsValue, JsValue> {
 /// ```
 #[wasm_bindgen]
 pub fn mago_analysis(code: String, format_settings: JsValue, linter_settings: JsValue) -> Result<JsValue, JsValue> {
+    let bump = Bump::new();
+
     // Deserialize or use defaults
     let linter_settings = if !linter_settings.is_undefined() && !linter_settings.is_null() {
         serde_wasm_bindgen::from_value::<Settings>(linter_settings)?
@@ -123,7 +126,7 @@ pub fn mago_analysis(code: String, format_settings: JsValue, linter_settings: Js
     };
 
     // Run analysis
-    let results = AnalysisResults::analyze(code, linter_settings, format_settings);
+    let results = AnalysisResults::analyze(&bump, code, linter_settings, format_settings);
 
     // Return the analysis result as a JS object
     Ok(serde_wasm_bindgen::to_value(&results)?)
@@ -161,6 +164,8 @@ pub fn mago_analysis(code: String, format_settings: JsValue, linter_settings: Js
 /// ```
 #[wasm_bindgen]
 pub fn mago_format(code: String, format_settings: JsValue) -> Result<JsValue, JsValue> {
+    let bump = Bump::new();
+
     // Deserialize or default
     let settings = if !format_settings.is_undefined() && !format_settings.is_null() {
         serde_wasm_bindgen::from_value::<FormatSettings>(format_settings)?
@@ -176,14 +181,14 @@ pub fn mago_format(code: String, format_settings: JsValue) -> Result<JsValue, Js
     let source = manager.load(&source_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     // Parse the code
-    let (program, parse_error) = parse_source(&interner, &source);
+    let (program, parse_error) = parse_source(&interner, &bump, &source);
 
     if let Some(err) = parse_error {
         return Err(JsValue::from_str(&err.to_string()));
     }
 
     // Format the parsed program
-    let formatted = mago_formatter::format(&interner, &source, &program, settings);
+    let formatted = mago_formatter::format(&interner, &source, program, settings);
 
     // Return the formatted string
     Ok(JsValue::from_str(&formatted))

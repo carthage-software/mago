@@ -59,7 +59,7 @@ fn make_string(raw_text: &str, enclosing_quote: char) -> String {
     result
 }
 
-pub(super) fn print_string<'a>(f: &Formatter<'a>, kind: &LiteralStringKind, value: &StringIdentifier) -> &'a str {
+pub(super) fn print_string<'a>(f: &Formatter<'a, '_>, kind: &LiteralStringKind, value: &StringIdentifier) -> &'a str {
     let text = f.lookup(value);
 
     let quote = unsafe { text.chars().next().unwrap_unchecked() };

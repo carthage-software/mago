@@ -257,7 +257,7 @@ impl<'a> MutWalker<NameContext<'a>> for NameResolver {
 
     fn walk_in_binary<'ast>(&mut self, binary: &'ast Binary, context: &mut NameContext<'a>) {
         if let (BinaryOperator::Instanceof(_), Expression::Identifier(identifier)) =
-            (binary.operator, binary.rhs.as_ref())
+            (&binary.operator, binary.rhs.as_ref())
         {
             let (name, imported) = context.resolve_name(NameKind::Default, identifier.value());
 

@@ -1,26 +1,27 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use strum::Display;
 
 use crate::ast::expression::Expression;
 use crate::ast::keyword::Keyword;
 use crate::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ArrayAccess {
-    pub array: Box<Expression>,
+pub struct ArrayAccess<'a> {
+    pub array: Box<'a, Expression<'a>>,
     pub left_bracket: Span,
-    pub index: Box<Expression>,
+    pub index: Box<'a, Expression<'a>>,
     pub right_bracket: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ArrayAppend {
-    pub array: Box<Expression>,
+pub struct ArrayAppend<'a> {
+    pub array: Box<'a, Expression<'a>>,
     pub left_bracket: Span,
     pub right_bracket: Span,
 }
@@ -34,12 +35,12 @@ pub struct ArrayAppend {
 ///
 /// list($a, 'b' => $c, /* missing */, ...$rest) = $arr;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct List {
+pub struct List<'a> {
     pub list: Keyword,
     pub left_parenthesis: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'a, ArrayElement<'a>>,
     pub right_parenthesis: Span,
 }
 
@@ -52,11 +53,11 @@ pub struct List {
 ///
 /// $arr = ['apple', 'banana', 3 => 'orange'];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Array {
+pub struct Array<'a> {
     pub left_bracket: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'a, ArrayElement<'a>>,
     pub right_bracket: Span,
 }
 
@@ -69,23 +70,23 @@ pub struct Array {
 ///
 /// $arr = array('apple', 'banana', 3 => 'orange');
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct LegacyArray {
+pub struct LegacyArray<'a> {
     pub array: Keyword,
     pub left_parenthesis: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'a, ArrayElement<'a>>,
     pub right_parenthesis: Span,
 }
 
 /// Represents an array element.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum ArrayElement {
-    KeyValue(KeyValueArrayElement),
-    Value(ValueArrayElement),
-    Variadic(VariadicArrayElement),
+pub enum ArrayElement<'a> {
+    KeyValue(KeyValueArrayElement<'a>),
+    Value(ValueArrayElement<'a>),
+    Variadic(VariadicArrayElement<'a>),
     Missing(MissingArrayElement),
 }
 
@@ -100,12 +101,12 @@ pub enum ArrayElement {
 ///   1 => 'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct KeyValueArrayElement {
-    pub key: Box<Expression>,
+pub struct KeyValueArrayElement<'a> {
+    pub key: Box<'a, Expression<'a>>,
     pub double_arrow: Span,
-    pub value: Box<Expression>,
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents a value in an array.
@@ -119,10 +120,10 @@ pub struct KeyValueArrayElement {
 ///   'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ValueArrayElement {
-    pub value: Box<Expression>,
+pub struct ValueArrayElement<'a> {
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents a variadic array element.
@@ -136,11 +137,11 @@ pub struct ValueArrayElement {
 ///   ...$other,
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct VariadicArrayElement {
+pub struct VariadicArrayElement<'a> {
     pub ellipsis: Span,
-    pub value: Box<Expression>,
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents a missing array element.
@@ -155,43 +156,43 @@ pub struct VariadicArrayElement {
 ///   ,
 ///   'third',
 /// ];
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct MissingArrayElement {
     pub comma: Span,
 }
 
-impl HasSpan for ArrayAccess {
+impl HasSpan for ArrayAccess<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_bracket)
     }
 }
 
-impl HasSpan for ArrayAppend {
+impl HasSpan for ArrayAppend<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_bracket)
     }
 }
 
-impl HasSpan for List {
+impl HasSpan for List<'_> {
     fn span(&self) -> Span {
         self.list.span().join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for Array {
+impl HasSpan for Array<'_> {
     fn span(&self) -> Span {
         self.left_bracket.join(self.right_bracket)
     }
 }
 
-impl HasSpan for LegacyArray {
+impl HasSpan for LegacyArray<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for ArrayElement {
+impl HasSpan for ArrayElement<'_> {
     fn span(&self) -> Span {
         match self {
             ArrayElement::KeyValue(element) => element.span(),
@@ -202,19 +203,19 @@ impl HasSpan for ArrayElement {
     }
 }
 
-impl HasSpan for KeyValueArrayElement {
+impl HasSpan for KeyValueArrayElement<'_> {
     fn span(&self) -> Span {
         self.key.span().join(self.value.span())
     }
 }
 
-impl HasSpan for ValueArrayElement {
+impl HasSpan for ValueArrayElement<'_> {
     fn span(&self) -> Span {
         self.value.span()
     }
 }
 
-impl HasSpan for VariadicArrayElement {
+impl HasSpan for VariadicArrayElement<'_> {
     fn span(&self) -> Span {
         self.ellipsis.join(self.value.span())
     }

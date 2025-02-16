@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -23,27 +23,27 @@ use crate::sequence::TokenSeparatedSequence;
 ///   echo $i;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct For {
+pub struct For<'a> {
     pub r#for: Keyword,
     pub left_parenthesis: Span,
-    pub initializations: TokenSeparatedSequence<Expression>,
+    pub initializations: TokenSeparatedSequence<'a, Expression<'a>>,
     pub initializations_semicolon: Span,
-    pub conditions: TokenSeparatedSequence<Expression>,
+    pub conditions: TokenSeparatedSequence<'a, Expression<'a>>,
     pub conditions_semicolon: Span,
-    pub increments: TokenSeparatedSequence<Expression>,
+    pub increments: TokenSeparatedSequence<'a, Expression<'a>>,
     pub right_parenthesis: Span,
-    pub body: ForBody,
+    pub body: ForBody<'a>,
 }
 
 /// Represents the body of a for statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum ForBody {
-    Statement(Box<Statement>),
-    ColonDelimited(ForColonDelimitedBody),
+pub enum ForBody<'a> {
+    Statement(Box<'a, Statement<'a>>),
+    ColonDelimited(ForColonDelimitedBody<'a>),
 }
 
 /// Represents a colon-delimited for statement body.
@@ -57,22 +57,22 @@ pub enum ForBody {
 ///   echo $i;
 /// endfor;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ForColonDelimitedBody {
+pub struct ForColonDelimitedBody<'a> {
     pub colon: Span,
-    pub statements: Sequence<Statement>,
+    pub statements: Sequence<'a, Statement<'a>>,
     pub end_for: Keyword,
     pub terminator: Terminator,
 }
 
-impl HasSpan for For {
+impl HasSpan for For<'_> {
     fn span(&self) -> Span {
         self.r#for.span().join(self.body.span())
     }
 }
 
-impl HasSpan for ForBody {
+impl HasSpan for ForBody<'_> {
     fn span(&self) -> Span {
         match self {
             ForBody::Statement(statement) => statement.span(),
@@ -81,7 +81,7 @@ impl HasSpan for ForBody {
     }
 }
 
-impl HasSpan for ForColonDelimitedBody {
+impl HasSpan for ForColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         self.colon.join(self.terminator.span())
     }

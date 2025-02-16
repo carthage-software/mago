@@ -39,7 +39,7 @@ impl Rule for NoTagPairTerminatorRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Terminator(terminator) = node else { return LintDirective::default() };
         let Terminator::TagPair(close, open) = terminator else {
             return LintDirective::default();

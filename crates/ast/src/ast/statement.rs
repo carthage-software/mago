@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -38,59 +38,59 @@ use crate::ast::tag::OpeningTag;
 use crate::ast::terminator::Terminator;
 use crate::ast::unset::Unset;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ExpressionStatement {
-    pub expression: Box<Expression>,
+pub struct ExpressionStatement<'a> {
+    pub expression: Box<'a, Expression<'a>>,
     pub terminator: Terminator,
 }
 
 /// Represents a PHP statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Statement {
+pub enum Statement<'a> {
     OpeningTag(OpeningTag),
     ClosingTag(ClosingTag),
     Inline(Inline),
-    Namespace(Namespace),
-    Use(Use),
-    Class(Class),
-    Interface(Interface),
-    Trait(Trait),
-    Enum(Enum),
-    Block(Block),
-    Constant(Constant),
-    Function(Function),
-    Declare(Declare),
+    Namespace(Namespace<'a>),
+    Use(Use<'a>),
+    Class(Class<'a>),
+    Interface(Interface<'a>),
+    Trait(Trait<'a>),
+    Enum(Enum<'a>),
+    Block(Block<'a>),
+    Constant(Constant<'a>),
+    Function(Function<'a>),
+    Declare(Declare<'a>),
     Goto(Goto),
     Label(Label),
-    Try(Try),
-    Foreach(Foreach),
-    For(For),
-    While(While),
-    DoWhile(DoWhile),
-    Continue(Continue),
-    Break(Break),
-    Switch(Switch),
-    If(If),
-    Return(Return),
-    Expression(ExpressionStatement),
-    Echo(Echo),
-    Global(Global),
-    Static(Static),
+    Try(Try<'a>),
+    Foreach(Foreach<'a>),
+    For(For<'a>),
+    While(While<'a>),
+    DoWhile(DoWhile<'a>),
+    Continue(Continue<'a>),
+    Break(Break<'a>),
+    Switch(Switch<'a>),
+    If(If<'a>),
+    Return(Return<'a>),
+    Expression(ExpressionStatement<'a>),
+    Echo(Echo<'a>),
+    Global(Global<'a>),
+    Static(Static<'a>),
     HaltCompiler(HaltCompiler),
-    Unset(Unset),
+    Unset(Unset<'a>),
     Noop(Span),
 }
 
-impl HasSpan for ExpressionStatement {
+impl HasSpan for ExpressionStatement<'_> {
     fn span(&self) -> Span {
         self.expression.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for Statement {
+impl HasSpan for Statement<'_> {
     fn span(&self) -> Span {
         match self {
             Statement::OpeningTag(statement) => statement.span(),

@@ -29,7 +29,7 @@ impl Rule for NoShellExecuteStringRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::ShellExecuteString(shell_execute_string) = node else { return LintDirective::default() };
 
         let mut is_interpolated = false;

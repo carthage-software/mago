@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -22,34 +22,34 @@ use crate::sequence::TokenSeparatedSequence;
 ///
 /// declare(strict_types=1);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Declare {
+pub struct Declare<'a> {
     pub declare: Keyword,
     pub left_parenthesis: Span,
-    pub items: TokenSeparatedSequence<DeclareItem>,
+    pub items: TokenSeparatedSequence<'a, DeclareItem<'a>>,
     pub right_parenthesis: Span,
-    pub body: DeclareBody,
+    pub body: DeclareBody<'a>,
 }
 
 /// Represents a single name-value pair within a declare statement.
 ///
 /// Example: `strict_types=1`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct DeclareItem {
+pub struct DeclareItem<'a> {
     pub name: LocalIdentifier,
     pub equal: Span,
-    pub value: Expression,
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents the body of a declare statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum DeclareBody {
-    Statement(Box<Statement>),
-    ColonDelimited(DeclareColonDelimitedBody),
+pub enum DeclareBody<'a> {
+    Statement(Box<'a, Statement<'a>>),
+    ColonDelimited(DeclareColonDelimitedBody<'a>),
 }
 
 /// Represents a colon-delimited body of a declare statement.
@@ -62,28 +62,28 @@ pub enum DeclareBody {
 ///   echo "Goodbye, world!";
 /// enddeclare;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct DeclareColonDelimitedBody {
+pub struct DeclareColonDelimitedBody<'a> {
     pub colon: Span,
-    pub statements: Sequence<Statement>,
+    pub statements: Sequence<'a, Statement<'a>>,
     pub end_declare: Keyword,
     pub terminator: Terminator,
 }
 
-impl HasSpan for Declare {
+impl HasSpan for Declare<'_> {
     fn span(&self) -> Span {
         self.declare.span().join(self.body.span())
     }
 }
 
-impl HasSpan for DeclareItem {
+impl HasSpan for DeclareItem<'_> {
     fn span(&self) -> Span {
         self.name.span().join(self.value.span())
     }
 }
 
-impl HasSpan for DeclareBody {
+impl HasSpan for DeclareBody<'_> {
     fn span(&self) -> Span {
         match self {
             DeclareBody::Statement(s) => s.span(),
@@ -92,7 +92,7 @@ impl HasSpan for DeclareBody {
     }
 }
 
-impl HasSpan for DeclareColonDelimitedBody {
+impl HasSpan for DeclareColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         self.colon.join(self.terminator.span())
     }

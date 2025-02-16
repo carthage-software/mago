@@ -1,6 +1,11 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
+use bumpalo::boxed::Box;
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
+use bumpalo::Bump;
+
 use mago_ast::sequence::Sequence;
 use mago_ast::trivia::Trivia;
 use mago_ast::trivia::TriviaKind;
@@ -12,19 +17,28 @@ use mago_token::Token;
 use mago_token::TokenKind;
 
 #[derive(Debug)]
-pub struct TokenStream<'a, 'i> {
+pub struct TokenStream<'i, 'alloc> {
     interner: &'i ThreadedInterner,
-    lexer: Lexer<'a, 'i>,
+    lexer: Lexer<'i, 'i>,
+    bump: &'alloc Bump,
     buffer: VecDeque<Token>,
-    trivia: Vec<Token>,
+    trivia: Vec<'alloc, Token>,
     position: Position,
 }
 
-impl<'a, 'i> TokenStream<'a, 'i> {
-    pub fn new(interner: &'i ThreadedInterner, lexer: Lexer<'a, 'i>) -> TokenStream<'a, 'i> {
+impl<'i, 'alloc> TokenStream<'i, 'alloc> {
+    pub fn new(interner: &'i ThreadedInterner, bump: &'alloc Bump, lexer: Lexer<'i, 'i>) -> TokenStream<'i, 'alloc> {
         let position = lexer.get_position();
 
-        TokenStream { interner, lexer, buffer: VecDeque::new(), trivia: Vec::new(), position }
+        TokenStream { interner, bump, lexer, buffer: VecDeque::new(), trivia: Vec::new_in(bump), position }
+    }
+
+    pub fn boxed<T>(&self, value: T) -> Box<'alloc, T> {
+        Box::new_in(value, self.bump)
+    }
+
+    pub fn vec<T>(&self) -> Vec<'alloc, T> {
+        Vec::new_in(self.bump)
     }
 
     pub fn interner(&self) -> &'i ThreadedInterner {
@@ -95,28 +109,30 @@ impl<'a, 'i> TokenStream<'a, 'i> {
 
     /// Consumes the comments collected by the lexer and returns them.
     #[inline]
-    pub fn get_trivia(&mut self) -> Sequence<Trivia> {
-        let tokens = std::mem::take(&mut self.trivia);
-
-        tokens
-            .into_iter()
-            .map(|token| match token.kind {
-                TokenKind::Whitespace => Trivia { kind: TriviaKind::WhiteSpace, span: token.span, value: token.value },
-                TokenKind::HashComment => {
-                    Trivia { kind: TriviaKind::HashComment, span: token.span, value: token.value }
-                }
-                TokenKind::SingleLineComment => {
-                    Trivia { kind: TriviaKind::SingleLineComment, span: token.span, value: token.value }
-                }
-                TokenKind::MultiLineComment => {
-                    Trivia { kind: TriviaKind::MultiLineComment, span: token.span, value: token.value }
-                }
-                TokenKind::DocBlockComment => {
-                    Trivia { kind: TriviaKind::DocBlockComment, span: token.span, value: token.value }
-                }
-                _ => unreachable!(),
-            })
-            .collect()
+    pub fn get_trivia(&mut self) -> Sequence<'alloc, Trivia> {
+        Sequence::new(
+            self.trivia
+                .drain(..)
+                .map(|token| match token.kind {
+                    TokenKind::Whitespace => {
+                        Trivia { kind: TriviaKind::WhiteSpace, span: token.span, value: token.value }
+                    }
+                    TokenKind::HashComment => {
+                        Trivia { kind: TriviaKind::HashComment, span: token.span, value: token.value }
+                    }
+                    TokenKind::SingleLineComment => {
+                        Trivia { kind: TriviaKind::SingleLineComment, span: token.span, value: token.value }
+                    }
+                    TokenKind::MultiLineComment => {
+                        Trivia { kind: TriviaKind::MultiLineComment, span: token.span, value: token.value }
+                    }
+                    TokenKind::DocBlockComment => {
+                        Trivia { kind: TriviaKind::DocBlockComment, span: token.span, value: token.value }
+                    }
+                    _ => unreachable!(),
+                })
+                .collect_in(self.bump),
+        )
     }
 
     /// Fills the token buffer until at least `n` tokens are available, unless the lexer returns EOF.

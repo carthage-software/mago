@@ -27,3 +27,4 @@ mago-typing = { workspace = true }
 mago-source = { workspace = true }
 serde = { workspace = true }
 ahash = { workspace = true }
+bumpalo = { workspace = true }

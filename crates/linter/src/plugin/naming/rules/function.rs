@@ -92,7 +92,7 @@ impl Rule for FunctionRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Function(function) = node else { return LintDirective::default() };
 
         let name = context.lookup(&function.name.value);

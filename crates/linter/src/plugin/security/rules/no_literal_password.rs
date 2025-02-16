@@ -88,7 +88,7 @@ impl Rule for NoLiteralPasswordRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Assignment(assignment) => {
                 let Some(password) = get_password(context, &assignment.lhs) else {

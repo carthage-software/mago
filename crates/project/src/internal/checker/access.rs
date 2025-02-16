@@ -7,7 +7,7 @@ use crate::internal::checker::expression::check_for_new_without_parenthesis;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_access(access: &Access, context: &mut Context<'_>) {
+pub fn check_access(access: &Access, context: &mut Context<'_, '_>) {
     match access {
         Access::Property(property_access) => {
             check_for_new_without_parenthesis(&property_access.object, context, "property access");

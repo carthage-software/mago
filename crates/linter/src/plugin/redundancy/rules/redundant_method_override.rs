@@ -45,7 +45,7 @@ impl Rule for RedundantMethodOverrideRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Method(method) = node else { return LintDirective::default() };
 
         let MethodBody::Concrete(block) = &method.body else {
@@ -120,7 +120,7 @@ fn matches_method(
         };
 
         if variadic.eq(is_variadic)
-            || !matches!(value, Expression::Variable(Variable::Direct(variable)) if variable.name.eq(parameter))
+            || !matches!(value.as_ref(), Expression::Variable(Variable::Direct(variable)) if variable.name.eq(parameter))
         {
             return false;
         }

@@ -80,7 +80,7 @@ impl Rule for InstantiationRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Instantiation(instantiation) = node else {
             return LintDirective::Continue;
         };

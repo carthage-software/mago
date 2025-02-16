@@ -7,7 +7,7 @@ use crate::internal::consts::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) {
+pub fn check_top_level_statements(program: &Program, context: &mut Context<'_, '_>) {
     let mut index = 0;
     let mut before = vec![];
 
@@ -162,7 +162,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
 }
 
 #[inline]
-pub fn check_opening_tag(opening_tag: &OpeningTag, context: &mut Context<'_>) {
+pub fn check_opening_tag(opening_tag: &OpeningTag, context: &mut Context<'_, '_>) {
     if let OpeningTag::Short(short_opening_tag) = opening_tag {
         if !context.version.is_supported(Feature::ShortOpenTag) {
             context.issues.push(
@@ -178,13 +178,13 @@ pub fn check_opening_tag(opening_tag: &OpeningTag, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
+pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_>) {
     for item in declare.items.iter() {
         let name = context.interner.lookup(&item.name.value);
 
         match name.to_ascii_lowercase().as_str() {
             STRICT_TYPES_DECLARE_DIRECTIVE => {
-                let value = match &item.value {
+                let value = match item.value.as_ref() {
                     Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => *value,
                     _ => None,
                 };
@@ -219,7 +219,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
                 }
             }
             TICKS_DECLARE_DIRECTIVE => {
-                if !matches!(item.value, Expression::Literal(Literal::Integer(_))) {
+                if !matches!(item.value.as_ref(), Expression::Literal(Literal::Integer(_))) {
                     context.issues.push(
                         Issue::error("The `ticks` directive must be set to a literal integer.")
                             .with_annotation(
@@ -234,7 +234,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
                 }
             }
             ENCODING_DECLARE_DIRECTIVE => {
-                if !matches!(item.value, Expression::Literal(Literal::String(_))) {
+                if !matches!(item.value.as_ref(), Expression::Literal(Literal::String(_))) {
                     context.issues.push(
                         Issue::error("The `encoding` declare directive must be set to a literal string")
                             .with_annotation(
@@ -265,7 +265,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_>) {
+pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_, '_>) {
     if context.ancestors.len() > 2 {
         // get the span of the parent, and label it.
         let parent = context.ancestors[context.ancestors.len() - 2];
@@ -286,7 +286,7 @@ pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_goto(goto: &Goto, context: &mut Context<'_>) {
+pub fn check_goto(goto: &Goto, context: &mut Context<'_, '_>) {
     let all_labels =
         Node::Program(context.program)
             .filter_map(|node| if let Node::Label(label) = node { Some(*label) } else { None });

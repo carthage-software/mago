@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -27,7 +26,7 @@ use crate::ast::terminator::Terminator;
 ///
 /// ?>
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct Goto {
     pub goto: Keyword,
@@ -44,7 +43,7 @@ pub struct Goto {
 ///
 /// foo:
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct Label {
     pub name: LocalIdentifier,

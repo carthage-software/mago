@@ -45,7 +45,7 @@ impl Rule for RequirePropertyTypeRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let (reflection, members) = match node {
             Node::Class(class) => {
                 let name = context.module.names.get(&class.name);

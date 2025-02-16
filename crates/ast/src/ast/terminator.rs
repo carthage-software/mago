@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,7 +10,7 @@ use crate::ast::tag::OpeningTag;
 /// A statement terminator.
 ///
 /// A PHP statement can be terminated with a semicolon `;` or a closing tag `?>`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum Terminator {

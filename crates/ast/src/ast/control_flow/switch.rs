@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -12,80 +12,80 @@ use crate::ast::terminator::Terminator;
 use crate::sequence::Sequence;
 
 /// Represents a `switch` statement in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Switch {
+pub struct Switch<'a> {
     pub switch: Keyword,
     pub left_parenthesis: Span,
-    pub expression: Box<Expression>,
+    pub expression: Box<'a, Expression<'a>>,
     pub right_parenthesis: Span,
-    pub body: SwitchBody,
+    pub body: SwitchBody<'a>,
 }
 
 /// Represents the body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum SwitchBody {
-    BraceDelimited(SwitchBraceDelimitedBody),
-    ColonDelimited(SwitchColonDelimitedBody),
+pub enum SwitchBody<'a> {
+    BraceDelimited(SwitchBraceDelimitedBody<'a>),
+    ColonDelimited(SwitchColonDelimitedBody<'a>),
 }
 
 /// Represents a brace-delimited body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct SwitchBraceDelimitedBody {
+pub struct SwitchBraceDelimitedBody<'a> {
     pub left_brace: Span,
     pub optional_terminator: Option<Terminator>,
-    pub cases: Sequence<SwitchCase>,
+    pub cases: Sequence<'a, SwitchCase<'a>>,
     pub right_brace: Span,
 }
 
 /// Represents a colon-delimited body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct SwitchColonDelimitedBody {
+pub struct SwitchColonDelimitedBody<'a> {
     pub colon: Span,
     pub optional_terminator: Option<Terminator>,
-    pub cases: Sequence<SwitchCase>,
+    pub cases: Sequence<'a, SwitchCase<'a>>,
     pub end_switch: Keyword,
     pub terminator: Terminator,
 }
 
 /// Represents a single case within a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum SwitchCase {
-    Expression(SwitchExpressionCase),
-    Default(SwitchDefaultCase),
+pub enum SwitchCase<'a> {
+    Expression(SwitchExpressionCase<'a>),
+    Default(SwitchDefaultCase<'a>),
 }
 
 /// Represents a single case within a switch statement.
 ///
 /// Example: `case 1: echo "One";`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct SwitchExpressionCase {
+pub struct SwitchExpressionCase<'a> {
     pub case: Keyword,
-    pub expression: Box<Expression>,
+    pub expression: Box<'a, Expression<'a>>,
     pub separator: SwitchCaseSeparator,
-    pub statements: Sequence<Statement>,
+    pub statements: Sequence<'a, Statement<'a>>,
 }
 
 /// Represents the default case within a switch statement.
 ///
 /// Example: `default: echo "Default";`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct SwitchDefaultCase {
+pub struct SwitchDefaultCase<'a> {
     pub default: Keyword,
     pub separator: SwitchCaseSeparator,
-    pub statements: Sequence<Statement>,
+    pub statements: Sequence<'a, Statement<'a>>,
 }
 
 /// Represents the separator between a case and its statements.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum SwitchCaseSeparator {
@@ -93,8 +93,8 @@ pub enum SwitchCaseSeparator {
     SemiColon(Span),
 }
 
-impl SwitchBody {
-    pub fn cases(&self) -> &[SwitchCase] {
+impl<'a> SwitchBody<'a> {
+    pub fn cases(&self) -> &[SwitchCase<'a>] {
         match self {
             SwitchBody::BraceDelimited(body) => body.cases.as_slice(),
             SwitchBody::ColonDelimited(body) => body.cases.as_slice(),
@@ -102,9 +102,9 @@ impl SwitchBody {
     }
 }
 
-impl SwitchCase {
+impl<'a> SwitchCase<'a> {
     /// Returns the statements within the case.
-    pub fn statements(&self) -> &[Statement] {
+    pub fn statements(&self) -> &[Statement<'a>] {
         match self {
             SwitchCase::Expression(case) => case.statements.as_slice(),
             SwitchCase::Default(case) => case.statements.as_slice(),
@@ -140,13 +140,13 @@ impl SwitchCase {
     }
 }
 
-impl HasSpan for Switch {
+impl HasSpan for Switch<'_> {
     fn span(&self) -> Span {
         Span::between(self.switch.span(), self.body.span())
     }
 }
 
-impl HasSpan for SwitchBody {
+impl HasSpan for SwitchBody<'_> {
     fn span(&self) -> Span {
         match self {
             SwitchBody::BraceDelimited(body) => body.span(),
@@ -155,19 +155,19 @@ impl HasSpan for SwitchBody {
     }
 }
 
-impl HasSpan for SwitchBraceDelimitedBody {
+impl HasSpan for SwitchBraceDelimitedBody<'_> {
     fn span(&self) -> Span {
         Span::between(self.left_brace, self.right_brace)
     }
 }
 
-impl HasSpan for SwitchColonDelimitedBody {
+impl HasSpan for SwitchColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         Span::between(self.colon, self.terminator.span())
     }
 }
 
-impl HasSpan for SwitchCase {
+impl HasSpan for SwitchCase<'_> {
     fn span(&self) -> Span {
         match self {
             SwitchCase::Expression(case) => case.span(),
@@ -176,7 +176,7 @@ impl HasSpan for SwitchCase {
     }
 }
 
-impl HasSpan for SwitchExpressionCase {
+impl HasSpan for SwitchExpressionCase<'_> {
     fn span(&self) -> Span {
         Span::between(
             self.case.span(),
@@ -185,7 +185,7 @@ impl HasSpan for SwitchExpressionCase {
     }
 }
 
-impl HasSpan for SwitchDefaultCase {
+impl HasSpan for SwitchDefaultCase<'_> {
     fn span(&self) -> Span {
         Span::between(
             self.default.span(),

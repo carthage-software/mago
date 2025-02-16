@@ -116,7 +116,7 @@ impl Rule for RedundantInstanceOfRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Method(method) = node else { return LintDirective::default() };
 
         let name = context.lookup(&method.name.value);

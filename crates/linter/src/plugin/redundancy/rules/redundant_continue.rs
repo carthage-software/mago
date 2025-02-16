@@ -34,7 +34,7 @@ impl Rule for RedundantContinueRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let r#continue = match node {
             Node::Foreach(foreach) => match &foreach.body {
                 ForeachBody::Statement(stmt) => get_continue_from_statement(stmt),
@@ -74,14 +74,16 @@ impl Rule for RedundantContinueRule {
 }
 
 #[inline]
-fn get_continue_from_last_statement(statements: &[Statement]) -> Option<&Continue> {
+fn get_continue_from_last_statement<'ast, 'alloc>(
+    statements: &'ast [Statement<'alloc>],
+) -> Option<&'ast Continue<'alloc>> {
     let last = statements.last()?;
 
     get_continue_from_statement(last)
 }
 
 #[inline]
-fn get_continue_from_statement(statement: &Statement) -> Option<&Continue> {
+fn get_continue_from_statement<'ast, 'alloc>(statement: &'ast Statement<'alloc>) -> Option<&'ast Continue<'alloc>> {
     match statement {
         Statement::Block(block) => get_continue_from_statement(block.statements.last()?),
         Statement::Continue(cont) => match cont.level {

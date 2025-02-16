@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_literal(literal: &Literal, context: &mut Context<'_>) {
+pub fn check_literal(literal: &Literal, context: &mut Context<'_, '_>) {
     if context.version.is_supported(Feature::NumericLiteralSeparator) {
         return;
     }

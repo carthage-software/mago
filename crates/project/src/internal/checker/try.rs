@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_try(r#try: &Try, context: &mut Context<'_>) {
+pub fn check_try(r#try: &Try, context: &mut Context<'_, '_>) {
     for catch in r#try.catch_clauses.iter() {
         if catch.variable.is_none() && !context.version.is_supported(Feature::CatchOptionalVariable) {
             context.issues.push(

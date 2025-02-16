@@ -12,7 +12,7 @@ pub use parameter::*;
 use super::returns_generator;
 
 #[inline]
-pub fn check_function(function: &Function, context: &mut Context<'_>) {
+pub fn check_function(function: &Function, context: &mut Context<'_, '_>) {
     check_for_promoted_properties_outside_constructor(&function.parameter_list, context);
     let Some(return_hint) = &function.return_type_hint else {
         return;
@@ -75,7 +75,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Context<'_>) {
+pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Context<'_, '_>) {
     if !context.version.is_supported(Feature::ArrowFunctions) {
         let issue = Issue::error("The `fn` keyword for arrow functions is only available in PHP 7.4 and later.")
             .with_annotation(
@@ -127,7 +127,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 }
 
 #[inline]
-pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
+pub fn check_closure(closure: &Closure, context: &mut Context<'_, '_>) {
     check_for_promoted_properties_outside_constructor(&closure.parameter_list, context);
 
     if !context.version.is_supported(Feature::TrailingCommaInClosureUseList) {
@@ -205,7 +205,10 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_return_type_hint(function_like_return_type_hint: &FunctionLikeReturnTypeHint, context: &mut Context<'_>) {
+pub fn check_return_type_hint(
+    function_like_return_type_hint: &FunctionLikeReturnTypeHint,
+    context: &mut Context<'_, '_>,
+) {
     match &function_like_return_type_hint.hint {
         Hint::Union(union_hint) if !context.version.is_supported(Feature::NativeUnionTypes) => {
             context.issues.push(
@@ -234,7 +237,7 @@ pub fn check_return_type_hint(function_like_return_type_hint: &FunctionLikeRetur
 #[inline]
 pub fn check_for_promoted_properties_outside_constructor(
     parameter_list: &FunctionLikeParameterList,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     for parameter in parameter_list.parameters.iter() {
         if parameter.is_promoted_property() {

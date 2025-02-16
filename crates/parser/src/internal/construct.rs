@@ -10,7 +10,8 @@ use crate::internal::expression::parse_expression_with_precedence;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, ParseError> {
+#[inline]
+pub fn parse_construct<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Construct<'i>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
@@ -18,8 +19,8 @@ pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, Pa
             isset: utils::expect_keyword(stream, T!["isset"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
             values: {
-                let mut values = vec![];
-                let mut commas = vec![];
+                let mut values = stream.vec();
+                let mut commas = stream.vec();
                 loop {
                     if matches!(utils::peek(stream)?.kind, T![")"]) {
                         break;
@@ -41,38 +42,52 @@ pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, Pa
             },
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
-        T!["empty"] => Construct::Empty(EmptyConstruct {
-            empty: utils::expect_keyword(stream, T!["empty"])?,
-            left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: Box::new(parse_expression(stream)?),
-            right_parenthesis: utils::expect_span(stream, T![")"])?,
-        }),
-        T!["eval"] => Construct::Eval(EvalConstruct {
-            eval: utils::expect_keyword(stream, T!["eval"])?,
-            left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: Box::new(parse_expression(stream)?),
-            right_parenthesis: utils::expect_span(stream, T![")"])?,
-        }),
-        T!["print"] => Construct::Print(PrintConstruct {
-            print: utils::expect_keyword(stream, T!["print"])?,
-            value: Box::new(parse_expression_with_precedence(stream, Precedence::Print)?),
-        }),
-        T!["require"] => Construct::Require(RequireConstruct {
-            require: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
-        }),
-        T!["require_once"] => Construct::RequireOnce(RequireOnceConstruct {
-            require_once: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
-        }),
-        T!["include"] => Construct::Include(IncludeConstruct {
-            include: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
-        }),
-        T!["include_once"] => Construct::IncludeOnce(IncludeOnceConstruct {
-            include_once: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
-        }),
+        T!["empty"] => {
+            let empty = utils::expect_keyword(stream, T!["empty"])?;
+            let left_parenthesis = utils::expect_span(stream, T!["("])?;
+            let value = parse_expression(stream)?;
+            let right_parenthesis = utils::expect_span(stream, T![")"])?;
+
+            Construct::Empty(EmptyConstruct { empty, left_parenthesis, value: stream.boxed(value), right_parenthesis })
+        }
+        T!["eval"] => {
+            let eval = utils::expect_keyword(stream, T!["eval"])?;
+            let left_parenthesis = utils::expect_span(stream, T!["("])?;
+            let value = parse_expression(stream)?;
+            let right_parenthesis = utils::expect_span(stream, T![")"])?;
+
+            Construct::Eval(EvalConstruct { eval, left_parenthesis, value: stream.boxed(value), right_parenthesis })
+        }
+        T!["print"] => {
+            let print = utils::expect_any_keyword(stream)?;
+            let value = parse_expression_with_precedence(stream, Precedence::Print)?;
+
+            Construct::Print(PrintConstruct { print, value: stream.boxed(value) })
+        }
+        T!["require"] => {
+            let require = utils::expect_any_keyword(stream)?;
+            let value = parse_expression(stream)?;
+
+            Construct::Require(RequireConstruct { require, value: stream.boxed(value) })
+        }
+        T!["require_once"] => {
+            let require_once = utils::expect_any_keyword(stream)?;
+            let value = parse_expression(stream)?;
+
+            Construct::RequireOnce(RequireOnceConstruct { require_once, value: stream.boxed(value) })
+        }
+        T!["include"] => {
+            let include = utils::expect_any_keyword(stream)?;
+            let value = parse_expression(stream)?;
+
+            Construct::Include(IncludeConstruct { include, value: stream.boxed(value) })
+        }
+        T!["include_once"] => {
+            let include_once = utils::expect_any_keyword(stream)?;
+            let value = parse_expression(stream)?;
+
+            Construct::IncludeOnce(IncludeOnceConstruct { include_once, value: stream.boxed(value) })
+        }
         T!["exit"] => Construct::Exit(ExitConstruct {
             exit: utils::expect_any_keyword(stream)?,
             arguments: parse_optional_argument_list(stream)?,

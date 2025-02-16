@@ -50,7 +50,7 @@ impl Rule for ConstantRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Constant(constant) => {
                 for item in constant.items.iter() {

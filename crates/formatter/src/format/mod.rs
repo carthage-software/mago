@@ -37,31 +37,40 @@ pub mod parameters;
 pub mod statement;
 pub mod string;
 
-pub trait Format<'a> {
+pub trait Format<'a, 'alloc> {
     #[must_use]
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a>;
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a>;
 }
 
-impl<'a, T> Format<'a> for Box<T>
+impl<'a, 'alloc, T> Format<'a, 'alloc> for Box<T>
 where
-    T: Format<'a>,
+    T: Format<'a, 'alloc>,
 {
-    fn format(&'a self, p: &mut Formatter<'a>) -> Document<'a> {
+    fn format(&'a self, p: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         (**self).format(p)
     }
 }
 
-impl<'a, T> Format<'a> for &'a T
+impl<'a, 'alloc, T> Format<'a, 'alloc> for bumpalo::boxed::Box<'alloc, T>
 where
-    T: Format<'a>,
+    T: Format<'a, 'alloc>,
 {
-    fn format(&'a self, p: &mut Formatter<'a>) -> Document<'a> {
+    fn format(&'a self, p: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         (**self).format(p)
     }
 }
 
-impl<'a> Format<'a> for Program {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc, T> Format<'a, 'alloc> for &'a T
+where
+    T: Format<'a, 'alloc>,
+{
+    fn format(&'a self, p: &mut Formatter<'a, 'alloc>) -> Document<'a> {
+        (**self).format(p)
+    }
+}
+
+impl<'a, 'alloc> Format<'a, 'alloc> for Program<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         f.enter_node(Node::Program(self));
         let mut parts = vec![];
         if let Some(doc) = block::print_block_body(f, &self.statements) {
@@ -87,8 +96,8 @@ impl<'a> Format<'a> for Program {
     }
 }
 
-impl<'a> Format<'a> for Statement {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Statement<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Statement, {
             match self {
                 Statement::OpeningTag(t) => t.format(f),
@@ -128,8 +137,8 @@ impl<'a> Format<'a> for Statement {
     }
 }
 
-impl<'a> Format<'a> for OpeningTag {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for OpeningTag {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         f.scripting_mode = true;
 
         wrap!(f, self, OpeningTag, {
@@ -142,8 +151,8 @@ impl<'a> Format<'a> for OpeningTag {
     }
 }
 
-impl<'a> Format<'a> for FullOpeningTag {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FullOpeningTag {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FullOpeningTag, {
             Document::String(match f.settings.keyword_case {
                 CasingStyle::Lowercase => "<?php",
@@ -153,20 +162,20 @@ impl<'a> Format<'a> for FullOpeningTag {
     }
 }
 
-impl<'a> Format<'a> for ShortOpeningTag {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ShortOpeningTag {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ShortOpeningTag, { Document::String("<?") })
     }
 }
 
-impl<'a> Format<'a> for EchoOpeningTag {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EchoOpeningTag {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EchoOpeningTag, { Document::String("<?=") })
     }
 }
 
-impl<'a> Format<'a> for ClosingTag {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ClosingTag {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         f.scripting_mode = false;
 
         wrap!(f, self, ClosingTag, {
@@ -183,16 +192,16 @@ impl<'a> Format<'a> for ClosingTag {
     }
 }
 
-impl<'a> Format<'a> for Inline {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Inline {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         f.scripting_mode = false;
 
         wrap!(f, self, Inline, { Document::String(f.lookup(&self.value)) })
     }
 }
 
-impl<'a> Format<'a> for Declare {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Declare<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Declare, {
             let mut contents = vec![self.declare.format(f)];
 
@@ -214,8 +223,8 @@ impl<'a> Format<'a> for Declare {
     }
 }
 
-impl<'a> Format<'a> for DeclareItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for DeclareItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, DeclareItem, {
             Document::Array(vec![
                 self.name.format(f),
@@ -228,8 +237,8 @@ impl<'a> Format<'a> for DeclareItem {
     }
 }
 
-impl<'a> Format<'a> for DeclareBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for DeclareBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, DeclareBody, {
             match self {
                 DeclareBody::Statement(s) => {
@@ -243,16 +252,16 @@ impl<'a> Format<'a> for DeclareBody {
     }
 }
 
-impl<'a> Format<'a> for DeclareColonDelimitedBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for DeclareColonDelimitedBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, DeclareColonDelimitedBody, {
             print_colon_delimited_body(f, &self.colon, &self.statements, &self.end_declare, &self.terminator)
         })
     }
 }
 
-impl<'a> Format<'a> for Namespace {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Namespace<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Namespace, {
             let mut parts = vec![self.namespace.format(f)];
 
@@ -280,8 +289,8 @@ impl<'a> Format<'a> for Namespace {
     }
 }
 
-impl<'a> Format<'a> for Identifier {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Identifier {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Identifier, {
             match self {
                 Identifier::Local(i) => i.format(f),
@@ -292,26 +301,26 @@ impl<'a> Format<'a> for Identifier {
     }
 }
 
-impl<'a> Format<'a> for LocalIdentifier {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for LocalIdentifier {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, LocalIdentifier, { Document::String(f.lookup(&self.value)) })
     }
 }
 
-impl<'a> Format<'a> for QualifiedIdentifier {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for QualifiedIdentifier {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, QualifiedIdentifier, { Document::String(f.lookup(&self.value)) })
     }
 }
 
-impl<'a> Format<'a> for FullyQualifiedIdentifier {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FullyQualifiedIdentifier {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FullyQualifiedIdentifier, { Document::String(f.lookup(&self.value)) })
     }
 }
 
-impl<'a> Format<'a> for Use {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Use<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Use, {
             Document::Group(Group::new(vec![
                 self.r#use.format(f),
@@ -328,8 +337,8 @@ impl<'a> Format<'a> for Use {
     }
 }
 
-impl<'a> Format<'a> for UseItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for UseItem {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, UseItem, {
             let mut parts = vec![self.name.format(f)];
 
@@ -343,8 +352,8 @@ impl<'a> Format<'a> for UseItem {
     }
 }
 
-impl<'a> Format<'a> for UseItemSequence {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for UseItemSequence<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, UseItemSequence, {
             Document::Group(Group::new(vec![
                 Document::Indent(Document::join(
@@ -357,8 +366,8 @@ impl<'a> Format<'a> for UseItemSequence {
     }
 }
 
-impl<'a> Format<'a> for TypedUseItemList {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TypedUseItemList<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TypedUseItemList, {
             let mut contents = vec![
                 self.r#type.format(f),
@@ -388,8 +397,8 @@ impl<'a> Format<'a> for TypedUseItemList {
     }
 }
 
-impl<'a> Format<'a> for MixedUseItemList {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for MixedUseItemList<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, MixedUseItemList, {
             let mut contents = vec![self.namespace.format(f), Document::String("\\"), Document::String("{")];
 
@@ -413,8 +422,8 @@ impl<'a> Format<'a> for MixedUseItemList {
     }
 }
 
-impl<'a> Format<'a> for MaybeTypedUseItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for MaybeTypedUseItem {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, MaybeTypedUseItem, {
             match &self.r#type {
                 Some(t) => Document::Group(Group::new(vec![t.format(f), Document::space(), self.item.format(f)])),
@@ -424,8 +433,8 @@ impl<'a> Format<'a> for MaybeTypedUseItem {
     }
 }
 
-impl<'a> Format<'a> for TypedUseItemSequence {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TypedUseItemSequence<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TypedUseItemSequence, {
             Document::Group(Group::new(vec![
                 self.r#type.format(f),
@@ -440,16 +449,16 @@ impl<'a> Format<'a> for TypedUseItemSequence {
     }
 }
 
-impl<'a> Format<'a> for UseItemAlias {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for UseItemAlias {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, UseItemAlias, {
             Document::Group(Group::new(vec![self.r#as.format(f), Document::space(), self.identifier.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for UseType {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for UseType {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, UseType, {
             match self {
                 UseType::Function(keyword) => keyword.format(f),
@@ -459,8 +468,8 @@ impl<'a> Format<'a> for UseType {
     }
 }
 
-impl<'a> Format<'a> for TraitUse {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUse<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUse, {
             let mut contents = vec![self.r#use.format(f), Document::space()];
             for (i, trait_name) in self.trait_names.iter().enumerate() {
@@ -478,8 +487,8 @@ impl<'a> Format<'a> for TraitUse {
     }
 }
 
-impl<'a> Format<'a> for TraitUseSpecification {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseSpecification<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseSpecification, {
             match self {
                 TraitUseSpecification::Abstract(s) => s.format(f),
@@ -489,22 +498,22 @@ impl<'a> Format<'a> for TraitUseSpecification {
     }
 }
 
-impl<'a> Format<'a> for TraitUseAbstractSpecification {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseAbstractSpecification {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseAbstractSpecification, { self.0.format(f) })
     }
 }
 
-impl<'a> Format<'a> for TraitUseConcreteSpecification {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseConcreteSpecification<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseConcreteSpecification, {
             print_block_of_nodes(f, &self.left_brace, &self.adaptations, &self.right_brace, false)
         })
     }
 }
 
-impl<'a> Format<'a> for TraitUseAdaptation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseAdaptation<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseAdaptation, {
             match self {
                 TraitUseAdaptation::Precedence(a) => a.format(f),
@@ -514,8 +523,8 @@ impl<'a> Format<'a> for TraitUseAdaptation {
     }
 }
 
-impl<'a> Format<'a> for TraitUseMethodReference {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseMethodReference {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseMethodReference, {
             match self {
                 TraitUseMethodReference::Identifier(m) => m.format(f),
@@ -525,8 +534,8 @@ impl<'a> Format<'a> for TraitUseMethodReference {
     }
 }
 
-impl<'a> Format<'a> for TraitUseAbsoluteMethodReference {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseAbsoluteMethodReference {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseAbsoluteMethodReference, {
             Document::Group(Group::new(vec![
                 self.trait_name.format(f),
@@ -537,8 +546,8 @@ impl<'a> Format<'a> for TraitUseAbsoluteMethodReference {
     }
 }
 
-impl<'a> Format<'a> for TraitUsePrecedenceAdaptation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUsePrecedenceAdaptation<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUsePrecedenceAdaptation, {
             let mut contents =
                 vec![self.method_reference.format(f), Document::space(), self.insteadof.format(f), Document::space()];
@@ -558,8 +567,8 @@ impl<'a> Format<'a> for TraitUsePrecedenceAdaptation {
     }
 }
 
-impl<'a> Format<'a> for TraitUseAliasAdaptation {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TraitUseAliasAdaptation {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TraitUseAliasAdaptation, {
             let mut parts = vec![self.method_reference.format(f), Document::space(), self.r#as.format(f)];
 
@@ -580,8 +589,8 @@ impl<'a> Format<'a> for TraitUseAliasAdaptation {
     }
 }
 
-impl<'a> Format<'a> for ClassLikeConstant {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ClassLikeConstant<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ClassLikeConstant, {
             let attributes =
                 if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists, false) {
@@ -626,8 +635,8 @@ impl<'a> Format<'a> for ClassLikeConstant {
     }
 }
 
-impl<'a> Format<'a> for ClassLikeConstantItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ClassLikeConstantItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ClassLikeConstantItem, {
             let lhs = self.name.format(f);
 
@@ -642,8 +651,8 @@ impl<'a> Format<'a> for ClassLikeConstantItem {
     }
 }
 
-impl<'a> Format<'a> for EnumCase {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EnumCase<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EnumCase, {
             let mut parts = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -661,8 +670,8 @@ impl<'a> Format<'a> for EnumCase {
     }
 }
 
-impl<'a> Format<'a> for EnumCaseItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EnumCaseItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EnumCaseItem, {
             match self {
                 EnumCaseItem::Unit(c) => c.format(f),
@@ -672,14 +681,14 @@ impl<'a> Format<'a> for EnumCaseItem {
     }
 }
 
-impl<'a> Format<'a> for EnumCaseUnitItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EnumCaseUnitItem {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EnumCaseUnitItem, { self.name.format(f) })
     }
 }
 
-impl<'a> Format<'a> for EnumCaseBackedItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EnumCaseBackedItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EnumCaseBackedItem, {
             let lhs = self.name.format(f);
             let operator = Document::String("=");
@@ -689,8 +698,8 @@ impl<'a> Format<'a> for EnumCaseBackedItem {
     }
 }
 
-impl<'a> Format<'a> for Property {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Property<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Property, {
             match self {
                 Property::Plain(p) => p.format(f),
@@ -700,8 +709,8 @@ impl<'a> Format<'a> for Property {
     }
 }
 
-impl<'a> Format<'a> for PlainProperty {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PlainProperty<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PlainProperty, {
             let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let property = {
@@ -756,8 +765,8 @@ impl<'a> Format<'a> for PlainProperty {
     }
 }
 
-impl<'a> Format<'a> for HookedProperty {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for HookedProperty<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, HookedProperty, {
             let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
 
@@ -798,8 +807,8 @@ impl<'a> Format<'a> for HookedProperty {
     }
 }
 
-impl<'a> Format<'a> for PropertyItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyItem, {
             match self {
                 PropertyItem::Abstract(p) => p.format(f),
@@ -809,14 +818,14 @@ impl<'a> Format<'a> for PropertyItem {
     }
 }
 
-impl<'a> Format<'a> for PropertyAbstractItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyAbstractItem {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyAbstractItem, { self.variable.format(f) })
     }
 }
 
-impl<'a> Format<'a> for PropertyConcreteItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyConcreteItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyConcreteItem, {
             let lhs = self.variable.format(f);
             let operator = Document::String("=");
@@ -826,8 +835,8 @@ impl<'a> Format<'a> for PropertyConcreteItem {
     }
 }
 
-impl<'a> Format<'a> for Method {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Method<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Method, {
             let mut attributes = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -876,8 +885,8 @@ impl<'a> Format<'a> for Method {
     }
 }
 
-impl<'a> Format<'a> for MethodBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for MethodBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, MethodBody, {
             match self {
                 MethodBody::Abstract(b) => b.format(f),
@@ -887,14 +896,14 @@ impl<'a> Format<'a> for MethodBody {
     }
 }
 
-impl<'a> Format<'a> for MethodAbstractBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for MethodAbstractBody {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, MethodAbstractBody, { Document::String(";") })
     }
 }
 
-impl<'a> Format<'a> for Keyword {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Keyword {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Keyword, {
             let mut value = f.lookup(&self.value);
 
@@ -908,8 +917,8 @@ impl<'a> Format<'a> for Keyword {
     }
 }
 
-impl<'a> Format<'a> for Terminator {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Terminator {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Terminator, {
             match self {
                 Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(";"),
@@ -919,16 +928,16 @@ impl<'a> Format<'a> for Terminator {
     }
 }
 
-impl<'a> Format<'a> for ExpressionStatement {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ExpressionStatement<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ExpressionStatement, {
             Document::Array(vec![self.expression.format(f), self.terminator.format(f)])
         })
     }
 }
 
-impl<'a> Format<'a> for Extends {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Extends<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Extends, {
             Document::Group(Group::new(vec![
                 self.extends.format(f),
@@ -942,8 +951,8 @@ impl<'a> Format<'a> for Extends {
     }
 }
 
-impl<'a> Format<'a> for Implements {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Implements<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Implements, {
             Document::Group(Group::new(vec![
                 self.implements.format(f),
@@ -957,8 +966,8 @@ impl<'a> Format<'a> for Implements {
     }
 }
 
-impl<'a> Format<'a> for ClassLikeMember {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ClassLikeMember<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ClassLikeMember, {
             match self {
                 ClassLikeMember::TraitUse(m) => m.format(f),
@@ -971,8 +980,8 @@ impl<'a> Format<'a> for ClassLikeMember {
     }
 }
 
-impl<'a> Format<'a> for Interface {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Interface<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Interface, {
             let mut attributes = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -1010,16 +1019,16 @@ impl<'a> Format<'a> for Interface {
     }
 }
 
-impl<'a> Format<'a> for EnumBackingTypeHint {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for EnumBackingTypeHint<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, EnumBackingTypeHint, {
             Document::Group(Group::new(vec![Document::String(":"), Document::space(), self.hint.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for Class {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Class<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Class, {
             let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let mut signature = print_modifiers(f, &self.modifiers);
@@ -1063,8 +1072,8 @@ impl<'a> Format<'a> for Class {
     }
 }
 
-impl<'a> Format<'a> for Trait {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Trait<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Trait, {
             let mut attributes = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -1092,8 +1101,8 @@ impl<'a> Format<'a> for Trait {
     }
 }
 
-impl<'a> Format<'a> for Enum {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Enum<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Enum, {
             let mut attributes = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -1137,9 +1146,12 @@ impl<'a> Format<'a> for Enum {
     }
 }
 
-impl<'a> Format<'a> for Return {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        fn return_argument_has_leading_comment<'a>(f: &mut Formatter<'a>, argument: &'a Expression) -> bool {
+impl<'a, 'alloc> Format<'a, 'alloc> for Return<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
+        fn return_argument_has_leading_comment<'a, 'alloc>(
+            f: &mut Formatter<'a, 'alloc>,
+            argument: &'a Expression<'alloc>,
+        ) -> bool {
             if f.has_leading_own_line_comment(argument.span())
                 || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {
                     has_new_line_in_range(f.source_text, comment.start, comment.end)
@@ -1207,14 +1219,14 @@ impl<'a> Format<'a> for Return {
     }
 }
 
-impl<'a> Format<'a> for Block {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Block<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Block, { block::print_block(f, &self.left_brace, &self.statements, &self.right_brace) })
     }
 }
 
-impl<'a> Format<'a> for Echo {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Echo<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Echo, {
             let mut contents = vec![self.echo.format(f), Document::Indent(vec![Document::Line(Line::default())])];
 
@@ -1233,8 +1245,8 @@ impl<'a> Format<'a> for Echo {
     }
 }
 
-impl<'a> Format<'a> for ConstantItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for ConstantItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, ConstantItem, {
             let lhs = self.name.format(f);
             let operator = Document::String("=");
@@ -1244,8 +1256,8 @@ impl<'a> Format<'a> for ConstantItem {
     }
 }
 
-impl<'a> Format<'a> for Constant {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Constant<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Constant, {
             let attributes =
                 if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists, false) {
@@ -1280,14 +1292,14 @@ impl<'a> Format<'a> for Constant {
     }
 }
 
-impl<'a> Format<'a> for Attribute {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Attribute<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Attribute, { print_call_like_node(f, CallLikeNode::Attribute(self)) })
     }
 }
 
-impl<'a> Format<'a> for Hint {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Hint<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Hint, {
             let k = |v: &str| match f.settings.keyword_case {
                 CasingStyle::Lowercase => Document::String(f.as_str(v.to_ascii_lowercase())),
@@ -1435,8 +1447,8 @@ impl<'a> Format<'a> for Hint {
     }
 }
 
-impl<'a> Format<'a> for Modifier {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Modifier {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Modifier, {
             match self {
                 Modifier::Static(keyword) => keyword.format(f),
@@ -1454,8 +1466,8 @@ impl<'a> Format<'a> for Modifier {
     }
 }
 
-impl<'a> Format<'a> for AttributeList {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for AttributeList<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, AttributeList, {
             // Determine if there are comments between the `#[` and the first attribute (if any).
             let has_comments_before_first = || {
@@ -1531,14 +1543,14 @@ impl<'a> Format<'a> for AttributeList {
     }
 }
 
-impl<'a> Format<'a> for PropertyHookAbstractBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHookAbstractBody {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHookAbstractBody, { Document::String(";") })
     }
 }
 
-impl<'a> Format<'a> for PropertyHookConcreteBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHookConcreteBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHookConcreteBody, {
             Document::Group(Group::new(vec![
                 Document::space(),
@@ -1551,8 +1563,8 @@ impl<'a> Format<'a> for PropertyHookConcreteBody {
     }
 }
 
-impl<'a> Format<'a> for PropertyHookConcreteExpressionBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHookConcreteExpressionBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHookConcreteExpressionBody, {
             Document::Group(Group::new(vec![
                 Document::String("=>"),
@@ -1564,8 +1576,8 @@ impl<'a> Format<'a> for PropertyHookConcreteExpressionBody {
     }
 }
 
-impl<'a> Format<'a> for PropertyHookBody {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHookBody<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHookBody, {
             match self {
                 PropertyHookBody::Abstract(b) => b.format(f),
@@ -1575,8 +1587,8 @@ impl<'a> Format<'a> for PropertyHookBody {
     }
 }
 
-impl<'a> Format<'a> for PropertyHook {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHook<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHook, {
             let attributes = misc::print_attribute_list_sequence(f, &self.attribute_lists, false);
             let hook = {
@@ -1608,8 +1620,8 @@ impl<'a> Format<'a> for PropertyHook {
     }
 }
 
-impl<'a> Format<'a> for PropertyHookList {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for PropertyHookList<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, PropertyHookList, {
             let mut parts = vec![Document::String("{")];
             for hook in self.hooks.iter() {
@@ -1624,16 +1636,16 @@ impl<'a> Format<'a> for PropertyHookList {
     }
 }
 
-impl<'a> Format<'a> for FunctionLikeParameterDefaultValue {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FunctionLikeParameterDefaultValue<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FunctionLikeParameterDefaultValue, {
             Document::Group(Group::new(vec![Document::String("= "), self.value.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for FunctionLikeParameter {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FunctionLikeParameter<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FunctionLikeParameter, {
             let attributes = print_attribute_list_sequence(f, &self.attribute_lists, true);
             let parameter = {
@@ -1681,22 +1693,22 @@ impl<'a> Format<'a> for FunctionLikeParameter {
     }
 }
 
-impl<'a> Format<'a> for FunctionLikeParameterList {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FunctionLikeParameterList<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FunctionLikeParameterList, { print_function_like_parameters(f, self) })
     }
 }
 
-impl<'a> Format<'a> for FunctionLikeReturnTypeHint {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for FunctionLikeReturnTypeHint<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, FunctionLikeReturnTypeHint, {
             Document::Group(Group::new(vec![Document::String(":"), Document::space(), self.hint.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for Function {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Function<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Function, {
             let mut attributes = vec![];
             for attribute_list in self.attribute_lists.iter() {
@@ -1741,8 +1753,8 @@ impl<'a> Format<'a> for Function {
     }
 }
 
-impl<'a> Format<'a> for Try {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Try<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Try, {
             let mut parts = vec![self.r#try.format(f), Document::space(), self.block.format(f)];
 
@@ -1761,8 +1773,8 @@ impl<'a> Format<'a> for Try {
     }
 }
 
-impl<'a> Format<'a> for TryCatchClause {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TryCatchClause<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TryCatchClause, {
             let mut context = vec![self.hint.format(f)];
             if let Some(variable) = &self.variable {
@@ -1783,16 +1795,16 @@ impl<'a> Format<'a> for TryCatchClause {
     }
 }
 
-impl<'a> Format<'a> for TryFinallyClause {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for TryFinallyClause<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, TryFinallyClause, {
             Document::Group(Group::new(vec![self.finally.format(f), Document::space(), self.block.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for Global {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Global<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Global, {
             let mut contents = vec![self.global.format(f)];
 
@@ -1816,14 +1828,14 @@ impl<'a> Format<'a> for Global {
     }
 }
 
-impl<'a> Format<'a> for StaticAbstractItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for StaticAbstractItem {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, StaticAbstractItem, { self.variable.format(f) })
     }
 }
 
-impl<'a> Format<'a> for StaticConcreteItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for StaticConcreteItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, StaticConcreteItem, {
             Document::Group(Group::new(vec![
                 self.variable.format(f),
@@ -1836,8 +1848,8 @@ impl<'a> Format<'a> for StaticConcreteItem {
     }
 }
 
-impl<'a> Format<'a> for StaticItem {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for StaticItem<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, StaticItem, {
             match self {
                 StaticItem::Abstract(i) => i.format(f),
@@ -1847,8 +1859,8 @@ impl<'a> Format<'a> for StaticItem {
     }
 }
 
-impl<'a> Format<'a> for Static {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Static<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Static, {
             let mut contents = vec![self.r#static.format(f)];
 
@@ -1872,8 +1884,8 @@ impl<'a> Format<'a> for Static {
     }
 }
 
-impl<'a> Format<'a> for Unset {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Unset<'alloc> {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Unset, {
             let mut contents = vec![self.unset.format(f), Document::String("(")];
 
@@ -1899,8 +1911,8 @@ impl<'a> Format<'a> for Unset {
     }
 }
 
-impl<'a> Format<'a> for Goto {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Goto {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Goto, {
             Document::Group(Group::new(vec![
                 self.goto.format(f),
@@ -1912,14 +1924,14 @@ impl<'a> Format<'a> for Goto {
     }
 }
 
-impl<'a> Format<'a> for Label {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for Label {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         wrap!(f, self, Label, { Document::Group(Group::new(vec![self.name.format(f), Document::String(":")])) })
     }
 }
 
-impl<'a> Format<'a> for HaltCompiler {
-    fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
+impl<'a, 'alloc> Format<'a, 'alloc> for HaltCompiler {
+    fn format(&'a self, f: &mut Formatter<'a, 'alloc>) -> Document<'a> {
         f.scripting_mode = false;
 
         wrap!(f, self, HaltCompiler, {

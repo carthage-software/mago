@@ -14,7 +14,7 @@ pub fn check_extends(
     class_like_name: &str,
     class_like_fqcn: &str,
     extension_limit: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     if extension_limit && extends.types.len() > 1 {
         context.issues.push(
@@ -89,7 +89,7 @@ pub fn check_implements(
     class_like_name: &str,
     class_like_fqcn: &str,
     check_for_self_implement: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     if check_for_self_implement {
         for implemented_type in implements.types.iter() {

@@ -36,7 +36,7 @@ impl Rule for CyclomaticComplexityRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Class(node) => check_class_like("Class", node, node.members.as_slice(), context),
             Node::Trait(node) => check_class_like("Trait", node, node.members.as_slice(), context),
@@ -124,7 +124,7 @@ fn get_cyclomatic_complexity_of_method(method: &Method, context: &LintContext<'_
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_node(node: Node<'_>) -> usize {
+fn get_cyclomatic_complexity_of_node(node: Node<'_, '_>) -> usize {
     let mut number = 0;
 
     for child in node.children() {
@@ -141,7 +141,7 @@ fn get_cyclomatic_complexity_of_node(node: Node<'_>) -> usize {
         | Node::DoWhile(_)
         | Node::TryCatchClause(_)
         | Node::Conditional(_) => number += 1,
-        Node::Binary(operation) => match operation.operator {
+        Node::Binary(operation) => match &operation.operator {
             operator if operator.is_logical() || operator.is_null_coalesce() => number += 1,
             BinaryOperator::Spaceship(_) => number += 2,
             _ => (),

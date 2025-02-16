@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_source::SourceIdentifier;
@@ -19,14 +18,14 @@ pub mod node;
 pub mod sequence;
 pub mod trivia;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Program {
+#[derive(Debug, Hash, Serialize)]
+pub struct Program<'a> {
     pub source: SourceIdentifier,
-    pub trivia: Sequence<Trivia>,
-    pub statements: Sequence<Statement>,
+    pub trivia: Sequence<'a, Trivia>,
+    pub statements: Sequence<'a, Statement<'a>>,
 }
 
-impl Program {
+impl Program<'_> {
     pub fn has_script(&self) -> bool {
         for statement in self.statements.iter() {
             if !matches!(statement, Statement::Inline(_)) {
@@ -38,7 +37,7 @@ impl Program {
     }
 }
 
-impl HasSpan for Program {
+impl HasSpan for Program<'_> {
     fn span(&self) -> Span {
         let start =
             self.statements.first().map(|stmt| stmt.span().start).unwrap_or_else(|| Position::start_of(self.source));

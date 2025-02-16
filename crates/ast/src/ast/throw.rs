@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -7,14 +7,13 @@ use mago_span::Span;
 use crate::ast::expression::Expression;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Throw {
+pub struct Throw<'a> {
     pub throw: Keyword,
-    pub exception: Box<Expression>,
+    pub exception: Box<'a, Expression<'a>>,
 }
-
-impl HasSpan for Throw {
+impl HasSpan for Throw<'_> {
     fn span(&self) -> Span {
         self.throw.span().join(self.exception.span())
     }

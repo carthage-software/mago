@@ -1,9 +1,9 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
 use mago_interner::StringIdentifier;
+use mago_interner::ThreadedInterner;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_token::GetPrecedence;
@@ -11,7 +11,7 @@ use mago_token::Precedence;
 
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum UnaryPrefixOperator {
@@ -37,7 +37,7 @@ pub enum UnaryPrefixOperator {
     Negation(Span),                      // `-$expr`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum UnaryPostfixOperator {
@@ -45,17 +45,17 @@ pub enum UnaryPostfixOperator {
     PostDecrement(Span), // `$expr--`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct UnaryPrefix {
+pub struct UnaryPrefix<'a> {
     pub operator: UnaryPrefixOperator,
-    pub operand: Box<Expression>,
+    pub operand: Box<'a, Expression<'a>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct UnaryPostfix {
-    pub operand: Box<Expression>,
+pub struct UnaryPostfix<'a> {
+    pub operand: Box<'a, Expression<'a>>,
     pub operator: UnaryPostfixOperator,
 }
 
@@ -225,13 +225,13 @@ impl HasSpan for UnaryPostfixOperator {
     }
 }
 
-impl HasSpan for UnaryPrefix {
+impl HasSpan for UnaryPrefix<'_> {
     fn span(&self) -> Span {
         self.operator.span().join(self.operand.span())
     }
 }
 
-impl HasSpan for UnaryPostfix {
+impl HasSpan for UnaryPostfix<'_> {
     fn span(&self) -> Span {
         self.operand.span().join(self.operator.span())
     }

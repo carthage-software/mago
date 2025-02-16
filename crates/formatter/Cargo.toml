@@ -21,6 +21,7 @@ mago-interner = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 bitflags = { workspace = true }
+bumpalo = { workspace = true }
 
 [dev-dependencies]
 mago-parser = { workspace = true }

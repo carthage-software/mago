@@ -33,7 +33,7 @@ impl Rule for NoEmptyCommentsRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(program) = node else { return LintDirective::Abort };
 
         let preseve_single_line =

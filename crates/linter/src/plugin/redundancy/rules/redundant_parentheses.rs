@@ -30,7 +30,7 @@ impl Rule for RedundantParenthesesRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let parenthesized = match node {
             Node::Parenthesized(parenthesized) => {
                 if let Expression::Parenthesized(inner) = parenthesized.expression.as_ref() {
@@ -59,7 +59,7 @@ impl Rule for RedundantParenthesesRule {
                     return LintDirective::default();
                 }
 
-                if let Expression::Parenthesized(value) = &positional_argument.value {
+                if let Expression::Parenthesized(value) = positional_argument.value.as_ref() {
                     value
                 } else {
                     return LintDirective::default();
@@ -70,7 +70,7 @@ impl Rule for RedundantParenthesesRule {
                     return LintDirective::default();
                 }
 
-                if let Expression::Parenthesized(value) = &named_argument.value {
+                if let Expression::Parenthesized(value) = named_argument.value.as_ref() {
                     value
                 } else {
                     return LintDirective::default();
@@ -99,14 +99,14 @@ impl Rule for RedundantParenthesesRule {
                 }
             }
             Node::FunctionLikeParameterDefaultValue(function_like_parameter_default_value) => {
-                if let Expression::Parenthesized(value) = &function_like_parameter_default_value.value {
+                if let Expression::Parenthesized(value) = function_like_parameter_default_value.value.as_ref() {
                     value
                 } else {
                     return LintDirective::default();
                 }
             }
             Node::EnumCaseBackedItem(enum_case_backed_item) => {
-                if let Expression::Parenthesized(value) = &enum_case_backed_item.value {
+                if let Expression::Parenthesized(value) = enum_case_backed_item.value.as_ref() {
                     value
                 } else {
                     return LintDirective::default();

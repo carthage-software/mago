@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_switch(switch: &Switch, context: &mut Context<'_>) {
+pub fn check_switch(switch: &Switch, context: &mut Context<'_, '_>) {
     let mut last_default: Option<Span> = None;
 
     for case in switch.body.cases() {
@@ -40,7 +40,7 @@ pub fn check_switch(switch: &Switch, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_match(r#match: &Match, context: &mut Context<'_>) {
+pub fn check_match(r#match: &Match, context: &mut Context<'_, '_>) {
     if !context.version.is_supported(Feature::MatchExpression) {
         context.issues.push(
             Issue::error("Match expressions are only available in PHP 8.0 and above.")

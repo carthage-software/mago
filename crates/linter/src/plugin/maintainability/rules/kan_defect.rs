@@ -39,7 +39,7 @@ impl Rule for KanDefectRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let kind = match node {
             Node::Class(_) => "Class",
             Node::Trait(_) => "Trait",
@@ -77,7 +77,7 @@ impl Rule for KanDefectRule {
 /// the number of select statements, loop statements, and `if` statements,
 /// then applying the **Kan Defect** formula.
 #[inline]
-fn get_kan_defect_of_node(node: Node<'_>) -> f64 {
+fn get_kan_defect_of_node(node: Node<'_, '_>) -> f64 {
     let (select_count, while_count, if_count) = collect_defect_factors(node);
     calculate_kan_defect(select_count, while_count, if_count)
 }
@@ -118,7 +118,7 @@ fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
 /// how many of each type of statement appear under the given node and all
 /// its descendants.
 #[inline]
-fn collect_defect_factors(node: Node<'_>) -> (usize, usize, usize) {
+fn collect_defect_factors(node: Node<'_, '_>) -> (usize, usize, usize) {
     let mut select_count = 0;
     let mut while_count = 0;
     let mut if_count = 0;

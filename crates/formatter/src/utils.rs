@@ -1,9 +1,11 @@
 use mago_ast::*;
+use mago_span::HasSpan;
 
 use crate::document::Document;
 use crate::document::IndentIfBreak;
 use crate::Formatter;
 
+#[inline]
 pub const fn has_naked_left_side(expression: &Expression) -> bool {
     matches!(
         expression,
@@ -19,7 +21,8 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
     )
 }
 
-pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
+#[inline]
+pub fn get_left_side<'a, 'alloc>(expression: &'a Expression<'alloc>) -> Option<&'a Expression<'alloc>> {
     match expression {
         Expression::Binary(binary) => Some(&binary.lhs),
         Expression::UnaryPostfix(unary) => Some(&unary.operand),
@@ -48,6 +51,7 @@ pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
     }
 }
 
+#[inline]
 pub fn is_non_empty_array_like_expression(mut expression: &Expression) -> bool {
     while let Expression::Parenthesized(parenthesized) = expression {
         expression = &parenthesized.expression;
@@ -61,7 +65,8 @@ pub fn is_non_empty_array_like_expression(mut expression: &Expression) -> bool {
     }
 }
 
-pub fn is_at_call_like_expression(f: &Formatter<'_>) -> bool {
+#[inline]
+pub fn is_at_call_like_expression(f: &Formatter<'_, '_>) -> bool {
     let Some(grant_parent) = f.grandparent_node() else {
         return false;
     };
@@ -78,7 +83,8 @@ pub fn is_at_call_like_expression(f: &Formatter<'_>) -> bool {
     )
 }
 
-pub fn is_at_callee(f: &Formatter<'_>) -> bool {
+#[inline]
+pub fn is_at_callee(f: &Formatter<'_, '_>) -> bool {
     let Node::Expression(expression) = f.parent_node() else {
         return false;
     };
@@ -88,17 +94,18 @@ pub fn is_at_callee(f: &Formatter<'_>) -> bool {
     };
 
     match parent {
-        Node::FunctionCall(call) => call.function.as_ref() == expression,
-        Node::MethodCall(call) => call.object.as_ref() == expression,
-        Node::StaticMethodCall(call) => call.class.as_ref() == expression,
-        Node::NullSafeMethodCall(call) => call.object.as_ref() == expression,
-        Node::FunctionClosureCreation(closure) => closure.function.as_ref() == expression,
-        Node::MethodClosureCreation(closure) => closure.object.as_ref() == expression,
-        Node::StaticMethodClosureCreation(closure) => closure.class.as_ref() == expression,
+        Node::FunctionCall(call) => call.function.as_ref().span() == expression.span(),
+        Node::MethodCall(call) => call.object.as_ref().span() == expression.span(),
+        Node::StaticMethodCall(call) => call.class.as_ref().span() == expression.span(),
+        Node::NullSafeMethodCall(call) => call.object.as_ref().span() == expression.span(),
+        Node::FunctionClosureCreation(closure) => closure.function.as_ref().span() == expression.span(),
+        Node::MethodClosureCreation(closure) => closure.object.as_ref().span() == expression.span(),
+        Node::StaticMethodClosureCreation(closure) => closure.class.as_ref().span() == expression.span(),
         _ => false,
     }
 }
 
+#[inline]
 pub fn will_break(document: &mut Document<'_>) -> bool {
     let check_array = |array: &mut Vec<Document<'_>>| array.iter_mut().rev().any(|doc| will_break(doc));
 

@@ -83,7 +83,7 @@ impl Rule for ReadonlyClassPromotionRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Class(class) = node else { return LintDirective::default() };
 
         let name = context.module.names.get(&class.name);

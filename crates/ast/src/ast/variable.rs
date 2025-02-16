@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -17,13 +17,13 @@ use crate::ast::expression::Expression;
 /// ${foo}
 /// $$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Variable {
+pub enum Variable<'a> {
     Direct(DirectVariable),
-    Indirect(IndirectVariable),
-    Nested(NestedVariable),
+    Indirect(IndirectVariable<'a>),
+    Nested(NestedVariable<'a>),
 }
 
 /// Represents a direct variable.
@@ -35,7 +35,7 @@ pub enum Variable {
 /// ```php
 /// $foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct DirectVariable {
     pub span: Span,
@@ -53,11 +53,11 @@ pub struct DirectVariable {
 /// ```php
 /// ${foo}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct IndirectVariable {
+pub struct IndirectVariable<'a> {
     pub dollar_left_brace: Span,
-    pub expression: Box<Expression>,
+    pub expression: Box<'a, Expression<'a>>,
     pub right_brace: Span,
 }
 
@@ -72,14 +72,14 @@ pub struct IndirectVariable {
 /// $${foo}
 /// $$$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct NestedVariable {
+pub struct NestedVariable<'a> {
     pub dollar: Span,
-    pub variable: Box<Variable>,
+    pub variable: Box<'a, Variable<'a>>,
 }
 
-impl HasSpan for Variable {
+impl HasSpan for Variable<'_> {
     fn span(&self) -> Span {
         match self {
             Variable::Direct(node) => node.span(),
@@ -95,13 +95,13 @@ impl HasSpan for DirectVariable {
     }
 }
 
-impl HasSpan for IndirectVariable {
+impl HasSpan for IndirectVariable<'_> {
     fn span(&self) -> Span {
         Span::between(self.dollar_left_brace, self.right_brace)
     }
 }
 
-impl HasSpan for NestedVariable {
+impl HasSpan for NestedVariable<'_> {
     fn span(&self) -> Span {
         Span::between(self.dollar, self.variable.span())
     }

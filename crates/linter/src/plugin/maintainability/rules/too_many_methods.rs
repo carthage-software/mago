@@ -54,7 +54,7 @@ impl Rule for TooManyMethodsRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let (kind, members) = match node {
             Node::Class(class) => ("Class", class.members.as_slice()),
             Node::Trait(r#trait) => ("Trait", r#trait.members.as_slice()),

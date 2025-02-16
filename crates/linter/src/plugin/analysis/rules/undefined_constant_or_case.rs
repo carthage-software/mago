@@ -92,7 +92,7 @@ impl Rule for UndefinedConstantOrCaseRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::ConstantAccess(constant_access) => {
                 // Handle global constant usage (e.g. `FOO`).

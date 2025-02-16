@@ -49,7 +49,7 @@ impl Rule for ImplicitlyNullableParameterRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::FunctionLikeParameter(function_like_parameter) = node else { return LintDirective::default() };
         let Some(hint) = function_like_parameter.hint.as_ref() else {
             return LintDirective::default();
@@ -63,7 +63,7 @@ impl Rule for ImplicitlyNullableParameterRule {
             return LintDirective::default();
         };
 
-        let Expression::Literal(Literal::Null(_)) = default_value.value else {
+        let Expression::Literal(Literal::Null(_)) = default_value.value.as_ref() else {
             return LintDirective::default();
         };
 

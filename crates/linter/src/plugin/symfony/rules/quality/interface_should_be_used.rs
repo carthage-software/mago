@@ -68,7 +68,7 @@ impl Rule for InterfaceShouldBeUsed {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Hint(Hint::Identifier(identifier)) = node else { return LintDirective::default() };
 
         let fqcn = context.lookup_name(identifier);

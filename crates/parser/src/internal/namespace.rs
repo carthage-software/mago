@@ -11,7 +11,8 @@ use crate::internal::utils;
 
 use super::block::parse_block;
 
-pub fn parse_namespace(stream: &mut TokenStream<'_, '_>) -> Result<Namespace, ParseError> {
+#[inline]
+pub fn parse_namespace<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Namespace<'i>, ParseError> {
     let namespace = utils::expect_keyword(stream, T!["namespace"])?;
     let name = match utils::peek(stream)?.kind {
         T![";" | "?>" | "{"] => None,
@@ -22,7 +23,8 @@ pub fn parse_namespace(stream: &mut TokenStream<'_, '_>) -> Result<Namespace, Pa
     Ok(Namespace { namespace, name, body })
 }
 
-pub fn parse_namespace_body(stream: &mut TokenStream<'_, '_>) -> Result<NamespaceBody, ParseError> {
+#[inline]
+pub fn parse_namespace_body<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<NamespaceBody<'i>, ParseError> {
     let next = utils::peek(stream)?;
     match next.kind {
         T!["{"] => Ok(NamespaceBody::BraceDelimited(parse_block(stream)?)),
@@ -30,9 +32,12 @@ pub fn parse_namespace_body(stream: &mut TokenStream<'_, '_>) -> Result<Namespac
     }
 }
 
-pub fn parse_namespace_implicit_body(stream: &mut TokenStream<'_, '_>) -> Result<NamespaceImplicitBody, ParseError> {
+#[inline]
+pub fn parse_namespace_implicit_body<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<NamespaceImplicitBody<'i>, ParseError> {
     let terminator = parse_terminator(stream)?;
-    let mut statements = Vec::new();
+    let mut statements = stream.vec();
     loop {
         let next = utils::maybe_peek(stream)?.map(|t| t.kind);
         if matches!(next, None | Some(T!["namespace"])) {

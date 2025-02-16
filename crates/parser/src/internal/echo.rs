@@ -8,12 +8,13 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_echo(stream: &mut TokenStream<'_, '_>) -> Result<Echo, ParseError> {
+#[inline]
+pub fn parse_echo<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Echo<'i>, ParseError> {
     Ok(Echo {
         echo: utils::expect_keyword(stream, T!["echo"])?,
         values: {
-            let mut values = vec![];
-            let mut commas = vec![];
+            let mut values = stream.vec();
+            let mut commas = stream.vec();
 
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {

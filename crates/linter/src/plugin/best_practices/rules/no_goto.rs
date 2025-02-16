@@ -21,7 +21,7 @@ impl Rule for NoGotoRule {
         "})
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Goto(goto) => {
                 context.report(

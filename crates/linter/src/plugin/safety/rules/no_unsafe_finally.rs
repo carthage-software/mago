@@ -41,7 +41,7 @@ impl Rule for NoUnsafeFinallyRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Try(r#try) = node else { return LintDirective::default() };
 
         let Some(finally) = r#try.finally_clause.as_ref() else {

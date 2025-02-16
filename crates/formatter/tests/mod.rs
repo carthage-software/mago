@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 use mago_formatter::settings::FormatSettings;
 use mago_interner::ThreadedInterner;
 use mago_parser::parse_source;
@@ -18,17 +20,18 @@ pub mod parens;
 /// * `expected` - The expected result of formatting the code
 /// * `settings` - The settings to use when formatting the code
 pub fn test_format(code: impl AsRef<str>, expected: &str, settings: FormatSettings) {
+    let bump = Bump::new();
     let interner = ThreadedInterner::new();
 
     let code_source = Source::standalone(&interner, "code.php", code.as_ref());
-    let (code_program, error) = parse_source(&interner, &code_source);
+    let (code_program, error) = parse_source(&interner, &bump, &code_source);
     assert_eq!(error, None, "Error parsing code");
-    let formatted_code = mago_formatter::format(&interner, &code_source, &code_program, settings);
+    let formatted_code = mago_formatter::format(&interner, &code_source, code_program, settings);
     pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected");
 
     let formatted_code_source = Source::standalone(&interner, "formatted_code.php", &formatted_code);
-    let (formatted_code_program, error) = parse_source(&interner, &formatted_code_source);
+    let (formatted_code_program, error) = parse_source(&interner, &bump, &formatted_code_source);
     assert_eq!(error, None, "Error parsing formatted code");
-    let reformatted_code = mago_formatter::format(&interner, &formatted_code_source, &formatted_code_program, settings);
+    let reformatted_code = mago_formatter::format(&interner, &formatted_code_source, formatted_code_program, settings);
     pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected");
 }

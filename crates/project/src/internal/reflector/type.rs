@@ -10,7 +10,7 @@ use crate::internal::context::Context;
 #[inline]
 pub fn maybe_reflect_hint<'ast>(
     hint: &'ast Option<Hint>,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> Option<TypeReflection> {
     let Some(hint) = hint else {
@@ -23,14 +23,18 @@ pub fn maybe_reflect_hint<'ast>(
 #[inline]
 pub fn reflect_hint<'ast>(
     hint: &'ast Hint,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> TypeReflection {
     TypeReflection { kind: build_kind(hint, context, scope), inferred: false, span: hint.span() }
 }
 
 #[inline]
-fn build_kind<'ast>(hint: &'ast Hint, context: &'ast mut Context<'_>, scope: Option<&ClassLikeReflection>) -> TypeKind {
+fn build_kind<'ast>(
+    hint: &'ast Hint,
+    context: &'ast mut Context<'_, '_>,
+    scope: Option<&ClassLikeReflection>,
+) -> TypeKind {
     match &hint {
         Hint::Identifier(identifier) => named_object_kind(*context.names.get(identifier), vec![]),
         Hint::Parenthesized(parenthesized_hint) => build_kind(parenthesized_hint.hint.as_ref(), context, scope),

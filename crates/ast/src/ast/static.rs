@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,37 +10,37 @@ use crate::ast::terminator::Terminator;
 use crate::ast::variable::DirectVariable;
 use crate::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Static {
+pub struct Static<'a> {
     pub r#static: Keyword,
-    pub items: TokenSeparatedSequence<StaticItem>,
+    pub items: TokenSeparatedSequence<'a, StaticItem<'a>>,
     pub terminator: Terminator,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum StaticItem {
+pub enum StaticItem<'a> {
     Abstract(StaticAbstractItem),
-    Concrete(StaticConcreteItem),
+    Concrete(StaticConcreteItem<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct StaticAbstractItem {
     pub variable: DirectVariable,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct StaticConcreteItem {
+pub struct StaticConcreteItem<'a> {
     pub variable: DirectVariable,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'a>,
 }
 
-impl StaticItem {
+impl StaticItem<'_> {
     pub fn variable(&self) -> &DirectVariable {
         match self {
             StaticItem::Abstract(item) => &item.variable,
@@ -50,13 +49,13 @@ impl StaticItem {
     }
 }
 
-impl HasSpan for Static {
+impl HasSpan for Static<'_> {
     fn span(&self) -> Span {
         self.r#static.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for StaticItem {
+impl HasSpan for StaticItem<'_> {
     fn span(&self) -> Span {
         match self {
             StaticItem::Abstract(item) => item.span(),
@@ -71,7 +70,7 @@ impl HasSpan for StaticAbstractItem {
     }
 }
 
-impl HasSpan for StaticConcreteItem {
+impl HasSpan for StaticConcreteItem<'_> {
     fn span(&self) -> Span {
         self.variable.span().join(self.value.span())
     }

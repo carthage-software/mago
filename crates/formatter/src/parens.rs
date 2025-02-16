@@ -7,8 +7,8 @@ use crate::document::Document;
 use crate::document::Group;
 use crate::Formatter;
 
-impl<'a> Formatter<'a> {
-    pub(crate) fn wrap_parens(&mut self, document: Document<'a>, node: Node<'a>) -> Document<'a> {
+impl<'a, 'alloc> Formatter<'a, 'alloc> {
+    pub(crate) fn wrap_parens(&mut self, document: Document<'a>, node: Node<'a, 'alloc>) -> Document<'a> {
         if self.need_parens(node) {
             Document::Group(Group::new(vec![Document::String("("), document, Document::String(")")]))
         } else {
@@ -16,7 +16,7 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    fn need_parens(&mut self, node: Node<'a>) -> bool {
+    fn need_parens(&mut self, node: Node<'a, 'alloc>) -> bool {
         if matches!(node, Node::Program(_)) || node.is_statement() {
             return false;
         }
@@ -32,7 +32,7 @@ impl<'a> Formatter<'a> {
         false
     }
 
-    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
+    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'a, 'alloc>) -> bool {
         if !matches!(node, Node::Assignment(_) | Node::Conditional(_)) {
             return false;
         }
@@ -44,7 +44,7 @@ impl<'a> Formatter<'a> {
         self.is_unary_or_binary_or_ternary(parent_node)
     }
 
-    fn binary_node_needs_parens(&self, node: Node<'a>) -> bool {
+    fn binary_node_needs_parens(&self, node: Node<'a, 'alloc>) -> bool {
         let operator = match node {
             Node::Binary(e) => &e.operator,
             _ => return false,
@@ -149,7 +149,7 @@ impl<'a> Formatter<'a> {
         false
     }
 
-    fn unary_prefix_node_needs_parens(&self, node: Node<'a>) -> bool {
+    fn unary_prefix_node_needs_parens(&self, node: Node<'a, 'alloc>) -> bool {
         let operator = match node {
             Node::UnaryPrefix(e) => &e.operator,
             _ => return false,
@@ -178,7 +178,7 @@ impl<'a> Formatter<'a> {
         false
     }
 
-    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'a>) -> bool {
+    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'a, 'alloc>) -> bool {
         let Node::Expression(expression) = node else {
             return false;
         };
@@ -290,11 +290,11 @@ impl<'a> Formatter<'a> {
         )
     }
 
-    const fn is_unary_or_binary_or_ternary(&self, node: Node<'a>) -> bool {
+    const fn is_unary_or_binary_or_ternary(&self, node: Node<'a, 'alloc>) -> bool {
         self.is_unary(node) || self.is_binaryish(node) || self.is_conditional(node)
     }
 
-    const fn is_binaryish(&self, node: Node<'a>) -> bool {
+    const fn is_binaryish(&self, node: Node<'a, 'alloc>) -> bool {
         match node {
             Node::Binary(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
@@ -302,11 +302,11 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    const fn is_unary(&self, node: Node<'a>) -> bool {
+    const fn is_unary(&self, node: Node<'a, 'alloc>) -> bool {
         matches!(node, Node::UnaryPrefix(_) | Node::UnaryPostfix(_))
     }
 
-    const fn is_conditional(&self, node: Node<'a>) -> bool {
+    const fn is_conditional(&self, node: Node<'a, 'alloc>) -> bool {
         if let Node::Conditional(op) = node {
             op.then.is_some()
         } else {

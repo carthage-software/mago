@@ -42,7 +42,7 @@ impl Rule for RedundantIfStatementRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::If(r#if) = node else { return LintDirective::default() };
 
         if mago_ast_utils::condition::is_truthy(&r#if.condition) {

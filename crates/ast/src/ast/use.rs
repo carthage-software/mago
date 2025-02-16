@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -12,25 +11,25 @@ use crate::ast::keyword::Keyword;
 use crate::ast::terminator::Terminator;
 use crate::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Use {
+pub struct Use<'a> {
     pub r#use: Keyword,
-    pub items: UseItems,
+    pub items: UseItems<'a>,
     pub terminator: Terminator,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum UseItems {
-    Sequence(UseItemSequence),
-    TypedSequence(TypedUseItemSequence),
-    TypedList(TypedUseItemList),
-    MixedList(MixedUseItemList),
+pub enum UseItems<'a> {
+    Sequence(UseItemSequence<'a>),
+    TypedSequence(TypedUseItemSequence<'a>),
+    TypedList(TypedUseItemList<'a>),
+    MixedList(MixedUseItemList<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum UseType {
@@ -38,69 +37,69 @@ pub enum UseType {
     Const(Keyword),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct UseItemSequence {
+pub struct UseItemSequence<'a> {
     pub start: Position,
-    pub items: TokenSeparatedSequence<UseItem>,
+    pub items: TokenSeparatedSequence<'a, UseItem>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct TypedUseItemSequence {
+pub struct TypedUseItemSequence<'a> {
     pub r#type: UseType,
-    pub items: TokenSeparatedSequence<UseItem>,
+    pub items: TokenSeparatedSequence<'a, UseItem>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct TypedUseItemList {
+pub struct TypedUseItemList<'a> {
     pub r#type: UseType,
     pub namespace: Identifier,
     pub namespace_separator: Span,
     pub left_brace: Span,
-    pub items: TokenSeparatedSequence<UseItem>,
+    pub items: TokenSeparatedSequence<'a, UseItem>,
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct MixedUseItemList {
+pub struct MixedUseItemList<'a> {
     pub namespace: Identifier,
     pub namespace_separator: Span,
     pub left_brace: Span,
-    pub items: TokenSeparatedSequence<MaybeTypedUseItem>,
+    pub items: TokenSeparatedSequence<'a, MaybeTypedUseItem>,
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct MaybeTypedUseItem {
     pub r#type: Option<UseType>,
     pub item: UseItem,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct UseItem {
     pub name: Identifier,
     pub alias: Option<UseItemAlias>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct UseItemAlias {
     pub r#as: Keyword,
     pub identifier: LocalIdentifier,
 }
 
-impl HasSpan for Use {
+impl HasSpan for Use<'_> {
     fn span(&self) -> Span {
         self.r#use.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for UseItems {
+impl HasSpan for UseItems<'_> {
     fn span(&self) -> Span {
         match self {
             UseItems::Sequence(items) => items.span(),
@@ -120,25 +119,25 @@ impl HasSpan for UseType {
     }
 }
 
-impl HasSpan for UseItemSequence {
+impl HasSpan for UseItemSequence<'_> {
     fn span(&self) -> Span {
         self.items.span(self.start)
     }
 }
 
-impl HasSpan for TypedUseItemSequence {
+impl HasSpan for TypedUseItemSequence<'_> {
     fn span(&self) -> Span {
         self.r#type.span().join(self.items.span(self.r#type.span().end))
     }
 }
 
-impl HasSpan for TypedUseItemList {
+impl HasSpan for TypedUseItemList<'_> {
     fn span(&self) -> Span {
         self.r#type.span().join(self.right_brace)
     }
 }
 
-impl HasSpan for MixedUseItemList {
+impl HasSpan for MixedUseItemList<'_> {
     fn span(&self) -> Span {
         self.namespace.span().join(self.right_brace)
     }

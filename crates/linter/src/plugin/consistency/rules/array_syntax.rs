@@ -83,7 +83,7 @@ impl Rule for ArraySyntaxRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::LegacyArray(arr) => {
                 let preferred_syntax = context.option(SYNTAX).and_then(|o| o.as_str()).unwrap_or(SYNTAX_DEFAULT);

@@ -59,7 +59,7 @@ impl Rule for HalsteadRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let kind = match node {
             Node::PropertyHookConcreteBody(_) => "Hook",
             Node::Method(_) => "Method",
@@ -85,7 +85,7 @@ impl Rule for HalsteadRule {
 fn check_against_thresholds(
     kind: &'static str,
     halstead: &HalsteadMetrics,
-    node: &Node<'_>,
+    node: &Node<'_, '_>,
     context: &mut LintContext<'_>,
 ) {
     let volume_threshold = context
@@ -145,7 +145,7 @@ struct HalsteadMetrics {
 }
 
 #[inline]
-fn gather_and_compute_halstead(node: Node<'_>) -> HalsteadMetrics {
+fn gather_and_compute_halstead(node: Node<'_, '_>) -> HalsteadMetrics {
     let (operators, operands) = gather_operators_and_operands(node);
 
     compute_halstead_metrics(&operators, &operands)
@@ -158,11 +158,11 @@ struct Operator(NodeKind);
 struct Operand(StringIdentifier);
 
 #[inline]
-fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>) {
+fn gather_operators_and_operands(node: Node<'_, '_>) -> (Vec<Operator>, Vec<Operand>) {
     let mut operators = Vec::new();
     let mut operands = Vec::new();
 
-    fn recurse(n: Node<'_>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand>) {
+    fn recurse(n: Node<'_, '_>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand>) {
         if n.is_declaration() {
             return;
         }
@@ -184,7 +184,7 @@ fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>
 /// Check if the node is considered an operator or operand in Halstead terms
 /// and record a textual representation.
 #[inline]
-fn categorize_node(node: Node<'_>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand>) {
+fn categorize_node(node: Node<'_, '_>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand>) {
     match node {
         Node::Binary(_)
         | Node::Assignment(_)

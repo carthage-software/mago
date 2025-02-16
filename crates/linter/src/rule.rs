@@ -82,7 +82,7 @@ pub trait Rule: Send + Sync + Debug {
     ///
     /// A [`LintDirective`] that determines how the linter should proceed after processing this node.
     #[allow(unused_variables)]
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective;
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective;
 }
 
 impl Rule for Box<dyn Rule> {
@@ -90,7 +90,7 @@ impl Rule for Box<dyn Rule> {
         self.as_ref().get_definition()
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         self.as_ref().lint_node(node, context)
     }
 }

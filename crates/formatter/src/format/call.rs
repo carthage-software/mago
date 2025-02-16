@@ -9,12 +9,12 @@ use super::call_arguments::print_call_arguments;
 use super::call_node::CallLikeNode;
 use super::Line;
 
-pub(super) struct MethodChain<'a> {
-    pub base: &'a Expression,
-    pub calls: Vec<CallLikeNode<'a>>,
+pub(super) struct MethodChain<'a, 'alloc> {
+    pub base: &'a Expression<'alloc>,
+    pub calls: Vec<CallLikeNode<'a, 'alloc>>,
 }
 
-pub(super) fn collect_method_call_chain(expr: &Expression) -> Option<MethodChain<'_>> {
+pub(super) fn collect_method_call_chain<'a, 'alloc>(expr: &'a Expression<'alloc>) -> Option<MethodChain<'a, 'alloc>> {
     let mut calls = Vec::new();
     let mut current_expr = expr;
 
@@ -45,7 +45,10 @@ pub(super) fn collect_method_call_chain(expr: &Expression) -> Option<MethodChain
     }
 }
 
-pub(super) fn print_method_call_chain<'a>(method_chain: &MethodChain<'a>, f: &mut Formatter<'a>) -> Document<'a> {
+pub(super) fn print_method_call_chain<'a, 'alloc>(
+    method_chain: &MethodChain<'a, 'alloc>,
+    f: &mut Formatter<'a, 'alloc>,
+) -> Document<'a> {
     let base_document = method_chain.base.format(f);
     let mut parts = if base_needs_parerns(method_chain.base) {
         vec![Document::String("("), base_document, Document::String(")")]

@@ -20,7 +20,7 @@ use crate::internal::reflector::r#type::maybe_reflect_hint;
 use crate::internal::reflector::r#type::reflect_hint;
 
 #[inline]
-pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -> ClassLikeReflection {
+pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_, '_>) -> ClassLikeReflection {
     let name = ClassLikeName::Class(Name::new(*context.names.get(&class.name), class.name.span));
     let span = class.span();
 
@@ -65,7 +65,7 @@ pub fn reflect_class<'ast>(class: &'ast Class, context: &'ast mut Context<'_>) -
 #[inline]
 pub fn reflect_anonymous_class<'ast>(
     class: &'ast AnonymousClass,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> ClassLikeReflection {
     let name = ClassLikeName::AnonymousClass(class.span());
     let span = class.span();
@@ -110,7 +110,7 @@ pub fn reflect_anonymous_class<'ast>(
 }
 
 #[inline]
-pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Context<'_>) -> ClassLikeReflection {
+pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Context<'_, '_>) -> ClassLikeReflection {
     let name = ClassLikeName::Interface(Name::new(*context.names.get(&interface.name), interface.name.span()));
     let span = interface.span();
 
@@ -139,7 +139,7 @@ pub fn reflect_interface<'ast>(interface: &'ast Interface, context: &'ast mut Co
 }
 
 #[inline]
-pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>) -> ClassLikeReflection {
+pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_, '_>) -> ClassLikeReflection {
     let name = ClassLikeName::Trait(Name::new(*context.names.get(&r#trait.name), r#trait.name.span()));
     let span = r#trait.span();
 
@@ -153,7 +153,7 @@ pub fn reflect_trait<'ast>(r#trait: &'ast Trait, context: &'ast mut Context<'_>)
 }
 
 #[inline]
-pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) -> ClassLikeReflection {
+pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_, '_>) -> ClassLikeReflection {
     let name = ClassLikeName::Enum(Name::new(*context.names.get(&r#enum.name), r#enum.name.span()));
     let span = r#enum.span();
 
@@ -190,7 +190,7 @@ pub fn reflect_enum<'ast>(r#enum: &'ast Enum, context: &'ast mut Context<'_>) ->
 fn reflect_class_like_members<'ast>(
     reflection: &mut ClassLikeReflection,
     members: &'ast Sequence<ClassLikeMember>,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) {
     for member in members.iter() {
         match &member {
@@ -248,7 +248,7 @@ fn reflect_class_like_members<'ast>(
 fn reflect_class_like_constant<'ast>(
     class_like: &mut ClassLikeReflection,
     constant: &'ast ClassLikeConstant,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> Vec<ClassLikeConstantReflection> {
     let attribute_reflections = reflect_attributes(&constant.attribute_lists, context);
     let visibility_reflection = modifier_to_visibility(constant.modifiers.get_first_read_visibility());
@@ -278,7 +278,7 @@ fn reflect_class_like_constant<'ast>(
 fn reflect_class_like_enum_case<'ast>(
     class_like: &mut ClassLikeReflection,
     case: &'ast EnumCase,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> EnumCaseReflection {
     let (identifier, type_reflection, is_backed) = match &case.item {
         EnumCaseItem::Unit(enum_case_unit_item) => (
@@ -312,7 +312,7 @@ fn reflect_class_like_enum_case<'ast>(
 fn reflect_class_like_method<'ast>(
     class_like: &mut ClassLikeReflection,
     method: &'ast Method,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> (Name, FunctionLikeReflection) {
     let name = Name::new(method.name.value, method.name.span);
 
@@ -360,7 +360,7 @@ fn reflect_class_like_method<'ast>(
 fn reflect_class_like_property<'ast>(
     class_like: &mut ClassLikeReflection,
     property: &'ast Property,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> Vec<PropertyReflection> {
     let mut reflections = vec![];
 

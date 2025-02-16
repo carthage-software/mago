@@ -15,7 +15,7 @@ use crate::internal::reflector::r#type::reflect_hint;
 #[inline]
 pub fn reflect_function<'ast>(
     function: &'ast Function,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeReflection {
     let name = Name::new(*context.names.get(&function.name), function.name.span);
@@ -47,7 +47,7 @@ pub fn reflect_function<'ast>(
 #[inline]
 pub fn reflect_closure<'ast>(
     closure: &'ast Closure,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeReflection {
     FunctionLikeReflection {
@@ -77,7 +77,7 @@ pub fn reflect_closure<'ast>(
 #[inline]
 pub fn reflect_arrow_function<'ast>(
     arrow_function: &'ast ArrowFunction,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeReflection {
     FunctionLikeReflection {
@@ -111,7 +111,7 @@ pub fn reflect_arrow_function<'ast>(
 #[inline]
 pub fn reflect_function_like_parameter_list<'ast>(
     parameter_list: &'ast FunctionLikeParameterList,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> Vec<FunctionLikeParameterReflection> {
     let mut parameters = vec![];
@@ -125,7 +125,7 @@ pub fn reflect_function_like_parameter_list<'ast>(
 #[inline]
 pub fn reflect_function_like_parameter<'ast>(
     parameter: &'ast FunctionLikeParameter,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> FunctionLikeParameterReflection {
     FunctionLikeParameterReflection {
@@ -146,7 +146,7 @@ pub fn reflect_function_like_parameter<'ast>(
 #[inline]
 pub fn reflect_function_like_return_type_hint<'ast>(
     return_type_hint: &'ast Option<FunctionLikeReturnTypeHint>,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
     scope: Option<&ClassLikeReflection>,
 ) -> Option<FunctionLikeReturnTypeReflection> {
     let Some(return_type_hint) = return_type_hint else {

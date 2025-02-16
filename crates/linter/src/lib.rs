@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::RwLockReadGuard;
 
+use bumpalo::Bump;
 use mago_interner::ThreadedInterner;
 use mago_project::module::Module;
 use mago_reflection::CodebaseReflection;
@@ -231,8 +232,9 @@ impl Linter {
             return IssueCollection::new();
         }
 
-        let program = module.parse(&self.interner);
-        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, module, &program);
+        let bump = Bump::new();
+        let program = module.parse(&self.interner, &bump);
+        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, module, program);
         for configured_rule in configured_rules.iter() {
             runner.run(configured_rule);
         }

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -26,11 +25,11 @@ pub mod r#while;
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Continue {
+pub struct Continue<'a> {
     pub r#continue: Keyword,
-    pub level: Option<Expression>,
+    pub level: Option<Expression<'a>>,
     pub terminator: Terminator,
 }
 
@@ -47,21 +46,21 @@ pub struct Continue {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Break {
+pub struct Break<'a> {
     pub r#break: Keyword,
-    pub level: Option<Expression>,
+    pub level: Option<Expression<'a>>,
     pub terminator: Terminator,
 }
 
-impl HasSpan for Continue {
+impl HasSpan for Continue<'_> {
     fn span(&self) -> Span {
         self.r#continue.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for Break {
+impl HasSpan for Break<'_> {
     fn span(&self) -> Span {
         self.r#break.span().join(self.terminator.span())
     }

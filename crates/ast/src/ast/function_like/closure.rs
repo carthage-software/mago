@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -13,36 +12,36 @@ use crate::ast::variable::DirectVariable;
 use crate::sequence::Sequence;
 use crate::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Closure {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Closure<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub r#static: Option<Keyword>,
     pub function: Keyword,
     pub ampersand: Option<Span>,
-    pub parameter_list: FunctionLikeParameterList,
-    pub use_clause: Option<ClosureUseClause>,
-    pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
-    pub body: Block,
+    pub parameter_list: FunctionLikeParameterList<'a>,
+    pub use_clause: Option<ClosureUseClause<'a>>,
+    pub return_type_hint: Option<FunctionLikeReturnTypeHint<'a>>,
+    pub body: Block<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ClosureUseClause {
+pub struct ClosureUseClause<'a> {
     pub r#use: Keyword,
     pub left_parenthesis: Span,
-    pub variables: TokenSeparatedSequence<ClosureUseClauseVariable>,
+    pub variables: TokenSeparatedSequence<'a, ClosureUseClauseVariable>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct ClosureUseClauseVariable {
     pub ampersand: Option<Span>,
     pub variable: DirectVariable,
 }
 
-impl HasSpan for Closure {
+impl HasSpan for Closure<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.body.span());
@@ -56,7 +55,7 @@ impl HasSpan for Closure {
     }
 }
 
-impl HasSpan for ClosureUseClause {
+impl HasSpan for ClosureUseClause<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#use.span(), self.right_parenthesis)
     }

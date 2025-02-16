@@ -44,7 +44,7 @@ impl Rule for LowercaseHintRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Hint(hint) = node else { return LintDirective::default() };
 
         match hint {

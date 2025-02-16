@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -9,7 +8,7 @@ use mago_span::Span;
 /// Represents an identifier.
 ///
 /// An identifier can be a local, qualified, or fully qualified identifier.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum Identifier {
@@ -21,7 +20,7 @@ pub enum Identifier {
 /// Represents a local, unqualified identifier.
 ///
 /// Example: `foo`, `Bar`, `BAZ`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct LocalIdentifier {
     pub span: Span,
@@ -31,7 +30,7 @@ pub struct LocalIdentifier {
 /// Represents a qualified identifier.
 ///
 /// Example: `Foo\bar`, `Bar\Baz`, `Baz\QUX`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct QualifiedIdentifier {
     pub span: Span,
@@ -41,7 +40,7 @@ pub struct QualifiedIdentifier {
 /// Represents a fully qualified identifier.
 ///
 /// Example: `\Foo\bar`, `\Bar\Baz`, `\Baz\QUX`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct FullyQualifiedIdentifier {
     pub span: Span,

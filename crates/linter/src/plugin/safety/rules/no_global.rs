@@ -49,7 +49,7 @@ impl Rule for NoGlobalRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Global(global) => {
                 let mut issue = Issue::new(context.level(), "Unsafe use of `global` keyword.")

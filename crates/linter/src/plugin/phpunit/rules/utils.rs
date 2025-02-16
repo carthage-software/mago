@@ -240,18 +240,18 @@ pub const ASSERTION_METHODS: [&str; 173] = [
 ];
 
 #[inline]
-pub fn find_all_assertion_references_in_method<'a>(
-    method: &'a Method,
+pub fn find_all_assertion_references_in_method<'ast, 'alloc>(
+    method: &'ast Method<'alloc>,
     context: &LintContext<'_>,
-) -> Vec<MethodReference<'a>> {
+) -> Vec<MethodReference<'ast, 'alloc>> {
     find_assertion_references_in_method(method, context, &ASSERTION_METHODS)
 }
 
 #[inline]
-pub fn find_testing_or_assertion_references_in_method<'a>(
-    method: &'a Method,
+pub fn find_testing_or_assertion_references_in_method<'ast, 'alloc>(
+    method: &'ast Method<'alloc>,
     context: &LintContext<'_>,
-) -> Vec<MethodReference<'a>> {
+) -> Vec<MethodReference<'ast, 'alloc>> {
     find_assertion_references_in_method(
         method,
         context,
@@ -260,11 +260,11 @@ pub fn find_testing_or_assertion_references_in_method<'a>(
 }
 
 #[inline]
-pub fn find_assertion_references_in_method<'a>(
-    method: &'a Method,
+pub fn find_assertion_references_in_method<'ast, 'alloc>(
+    method: &'ast Method<'alloc>,
     context: &LintContext<'_>,
     method_names: &[&str],
-) -> Vec<MethodReference<'a>> {
+) -> Vec<MethodReference<'ast, 'alloc>> {
     let MethodBody::Concrete(block) = &method.body else {
         return vec![];
     };

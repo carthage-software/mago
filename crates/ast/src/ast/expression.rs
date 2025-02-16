@@ -1,9 +1,9 @@
-use mago_php_version::feature::Feature;
-use mago_php_version::PHPVersion;
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
+use mago_php_version::feature::Feature;
+use mago_php_version::PHPVersion;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -46,53 +46,53 @@ use crate::ast::unary::UnaryPrefix;
 use crate::ast::variable::Variable;
 use crate::node::NodeKind;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Parenthesized {
+pub struct Parenthesized<'a> {
     pub left_parenthesis: Span,
-    pub expression: Box<Expression>,
+    pub expression: Box<'a, Expression<'a>>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Expression {
-    Binary(Binary),
-    UnaryPrefix(UnaryPrefix),
-    UnaryPostfix(UnaryPostfix),
-    Parenthesized(Parenthesized),
+pub enum Expression<'a> {
+    Binary(Binary<'a>),
+    UnaryPrefix(UnaryPrefix<'a>),
+    UnaryPostfix(UnaryPostfix<'a>),
+    Parenthesized(Parenthesized<'a>),
     Literal(Literal),
-    CompositeString(CompositeString),
-    Assignment(Assignment),
-    Conditional(Conditional),
-    Array(Array),
-    LegacyArray(LegacyArray),
-    List(List),
-    ArrayAccess(ArrayAccess),
-    ArrayAppend(ArrayAppend),
-    AnonymousClass(AnonymousClass),
-    Closure(Closure),
-    ArrowFunction(ArrowFunction),
-    Variable(Variable),
+    CompositeString(CompositeString<'a>),
+    Assignment(Assignment<'a>),
+    Conditional(Conditional<'a>),
+    Array(Array<'a>),
+    LegacyArray(LegacyArray<'a>),
+    List(List<'a>),
+    ArrayAccess(ArrayAccess<'a>),
+    ArrayAppend(ArrayAppend<'a>),
+    AnonymousClass(AnonymousClass<'a>),
+    Closure(Closure<'a>),
+    ArrowFunction(ArrowFunction<'a>),
+    Variable(Variable<'a>),
     ConstantAccess(ConstantAccess),
     Identifier(Identifier),
-    Match(Match),
-    Yield(Yield),
-    Construct(Construct),
-    Throw(Throw),
-    Clone(Clone),
-    Call(Call),
-    Access(Access),
-    ClosureCreation(ClosureCreation),
+    Match(Match<'a>),
+    Yield(Yield<'a>),
+    Construct(Construct<'a>),
+    Throw(Throw<'a>),
+    Clone(Clone<'a>),
+    Call(Call<'a>),
+    Access(Access<'a>),
+    ClosureCreation(ClosureCreation<'a>),
     Parent(Keyword),
     Static(Keyword),
     Self_(Keyword),
-    Instantiation(Instantiation),
+    Instantiation(Instantiation<'a>),
     MagicConstant(MagicConstant),
 }
 
-impl Expression {
+impl Expression<'_> {
     pub fn is_constant(&self, version: &PHPVersion, initilization: bool) -> bool {
         match &self {
             Self::Binary(operation) => {
@@ -263,13 +263,13 @@ impl Expression {
     }
 }
 
-impl HasSpan for Parenthesized {
+impl HasSpan for Parenthesized<'_> {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for Expression {
+impl HasSpan for Expression<'_> {
     fn span(&self) -> Span {
         match &self {
             Expression::Binary(expression) => expression.span(),

@@ -9,7 +9,7 @@ pub mod definition;
 pub mod reference;
 
 #[inline]
-pub fn find_returns_in_block(block: &Block) -> Vec<&Return> {
+pub fn find_returns_in_block<'ast, 'alloc>(block: &'ast Block<'alloc>) -> Vec<&'ast Return<'alloc>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_block(block) {
         if let ControlFlow::Return(r#return) = control_flow {
@@ -21,7 +21,7 @@ pub fn find_returns_in_block(block: &Block) -> Vec<&Return> {
 }
 
 #[inline]
-pub fn find_returns_in_statement(statement: &Statement) -> Vec<&Return> {
+pub fn find_returns_in_statement<'ast, 'alloc>(statement: &'ast Statement<'alloc>) -> Vec<&'ast Return<'alloc>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_statement(statement) {
         if let ControlFlow::Return(r#return) = control_flow {
@@ -33,7 +33,7 @@ pub fn find_returns_in_statement(statement: &Statement) -> Vec<&Return> {
 }
 
 #[inline]
-pub fn block_has_throws(block: &Block) -> bool {
+pub fn block_has_throws(block: &Block<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_block(block) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -44,7 +44,7 @@ pub fn block_has_throws(block: &Block) -> bool {
 }
 
 #[inline]
-pub fn statement_has_throws(statement: &Statement) -> bool {
+pub fn statement_has_throws(statement: &Statement<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_statement(statement) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -55,7 +55,7 @@ pub fn statement_has_throws(statement: &Statement) -> bool {
 }
 
 #[inline]
-pub fn expression_has_throws(expression: &Expression) -> bool {
+pub fn expression_has_throws(expression: &Expression<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_expression(expression) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -66,7 +66,7 @@ pub fn expression_has_throws(expression: &Expression) -> bool {
 }
 
 #[inline]
-pub fn block_has_yield(block: &Block) -> bool {
+pub fn block_has_yield(block: &Block<'_>) -> bool {
     for statement in block.statements.iter() {
         if statement_has_yield(statement) {
             return true;
@@ -77,7 +77,7 @@ pub fn block_has_yield(block: &Block) -> bool {
 }
 
 #[inline]
-pub fn statement_has_yield(statement: &Statement) -> bool {
+pub fn statement_has_yield(statement: &Statement<'_>) -> bool {
     match statement {
         Statement::Namespace(namespace) => {
             for statement in namespace.statements().iter() {
@@ -200,7 +200,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
 }
 
 #[inline]
-pub fn expression_has_yield(expression: &Expression) -> bool {
+pub fn expression_has_yield(expression: &Expression<'_>) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => expression_has_yield(&parenthesized.expression),
         Expression::Literal(_) => false,

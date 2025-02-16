@@ -7,10 +7,10 @@ use crate::Formatter;
 
 use super::block::print_block_of_nodes;
 
-pub fn print_class_like_body<'a>(
-    f: &mut Formatter<'a>,
+pub fn print_class_like_body<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
     left_brace: &'a Span,
-    class_like_members: &'a Sequence<ClassLikeMember>,
+    class_like_members: &'a Sequence<'alloc, ClassLikeMember<'alloc>>,
     right_brace: &'a Span,
 ) -> Document<'a> {
     let inline_empty = match f.settings.classlike_brace_style {

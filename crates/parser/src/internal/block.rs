@@ -7,11 +7,12 @@ use crate::internal::statement::parse_statement;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_block(stream: &mut TokenStream<'_, '_>) -> Result<Block, ParseError> {
+#[inline]
+pub fn parse_block<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Block<'i>, ParseError> {
     Ok(Block {
         left_brace: utils::expect_span(stream, T!["{"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.vec();
             loop {
                 let next = utils::peek(stream)?;
                 if matches!(next.kind, T!["}"]) {

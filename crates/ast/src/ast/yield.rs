@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -21,13 +21,13 @@ use crate::ast::keyword::Keyword;
 ///     yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Yield {
-    Value(YieldValue),
-    Pair(YieldPair),
-    From(YieldFrom),
+pub enum Yield<'a> {
+    Value(YieldValue<'a>),
+    Pair(YieldPair<'a>),
+    From(YieldFrom<'a>),
 }
 
 /// Represents a PHP `yield` expression with a value.
@@ -41,11 +41,11 @@ pub enum Yield {
 ///    yield 1;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct YieldValue {
+pub struct YieldValue<'a> {
     pub r#yield: Keyword,
-    pub value: Option<Box<Expression>>,
+    pub value: Option<Box<'a, Expression<'a>>>,
 }
 
 /// Represents a PHP `yield` expression with a key-value pair.
@@ -59,13 +59,13 @@ pub struct YieldValue {
 ///   yield 2 => 3;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct YieldPair {
+pub struct YieldPair<'a> {
     pub r#yield: Keyword,
-    pub key: Box<Expression>,
+    pub key: Box<'a, Expression<'a>>,
     pub arrow: Span,
-    pub value: Box<Expression>,
+    pub value: Box<'a, Expression<'a>>,
 }
 
 /// Represents a PHP `yield from` expression.
@@ -79,15 +79,15 @@ pub struct YieldPair {
 ///  yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct YieldFrom {
+pub struct YieldFrom<'a> {
     pub r#yield: Keyword,
     pub from: Keyword,
-    pub iterator: Box<Expression>,
+    pub iterator: Box<'a, Expression<'a>>,
 }
 
-impl HasSpan for Yield {
+impl HasSpan for Yield<'_> {
     fn span(&self) -> Span {
         match self {
             Yield::Value(y) => y.span(),
@@ -97,7 +97,7 @@ impl HasSpan for Yield {
     }
 }
 
-impl HasSpan for YieldValue {
+impl HasSpan for YieldValue<'_> {
     fn span(&self) -> Span {
         if let Some(value) = &self.value {
             self.r#yield.span().join(value.span())
@@ -107,13 +107,13 @@ impl HasSpan for YieldValue {
     }
 }
 
-impl HasSpan for YieldPair {
+impl HasSpan for YieldPair<'_> {
     fn span(&self) -> Span {
         self.r#yield.span().join(self.value.span())
     }
 }
 
-impl HasSpan for YieldFrom {
+impl HasSpan for YieldFrom<'_> {
     fn span(&self) -> Span {
         self.r#yield.span().join(self.iterator.span())
     }

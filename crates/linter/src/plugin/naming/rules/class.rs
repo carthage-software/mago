@@ -74,7 +74,7 @@ impl Rule for ClassRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Class(class) = node else { return LintDirective::default() };
         let mut issues = vec![];
         let name = context.lookup(&class.name.value);

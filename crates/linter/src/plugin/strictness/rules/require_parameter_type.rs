@@ -124,7 +124,7 @@ impl Rule for RequireParameterTypeRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Function(function) => {
                 for parameter in function.parameter_list.parameters.iter() {

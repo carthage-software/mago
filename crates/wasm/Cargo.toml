@@ -32,3 +32,4 @@ wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 getrandom = { workspace = true }
 serde = { workspace = true }
+bumpalo = { workspace = true }

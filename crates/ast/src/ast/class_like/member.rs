@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -13,45 +13,45 @@ use crate::ast::class_like::trait_use::TraitUse;
 use crate::ast::expression::Expression;
 use crate::ast::identifier::LocalIdentifier;
 use crate::ast::variable::Variable;
-use crate::Sequence;
+use crate::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum ClassLikeMember {
-    TraitUse(TraitUse),
-    Constant(ClassLikeConstant),
-    Property(Property),
-    EnumCase(EnumCase),
-    Method(Method),
+pub enum ClassLikeMember<'a> {
+    TraitUse(TraitUse<'a>),
+    Constant(ClassLikeConstant<'a>),
+    Property(Property<'a>),
+    EnumCase(EnumCase<'a>),
+    Method(Method<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum ClassLikeMemberSelector {
+pub enum ClassLikeMemberSelector<'a> {
     Identifier(LocalIdentifier),
-    Variable(Variable),
-    Expression(ClassLikeMemberExpressionSelector),
+    Variable(Variable<'a>),
+    Expression(ClassLikeMemberExpressionSelector<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum ClassLikeConstantSelector {
+pub enum ClassLikeConstantSelector<'a> {
     Identifier(LocalIdentifier),
-    Expression(ClassLikeMemberExpressionSelector),
+    Expression(ClassLikeMemberExpressionSelector<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ClassLikeMemberExpressionSelector {
+pub struct ClassLikeMemberExpressionSelector<'a> {
     pub left_brace: Span,
-    pub expression: Box<Expression>,
+    pub expression: Box<'a, Expression<'a>>,
     pub right_brace: Span,
 }
 
-impl Sequence<ClassLikeMember> {
+impl Sequence<'_, ClassLikeMember<'_>> {
     pub fn contains_trait_uses(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::TraitUse(_)))
     }
@@ -73,7 +73,7 @@ impl Sequence<ClassLikeMember> {
     }
 }
 
-impl HasSpan for ClassLikeMember {
+impl HasSpan for ClassLikeMember<'_> {
     fn span(&self) -> Span {
         match self {
             ClassLikeMember::TraitUse(trait_use) => trait_use.span(),
@@ -85,7 +85,7 @@ impl HasSpan for ClassLikeMember {
     }
 }
 
-impl HasSpan for ClassLikeMemberSelector {
+impl HasSpan for ClassLikeMemberSelector<'_> {
     fn span(&self) -> Span {
         match self {
             ClassLikeMemberSelector::Identifier(i) => i.span(),
@@ -95,7 +95,7 @@ impl HasSpan for ClassLikeMemberSelector {
     }
 }
 
-impl HasSpan for ClassLikeConstantSelector {
+impl HasSpan for ClassLikeConstantSelector<'_> {
     fn span(&self) -> Span {
         match self {
             ClassLikeConstantSelector::Identifier(i) => i.span(),
@@ -104,7 +104,7 @@ impl HasSpan for ClassLikeConstantSelector {
     }
 }
 
-impl HasSpan for ClassLikeMemberExpressionSelector {
+impl HasSpan for ClassLikeMemberExpressionSelector<'_> {
     fn span(&self) -> Span {
         self.left_brace.join(self.right_brace)
     }

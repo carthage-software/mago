@@ -119,7 +119,7 @@ pub fn check_class_like_constant(
     for item in class_like_constant.items.iter() {
         let item_name = context.interner.lookup(&item.name.value);
 
-        if !item.value.is_constant(context.version, false) {
+        if !item.value.is_constant(&context.version, false) {
             context.issues.push(
                 Issue::error(format!(
                     "Constant `{}::{}` value contains a non-constant expression.",

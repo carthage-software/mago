@@ -11,7 +11,7 @@ use crate::Formatter;
 use crate::comment::Comment;
 use crate::comment::CommentFlags;
 
-impl<'a> Formatter<'a> {
+impl<'a> Formatter<'a, '_> {
     #[must_use]
     pub(crate) fn print_comments(
         &mut self,

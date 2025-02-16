@@ -34,7 +34,7 @@ impl Rule for TooManyEnumCasesRule {
             })
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Enum(r#enum) = node else { return LintDirective::default() };
 
         let mut cases = 0;

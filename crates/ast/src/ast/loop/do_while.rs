@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -22,19 +22,19 @@ use crate::ast::terminator::Terminator;
 ///   $i++;
 /// } while ($i < 10);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct DoWhile {
+pub struct DoWhile<'a> {
     pub r#do: Keyword,
-    pub statement: Box<Statement>,
+    pub statement: Box<'a, Statement<'a>>,
     pub r#while: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Box<Expression>,
+    pub condition: Box<'a, Expression<'a>>,
     pub right_parenthesis: Span,
     pub terminator: Terminator,
 }
 
-impl HasSpan for DoWhile {
+impl HasSpan for DoWhile<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#do.span(), self.terminator.span())
     }

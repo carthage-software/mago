@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,52 +11,52 @@ use crate::ast::expression::Expression;
 use crate::ast::identifier::Identifier;
 use crate::ast::variable::Variable;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct ConstantAccess {
     pub name: Identifier,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum Access {
-    Property(PropertyAccess),
-    NullSafeProperty(NullSafePropertyAccess),
-    StaticProperty(StaticPropertyAccess),
-    ClassConstant(ClassConstantAccess),
+pub enum Access<'a> {
+    Property(PropertyAccess<'a>),
+    NullSafeProperty(NullSafePropertyAccess<'a>),
+    StaticProperty(StaticPropertyAccess<'a>),
+    ClassConstant(ClassConstantAccess<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct PropertyAccess {
-    pub object: Box<Expression>,
+pub struct PropertyAccess<'a> {
+    pub object: Box<'a, Expression<'a>>,
     pub arrow: Span,
-    pub property: ClassLikeMemberSelector,
+    pub property: ClassLikeMemberSelector<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct NullSafePropertyAccess {
-    pub object: Box<Expression>,
+pub struct NullSafePropertyAccess<'a> {
+    pub object: Box<'a, Expression<'a>>,
     pub question_mark_arrow: Span,
-    pub property: ClassLikeMemberSelector,
+    pub property: ClassLikeMemberSelector<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct StaticPropertyAccess {
-    pub class: Box<Expression>,
+pub struct StaticPropertyAccess<'a> {
+    pub class: Box<'a, Expression<'a>>,
     pub double_colon: Span,
-    pub property: Variable,
+    pub property: Variable<'a>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ClassConstantAccess {
-    pub class: Box<Expression>,
+pub struct ClassConstantAccess<'a> {
+    pub class: Box<'a, Expression<'a>>,
     pub double_colon: Span,
-    pub constant: ClassLikeConstantSelector,
+    pub constant: ClassLikeConstantSelector<'a>,
 }
 
 impl HasSpan for ConstantAccess {
@@ -65,7 +65,7 @@ impl HasSpan for ConstantAccess {
     }
 }
 
-impl HasSpan for Access {
+impl HasSpan for Access<'_> {
     fn span(&self) -> Span {
         match self {
             Access::Property(p) => p.span(),
@@ -76,25 +76,25 @@ impl HasSpan for Access {
     }
 }
 
-impl HasSpan for PropertyAccess {
+impl HasSpan for PropertyAccess<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.property.span())
     }
 }
 
-impl HasSpan for NullSafePropertyAccess {
+impl HasSpan for NullSafePropertyAccess<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.property.span())
     }
 }
 
-impl HasSpan for StaticPropertyAccess {
+impl HasSpan for StaticPropertyAccess<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.property.span())
     }
 }
 
-impl HasSpan for ClassConstantAccess {
+impl HasSpan for ClassConstantAccess<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.constant.span())
     }

@@ -51,7 +51,7 @@ const MAGIC_METHOD_SEMANTICS: &[(&str, Option<usize>, bool, bool, bool)] = &[
 ];
 
 #[inline]
-fn returns_generator<'ast>(context: &mut Context<'_>, block: &'ast Block, hint: &'ast Hint) -> bool {
+fn returns_generator<'ast>(context: &mut Context<'_, '_>, block: &'ast Block, hint: &'ast Hint) -> bool {
     if hint_contains_generator(context, hint) {
         return true;
     }
@@ -60,7 +60,7 @@ fn returns_generator<'ast>(context: &mut Context<'_>, block: &'ast Block, hint: 
 }
 
 #[inline]
-fn hint_contains_generator(context: &mut Context<'_>, hint: &Hint) -> bool {
+fn hint_contains_generator(context: &mut Context<'_, '_>, hint: &Hint) -> bool {
     match hint {
         Hint::Identifier(identifier) => {
             let symbol = context.get_name(&identifier.span().start);

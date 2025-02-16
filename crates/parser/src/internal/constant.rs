@@ -10,16 +10,17 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_constant_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attribute_lists: Sequence<AttributeList>,
-) -> Result<Constant, ParseError> {
+#[inline]
+pub fn parse_constant_with_attributes<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+    attribute_lists: Sequence<'i, AttributeList<'i>>,
+) -> Result<Constant<'i>, ParseError> {
     Ok(Constant {
         attribute_lists,
         r#const: utils::expect_keyword(stream, T!["const"])?,
         items: {
-            let mut items = vec![];
-            let mut commas = vec![];
+            let mut items = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T![";" | "?>"])) {
                     break;
@@ -41,7 +42,8 @@ pub fn parse_constant_with_attributes(
     })
 }
 
-pub fn parse_constant_item(stream: &mut TokenStream<'_, '_>) -> Result<ConstantItem, ParseError> {
+#[inline]
+pub fn parse_constant_item<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ConstantItem<'i>, ParseError> {
     Ok(ConstantItem {
         name: parse_local_identifier(stream)?,
         equals: utils::expect_span(stream, T!["="])?,

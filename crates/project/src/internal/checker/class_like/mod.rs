@@ -18,7 +18,7 @@ mod method;
 mod property;
 
 #[inline]
-pub fn check_class(class: &Class, context: &mut Context<'_>) {
+pub fn check_class(class: &Class, context: &mut Context<'_, '_>) {
     let class_name = context.interner.lookup(&class.name.value);
     let class_fqcn = context.get_name(&class.name.span.start);
 
@@ -240,7 +240,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
+pub fn check_interface(interface: &Interface, context: &mut Context<'_, '_>) {
     let interface_name = context.interner.lookup(&interface.name.value);
     let interface_fqcn = context.get_name(&interface.name.span.start);
 
@@ -605,7 +605,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
+pub fn check_trait(r#trait: &Trait, context: &mut Context<'_, '_>) {
     let class_like_name = context.interner.lookup(&r#trait.name.value);
     let class_like_fqcn = context.get_name(&r#trait.name.span.start);
 
@@ -690,7 +690,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
+pub fn check_enum(r#enum: &Enum, context: &mut Context<'_, '_>) {
     if !context.version.is_supported(Feature::Enums) {
         context.issues.push(
             Issue::error("Enums are only available in PHP 8.1 and above.")
@@ -871,7 +871,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Context<'_>) {
+pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Context<'_, '_>) {
     let mut last_final = None;
     let mut last_readonly = None;
 
@@ -1074,7 +1074,7 @@ pub fn check_members(
     class_like_kind: &str,
     class_like_name: &str,
     class_like_fqcn: &str,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     let mut method_names: Vec<(Span, StringIdentifier)> = vec![];
     let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];

@@ -13,11 +13,11 @@ use crate::utils::is_at_callee;
 use crate::utils::is_non_empty_array_like_expression;
 use crate::Formatter;
 
-pub(super) fn print_binaryish_expression<'a>(
-    f: &mut Formatter<'a>,
-    left: &'a Expression,
+pub(super) fn print_binaryish_expression<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    left: &'a Expression<'alloc>,
     operator: &'a BinaryOperator,
-    right: &'a Expression,
+    right: &'a Expression<'alloc>,
 ) -> Document<'a> {
     let parent = f.parent_node();
     let grandparent = f.grandparent_node();
@@ -97,11 +97,11 @@ pub(super) fn print_binaryish_expression<'a>(
     Document::Group(Group::new(head_parts))
 }
 
-pub(super) fn print_binaryish_expressions<'a>(
-    f: &mut Formatter<'a>,
-    left: &'a Expression,
+pub(super) fn print_binaryish_expressions<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    left: &'a Expression<'alloc>,
     operator: &BinaryOperator,
-    right: &'a Expression,
+    right: &'a Expression<'alloc>,
     is_inside_parenthesis: bool,
     is_nested: bool,
 ) -> Vec<Document<'a>> {

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -6,7 +5,7 @@ use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C)]
 pub enum InlineKind {
@@ -25,7 +24,7 @@ pub enum InlineKind {
 /// ?>
 /// This is another inline text.
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct Inline {
     pub kind: InlineKind,

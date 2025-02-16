@@ -9,8 +9,11 @@ use crate::internal::identifier;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_attribute_list_sequence(stream: &mut TokenStream<'_, '_>) -> Result<Sequence<AttributeList>, ParseError> {
-    let mut inner = Vec::new();
+#[inline]
+pub fn parse_attribute_list_sequence<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<Sequence<'i, AttributeList<'i>>, ParseError> {
+    let mut inner = stream.vec();
     loop {
         let next = utils::peek(stream)?;
         if next.kind == T!["#["] {
@@ -23,12 +26,13 @@ pub fn parse_attribute_list_sequence(stream: &mut TokenStream<'_, '_>) -> Result
     Ok(Sequence::new(inner))
 }
 
-pub fn parse_attribute_list(stream: &mut TokenStream<'_, '_>) -> Result<AttributeList, ParseError> {
+#[inline]
+pub fn parse_attribute_list<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<AttributeList<'i>, ParseError> {
     Ok(AttributeList {
         hash_left_bracket: utils::expect_span(stream, T!["#["])?,
         attributes: {
-            let mut attributes = Vec::new();
-            let mut commas = Vec::new();
+            let mut attributes = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 let next = utils::peek(stream)?;
                 if next.kind == T!["]"] {
@@ -51,7 +55,8 @@ pub fn parse_attribute_list(stream: &mut TokenStream<'_, '_>) -> Result<Attribut
     })
 }
 
-pub fn parse_attribute(stream: &mut TokenStream<'_, '_>) -> Result<Attribute, ParseError> {
+#[inline]
+pub fn parse_attribute<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Attribute<'i>, ParseError> {
     Ok(Attribute {
         name: identifier::parse_identifier(stream)?,
         arguments: argument::parse_optional_argument_list(stream)?,

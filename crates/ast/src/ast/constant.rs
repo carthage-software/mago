@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -15,31 +14,31 @@ use crate::sequence::TokenSeparatedSequence;
 /// Represents a constant statement in PHP.
 ///
 /// Example: `const FOO = 1;` or `const BAR = 2, QUX = 3, BAZ = 4;`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Constant {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Constant<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub r#const: Keyword,
-    pub items: TokenSeparatedSequence<ConstantItem>,
+    pub items: TokenSeparatedSequence<'a, ConstantItem<'a>>,
     pub terminator: Terminator,
 }
 
 /// Represents a single name-value pair within a constant statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct ConstantItem {
+pub struct ConstantItem<'a> {
     pub name: LocalIdentifier,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'a>,
 }
 
-impl HasSpan for Constant {
+impl HasSpan for Constant<'_> {
     fn span(&self) -> Span {
         self.r#const.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for ConstantItem {
+impl HasSpan for ConstantItem<'_> {
     fn span(&self) -> Span {
         self.name.span().join(self.value.span())
     }

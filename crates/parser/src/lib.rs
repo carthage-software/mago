@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_ast::sequence::Sequence;
 use mago_ast::Program;
 use mago_interner::ThreadedInterner;
@@ -13,25 +14,37 @@ pub mod error;
 
 mod internal;
 
-pub fn parse_source(interner: &ThreadedInterner, source: &Source) -> (Program, Option<ParseError>) {
+pub fn parse_source<'alloc>(
+    interner: &ThreadedInterner,
+    bump: &'alloc Bump,
+    source: &Source,
+) -> (&'alloc Program<'alloc>, Option<ParseError>) {
     let content = interner.lookup(&source.content);
     let lexer = Lexer::new(interner, Input::new(source.identifier, content.as_bytes()));
 
-    construct(interner, lexer)
+    construct(interner, bump, lexer)
 }
 
-pub fn parse(interner: &ThreadedInterner, input: Input<'_>) -> (Program, Option<ParseError>) {
+pub fn parse<'alloc>(
+    interner: &ThreadedInterner,
+    bump: &'alloc Bump,
+    input: Input<'_>,
+) -> (&'alloc Program<'alloc>, Option<ParseError>) {
     let lexer = Lexer::new(interner, input);
 
-    construct(interner, lexer)
+    construct(interner, bump, lexer)
 }
 
-fn construct<'i>(interner: &'i ThreadedInterner, lexer: Lexer<'_, 'i>) -> (Program, Option<ParseError>) {
-    let mut stream = TokenStream::new(interner, lexer);
+fn construct<'i, 'alloc>(
+    interner: &'i ThreadedInterner,
+    bump: &'alloc Bump,
+    lexer: Lexer<'_, 'i>,
+) -> (&'alloc Program<'alloc>, Option<ParseError>) {
+    let mut stream = TokenStream::new(interner, bump, lexer);
 
     let mut error = None;
     let statements = {
-        let mut statements = Vec::new();
+        let mut statements = bumpalo::vec![in bump];
 
         loop {
             match stream.has_reached_eof() {
@@ -59,12 +72,11 @@ fn construct<'i>(interner: &'i ThreadedInterner, lexer: Lexer<'_, 'i>) -> (Progr
         statements
     };
 
-    (
-        Program {
-            source: stream.get_position().source,
-            statements: Sequence::new(statements),
-            trivia: stream.get_trivia(),
-        },
-        error,
-    )
+    let program = bump.alloc(Program {
+        source: stream.get_position().source,
+        statements: Sequence::new(statements),
+        trivia: stream.get_trivia(),
+    });
+
+    (program, error)
 }

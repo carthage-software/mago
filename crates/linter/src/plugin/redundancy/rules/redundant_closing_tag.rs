@@ -32,7 +32,7 @@ impl Rule for RedudnantClosingTagRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(program) = node else { return LintDirective::Abort };
 
         check_statements(&program.statements, context);

@@ -124,7 +124,7 @@ pub fn to_keyword(token: Token) -> Keyword {
 }
 
 #[inline]
-pub fn unexpected(stream: &mut TokenStream<'_, '_>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
+pub fn unexpected(stream: &TokenStream<'_, '_>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
     if let Some(token) = token {
         ParseError::UnexpectedToken(one_of.to_vec(), token.kind, token.span)
     } else {

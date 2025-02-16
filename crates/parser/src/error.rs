@@ -1,16 +1,15 @@
-use mago_reporting::Annotation;
-use mago_reporting::Issue;
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_ast::ast::*;
 use mago_lexer::error::SyntaxError;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
 use mago_token::TokenKind;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(Vec<TokenKind>, Position),

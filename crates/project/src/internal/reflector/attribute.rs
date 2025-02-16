@@ -10,7 +10,7 @@ use crate::internal::context::Context;
 #[inline]
 pub fn reflect_attributes<'ast>(
     attribute_lists: &'ast Sequence<AttributeList>,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> Vec<AttributeReflection> {
     let mut reflections = vec![];
 
@@ -32,7 +32,7 @@ pub fn reflect_attributes<'ast>(
 #[inline]
 pub fn reflect_attribute_arguments<'ast>(
     argument_list: &'ast Option<ArgumentList>,
-    context: &'ast mut Context<'_>,
+    context: &'ast mut Context<'_, '_>,
 ) -> Option<AttributeArgumentListReflection> {
     let Some(argument_list) = argument_list else {
         return None;

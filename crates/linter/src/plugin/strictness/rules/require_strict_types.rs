@@ -77,7 +77,7 @@ impl Rule for RequireStrictTypesRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(program) = node else { return LintDirective::default() };
 
         if program.statements.len() < 2 {
@@ -95,7 +95,7 @@ impl Rule for RequireStrictTypesRule {
                         continue;
                     }
 
-                    match &item.value {
+                    match item.value.as_ref() {
                         Expression::Literal(Literal::Integer(integer)) => {
                             let disabled = match &integer.value {
                                 Some(val) => *val == 0,

@@ -95,7 +95,7 @@ impl Rule for UndefinedFunctionOrMethodRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::FunctionCall(function_call) => {
                 let Expression::Identifier(identifier) = function_call.function.as_ref() else {

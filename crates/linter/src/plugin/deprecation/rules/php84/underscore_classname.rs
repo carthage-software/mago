@@ -40,7 +40,7 @@ impl Rule for UnderscoreClassNameRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Class(class) => {
                 let class_name = context.lookup(&class.name.value);

@@ -39,7 +39,7 @@ impl Rule for ExplicitOctalNotationRule {
                 "#},
             ))
     }
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::LiteralInteger(literal_integer) = node else { return LintDirective::default() };
 
         let literal_text = context.lookup(&literal_integer.raw);

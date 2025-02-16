@@ -47,7 +47,7 @@ impl Rule for LowercaseKeywordRule {
                "#},
             ))
     }
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Keyword(keyword) = node else { return LintDirective::default() };
 
         let name = context.lookup(&keyword.value);

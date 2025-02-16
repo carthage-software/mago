@@ -33,7 +33,7 @@ impl Rule for ExcessiveParameterListRule {
                 default: Value::Integer(THRESHOLD_DEFAULT),
             })
     }
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::FunctionLikeParameterList(parameter_list) = node else {
             return LintDirective::default();
         };

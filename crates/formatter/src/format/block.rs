@@ -9,11 +9,11 @@ use crate::format::statement;
 use crate::format::Format;
 use crate::Formatter;
 
-pub(super) fn print_block_of_nodes<'a, T: Format<'a> + HasSpan>(
-    f: &mut Formatter<'a>,
-    left_brace: &Span,
-    nodes: &'a Sequence<T>,
-    right_brace: &Span,
+pub(super) fn print_block_of_nodes<'a, 'alloc, T: Format<'a, 'alloc> + HasSpan>(
+    f: &mut Formatter<'a, 'alloc>,
+    left_brace: &'a Span,
+    nodes: &'a Sequence<'alloc, T>,
+    right_brace: &'a Span,
     inline_empty: bool,
 ) -> Document<'a> {
     let length = nodes.len();
@@ -48,10 +48,10 @@ pub(super) fn print_block_of_nodes<'a, T: Format<'a> + HasSpan>(
     Document::Group(Group::new(contents))
 }
 
-pub(super) fn print_block<'a>(
-    f: &mut Formatter<'a>,
+pub(super) fn print_block<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
     left_brace: &Span,
-    stmts: &'a Sequence<Statement>,
+    stmts: &'a Sequence<'alloc, Statement<'alloc>>,
     right_brace: &Span,
 ) -> Document<'a> {
     let mut contents = vec![];
@@ -104,7 +104,10 @@ pub(super) fn print_block<'a>(
     Document::Group(Group::new(contents).with_break(should_break))
 }
 
-pub(super) fn print_block_body<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<Statement>) -> Option<Document<'a>> {
+pub(super) fn print_block_body<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    stmts: &'a Sequence<'alloc, Statement<'alloc>>,
+) -> Option<Document<'a>> {
     let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
 
     if has_body {

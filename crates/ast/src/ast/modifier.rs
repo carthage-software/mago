@@ -1,8 +1,7 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
+use mago_interner::ThreadedInterner;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -16,7 +15,7 @@ use crate::sequence::Sequence;
 /// ```php
 /// final class Foo {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum Modifier {
@@ -104,7 +103,7 @@ impl HasSpan for Modifier {
     }
 }
 
-impl Sequence<Modifier> {
+impl Sequence<'_, Modifier> {
     /// Returns the first abstract modifier in the sequence, if any.
     pub fn get_static(&self) -> Option<&Modifier> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Static(..)))

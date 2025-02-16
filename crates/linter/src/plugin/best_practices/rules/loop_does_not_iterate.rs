@@ -125,7 +125,7 @@ impl Rule for LoopDoesNotIterateRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Foreach(foreach) => {
                 if let Some(terminator) = match &foreach.body {
@@ -167,7 +167,7 @@ impl Rule for LoopDoesNotIterateRule {
     }
 }
 
-fn check_loop(r#loop: impl HasSpan, terminator: LoopTerminator<'_>, context: &mut LintContext<'_>) {
+fn check_loop(r#loop: impl HasSpan, terminator: LoopTerminator<'_, '_>, context: &mut LintContext<'_>) {
     let loop_span = r#loop.span();
     let terminator_span = match terminator {
         LoopTerminator::Break(break_stmt) => break_stmt.span(),
@@ -185,13 +185,15 @@ fn check_loop(r#loop: impl HasSpan, terminator: LoopTerminator<'_>, context: &mu
 }
 
 #[derive(Debug)]
-enum LoopTerminator<'a> {
-    Break(&'a Break),
-    Return(&'a Return),
+enum LoopTerminator<'a, 'alloc> {
+    Break(&'a Break<'alloc>),
+    Return(&'a Return<'alloc>),
 }
 
 #[inline]
-fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopTerminator<'_>> {
+fn get_loop_terminator_from_statements<'ast, 'alloc>(
+    statements: &'ast [Statement<'alloc>],
+) -> Option<LoopTerminator<'ast, 'alloc>> {
     for statement in statements.iter() {
         if might_skip_terminator(statement) {
             return None;
@@ -206,7 +208,9 @@ fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopT
 }
 
 #[inline]
-fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTerminator<'_>> {
+fn get_loop_terminator_from_statement<'ast, 'alloc>(
+    statement: &'ast Statement<'alloc>,
+) -> Option<LoopTerminator<'ast, 'alloc>> {
     match statement {
         Statement::Block(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
         Statement::Break(break_stmt) => match break_stmt.level {

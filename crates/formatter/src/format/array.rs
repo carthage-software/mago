@@ -13,13 +13,13 @@ use super::misc::is_string_word_type;
 use super::misc::should_hug_expression;
 
 #[allow(clippy::enum_variant_names)]
-pub enum ArrayLike<'a> {
-    Array(&'a Array),
-    List(&'a List),
-    LegacyArray(&'a LegacyArray),
+pub enum ArrayLike<'a, 'alloc> {
+    Array(&'a Array<'alloc>),
+    List(&'a List<'alloc>),
+    LegacyArray(&'a LegacyArray<'alloc>),
 }
 
-impl<'a> ArrayLike<'a> {
+impl<'a, 'alloc> ArrayLike<'a, 'alloc> {
     #[inline]
     fn len(&self) -> usize {
         match self {
@@ -39,7 +39,7 @@ impl<'a> ArrayLike<'a> {
     }
 
     #[inline]
-    fn elements(&self) -> &'a [ArrayElement] {
+    fn elements(&self) -> &'a [ArrayElement<'alloc>] {
         match self {
             Self::Array(array) => array.elements.as_slice(),
             Self::LegacyArray(array) => array.elements.as_slice(),
@@ -52,7 +52,7 @@ impl<'a> ArrayLike<'a> {
         matches!(self, Self::List(_) | Self::LegacyArray(_))
     }
 
-    fn prefix(&self, f: &mut Formatter<'a>) -> Option<Document<'a>> {
+    fn prefix(&self, f: &mut Formatter<'a, 'alloc>) -> Option<Document<'a>> {
         match self {
             Self::List(list) => Some(list.list.format(f)),
             Self::LegacyArray(array) => Some(array.array.format(f)),
@@ -60,7 +60,7 @@ impl<'a> ArrayLike<'a> {
         }
     }
 
-    fn iter<'b>(&'b self, p: &'b mut Formatter<'a>) -> Box<dyn Iterator<Item = Document<'a>> + 'b> {
+    fn iter<'b>(&'b self, p: &'b mut Formatter<'a, 'alloc>) -> Box<dyn Iterator<Item = Document<'a>> + 'b> {
         match self {
             Self::Array(array) => Box::new(array.elements.iter().map(|element| element.format(p))),
             Self::List(list) => Box::new(list.elements.iter().map(|element| element.format(p))),
@@ -69,7 +69,7 @@ impl<'a> ArrayLike<'a> {
     }
 }
 
-impl HasSpan for ArrayLike<'_> {
+impl HasSpan for ArrayLike<'_, '_> {
     fn span(&self) -> Span {
         match self {
             Self::Array(array) => array.span(),
@@ -79,7 +79,10 @@ impl HasSpan for ArrayLike<'_> {
     }
 }
 
-pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<'a>) -> Document<'a> {
+pub(super) fn print_array_like<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    array_like: ArrayLike<'a, 'alloc>,
+) -> Document<'a> {
     let left_delimiter = if let Some(prefix) = array_like.prefix(f) {
         Document::Array(vec![prefix, Document::String(if array_like.uses_parenthesis() { "(" } else { "[" })])
     } else {
@@ -148,7 +151,10 @@ pub(super) fn print_array_like<'a>(f: &mut Formatter<'a>, array_like: ArrayLike<
     Document::Group(Group::new(parts).with_break(should_break))
 }
 
-fn inline_single_element<'a>(f: &mut Formatter<'a>, array_like: &ArrayLike<'a>) -> Option<Document<'a>> {
+fn inline_single_element<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    array_like: &ArrayLike<'a, 'alloc>,
+) -> Option<Document<'a>> {
     if array_like.len() != 1 {
         return None;
     }

@@ -7,9 +7,10 @@ use crate::internal::expression::parse_expression_with_precedence;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_clone(stream: &mut TokenStream<'_, '_>) -> Result<Clone, ParseError> {
-    Ok(Clone {
-        clone: utils::expect_keyword(stream, T!["clone"])?,
-        object: Box::new(parse_expression_with_precedence(stream, Precedence::Clone)?),
-    })
+#[inline]
+pub fn parse_clone<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Clone<'i>, ParseError> {
+    let clone = utils::expect_keyword(stream, T!["clone"])?;
+    let object = parse_expression_with_precedence(stream, Precedence::Clone)?;
+
+    Ok(Clone { clone, object: stream.boxed(object) })
 }

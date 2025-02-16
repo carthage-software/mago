@@ -9,30 +9,37 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_while(stream: &mut TokenStream<'_, '_>) -> Result<While, ParseError> {
-    Ok(While {
-        r#while: utils::expect_keyword(stream, T!["while"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: Box::new(parse_expression(stream)?),
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_while_body(stream)?,
-    })
+#[inline]
+pub fn parse_while<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<While<'i>, ParseError> {
+    let r#while = utils::expect_keyword(stream, T!["while"])?;
+    let left_parenthesis = utils::expect_span(stream, T!["("])?;
+    let condition = parse_expression(stream)?;
+    let right_parenthesis = utils::expect_span(stream, T![")"])?;
+    let body = parse_while_body(stream)?;
+
+    Ok(While { r#while, left_parenthesis, condition: stream.boxed(condition), right_parenthesis, body })
 }
 
-pub fn parse_while_body(stream: &mut TokenStream<'_, '_>) -> Result<WhileBody, ParseError> {
+#[inline]
+pub fn parse_while_body<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<WhileBody<'i>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => WhileBody::ColonDelimited(parse_while_colon_delimited_body(stream)?),
-        _ => WhileBody::Statement(Box::new(parse_statement(stream)?)),
+        _ => {
+            let statement = parse_statement(stream)?;
+
+            WhileBody::Statement(stream.boxed(statement))
+        }
     })
 }
 
-pub fn parse_while_colon_delimited_body(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<WhileColonDelimitedBody, ParseError> {
+#[inline]
+pub fn parse_while_colon_delimited_body<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<WhileColonDelimitedBody<'i>, ParseError> {
     Ok(WhileColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = vec![];
+            let mut statements = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["endwhile"]) {
                     break;

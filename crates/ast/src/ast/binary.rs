@@ -1,8 +1,8 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
+use mago_interner::ThreadedInterner;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_token::GetPrecedence;
@@ -12,7 +12,7 @@ use crate::ast::expression::Expression;
 use crate::Keyword;
 
 /// Represents a PHP binary operator.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum BinaryOperator {
@@ -51,12 +51,12 @@ pub enum BinaryOperator {
 /// Represents a PHP binary operation.
 ///
 /// A binary operation is an operation that takes two operands, a left-hand side and a right-hand side.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Binary {
-    pub lhs: Box<Expression>,
+pub struct Binary<'a> {
+    pub lhs: Box<'a, Expression<'a>>,
     pub operator: BinaryOperator,
-    pub rhs: Box<Expression>,
+    pub rhs: Box<'a, Expression<'a>>,
 }
 
 impl BinaryOperator {
@@ -285,7 +285,7 @@ impl HasSpan for BinaryOperator {
     }
 }
 
-impl HasSpan for Binary {
+impl HasSpan for Binary<'_> {
     fn span(&self) -> Span {
         self.lhs.span().join(self.rhs.span())
     }

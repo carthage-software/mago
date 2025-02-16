@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 use std::str::FromStr;
 
+use bumpalo::Bump;
 use clap::Parser;
 
 use mago_interner::ThreadedInterner;
@@ -169,13 +170,15 @@ pub async fn find_references(
         let query = query.clone();
 
         handles.push(tokio::spawn(async move {
+            let bump = Bump::new();
+
             // 1) Load the source code
             let source = manager.load(&source_id)?;
             // 2) Build module
             let (module, program) =
-                Module::build_with_ast(&interner, php_version, source, ModuleBuildOptions::new(false, false));
+                Module::build_with_ast(&interner, &bump, php_version, source, ModuleBuildOptions::new(false, false));
             // 3) Use the reference finder
-            let references = ReferenceFinder::new(&interner).find(&module, &program, query);
+            let references = ReferenceFinder::new(&interner).find(&module, program, query);
 
             // Increment progress after finishing this file
             progress_bar.inc(1);

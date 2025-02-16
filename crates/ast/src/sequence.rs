@@ -1,7 +1,6 @@
 use std::slice::Iter;
-use std::vec::IntoIter;
 
-use serde::Deserialize;
+use bumpalo::collections::Vec;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -14,10 +13,10 @@ use mago_token::Token;
 /// An example of this is modifiers in a method declaration.
 ///
 /// i.e. `public` and `static` in `public static function foo() {}`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, Hash, Serialize)]
 #[repr(transparent)]
-pub struct Sequence<T> {
-    pub nodes: Vec<T>,
+pub struct Sequence<'a, T> {
+    pub nodes: Vec<'a, T>,
 }
 
 /// Represents a sequence of nodes separated by a token.
@@ -25,21 +24,16 @@ pub struct Sequence<T> {
 /// An example of this is arguments in a function call, where the tokens are commas.
 ///
 /// i.e. `1`, `2` and `3` in `foo(1, 2, 3)`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct TokenSeparatedSequence<T> {
-    pub nodes: Vec<T>,
-    pub tokens: Vec<Token>,
+#[derive(Debug, Eq, PartialEq, Hash, Serialize)]
+pub struct TokenSeparatedSequence<'a, T> {
+    pub nodes: Vec<'a, T>,
+    pub tokens: Vec<'a, Token>,
 }
 
-impl<T: HasSpan> Sequence<T> {
+impl<'a, T: HasSpan> Sequence<'a, T> {
     #[inline]
-    pub const fn new(inner: Vec<T>) -> Self {
+    pub const fn new(inner: Vec<'a, T>) -> Self {
         Self { nodes: inner }
-    }
-
-    #[inline]
-    pub const fn empty() -> Self {
-        Self { nodes: vec![] }
     }
 
     #[inline]
@@ -100,17 +94,11 @@ impl<T: HasSpan> Sequence<T> {
     }
 }
 
-impl<T: HasSpan> TokenSeparatedSequence<T> {
+impl<'a, T: HasSpan> TokenSeparatedSequence<'a, T> {
     #[inline]
     #[must_use]
-    pub const fn new(inner: Vec<T>, tokens: Vec<Token>) -> Self {
+    pub const fn new(inner: Vec<'a, T>, tokens: Vec<'a, Token>) -> Self {
         Self { nodes: inner, tokens }
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self { nodes: vec![], tokens: vec![] }
     }
 
     #[inline]
@@ -211,38 +199,20 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
     }
 }
 
-impl<T: HasSpan> FromIterator<T> for Sequence<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self { nodes: iter.into_iter().collect() }
-    }
-}
-
-impl<T: HasSpan> IntoIterator for Sequence<T> {
+impl<'a, T: HasSpan> IntoIterator for Sequence<'a, T> {
     type Item = T;
-    type IntoIter = IntoIter<Self::Item>;
+    type IntoIter = <Vec<'a, T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.nodes.into_iter()
     }
 }
 
-impl<T: HasSpan> IntoIterator for TokenSeparatedSequence<T> {
+impl<'a, T: HasSpan> IntoIterator for TokenSeparatedSequence<'a, T> {
     type Item = T;
-    type IntoIter = IntoIter<Self::Item>;
+    type IntoIter = <Vec<'a, T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.nodes.into_iter()
-    }
-}
-
-impl<T: HasSpan> std::default::Default for Sequence<T> {
-    fn default() -> Self {
-        Sequence::new(Default::default())
-    }
-}
-
-impl<T: HasSpan> std::default::Default for TokenSeparatedSequence<T> {
-    fn default() -> Self {
-        TokenSeparatedSequence::new(Default::default(), Default::default())
     }
 }

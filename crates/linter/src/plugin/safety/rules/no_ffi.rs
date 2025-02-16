@@ -35,7 +35,7 @@ impl Rule for NoFFIRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let identifier = match node {
             Node::StaticMethodCall(static_method_call) => {
                 if let Expression::Identifier(identifier) = static_method_call.class.as_ref() {

@@ -6,9 +6,9 @@ use crate::document::*;
 use crate::format::Format;
 use crate::Formatter;
 
-pub(super) fn should_hug_the_only_parameter<'a>(
-    f: &mut Formatter<'a>,
-    parameter_list: &'a FunctionLikeParameterList,
+pub(super) fn should_hug_the_only_parameter<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    parameter_list: &'a FunctionLikeParameterList<'alloc>,
 ) -> bool {
     if parameter_list.parameters.len() != 1 {
         return false;
@@ -38,9 +38,9 @@ pub(super) fn should_hug_the_only_parameter<'a>(
     true
 }
 
-pub(super) fn print_function_like_parameters<'a>(
-    f: &mut Formatter<'a>,
-    parameter_list: &'a FunctionLikeParameterList,
+pub(super) fn print_function_like_parameters<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    parameter_list: &'a FunctionLikeParameterList<'alloc>,
 ) -> Document<'a> {
     let should_hug_the_parameters = should_hug_the_only_parameter(f, parameter_list);
     let should_break = !should_hug_the_parameters

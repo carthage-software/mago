@@ -14,7 +14,7 @@ pub fn check_property(
     class_like_name: &str,
     class_like_fqcn: &str,
     class_like_is_interface: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     let first_variable = property.first_variable();
     let first_variable_id = first_variable.name;
@@ -386,7 +386,7 @@ pub fn check_property(
                     let item_name_id = property_concrete_item.variable.name;
                     let item_name = context.interner.lookup(&item_name_id);
 
-                    if !property_concrete_item.value.is_constant(context.version, false) {
+                    if !property_concrete_item.value.is_constant(&context.version, false) {
                         context.issues.push(
                             Issue::error(format!(
                                 "Property `{}::{}` value contains a non-constant expression.",

@@ -8,12 +8,13 @@ use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 use crate::internal::variable::parse_variable;
 
-pub fn parse_global(stream: &mut TokenStream<'_, '_>) -> Result<Global, ParseError> {
+#[inline]
+pub fn parse_global<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Global<'i>, ParseError> {
     Ok(Global {
         global: utils::expect_keyword(stream, T!["global"])?,
         variables: {
-            let mut variables = vec![];
-            let mut commas = vec![];
+            let mut variables = stream.vec();
+            let mut commas = stream.vec();
 
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {

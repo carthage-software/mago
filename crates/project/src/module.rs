@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::Bump;
 use serde::Serialize;
 
 use mago_ast::Program;
@@ -17,7 +17,7 @@ use crate::internal;
 ///
 /// It encapsulates the original source, resolved names, any parsing errors,
 /// optional reflection data (if enabled), and a collection of semantic issues.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Module {
     pub source: Source,
     pub names: Names,
@@ -31,7 +31,7 @@ pub struct Module {
 /// The options determine whether the module should perform reflection, validation, or both:
 /// - `reflect`: When true, reflection is performed.
 /// - `validate`: When true, semantic validation is performed.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub struct ModuleBuildOptions {
     pub reflect: bool,
     pub validate: bool,
@@ -64,7 +64,8 @@ impl Module {
         source: Source,
         options: ModuleBuildOptions,
     ) -> Self {
-        let (module, _) = Self::build_with_ast(interner, version, source, options);
+        let bump = Bump::new();
+        let (module, _) = Self::build_with_ast(interner, &bump, version, source, options);
 
         module
     }
@@ -80,6 +81,7 @@ impl Module {
     /// # Arguments
     ///
     /// * `interner` - A reference to a `ThreadedInterner` for efficient string interning.
+    /// * `bump` - A reference to a `Bump` allocator for temporary memory allocation.
     /// * `version` - The PHP version used to guide parsing and analysis.
     /// * `source` - The PHP source code encapsulated in a `Source` struct.
     /// * `options` - The build options that control reflection and validation.
@@ -93,15 +95,16 @@ impl Module {
     /// This is useful when the AST is required immediately before moving the module
     /// to another context (e.g., across threads) so that the cost of re-parsing can be avoided.
     #[inline(always)]
-    pub fn build_with_ast(
-        interner: &ThreadedInterner,
+    pub fn build_with_ast<'i>(
+        interner: &'i ThreadedInterner,
+        bump: &'i Bump,
         version: PHPVersion,
         source: Source,
         options: ModuleBuildOptions,
-    ) -> (Self, Program) {
-        let (program, parse_error) = mago_parser::parse_source(interner, &source);
-        let names = Names::resolve(interner, &program);
-        let (reflection, issues) = internal::build(interner, version, &source, &program, &names, options);
+    ) -> (Self, &'i Program<'i>) {
+        let (program, parse_error) = mago_parser::parse_source(interner, bump, &source);
+        let names = Names::resolve(interner, program);
+        let (reflection, issues) = internal::build(interner, version, &source, program, &names, options);
         let module = Self { source, parse_error, names, reflection, issues };
 
         (module, program)
@@ -115,12 +118,13 @@ impl Module {
     /// # Arguments
     ///
     /// * `interner` - A reference to a `ThreadedInterner` used for efficient string handling during parsing.
+    /// * `bump` - A reference to a `Bump` allocator for temporary memory allocation during parsing.
     ///
     /// # Returns
     ///
     /// A `Program` representing the abstract syntax tree (AST) of the module.
-    pub fn parse(&self, interner: &ThreadedInterner) -> Program {
-        mago_parser::parse_source(interner, &self.source).0
+    pub fn parse<'alloc>(&self, interner: &ThreadedInterner, bump: &'alloc Bump) -> &'alloc Program<'alloc> {
+        mago_parser::parse_source(interner, bump, &self.source).0
     }
 
     /// Retrieves the category of the module's source.

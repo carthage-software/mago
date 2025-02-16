@@ -2,15 +2,15 @@ use mago_ast::*;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControlFlow<'a> {
-    Return(&'a Return),
-    Throw(&'a Throw),
-    Continue(&'a Continue),
-    Break(&'a Break),
+#[derive(Debug, Clone, Copy, Hash)]
+pub enum ControlFlow<'ast, 'alloc> {
+    Return(&'ast Return<'alloc>),
+    Throw(&'ast Throw<'alloc>),
+    Continue(&'ast Continue<'alloc>),
+    Break(&'ast Break<'alloc>),
 }
 
-impl HasSpan for ControlFlow<'_> {
+impl HasSpan for ControlFlow<'_, '_> {
     fn span(&self) -> Span {
         match self {
             ControlFlow::Return(r#return) => r#return.span(),
@@ -22,7 +22,7 @@ impl HasSpan for ControlFlow<'_> {
 }
 
 #[inline]
-pub fn find_control_flows_in_block(block: &Block) -> Vec<ControlFlow<'_>> {
+pub fn find_control_flows_in_block<'ast, 'alloc>(block: &'ast Block<'alloc>) -> Vec<ControlFlow<'ast, 'alloc>> {
     let mut controls = vec![];
 
     for statement in block.statements.iter() {
@@ -33,7 +33,9 @@ pub fn find_control_flows_in_block(block: &Block) -> Vec<ControlFlow<'_>> {
 }
 
 #[inline]
-pub fn find_control_flows_in_statement(statement: &Statement) -> Vec<ControlFlow<'_>> {
+pub fn find_control_flows_in_statement<'ast, 'alloc>(
+    statement: &'ast Statement<'alloc>,
+) -> Vec<ControlFlow<'ast, 'alloc>> {
     let mut controls = vec![];
 
     match statement {
@@ -235,7 +237,9 @@ pub fn find_control_flows_in_statement(statement: &Statement) -> Vec<ControlFlow
 }
 
 #[inline]
-pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlFlow<'_>> {
+pub fn find_control_flows_in_expression<'ast, 'alloc>(
+    expression: &'ast Expression<'alloc>,
+) -> Vec<ControlFlow<'ast, 'alloc>> {
     let mut controls = vec![];
 
     match expression {
@@ -544,7 +548,7 @@ pub fn find_control_flows_in_expression(expression: &Expression) -> Vec<ControlF
     controls
 }
 
-fn find_control_flows_in_variable(variable: &Variable) -> Vec<ControlFlow<'_>> {
+fn find_control_flows_in_variable<'ast, 'alloc>(variable: &'ast Variable<'alloc>) -> Vec<ControlFlow<'ast, 'alloc>> {
     match variable {
         Variable::Indirect(indirect_variable) => {
             find_control_flows_in_expression(indirect_variable.expression.as_ref())

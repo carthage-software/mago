@@ -1,5 +1,4 @@
 use ordered_float::OrderedFloat;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -9,7 +8,7 @@ use mago_span::Span;
 
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
 pub enum Literal {
@@ -21,7 +20,7 @@ pub enum Literal {
     Null(Keyword),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
 #[repr(C)]
 pub enum LiteralStringKind {
@@ -29,7 +28,7 @@ pub enum LiteralStringKind {
     DoubleQuoted,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct LiteralString {
     pub kind: LiteralStringKind,
@@ -37,7 +36,7 @@ pub struct LiteralString {
     pub value: StringIdentifier,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct LiteralInteger {
     pub span: Span,
@@ -45,7 +44,7 @@ pub struct LiteralInteger {
     pub value: Option<u64>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct LiteralFloat {
     pub span: Span,

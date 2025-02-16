@@ -32,7 +32,7 @@ impl Rule for RedundantBlockRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let statements = match node {
             Node::Program(program) => program.statements.as_slice(),
             Node::Block(block) => block.statements.as_slice(),

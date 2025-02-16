@@ -69,7 +69,7 @@ impl Rule for RequireConstantTypeRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::ClassLikeConstant(class_like_constant) = node else { return LintDirective::default() };
 
         if class_like_constant.hint.is_some() {

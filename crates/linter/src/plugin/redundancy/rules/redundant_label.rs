@@ -31,7 +31,7 @@ impl Rule for RedundantLabelRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(_) = node else { return LintDirective::Abort };
 
         let labels =

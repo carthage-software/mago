@@ -284,6 +284,9 @@ name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "byteorder"
@@ -1518,6 +1521,7 @@ version = "0.10.0"
 dependencies = [
  "ahash",
  "async-walkdir",
+ "bumpalo",
  "clap",
  "colored",
  "config",
@@ -1556,6 +1560,7 @@ dependencies = [
 name = "mago-ast"
 version = "0.10.0"
 dependencies = [
+ "bumpalo",
  "mago-interner",
  "mago-php-version",
  "mago-source",
@@ -1616,6 +1621,7 @@ version = "0.10.0"
 dependencies = [
  "ahash",
  "bitflags",
+ "bumpalo",
  "indoc",
  "mago-ast",
  "mago-interner",
@@ -1656,6 +1662,7 @@ name = "mago-linter"
 version = "0.10.0"
 dependencies = [
  "ahash",
+ "bumpalo",
  "indoc",
  "mago-ast",
  "mago-ast-utils",
@@ -1693,6 +1700,7 @@ dependencies = [
 name = "mago-parser"
 version = "0.10.0"
 dependencies = [
+ "bumpalo",
  "either",
  "mago-ast",
  "mago-interner",
@@ -1721,6 +1729,7 @@ name = "mago-project"
 version = "0.10.0"
 dependencies = [
  "ahash",
+ "bumpalo",
  "mago-ast",
  "mago-ast-utils",
  "mago-interner",
@@ -1844,6 +1853,7 @@ dependencies = [
 name = "mago-wasm"
 version = "0.10.0"
 dependencies = [
+ "bumpalo",
  "getrandom 0.2.15",
  "mago-ast",
  "mago-formatter",

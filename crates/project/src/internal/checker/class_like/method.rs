@@ -18,7 +18,7 @@ pub fn check_method(
     class_like_fqcn: &str,
     class_like_kind: &str,
     class_like_is_interface: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
 ) {
     let mut last_static: Option<Span> = None;
     let mut last_final: Option<Span> = None;

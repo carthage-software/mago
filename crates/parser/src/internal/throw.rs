@@ -6,6 +6,10 @@ use crate::internal::expression::parse_expression;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_throw(stream: &mut TokenStream<'_, '_>) -> Result<Throw, ParseError> {
-    Ok(Throw { throw: utils::expect_keyword(stream, T!["throw"])?, exception: Box::new(parse_expression(stream)?) })
+#[inline]
+pub fn parse_throw<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Throw<'i>, ParseError> {
+    let throw = utils::expect_keyword(stream, T!["throw"])?;
+    let exception = parse_expression(stream)?;
+
+    Ok(Throw { throw, exception: stream.boxed(exception) })
 }

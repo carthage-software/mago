@@ -32,7 +32,7 @@ impl Rule for NoErrorControlOperatorRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::UnaryPrefix(unary_prefix) = node else { return LintDirective::default() };
 
         if let UnaryPrefixOperator::ErrorControl(_) = unary_prefix.operator {

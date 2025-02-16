@@ -12,36 +12,36 @@ use crate::Formatter;
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum AssignmentLikeNode<'a> {
+pub(super) enum AssignmentLikeNode<'a, 'alloc> {
     /// Represents a standard assignment operation, such as `$a = $b`.
-    AssignmentOperation(&'a Assignment),
+    AssignmentOperation(&'a Assignment<'alloc>),
 
     /// Represents a class-like constant item.
     ///
     /// - `A = 1` in `class A { public const A = 1; }`.
-    ClassLikeConstantItem(&'a ClassLikeConstantItem),
+    ClassLikeConstantItem(&'a ClassLikeConstantItem<'alloc>),
 
     /// Represents a global constant item.
     ///
     /// - `A = 1` in `const A = 1;`.
-    ConstantItem(&'a ConstantItem),
+    ConstantItem(&'a ConstantItem<'alloc>),
 
     /// Represents a backed enum case item.
     ///
     /// - `A = 1` in `enum A: int { case A = 1; }`.
-    EnumCaseBackedItem(&'a EnumCaseBackedItem),
+    EnumCaseBackedItem(&'a EnumCaseBackedItem<'alloc>),
 
     /// Represents a property declaration with an initializer in a class.
     ///
     /// - `$foo = 1` in `class A { public int $foo = 1; }`.
-    PropertyConcreteItem(&'a PropertyConcreteItem),
+    PropertyConcreteItem(&'a PropertyConcreteItem<'alloc>),
 
     /// Represents a key-value pair in an array, list, or similar structure.
     ///
     /// - `$a => $b` in `[ $a => $b ]`
     /// - `$a => $b` in `array($a => $b)`
     /// - `$a => $b` in `list($a => $b)`
-    KeyValueArrayElement(&'a KeyValueArrayElement),
+    KeyValueArrayElement(&'a KeyValueArrayElement<'alloc>),
 }
 
 #[derive(Debug)]
@@ -55,12 +55,12 @@ enum Layout {
     Fluid,
 }
 
-pub(super) fn print_assignment<'a>(
-    f: &mut Formatter<'a>,
-    assignment_node: AssignmentLikeNode<'a>,
+pub(super) fn print_assignment<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    assignment_node: AssignmentLikeNode<'a, 'alloc>,
     lhs: Document<'a>,
     operator: Document<'a>,
-    rhs_expression: &'a Expression,
+    rhs_expression: &'a Expression<'alloc>,
 ) -> Document<'a> {
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
     let rhs = rhs_expression.format(f);
@@ -118,11 +118,11 @@ pub(super) fn print_assignment<'a>(
     }
 }
 
-fn choose_layout<'a, 'b>(
-    f: &Formatter<'a>,
+fn choose_layout<'a, 'b, 'alloc>(
+    f: &Formatter<'a, 'alloc>,
     lhs: &'b Document<'a>,
-    assignment_like_node: &'b AssignmentLikeNode<'a>,
-    rhs_expression: &'a Expression,
+    assignment_like_node: &'b AssignmentLikeNode<'a, 'alloc>,
+    rhs_expression: &'a Expression<'alloc>,
 ) -> Layout {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
         return choose_layout(f, lhs, assignment_like_node, &parenthesized.expression);
@@ -194,7 +194,7 @@ fn is_assignment(expression: &Expression) -> bool {
 ///
 /// A destruction assignment is considered complex if it has more than two elements
 ///  and at least one of them is a key-value pair.
-fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
+fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
             let elements = match assignment.lhs.as_ref() {
@@ -212,7 +212,7 @@ fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_>) -> bo
     }
 }
 
-fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
+fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
             matches!(
@@ -226,7 +226,10 @@ fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNo
 
 const MIN_OVERLAP_FOR_BREAK: usize = 3;
 
-fn is_property_like_with_short_key<'a>(f: &Formatter<'a>, assignment_like_node: &AssignmentLikeNode<'a>) -> bool {
+fn is_property_like_with_short_key<'a, 'alloc>(
+    f: &Formatter<'a, 'alloc>,
+    assignment_like_node: &AssignmentLikeNode<'a, 'alloc>,
+) -> bool {
     let width = match assignment_like_node {
         AssignmentLikeNode::ClassLikeConstantItem(constant_item) => f.lookup(&constant_item.name.value).len(),
         AssignmentLikeNode::ConstantItem(constant_item) => f.lookup(&constant_item.name.value).len(),
@@ -256,7 +259,11 @@ fn is_property_like_with_short_key<'a>(f: &Formatter<'a>, assignment_like_node: 
 }
 
 /// <https://github.com/prettier/prettier/blob/eebf0e4b5ec8ac24393c56ced4b4819d4c551f31/src/language-js/print/assignment.js#L182>
-fn should_break_after_operator<'a>(f: &Formatter<'a>, rhs_expression: &'a Expression, has_short_key: bool) -> bool {
+fn should_break_after_operator<'a, 'alloc>(
+    f: &Formatter<'a, 'alloc>,
+    rhs_expression: &'a Expression<'alloc>,
+    has_short_key: bool,
+) -> bool {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
         return should_break_after_operator(f, &parenthesized.expression, has_short_key);
     }
@@ -313,7 +320,10 @@ fn should_break_after_operator<'a>(f: &Formatter<'a>, rhs_expression: &'a Expres
     false
 }
 
-fn is_poorly_breakable_member_or_call_chain<'a>(f: &Formatter<'a>, rhs_expression: &'a Expression) -> bool {
+fn is_poorly_breakable_member_or_call_chain<'a, 'alloc>(
+    f: &Formatter<'a, 'alloc>,
+    rhs_expression: &'a Expression<'alloc>,
+) -> bool {
     let mut is_chain_expression = false;
     let mut is_identifier_or_variable = false;
     let mut call_argument_lists = vec![];
@@ -384,7 +394,7 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &Formatter<'a>, rhs_expressio
     true
 }
 
-fn is_lone_short_argument_list<'a>(f: &Formatter<'a>, argument_list: &'a ArgumentList) -> bool {
+fn is_lone_short_argument_list<'a, 'alloc>(f: &Formatter<'a, 'alloc>, argument_list: &'a ArgumentList<'alloc>) -> bool {
     if let Some(first_argument) = argument_list.arguments.first() {
         if argument_list.arguments.len() == 1 {
             return is_lone_short_argument(f, first_argument.value());
@@ -398,7 +408,7 @@ fn is_lone_short_argument_list<'a>(f: &Formatter<'a>, argument_list: &'a Argumen
 
 const LONE_SHORT_ARGUMENT_THRESHOLD_RATE: f32 = 0.25;
 
-fn is_lone_short_argument<'a>(f: &Formatter<'a>, argument_value: &'a Expression) -> bool {
+fn is_lone_short_argument<'a, 'alloc>(f: &Formatter<'a, 'alloc>, argument_value: &'a Expression<'alloc>) -> bool {
     let argument_span = argument_value.span();
     if f.has_comment(argument_span, CommentFlags::all()) {
         return false;

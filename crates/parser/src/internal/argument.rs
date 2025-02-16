@@ -8,7 +8,10 @@ use crate::internal::identifier;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_optional_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<Option<ArgumentList>, ParseError> {
+#[inline]
+pub fn parse_optional_argument_list<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<Option<ArgumentList<'i>>, ParseError> {
     let next = utils::peek(stream)?;
     if next.kind == T!["("] {
         Ok(Some(parse_argument_list(stream)?))
@@ -17,12 +20,13 @@ pub fn parse_optional_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<
     }
 }
 
-pub fn parse_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<ArgumentList, ParseError> {
+#[inline]
+pub fn parse_argument_list<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ArgumentList<'i>, ParseError> {
     Ok(ArgumentList {
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         arguments: {
-            let mut arguments = Vec::new();
-            let mut commas = Vec::new();
+            let mut arguments = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 let next = utils::peek(stream)?;
                 if next.kind == T![")"] {
@@ -45,22 +49,23 @@ pub fn parse_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<ArgumentL
     })
 }
 
-pub fn parse_argument(stream: &mut TokenStream<'_, '_>) -> Result<Argument, ParseError> {
+#[inline]
+pub fn parse_argument<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Argument<'i>, ParseError> {
     let token = utils::peek(stream)?;
 
     if token.kind.is_identifier_maybe_reserved()
         && matches!(utils::maybe_peek_nth(stream, 1)?.map(|token| token.kind), Some(T![":"]))
     {
-        return Ok(Argument::Named(NamedArgument {
-            name: identifier::parse_local_identifier(stream)?,
-            colon: utils::expect(stream, T![":"])?.span,
-            ellipsis: utils::maybe_expect(stream, T!["..."])?.map(|token| token.span),
-            value: expression::parse_expression(stream)?,
-        }));
+        let name = identifier::parse_local_identifier(stream)?;
+        let colon = utils::expect(stream, T![":"])?.span;
+        let ellipsis = utils::maybe_expect(stream, T!["..."])?.map(|token| token.span);
+        let value = expression::parse_expression(stream)?;
+
+        return Ok(Argument::Named(NamedArgument { name, colon, ellipsis, value: stream.boxed(value) }));
     }
 
-    Ok(Argument::Positional(PositionalArgument {
-        ellipsis: utils::maybe_expect(stream, T!["..."])?.map(|token| token.span),
-        value: expression::parse_expression(stream)?,
-    }))
+    let ellipsis = utils::maybe_expect(stream, T!["..."])?.map(|token| token.span);
+    let value = expression::parse_expression(stream)?;
+
+    Ok(Argument::Positional(PositionalArgument { ellipsis, value: stream.boxed(value) }))
 }

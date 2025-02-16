@@ -102,7 +102,7 @@ impl Rule for RequireReturnTypeRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         match node {
             Node::Function(function) => {
                 if function.return_type_hint.is_some() {

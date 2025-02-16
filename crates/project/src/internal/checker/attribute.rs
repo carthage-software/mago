@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Context<'_>) {
+pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Context<'_, '_>) {
     if !context.version.is_supported(Feature::Attribute) {
         context.issues.push(
             Issue::error("Attributes are only available in PHP 8.0 and above.")
@@ -40,7 +40,7 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
                     );
                 }
 
-                if !value.is_constant(context.version, true) {
+                if !value.is_constant(&context.version, true) {
                     context.issues.push(
                         Issue::error(format!("Attribute `{}` argument contains a non-constant expression.", name))
                             .with_annotations([

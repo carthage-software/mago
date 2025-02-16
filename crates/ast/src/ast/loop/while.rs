@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -24,23 +24,23 @@ use crate::sequence::Sequence;
 ///   $i++;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct While {
+pub struct While<'a> {
     pub r#while: Keyword,
     pub left_parenthesis: Span,
-    pub condition: Box<Expression>,
+    pub condition: Box<'a, Expression<'a>>,
     pub right_parenthesis: Span,
-    pub body: WhileBody,
+    pub body: WhileBody<'a>,
 }
 
 /// Represents the body of a while statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum WhileBody {
-    Statement(Box<Statement>),
-    ColonDelimited(WhileColonDelimitedBody),
+pub enum WhileBody<'a> {
+    Statement(Box<'a, Statement<'a>>),
+    ColonDelimited(WhileColonDelimitedBody<'a>),
 }
 
 /// Represents a colon-delimited body of a while statement.
@@ -56,22 +56,22 @@ pub enum WhileBody {
 ///   $i++;
 /// endwhile;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct WhileColonDelimitedBody {
+pub struct WhileColonDelimitedBody<'a> {
     pub colon: Span,
-    pub statements: Sequence<Statement>,
+    pub statements: Sequence<'a, Statement<'a>>,
     pub end_while: Keyword,
     pub terminator: Terminator,
 }
 
-impl HasSpan for While {
+impl HasSpan for While<'_> {
     fn span(&self) -> Span {
         self.r#while.span().join(self.body.span())
     }
 }
 
-impl HasSpan for WhileBody {
+impl HasSpan for WhileBody<'_> {
     fn span(&self) -> Span {
         match self {
             WhileBody::Statement(statement) => statement.span(),
@@ -80,7 +80,7 @@ impl HasSpan for WhileBody {
     }
 }
 
-impl HasSpan for WhileColonDelimitedBody {
+impl HasSpan for WhileColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         self.colon.join(self.terminator.span())
     }

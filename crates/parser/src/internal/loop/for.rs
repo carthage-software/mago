@@ -10,13 +10,14 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_for(stream: &mut TokenStream<'_, '_>) -> Result<For, ParseError> {
+#[inline]
+pub fn parse_for<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<For<'i>, ParseError> {
     Ok(For {
         r#for: utils::expect_keyword(stream, T!["for"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         initializations: {
-            let mut initializations = vec![];
-            let mut commas = vec![];
+            let mut initializations = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T![";"]) {
                     break;
@@ -38,8 +39,8 @@ pub fn parse_for(stream: &mut TokenStream<'_, '_>) -> Result<For, ParseError> {
         },
         initializations_semicolon: utils::expect_span(stream, T![";"])?,
         conditions: {
-            let mut conditions = vec![];
-            let mut commas = vec![];
+            let mut conditions = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T![";"]) {
                     break;
@@ -61,8 +62,8 @@ pub fn parse_for(stream: &mut TokenStream<'_, '_>) -> Result<For, ParseError> {
         },
         conditions_semicolon: utils::expect_span(stream, T![";"])?,
         increments: {
-            let mut increments = vec![];
-            let mut commas = vec![];
+            let mut increments = stream.vec();
+            let mut commas = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T![")"]) {
                     break;
@@ -87,18 +88,26 @@ pub fn parse_for(stream: &mut TokenStream<'_, '_>) -> Result<For, ParseError> {
     })
 }
 
-pub fn parse_for_body(stream: &mut TokenStream<'_, '_>) -> Result<ForBody, ParseError> {
+#[inline]
+pub fn parse_for_body<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ForBody<'i>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => ForBody::ColonDelimited(parse_for_colon_delimited_body(stream)?),
-        _ => ForBody::Statement(Box::new(parse_statement(stream)?)),
+        _ => {
+            let statement = parse_statement(stream)?;
+
+            ForBody::Statement(stream.boxed(statement))
+        }
     })
 }
 
-pub fn parse_for_colon_delimited_body(stream: &mut TokenStream<'_, '_>) -> Result<ForColonDelimitedBody, ParseError> {
+#[inline]
+pub fn parse_for_colon_delimited_body<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<ForColonDelimitedBody<'i>, ParseError> {
     Ok(ForColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = vec![];
+            let mut statements = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["endfor"]) {
                     break;

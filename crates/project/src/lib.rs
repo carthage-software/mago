@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_interner::ThreadedInterner;
@@ -16,7 +15,7 @@ pub mod module;
 /// or from an empty state, and then add [`Module`]s one by one. When finished,
 /// calling [`build`] returns a fully constructed [`Project`] with all module reflections
 /// merged into a unified reflection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ProjectBuilder {
     interner: ThreadedInterner,
     reflection: CodebaseReflection,
@@ -76,7 +75,7 @@ impl ProjectBuilder {
 ///
 /// A `Project` is composed of multiple modules along with a unified reflection of the codebase.
 /// The reflection provides a merged view of code insights (such as classes and functions) extracted from each module.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Project {
     /// A list of modules that comprise the project.
     pub modules: Vec<Module>,

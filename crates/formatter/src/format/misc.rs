@@ -53,7 +53,7 @@ pub(super) fn has_new_line_in_range(text: &str, start: usize, end: usize) -> boo
 /// # Performance
 ///
 /// O(1) for most checks, with potential O(n) recursion for nested expressions
-pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expression) -> bool {
+pub(super) fn should_hug_expression<'a>(f: &Formatter<'a, '_>, expression: &'a Expression) -> bool {
     if let Expression::Parenthesized(inner) = expression {
         return should_hug_expression(f, &inner.expression);
     }
@@ -92,10 +92,10 @@ pub(super) fn is_string_word_type(node: &Expression) -> bool {
     }
 }
 
-pub(super) fn print_colon_delimited_body<'a>(
-    f: &mut Formatter<'a>,
+pub(super) fn print_colon_delimited_body<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
     colon: &'a Span,
-    statements: &'a Sequence<Statement>,
+    statements: &'a Sequence<'alloc, Statement<'alloc>>,
     end_keyword: &'a Keyword,
     terminator: &'a Terminator,
 ) -> Document<'a> {
@@ -126,7 +126,10 @@ pub(super) fn print_colon_delimited_body<'a>(
     Document::Group(Group::new(parts).with_break(true))
 }
 
-pub(super) fn print_modifiers<'a>(f: &mut Formatter<'a>, modifiers: &'a Sequence<Modifier>) -> Vec<Document<'a>> {
+pub(super) fn print_modifiers<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    modifiers: &'a Sequence<'alloc, Modifier>,
+) -> Vec<Document<'a>> {
     let mut printed_modifiers = vec![];
 
     if let Some(modifier) = modifiers.get_final() {
@@ -174,9 +177,9 @@ pub(super) fn print_modifiers<'a>(f: &mut Formatter<'a>, modifiers: &'a Sequence
     Document::join(printed_modifiers, Separator::Space)
 }
 
-pub(super) fn print_attribute_list_sequence<'a>(
-    f: &mut Formatter<'a>,
-    attribute_lists: &'a Sequence<AttributeList>,
+pub(super) fn print_attribute_list_sequence<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    attribute_lists: &'a Sequence<'alloc, AttributeList<'alloc>>,
     can_inline: bool,
 ) -> Option<Document<'a>> {
     if attribute_lists.is_empty() {
@@ -205,7 +208,11 @@ pub(super) fn print_attribute_list_sequence<'a>(
     Some(Document::Group(Group::new(contents).with_break(true)))
 }
 
-pub(super) fn print_clause<'a>(f: &mut Formatter<'a>, node: &'a Statement, force_space: bool) -> Document<'a> {
+pub(super) fn print_clause<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    node: &'a Statement<'alloc>,
+    force_space: bool,
+) -> Document<'a> {
     let clause = node.format(f);
     let clause = adjust_clause(f, node, clause, force_space);
 
@@ -213,7 +220,7 @@ pub(super) fn print_clause<'a>(f: &mut Formatter<'a>, node: &'a Statement, force
 }
 
 pub(super) fn adjust_clause<'a>(
-    f: &mut Formatter<'a>,
+    f: &mut Formatter<'a, '_>,
     node: &'a Statement,
     clause: Document<'a>,
     mut force_space: bool,
@@ -271,7 +278,10 @@ pub(super) fn adjust_clause<'a>(
     }
 }
 
-pub(super) fn print_condition<'a>(f: &mut Formatter<'a>, condition: &'a Expression) -> Document<'a> {
+pub(super) fn print_condition<'a, 'alloc>(
+    f: &mut Formatter<'a, 'alloc>,
+    condition: &'a Expression<'alloc>,
+) -> Document<'a> {
     Document::Group(Group::new(vec![
         Document::String("("),
         Document::Indent(vec![

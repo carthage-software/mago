@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use bumpalo::Bump;
 use clap::Parser;
 
 use mago_formatter::format;
@@ -167,11 +168,13 @@ fn format_source(
     settings: FormatSettings,
     dry_run: bool,
 ) -> Result<bool, Error> {
+    let bump = Bump::new();
+
     // Load the source file.
     let source = manager.load(source)?;
 
     // Parse the source file to generate an AST.
-    let (program, error) = parse_source(interner, &source);
+    let (program, error) = parse_source(interner, &bump, &source);
 
     // Handle parsing errors and perform formatting.
     let changed = match error {
@@ -183,7 +186,7 @@ fn format_source(
             false
         }
         None => {
-            let formatted = format(interner, &source, &program, settings);
+            let formatted = format(interner, &source, program, settings);
 
             utils::apply_changes(interner, manager, &source, formatted, dry_run)?
         }

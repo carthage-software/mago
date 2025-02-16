@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -7,7 +6,7 @@ use mago_span::Span;
 use crate::ast::keyword::Keyword;
 use crate::ast::terminator::Terminator;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct HaltCompiler {
     pub halt_compiler: Keyword,

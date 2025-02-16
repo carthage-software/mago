@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -32,15 +31,15 @@ pub mod trait_use;
 ///
 /// interface Foo {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Interface {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Interface<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub interface: Keyword,
     pub name: LocalIdentifier,
-    pub extends: Option<Extends>,
+    pub extends: Option<Extends<'a>>,
     pub left_brace: Span,
-    pub members: Sequence<ClassLikeMember>,
+    pub members: Sequence<'a, ClassLikeMember<'a>>,
     pub right_brace: Span,
 }
 
@@ -58,17 +57,17 @@ pub struct Interface {
 ///     ) {}
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Class {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
+pub struct Class<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
+    pub modifiers: Sequence<'a, Modifier>,
     pub class: Keyword,
     pub name: LocalIdentifier,
-    pub extends: Option<Extends>,
-    pub implements: Option<Implements>,
+    pub extends: Option<Extends<'a>>,
+    pub implements: Option<Implements<'a>>,
     pub left_brace: Span,
-    pub members: Sequence<ClassLikeMember>,
+    pub members: Sequence<'a, ClassLikeMember<'a>>,
     pub right_brace: Span,
 }
 
@@ -86,18 +85,18 @@ pub struct Class {
 ///   ) {}
 /// };
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct AnonymousClass {
+pub struct AnonymousClass<'a> {
     pub new: Keyword,
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
+    pub modifiers: Sequence<'a, Modifier>,
     pub class: Keyword,
-    pub arguments: Option<ArgumentList>,
-    pub extends: Option<Extends>,
-    pub implements: Option<Implements>,
+    pub arguments: Option<ArgumentList<'a>>,
+    pub extends: Option<Extends<'a>>,
+    pub implements: Option<Implements<'a>>,
     pub left_brace: Span,
-    pub members: Sequence<ClassLikeMember>,
+    pub members: Sequence<'a, ClassLikeMember<'a>>,
     pub right_brace: Span,
 }
 
@@ -114,14 +113,14 @@ pub struct AnonymousClass {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Trait {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Trait<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub r#trait: Keyword,
     pub name: LocalIdentifier,
     pub left_brace: Span,
-    pub members: Sequence<ClassLikeMember>,
+    pub members: Sequence<'a, ClassLikeMember<'a>>,
     pub right_brace: Span,
 }
 
@@ -139,16 +138,16 @@ pub struct Trait {
 ///   case Left;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Enum {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Enum<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub r#enum: Keyword,
     pub name: LocalIdentifier,
-    pub backing_type_hint: Option<EnumBackingTypeHint>,
-    pub implements: Option<Implements>,
+    pub backing_type_hint: Option<EnumBackingTypeHint<'a>>,
+    pub implements: Option<Implements<'a>>,
     pub left_brace: Span,
-    pub members: Sequence<ClassLikeMember>,
+    pub members: Sequence<'a, ClassLikeMember<'a>>,
     pub right_brace: Span,
 }
 
@@ -171,14 +170,14 @@ pub struct Enum {
 ///   case XLarge = 3;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct EnumBackingTypeHint {
+pub struct EnumBackingTypeHint<'a> {
     pub colon: Span,
-    pub hint: Hint,
+    pub hint: Hint<'a>,
 }
 
-impl HasSpan for Interface {
+impl HasSpan for Interface<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
@@ -188,7 +187,7 @@ impl HasSpan for Interface {
     }
 }
 
-impl HasSpan for Class {
+impl HasSpan for Class<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
@@ -202,13 +201,13 @@ impl HasSpan for Class {
     }
 }
 
-impl HasSpan for AnonymousClass {
+impl HasSpan for AnonymousClass<'_> {
     fn span(&self) -> Span {
         self.new.span().join(self.right_brace)
     }
 }
 
-impl HasSpan for Trait {
+impl HasSpan for Trait<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
@@ -218,7 +217,7 @@ impl HasSpan for Trait {
     }
 }
 
-impl HasSpan for Enum {
+impl HasSpan for Enum<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.right_brace);
@@ -228,7 +227,7 @@ impl HasSpan for Enum {
     }
 }
 
-impl HasSpan for EnumBackingTypeHint {
+impl HasSpan for EnumBackingTypeHint<'_> {
     fn span(&self) -> Span {
         Span::between(self.colon, self.hint.span())
     }

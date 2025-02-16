@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use bumpalo::boxed::Box;
 use serde::Serialize;
 use strum::Display;
 
@@ -12,38 +12,38 @@ use crate::ast::keyword::Keyword;
 use crate::ast::terminator::Terminator;
 use crate::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct EnumCase {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct EnumCase<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub case: Keyword,
-    pub item: EnumCaseItem,
+    pub item: EnumCaseItem<'a>,
     pub terminator: Terminator,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Hash, Serialize, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C, u8)]
-pub enum EnumCaseItem {
+pub enum EnumCaseItem<'a> {
     Unit(EnumCaseUnitItem),
-    Backed(EnumCaseBackedItem),
+    Backed(EnumCaseBackedItem<'a>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
 pub struct EnumCaseUnitItem {
     pub name: LocalIdentifier,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct EnumCaseBackedItem {
+pub struct EnumCaseBackedItem<'a> {
     pub name: LocalIdentifier,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Box<'a, Expression<'a>>,
 }
 
-impl EnumCaseItem {
+impl EnumCaseItem<'_> {
     pub fn name(&self) -> &LocalIdentifier {
         match &self {
             EnumCaseItem::Unit(enum_case_unit_item) => &enum_case_unit_item.name,
@@ -52,7 +52,7 @@ impl EnumCaseItem {
     }
 }
 
-impl HasSpan for EnumCase {
+impl HasSpan for EnumCase<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.terminator.span());
@@ -62,7 +62,7 @@ impl HasSpan for EnumCase {
     }
 }
 
-impl HasSpan for EnumCaseItem {
+impl HasSpan for EnumCaseItem<'_> {
     fn span(&self) -> Span {
         match self {
             EnumCaseItem::Unit(item) => item.span(),
@@ -77,7 +77,7 @@ impl HasSpan for EnumCaseUnitItem {
     }
 }
 
-impl HasSpan for EnumCaseBackedItem {
+impl HasSpan for EnumCaseBackedItem<'_> {
     fn span(&self) -> Span {
         Span::between(self.name.span(), self.value.span())
     }

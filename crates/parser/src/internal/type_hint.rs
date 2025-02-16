@@ -6,6 +6,7 @@ use crate::internal::identifier;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
+#[inline]
 pub fn is_at_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<bool, ParseError> {
     Ok(matches!(
         utils::peek(stream)?.kind,
@@ -27,7 +28,8 @@ pub fn is_at_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<bool, ParseEr
     ))
 }
 
-pub fn parse_optional_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<Option<Hint>, ParseError> {
+#[inline]
+pub fn parse_optional_type_hint<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Option<Hint<'i>>, ParseError> {
     if is_at_type_hint(stream)? {
         Ok(Some(parse_type_hint(stream)?))
     } else {
@@ -35,7 +37,8 @@ pub fn parse_optional_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<Opti
     }
 }
 
-pub fn parse_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<Hint, ParseError> {
+#[inline]
+pub fn parse_type_hint<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Hint<'i>, ParseError> {
     let token = utils::peek(stream)?;
 
     let hint = match &token.kind {
@@ -99,7 +102,7 @@ pub fn parse_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<Hint, ParseEr
             let pipe = utils::expect(stream, T!["|"])?.span;
             let right = parse_type_hint(stream)?;
 
-            Hint::Union(UnionHint { left: Box::new(left), pipe, right: Box::new(right) })
+            Hint::Union(UnionHint { left: stream.boxed(left), pipe, right: stream.boxed(right) })
         }
         T!["&"]
             if !matches!(
@@ -111,22 +114,27 @@ pub fn parse_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<Hint, ParseEr
             let ampersand = utils::expect(stream, T!["&"])?.span;
             let right = parse_type_hint(stream)?;
 
-            Hint::Intersection(IntersectionHint { left: Box::new(left), ampersand, right: Box::new(right) })
+            Hint::Intersection(IntersectionHint { left: stream.boxed(left), ampersand, right: stream.boxed(right) })
         }
         _ => hint,
     })
 }
 
-pub fn parse_nullable_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<NullableHint, ParseError> {
+#[inline]
+pub fn parse_nullable_type_hint<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<NullableHint<'i>, ParseError> {
     let question_mark = utils::expect(stream, T!["?"])?.span;
+    let hint = parse_type_hint(stream)?;
 
-    Ok(NullableHint { question_mark, hint: Box::new(parse_type_hint(stream)?) })
+    Ok(NullableHint { question_mark, hint: stream.boxed(hint) })
 }
 
-pub fn parse_parenthesized_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<ParenthesizedHint, ParseError> {
+#[inline]
+pub fn parse_parenthesized_type_hint<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<ParenthesizedHint<'i>, ParseError> {
     let left_parenthesis = utils::expect(stream, T!["("])?.span;
-    let hint = Box::new(parse_type_hint(stream)?);
+    let hint = parse_type_hint(stream)?;
     let right_parenthesis = utils::expect(stream, T![")"])?.span;
 
-    Ok(ParenthesizedHint { left_parenthesis, hint, right_parenthesis })
+    Ok(ParenthesizedHint { left_parenthesis, hint: stream.boxed(hint), right_parenthesis })
 }

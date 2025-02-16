@@ -9,45 +9,67 @@ use crate::internal::terminator::parse_terminator;
 use crate::internal::token_stream::TokenStream;
 use crate::internal::utils;
 
-pub fn parse_foreach(stream: &mut TokenStream<'_, '_>) -> Result<Foreach, ParseError> {
+#[inline]
+pub fn parse_foreach<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<Foreach<'i>, ParseError> {
+    let foreach = utils::expect_keyword(stream, T!["foreach"])?;
+    let left_parenthesis = utils::expect_span(stream, T!["("])?;
+    let expression = parse_expression(stream)?;
+    let r#as = utils::expect_keyword(stream, T!["as"])?;
+    let target = parse_foreach_target(stream)?;
+    let right_parenthesis = utils::expect_span(stream, T![")"])?;
+    let body = parse_foreach_body(stream)?;
+
     Ok(Foreach {
-        foreach: utils::expect_keyword(stream, T!["foreach"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        expression: Box::new(parse_expression(stream)?),
-        r#as: utils::expect_keyword(stream, T!["as"])?,
-        target: parse_foreach_target(stream)?,
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_foreach_body(stream)?,
+        foreach,
+        left_parenthesis,
+        expression: stream.boxed(expression),
+        r#as,
+        target,
+        right_parenthesis,
+        body,
     })
 }
 
-pub fn parse_foreach_target(stream: &mut TokenStream<'_, '_>) -> Result<ForeachTarget, ParseError> {
-    let key_or_value = Box::new(parse_expression(stream)?);
+#[inline]
+pub fn parse_foreach_target<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ForeachTarget<'i>, ParseError> {
+    let key_or_value = parse_expression(stream)?;
 
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["=>"]) => ForeachTarget::KeyValue(ForeachKeyValueTarget {
-            key: key_or_value,
-            double_arrow: utils::expect_any(stream)?.span,
-            value: Box::new(parse_expression(stream)?),
-        }),
-        _ => ForeachTarget::Value(ForeachValueTarget { value: key_or_value }),
+        Some(T!["=>"]) => {
+            let key = key_or_value;
+            let double_arrow = utils::expect_span(stream, T!["=>"])?;
+            let value = parse_expression(stream)?;
+
+            ForeachTarget::KeyValue(ForeachKeyValueTarget {
+                key: stream.boxed(key),
+                double_arrow,
+                value: stream.boxed(value),
+            })
+        }
+        _ => ForeachTarget::Value(ForeachValueTarget { value: stream.boxed(key_or_value) }),
     })
 }
 
-pub fn parse_foreach_body(stream: &mut TokenStream<'_, '_>) -> Result<ForeachBody, ParseError> {
+#[inline]
+pub fn parse_foreach_body<'i>(stream: &mut TokenStream<'_, 'i>) -> Result<ForeachBody<'i>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => ForeachBody::ColonDelimited(parse_foreach_colon_delimited_body(stream)?),
-        _ => ForeachBody::Statement(Box::new(parse_statement(stream)?)),
+        _ => {
+            let statement = parse_statement(stream)?;
+
+            ForeachBody::Statement(stream.boxed(statement))
+        }
     })
 }
 
-pub fn parse_foreach_colon_delimited_body(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<ForeachColonDelimitedBody, ParseError> {
+#[inline]
+pub fn parse_foreach_colon_delimited_body<'i>(
+    stream: &mut TokenStream<'_, 'i>,
+) -> Result<ForeachColonDelimitedBody<'i>, ParseError> {
     Ok(ForeachColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["endforeach"]) {
                     break;

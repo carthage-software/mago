@@ -94,7 +94,7 @@ impl Rule for DisallowedFunctionsRule {
             )
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::FunctionCall(function_call) = node else { return LintDirective::default() };
 
         let Expression::Identifier(identifier) = function_call.function.as_ref() else {

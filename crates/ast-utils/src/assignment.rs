@@ -7,7 +7,9 @@ use mago_ast::*;
 ///
 /// If no assignment operation is found, it will return `None`.
 #[inline]
-pub fn get_assignment_from_expression(expression: &Expression) -> Option<&Assignment> {
+pub fn get_assignment_from_expression<'ast, 'alloc>(
+    expression: &'ast Expression<'alloc>,
+) -> Option<&'ast Assignment<'alloc>> {
     match &expression {
         Expression::Assignment(assignment_operation) => Some(assignment_operation),
         Expression::Parenthesized(parenthesized) => get_assignment_from_expression(&parenthesized.expression),

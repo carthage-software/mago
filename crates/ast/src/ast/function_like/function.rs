@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -23,19 +22,19 @@ use crate::sequence::Sequence;
 ///    return 'bar';
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Hash, Serialize)]
 #[repr(C)]
-pub struct Function {
-    pub attribute_lists: Sequence<AttributeList>,
+pub struct Function<'a> {
+    pub attribute_lists: Sequence<'a, AttributeList<'a>>,
     pub function: Keyword,
     pub ampersand: Option<Span>,
     pub name: LocalIdentifier,
-    pub parameter_list: FunctionLikeParameterList,
-    pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
-    pub body: Block,
+    pub parameter_list: FunctionLikeParameterList<'a>,
+    pub return_type_hint: Option<FunctionLikeReturnTypeHint<'a>>,
+    pub body: Block<'a>,
 }
 
-impl HasSpan for Function {
+impl HasSpan for Function<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.body.span());

@@ -6,7 +6,7 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_list(list: &List, context: &mut Context<'_>) {
+pub fn check_list(list: &List, context: &mut Context<'_, '_>) {
     if !context.version.is_supported(Feature::TrailingCommaInListSyntax) {
         if let Some(token) = list.elements.get_trailing_token() {
             context.issues.push(

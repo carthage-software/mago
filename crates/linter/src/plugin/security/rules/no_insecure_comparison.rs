@@ -86,7 +86,7 @@ impl Rule for NoInsecureComparisonRule {
             ))
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Binary(binary) = node else { return LintDirective::default() };
 
         if !binary.operator.is_equality() {

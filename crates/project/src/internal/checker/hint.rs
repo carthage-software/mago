@@ -6,11 +6,11 @@ use mago_span::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
+pub fn check_hint(hint: &Hint, context: &mut Context<'_, '_>) {
     match hint {
         Hint::Parenthesized(parenthesized_hint) => {
             if !parenthesized_hint.hint.is_parenthesizable() {
-                let val = context.get_code_snippet(&parenthesized_hint.hint);
+                let val = context.get_code_snippet(parenthesized_hint.hint.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be parenthesized.", val))
@@ -39,7 +39,7 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
             }
 
             if nullable_hint.hint.is_standalone() || nullable_hint.hint.is_complex() {
-                let val = context.get_code_snippet(&nullable_hint.hint);
+                let val = context.get_code_snippet(nullable_hint.hint.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be nullable.", val))
@@ -55,7 +55,7 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
         }
         Hint::Union(union_hint) => {
             if !union_hint.left.is_unionable() {
-                let val = context.get_code_snippet(&union_hint.left);
+                let val = context.get_code_snippet(union_hint.left.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be part of a union.", val))
@@ -71,7 +71,7 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
             }
 
             if !union_hint.right.is_unionable() {
-                let val = context.get_code_snippet(&union_hint.right);
+                let val = context.get_code_snippet(union_hint.right.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be part of a union.", val))
@@ -101,7 +101,7 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
             }
 
             if !intersection_hint.left.is_intersectable() {
-                let val = context.get_code_snippet(&intersection_hint.left);
+                let val = context.get_code_snippet(intersection_hint.left.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be part of an intersection.", val))
@@ -119,7 +119,7 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_>) {
             }
 
             if !intersection_hint.right.is_intersectable() {
-                let val = context.get_code_snippet(&intersection_hint.right);
+                let val = context.get_code_snippet(intersection_hint.right.as_ref());
 
                 context.issues.push(
                     Issue::error(format!("Type `{}` cannot be part of an intersection.", val))

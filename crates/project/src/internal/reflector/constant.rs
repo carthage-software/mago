@@ -7,7 +7,7 @@ use crate::internal::context::Context;
 use crate::internal::reflector::attribute::reflect_attributes;
 
 #[inline]
-pub fn reflect_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<ConstantReflection> {
+pub fn reflect_constant(constant: &Constant, context: &mut Context<'_, '_>) -> Vec<ConstantReflection> {
     let attribute_reflections = reflect_attributes(&constant.attribute_lists, context);
 
     let mut reflections = vec![];
@@ -29,7 +29,7 @@ pub fn reflect_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<C
 }
 
 #[inline]
-pub fn reflect_defined_constant(define: &FunctionCall, context: &mut Context<'_>) -> Option<ConstantReflection> {
+pub fn reflect_defined_constant(define: &FunctionCall, context: &mut Context<'_, '_>) -> Option<ConstantReflection> {
     let Expression::Identifier(identifier) = define.function.as_ref() else {
         return None;
     };

@@ -23,26 +23,24 @@ mod walker;
 pub mod populator;
 
 #[inline(always)]
-pub fn build(
-    interner: &ThreadedInterner,
+pub fn build<'i, 'alloc>(
+    interner: &'i ThreadedInterner,
     version: PHPVersion,
-    source: &Source,
-    program: &Program,
-    names: &Names,
+    source: &'i Source,
+    program: &'alloc Program<'alloc>,
+    names: &'i Names,
     options: ModuleBuildOptions,
 ) -> (Option<CodebaseReflection>, IssueCollection) {
-    let mut context = Context::new(interner, &version, program, names, source);
+    let mut context = Context::new(interner, version, program, names, source);
 
     let reflection = match options {
         ModuleBuildOptions { reflect: true, validate: true } => {
-            let mut context = Context::new(interner, &version, program, names, source);
             let mut walker = ModuleBuildingWalker::new();
             walker.walk_program(program, &mut context);
 
             Some(walker.reflection)
         }
         ModuleBuildOptions { reflect: true, validate: false } => {
-            let mut context = Context::new(interner, &version, program, names, source);
             let mut walker = ModuleReflectionWalker::new();
             walker.walk_program(program, &mut context);
 

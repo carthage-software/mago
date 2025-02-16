@@ -21,7 +21,7 @@ impl Rule for UseWhileInsteadOfForRule {
         "})
     }
 
-    fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: Node<'_, '_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::For(r#for) = node else { return LintDirective::default() };
 
         if !r#for.initializations.is_empty() || !r#for.increments.is_empty() {
