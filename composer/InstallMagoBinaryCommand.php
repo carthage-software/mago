@@ -111,14 +111,14 @@ final class InstallMagoBinaryCommand extends BaseCommand
 
     private function detectMagoReleaseId(HttpDownloader $httpDownloader): string
     {
-        $version = InstalledVersions::getVersion(MagoPlugin::PACKAGE_NAME);
+        $version = InstalledVersions::getPrettyVersion(MagoPlugin::PACKAGE_NAME);
 
         $response = $httpDownloader->get($this->buildGithubApiUri('/releases?per_page=99999999999999999'));
         $json = $response->decodeJson();
 
         foreach ($json as $release) {
             if ($release['tag_name'] === $version) {
-                return $release['id'];
+                return (string) $release['id'];
             }
         }
 
