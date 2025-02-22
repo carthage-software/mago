@@ -323,3 +323,39 @@ Controls whether a line break is added before or after binary operators when bre
   ```
 
 > This setting will always be false if the rhs of the binary operator has a leading comment.
+
+### `sort_uses`
+
+Whether to sort use statements alphabetically.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  sort_uses = true
+  ```
+
+### `separate_use_types`
+
+Whether to insert a blank line between different types of use statements (e.g., classes, functions, constants).
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  separate_use_types = false
+  ```
+
+### `expand_use_groups`
+
+Whether to expand grouped use statements into individual statements.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  expand_use_groups = false
+  ```

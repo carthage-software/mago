@@ -486,6 +486,58 @@ pub struct FormatSettings {
     /// Default: false
     #[serde(default = "default_false")]
     pub line_before_binary_operator: bool,
+
+    /// Whether to sort use statements alphabetically.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub sort_uses: bool,
+
+    /// Whether to insert a blank line between different types of use statements
+    /// (e.g., classes, functions, constants).
+    ///
+    /// Default: true
+    ///
+    /// Example:
+    ///
+    /// ```php
+    /// use Foo\Bar;
+    /// use Foo\Baz;
+    ///
+    /// use function Foo\bar;
+    /// use function Foo\baz;
+    ///
+    /// use const Foo\A;
+    /// use const Foo\B;
+    ///
+    /// // or, if separate_use_types is false:
+    ///
+    /// use Foo\Bar;
+    /// use Foo\Baz;
+    /// use function Foo\bar;
+    /// use function Foo\baz;
+    /// use const Foo\A;
+    /// use const Foo\B;
+    /// ```
+    #[serde(default = "default_true")]
+    pub separate_use_types: bool,
+
+    /// Whether to expand grouped use statements into individual statements.
+    ///
+    /// Default: true
+    ///
+    /// Example:
+    ///
+    /// ```php
+    /// use Foo\{Bar, Baz};
+    ///
+    /// // or, if expand_use_groups is true:
+    ///
+    /// use Foo\Bar;
+    /// use Foo\Baz;
+    /// ```
+    #[serde(default = "default_true")]
+    pub expand_use_groups: bool,
 }
 
 impl Default for FormatSettings {
@@ -518,6 +570,9 @@ impl Default for FormatSettings {
             space_concatenation: true,
             method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
             line_before_binary_operator: false,
+            sort_uses: true,
+            separate_use_types: true,
+            expand_use_groups: true,
         }
     }
 }

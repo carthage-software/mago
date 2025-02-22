@@ -123,6 +123,18 @@ pub struct FormatterConfiguration {
     /// Whether to add a line before a binary operator or after if it is broken.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line_before_binary_operator: Option<bool>,
+
+    /// Whether to sort `use` statements.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_uses: Option<bool>,
+
+    /// Whether to separate `use` statements by type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub separate_use_types: Option<bool>,
+
+    /// Whether to expand `use` groups.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expand_use_groups: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -170,6 +182,9 @@ impl FormatterConfiguration {
             line_before_binary_operator: self
                 .line_before_binary_operator
                 .unwrap_or(default.line_before_binary_operator),
+            sort_uses: self.sort_uses.unwrap_or(default.sort_uses),
+            separate_use_types: self.separate_use_types.unwrap_or(default.separate_use_types),
+            expand_use_groups: self.expand_use_groups.unwrap_or(default.expand_use_groups),
         }
     }
 }

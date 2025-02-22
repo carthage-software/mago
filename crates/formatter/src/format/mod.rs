@@ -346,11 +346,14 @@ impl<'a> Format<'a> for UseItem {
 impl<'a> Format<'a> for UseItemSequence {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, UseItemSequence, {
+            let items: Vec<_> = if f.settings.sort_uses {
+                statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)).collect()
+            } else {
+                self.items.iter().map(|i| i.format(f)).collect()
+            };
+
             Document::Group(Group::new(vec![
-                Document::Indent(Document::join(
-                    self.items.iter().map(|i| i.format(f)).collect(),
-                    Separator::CommaLine,
-                )),
+                Document::Indent(Document::join(items, Separator::CommaLine)),
                 Document::Line(Line::softline()),
             ]))
         })
@@ -369,7 +372,13 @@ impl<'a> Format<'a> for TypedUseItemList {
             ];
 
             if !self.items.is_empty() {
-                let mut items = Document::join(self.items.iter().map(|i| i.format(f)).collect(), Separator::CommaLine);
+                let items: Vec<_> = if f.settings.sort_uses {
+                    statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)).collect()
+                } else {
+                    self.items.iter().map(|i| i.format(f)).collect()
+                };
+
+                let mut items = Document::join(items, Separator::CommaLine);
                 items.insert(0, Document::Line(Line::softline()));
 
                 contents.push(Document::Indent(items));
@@ -394,7 +403,18 @@ impl<'a> Format<'a> for MixedUseItemList {
             let mut contents = vec![self.namespace.format(f), Document::String("\\"), Document::String("{")];
 
             if !self.items.is_empty() {
-                let mut items = Document::join(self.items.iter().map(|i| i.format(f)).collect(), Separator::CommaLine);
+                let mut items: Vec<_> = Document::join(
+                    if f.settings.sort_uses {
+                        statement::sort_maybe_typed_use_items(f, self.items.iter())
+                            .into_iter()
+                            .map(|i| i.format(f))
+                            .collect()
+                    } else {
+                        self.items.iter().map(|i| i.format(f)).collect()
+                    },
+                    Separator::CommaLine,
+                );
+
                 items.insert(0, Document::Line(Line::softline()));
 
                 contents.push(Document::Indent(items));
@@ -427,15 +447,18 @@ impl<'a> Format<'a> for MaybeTypedUseItem {
 impl<'a> Format<'a> for TypedUseItemSequence {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
         wrap!(f, self, TypedUseItemSequence, {
-            Document::Group(Group::new(vec![
-                self.r#type.format(f),
-                Document::space(),
-                Document::Indent(Document::join(
-                    self.items.iter().map(|i| i.format(f)).collect(),
-                    Separator::CommaLine,
-                )),
-                Document::Line(Line::softline()),
-            ]))
+            let mut documents = vec![self.r#type.format(f), Document::space()];
+
+            let items = if f.settings.sort_uses {
+                statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)).collect()
+            } else {
+                self.items.iter().map(|i| i.format(f)).collect()
+            };
+
+            documents.push(Document::Indent(Document::join(items, Separator::CommaLine)));
+            documents.push(Document::Line(Line::softline()));
+
+            Document::Group(Group::new(documents))
         })
     }
 }

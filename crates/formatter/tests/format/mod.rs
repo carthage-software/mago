@@ -8,6 +8,7 @@ pub mod assignment;
 pub mod binaryish;
 pub mod control_structure;
 pub mod expression;
+pub mod statement;
 pub mod string;
 
 #[test]

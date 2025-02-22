@@ -94,6 +94,18 @@ pub struct UseItemAlias {
     pub identifier: LocalIdentifier,
 }
 
+impl UseType {
+    #[inline(always)]
+    pub const fn is_function(&self) -> bool {
+        matches!(self, UseType::Function(_))
+    }
+
+    #[inline(always)]
+    pub const fn is_const(&self) -> bool {
+        matches!(self, UseType::Const(_))
+    }
+}
+
 impl HasSpan for Use {
     fn span(&self) -> Span {
         self.r#use.span().join(self.terminator.span())
