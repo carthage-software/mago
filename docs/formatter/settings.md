@@ -359,3 +359,15 @@ Whether to expand grouped use statements into individual statements.
   ```toml
   expand_use_groups = false
   ```
+
+### `remove_trailing_close_tag`
+
+Whether to remove the trailing `?>` tag from PHP files.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  remove_trailing_close_tag = true
+  ```

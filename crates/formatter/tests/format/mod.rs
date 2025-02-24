@@ -361,3 +361,43 @@ pub fn test_php_85_constant_attributes() {
 
     test_format(code, expected, FormatSettings::default())
 }
+
+#[test]
+pub fn test_closing_tag_preserved() {
+    let code = indoc! {r#"
+        <?php
+
+        echo 'Hello, world!';
+
+        ?>
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        echo 'Hello, world!';
+
+        ?>
+    "#};
+
+    test_format(code, expected, FormatSettings { remove_trailing_close_tag: false, ..Default::default() })
+}
+
+#[test]
+pub fn test_closing_tag_removed() {
+    let code = indoc! {r#"
+        <?php
+
+        echo 'Hello, world!';
+
+        ?>
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        echo 'Hello, world!';
+    "#};
+
+    test_format(code, expected, FormatSettings { remove_trailing_close_tag: true, ..Default::default() })
+}

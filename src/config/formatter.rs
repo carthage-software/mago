@@ -135,6 +135,10 @@ pub struct FormatterConfiguration {
     /// Whether to expand `use` groups.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expand_use_groups: Option<bool>,
+
+    /// Whether to remove the trailing close tag.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remove_trailing_close_tag: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -185,6 +189,7 @@ impl FormatterConfiguration {
             sort_uses: self.sort_uses.unwrap_or(default.sort_uses),
             separate_use_types: self.separate_use_types.unwrap_or(default.separate_use_types),
             expand_use_groups: self.expand_use_groups.unwrap_or(default.expand_use_groups),
+            remove_trailing_close_tag: self.remove_trailing_close_tag.unwrap_or(default.remove_trailing_close_tag),
         }
     }
 }

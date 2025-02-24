@@ -538,6 +538,12 @@ pub struct FormatSettings {
     /// ```
     #[serde(default = "default_true")]
     pub expand_use_groups: bool,
+
+    /// Whether to remove the trailing close tag.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub remove_trailing_close_tag: bool,
 }
 
 impl Default for FormatSettings {
@@ -573,6 +579,7 @@ impl Default for FormatSettings {
             sort_uses: true,
             separate_use_types: true,
             expand_use_groups: true,
+            remove_trailing_close_tag: true,
         }
     }
 }

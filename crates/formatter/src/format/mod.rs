@@ -171,12 +171,12 @@ impl<'a> Format<'a> for ClosingTag {
         f.scripting_mode = false;
 
         wrap!(f, self, ClosingTag, {
-            let last_index = self.span.end.offset;
-            // todo: put this behind a setting
-            if f.skip_spaces_and_new_lines(Some(last_index), false).is_none() {
+            if f.settings.remove_trailing_close_tag
+                && f.skip_spaces_and_new_lines(Some(self.span.end.offset), false).is_none()
+            {
                 f.scripting_mode = true;
 
-                Document::empty()
+                Document::Trim(Trim::Newlines)
             } else {
                 Document::Array(vec![Document::LineSuffixBoundary, Document::String("?>")])
             }

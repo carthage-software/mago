@@ -10,6 +10,7 @@ use crate::document::Fill;
 use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
+use crate::document::Trim;
 use crate::document::group::GroupIdentifier;
 use crate::printer::command::Command;
 use crate::printer::command::Indentation;
@@ -79,6 +80,7 @@ impl<'a> Printer<'a> {
                 Document::IfBreak(if_break) => self.handle_if_break(if_break, indentation, mode),
                 Document::Fill(fill) => self.handle_fill(indentation, mode, fill),
                 Document::BreakParent => { /* No op */ }
+                Document::Trim(trim) => self.handle_trim(trim),
             }
 
             if self.commands.is_empty() && !self.line_suffix.is_empty() {
@@ -98,6 +100,30 @@ impl<'a> Printer<'a> {
 
     fn handle_array(&mut self, indentation: Indentation<'a>, mode: Mode, docs: Vec<Document<'a>>) {
         self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(indentation.clone(), mode, doc)));
+    }
+
+    #[inline]
+    fn handle_trim(&mut self, trim: Trim) {
+        match trim {
+            Trim::Whitespace => {
+                while let Some(&last) = self.out.last() {
+                    if last == b' ' || last == b'\t' {
+                        self.out.pop();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            Trim::Newlines => {
+                while let Some(&last) = self.out.last() {
+                    if last == b' ' || last == b'\t' || last == b'\n' {
+                        self.out.pop();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     fn handle_indent(&mut self, indentation: Indentation<'a>, mode: Mode, docs: Vec<Document<'a>>) {
@@ -232,7 +258,7 @@ impl<'a> Printer<'a> {
             return should_remeasure;
         }
 
-        self.trim();
+        self.handle_trim(Trim::Whitespace);
         self.out.extend(self.new_line.as_bytes());
         self.position = self.add_indentation(indentation);
 
@@ -361,16 +387,6 @@ impl<'a> Printer<'a> {
         value.len()
     }
 
-    fn trim(&mut self) {
-        while let Some(&last) = self.out.last() {
-            if last == b' ' || last == b'\t' {
-                self.out.pop();
-            } else {
-                break;
-            }
-        }
-    }
-
     fn set_group_mode_from_last_cmd(&mut self, id: Option<GroupIdentifier>) {
         let Some(id) = id else {
             return;
@@ -445,6 +461,7 @@ impl<'a> Printer<'a> {
                     break;
                 }
                 Document::BreakParent => {}
+                Document::Trim(_) => {}
             }
 
             if remaining_width < 0 {

@@ -18,6 +18,7 @@ impl GroupIdentifierBuilder {
         Self { id: GroupIdentifier(0) }
     }
 
+    #[inline]
     pub fn next_id(&mut self) -> GroupIdentifier {
         self.id += 1;
         self.id
@@ -25,6 +26,7 @@ impl GroupIdentifierBuilder {
 }
 
 impl AddAssign<usize> for GroupIdentifier {
+    #[inline]
     fn add_assign(&mut self, rhs: usize) {
         self.0 += rhs;
     }

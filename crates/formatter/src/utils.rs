@@ -125,7 +125,7 @@ pub fn will_break(document: &mut Document<'_>) -> bool {
         | Document::Align(Align { contents, .. }) => check_array(contents),
         Document::Fill(doc) => check_array(&mut doc.parts),
         Document::Line(doc) => doc.hard,
-        Document::String(_) | Document::LineSuffixBoundary => false,
+        Document::String(_) | Document::LineSuffixBoundary | Document::Trim(_) => false,
     }
 }
 

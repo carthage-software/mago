@@ -37,6 +37,16 @@ pub enum Document<'a> {
     /// Include this anywhere to force all parent groups to break.
     BreakParent,
     Align(Align<'a>),
+    /// Trim all newlines from the end of the document.
+    Trim(Trim),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum Trim {
+    /// Trims trailing whitespace characters (spaces and tabs) from the end of the document.
+    Whitespace,
+    /// Removes all newline characters from the end of the document.
+    Newlines,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -323,5 +333,6 @@ fn print_doc_to_debug(doc: &Document) -> String {
         Document::Align(Align { alignment, contents }) => {
             format!("dedentToRoot(align({:?}, {}))", alignment, print_doc_to_debug(&Document::Array(contents.clone())))
         }
+        Document::Trim(_) => "trim".to_string(),
     }
 }
