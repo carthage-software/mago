@@ -139,6 +139,10 @@ pub struct FormatterConfiguration {
     /// Whether to remove the trailing close tag.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remove_trailing_close_tag: Option<bool>,
+
+    /// Whether to add a space before the colon in enum backing type hints.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_before_enum_backing_type_hint_colon: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -190,6 +194,9 @@ impl FormatterConfiguration {
             separate_use_types: self.separate_use_types.unwrap_or(default.separate_use_types),
             expand_use_groups: self.expand_use_groups.unwrap_or(default.expand_use_groups),
             remove_trailing_close_tag: self.remove_trailing_close_tag.unwrap_or(default.remove_trailing_close_tag),
+            space_before_enum_backing_type_hint_colon: self
+                .space_before_enum_backing_type_hint_colon
+                .unwrap_or(default.space_before_enum_backing_type_hint_colon),
         }
     }
 }

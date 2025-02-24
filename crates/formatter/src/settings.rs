@@ -544,6 +544,22 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub remove_trailing_close_tag: bool,
+
+    /// Whether to add a space before the colon in enum backing type hints.
+    ///
+    /// Example:
+    ///
+    /// ```php
+    /// enum Foo: int {}
+    ///
+    /// // or
+    ///
+    /// enum Foo : int {}
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub space_before_enum_backing_type_hint_colon: bool,
 }
 
 impl Default for FormatSettings {
@@ -580,6 +596,7 @@ impl Default for FormatSettings {
             separate_use_types: true,
             expand_use_groups: true,
             remove_trailing_close_tag: true,
+            space_before_enum_backing_type_hint_colon: false,
         }
     }
 }

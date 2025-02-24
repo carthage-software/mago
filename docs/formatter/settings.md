@@ -371,3 +371,15 @@ Whether to remove the trailing `?>` tag from PHP files.
   ```toml
   remove_trailing_close_tag = true
   ```
+
+### `space_before_enum_backing_type_hint_colon`
+
+Controls whether a space is added before the colon in enum backing type hints.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  space_before_enum_backing_type_hint_colon = false
+  ```

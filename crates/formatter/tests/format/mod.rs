@@ -401,3 +401,55 @@ pub fn test_closing_tag_removed() {
 
     test_format(code, expected, FormatSettings { remove_trailing_close_tag: true, ..Default::default() })
 }
+
+#[test]
+pub fn test_no_space_before_enum_backing_type_colon() {
+    let code = indoc! {r#"
+        <?php
+
+        enum Foo: int {
+            case bar;
+        }
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        enum Foo: int
+        {
+            case bar;
+        }
+    "#};
+
+    test_format(
+        code,
+        expected,
+        FormatSettings { space_before_enum_backing_type_hint_colon: false, ..Default::default() },
+    )
+}
+
+#[test]
+pub fn test_space_before_enum_backing_type_colon() {
+    let code = indoc! {r#"
+        <?php
+
+        enum Foo: int {
+            case bar;
+        }
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        enum Foo : int
+        {
+            case bar;
+        }
+    "#};
+
+    test_format(
+        code,
+        expected,
+        FormatSettings { space_before_enum_backing_type_hint_colon: true, ..Default::default() },
+    )
+}

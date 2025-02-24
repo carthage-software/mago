@@ -1124,8 +1124,11 @@ impl<'a> Format<'a> for Enum {
                 Document::space(),
                 self.name.format(f),
                 if let Some(backing_type_hint) = &self.backing_type_hint {
-                    // TODO: add an option to add a space before the colon
-                    backing_type_hint.format(f)
+                    if f.settings.space_before_enum_backing_type_hint_colon {
+                        Document::Array(vec![Document::space(), backing_type_hint.format(f)])
+                    } else {
+                        backing_type_hint.format(f)
+                    }
                 } else {
                     Document::empty()
                 },
