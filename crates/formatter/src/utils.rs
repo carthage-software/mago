@@ -1,6 +1,7 @@
 use mago_ast::*;
 
 use crate::Formatter;
+use crate::document::Align;
 use crate::document::Document;
 use crate::document::IndentIfBreak;
 use crate::document::Separator;
@@ -117,10 +118,11 @@ pub fn will_break(document: &mut Document<'_>) -> bool {
             check_array(&mut group.contents)
         }
         Document::IfBreak(d) => will_break(&mut d.break_contents),
-        Document::Array(arr)
-        | Document::Indent(arr)
-        | Document::LineSuffix(arr)
-        | Document::IndentIfBreak(IndentIfBreak { contents: arr, .. }) => check_array(arr),
+        Document::Array(contents)
+        | Document::Indent(contents)
+        | Document::LineSuffix(contents)
+        | Document::IndentIfBreak(IndentIfBreak { contents, .. })
+        | Document::Align(Align { contents, .. }) => check_array(contents),
         Document::Fill(doc) => check_array(&mut doc.parts),
         Document::Line(doc) => doc.hard,
         Document::String(_) | Document::LineSuffixBoundary => false,

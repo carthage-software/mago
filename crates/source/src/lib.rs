@@ -181,6 +181,23 @@ impl Source {
         self.lines.get(line).copied()
     }
 
+    /// Retrieve the byte offset for the end of the given line.
+    ///
+    /// # Parameters
+    ///
+    /// - `line`: The line number to retrieve the end offset for.
+    ///
+    /// # Returns
+    ///
+    /// The byte offset for the end of the given line (0-based index).
+    pub fn get_line_end_offset(&self, line: usize) -> Option<usize> {
+        match self.lines.get(line + 1) {
+            Some(&end) => Some(end - 1),
+            None if line == self.lines.len() - 1 => Some(self.size),
+            _ => None,
+        }
+    }
+
     /// Retrieve the column number for the given byte offset.
     ///
     /// # Parameters

@@ -36,6 +36,13 @@ pub enum Document<'a> {
     Fill(Fill<'a>),
     /// Include this anywhere to force all parent groups to break.
     BreakParent,
+    Align(Align<'a>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Align<'a> {
+    pub alignment: &'a str,
+    pub contents: Vec<Document<'a>>,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -313,5 +320,8 @@ fn print_doc_to_debug(doc: &Document) -> String {
             format!("fill([{}])", parts.iter().map(|p| print_doc_to_debug(p)).collect::<Vec<_>>().join(", "))
         }
         Document::BreakParent => "breakParent".to_string(),
+        Document::Align(Align { alignment, contents }) => {
+            format!("dedentToRoot(align({:?}, {}))", alignment, print_doc_to_debug(&Document::Array(contents.clone())))
+        }
     }
 }

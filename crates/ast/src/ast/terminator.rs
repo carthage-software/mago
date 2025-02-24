@@ -23,6 +23,20 @@ pub enum Terminator {
     TagPair(ClosingTag, OpeningTag),
 }
 
+impl Terminator {
+    #[must_use]
+    #[inline(always)]
+    pub const fn is_semicolon(&self) -> bool {
+        matches!(self, Terminator::Semicolon(_))
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn is_closing_tag(&self) -> bool {
+        matches!(self, Terminator::ClosingTag(_))
+    }
+}
+
 impl HasSpan for Terminator {
     fn span(&self) -> Span {
         match self {

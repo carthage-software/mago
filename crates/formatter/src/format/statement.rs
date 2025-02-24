@@ -2,19 +2,30 @@ use mago_ast::*;
 use mago_span::HasSpan;
 
 use crate::Formatter;
+use crate::document::Align;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
 use crate::format::Format;
 
 pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<Statement>) -> Vec<Document<'a>> {
+    let stmts = stmts.nodes.iter().collect::<Vec<_>>();
+
+    print_statement_slice(f, &stmts)
+}
+
+fn print_statement_slice<'a>(f: &mut Formatter<'a>, stmts: &[&'a Statement]) -> Vec<Document<'a>> {
     let mut use_statements: Vec<&'a Use> = Vec::new();
     let mut parts = vec![];
 
     let last_non_noop_index = stmts.iter().rposition(|stmt| !matches!(stmt, Statement::Noop(_)));
-    for (i, stmt) in stmts.iter().enumerate() {
+    let mut i = 0;
+    while i < stmts.len() {
+        let stmt = stmts[i];
+
         if let Statement::Use(use_stmt) = stmt {
             use_statements.push(use_stmt);
+            i += 1;
             continue;
         }
 
@@ -24,26 +35,46 @@ pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<S
             parts.push(Document::Line(Line::hard()));
         }
 
-        let (should_add_new_line, should_add_space) = should_add_new_line_or_space_after_stmt(f, stmts, i, stmt);
+        let mut formatted_statement = format_statement_with_spacing(f, i, stmt, stmts, last_non_noop_index);
 
-        parts.push(stmt.format(f));
+        if let Statement::OpeningTag(tag) = stmt {
+            let offset = tag.span().start.offset;
+            let line = f.source.line_number(offset);
+            if let Some(line_start_offset) = f.source.get_line_start_offset(line) {
+                let c = &f.source_text[line_start_offset..offset];
+                let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+                if !ws.is_empty() {
+                    let mut j = i + 1;
+                    let mut stmts_to_format = vec![];
+                    while j < stmts.len() {
+                        let next_stmt = stmts[j];
+                        stmts_to_format.push(next_stmt);
+                        if next_stmt.terminates_scripting() {
+                            break;
+                        }
 
-        let is_last = if let Some(index) = last_non_noop_index { i == index } else { i == stmts.len() - 1 };
-
-        if should_add_space {
-            if !is_last {
-                parts.push(Document::space());
-            }
-        } else if should_add_new_line {
-            if let Some(index) = last_non_noop_index {
-                if i != index {
-                    parts.push(Document::Line(Line::hard()));
-                    if f.is_next_line_empty(stmt.span()) {
-                        parts.push(Document::Line(Line::hard()));
+                        j += 1;
                     }
+
+                    parts.push(Document::Group(Group::new(vec![Document::Align(Align {
+                        alignment: f.as_str(&ws),
+                        contents: {
+                            formatted_statement.extend(print_statement_slice(f, &stmts_to_format));
+
+                            formatted_statement
+                        },
+                    })])));
+
+                    i = j + 1;
+
+                    continue;
                 }
             }
         }
+
+        parts.extend(formatted_statement);
+
+        i += 1;
     }
 
     if !use_statements.is_empty() {
@@ -53,9 +84,43 @@ pub fn print_statement_sequence<'a>(f: &mut Formatter<'a>, stmts: &'a Sequence<S
     parts
 }
 
+// New function to format statements with spacing and newlines
+fn format_statement_with_spacing<'a>(
+    f: &mut Formatter<'a>,
+    i: usize,
+    stmt: &'a Statement,
+    stmts: &[&'a Statement],
+    last_non_noop_index: Option<usize>,
+) -> Vec<Document<'a>> {
+    let mut statement_parts = vec![];
+
+    let (should_add_new_line, should_add_space) = should_add_new_line_or_space_after_stmt(f, stmts, i, stmt);
+
+    statement_parts.push(stmt.format(f));
+
+    let is_last = if let Some(index) = last_non_noop_index { i == index } else { i == stmts.len() - 1 };
+
+    if should_add_space {
+        if !is_last {
+            statement_parts.push(Document::space());
+        }
+    } else if should_add_new_line {
+        if let Some(index) = last_non_noop_index {
+            if i != index {
+                statement_parts.push(Document::Line(Line::hard()));
+                if f.is_next_line_empty(stmt.span()) {
+                    statement_parts.push(Document::Line(Line::hard()));
+                }
+            }
+        }
+    }
+
+    statement_parts
+}
+
 fn should_add_new_line_or_space_after_stmt<'a>(
     f: &mut Formatter<'a>,
-    stmts: &'a Sequence<Statement>,
+    stmts: &[&'a Statement],
     i: usize,
     stmt: &'a Statement,
 ) -> (bool, bool) {

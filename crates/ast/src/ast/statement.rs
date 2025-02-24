@@ -38,6 +38,13 @@ use crate::ast::r#try::Try;
 use crate::ast::unset::Unset;
 use crate::ast::r#use::Use;
 
+use super::DeclareBody;
+use super::ForBody;
+use super::ForeachBody;
+use super::IfBody;
+use super::NamespaceBody;
+use super::WhileBody;
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[repr(C)]
 pub struct ExpressionStatement {
@@ -82,6 +89,45 @@ pub enum Statement {
     HaltCompiler(HaltCompiler),
     Unset(Unset),
     Noop(Span),
+}
+
+impl Statement {
+    #[inline]
+    #[must_use]
+    pub fn terminates_scripting(&self) -> bool {
+        match self {
+            Statement::ClosingTag(_) => true,
+            Statement::Namespace(Namespace { body: NamespaceBody::Implicit(implicit), .. }) => implicit
+                .statements
+                .last()
+                .map_or(implicit.terminator.is_closing_tag(), |statement| statement.terminates_scripting()),
+            Statement::Use(r#use) => r#use.terminator.is_closing_tag(),
+            Statement::Goto(goto) => goto.terminator.is_closing_tag(),
+            Statement::Declare(Declare { body: DeclareBody::Statement(stmt), .. })
+            | Statement::For(For { body: ForBody::Statement(stmt), .. })
+            | Statement::Foreach(Foreach { body: ForeachBody::Statement(stmt), .. })
+            | Statement::While(While { body: WhileBody::Statement(stmt), .. }) => stmt.terminates_scripting(),
+            Statement::DoWhile(do_while) => do_while.terminator.is_closing_tag(),
+            Statement::Continue(cont) => cont.terminator.is_closing_tag(),
+            Statement::Break(brk) => brk.terminator.is_closing_tag(),
+            Statement::If(If { body: IfBody::Statement(stmt), .. }) => match &stmt.else_clause {
+                Some(else_clause) => else_clause.statement.terminates_scripting(),
+                None => stmt
+                    .else_if_clauses
+                    .iter()
+                    .last()
+                    .map_or(stmt.statement.terminates_scripting(), |clause| clause.statement.terminates_scripting()),
+            },
+            Statement::Return(ret) => ret.terminator.is_closing_tag(),
+            Statement::Expression(expression_statement) => expression_statement.terminator.is_closing_tag(),
+            Statement::Echo(echo) => echo.terminator.is_closing_tag(),
+            Statement::Global(global) => global.terminator.is_closing_tag(),
+            Statement::Static(r#static) => r#static.terminator.is_closing_tag(),
+            Statement::HaltCompiler(halt_compiler) => halt_compiler.terminator.is_closing_tag(),
+            Statement::Unset(unset) => unset.terminator.is_closing_tag(),
+            _ => false,
+        }
+    }
 }
 
 impl HasSpan for ExpressionStatement {

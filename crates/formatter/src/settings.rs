@@ -642,7 +642,8 @@ impl MethodChainBreakingStyle {
 }
 
 impl EndOfLine {
-    pub fn as_str(&self) -> &'static str {
+    #[inline(always)]
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Crlf => "\r\n",
             Self::Cr => "\r",

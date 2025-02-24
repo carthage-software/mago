@@ -254,6 +254,10 @@ impl<'a> Formatter<'a> {
             return true;
         }
 
+        if let Expression::Construct(construct) = expression {
+            return !construct.has_bounds();
+        }
+
         !matches!(
             expression,
             Expression::Literal(_)
@@ -262,7 +266,6 @@ impl<'a> Formatter<'a> {
                 | Expression::ArrayAccess(_)
                 | Expression::Variable(_)
                 | Expression::Identifier(_)
-                | Expression::Construct(_)
                 | Expression::Call(_)
                 | Expression::Access(_)
                 | Expression::ClosureCreation(_)

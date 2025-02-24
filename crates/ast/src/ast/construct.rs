@@ -102,6 +102,30 @@ pub struct DieConstruct {
     pub arguments: Option<ArgumentList>,
 }
 
+impl Construct {
+    #[must_use]
+    #[inline(always)]
+    pub const fn is_import(&self) -> bool {
+        matches!(
+            self,
+            Construct::Include(_) | Construct::IncludeOnce(_) | Construct::Require(_) | Construct::RequireOnce(_)
+        )
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn has_bounds(&self) -> bool {
+        !matches!(
+            self,
+            Construct::Include(_)
+                | Construct::IncludeOnce(_)
+                | Construct::Require(_)
+                | Construct::RequireOnce(_)
+                | Construct::Print(_)
+        )
+    }
+}
+
 impl HasSpan for Construct {
     fn span(&self) -> Span {
         match self {
