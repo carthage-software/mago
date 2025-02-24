@@ -1,11 +1,14 @@
 use crate::definition::PluginDefinition;
 use crate::plugin::strictness::rules::missing_assert_description::MissingAssertDescriptionRule;
 use crate::plugin::strictness::rules::no_assignment_in_condition::NoAssignmentInConditionRule;
+use crate::plugin::strictness::rules::no_elvis_operator::NoElvisOperator;
+use crate::plugin::strictness::rules::no_empty_construct::NoEmptyConstruct;
 use crate::plugin::strictness::rules::require_constant_type::RequireConstantTypeRule;
 use crate::plugin::strictness::rules::require_identity_comparison::RequireIdentityComparisonRule;
 use crate::plugin::strictness::rules::require_parameter_type::RequireParameterTypeRule;
 use crate::plugin::strictness::rules::require_property_type::RequirePropertyTypeRule;
 use crate::plugin::strictness::rules::require_return_type::RequireReturnTypeRule;
+use crate::plugin::strictness::rules::require_strict_behavior::RequireStrictBehavior;
 use crate::plugin::strictness::rules::require_strict_types::RequireStrictTypesRule;
 
 use crate::plugin::Plugin;
@@ -29,12 +32,15 @@ impl Plugin for StrictnessPlugin {
         vec![
             Box::new(MissingAssertDescriptionRule),
             Box::new(NoAssignmentInConditionRule),
+            Box::new(NoElvisOperator),
+            Box::new(NoEmptyConstruct),
             Box::new(RequireConstantTypeRule),
+            Box::new(RequireIdentityComparisonRule),
             Box::new(RequireParameterTypeRule),
             Box::new(RequirePropertyTypeRule),
             Box::new(RequireReturnTypeRule),
+            Box::new(RequireStrictBehavior),
             Box::new(RequireStrictTypesRule),
-            Box::new(RequireIdentityComparisonRule),
         ]
     }
 }
