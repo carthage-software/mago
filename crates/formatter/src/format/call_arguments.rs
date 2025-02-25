@@ -13,8 +13,21 @@ use super::misc::is_string_word_type;
 
 pub(super) fn print_call_arguments<'a>(f: &mut Formatter<'a>, expression: &CallLikeNode<'a>) -> Document<'a> {
     let Some(argument_list) = expression.arguments() else {
-        return Document::empty();
+        return if (expression.is_instantiation() && f.settings.parentheses_in_new_expression)
+            || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
+        {
+            Document::String("()")
+        } else {
+            Document::empty()
+        };
     };
+
+    if argument_list.arguments.is_empty()
+        && ((expression.is_instantiation() && !f.settings.parentheses_in_new_expression)
+            || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die))
+    {
+        return Document::Array(f.print_inner_comment(argument_list.span()));
+    }
 
     print_argument_list(f, argument_list)
 }

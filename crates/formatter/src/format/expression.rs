@@ -402,16 +402,12 @@ impl<'a> Format<'a> for PrintConstruct {
 
 impl<'a> Format<'a> for ExitConstruct {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        // TODO: add support to check what syntax to use `exit` or `die`
-        // and whether to use parentheses or not if there are no arguments
         wrap!(f, self, ExitConstruct, { print_call_like_node(f, CallLikeNode::ExitConstruct(self)) })
     }
 }
 
 impl<'a> Format<'a> for DieConstruct {
     fn format(&'a self, f: &mut Formatter<'a>) -> Document<'a> {
-        // TODO: add support to check what syntax to use `exit` or `die`
-        // and whether to use parentheses or not if there are no arguments
         wrap!(f, self, DieConstruct, { print_call_like_node(f, CallLikeNode::DieConstruct(self)) })
     }
 }

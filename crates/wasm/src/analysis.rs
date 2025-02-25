@@ -114,7 +114,13 @@ impl AnalysisResults {
         let mut formatted = None;
         if module.parse_error.is_none() {
             // Only format if there are no parse errors
-            formatted = Some(mago_formatter::format(&interner, &module.source, &program, format_settings));
+            formatted = Some(mago_formatter::format(
+                &interner,
+                &module.source,
+                &program,
+                lint_settings.php_version,
+                format_settings,
+            ));
         }
 
         let linter =

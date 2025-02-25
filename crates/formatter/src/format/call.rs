@@ -3,11 +3,11 @@ use mago_ast::*;
 use crate::Formatter;
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::Line;
 use crate::format::Format;
-
-use super::Line;
-use super::call_arguments::print_call_arguments;
-use super::call_node::CallLikeNode;
+use crate::format::call_arguments::print_call_arguments;
+use crate::format::call_node::CallLikeNode;
+use crate::parens::instantiation_needs_parens;
 
 pub(super) struct MethodChain<'a> {
     pub base: &'a Expression,
@@ -47,7 +47,7 @@ pub(super) fn collect_method_call_chain(expr: &Expression) -> Option<MethodChain
 
 pub(super) fn print_method_call_chain<'a>(method_chain: &MethodChain<'a>, f: &mut Formatter<'a>) -> Document<'a> {
     let base_document = method_chain.base.format(f);
-    let mut parts = if base_needs_parerns(method_chain.base) {
+    let mut parts = if base_needs_parerns(f, method_chain.base) {
         vec![Document::String("("), base_document, Document::String(")")]
     } else {
         vec![base_document]
@@ -92,29 +92,13 @@ pub(super) fn print_method_call_chain<'a>(method_chain: &MethodChain<'a>, f: &mu
     Document::Group(Group::new(parts))
 }
 
-fn base_needs_parerns(base: &Expression) -> bool {
+fn base_needs_parerns(f: &Formatter<'_>, base: &Expression) -> bool {
     if let Expression::Parenthesized(parenthesized) = base {
-        return base_needs_parerns(&parenthesized.expression);
+        return base_needs_parerns(f, &parenthesized.expression);
     }
 
     match base {
-        Expression::Instantiation(instantiation) => {
-            if instantiation.arguments.is_none() {
-                // parentheses are required if the instantiation has no arguments
-                // e.g. `new Foo->baz()` should be `(new Foo)->baz()`
-                true
-            } else {
-                // parentheses are not required if the instantiation has arguments
-                // e.g. `new Foo()->baz()`.
-                //
-                // but this is only allowed in PHP 8.4, so for now, we add
-                // parentheses to be safe, in the future, we can add an option
-                // to remove them.
-                //
-                // TODO(azjezz): we should add an option to remove parentheses.
-                true
-            }
-        }
+        Expression::Instantiation(instantiation) => instantiation_needs_parens(f, instantiation),
         Expression::Binary(_)
         | Expression::UnaryPrefix(_)
         | Expression::UnaryPostfix(_)

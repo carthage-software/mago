@@ -143,6 +143,20 @@ pub struct FormatterConfiguration {
     /// Whether to add a space before the colon in enum backing type hints.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_before_enum_backing_type_hint_colon: Option<bool>,
+
+    /// Controls whether to include parentheses around instantiation expressions
+    /// when they are followed by a member access operator (`->`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parentheses_around_new_in_member_access: Option<bool>,
+
+    /// Controls whether to include parentheses in `new` expressions, even when no arguments are provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parentheses_in_new_expression: Option<bool>,
+
+    /// Controls whether to include parentheses in `exit` and `die` constructs,
+    /// making them resemble function calls.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parentheses_in_exit_and_die: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -197,6 +211,15 @@ impl FormatterConfiguration {
             space_before_enum_backing_type_hint_colon: self
                 .space_before_enum_backing_type_hint_colon
                 .unwrap_or(default.space_before_enum_backing_type_hint_colon),
+            parentheses_around_new_in_member_access: self
+                .parentheses_around_new_in_member_access
+                .unwrap_or(default.parentheses_around_new_in_member_access),
+            parentheses_in_new_expression: self
+                .parentheses_in_new_expression
+                .unwrap_or(default.parentheses_in_new_expression),
+            parentheses_in_exit_and_die: self
+                .parentheses_in_exit_and_die
+                .unwrap_or(default.parentheses_in_exit_and_die),
         }
     }
 }

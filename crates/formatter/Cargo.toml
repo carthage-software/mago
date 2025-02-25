@@ -18,6 +18,7 @@ mago-source = { workspace = true }
 mago-span = { workspace = true }
 mago-token = { workspace = true }
 mago-interner = { workspace = true }
+mago-php-version = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 bitflags = { workspace = true }

@@ -560,6 +560,69 @@ pub struct FormatSettings {
     /// Default: false
     #[serde(default = "default_false")]
     pub space_before_enum_backing_type_hint_colon: bool,
+
+    /// Controls whether to include parentheses around instantiation expressions
+    /// when they are followed by a member access operator (`->`).
+    ///
+    /// This option reflects the behavior introduced in PHP 8.4,
+    /// where parentheses can be omitted in such cases.
+    ///
+    /// If the configured version for the formatter is earlier than PHP 8.4,
+    /// the value of the formatter is always considered to be true.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// $foo = new Foo->bar(); // `false`
+    ///
+    /// // or
+    ///
+    /// $foo = (new Foo)->bar(); // `true`
+    /// ```
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub parentheses_around_new_in_member_access: bool,
+
+    /// Controls whether to include parentheses in `new` expressions, even when no arguments are provided.
+    ///
+    /// If enabled, the formatter will add parentheses to `new` expressions that don't have them, making them more explicit.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// $foo = new Foo(); // `parentheses_in_new_expression = true`
+    ///
+    /// // or
+    ///
+    /// $foo = new Foo;   // `parentheses_in_new_expression = false`
+    /// ```
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub parentheses_in_new_expression: bool,
+
+    /// Controls whether to include parentheses in `exit` and `die` constructs,
+    /// making them resemble function calls.
+    ///
+    /// If enabled, the formatter will add parentheses to `exit` and `die` statements
+    /// that don't have them.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// exit(); // `parentheses_in_exit_and_die = true`
+    /// die();  // `parentheses_in_exit_and_die = true`
+    ///
+    /// // or
+    ///
+    /// exit;   // `parentheses_in_exit_and_die = false`
+    /// die;    // `parentheses_in_exit_and_die = false`
+    /// ```
+    ///
+    /// Default: `true` (Add parentheses for consistency)
+    #[serde(default = "default_true")]
+    pub parentheses_in_exit_and_die: bool,
 }
 
 impl Default for FormatSettings {
@@ -597,6 +660,9 @@ impl Default for FormatSettings {
             expand_use_groups: true,
             remove_trailing_close_tag: true,
             space_before_enum_backing_type_hint_colon: false,
+            parentheses_around_new_in_member_access: false,
+            parentheses_in_new_expression: true,
+            parentheses_in_exit_and_die: true,
         }
     }
 }

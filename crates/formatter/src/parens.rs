@@ -1,4 +1,5 @@
 use mago_ast::*;
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_token::GetPrecedence;
 
@@ -196,22 +197,8 @@ impl<'a> Formatter<'a> {
                 return self.function_callee_expression_need_parenthesis(expression);
             }
 
-            if let Expression::Instantiation(new) = expression {
-                if new.arguments.is_none() {
-                    // parentheses are required if the instantiation has no arguments
-                    // e.g. `new Foo->baz()` should be `(new Foo)->baz()`
-                    return true;
-                }
-
-                // parentheses are not required if the instantiation has arguments
-                // e.g. `new Foo()->baz()`.
-                //
-                // but this is only allowed in PHP 8.4, so for now, we add
-                // parentheses to be safe, in the future, we can add an option
-                // to remove them.
-                //
-                // TODO(azjezz): we should add an option to remove parentheses.
-                return true;
+            if let Expression::Instantiation(instantiation) = expression {
+                return instantiation_needs_parens(self, instantiation);
             } else {
                 return self.callee_expression_need_parenthesis(expression, false);
             }
@@ -311,5 +298,21 @@ impl<'a> Formatter<'a> {
 
     const fn is_conditional(&self, node: Node<'a>) -> bool {
         if let Node::Conditional(op) = node { op.then.is_some() } else { false }
+    }
+}
+
+pub(crate) fn instantiation_needs_parens(f: &Formatter<'_>, i: &Instantiation) -> bool {
+    if f.php_version.is_supported(Feature::NewWithoutParentheses) {
+        if i.arguments.as_ref().is_none_or(|list| list.arguments.is_empty()) {
+            if f.settings.parentheses_in_new_expression {
+                f.settings.parentheses_around_new_in_member_access
+            } else {
+                true
+            }
+        } else {
+            f.settings.parentheses_around_new_in_member_access
+        }
+    } else {
+        true
     }
 }

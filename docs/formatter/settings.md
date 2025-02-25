@@ -383,3 +383,47 @@ Controls whether a space is added before the colon in enum backing type hints.
   ```toml
   space_before_enum_backing_type_hint_colon = false
   ```
+
+### `parentheses_around_new_in_member_access`
+
+Controls whether to include parentheses around instantiation expressions when they are followed by a member access operator (`->`).
+
+This option reflects the behavior introduced in PHP 8.4, where parentheses can be omitted in such cases.
+
+If the configured version for the formatter is earlier than PHP 8.4, the value of this option is always considered to be `true`.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  parentheses_around_new_in_member_access = false
+  ```
+
+### `parentheses_in_new_expression`
+
+Controls whether to include parentheses in `new` expressions, even when no arguments are provided.
+
+If enabled, the formatter will add parentheses to `new` expressions that don't have them, making them more explicit.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  parentheses_in_new_expression = false
+  ```
+
+### `parentheses_in_exit_and_die`
+
+Controls whether to include parentheses in `exit` and `die` constructs, making them resemble function calls.
+
+If enabled, the formatter will add parentheses to `exit` and `die` statements that don't have them.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  parentheses_in_exit_and_die = false
+  ```

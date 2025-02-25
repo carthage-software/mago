@@ -6,6 +6,7 @@ use mago_ast::Program;
 use mago_ast::Trivia;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_php_version::PHPVersion;
 use mago_source::Source;
 use mago_span::Span;
 
@@ -43,9 +44,10 @@ pub fn format<'a>(
     interner: &'a ThreadedInterner,
     source: &'a Source,
     program: &'a Program,
+    php_version: PHPVersion,
     settings: FormatSettings,
 ) -> String {
-    let mut formatter = Formatter::new(interner, source, settings);
+    let mut formatter = Formatter::new(interner, source, php_version, settings);
 
     formatter.format(program)
 }
@@ -61,6 +63,7 @@ pub struct Formatter<'a> {
     interner: &'a ThreadedInterner,
     source: &'a Source,
     source_text: &'a str,
+    php_version: PHPVersion,
     settings: FormatSettings,
     stack: Vec<Node<'a>>,
     comments: Peekable<IntoIter<Trivia>>,
@@ -70,11 +73,17 @@ pub struct Formatter<'a> {
 }
 
 impl<'a> Formatter<'a> {
-    pub fn new(interner: &'a ThreadedInterner, source: &'a Source, settings: FormatSettings) -> Self {
+    pub fn new(
+        interner: &'a ThreadedInterner,
+        source: &'a Source,
+        php_version: PHPVersion,
+        settings: FormatSettings,
+    ) -> Self {
         Self {
             interner,
             source,
             source_text: interner.lookup(&source.content),
+            php_version,
             settings,
             stack: vec![],
             comments: vec![].into_iter().peekable(),

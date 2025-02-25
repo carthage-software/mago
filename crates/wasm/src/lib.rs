@@ -183,7 +183,7 @@ pub fn mago_format(code: String, format_settings: JsValue) -> Result<JsValue, Js
     }
 
     // Format the parsed program
-    let formatted = mago_formatter::format(&interner, &source, &program, settings);
+    let formatted = mago_formatter::format(&interner, &source, &program, PHPVersion::PHP84, settings);
 
     // Return the formatted string
     Ok(JsValue::from_str(&formatted))

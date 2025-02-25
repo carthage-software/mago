@@ -7,6 +7,7 @@ use mago_formatter::format;
 use mago_formatter::settings::FormatSettings;
 use mago_interner::ThreadedInterner;
 use mago_parser::parse_source;
+use mago_php_version::PHPVersion;
 use mago_source::SourceCategory;
 use mago_source::SourceIdentifier;
 use mago_source::SourceManager;
@@ -69,7 +70,7 @@ pub async fn execute(command: FormatCommand, mut configuration: Configuration) -
     let settings = configuration.format.get_settings();
 
     // Format all sources and get the count of changed files.
-    let changed = format_all(interner, source_manager, settings, command.dry_run).await?;
+    let changed = format_all(interner, source_manager, configuration.php_version, settings, command.dry_run).await?;
 
     // Provide feedback and return appropriate exit code.
     if changed == 0 {
@@ -105,6 +106,7 @@ pub async fn execute(command: FormatCommand, mut configuration: Configuration) -
 async fn format_all(
     interner: ThreadedInterner,
     source_manager: SourceManager,
+    php_version: PHPVersion,
     settings: FormatSettings,
     dry_run: bool,
 ) -> Result<usize, Error> {
@@ -123,7 +125,7 @@ async fn format_all(
             let progress_bar = progress_bar.clone();
 
             async move {
-                let result = format_source(&interner, &manager, &source, settings, dry_run);
+                let result = format_source(&interner, &manager, &source, php_version, settings, dry_run);
 
                 progress_bar.inc(1);
 
@@ -164,6 +166,7 @@ fn format_source(
     interner: &ThreadedInterner,
     manager: &SourceManager,
     source: &SourceIdentifier,
+    php_version: PHPVersion,
     settings: FormatSettings,
     dry_run: bool,
 ) -> Result<bool, Error> {
@@ -183,7 +186,7 @@ fn format_source(
             false
         }
         None => {
-            let formatted = format(interner, &source, &program, settings);
+            let formatted = format(interner, &source, &program, php_version, settings);
 
             utils::apply_changes(interner, manager, &source, formatted, dry_run)?
         }

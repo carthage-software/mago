@@ -16,6 +16,16 @@ pub(super) enum CallLikeNode<'a> {
 }
 
 impl<'a> CallLikeNode<'a> {
+    #[inline]
+    pub const fn is_instantiation(&self) -> bool {
+        matches!(self, CallLikeNode::Instantiation(_))
+    }
+
+    #[inline]
+    pub const fn is_exit_or_die_construct(&self) -> bool {
+        matches!(self, CallLikeNode::DieConstruct(_) | CallLikeNode::ExitConstruct(_))
+    }
+
     pub fn arguments(&self) -> Option<&'a ArgumentList> {
         match self {
             CallLikeNode::Call(call) => Some(match call {
