@@ -19,6 +19,7 @@ pub(super) struct MemberAccessChain<'a> {
 pub(super) enum MemberAccess<'a> {
     PropertyAccess(&'a PropertyAccess),
     NullSafePropertyAccess(&'a NullSafePropertyAccess),
+    StaticMethodCall(&'a StaticMethodCall),
     MethodCall(&'a MethodCall),
     NullSafeMethodCall(&'a NullSafeMethodCall),
 }
@@ -28,12 +29,19 @@ impl<'a> MemberAccess<'a> {
         match self {
             MemberAccess::MethodCall(call) => Some(&call.argument_list),
             MemberAccess::NullSafeMethodCall(call) => Some(&call.argument_list),
+            MemberAccess::StaticMethodCall(call) => Some(&call.argument_list),
             _ => None,
         }
     }
 }
 
 impl MemberAccessChain<'_> {
+    #[inline]
+    fn is_first_link_static_method_call(&self) -> bool {
+        matches!(self.accesses.first(), Some(MemberAccess::StaticMethodCall(_)))
+    }
+
+    #[inline]
     fn find_fluent_access_chain_start(&self) -> Option<usize> {
         let mut p_count = 0;
         let mut pm_count = 0;
@@ -55,6 +63,9 @@ impl MemberAccessChain<'_> {
                     }
                     last_was_p = false;
                 }
+                _ => {
+                    last_was_p = false;
+                }
             }
         }
 
@@ -72,6 +83,13 @@ pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAcc
 
     loop {
         match current_expr {
+            Expression::Call(Call::StaticMethod(static_method_call)) if !member_access.is_empty() => {
+                member_access.push(MemberAccess::StaticMethodCall(static_method_call));
+
+                current_expr = &static_method_call.class;
+
+                break;
+            }
             Expression::Access(Access::Property(property_access)) => {
                 member_access.push(MemberAccess::PropertyAccess(property_access));
 
@@ -108,27 +126,29 @@ pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAcc
 }
 
 pub(super) fn print_member_access_chain<'a>(
-    method_chain: &MemberAccessChain<'a>,
+    member_access_chain: &MemberAccessChain<'a>,
     f: &mut Formatter<'a>,
 ) -> Document<'a> {
-    let base_document = method_chain.base.format(f);
-    let mut parts = if base_needs_parerns(f, method_chain.base) {
+    let base_document = member_access_chain.base.format(f);
+    let mut parts = if base_needs_parerns(f, member_access_chain.base) {
         vec![Document::String("("), base_document, Document::String(")")]
     } else {
         vec![base_document]
     };
 
-    let mut calls_iter = method_chain.accesses.iter();
+    let mut accesses_iter = member_access_chain.accesses.iter();
 
     // Handle the first method call
-    if !f.settings.method_chain_breaking_style.is_next_line() {
-        if let Some(first_chain_link) = calls_iter.next() {
+    if !f.settings.method_chain_breaking_style.is_next_line() || member_access_chain.is_first_link_static_method_call()
+    {
+        if let Some(first_chain_link) = accesses_iter.next() {
             // Format the base object and first method call together
             let (operator, method) = match first_chain_link {
                 MemberAccess::PropertyAccess(c) => (Document::String("->"), c.property.format(f)),
                 MemberAccess::NullSafePropertyAccess(c) => (Document::String("?->"), c.property.format(f)),
                 MemberAccess::MethodCall(c) => (Document::String("->"), c.method.format(f)),
                 MemberAccess::NullSafeMethodCall(c) => (Document::String("?->"), c.method.format(f)),
+                MemberAccess::StaticMethodCall(c) => (Document::String("::"), c.method.format(f)),
             };
 
             parts.push(operator);
@@ -140,15 +160,15 @@ pub(super) fn print_member_access_chain<'a>(
         }
     }
 
-    let fluent_access_chain_start = method_chain.find_fluent_access_chain_start();
+    let fluent_access_chain_start = member_access_chain.find_fluent_access_chain_start();
     let mut last_was_property = false;
 
     // Now handle the remaining method calls
-    for (i, chain_link) in calls_iter.enumerate() {
+    for (i, chain_link) in accesses_iter.enumerate() {
         let is_in_fluent_chain = fluent_access_chain_start.is_some_and(|start| i >= start);
 
         let mut contents = if !is_in_fluent_chain || !last_was_property {
-            vec![Document::Line(Line::hard())]
+            vec![Document::Line(Line::soft())]
         } else {
             vec![] // No newline if in fluent chain and last was property
         };
@@ -170,6 +190,10 @@ pub(super) fn print_member_access_chain<'a>(
                 last_was_property = false;
                 vec![Document::String("?->"), c.method.format(f)]
             }
+            MemberAccess::StaticMethodCall(c) => {
+                last_was_property = false;
+                vec![Document::String("::"), c.method.format(f)]
+            }
         });
 
         if let Some(argument_list) = chain_link.get_arguments_list() {
@@ -179,7 +203,9 @@ pub(super) fn print_member_access_chain<'a>(
         parts.push(Document::Indent(contents));
     }
 
-    parts.push(Document::BreakParent);
+    if member_access_chain.is_first_link_static_method_call() {
+        parts.push(Document::BreakParent);
+    }
 
     // Wrap everything in a group to manage line breaking
     Document::Group(Group::new(parts))

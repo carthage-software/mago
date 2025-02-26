@@ -48,11 +48,7 @@ pub fn test_instantiation_with_member_access_parentheses() {
         $a = (new Foo())->something();
         $a = (new Foo())->something();
         $a = (new Foo(1, 2))->something();
-        $a = (new Foo(1, 2))
-            ->something()
-            ->else()
-            ->other()
-            ->thing();
+        $a = (new Foo(1, 2))->something()->else()->other()->thing();
     "#};
 
     let expected_php84 = indoc! {r#"
@@ -61,11 +57,7 @@ pub fn test_instantiation_with_member_access_parentheses() {
         $a = new Foo()->something();
         $a = new Foo()->something();
         $a = new Foo(1, 2)->something();
-        $a = new Foo(1, 2)
-            ->something()
-            ->else()
-            ->other()
-            ->thing();
+        $a = new Foo(1, 2)->something()->else()->other()->thing();
     "#};
 
     let expected_php83_without_parens = indoc! {r#"
@@ -74,11 +66,7 @@ pub fn test_instantiation_with_member_access_parentheses() {
         $a = (new Foo)->something();
         $a = (new Foo)->something();
         $a = (new Foo(1, 2))->something();
-        $a = (new Foo(1, 2))
-            ->something()
-            ->else()
-            ->other()
-            ->thing();
+        $a = (new Foo(1, 2))->something()->else()->other()->thing();
     "#};
 
     let expected_php84_without_parens = indoc! {r#"
@@ -87,11 +75,7 @@ pub fn test_instantiation_with_member_access_parentheses() {
         $a = (new Foo)->something();
         $a = (new Foo)->something();
         $a = new Foo(1, 2)->something();
-        $a = new Foo(1, 2)
-            ->something()
-            ->else()
-            ->other()
-            ->thing();
+        $a = new Foo(1, 2)->something()->else()->other()->thing();
     "#};
 
     test_format_with_version(code, expected_php83, PHPVersion::PHP83, FormatSettings::default());
