@@ -7,6 +7,7 @@ use crate::test_format;
 pub mod arguments;
 pub mod assignment;
 pub mod binaryish;
+pub mod call;
 pub mod control_structure;
 pub mod expression;
 pub mod mixed;

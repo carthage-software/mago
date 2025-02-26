@@ -5,47 +5,112 @@ use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
 use crate::format::Format;
-use crate::format::call_arguments::print_call_arguments;
-use crate::format::call_node::CallLikeNode;
 use crate::parens::instantiation_needs_parens;
 
-pub(super) struct MethodChain<'a> {
+use super::call_arguments::print_argument_list;
+
+#[derive(Debug)]
+pub(super) struct MemberAccessChain<'a> {
     pub base: &'a Expression,
-    pub calls: Vec<CallLikeNode<'a>>,
+    pub accesses: Vec<MemberAccess<'a>>,
 }
 
-pub(super) fn collect_method_call_chain(expr: &Expression) -> Option<MethodChain<'_>> {
-    let mut calls = Vec::new();
+#[derive(Debug)]
+pub(super) enum MemberAccess<'a> {
+    PropertyAccess(&'a PropertyAccess),
+    NullSafePropertyAccess(&'a NullSafePropertyAccess),
+    MethodCall(&'a MethodCall),
+    NullSafeMethodCall(&'a NullSafeMethodCall),
+}
+
+impl<'a> MemberAccess<'a> {
+    pub fn get_arguments_list(&self) -> Option<&'a ArgumentList> {
+        match self {
+            MemberAccess::MethodCall(call) => Some(&call.argument_list),
+            MemberAccess::NullSafeMethodCall(call) => Some(&call.argument_list),
+            _ => None,
+        }
+    }
+}
+
+impl MemberAccessChain<'_> {
+    fn find_fluent_access_chain_start(&self) -> Option<usize> {
+        let mut p_count = 0;
+        let mut pm_count = 0;
+        let mut last_was_p = false;
+        let mut pattern_start_index = None;
+
+        for (i, access) in self.accesses.iter().enumerate() {
+            match access {
+                MemberAccess::PropertyAccess(_) | MemberAccess::NullSafePropertyAccess(_) => {
+                    p_count += 1;
+                    last_was_p = true;
+                }
+                MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_) => {
+                    if last_was_p {
+                        pm_count += 1;
+                        if pattern_start_index.is_none() {
+                            pattern_start_index = Some(i - 1);
+                        }
+                    }
+                    last_was_p = false;
+                }
+            }
+        }
+
+        if pm_count >= (p_count - pm_count) && pm_count > 0 && !last_was_p {
+            return pattern_start_index;
+        }
+
+        None
+    }
+}
+
+pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAccessChain<'_>> {
+    let mut member_access = Vec::new();
     let mut current_expr = expr;
 
-    while let Expression::Call(call) = current_expr {
-        current_expr = match call {
-            Call::Method(method_call) => {
-                calls.push(CallLikeNode::Call(call));
+    loop {
+        match current_expr {
+            Expression::Access(Access::Property(property_access)) => {
+                member_access.push(MemberAccess::PropertyAccess(property_access));
 
-                method_call.object.as_ref()
+                current_expr = &property_access.object;
             }
-            Call::NullSafeMethod(null_safe_method_call) => {
-                calls.push(CallLikeNode::Call(call));
+            Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
+                member_access.push(MemberAccess::NullSafePropertyAccess(null_safe_property_access));
 
-                null_safe_method_call.object.as_ref()
+                current_expr = &null_safe_property_access.object;
+            }
+            Expression::Call(Call::Method(method_call)) => {
+                member_access.push(MemberAccess::MethodCall(method_call));
+
+                current_expr = &method_call.object;
+            }
+            Expression::Call(Call::NullSafeMethod(null_safe_method_call)) => {
+                member_access.push(MemberAccess::NullSafeMethodCall(null_safe_method_call));
+
+                current_expr = &null_safe_method_call.object;
             }
             _ => {
                 break;
             }
-        };
+        }
     }
 
-    if calls.is_empty() {
+    if member_access.is_empty() {
         None
     } else {
-        calls.reverse();
+        member_access.reverse();
 
-        Some(MethodChain { base: current_expr, calls })
+        Some(MemberAccessChain { base: current_expr, accesses: member_access })
     }
 }
 
-pub(super) fn print_method_call_chain<'a>(method_chain: &MethodChain<'a>, f: &mut Formatter<'a>) -> Document<'a> {
+pub(super) fn print_member_access_chain<'a>(
+    method_chain: &MemberAccessChain<'a>,
+    f: &mut Formatter<'a>,
+) -> Document<'a> {
     let base_document = method_chain.base.format(f);
     let mut parts = if base_needs_parerns(f, method_chain.base) {
         vec![Document::String("("), base_document, Document::String(")")]
@@ -53,35 +118,63 @@ pub(super) fn print_method_call_chain<'a>(method_chain: &MethodChain<'a>, f: &mu
         vec![base_document]
     };
 
-    let mut calls_iter = method_chain.calls.iter();
+    let mut calls_iter = method_chain.accesses.iter();
 
     // Handle the first method call
     if !f.settings.method_chain_breaking_style.is_next_line() {
         if let Some(first_chain_link) = calls_iter.next() {
             // Format the base object and first method call together
             let (operator, method) = match first_chain_link {
-                CallLikeNode::Call(Call::Method(c)) => (Document::String("->"), c.method.format(f)),
-                CallLikeNode::Call(Call::NullSafeMethod(c)) => (Document::String("?->"), c.method.format(f)),
-                _ => unreachable!(),
+                MemberAccess::PropertyAccess(c) => (Document::String("->"), c.property.format(f)),
+                MemberAccess::NullSafePropertyAccess(c) => (Document::String("?->"), c.property.format(f)),
+                MemberAccess::MethodCall(c) => (Document::String("->"), c.method.format(f)),
+                MemberAccess::NullSafeMethodCall(c) => (Document::String("?->"), c.method.format(f)),
             };
 
             parts.push(operator);
             parts.push(method);
 
-            parts.push(Document::Group(Group::new(vec![print_call_arguments(f, first_chain_link)])));
+            if let Some(argument_list) = first_chain_link.get_arguments_list() {
+                parts.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list)])));
+            }
         }
     }
 
+    let fluent_access_chain_start = method_chain.find_fluent_access_chain_start();
+    let mut last_was_property = false;
+
     // Now handle the remaining method calls
-    for chain_link in calls_iter {
-        let mut contents = vec![Document::Line(Line::hard())];
+    for (i, chain_link) in calls_iter.enumerate() {
+        let is_in_fluent_chain = fluent_access_chain_start.is_some_and(|start| i >= start);
+
+        let mut contents = if !is_in_fluent_chain || !last_was_property {
+            vec![Document::Line(Line::hard())]
+        } else {
+            vec![] // No newline if in fluent chain and last was property
+        };
+
         contents.extend(match chain_link {
-            CallLikeNode::Call(Call::Method(c)) => vec![Document::String("->"), c.method.format(f)],
-            CallLikeNode::Call(Call::NullSafeMethod(c)) => vec![Document::String("?->"), c.method.format(f)],
-            _ => unreachable!(),
+            MemberAccess::PropertyAccess(c) => {
+                last_was_property = true;
+                vec![Document::String("->"), c.property.format(f)]
+            }
+            MemberAccess::NullSafePropertyAccess(c) => {
+                last_was_property = true;
+                vec![Document::String("?->"), c.property.format(f)]
+            }
+            MemberAccess::MethodCall(c) => {
+                last_was_property = false;
+                vec![Document::String("->"), c.method.format(f)]
+            }
+            MemberAccess::NullSafeMethodCall(c) => {
+                last_was_property = false;
+                vec![Document::String("?->"), c.method.format(f)]
+            }
         });
 
-        contents.push(Document::Group(Group::new(vec![print_call_arguments(f, chain_link)])));
+        if let Some(argument_list) = chain_link.get_arguments_list() {
+            contents.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list)])));
+        }
 
         parts.push(Document::Indent(contents));
     }

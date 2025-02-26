@@ -13,8 +13,8 @@ use crate::format::array::print_array_like;
 use crate::format::assignment::AssignmentLikeNode;
 use crate::format::assignment::print_assignment;
 use crate::format::binaryish;
-use crate::format::call::collect_method_call_chain;
-use crate::format::call::print_method_call_chain;
+use crate::format::call::collect_member_access_chain;
+use crate::format::call::print_member_access_chain;
 use crate::format::call_arguments::print_argument_list;
 use crate::format::call_node::CallLikeNode;
 use crate::format::call_node::print_call_like_node;
@@ -61,20 +61,29 @@ impl<'a> Format<'a> for Expression {
                 Expression::Throw(t) => t.format(f),
                 Expression::Clone(c) => c.format(f),
                 Expression::Call(c) => {
-                    if let Some(method_chain) = collect_method_call_chain(self) {
-                        let chain_length = method_chain.calls.len();
+                    if let Some(access_chain) = collect_member_access_chain(self) {
+                        let chain_length = access_chain.accesses.len();
                         if chain_length >= f.settings.method_chain_break_threshold {
-                            // Chain is longer than threshold; format with line breaks
-                            print_method_call_chain(&method_chain, f)
+                            print_member_access_chain(&access_chain, f)
                         } else {
-                            // Regular formatting
                             c.format(f)
                         }
                     } else {
                         c.format(f)
                     }
                 }
-                Expression::Access(a) => a.format(f),
+                Expression::Access(a) => {
+                    if let Some(access_chain) = collect_member_access_chain(self) {
+                        let chain_length = access_chain.accesses.len();
+                        if chain_length >= f.settings.method_chain_break_threshold {
+                            print_member_access_chain(&access_chain, f)
+                        } else {
+                            a.format(f)
+                        }
+                    } else {
+                        a.format(f)
+                    }
+                }
                 Expression::ConstantAccess(a) => a.format(f),
                 Expression::ClosureCreation(c) => c.format(f),
                 Expression::Parent(k) => k.format(f),
