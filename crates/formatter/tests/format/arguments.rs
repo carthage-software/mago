@@ -83,3 +83,26 @@ pub fn test_hug_new_with_few_simple_args() {
 
     test_format(code, expected, FormatSettings::default());
 }
+
+#[test]
+pub fn test_hug_last_new_with_named_args() {
+    let code = indoc! {r#"
+        <?php
+
+        $foo = (new \Lcobucci\JWT\Validation\Validator())->assert($token, new SignedWith(
+            signer: new Sha256(),
+            key: InMemory::plainText($this->jwtKey),
+        ));
+    "#};
+
+    let expected = indoc! {r#"
+        <?php
+
+        $foo = new \Lcobucci\JWT\Validation\Validator()->assert($token, new SignedWith(
+            signer: new Sha256(),
+            key: InMemory::plainText($this->jwtKey),
+        ));
+    "#};
+
+    test_format(code, expected, FormatSettings::default());
+}

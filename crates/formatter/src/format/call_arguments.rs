@@ -428,6 +428,17 @@ fn could_expand_argument_value(argument_value: &Expression, arrow_chain_recursio
             Expression::Call(_) | Expression::Conditional(_) => !arrow_chain_recursion,
             _ => false,
         },
+        Expression::Instantiation(instantiation) => {
+            let Expression::Identifier(_) = instantiation.class.as_ref() else {
+                return false;
+            };
+
+            let Some(arguments) = instantiation.arguments.as_ref() else {
+                return false;
+            };
+
+            arguments.arguments.len() > 1 && arguments.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
+        }
         _ => false,
     }
 }
