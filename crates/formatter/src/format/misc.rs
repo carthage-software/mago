@@ -74,6 +74,41 @@ pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expre
             .is_none_or(|chain| chain.accesses.len() < f.settings.method_chain_break_threshold);
     }
 
+    if let Expression::Instantiation(instantiation) = expression {
+        // Hug instantiations if it is a simple class instantiation
+        if let Expression::Identifier(_) = instantiation.class.as_ref() {
+            // And either:
+            return match &instantiation.arguments {
+                // a. The instantiation is a simple class instantiation without arguments
+                None => true,
+                Some(argument_list) => {
+                    let arguments_len = argument_list.arguments.len();
+                    if 0 == arguments_len {
+                        false
+                    } else if arguments_len == 1 {
+                        // b. The instantiation has a single non-named argument that is huggable or an instantiation
+                        //   (e.g. `new Foo(new Bar())`)
+                        match &argument_list.arguments.as_slice()[0] {
+                            Argument::Named(_) => false,
+                            Argument::Positional(positional) => {
+                                matches!(positional.value, Expression::Instantiation(_))
+                                    || should_hug_expression(f, &positional.value)
+                            }
+                        }
+                    } else {
+                        // c. The instantiation has multiple arguments and all are named.
+                        argument_list.arguments.iter().all(|arg| matches!(arg, Argument::Named(_))) ||
+                            // d. The instantiation has less than 4 non-named arguments,
+                            // all of which are simple expressions
+                            (arguments_len < 4 && argument_list.arguments.iter().all(|arg| {
+                                matches!(arg, Argument::Positional(positional) if is_simple_expression(&positional.value))
+                            }))
+                    }
+                }
+            };
+        }
+    }
+
     matches!(
         expression,
         Expression::Array(_)
@@ -83,7 +118,33 @@ pub(super) fn should_hug_expression<'a>(f: &Formatter<'a>, expression: &'a Expre
             | Expression::ClosureCreation(_)
             | Expression::AnonymousClass(_)
             | Expression::Match(_)
-            | Expression::Call(_)
+    )
+}
+
+pub(super) fn is_simple_expression(node: &Expression) -> bool {
+    if let Expression::Parenthesized(inner) = node {
+        return is_simple_expression(&inner.expression);
+    }
+
+    if let Expression::UnaryPrefix(operation) = node {
+        return is_simple_expression(&operation.operand);
+    }
+
+    if let Expression::Binary(operation) = node {
+        return is_simple_expression(&operation.lhs) && is_simple_expression(&operation.rhs);
+    }
+
+    matches!(
+        node,
+        Expression::Static(_)
+            | Expression::Parent(_)
+            | Expression::Self_(_)
+            | Expression::MagicConstant(_)
+            | Expression::Literal(_)
+            | Expression::Identifier(_)
+            | Expression::ConstantAccess(_)
+            | Expression::Variable(_)
+            | Expression::Access(Access::ClassConstant(_))
     )
 }
 
@@ -92,6 +153,7 @@ pub(super) fn is_string_word_type(node: &Expression) -> bool {
         Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_) => true,
         Expression::MagicConstant(_) => true,
         Expression::Identifier(identifier) => matches!(identifier, Identifier::Local(_)),
+        Expression::ConstantAccess(constant_access) => matches!(constant_access.name, Identifier::Local(_)),
         Expression::Variable(variable) => {
             matches!(variable, Variable::Direct(_))
         }
