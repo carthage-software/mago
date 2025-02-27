@@ -261,18 +261,6 @@ Controls the number of spaces to add around types in a compound type (e.g., `int
   type_spacing = 1
   ```
 
-### `method_chain_break_threshold`
-
-Specifies the maximum number of method calls allowed before breaking the chain.
-
-- Default: `4`
-- Type: `integer`
-- Example:
-
-  ```toml
-  method_chain_break_threshold = 2
-  ```
-
 ### `break_promoted_properties_list`
 
 Whether to break a parameter list into multiple lines if it contains one or more promoted property even
