@@ -15,6 +15,9 @@ macro_rules! test_case {
             let expected = include_str!(concat!("./cases/", stringify!($name), "/after.php"));
             let settings = include!(concat!("./cases/", stringify!($name), "/settings.inc"));
 
+            // Normalize line endings in the expected output to match the formatter's output.
+            let expected = expected.replace("\r\n", "\n");
+
             let interner = ThreadedInterner::new();
             let formatter = Formatter::new(&interner, $version, settings);
 
