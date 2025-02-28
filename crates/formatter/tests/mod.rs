@@ -1,4 +1,5 @@
 use mago_formatter::Formatter;
+use mago_formatter::settings::EndOfLine;
 use mago_formatter::settings::FormatSettings;
 use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
@@ -15,16 +16,29 @@ macro_rules! test_case {
             let expected = include_str!(concat!("./cases/", stringify!($name), "/after.php"));
             let settings = include!(concat!("./cases/", stringify!($name), "/settings.inc"));
 
-            // Normalize line endings in the expected output to match the formatter's output.
-            let expected = expected.replace("\r\n", "\n");
-
             let interner = ThreadedInterner::new();
             let formatter = Formatter::new(&interner, $version, settings);
 
             let formatted_code = formatter.format_code("code.php", code.as_ref()).unwrap();
+            if formatted_code != expected {
+                eprintln!("Formatted code does not match expected:");
+                eprintln!("Expected:");
+                eprintln!("{:?}", expected);
+                eprintln!("Actual:");
+                eprintln!("{:?}", formatted_code);
+            }
+
             pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected");
 
             let reformatted_code = formatter.format_code("formatted_code.php", &formatted_code).unwrap();
+            if reformatted_code != expected {
+                eprintln!("Reformatted code does not match expected:");
+                eprintln!("Expected:");
+                eprintln!("{:?}", expected);
+                eprintln!("Actual:");
+                eprintln!("{:?}", reformatted_code);
+            }
+
             pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected");
         }
     };
