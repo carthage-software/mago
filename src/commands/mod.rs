@@ -14,6 +14,7 @@ use crate::commands::ast::AstCommand;
 use crate::commands::find::FindCommand;
 use crate::commands::fix::FixCommand;
 use crate::commands::format::FormatCommand;
+use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 use crate::error::Error;
@@ -22,6 +23,7 @@ pub mod ast;
 pub mod find;
 pub mod fix;
 pub mod format;
+pub mod init;
 pub mod lint;
 pub mod self_update;
 
@@ -38,6 +40,9 @@ pub const CLAP_STYLING: Styles = Styles::styled()
 /// The main Mago CLI command.
 #[derive(Parser, Debug)]
 pub enum MagoCommand {
+    /// Initialize the configuration for Mago.
+    #[command(name = "init")]
+    Init(InitCommand),
     /// Analyze the abstract syntax tree (AST) of PHP code.
     #[command(name = "ast")]
     Ast(AstCommand),

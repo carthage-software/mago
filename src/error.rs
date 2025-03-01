@@ -1,3 +1,5 @@
+use dialoguer::Error as DialoguerError;
+
 use mago_php_version::PHPVersion;
 use mago_php_version::error::ParsingError;
 use mago_reporting::error::ReportingError;
@@ -19,6 +21,10 @@ pub enum Error {
     PHPVersionIsTooOld(PHPVersion, PHPVersion),
     PHPVersionIsTooNew(PHPVersion, PHPVersion),
     InvalidPHPVersion(String, ParsingError),
+    Dialoguer(DialoguerError),
+    WritingConfiguration(std::io::Error),
+    ReadingComposerJson(std::io::Error),
+    ParsingComposerJson(serde_json::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -44,6 +50,10 @@ impl std::fmt::Display for Error {
             Self::InvalidPHPVersion(version, error) => {
                 write!(f, "Invalid PHP version `{}`: {}", version, error)
             }
+            Self::Dialoguer(error) => write!(f, "Failed to interact with the user: {}", error),
+            Self::WritingConfiguration(error) => write!(f, "Failed to write the configuration file: {}", error),
+            Self::ReadingComposerJson(error) => write!(f, "Failed to read the `composer.json` file: {}", error),
+            Self::ParsingComposerJson(error) => write!(f, "Failed to parse the `composer.json` file: {}", error),
         }
     }
 }
@@ -63,6 +73,10 @@ impl std::error::Error for Error {
             Self::Json(error) => Some(error),
             Self::SelfUpdate(error) => Some(error),
             Self::InvalidPHPVersion(_, error) => Some(error),
+            Self::Dialoguer(error) => Some(error),
+            Self::WritingConfiguration(error) => Some(error),
+            Self::ReadingComposerJson(error) => Some(error),
+            Self::ParsingComposerJson(error) => Some(error),
             _ => None,
         }
     }
@@ -119,5 +133,11 @@ impl From<serde_json::Error> for Error {
 impl From<self_update::errors::Error> for Error {
     fn from(error: self_update::errors::Error) -> Self {
         Self::SelfUpdate(error)
+    }
+}
+
+impl From<DialoguerError> for Error {
+    fn from(error: DialoguerError) -> Self {
+        Self::Dialoguer(error)
     }
 }

@@ -8,6 +8,7 @@ use crate::error::Error;
 
 pub mod logger;
 pub mod progress;
+pub mod version;
 
 /// Applies changes to the source file.
 ///

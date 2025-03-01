@@ -36,6 +36,9 @@ pub const ENVIRONMENT_PREFIX: &str = "MAGO";
 /// The name of the configuration file for mago.
 pub const CONFIGURATION_FILE: &str = "mago.toml";
 
+/// The name of `composer.json` file.
+pub const COMPOSER_JSON_FILE: &str = "composer.json";
+
 /// The minimum stack size for each thread (8 MB).
 pub const MINIMUM_STACK_SIZE: usize = 8 * 1024 * 1024;
 

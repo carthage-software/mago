@@ -88,6 +88,7 @@ colored = "3.0.0"
 blake3 = "1.5.5"
 memchr = "2.7.4"
 parking_lot = "0.12.3"
+dialoguer = "0.11.0"
 
 [lints]
 workspace = true
@@ -106,6 +107,7 @@ mago-parser = { workspace = true }
 mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
 mago-reference = { workspace = true }
+mago-composer = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "time"] }
 clap = { workspace = true }
@@ -126,6 +128,7 @@ tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
+dialoguer = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }
