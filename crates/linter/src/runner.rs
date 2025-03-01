@@ -8,8 +8,8 @@ use mago_reporting::IssueCollection;
 
 use crate::ast::AstNode;
 use crate::context::LintContext;
-use crate::ignore::IgnoreDirective;
-use crate::ignore::get_ignores;
+use crate::pragma::Pragma;
+use crate::pragma::get_pragmas;
 use crate::rule::ConfiguredRule;
 
 /// The `Runner` is responsible for executing a lint rule on the AST of a PHP program.
@@ -30,7 +30,7 @@ pub struct Runner<'a> {
     module: &'a Module,
     issues: IssueCollection,
     ast: AstNode<'a>,
-    ignores: Vec<IgnoreDirective<'a>>,
+    pragmas: Vec<Pragma<'a>>,
 }
 
 impl<'a> Runner<'a> {
@@ -62,7 +62,7 @@ impl<'a> Runner<'a> {
             codebase,
             module,
             ast: AstNode::from(Node::Program(program)),
-            ignores: get_ignores(module, program, interner),
+            pragmas: get_pragmas(module, program, interner),
             issues: IssueCollection::default(),
         }
     }
@@ -79,8 +79,8 @@ impl<'a> Runner<'a> {
             self.interner,
             self.codebase,
             self.module,
-            // Filter the ignores to only those that are relevant to this rule.
-            self.ignores
+            // Filter the pragmas to only those that are relevant to this rule.
+            self.pragmas
                 .iter()
                 .filter(|directive| configured_rule.slug.eq_ignore_ascii_case(directive.rule))
                 .collect::<Vec<_>>(),

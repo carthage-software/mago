@@ -5,6 +5,7 @@ use crate::plugin::comment::rules::no_shell_style::NoShellStyleRule;
 use crate::plugin::comment::rules::no_trailing_whitespace::NoTrailingWhitespaceRule;
 use crate::plugin::comment::rules::no_untagged_fixme::NoUntaggedFixmeRule;
 use crate::plugin::comment::rules::no_untagged_todo::NoUntaggedTodoRule;
+use crate::plugin::comment::rules::use_expect_instead_of_ignore::UseExpectInsteadOfIgnoreRule;
 
 use crate::plugin::Plugin;
 use crate::rule::Rule;
@@ -31,6 +32,7 @@ impl Plugin for CommentPlugin {
             Box::new(NoShellStyleRule),
             Box::new(NoTrailingWhitespaceRule),
             Box::new(DocblockSyntaxRule),
+            Box::new(UseExpectInsteadOfIgnoreRule),
         ]
     }
 }

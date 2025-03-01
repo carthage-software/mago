@@ -25,7 +25,7 @@ pub mod scope;
 pub mod settings;
 
 mod ast;
-mod ignore;
+mod pragma;
 mod runner;
 mod utils;
 
