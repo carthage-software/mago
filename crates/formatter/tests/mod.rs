@@ -98,3 +98,4 @@ test_case!(nesting_wrap_more_narrow);
 test_case!(nesting_wrap_narrow);
 test_case!(nesting_wrap_super_narrow);
 test_case!(awaitable);
+test_case!(argument_list_comments);

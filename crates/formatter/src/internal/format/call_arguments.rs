@@ -33,10 +33,31 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &
 }
 
 pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list: &'a ArgumentList) -> Document<'a> {
-    let mut contents = vec![Document::String("(")];
+    let left_parenthesis = {
+        let mut contents = vec![Document::String("(")];
+        if let Some(trailing_comments) = f.print_trailing_comments(argument_list.left_parenthesis) {
+            contents.push(trailing_comments);
+        }
+
+        Document::Array(contents)
+    };
+
+    let get_right_parenthesis = |f: &mut FormatterState<'a>| {
+        let mut contents = vec![];
+        if let Some(leading_comments) = f.print_leading_comments(argument_list.right_parenthesis) {
+            contents.push(leading_comments);
+        }
+
+        contents.push(Document::String(")"));
+
+        Document::Array(contents)
+    };
+
+    let mut contents = vec![left_parenthesis.clone()];
+
     if argument_list.arguments.is_empty() {
         contents.extend(f.print_inner_comment(argument_list.span()));
-        contents.push(Document::String(")"));
+        contents.push(get_right_parenthesis(f));
 
         return Document::Array(contents);
     }
@@ -84,7 +105,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
 
     let all_arguments_broken_out = |f: &mut FormatterState<'a>| {
         let mut parts = vec![];
-        parts.push(Document::String("("));
+        parts.push(left_parenthesis.clone());
         parts.push(Document::Indent(vec![
             Document::Line(Line::default()),
             Document::Array(get_printed_arguments(f, 0)),
@@ -104,7 +125,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         let single_argument = argument_list.arguments.first().unwrap().format(f);
 
         return Document::Group(Group::new(vec![
-            Document::String("("),
+            left_parenthesis,
             Document::Group(Group::new(vec![single_argument])),
             Document::String(")"),
         ]));
@@ -122,7 +143,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
                 Document::BreakParent,
                 Document::Group(Group::conditional(
                     vec![
-                        Document::String("("),
+                        left_parenthesis.clone(),
                         Document::Group(Group::new(vec![first_doc]).with_break(true)),
                         Document::String(", "),
                         last_doc,
@@ -160,7 +181,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
                 Document::BreakParent,
                 Document::Group(Group::conditional(
                     vec![
-                        Document::String("("),
+                        left_parenthesis.clone(),
                         Document::Array(printed_arguments),
                         Document::Group(Group::new(vec![last_doc]).with_break(true)),
                         Document::String(")"),
@@ -171,10 +192,10 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         }
 
         return Document::Group(Group::conditional(
-            vec![Document::String("("), Document::Array(printed_arguments), last_doc, Document::String(")")],
+            vec![left_parenthesis.clone(), Document::Array(printed_arguments), last_doc, Document::String(")")],
             vec![
                 Document::Array(vec![
-                    Document::String("("),
+                    left_parenthesis.clone(),
                     if argument_list.arguments.len() > 1 {
                         Document::Array(vec![
                             Document::Array(get_printed_arguments(f, -1)),
@@ -200,7 +221,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
     }
     contents.push(Document::Line(Line::soft()));
-    contents.push(Document::String(")"));
+    contents.push(get_right_parenthesis(f));
 
     Document::Group(Group::new(contents))
 }
