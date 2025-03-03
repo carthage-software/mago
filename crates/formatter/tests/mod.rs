@@ -100,3 +100,4 @@ test_case!(nesting_wrap_super_narrow);
 test_case!(awaitable);
 test_case!(argument_list_comments);
 test_case!(space_after_not_operator);
+test_case!(breaking_named_arguments);

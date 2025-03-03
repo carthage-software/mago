@@ -113,10 +113,17 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         ]));
 
         parts.push(Document::Line(Line::default()));
+        if let Some(leading_comments) = f.print_leading_comments(argument_list.right_parenthesis) {
+            parts.push(leading_comments);
+        }
         parts.push(Document::String(")"));
 
         Document::Group(Group::new(parts).with_break(true))
     };
+
+    if should_break_all_arguments(argument_list) {
+        return all_arguments_broken_out(f);
+    }
 
     if should_inline_single_breaking_argument(f, argument_list) {
         // we have a single argument that we can hug
@@ -226,6 +233,12 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
     Document::Group(Group::new(contents))
 }
 
+#[inline]
+fn should_break_all_arguments(argument_list: &ArgumentList) -> bool {
+    argument_list.arguments.len() >= 2 && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
+}
+
+#[inline]
 fn should_inline_single_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
     if argument_list.arguments.len() != 1 {
         return false;
