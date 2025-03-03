@@ -99,3 +99,4 @@ test_case!(nesting_wrap_narrow);
 test_case!(nesting_wrap_super_narrow);
 test_case!(awaitable);
 test_case!(argument_list_comments);
+test_case!(space_after_not_operator);

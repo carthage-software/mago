@@ -149,6 +149,10 @@ pub struct FormatterConfiguration {
     /// making them resemble function calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parentheses_in_exit_and_die: Option<bool>,
+
+    /// Controls whether to include a space after the `!` operator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_after_not_operator: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -208,6 +212,7 @@ impl FormatterConfiguration {
             parentheses_in_exit_and_die: self
                 .parentheses_in_exit_and_die
                 .unwrap_or(default.parentheses_in_exit_and_die),
+            space_after_not_operator: self.space_after_not_operator.unwrap_or(default.space_after_not_operator),
         }
     }
 }

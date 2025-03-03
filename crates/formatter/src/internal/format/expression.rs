@@ -104,7 +104,7 @@ impl<'a> Format<'a> for Binary {
 impl<'a> Format<'a> for UnaryPrefix {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, UnaryPrefix, {
-            if self.operator.is_cast() {
+            if self.operator.is_cast() || (self.operator.is_not() && f.settings.space_after_not_operator) {
                 Document::Group(Group::new(vec![self.operator.format(f), Document::space(), self.operand.format(f)]))
             } else {
                 Document::Group(Group::new(vec![self.operator.format(f), self.operand.format(f)]))

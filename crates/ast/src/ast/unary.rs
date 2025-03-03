@@ -103,6 +103,11 @@ impl UnaryPrefixOperator {
     }
 
     #[inline]
+    pub const fn is_not(&self) -> bool {
+        matches!(self, Self::Not(_))
+    }
+
+    #[inline]
     pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
         match self {
             UnaryPrefixOperator::ErrorControl(_) => "@",

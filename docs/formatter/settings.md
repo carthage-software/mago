@@ -403,3 +403,17 @@ If enabled, the formatter will add parentheses to `exit` and `die` statements th
   ```toml
   parentheses_in_exit_and_die = false
   ```
+
+### `space_after_not_operator`
+
+Controls whether to add a space after the `!` operator.
+
+If enabled, the formatter will add a space after the `!` operator in logical negations.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  space_after_not_operator = false
+  ```

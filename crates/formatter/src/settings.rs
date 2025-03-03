@@ -599,6 +599,24 @@ pub struct FormatSettings {
     /// Default: `true` (Add parentheses for consistency)
     #[serde(default = "default_true")]
     pub parentheses_in_exit_and_die: bool,
+
+    /// Controls whether to add a space after `!` operator and before the expression.
+    ///
+    /// If enabled, the formatter will add a space after `!` operator and before the expression.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// $foo = ! $bar; // `space_after_not_operator = true`
+    ///
+    /// // or
+    ///
+    /// $foo = !$bar;  // `space_after_not_operator = false`
+    /// ```
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub space_after_not_operator: bool,
 }
 
 impl Default for FormatSettings {
@@ -637,6 +655,7 @@ impl Default for FormatSettings {
             parentheses_around_new_in_member_access: false,
             parentheses_in_new_expression: true,
             parentheses_in_exit_and_die: true,
+            space_after_not_operator: false,
         }
     }
 }
