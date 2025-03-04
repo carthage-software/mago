@@ -9,6 +9,7 @@ use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::will_break;
 
+use super::misc::is_simple_expression;
 use super::misc::is_string_word_type;
 
 pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &CallLikeNode<'a>) -> Document<'a> {
@@ -70,17 +71,18 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
 
     // First, run all the decision functions with unformatted arguments
     let should_break_all = should_break_all_arguments(argument_list);
-    let should_inline_single = should_inline_single_breaking_argument(f, argument_list);
+    let should_inline = should_inline_single_breaking_argument(f, argument_list);
     let should_expand_first = should_expand_first_arg(f, argument_list);
     let should_expand_last = should_expand_last_arg(f, argument_list);
+    let is_single_late_breaking_argument = is_single_late_breaking_argument(f, argument_list);
 
     let arguments_count = argument_list.arguments.len();
-    let formatted_arguments: Vec<Document<'a>> = argument_list
+    let mut formatted_arguments: Vec<Document<'a>> = argument_list
         .arguments
         .iter()
         .enumerate()
         .map(|(i, arg)| {
-            if !should_break_all && !should_inline_single {
+            if !should_break_all && !should_inline {
                 if should_expand_first && (i == 0) {
                     f.argument_state.expand_first_argument = true;
                     let document = arg.format(f);
@@ -160,16 +162,35 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         return all_arguments_broken_out(f);
     }
 
-    if should_inline_single {
+    if is_single_late_breaking_argument {
+        let single_argument = formatted_arguments.remove(0);
+        let right_parenthesis = get_right_parenthesis(f);
+
+        return Document::IfBreak(IfBreak::new(
+            Document::Group(Group::new(vec![
+                left_parenthesis.clone(),
+                Document::Indent(vec![
+                    Document::Line(Line::default()),
+                    Document::Group(Group::new(vec![single_argument.clone()])),
+                    if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
+                ]),
+                Document::Line(Line::default()),
+                right_parenthesis.clone(),
+            ])),
+            Document::Group(Group::new(vec![left_parenthesis, single_argument, right_parenthesis])),
+        ));
+    }
+
+    if should_inline {
         // we have a single argument that we can hug
         // this means we can avoid any spacing and just print the argument
         // between the parentheses
-        let single_argument = formatted_arguments[0].clone();
+        let single_argument = formatted_arguments.remove(0);
 
         return Document::Group(Group::new(vec![
             left_parenthesis,
             Document::Group(Group::new(vec![single_argument])),
-            Document::String(")"),
+            get_right_parenthesis(f),
         ]));
     }
 
@@ -260,24 +281,53 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
 }
 
 #[inline]
+fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) -> bool {
+    f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+        || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+}
+
+#[inline]
 fn should_break_all_arguments(argument_list: &ArgumentList) -> bool {
     argument_list.arguments.len() >= 2 && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
 }
 
 #[inline]
+fn is_single_late_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
+    let arguments = argument_list.arguments.as_slice();
+    if arguments.len() != 1 {
+        return false;
+    }
+
+    let argument = &arguments[0];
+    if !argument.is_positional() && argument_has_surrounding_comments(f, argument) {
+        return false;
+    }
+
+    let Expression::ArrowFunction(arrow_function) = argument.value() else {
+        return false;
+    };
+
+    if is_simple_expression(&arrow_function.expression) {
+        return true;
+    }
+
+    let Expression::Call(call) = arrow_function.expression.as_ref() else {
+        return false;
+    };
+
+    call.get_argument_list().arguments.iter().all(|a| a.is_positional() && is_simple_expression(a.value()))
+}
+
+#[inline]
 fn should_inline_single_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
-    if argument_list.arguments.len() != 1 {
+    let arguments = argument_list.arguments.as_slice();
+    if arguments.len() != 1 {
         return false;
     }
 
-    let argument = &argument_list.arguments.as_slice()[0];
-    if f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-        || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-    {
-        return false;
-    }
+    let argument = &arguments[0];
 
-    should_hug_expression(f, argument.value())
+    !argument_has_surrounding_comments(f, argument) && should_hug_expression(f, argument.value())
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>

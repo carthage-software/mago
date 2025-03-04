@@ -11,5 +11,9 @@ class Example
                 $consoleCommand->handler->getName() === $command[1]
             ),
         );
+
+        $callable = new CommandBusMiddlewareCallable(
+            fn(object $command) => $this->container->get($middlewareClass)($command, $callable),
+        );
     }
 }

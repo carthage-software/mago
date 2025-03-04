@@ -53,6 +53,18 @@ pub struct StaticMethodCall {
     pub argument_list: ArgumentList,
 }
 
+impl Call {
+    #[inline]
+    pub fn get_argument_list(&self) -> &ArgumentList {
+        match self {
+            Call::Function(f) => &f.argument_list,
+            Call::Method(m) => &m.argument_list,
+            Call::NullSafeMethod(n) => &n.argument_list,
+            Call::StaticMethod(s) => &s.argument_list,
+        }
+    }
+}
+
 impl HasSpan for Call {
     fn span(&self) -> Span {
         match self {

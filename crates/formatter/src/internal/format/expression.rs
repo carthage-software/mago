@@ -420,12 +420,6 @@ impl<'a> Format<'a> for DieConstruct {
     }
 }
 
-impl<'a> Format<'a> for ArgumentList {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, ArgumentList, { print_argument_list(f, self) })
-    }
-}
-
 impl<'a> Format<'a> for Argument {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Argument, {
@@ -1159,8 +1153,8 @@ impl<'a> Format<'a> for AnonymousClass {
             }
 
             signature.push(self.class.format(f));
-            if let Some(arguments) = &self.arguments {
-                signature.push(arguments.format(f));
+            if let Some(argument_list) = &self.arguments {
+                signature.push(print_argument_list(f, argument_list));
             }
 
             if let Some(extends) = &self.extends {

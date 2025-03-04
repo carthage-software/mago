@@ -147,17 +147,18 @@ pub(super) fn is_simple_expression(node: &Expression) -> bool {
     )
 }
 
-pub(super) fn is_string_word_type(node: &Expression) -> bool {
-    match node {
-        Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_) => true,
-        Expression::MagicConstant(_) => true,
-        Expression::Identifier(identifier) => matches!(identifier, Identifier::Local(_)),
-        Expression::ConstantAccess(constant_access) => matches!(constant_access.name, Identifier::Local(_)),
-        Expression::Variable(variable) => {
-            matches!(variable, Variable::Direct(_))
-        }
-        _ => false,
-    }
+#[inline]
+pub(super) const fn is_string_word_type(node: &Expression) -> bool {
+    matches!(
+        node,
+        Expression::Static(_)
+            | Expression::Parent(_)
+            | Expression::Self_(_)
+            | Expression::MagicConstant(_)
+            | Expression::Identifier(Identifier::Local(_))
+            | Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(_) })
+            | Expression::Variable(Variable::Direct(_))
+    )
 }
 
 pub(super) fn print_colon_delimited_body<'a>(

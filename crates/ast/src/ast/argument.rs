@@ -52,6 +52,11 @@ pub struct NamedArgument {
 }
 
 impl Argument {
+    #[inline]
+    pub const fn is_positional(&self) -> bool {
+        matches!(self, Argument::Positional(_))
+    }
+
     pub fn value(&self) -> &Expression {
         match self {
             Argument::Positional(arg) => &arg.value,

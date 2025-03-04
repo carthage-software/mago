@@ -1,7 +1,6 @@
 use mago_ast::*;
 use mago_span::HasSpan;
 use mago_span::Span;
-use return_value::format_return_value;
 
 use crate::document::*;
 use crate::internal::FormatterState;
@@ -16,6 +15,7 @@ use crate::internal::format::misc::print_attribute_list_sequence;
 use crate::internal::format::misc::print_colon_delimited_body;
 use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::parameters::print_function_like_parameters;
+use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::utils;
 use crate::settings::*;
