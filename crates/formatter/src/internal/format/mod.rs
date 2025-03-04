@@ -876,6 +876,9 @@ impl<'a> Format<'a> for Method {
             }
 
             signature.push(self.name.format(f));
+            let has_parameters_or_inner_parameter_comments =
+                !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
+
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
@@ -888,9 +891,15 @@ impl<'a> Format<'a> for Method {
             if let MethodBody::Concrete(_) = self.body {
                 body.push(match f.settings.method_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::IfBreak(
-                        IfBreak::new(Document::space(), Document::Line(Line::hard())).with_id(signature_id),
-                    ),
+                    BraceStyle::NextLine => {
+                        if !has_parameters_or_inner_parameter_comments {
+                            Document::Line(Line::hard())
+                        } else {
+                            Document::IfBreak(
+                                IfBreak::new(Document::space(), Document::Line(Line::hard())).with_id(signature_id),
+                            )
+                        }
+                    }
                 });
             }
 
@@ -1730,6 +1739,9 @@ impl<'a> Format<'a> for Function {
             }
 
             signature.push(self.name.format(f));
+            let has_parameters_or_inner_parameter_comments =
+                !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
+
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
@@ -1744,13 +1756,19 @@ impl<'a> Format<'a> for Function {
                 Document::Group(Group::new(vec![
                     match f.settings.function_brace_style {
                         BraceStyle::SameLine => Document::space(),
-                        BraceStyle::NextLine => Document::IfBreak(
-                            IfBreak::new(
-                                Document::space(),
-                                Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
-                            )
-                            .with_id(signature_id),
-                        ),
+                        BraceStyle::NextLine => {
+                            if !has_parameters_or_inner_parameter_comments {
+                                Document::Line(Line::hard())
+                            } else {
+                                Document::IfBreak(
+                                    IfBreak::new(
+                                        Document::space(),
+                                        Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
+                                    )
+                                    .with_id(signature_id),
+                                )
+                            }
+                        }
                     },
                     self.body.format(f),
                 ])),

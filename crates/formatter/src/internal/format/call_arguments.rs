@@ -26,7 +26,11 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &
         && ((expression.is_instantiation() && !f.settings.parentheses_in_new_expression)
             || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die))
     {
-        return Document::Array(f.print_inner_comment(argument_list.span()));
+        return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
+            Document::Array(vec![Document::String("("), inner_comments, Document::String(")")])
+        } else {
+            Document::empty()
+        };
     }
 
     print_argument_list(f, argument_list)
@@ -56,39 +60,70 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
     let mut contents = vec![left_parenthesis.clone()];
 
     if argument_list.arguments.is_empty() {
-        contents.extend(f.print_inner_comment(argument_list.span()));
+        if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
+            contents.push(inner_comments);
+        }
         contents.push(get_right_parenthesis(f));
 
         return Document::Array(contents);
     }
 
-    let get_printed_arguments = |p: &mut FormatterState<'a>, skip_index: isize| {
+    // First, run all the decision functions with unformatted arguments
+    let should_break_all = should_break_all_arguments(argument_list);
+    let should_inline_single = should_inline_single_breaking_argument(f, argument_list);
+    let should_expand_first = should_expand_first_arg(f, argument_list);
+    let should_expand_last = should_expand_last_arg(f, argument_list);
+
+    let arguments_count = argument_list.arguments.len();
+    let formatted_arguments: Vec<Document<'a>> = argument_list
+        .arguments
+        .iter()
+        .enumerate()
+        .map(|(i, arg)| {
+            if !should_break_all && !should_inline_single {
+                if should_expand_first && (i == 0) {
+                    f.argument_state.expand_first_argument = true;
+                    let document = arg.format(f);
+                    f.argument_state.expand_first_argument = false;
+
+                    return document;
+                }
+
+                if should_expand_last && (i == arguments_count - 1) {
+                    f.argument_state.expand_last_argument = true;
+                    let document = arg.format(f);
+                    f.argument_state.expand_last_argument = false;
+
+                    return document;
+                }
+            }
+
+            arg.format(f)
+        })
+        .collect();
+
+    let get_printed_arguments = |f: &mut FormatterState<'a>, skip_index: isize| {
         let mut printed_arguments = vec![];
         let mut length = argument_list.arguments.len();
-        let arguments: Box<dyn Iterator<Item = (usize, &'a Argument)>> = match skip_index {
+        let arguments_range: Box<dyn Iterator<Item = (usize, usize)>> = match skip_index {
             _ if skip_index > 0 => {
                 length -= skip_index as usize;
-                Box::new(argument_list.arguments.iter().skip(skip_index as usize).enumerate())
+                Box::new((skip_index as usize..argument_list.arguments.len()).enumerate())
             }
             _ if skip_index < 0 => {
                 length -= (-skip_index) as usize;
-                Box::new(
-                    argument_list
-                        .arguments
-                        .iter()
-                        .take(argument_list.arguments.len() - (-skip_index) as usize)
-                        .enumerate(),
-                )
+                Box::new((0..argument_list.arguments.len() - (-skip_index) as usize).enumerate())
             }
-            _ => Box::new(argument_list.arguments.iter().enumerate()),
+            _ => Box::new((0..argument_list.arguments.len()).enumerate()),
         };
 
-        for (i, element) in arguments {
-            let mut argument = vec![element.format(p)];
+        for (i, arg_idx) in arguments_range {
+            let element = &argument_list.arguments.as_slice()[arg_idx];
+            let mut argument = vec![formatted_arguments[arg_idx].clone()];
             if i < (length - 1) {
                 argument.push(Document::String(","));
 
-                if p.is_next_line_empty(element.span()) {
+                if f.is_next_line_empty(element.span()) {
                     argument.push(Document::Line(Line::hard()));
                     argument.push(Document::Line(Line::hard()));
                     argument.push(Document::BreakParent);
@@ -121,15 +156,15 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         Document::Group(Group::new(parts).with_break(true))
     };
 
-    if should_break_all_arguments(argument_list) {
+    if should_break_all {
         return all_arguments_broken_out(f);
     }
 
-    if should_inline_single_breaking_argument(f, argument_list) {
+    if should_inline_single {
         // we have a single argument that we can hug
         // this means we can avoid any spacing and just print the argument
         // between the parentheses
-        let single_argument = argument_list.arguments.first().unwrap().format(f);
+        let single_argument = formatted_arguments[0].clone();
 
         return Document::Group(Group::new(vec![
             left_parenthesis,
@@ -138,10 +173,8 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         ]));
     }
 
-    if should_expand_first_arg(f, argument_list) {
-        f.argument_state.expand_first_argument = true;
-        let mut first_doc = argument_list.arguments.first().unwrap().format(f);
-        f.argument_state.expand_first_argument = false;
+    if should_expand_first {
+        let mut first_doc = formatted_arguments[0].clone();
 
         if will_break(&mut first_doc) {
             let last_doc = get_printed_arguments(f, 1).pop().unwrap();
@@ -162,7 +195,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         }
     }
 
-    if should_expand_last_arg(f, argument_list) {
+    if should_expand_last {
         let mut printed_arguments = get_printed_arguments(f, -1);
         if printed_arguments.iter_mut().any(will_break) {
             return all_arguments_broken_out(f);
@@ -173,17 +206,10 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
             printed_arguments.push(Document::Line(Line::default()));
         }
 
-        let get_last_doc = |p: &mut FormatterState<'a>| {
-            p.argument_state.expand_last_argument = true;
-            let last_doc = argument_list.arguments.last().unwrap().format(p);
-            p.argument_state.expand_last_argument = false;
+        let last_doc = formatted_arguments.last().unwrap().clone();
+        let mut last_doc_clone = last_doc.clone();
 
-            last_doc
-        };
-
-        let mut last_doc = get_last_doc(f);
-
-        if will_break(&mut last_doc) {
+        if will_break(&mut last_doc_clone) {
             return Document::Array(vec![
                 Document::BreakParent,
                 Document::Group(Group::conditional(
@@ -199,7 +225,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
         }
 
         return Document::Group(Group::conditional(
-            vec![left_parenthesis.clone(), Document::Array(printed_arguments), last_doc, Document::String(")")],
+            vec![left_parenthesis.clone(), Document::Array(printed_arguments), last_doc.clone(), Document::String(")")],
             vec![
                 Document::Array(vec![
                     left_parenthesis.clone(),
@@ -212,7 +238,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
                     } else {
                         Document::empty()
                     },
-                    Document::Group(Group::new(vec![get_last_doc(f)]).with_break(true)),
+                    Document::Group(Group::new(vec![last_doc]).with_break(true)),
                     Document::String(")"),
                 ]),
                 all_arguments_broken_out(f),

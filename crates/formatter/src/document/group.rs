@@ -40,6 +40,6 @@ impl AddAssign<usize> for GroupIdentifier {
 
 impl Display for GroupIdentifier {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "group-identifier({})", self.0)
+        write!(f, "{}", self.0)
     }
 }

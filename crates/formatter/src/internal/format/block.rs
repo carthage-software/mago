@@ -70,13 +70,14 @@ pub(super) fn print_block<'a>(
         }
 
         contents.push(Document::Indent(statements));
+
         true
     } else {
         let parent = f.parent_node();
         // in case the block is empty, we still want to add a new line
         // in some cases.
         match &parent {
-            // functions, closures, and methods
+            // functions, and methods
             Node::Function(_) | Node::MethodBody(_) | Node::PropertyHookConcreteBody(_) => true,
             // try, catch, finally
             Node::Try(_) | Node::TryCatchClause(_) | Node::TryFinallyClause(_) => true,
@@ -106,7 +107,7 @@ pub(super) fn print_block<'a>(
         contents.push(comments);
     } else if has_inline_body {
         contents.push(Document::space());
-    } else {
+    } else if should_break {
         contents.push(Document::Line(Line::soft()));
     }
 

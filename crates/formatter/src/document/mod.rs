@@ -259,7 +259,7 @@ impl fmt::Display for Document<'_> {
             Document::IndentIfBreak(IndentIfBreak { contents, group_id }) => {
                 let mut options = vec![];
                 if let Some(id) = group_id {
-                    options.push(format!("groupId: {:?}", id));
+                    options.push(format!("groupId: {}", id));
                 }
                 let options_str =
                     if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
@@ -271,7 +271,7 @@ impl fmt::Display for Document<'_> {
                     options.push("shouldBreak: true".to_string());
                 }
                 if let Some(id) = id {
-                    options.push(format!("id: {:?}", id));
+                    options.push(format!("id: {}", id));
                 }
                 let expanded_states_str = if let Some(states) = expanded_states {
                     format!(
@@ -308,7 +308,7 @@ impl fmt::Display for Document<'_> {
             Document::IfBreak(IfBreak { break_contents, flat_content, group_id }) => {
                 let mut options = vec![];
                 if let Some(id) = group_id {
-                    options.push(format!("groupId: {:?}", id));
+                    options.push(format!("groupId: {}", id));
                 }
                 let options_str =
                     if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };

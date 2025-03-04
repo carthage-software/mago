@@ -7,7 +7,6 @@ use crate::document::Group;
 use crate::document::Line;
 use crate::document::Separator;
 use crate::internal::FormatterState;
-
 use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
 
@@ -78,6 +77,21 @@ impl<'a> FormatterState<'a> {
             }
 
             peekable_trivias.next();
+        }
+
+        false
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn has_inner_comment(&self, range: Span) -> bool {
+        let peekable_trivias = self.comments.clone();
+
+        for comment in peekable_trivias {
+            let comment = Comment::from_trivia(&comment);
+            if comment.start >= range.start.offset && comment.end <= range.end.offset {
+                return true;
+            }
         }
 
         false
@@ -201,20 +215,51 @@ impl<'a> FormatterState<'a> {
     }
 
     #[must_use]
-    pub(crate) fn print_inner_comment(&mut self, range: Span) -> Vec<Document<'a>> {
+    pub(crate) fn print_inner_comment(&mut self, range: Span, should_indent: bool) -> Option<Document<'a>> {
         let mut parts = vec![];
+        let mut must_break = false;
         while let Some(comment) = self.comments.peek() {
+            let span = comment.span;
             let comment = Comment::from_trivia(comment);
             // Comment within the span
             if comment.start >= range.start.offset && comment.end <= range.end.offset {
+                must_break = must_break || !comment.is_block;
+                if !should_indent && self.is_next_line_empty(span) {
+                    parts.push(Document::Array(vec![self.print_comment(comment), Document::Line(Line::hard())]));
+                    must_break = true;
+                } else {
+                    parts.push(self.print_comment(comment));
+                }
+
                 self.comments.next();
-                parts.push(self.print_comment(comment));
             } else {
                 break;
             }
         }
 
-        parts
+        if parts.is_empty() {
+            return None;
+        }
+
+        let document = Document::Array(Document::join(parts, Separator::HardLine));
+
+        Some(if should_indent {
+            Document::Group(
+                Group::new(vec![
+                    Document::Indent(vec![Document::Line(Line::default()), document]),
+                    Document::Line(Line::default()),
+                ])
+                .with_break(must_break),
+            )
+        } else {
+            Document::Group(
+                Group::new(vec![
+                    Document::Array(vec![Document::Line(Line::default()), document]),
+                    Document::Line(Line::default()),
+                ])
+                .with_break(must_break),
+            )
+        })
     }
 
     #[must_use]

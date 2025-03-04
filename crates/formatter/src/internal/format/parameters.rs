@@ -42,6 +42,17 @@ pub(super) fn print_function_like_parameters<'a>(
     f: &mut FormatterState<'a>,
     parameter_list: &'a FunctionLikeParameterList,
 ) -> Document<'a> {
+    if parameter_list.parameters.is_empty() {
+        let mut contents = vec![Document::String("(")];
+        if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
+            contents.push(comments);
+        }
+
+        contents.push(Document::String(")"));
+
+        return Document::Array(contents);
+    }
+
     let should_hug_the_parameters = should_hug_the_only_parameter(f, parameter_list);
     let should_break = !should_hug_the_parameters
         && f.settings.break_promoted_properties_list
@@ -57,15 +68,11 @@ pub(super) fn print_function_like_parameters<'a>(
         }
 
         printed.push(Document::String(","));
-        if should_hug_the_parameters {
-            printed.push(Document::space());
-        } else {
-            printed.push(Document::Line(Line::default()));
+        printed.push(Document::Line(Line::default()));
 
-            if f.is_next_line_empty(parameter.span()) {
-                printed.push(Document::BreakParent);
-                printed.push(Document::Line(Line::hard()));
-            }
+        if f.is_next_line_empty(parameter.span()) {
+            printed.push(Document::BreakParent);
+            printed.push(Document::Line(Line::hard()));
         }
     }
 
