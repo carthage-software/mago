@@ -147,12 +147,7 @@ impl<'a> Format<'a> for OpeningTag {
 
 impl<'a> Format<'a> for FullOpeningTag {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, FullOpeningTag, {
-            Document::String(match f.settings.keyword_case {
-                CasingStyle::Lowercase => "<?php",
-                CasingStyle::Uppercase => "<?PHP",
-            })
-        })
+        wrap!(f, self, FullOpeningTag, { Document::String("<?php") })
     }
 }
 
@@ -933,14 +928,9 @@ impl<'a> Format<'a> for MethodAbstractBody {
 impl<'a> Format<'a> for Keyword {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Keyword, {
-            let mut value = f.lookup(&self.value);
+            let value = f.lookup(&self.value);
 
-            value = match f.settings.keyword_case {
-                CasingStyle::Lowercase => f.as_str(value.to_ascii_lowercase()),
-                CasingStyle::Uppercase => f.as_str(value.to_ascii_uppercase()),
-            };
-
-            Document::String(value)
+            Document::String(f.as_str(value.to_ascii_lowercase()))
         })
     }
 }
@@ -1266,10 +1256,7 @@ impl<'a> Format<'a> for Attribute {
 impl<'a> Format<'a> for Hint {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Hint, {
-            let k = |v: &str| match f.settings.keyword_case {
-                CasingStyle::Lowercase => Document::String(f.as_str(v.to_ascii_lowercase())),
-                CasingStyle::Uppercase => Document::String(f.as_str(v.to_ascii_uppercase())),
-            };
+            let k = |v: &str| Document::String(f.as_str(v.to_ascii_lowercase()));
 
             match self {
                 Hint::Identifier(identifier) => identifier.format(f),

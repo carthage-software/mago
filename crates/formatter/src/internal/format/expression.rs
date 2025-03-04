@@ -119,10 +119,7 @@ impl<'a> Format<'a> for UnaryPrefixOperator {
         wrap!(f, self, UnaryPrefixOperator, {
             let value = self.as_str(f.interner);
 
-            Document::String(match f.settings.keyword_case {
-                CasingStyle::Lowercase => f.as_str(value.to_lowercase()),
-                CasingStyle::Uppercase => f.as_str(value.to_uppercase()),
-            })
+            Document::String(f.as_str(value.to_lowercase()))
         })
     }
 }

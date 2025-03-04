@@ -47,10 +47,6 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_around_declare_equals: Option<bool>,
 
-    /// Keyword casing (e.g., lowercase, uppercase, camelCase).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keyword_case: Option<CasingStyle>,
-
     /// In a control structure expression, is there a space after the opening parenthesis
     ///  and a space before the closing parenthesis?
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -169,7 +165,6 @@ impl FormatterConfiguration {
             space_around_declare_equals: self
                 .space_around_declare_equals
                 .unwrap_or(default.space_around_declare_equals),
-            keyword_case: self.keyword_case.unwrap_or(default.keyword_case),
             control_space_parens: self.control_space_parens.unwrap_or(default.control_space_parens),
             closure_brace_style: self.closure_brace_style.unwrap_or(default.closure_brace_style),
             function_brace_style: self.function_brace_style.unwrap_or(default.function_brace_style),

@@ -91,18 +91,6 @@ Controls whether spaces are added around the `=` sign in declare statements.
   space_around_declare_equals = false
   ```
 
-### `keyword_case`
-
-Specifies the case to use for keywords.
-
-- Default: `"lowercase"`
-- Type: `enum { "lowercase", "uppercase" }`
-- Example:
-
-  ```toml
-  keyword_case = "uppercase"
-  ```
-
 ### `control_space_parens`
 
 Controls whether spaces are added inside parentheses in control structures.

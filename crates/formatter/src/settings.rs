@@ -68,36 +68,6 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_around_declare_equals: bool,
 
-    /// Keyword casing (e.g., lowercase, uppercase).
-    ///
-    /// The formatter will convert keywords to the specified case.
-    ///
-    /// Example:
-    ///
-    /// ```php
-    /// // lowercase
-    /// if (true) {
-    ///    $foo = (string) $bar;
-    ///
-    ///    echo $foo;
-    ///
-    ///    return;
-    /// }
-    ///
-    /// // uppercase
-    /// IF (TRUE) {
-    ///   $foo = (STRING) $bar;
-    ///
-    ///   ECHO $foo;
-    ///
-    ///   RETURN;
-    /// }
-    /// ```
-    ///
-    /// Default: lowercase
-    #[serde(default)]
-    pub keyword_case: CasingStyle,
-
     /// In a control structure expression, is there a space after the opening parenthesis
     ///  and a space before the closing parenthesis?
     ///
@@ -630,7 +600,6 @@ impl Default for FormatSettings {
             single_quote: true,
             trailing_comma: true,
             space_around_declare_equals: false,
-            keyword_case: CasingStyle::default(),
             control_space_parens: false,
             closure_brace_style: BraceStyle::SameLine,
             function_brace_style: BraceStyle::NextLine,
@@ -672,16 +641,6 @@ pub enum EndOfLine {
     Crlf,
     #[serde(alias = "cr")]
     Cr,
-}
-
-/// Specifies the style of line endings.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum CasingStyle {
-    #[default]
-    #[serde(alias = "lowercase", alias = "lower")]
-    Lowercase,
-    #[serde(alias = "uppercase", alias = "upper")]
-    Uppercase,
 }
 
 /// Specifies the style of line endings.
