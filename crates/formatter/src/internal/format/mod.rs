@@ -1,7 +1,7 @@
 use mago_ast::*;
 use mago_span::HasSpan;
 use mago_span::Span;
-use misc::is_simple_expression;
+use return_value::format_return_value;
 
 use crate::document::*;
 use crate::internal::FormatterState;
@@ -12,15 +12,12 @@ use crate::internal::format::block::print_block_of_nodes;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
 use crate::internal::format::class_like::print_class_like_body;
-use crate::internal::format::misc::has_new_line_in_range;
 use crate::internal::format::misc::print_attribute_list_sequence;
 use crate::internal::format::misc::print_colon_delimited_body;
 use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::parameters::print_function_like_parameters;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::utils;
-use crate::internal::utils::get_left_side;
-use crate::internal::utils::has_naked_left_side;
 use crate::settings::*;
 use crate::wrap;
 
@@ -36,6 +33,7 @@ pub mod expression;
 pub mod member_access;
 pub mod misc;
 pub mod parameters;
+pub mod return_value;
 pub mod statement;
 pub mod string;
 
@@ -1171,70 +1169,17 @@ impl<'a> Format<'a> for Enum {
 
 impl<'a> Format<'a> for Return {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        fn return_argument_has_leading_comment<'a>(f: &mut FormatterState<'a>, argument: &'a Expression) -> bool {
-            if f.has_leading_own_line_comment(argument.span())
-                || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {
-                    has_new_line_in_range(f.source_text, comment.start, comment.end)
-                })
-            {
-                return true;
-            }
-
-            if has_naked_left_side(argument) {
-                let mut left_most = argument;
-                while let Some(new_left_most) = get_left_side(left_most) {
-                    left_most = new_left_most;
-
-                    if f.has_leading_own_line_comment(left_most.span()) {
-                        return true;
-                    }
-                }
-            }
-
-            false
-        }
-
         wrap!(f, self, Return, {
-            let mut parts = vec![];
+            let mut contents = vec![self.r#return.format(f)];
 
-            parts.push(self.r#return.format(f));
             if let Some(value) = &self.value {
-                parts.push(Document::space());
-
-                if return_argument_has_leading_comment(f, value) {
-                    parts.push(Document::String("("));
-                    parts.push(Document::Indent(vec![Document::Line(Line::hard()), value.format(f)]));
-                    parts.push(Document::Line(Line::hard()));
-                    parts.push(Document::String(")"));
-                } else {
-                    let mut expression = value;
-                    while let Expression::Parenthesized(parenthesized) = expression {
-                        expression = &parenthesized.expression;
-                    }
-
-                    if matches!(expression, Expression::Binary(binary) if !is_simple_expression(&binary.lhs) && !is_simple_expression(&binary.rhs))
-                        || matches!(expression, Expression::Conditional(conditional) if (
-                            conditional.then.is_none() || (
-                                matches!(conditional.then.as_ref().map(|e| e.as_ref()), Some(Expression::Conditional(_))) &&
-                                matches!(conditional.r#else.as_ref(), Expression::Conditional(_))
-                            )
-                        ))
-                    {
-                        parts.push(Document::Group(Group::new(vec![
-                            Document::IfBreak(IfBreak::then(Document::String("("))),
-                            Document::Indent(vec![Document::Line(Line::soft()), value.format(f)]),
-                            Document::Line(Line::soft()),
-                            Document::IfBreak(IfBreak::then(Document::String(")"))),
-                        ])));
-                    } else {
-                        parts.push(value.format(f));
-                    }
-                }
+                contents.push(Document::space());
+                contents.push(format_return_value(f, value));
             }
 
-            parts.push(self.terminator.format(f));
+            contents.push(self.terminator.format(f));
 
-            Document::Group(Group::new(parts))
+            Document::Group(Group::new(contents))
         })
     }
 }

@@ -104,3 +104,4 @@ test_case!(breaking_named_arguments);
 test_case!(break_fn_args);
 test_case!(member_access_chain);
 test_case!(return_wrapping);
+test_case!(arrow_return);

@@ -23,6 +23,7 @@ use crate::internal::format::misc;
 use crate::internal::format::misc::print_attribute_list_sequence;
 use crate::internal::format::misc::print_condition;
 use crate::internal::format::misc::print_modifiers;
+use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
 use crate::internal::utils;
 use crate::settings::*;
@@ -620,7 +621,7 @@ impl<'a> Format<'a> for ArrowFunction {
             }
 
             contents.push(Document::String(" => "));
-            contents.push(self.expression.format(f));
+            contents.push(format_return_value(f, self.expression.as_ref()));
 
             if let Some(attributes) = attributes {
                 Document::Group(Group::new(vec![attributes, Document::Group(Group::new(contents))]))
