@@ -102,3 +102,4 @@ test_case!(argument_list_comments);
 test_case!(space_after_not_operator);
 test_case!(breaking_named_arguments);
 test_case!(break_fn_args);
+test_case!(member_access_chain);

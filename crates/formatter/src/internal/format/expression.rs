@@ -62,7 +62,7 @@ impl<'a> Format<'a> for Expression {
                 Expression::Clone(c) => c.format(f),
                 Expression::Call(c) => {
                     if let Some(access_chain) = collect_member_access_chain(self) {
-                        if access_chain.is_eligible_for_chaining() {
+                        if access_chain.is_eligible_for_chaining(f) {
                             print_member_access_chain(&access_chain, f)
                         } else {
                             c.format(f)
@@ -73,7 +73,7 @@ impl<'a> Format<'a> for Expression {
                 }
                 Expression::Access(a) => {
                     if let Some(access_chain) = collect_member_access_chain(self) {
-                        if access_chain.is_eligible_for_chaining() {
+                        if access_chain.is_eligible_for_chaining(f) {
                             print_member_access_chain(&access_chain, f)
                         } else {
                             a.format(f)

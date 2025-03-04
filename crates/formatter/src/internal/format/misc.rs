@@ -70,7 +70,7 @@ pub(super) fn should_hug_expression<'a>(f: &FormatterState<'a>, expression: &'a 
 
     if let Expression::Call(_) = expression {
         // Don't hug calls if they are part of a member access chain
-        return collect_member_access_chain(expression).is_none_or(|chain| !chain.is_eligible_for_chaining());
+        return collect_member_access_chain(expression).is_none_or(|chain| !chain.is_eligible_for_chaining(f));
     }
 
     if let Expression::Instantiation(instantiation) = expression {
