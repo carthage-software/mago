@@ -79,25 +79,24 @@ final class InstallMagoBinaryCommand extends BaseCommand
         $io->write(" - {$download['file']}");
 
         $downloaded_file = $release_dir . '/' . $download['file'];
-        $promise = $downloader->addCopy(
-            $download['url'],
-            $downloaded_file,
-        )->then(static function (Response $response) use (
-            $filesystem,
-            $release_dir,
-            $downloaded_file,
-            $executable_platform_file,
-            $executable_platform_content,
-        ): Response {
-            $phar = new \PharData($downloaded_file);
-            $phar->extractTo($release_dir);
+        $promise = $downloader
+            ->addCopy($download['url'], $downloaded_file)
+            ->then(static function (Response $response) use (
+                $filesystem,
+                $release_dir,
+                $downloaded_file,
+                $executable_platform_file,
+                $executable_platform_content,
+            ): Response {
+                $phar = new \PharData($downloaded_file);
+                $phar->extractTo($release_dir);
 
-            $filesystem->remove($downloaded_file);
+                $filesystem->remove($downloaded_file);
 
-            file_put_contents($executable_platform_file, $executable_platform_content);
+                file_put_contents($executable_platform_file, $executable_platform_content);
 
-            return $response;
-        });
+                return $response;
+            });
 
         $io->write('');
         $progress_bar = ($io instanceof ConsoleIO) ? $io->getProgressBar() : null;

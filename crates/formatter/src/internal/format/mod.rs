@@ -1,6 +1,7 @@
 use mago_ast::*;
 use mago_span::HasSpan;
 use mago_span::Span;
+use misc::is_simple_expression;
 
 use crate::document::*;
 use crate::internal::FormatterState;
@@ -1211,7 +1212,7 @@ impl<'a> Format<'a> for Return {
                         expression = &parenthesized.expression;
                     }
 
-                    if expression.is_binary()
+                    if matches!(expression, Expression::Binary(binary) if !is_simple_expression(&binary.lhs) && !is_simple_expression(&binary.rhs))
                         || matches!(expression, Expression::Conditional(conditional) if (
                             conditional.then.is_none() || (
                                 matches!(conditional.then.as_ref().map(|e| e.as_ref()), Some(Expression::Conditional(_))) &&

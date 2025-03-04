@@ -103,3 +103,4 @@ test_case!(space_after_not_operator);
 test_case!(breaking_named_arguments);
 test_case!(break_fn_args);
 test_case!(member_access_chain);
+test_case!(return_wrapping);
