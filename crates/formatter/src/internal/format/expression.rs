@@ -763,10 +763,7 @@ impl<'a> Format<'a> for MatchDefaultArm {
         wrap!(f, self, MatchDefaultArm, {
             Document::Group(Group::new(vec![
                 self.default.format(f),
-                Document::IndentIfBreak(IndentIfBreak::new(vec![
-                    Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())),
-                    Document::String("=> "),
-                ])),
+                Document::String(" => "),
                 self.expression.format(f),
             ]))
         })
@@ -782,14 +779,14 @@ impl<'a> Format<'a> for MatchExpressionArm {
                 contents.push(condition.format(f));
                 if i != (len - 1) {
                     contents.push(Document::String(","));
-                    contents.push(Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())));
+                    contents.push(Document::Line(Line::default()));
                 } else if f.settings.trailing_comma {
                     contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
                 }
             }
 
             contents.push(Document::IndentIfBreak(IndentIfBreak::new(vec![
-                Document::IfBreak(IfBreak::new(Document::Line(Line::default()), Document::space())),
+                Document::Line(Line::default()),
                 Document::String("=> "),
             ])));
 

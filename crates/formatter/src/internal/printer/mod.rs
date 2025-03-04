@@ -202,18 +202,20 @@ impl<'a> Printer<'a> {
 
     fn handle_indent_if_break(&mut self, indentation: Indentation<'a>, mode: Mode, doc: IndentIfBreak<'a>) {
         let IndentIfBreak { contents, group_id } = doc;
-        let group_mode = group_id.map_or(Some(mode), |id| self.group_mode_map.get(&id).copied());
+        let Some(group_mode) = group_id.map_or(Some(mode), |id| self.group_mode_map.get(&id).copied()) else {
+            return;
+        };
 
         match group_mode {
-            Some(Mode::Flat) => {
+            Mode::Flat => {
                 self.commands
                     .extend(contents.into_iter().rev().map(|doc| Command::new(indentation.clone(), mode, doc)));
             }
-            Some(Mode::Break) => {
-                self.commands
-                    .extend(contents.into_iter().rev().map(|doc| Command::new(Indentation::Indent, mode, doc)));
+            Mode::Break => {
+                self.commands.extend(contents.into_iter().rev().map(|doc| {
+                    Command::new(Indentation::Combined(vec![Indentation::Indent, indentation.clone()]), mode, doc)
+                }));
             }
-            None => {}
         }
     }
 
