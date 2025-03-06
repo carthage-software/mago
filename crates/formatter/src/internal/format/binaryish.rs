@@ -51,7 +51,7 @@ pub(super) fn print_binaryish_expression<'a>(
     //     $this->lookahead()->type === $tt->parenLeft
     //   ) {
     if is_inside_parenthesis {
-        return Document::Array(parts);
+        return Document::Indent(parts);
     }
 
     // Break between the parens in

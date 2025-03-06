@@ -107,3 +107,5 @@ test_case!(return_wrapping);
 test_case!(arrow_return);
 test_case!(match_breaking);
 test_case!(array_alignment);
+test_case!(binary_alignment);
+test_case!(binary_alignment_before_op);
