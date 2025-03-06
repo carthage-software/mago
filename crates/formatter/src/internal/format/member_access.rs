@@ -1,4 +1,5 @@
 use mago_ast::*;
+use mago_span::Span;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -230,11 +231,13 @@ pub(super) fn print_member_access_chain<'a>(
         if let Some(first_chain_link) = accesses_iter.next() {
             // Format the base object and first method call together
             let (operator, method) = match first_chain_link {
-                MemberAccess::PropertyAccess(c) => (Document::String("->"), c.property.format(f)),
-                MemberAccess::NullSafePropertyAccess(c) => (Document::String("?->"), c.property.format(f)),
-                MemberAccess::MethodCall(c) => (Document::String("->"), c.method.format(f)),
-                MemberAccess::NullSafeMethodCall(c) => (Document::String("?->"), c.method.format(f)),
-                MemberAccess::StaticMethodCall(c) => (Document::String("::"), c.method.format(f)),
+                MemberAccess::PropertyAccess(c) => (format_op(f, c.arrow, "->"), c.property.format(f)),
+                MemberAccess::NullSafePropertyAccess(c) => {
+                    (format_op(f, c.question_mark_arrow, "?->"), c.property.format(f))
+                }
+                MemberAccess::MethodCall(c) => (format_op(f, c.arrow, "->"), c.method.format(f)),
+                MemberAccess::NullSafeMethodCall(c) => (format_op(f, c.question_mark_arrow, "?->"), c.method.format(f)),
+                MemberAccess::StaticMethodCall(c) => (format_op(f, c.double_colon, "::"), c.method.format(f)),
             };
 
             parts.push(operator);
@@ -262,23 +265,24 @@ pub(super) fn print_member_access_chain<'a>(
         contents.extend(match chain_link {
             MemberAccess::PropertyAccess(c) => {
                 last_was_property = true;
-                vec![Document::String("->"), c.property.format(f)]
+
+                [format_op(f, c.arrow, "->"), c.property.format(f)]
             }
             MemberAccess::NullSafePropertyAccess(c) => {
                 last_was_property = true;
-                vec![Document::String("?->"), c.property.format(f)]
+                [format_op(f, c.question_mark_arrow, "?->"), c.property.format(f)]
             }
             MemberAccess::MethodCall(c) => {
                 last_was_property = false;
-                vec![Document::String("->"), c.method.format(f)]
+                [format_op(f, c.arrow, "->"), c.method.format(f)]
             }
             MemberAccess::NullSafeMethodCall(c) => {
                 last_was_property = false;
-                vec![Document::String("?->"), c.method.format(f)]
+                [format_op(f, c.question_mark_arrow, "?->"), c.method.format(f)]
             }
             MemberAccess::StaticMethodCall(c) => {
                 last_was_property = false;
-                vec![Document::String("::"), c.method.format(f)]
+                [format_op(f, c.double_colon, "::"), c.method.format(f)]
             }
         });
 
@@ -317,4 +321,12 @@ fn base_needs_parerns(f: &FormatterState<'_>, base: &Expression) -> bool {
         | Expression::Clone(_) => true,
         _ => false,
     }
+}
+
+fn format_op<'a>(f: &mut FormatterState<'a>, span: Span, operator: &'a str) -> Document<'a> {
+    let leading = f.print_leading_comments(span);
+    let doc = Document::String(operator);
+    let doc = f.print_comments(leading, doc, None);
+
+    doc
 }

@@ -109,3 +109,4 @@ test_case!(match_breaking);
 test_case!(array_alignment);
 test_case!(binary_alignment);
 test_case!(binary_alignment_before_op);
+test_case!(chain_comments);
