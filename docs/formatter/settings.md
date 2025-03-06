@@ -392,7 +392,21 @@ If enabled, the formatter will add parentheses to `exit` and `die` statements th
   parentheses_in_exit_and_die = false
   ```
 
-### `space_after_not_operator`
+### `parentheses_in_attribute`
+
+Controls whether to include parentheses in attributes when they contain no arguments.
+
+If enabled, the formatter will add parentheses to attributes that don't have them.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  parentheses_in_attribute = true
+  ```
+
+### `space_after_not_operator`
 
 Controls whether to add a space after the `!` operator.
 
@@ -404,4 +418,46 @@ If enabled, the formatter will add a space after the `!` operator in logical neg
 
   ```toml
   space_after_not_operator = false
+  ```
+
+### `array_table_style_alignment`
+
+Controls whether to use table-style alignment for arrays.
+
+If enabled, the formatter will attempt to align array elements in a table-like format, making them more readable. This is particularly useful for arrays with consistent elements, such as those used for data structures or configuration.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  array_table_style_alignment = true
+  ```
+
+### `always_break_named_arguments_list`
+
+Controls whether to always break named argument lists into multiple lines.
+
+If enabled, the formatter will always break named argument lists into multiple lines, making them more readable.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  always_break_named_arguments_list = false
+  ```
+
+### `always_break_attribute_named_argument_lists`
+
+Controls whether to always break long named argument lists in attributes into multiple lines.
+
+If enabled, the formatter will always break named argument lists in attributes into multiple lines, making them more readable.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  always_break_attribute_named_argument_lists = true
   ```

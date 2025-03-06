@@ -566,9 +566,28 @@ pub struct FormatSettings {
     /// die;    // `parentheses_in_exit_and_die = false`
     /// ```
     ///
-    /// Default: `true` (Add parentheses for consistency)
+    /// Default: `true`
     #[serde(default = "default_true")]
     pub parentheses_in_exit_and_die: bool,
+
+    /// Controls whether to include parentheses in attributes when they contain no arguments.
+    ///
+    /// If enabled, the formatter will add parentheses to attributes that don't have them.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// #[SomeAttribute()] // `parentheses_in_attribute = true`
+    /// class Foo {}
+    ///
+    /// // or
+    /// #[SomeAttribute]   // `parentheses_in_attribute = false`
+    /// class Bar {}
+    /// ```
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub parentheses_in_attribute: bool,
 
     /// Controls whether to add a space after `!` operator and before the expression.
     ///
@@ -587,6 +606,65 @@ pub struct FormatSettings {
     /// Default: `false`
     #[serde(default = "default_false")]
     pub space_after_not_operator: bool,
+
+    /// Controls whether to use table-style alignment for arrays.
+    ///
+    /// If enabled, the formatter will attempt to align array elements in a table-like format,
+    /// making them more readable. This is particularly useful for arrays with consistent elements,
+    /// such as those used for data structures or configuration.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// $array = [
+    ///     ['foo',  1.2,  123, false],
+    ///     ['bar',  52.4, 456, true],
+    ///     ['baz',  3.6,  789, false],
+    ///     ['qux',  4.8,    1, true],
+    ///     ['quux', 5.0,   12, false],
+    /// ];
+    /// ```
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub array_table_style_alignment: bool,
+
+    /// Controls whether to always break named argument lists into multiple lines.
+    ///
+    /// If enabled, the formatter will always break named argument lists into multiple lines,
+    /// making them more readable.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// $foo = some_function(
+    ///     argument1: 'value1',
+    ///     argument2: 'value2',
+    /// );
+    /// ```
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub always_break_named_arguments_list: bool,
+
+    /// Controls whether to always long named argument lists in attributes into multiple lines.
+    ///
+    /// If enabled, the formatter will always break named argument lists in attributes into multiple lines,
+    /// making them more readable.
+    ///
+    /// For example:
+    ///
+    /// ```php
+    /// #[SomeAttribute(
+    ///     argument1: 'value1',
+    ///     argument2: 'value2',
+    /// )]
+    /// class Foo {}
+    /// ```
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub always_break_attribute_named_argument_lists: bool,
 }
 
 impl Default for FormatSettings {
@@ -624,7 +702,11 @@ impl Default for FormatSettings {
             parentheses_around_new_in_member_access: false,
             parentheses_in_new_expression: true,
             parentheses_in_exit_and_die: true,
+            parentheses_in_attribute: false,
             space_after_not_operator: false,
+            array_table_style_alignment: true,
+            always_break_named_arguments_list: true,
+            always_break_attribute_named_argument_lists: false,
         }
     }
 }

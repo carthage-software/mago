@@ -6,9 +6,8 @@ use crate::document::Group;
 use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
+use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::parens::instantiation_needs_parens;
-
-use super::call_arguments::print_argument_list;
 
 #[derive(Debug)]
 pub(super) struct MemberAccessChain<'a> {
@@ -244,7 +243,7 @@ pub(super) fn print_member_access_chain<'a>(
             parts.push(method);
 
             if let Some(argument_list) = first_chain_link.get_arguments_list() {
-                parts.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list)])));
+                parts.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list, false)])));
             }
         }
     }
@@ -287,7 +286,7 @@ pub(super) fn print_member_access_chain<'a>(
         });
 
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            contents.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list)])));
+            contents.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list, false)])));
         }
 
         parts.push(Document::Indent(contents));

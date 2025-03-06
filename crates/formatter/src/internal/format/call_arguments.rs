@@ -6,16 +6,16 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::call_node::CallLikeNode;
+use crate::internal::format::misc::is_simple_expression;
+use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::will_break;
-
-use super::misc::is_simple_expression;
-use super::misc::is_string_word_type;
 
 pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &CallLikeNode<'a>) -> Document<'a> {
     let Some(argument_list) = expression.arguments() else {
         return if (expression.is_instantiation() && f.settings.parentheses_in_new_expression)
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
+            || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
             Document::String("()")
         } else {
@@ -25,7 +25,8 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &
 
     if argument_list.arguments.is_empty()
         && ((expression.is_instantiation() && !f.settings.parentheses_in_new_expression)
-            || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die))
+            || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die)
+            || (expression.is_attribute() && !f.settings.parentheses_in_attribute))
     {
         return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
             Document::Array(vec![Document::String("("), inner_comments, Document::String(")")])
@@ -34,10 +35,14 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &
         };
     }
 
-    print_argument_list(f, argument_list)
+    print_argument_list(f, argument_list, expression.is_attribute())
 }
 
-pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list: &'a ArgumentList) -> Document<'a> {
+pub(super) fn print_argument_list<'a>(
+    f: &mut FormatterState<'a>,
+    argument_list: &'a ArgumentList,
+    for_attribute: bool,
+) -> Document<'a> {
     let left_parenthesis = {
         let mut contents = vec![Document::String("(")];
         if let Some(trailing_comments) = f.print_trailing_comments(argument_list.left_parenthesis) {
@@ -70,7 +75,7 @@ pub(super) fn print_argument_list<'a>(f: &mut FormatterState<'a>, argument_list:
     }
 
     // First, run all the decision functions with unformatted arguments
-    let should_break_all = should_break_all_arguments(argument_list);
+    let should_break_all = should_break_all_arguments(f, argument_list, for_attribute);
     let should_inline = should_inline_single_breaking_argument(f, argument_list);
     let should_expand_first = should_expand_first_arg(f, argument_list);
     let should_expand_last = should_expand_last_arg(f, argument_list);
@@ -287,8 +292,11 @@ fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) ->
 }
 
 #[inline]
-fn should_break_all_arguments(argument_list: &ArgumentList) -> bool {
-    argument_list.arguments.len() >= 2 && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
+fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
+    f.settings.always_break_named_arguments_list
+        && (!for_attributes || f.settings.always_break_attribute_named_argument_lists)
+        && argument_list.arguments.len() >= 2
+        && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
 }
 
 #[inline]

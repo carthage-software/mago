@@ -26,6 +26,11 @@ impl<'a> CallLikeNode<'a> {
         matches!(self, CallLikeNode::DieConstruct(_) | CallLikeNode::ExitConstruct(_))
     }
 
+    #[inline]
+    pub const fn is_attribute(&self) -> bool {
+        matches!(self, CallLikeNode::Attribute(_))
+    }
+
     pub fn arguments(&self) -> Option<&'a ArgumentList> {
         match self {
             CallLikeNode::Call(call) => Some(match call {

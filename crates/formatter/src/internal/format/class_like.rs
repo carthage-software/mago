@@ -3,9 +3,8 @@ use mago_span::Span;
 
 use crate::document::Document;
 use crate::internal::FormatterState;
+use crate::internal::format::block::print_block_of_nodes;
 use crate::settings::BraceStyle;
-
-use super::block::print_block_of_nodes;
 
 pub fn print_class_like_body<'a>(
     f: &mut FormatterState<'a>,

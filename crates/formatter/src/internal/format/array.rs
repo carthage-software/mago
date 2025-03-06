@@ -10,9 +10,8 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::misc;
-
-use super::misc::is_string_word_type;
-use super::misc::should_hug_expression;
+use crate::internal::format::misc::is_string_word_type;
+use crate::internal::format::misc::should_hug_expression;
 
 #[allow(clippy::enum_variant_names)]
 pub enum ArrayLike<'a> {
@@ -121,19 +120,18 @@ pub(super) fn print_array_like<'a>(f: &mut FormatterState<'a>, array_like: Array
         Document::Array(right_delimiter_content)
     };
 
-    if array_like.is_empty() {
-        return Document::Group(Group::new(vec![
-            left_delimiter,
-            if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
-                Document::Array(vec![dangling_comments, Document::Line(Line::soft())])
-            } else {
-                Document::empty()
-            },
-            get_right_delimiter(f, &array_like),
-        ]));
-    }
-
     let mut parts = vec![left_delimiter];
+
+    if array_like.is_empty() {
+        if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
+            parts.push(dangling_comments);
+            parts.push(Document::Line(Line::soft()));
+        }
+
+        parts.push(get_right_delimiter(f, &array_like));
+
+        return Document::Group(Group::new(parts));
+    }
 
     if let Some(element) = inline_single_element(f, &array_like) {
         parts.push(element);
@@ -143,7 +141,7 @@ pub(super) fn print_array_like<'a>(f: &mut FormatterState<'a>, array_like: Array
     }
 
     // Check if we should use table-style formatting
-    let use_table_style = is_table_style(f, &array_like);
+    let use_table_style = f.settings.array_table_style_alignment && is_table_style(f, &array_like);
     let column_widths = if use_table_style { calculate_column_widths(f, &array_like) } else { None };
 
     parts.push(Document::Indent({

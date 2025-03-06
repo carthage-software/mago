@@ -146,9 +146,25 @@ pub struct FormatterConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parentheses_in_exit_and_die: Option<bool>,
 
+    /// Controls whether to include parentheses in attributes when they contain no arguments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parentheses_in_attribute: Option<bool>,
+
     /// Controls whether to include a space after the `!` operator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub space_after_not_operator: Option<bool>,
+
+    /// Controls whether to use table-style alignment for arrays.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub array_table_style_alignment: Option<bool>,
+
+    /// Controls whether to always break named argument lists into multiple lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always_break_named_arguments_list: Option<bool>,
+
+    /// Controls whether to always long named argument lists in attributes into multiple lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always_break_attribute_named_argument_lists: Option<bool>,
 }
 
 impl FormatterConfiguration {
@@ -207,7 +223,17 @@ impl FormatterConfiguration {
             parentheses_in_exit_and_die: self
                 .parentheses_in_exit_and_die
                 .unwrap_or(default.parentheses_in_exit_and_die),
+            parentheses_in_attribute: self.parentheses_in_attribute.unwrap_or(default.parentheses_in_attribute),
             space_after_not_operator: self.space_after_not_operator.unwrap_or(default.space_after_not_operator),
+            array_table_style_alignment: self
+                .array_table_style_alignment
+                .unwrap_or(default.array_table_style_alignment),
+            always_break_named_arguments_list: self
+                .always_break_named_arguments_list
+                .unwrap_or(default.always_break_named_arguments_list),
+            always_break_attribute_named_argument_lists: self
+                .always_break_attribute_named_argument_lists
+                .unwrap_or(default.always_break_attribute_named_argument_lists),
         }
     }
 }

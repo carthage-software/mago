@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use crate::document::Document;
 use crate::document::Line;
 use crate::internal::FormatterState;
+use crate::internal::format::Format;
 use crate::internal::format::Group;
 use crate::internal::format::IfBreak;
 use crate::internal::format::IndentIfBreak;
@@ -28,8 +29,6 @@ use crate::internal::format::string::print_string;
 use crate::internal::utils;
 use crate::settings::*;
 use crate::wrap;
-
-use crate::internal::format::Format;
 
 impl<'a> Format<'a> for Expression {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
@@ -1148,7 +1147,7 @@ impl<'a> Format<'a> for AnonymousClass {
 
             signature.push(self.class.format(f));
             if let Some(argument_list) = &self.arguments {
-                signature.push(print_argument_list(f, argument_list));
+                signature.push(print_argument_list(f, argument_list, false));
             }
 
             if let Some(extends) = &self.extends {
