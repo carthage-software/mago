@@ -34,6 +34,12 @@ impl Rule for NoBooleanFlagParameterRule {
                     function get_difference_case_insensitive(string $a, string $b): string {
                         // ...
                     }
+
+                    class Example {
+                        public function __construct(
+                            private bool $flag,
+                        ) {}
+                    }
                 "#},
             ))
             .with_example(RuleUsageExample::invalid(
@@ -50,6 +56,11 @@ impl Rule for NoBooleanFlagParameterRule {
 
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::FunctionLikeParameter(parameter) = node else { return LintDirective::default() };
+
+        // Skip promoted properties
+        if parameter.is_promoted_property() {
+            return LintDirective::default();
+        }
 
         let Some(Hint::Bool(bool_hint)) = &parameter.hint else { return LintDirective::default() };
 
