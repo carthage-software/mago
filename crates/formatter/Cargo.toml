@@ -23,6 +23,7 @@ mago-php-version = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 bitflags = { workspace = true }
+unicode-width = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

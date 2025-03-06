@@ -89,6 +89,7 @@ blake3 = "1.5.5"
 memchr = "2.7.4"
 parking_lot = "0.12.3"
 dialoguer = "0.11.0"
+unicode-width = { version = "0.2.0", default-features = false }
 
 [lints]
 workspace = true

@@ -201,10 +201,7 @@ impl<'a> FormatterState<'a> {
         }
 
         if !comment.is_block || previous.is_some_and(|c| c.has_line_suffix) {
-            parts.push(Document::Array(vec![
-                Document::LineSuffix(vec![Document::space(), printed]),
-                Document::BreakParent,
-            ]));
+            parts.push(Document::LineSuffix(vec![Document::space(), printed]));
 
             return comment.with_line_suffix(true);
         }

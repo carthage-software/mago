@@ -1639,6 +1639,7 @@ dependencies = [
  "mago-token",
  "pretty_assertions",
  "serde",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
