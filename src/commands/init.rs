@@ -41,6 +41,7 @@ default_plugins = true
 plugins = [{plugins}]
 "#;
 
+const PSL_PLUGIN: &str = "psl";
 const SYMFONY_PLUGIN: &str = "symfony";
 const LARAVEL_PLUGIN: &str = "laravel";
 const PHPUNIT_PLUGIN: &str = "php-unit";
@@ -221,6 +222,14 @@ fn extract_paths_from_composer(composer: &ComposerPackage) -> Vec<String> {
 /// A vector of plugin names to enable
 fn detect_plugins_from_composer(composer: &ComposerPackage) -> Vec<String> {
     let mut plugins = vec![];
+
+    // Detect PSL
+    if has_exact_package(composer, "azjezz/psl")
+        || has_exact_package(composer, "php-standard-library/psalm-plugin")
+        || has_exact_package(composer, "php-standard-library/phpstan-extension")
+    {
+        plugins.push(PSL_PLUGIN.to_string());
+    }
 
     // Detect Symfony framework
     if has_package_prefix(composer, "symfony/") || has_package_prefix(composer, "symfony-") {

@@ -13,6 +13,7 @@ pub mod maintainability;
 pub mod migration;
 pub mod naming;
 pub mod phpunit;
+pub mod psl;
 pub mod redundancy;
 pub mod safety;
 pub mod security;
@@ -32,6 +33,7 @@ macro_rules! foreach_plugin {
         $do($crate::plugin::migration::MigrationPlugin);
         $do($crate::plugin::naming::NamingPlugin);
         $do($crate::plugin::phpunit::PHPUnitPlugin);
+        $do($crate::plugin::psl::PslPlugin);
         $do($crate::plugin::redundancy::RedundancyPlugin);
         $do($crate::plugin::safety::SafetyPlugin);
         $do($crate::plugin::security::SecurityPlugin);
