@@ -508,17 +508,17 @@ fn calculate_column_widths<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLik
 fn get_element_width<'a>(f: &mut FormatterState<'a>, element: &'a Expression) -> Option<usize> {
     Some(match element {
         Expression::Literal(literal) => match literal {
-            Literal::String(literal_string) => f.interner.lookup(&literal_string.value).width(),
+            Literal::String(literal_string) => width(f.interner.lookup(&literal_string.value)),
             Literal::Integer(literal_integer) => f.interner.lookup(&literal_integer.raw).width(),
             Literal::Float(literal_float) => f.interner.lookup(&literal_float.raw).width(),
             Literal::True(_) => 4,
             Literal::False(_) => 5,
             Literal::Null(_) => 4,
         },
-        Expression::MagicConstant(magic_constant) => f.interner.lookup(&magic_constant.value().value).width(),
+        Expression::MagicConstant(magic_constant) => width(f.interner.lookup(&magic_constant.value().value)),
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
-        | Expression::Identifier(Identifier::Local(local)) => f.interner.lookup(&local.value).width(),
-        Expression::Variable(Variable::Direct(variable)) => f.interner.lookup(&variable.name).width(),
+        | Expression::Identifier(Identifier::Local(local)) => width(f.interner.lookup(&local.value)),
+        Expression::Variable(Variable::Direct(variable)) => width(f.interner.lookup(&variable.name)),
         Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
             if !argument_list.arguments.is_empty() {
                 return None;
@@ -536,14 +536,14 @@ fn get_element_width<'a>(f: &mut FormatterState<'a>, element: &'a Expression) ->
                 return None;
             }
 
-            return get_element_width(f, class).map(|class| class + 2 + f.interner.lookup(&method.value).width() + 2);
+            return get_element_width(f, class).map(|class| class + 2 + width(f.interner.lookup(&method.value)) + 2);
         }
         Expression::Access(Access::ClassConstant(ClassConstantAccess {
             class,
             constant: ClassLikeConstantSelector::Identifier(constant),
             ..
         })) => {
-            return get_element_width(f, class).map(|class| class + 2 + f.interner.lookup(&constant.value).width() + 2);
+            return get_element_width(f, class).map(|class| class + 2 + width(f.interner.lookup(&constant.value)) + 2);
         }
         _ => {
             return None;
@@ -553,7 +553,7 @@ fn get_element_width<'a>(f: &mut FormatterState<'a>, element: &'a Expression) ->
 
 fn get_document_width(doc: &Document<'_>) -> usize {
     match doc {
-        Document::String(s) => s.width(),
+        Document::String(s) => width(s),
         Document::Array(docs) => docs.iter().map(get_document_width).sum(),
         Document::Group(group) => group.contents.iter().map(get_document_width).sum(),
         Document::Indent(docs) => docs.iter().map(get_document_width).sum(),
@@ -563,5 +563,16 @@ fn get_document_width(doc: &Document<'_>) -> usize {
             get_document_width(&if_break.break_contents).max(get_document_width(&if_break.flat_content))
         }
         _ => 0,
+    }
+}
+
+#[inline]
+fn width(s: &str) -> usize {
+    if s.contains("الله") {
+        // The word "الله" is a special case, as it is usually rendered as a single glyph
+        // while being 4 characters wide. This is a hack to handle this case.
+        s.replace("الله", "_").width()
+    } else {
+        s.width()
     }
 }
