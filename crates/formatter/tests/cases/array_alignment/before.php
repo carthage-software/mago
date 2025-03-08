@@ -244,3 +244,12 @@ $data = [
     [HtmlValue::any(), '$0.00', '$0.00'],
     [HtmlValue::any(), '$0.00', '$0.00'],
 ];
+
+
+$data =   [
+    ['Endorsement Type',      'Endorsement Status', 'Endorsement Creation Date','Gross Written Premium'],
+    ['0 - Bind',              'Issued',     '08/19/2021',           '$450.00'],
+    [HtmlValue::any()],
+    ['1 - Change of Address', 'Issued',             '05/02/2021', '$10.00'],
+    [HtmlValue::any()],
+];

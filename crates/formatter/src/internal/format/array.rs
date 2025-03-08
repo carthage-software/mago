@@ -379,7 +379,8 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
         return false; // Need at least two rows for table style to make sense
     }
 
-    let mut row_size = None;
+    let mut row_size = 0;
+    let mut sizes = Vec::new();
     let mut maximum_width = 0;
 
     // Check if all elements are nested arrays with consistent row sizes
@@ -396,17 +397,8 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
                     let size = elements.len();
 
                     // Check if row size is consistent
-                    if let Some(existing_size) = row_size {
-                        if existing_size != size {
-                            return false;
-                        }
-                    } else {
-                        if size < 2 {
-                            return false; // Need at least two columns
-                        }
-
-                        row_size = Some(size);
-                    }
+                    row_size = row_size.max(size);
+                    sizes.push(size);
 
                     // Check if all inner elements are simple (strings, numbers, etc.)
                     let mut elements_width = 0;
@@ -444,17 +436,26 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
         return false; // Too narrow to be a table
     }
 
-    // Check if row size is within reasonable bounds (2-10 columns)
-    match row_size {
-        Some(size) => (3..=12).contains(&size),
-        None => false,
+    // Check if row size is within reasonable bounds (3-10 columns)
+    if !(3..=12).contains(&row_size) {
+        println!("Row size: {}", row_size);
+
+        return false;
     }
+
+    // At least 60% of the rows should have the same size
+    let is = (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6;
+
+    println!("Row size: {}", row_size);
+    println!("Sizes: {:?}", sizes);
+    println!("Is: {}", is);
+
+    is
 }
 
 fn calculate_column_widths<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) -> Option<Vec<usize>> {
     let elements = array_like.elements();
-    let mut row_size = None;
-    let mut column_maximum_widths = Vec::new();
+    let mut row_size = 0;
 
     // First pass: determine consistent row size and initialize column widths
     for element in elements {
@@ -465,14 +466,7 @@ fn calculate_column_widths<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLik
                 {
                     let size = elements.len();
 
-                    if let Some(existing_size) = row_size {
-                        if existing_size != size {
-                            return None; // Inconsistent row sizes
-                        }
-                    } else {
-                        row_size = Some(size);
-                        column_maximum_widths = vec![0; size];
-                    }
+                    row_size = row_size.max(size);
                 } else {
                     return None; // Not a nested array
                 }
@@ -480,6 +474,8 @@ fn calculate_column_widths<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLik
             _ => return None, // Only support Value elements
         }
     }
+
+    let mut column_maximum_widths = vec![0; row_size];
 
     // Second pass: calculate maximum width for each column
     for element in elements {
