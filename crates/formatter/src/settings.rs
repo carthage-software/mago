@@ -665,6 +665,57 @@ pub struct FormatSettings {
     /// Default: `false`
     #[serde(default = "default_false")]
     pub always_break_attribute_named_argument_lists: bool,
+
+    /// Controls whether to preserve line breaks in member access chains, even if they could fit on a single line.
+    ///
+    /// If enabled, the formatter will not attempt to collapse member access chains onto a single line if they
+    /// were originally written with line breaks. This can be useful for preserving the original formatting
+    /// of complex or lengthy member access chains.
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub preserve_breaking_member_access_chain: bool,
+
+    /// Controls whether to preserve line breaks in argument lists, even if they could fit on a single line.
+    ///
+    /// If enabled, the formatter will not attempt to collapse argument lists onto a single line if they
+    /// were originally written with line breaks. This can be useful for preserving the original formatting
+    /// of complex or lengthy argument lists.
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub preserve_breaking_argument_list: bool,
+
+    /// Controls whether to preserve line breaks in array-like structures (arrays, lists), even if they could fit on a single line.
+    ///
+    /// By default, the formatter will preserve line breaks in array-like structures. This ensures that the original formatting of
+    /// complex or lengthy arrays is maintained, improving readability.
+    ///
+    /// If disabled, the formatter will attempt to collapse array-like structures onto a single line whenever possible.
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub preserve_breaking_array_like: bool,
+
+    /// Controls whether to preserve line breaks in parameter lists, even if they could fit on a single line.
+    ///
+    /// If enabled, the formatter will not attempt to collapse parameter lists onto a single line if they
+    /// were originally written with line breaks. This can be useful for preserving the original formatting
+    /// of complex or lengthy parameter lists.
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub preserve_breaking_parameter_list: bool,
+
+    /// Controls whether to preserve line breaks in attribute lists, even if they could fit on a single line.
+    ///
+    /// If enabled, the formatter will not attempt to collapse attribute lists onto a single line if they
+    /// were originally written with line breaks. This can be useful for preserving the original formatting
+    /// of complex or lengthy attribute lists.
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub preserve_breaking_attribute_list: bool,
 }
 
 impl Default for FormatSettings {
@@ -707,6 +758,11 @@ impl Default for FormatSettings {
             array_table_style_alignment: true,
             always_break_named_arguments_list: true,
             always_break_attribute_named_argument_lists: false,
+            preserve_breaking_member_access_chain: false,
+            preserve_breaking_argument_list: false,
+            preserve_breaking_array_like: true,
+            preserve_breaking_parameter_list: false,
+            preserve_breaking_attribute_list: false,
         }
     }
 }

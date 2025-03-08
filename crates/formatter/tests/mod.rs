@@ -27,6 +27,7 @@ macro_rules! test_case {
     };
 }
 
+// Test cases
 test_case!(leading_comment_with_missing_prefix);
 test_case!(dangling_block_comments);
 test_case!(opening_tag_trailing_comments);
@@ -111,3 +112,17 @@ test_case!(binary_alignment);
 test_case!(binary_alignment_before_op);
 test_case!(chain_comments);
 test_case!(literal_concat_parens);
+test_case!(preserve_breaking_member_access_chain);
+test_case!(preserve_breaking_member_access_chain_disabled);
+test_case!(preserve_breaking_argument_list);
+test_case!(preserve_breaking_argument_list_disabled);
+test_case!(preserve_breaking_array_like);
+test_case!(preserve_breaking_array_like_disabled);
+test_case!(preserve_breaking_parameter_list);
+test_case!(preserve_breaking_parameter_list_disabled);
+test_case!(preserve_breaking_attribute_list);
+test_case!(preserve_breaking_attribute_list_disabled);
+
+// GitHub issue test cases
+test_case!(issue_122);
+test_case!(issue_123);

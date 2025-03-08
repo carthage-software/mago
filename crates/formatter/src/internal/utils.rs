@@ -50,15 +50,6 @@ pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
     }
 }
 
-pub fn is_non_empty_array_like_expression(expression: &Expression) -> bool {
-    match unwrap_parenthesized(expression) {
-        Expression::Array(Array { elements, .. })
-        | Expression::List(List { elements, .. })
-        | Expression::LegacyArray(LegacyArray { elements, .. }) => !elements.is_empty(),
-        _ => false,
-    }
-}
-
 pub fn is_at_call_like_expression(f: &FormatterState<'_>) -> bool {
     let Some(grant_parent) = f.grandparent_node() else {
         return false;

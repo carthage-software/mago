@@ -1,10 +1,8 @@
 use mago_ast::*;
 use mago_span::HasSpan;
-use mago_span::Span;
 
 use crate::document::*;
 use crate::internal::FormatterState;
-use crate::internal::comment::CommentFlags;
 use crate::internal::format::assignment::AssignmentLikeNode;
 use crate::internal::format::assignment::print_assignment;
 use crate::internal::format::block::print_block_of_nodes;
@@ -1421,76 +1419,54 @@ impl<'a> Format<'a> for Modifier {
 impl<'a> Format<'a> for AttributeList {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, AttributeList, {
-            // Determine if there are comments between the `#[` and the first attribute (if any).
-            let has_comments_before_first = || {
-                if let Some(first_attr) = self.attributes.first() {
-                    f.has_comment(
-                        Span { start: self.hash_left_bracket.span().end, end: first_attr.span().start },
-                        CommentFlags::all(),
-                    )
-                } else {
-                    // If there are no attributes, then no comments "before the first attribute" can apply.
-                    false
-                }
-            };
-
-            // Determine if there are comments between the last attribute and the `]` (if any).
-            let has_comments_after_last = || {
-                if let Some(last_attr) = self.attributes.last() {
-                    f.has_comment(
-                        Span { start: last_attr.span().end, end: self.right_bracket.span().start },
-                        CommentFlags::all(),
-                    )
-                } else {
-                    // If there are no attributes, then no comments "after the last attribute" can apply.
-                    false
-                }
-            };
-
-            // Determine if the attribute list is empty and has comments inside the brackets.
-            let is_empty_with_comments = || {
-                self.attributes.is_empty()
-                    && f.has_comment(self.hash_left_bracket.join(self.right_bracket), CommentFlags::all())
-            };
-
-            let should_break = self.attributes.len() > 3
-                || has_comments_before_first()
-                || has_comments_after_last()
-                || is_empty_with_comments();
+            let attributes_count = self.attributes.len();
+            let must_break = f.settings.preserve_breaking_attribute_list
+                && attributes_count >= 1
+                && misc::has_new_line_in_range(
+                    f.source_text,
+                    self.hash_left_bracket.end.offset,
+                    self.attributes.as_slice()[0].span().start.offset,
+                );
+            let should_inline = !must_break && attributes_count == 1;
 
             let mut contents = vec![Document::String("#[")];
-            let mut attributes = vec![];
-            for attribute in self.attributes.iter() {
-                attributes.push(Document::Group(Group::new(vec![attribute.format(f)])));
+            if let Some(trailing_comments) = f.print_trailing_comments(self.hash_left_bracket) {
+                contents.push(trailing_comments);
             }
 
-            if should_break {
-                let mut inner_conent = Document::join(attributes, Separator::CommaLine);
-                inner_conent.insert(0, Document::Line(Line::soft()));
-                if f.settings.trailing_comma {
-                    inner_conent.push(Document::IfBreak(IfBreak::then(Document::String(","))));
-                }
-
-                contents.push(Document::Indent(inner_conent));
-                if let Some(comments) = f.print_dangling_comments(self.hash_left_bracket.join(self.right_bracket), true)
-                {
-                    contents.push(comments);
-                } else {
-                    contents.push(Document::Line(Line::soft()));
-                }
+            if should_inline {
+                contents.push(self.attributes.as_slice()[0].format(f));
             } else {
-                for (i, attribute) in attributes.into_iter().enumerate() {
-                    if i != 0 {
-                        contents.push(Document::String(", "));
-                    }
+                contents.push(Document::Indent({
+                    let mut attributes = Document::join(
+                        self.attributes
+                            .iter()
+                            .map(|a| Document::Group(Group::new(vec![a.format(f)])))
+                            .collect::<Vec<_>>(),
+                        Separator::CommaLine,
+                    );
 
-                    contents.push(attribute);
+                    attributes.insert(0, Document::Line(Line::soft()));
+
+                    attributes
+                }));
+            }
+
+            if !should_inline {
+                if f.settings.trailing_comma {
+                    contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
                 }
+
+                contents.push(Document::Line(Line::soft()));
+            }
+
+            if let Some(leading_comments) = f.print_leading_comments(self.right_bracket) {
+                contents.push(leading_comments);
             }
 
             contents.push(Document::String("]"));
 
-            Document::Group(Group::new(contents))
+            Document::Group(Group::new(contents).with_break(must_break))
         })
     }
 }

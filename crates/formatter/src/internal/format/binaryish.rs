@@ -11,7 +11,6 @@ use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
-use crate::internal::utils::is_non_empty_array_like_expression;
 use crate::internal::utils::unwrap_parenthesized;
 
 pub(super) fn print_binaryish_expression<'a>(
@@ -144,28 +143,20 @@ pub(super) fn print_binaryish_expressions<'a>(
 
     let line_before_operator = f.settings.line_before_binary_operator && !f.has_leading_own_line_comment(right.span());
 
-    let right_document = if should_inline {
-        vec![
-            Document::String(operator.as_str(f.interner)),
-            Document::String(if seperated { " " } else { "" }),
-            right.format(f),
-        ]
-    } else {
-        vec![
-            if line_before_operator {
-                Document::Line(if seperated { Line::default() } else { Line::soft() })
-            } else {
-                Document::String("")
-            },
-            Document::String(operator.as_str(f.interner)),
-            if line_before_operator {
-                Document::String(if seperated { " " } else { "" })
-            } else {
-                Document::Line(if seperated { Line::default() } else { Line::soft() })
-            },
-            right.format(f),
-        ]
-    };
+    let right_document = vec![
+        if line_before_operator && !should_inline {
+            Document::Line(if seperated { Line::default() } else { Line::soft() })
+        } else {
+            Document::String(if seperated { " " } else { "" })
+        },
+        Document::String(operator.as_str(f.interner)),
+        if line_before_operator || should_inline {
+            Document::String(if seperated { " " } else { "" })
+        } else {
+            Document::Line(if seperated { Line::default() } else { Line::soft() })
+        },
+        if should_inline { Document::Group(Group::new(vec![right.format(f)])) } else { right.format(f) },
+    ];
 
     // If there's only a single binary expression, we want to create a group
     // in order to avoid having a small right part like -1 be on its own line.
@@ -177,10 +168,6 @@ pub(super) fn print_binaryish_expressions<'a>(
                 && parent.kind() != NodeKind::Binary
                 && left.node_kind() != NodeKind::Binary
                 && right.node_kind() != NodeKind::Binary));
-
-    if !line_before_operator {
-        parts.push(Document::String(if seperated { " " } else { "" }));
-    }
 
     if should_group {
         parts.push(Document::Group(Group::new(right_document).with_break(should_break)));
@@ -199,9 +186,15 @@ pub(super) fn should_inline_logical_or_coalesce_expression(expression: &Expressi
 }
 
 pub(super) fn should_inline_logical_or_coalesce_rhs(rhs: &Expression, operator: &BinaryOperator) -> bool {
-    if !operator.is_logical() && !operator.is_null_coalesce() {
-        return false;
+    match unwrap_parenthesized(rhs) {
+        Expression::Array(Array { elements, .. })
+        | Expression::List(List { elements, .. })
+        | Expression::LegacyArray(LegacyArray { elements, .. }) => {
+            !elements.is_empty() && (operator.is_logical() || operator.is_null_coalesce())
+        }
+        Expression::Instantiation(_) | Expression::Closure(_) | Expression::Match(_) | Expression::Call(_) => {
+            operator.is_elvis() || operator.is_null_coalesce()
+        }
+        _ => false,
     }
-
-    is_non_empty_array_like_expression(rhs)
 }

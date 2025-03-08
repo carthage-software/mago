@@ -104,6 +104,8 @@ impl<'a> Formatter<'a> {
     pub fn format(&self, source: &'a Source, program: &'a Program) -> String {
         let document = self.build(source, program);
 
+        // println!("Document: {}", document);
+
         self.print(document, Some(source.size))
     }
 

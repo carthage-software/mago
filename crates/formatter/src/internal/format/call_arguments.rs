@@ -6,6 +6,7 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::call_node::CallLikeNode;
+use crate::internal::format::misc;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
@@ -89,17 +90,19 @@ pub(super) fn print_argument_list<'a>(
         .map(|(i, arg)| {
             if !should_break_all && !should_inline {
                 if should_expand_first && (i == 0) {
+                    let previous = f.argument_state.expand_first_argument;
                     f.argument_state.expand_first_argument = true;
                     let document = arg.format(f);
-                    f.argument_state.expand_first_argument = false;
+                    f.argument_state.expand_first_argument = previous;
 
                     return document;
                 }
 
                 if should_expand_last && (i == arguments_count - 1) {
+                    let previous = f.argument_state.expand_last_argument;
                     f.argument_state.expand_last_argument = true;
                     let document = arg.format(f);
-                    f.argument_state.expand_last_argument = false;
+                    f.argument_state.expand_last_argument = previous;
 
                     return document;
                 }
@@ -293,10 +296,26 @@ fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) ->
 
 #[inline]
 fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
-    f.settings.always_break_named_arguments_list
+    if f.settings.always_break_named_arguments_list
         && (!for_attributes || f.settings.always_break_attribute_named_argument_lists)
         && argument_list.arguments.len() >= 2
         && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
+    {
+        return true;
+    }
+
+    if f.settings.preserve_breaking_argument_list
+        && !argument_list.arguments.is_empty()
+        && misc::has_new_line_in_range(
+            f.source_text,
+            argument_list.left_parenthesis.start.offset,
+            argument_list.arguments.as_slice()[0].span().start.offset,
+        )
+    {
+        return true;
+    }
+
+    false
 }
 
 #[inline]
@@ -538,6 +557,7 @@ fn could_expand_argument_value(argument_value: &Expression, arrow_chain_recursio
         Expression::LegacyArray(expr) => !expr.elements.is_empty(),
         Expression::List(expr) => !expr.elements.is_empty(),
         Expression::Closure(_) => true,
+        Expression::Match(m) => !m.arms.is_empty(),
         Expression::Binary(operation) => could_expand_argument_value(&operation.lhs, arrow_chain_recursion),
         Expression::ArrowFunction(arrow_function) => match arrow_function.expression.as_ref() {
             Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {

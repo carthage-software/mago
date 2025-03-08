@@ -6,6 +6,8 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 
+use super::misc;
+
 pub(super) fn should_hug_the_only_parameter<'a>(
     f: &mut FormatterState<'a>,
     parameter_list: &'a FunctionLikeParameterList,
@@ -53,10 +55,28 @@ pub(super) fn print_function_like_parameters<'a>(
         return Document::Array(contents);
     }
 
-    let should_hug_the_parameters = should_hug_the_only_parameter(f, parameter_list);
-    let should_break = !should_hug_the_parameters
-        && f.settings.break_promoted_properties_list
-        && parameter_list.parameters.iter().any(|p| p.is_promoted_property());
+    let should_break = 'should_break: {
+        if f.settings.break_promoted_properties_list
+            && parameter_list.parameters.iter().any(|p| p.is_promoted_property())
+        {
+            break 'should_break true;
+        }
+
+        if f.settings.preserve_breaking_parameter_list
+            && parameter_list.parameters.len() > 1
+            && misc::has_new_line_in_range(
+                f.source_text,
+                parameter_list.left_parenthesis.start.offset,
+                parameter_list.parameters.as_slice()[0].span().start.offset,
+            )
+        {
+            break 'should_break true;
+        }
+
+        false
+    };
+
+    let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
     let mut parts = vec![Document::String("(")];
     let mut printed = vec![];

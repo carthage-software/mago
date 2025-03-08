@@ -143,7 +143,6 @@ impl<'a> FormatterState<'a> {
         while idx != old_idx {
             old_idx = idx;
             idx = self.skip_to_line_end(idx);
-            idx = self.skip_single_line_comments(idx);
             idx = self.skip_spaces(idx, /* backwards */ false);
         }
 

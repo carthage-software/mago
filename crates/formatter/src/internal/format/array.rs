@@ -133,11 +133,20 @@ pub(super) fn print_array_like<'a>(f: &mut FormatterState<'a>, array_like: Array
         return Document::Group(Group::new(parts));
     }
 
-    if let Some(element) = inline_single_element(f, &array_like) {
-        parts.push(element);
-        parts.push(get_right_delimiter(f, &array_like));
+    let must_break = f.settings.preserve_breaking_array_like
+        && misc::has_new_line_in_range(
+            f.source_text,
+            array_like.span().start.offset,
+            array_like.elements()[0].span().start.offset,
+        );
 
-        return Document::Group(Group::new(parts));
+    if !must_break {
+        if let Some(element) = inline_single_element(f, &array_like) {
+            parts.push(element);
+            parts.push(get_right_delimiter(f, &array_like));
+
+            return Document::Group(Group::new(parts));
+        }
     }
 
     // Check if we should use table-style formatting
@@ -189,15 +198,7 @@ pub(super) fn print_array_like<'a>(f: &mut FormatterState<'a>, array_like: Array
 
     parts.push(get_right_delimiter(f, &array_like));
 
-    // preserve new lines between the opening delimiter and the first element
-    let should_break = use_table_style
-        || misc::has_new_line_in_range(
-            f.source_text,
-            array_like.span().start.offset,
-            array_like.elements()[0].span().start.offset,
-        );
-
-    Document::Group(Group::new(parts).with_break(should_break))
+    Document::Group(Group::new(parts).with_break(use_table_style || must_break))
 }
 
 fn inline_single_element<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) -> Option<Document<'a>> {

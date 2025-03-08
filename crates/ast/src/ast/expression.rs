@@ -206,22 +206,38 @@ impl Expression {
 
     #[inline]
     pub const fn is_binary(&self) -> bool {
-        matches!(&self, Expression::Binary(_))
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_binary()
+        } else {
+            matches!(&self, Expression::Binary(_))
+        }
     }
 
     #[inline]
     pub const fn is_unary(&self) -> bool {
-        matches!(&self, Expression::UnaryPrefix(_) | Expression::UnaryPostfix(_))
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_unary()
+        } else {
+            matches!(&self, Expression::UnaryPrefix(_) | Expression::UnaryPostfix(_))
+        }
     }
 
     #[inline]
     pub const fn is_literal(&self) -> bool {
-        matches!(self, Expression::Literal(_))
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_literal()
+        } else {
+            matches!(&self, Expression::Literal(_))
+        }
     }
 
     #[inline]
     pub const fn is_string_literal(&self) -> bool {
-        matches!(self, Expression::Literal(Literal::String(_)))
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_string_literal()
+        } else {
+            matches!(&self, Expression::Literal(Literal::String(_)))
+        }
     }
 
     #[inline]

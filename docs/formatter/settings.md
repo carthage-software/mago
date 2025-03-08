@@ -461,3 +461,75 @@ If enabled, the formatter will always break named argument lists in attributes i
   ```toml
   always_break_attribute_named_argument_lists = true
   ```
+
+### `preserve_breaking_member_access_chain`
+
+Controls whether to preserve line breaks in member access chains, even if they could fit on a single line.
+
+If enabled, the formatter will not attempt to collapse member access chains onto a single line if they were originally written with line breaks. This can be useful for preserving the original formatting of complex or lengthy member access chains.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_member_access_chain = true
+  ```
+
+### `preserve_breaking_argument_list`
+
+Controls whether to preserve line breaks in argument lists, even if they could fit on a single line.
+
+If enabled, the formatter will not attempt to collapse argument lists onto a single line if they were originally written with line breaks. This can be useful for preserving the original formatting of complex or lengthy argument lists.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_argument_list = true
+  ```
+
+### `preserve_breaking_array_like`
+
+Controls whether to preserve line breaks in array-like structures (arrays, lists), even if they could fit on a single line.
+
+By default, the formatter will preserve line breaks in array-like structures. This ensures that the original formatting of complex or lengthy arrays is maintained, improving readability.
+
+If disabled, the formatter will attempt to collapse array-like structures onto a single line whenever possible.
+
+- Default: `true`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_array_like = false
+  ```
+
+### `preserve_breaking_parameter_list`
+
+Controls whether to preserve line breaks in parameter lists, even if they could fit on a single line.
+
+If enabled, the formatter will not attempt to collapse parameter lists onto a single line if they were originally written with line breaks. This can be useful for preserving the original formatting of complex or lengthy parameter lists.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_parameter_list = true
+  ```
+
+### `preserve_breaking_attribute_list`
+
+Controls whether to preserve line breaks in attribute lists, even if they could fit on a single line.
+
+If enabled, the formatter will not attempt to collapse attribute lists onto a single line if they were originally written with line breaks. This can be useful for preserving the original formatting of complex or lengthy attribute lists.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_attribute_list = true
+  ```

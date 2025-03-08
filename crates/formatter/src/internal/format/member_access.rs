@@ -8,6 +8,7 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::parens::instantiation_needs_parens;
+use crate::internal::utils::unwrap_parenthesized;
 
 #[derive(Debug)]
 pub(super) struct MemberAccessChain<'a> {
@@ -38,7 +39,8 @@ impl<'a> MemberAccess<'a> {
 impl MemberAccessChain<'_> {
     #[inline]
     fn get_eligibility_score(&self) -> usize {
-        self.accesses
+        let score = self
+            .accesses
             .iter()
             .map(|access| match access {
                 MemberAccess::PropertyAccess(_) | MemberAccess::NullSafePropertyAccess(_) => 1,
@@ -46,51 +48,60 @@ impl MemberAccessChain<'_> {
                 | MemberAccess::NullSafeMethodCall(_)
                 | MemberAccess::StaticMethodCall(_) => 2,
             })
-            .sum()
+            .sum();
+
+        match self.base {
+            Expression::Instantiation(_) => score + 2,
+            _ => score,
+        }
     }
 
     #[inline]
     pub fn is_eligible_for_chaining(&self, f: &FormatterState) -> bool {
         let score = self.get_eligibility_score();
-        let threshold = match self.base {
-            Expression::Call(Call::Function(function_call)) => {
-                if function_call.argument_list.arguments.len() == 1
-                    && matches!(self.accesses.last(), Some(MemberAccess::MethodCall(MethodCall { argument_list, .. }) | MemberAccess::NullSafeMethodCall(NullSafeMethodCall { argument_list, .. })) if !argument_list.arguments.is_empty())
-                {
-                    2
-                } else {
-                    4
-                }
-            }
-            Expression::Variable(Variable::Direct(_)) | Expression::Identifier(_) | Expression::Instantiation(_) => {
-                // Check if the last access is a method call with arguments
-                let Some(
-                    MemberAccess::MethodCall(MethodCall { argument_list, .. })
-                    | MemberAccess::NullSafeMethodCall(NullSafeMethodCall { argument_list, .. }),
-                ) = self.accesses.last()
-                else {
-                    return score >= 8;
-                };
-
-                // Check argument list length
-                if argument_list.arguments.len() > 1 {
-                    return score >= 8;
-                }
-
-                match &self.base {
-                    Expression::Variable(Variable::Direct(v)) => {
-                        if f.interner.lookup(&v.name).len() > 5 {
-                            4
-                        } else {
-                            5
-                        }
+        let threshold = 'threshold: {
+            match self.base {
+                Expression::Call(Call::Function(function_call)) => {
+                    if function_call.argument_list.arguments.len() == 1
+                        && matches!(self.accesses.last(), Some(MemberAccess::MethodCall(MethodCall { argument_list, .. }) | MemberAccess::NullSafeMethodCall(NullSafeMethodCall { argument_list, .. })) if !argument_list.arguments.is_empty())
+                    {
+                        2
+                    } else {
+                        4
                     }
-                    Expression::Identifier(_) => 6,
-                    Expression::Instantiation(_) => 4,
-                    _ => unreachable!(), // We already matched these variants
                 }
+                Expression::Variable(Variable::Direct(_))
+                | Expression::Identifier(_)
+                | Expression::Instantiation(_) => {
+                    // Check if the last access is a method call with arguments
+                    let Some(
+                        MemberAccess::MethodCall(MethodCall { argument_list, .. })
+                        | MemberAccess::NullSafeMethodCall(NullSafeMethodCall { argument_list, .. }),
+                    ) = self.accesses.last()
+                    else {
+                        break 'threshold 8;
+                    };
+
+                    // Check argument list length
+                    if argument_list.arguments.len() > 1 {
+                        break 'threshold 8;
+                    }
+
+                    match &self.base {
+                        Expression::Variable(Variable::Direct(v)) => {
+                            if f.interner.lookup(&v.name).len() > 5 {
+                                4
+                            } else {
+                                5
+                            }
+                        }
+                        Expression::Identifier(_) => 6,
+                        Expression::Instantiation(_) => 6,
+                        _ => unreachable!(), // We already matched these variants
+                    }
+                }
+                _ => 4,
             }
-            _ => 4,
         };
 
         score >= threshold
@@ -107,7 +118,7 @@ impl MemberAccessChain<'_> {
             return true;
         }
 
-        match self.base {
+        let must_break = match self.base {
             Expression::Instantiation(_) => {
                 self.accesses.iter().all(|access| {
                     matches!(access, MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_))
@@ -119,7 +130,27 @@ impl MemberAccessChain<'_> {
                 f.interner.lookup(&variable.name) == "$this" && self.accesses.len() > 3
             }
             _ => false,
+        };
+
+        if must_break || !f.settings.preserve_breaking_member_access_chain {
+            return must_break;
         }
+
+        for link in &self.accesses {
+            let span = match link {
+                MemberAccess::PropertyAccess(c) => c.arrow,
+                MemberAccess::NullSafePropertyAccess(c) => c.question_mark_arrow,
+                MemberAccess::MethodCall(c) => c.arrow,
+                MemberAccess::NullSafeMethodCall(c) => c.question_mark_arrow,
+                MemberAccess::StaticMethodCall(c) => c.double_colon,
+            };
+
+            if f.has_newline(span.start.offset, /* backwards */ true) {
+                return true;
+            }
+        }
+
+        false
     }
 
     #[inline]
@@ -162,6 +193,8 @@ impl MemberAccessChain<'_> {
 }
 
 pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAccessChain<'_>> {
+    let expr = unwrap_parenthesized(expr);
+
     let mut member_access = Vec::new();
     let mut current_expr = expr;
 

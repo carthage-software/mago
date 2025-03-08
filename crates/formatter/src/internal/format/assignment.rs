@@ -9,6 +9,9 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::binaryish::should_inline_logical_or_coalesce_expression;
+use crate::internal::utils::unwrap_parenthesized;
+
+use super::member_access::collect_member_access_chain;
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
@@ -177,7 +180,10 @@ fn choose_layout<'a, 'b>(
         && (has_short_key
             || matches!(
                 rhs_expression,
-                Expression::Literal(_) | Expression::CompositeString(_) | Expression::AnonymousClass(_)
+                Expression::Literal(_)
+                    | Expression::CompositeString(_)
+                    | Expression::AnonymousClass(_)
+                    | Expression::Call(_)
             ))
     {
         return Layout::NeverBreakAfterOperator;
@@ -255,7 +261,6 @@ fn is_property_like_with_short_key<'a>(f: &FormatterState<'a>, assignment_like_n
     width < f.settings.tab_width + MIN_OVERLAP_FOR_BREAK
 }
 
-/// <https://github.com/prettier/prettier/blob/eebf0e4b5ec8ac24393c56ced4b4819d4c551f31/src/language-js/print/assignment.js#L182>
 fn should_break_after_operator<'a>(
     f: &FormatterState<'a>,
     rhs_expression: &'a Expression,
@@ -265,26 +270,29 @@ fn should_break_after_operator<'a>(
         return should_break_after_operator(f, &parenthesized.expression, has_short_key);
     }
 
-    if rhs_expression.is_binary() && !should_inline_logical_or_coalesce_expression(rhs_expression) {
-        return true;
-    }
-
     match rhs_expression {
-        Expression::Binary(operation) => {
-            if let BinaryOperator::Elvis(_) = operation.operator {
-                let mut condition = operation.lhs.as_ref();
-                while let Expression::Parenthesized(parenthesized) = condition {
-                    condition = &parenthesized.expression;
-                }
-
-                return condition.is_binary() && !should_inline_logical_or_coalesce_expression(condition);
+        Expression::Binary(Binary { lhs, operator: BinaryOperator::Elvis(_), .. }) => {
+            return !should_inline_logical_or_coalesce_expression(rhs_expression)
+                || (lhs.is_binary()
+                    && !should_inline_logical_or_coalesce_expression(unwrap_parenthesized(lhs.as_ref())));
+        }
+        Expression::Binary(Binary { lhs, operator: BinaryOperator::NullCoalesce(_), rhs }) => {
+            if should_inline_logical_or_coalesce_expression(rhs_expression) {
+                return false;
             }
+
+            if !matches!(unwrap_parenthesized(lhs.as_ref()), Expression::Access(_) | Expression::Call(_)) {
+                return true;
+            }
+
+            return !collect_member_access_chain(rhs).is_some_and(|c| c.is_eligible_for_chaining(f))
+                && !matches!(unwrap_parenthesized(rhs.as_ref()), Expression::Instantiation(_));
+        }
+        Expression::Binary(_) if !should_inline_logical_or_coalesce_expression(rhs_expression) => {
+            return true;
         }
         Expression::Conditional(conditional) => {
-            let mut condition = conditional.condition.as_ref();
-            while let Expression::Parenthesized(parenthesized) = condition {
-                condition = &parenthesized.expression;
-            }
+            let condition = unwrap_parenthesized(conditional.condition.as_ref());
 
             return condition.is_binary() && !should_inline_logical_or_coalesce_expression(condition);
         }
@@ -318,6 +326,10 @@ fn should_break_after_operator<'a>(
 }
 
 fn is_poorly_breakable_member_or_call_chain<'a>(f: &FormatterState<'a>, rhs_expression: &'a Expression) -> bool {
+    if collect_member_access_chain(rhs_expression).is_some_and(|c| c.is_eligible_for_chaining(f)) {
+        return false;
+    }
+
     let mut is_chain_expression = false;
     let mut is_identifier_or_variable = false;
     let mut call_argument_lists = vec![];
