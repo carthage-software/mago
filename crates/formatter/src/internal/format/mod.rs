@@ -1547,15 +1547,26 @@ impl<'a> Format<'a> for PropertyHook {
 impl<'a> Format<'a> for PropertyHookList {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, PropertyHookList, {
-            let mut parts = vec![Document::String("{")];
-            for hook in self.hooks.iter() {
-                parts.push(Document::Indent(vec![Document::Line(Line::default()), hook.format(f)]));
-            }
-
-            parts.push(Document::Line(Line::default()));
-            parts.push(Document::String("}"));
-
-            Document::Group(Group::new(parts))
+            Document::Group(Group::new(vec![
+                Document::String("{"),
+                f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
+                if self.hooks.is_empty() {
+                    Document::empty()
+                } else {
+                    Document::Indent(vec![
+                        Document::Line(Line::hard()),
+                        Document::Array(Document::join(
+                            self.hooks.iter().map(|hook| hook.format(f)).collect::<Vec<_>>(),
+                            Separator::HardLine,
+                        )),
+                    ])
+                },
+                f.print_dangling_comments(self.span(), true).unwrap_or_else(|| {
+                    if self.hooks.is_empty() { Document::empty() } else { Document::Line(Line::hard()) }
+                }),
+                Document::String("}"),
+                f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
+            ]))
         })
     }
 }

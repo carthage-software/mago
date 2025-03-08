@@ -122,6 +122,7 @@ test_case!(preserve_breaking_parameter_list);
 test_case!(preserve_breaking_parameter_list_disabled);
 test_case!(preserve_breaking_attribute_list);
 test_case!(preserve_breaking_attribute_list_disabled);
+test_case!(hooks_always_break);
 
 // GitHub issue test cases
 test_case!(issue_122);
