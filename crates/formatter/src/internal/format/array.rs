@@ -371,6 +371,9 @@ fn format_elements_with_alignment<'a>(
 }
 
 fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) -> bool {
+    // Arbitrary limit to prevent excessive column width
+    const WIGGLE_ROOM: usize = 20;
+
     let elements = array_like.elements();
     if elements.len() < 2 {
         return false; // Need at least two rows for table style to make sense
@@ -424,8 +427,7 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
                     }
 
                     let total_width = elements_width + ((size - 1) * 2);
-                    // `20` is an arbitrary limit to prevent excessive column width
-                    if total_width > (f.settings.print_width - 20) {
+                    if total_width > (f.settings.print_width - WIGGLE_ROOM) {
                         return false; // Exceeds column width limit
                     }
 
@@ -438,7 +440,7 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
         }
     }
 
-    if maximum_width < 20 {
+    if maximum_width < WIGGLE_ROOM {
         return false; // Too narrow to be a table
     }
 
@@ -517,6 +519,32 @@ fn get_element_width<'a>(f: &mut FormatterState<'a>, element: &'a Expression) ->
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
         | Expression::Identifier(Identifier::Local(local)) => f.interner.lookup(&local.value).width(),
         Expression::Variable(Variable::Direct(variable)) => f.interner.lookup(&variable.name).width(),
+        Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
+            if !argument_list.arguments.is_empty() {
+                return None;
+            }
+
+            return get_element_width(f, function).map(|width| width + 2);
+        }
+        Expression::Call(Call::StaticMethod(StaticMethodCall {
+            class,
+            method: ClassLikeMemberSelector::Identifier(method),
+            argument_list,
+            ..
+        })) => {
+            if !argument_list.arguments.is_empty() {
+                return None;
+            }
+
+            return get_element_width(f, class).map(|class| class + 2 + f.interner.lookup(&method.value).width() + 2);
+        }
+        Expression::Access(Access::ClassConstant(ClassConstantAccess {
+            class,
+            constant: ClassLikeConstantSelector::Identifier(constant),
+            ..
+        })) => {
+            return get_element_width(f, class).map(|class| class + 2 + f.interner.lookup(&constant.value).width() + 2);
+        }
         _ => {
             return None;
         }

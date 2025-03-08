@@ -217,3 +217,37 @@ function _trailing_comments(): iterable
         ],
     ]];
 }
+
+$arr = [
+    [Language::Thai,         render_thai(),       Alignment::left()],
+    [Language::Arabic,       render_arabic(),     Alignment::right()],
+    [Language::English,      render_english(),    Alignment::center()],
+    [Language::French,       render_french(),     Alignment::left()],
+    [Language::Spanish,      render_spanish(),    Alignment::right()],
+    [Language::Russian,      render_russian(),    Alignment::center()],
+    [Language::Japanese,     render_japanese(),   Alignment::left()],
+    [Language::Korean,       render_korean(),     Alignment::right()],
+    [Language::Vietnamese,   render_vietnamese(), Alignment::center()],
+    [Language::Chinese,      render_chinese(),    Alignment::left()],
+    [Language::German,       render_german(),     Alignment::right()],
+    [Language::Tunisian,     render_tunisian(),   Alignment::center()],
+    [Language::Italian,      render_italian(),    Alignment::left()],
+    [Language::Portuguese,   render_portuguese(), Alignment::right()],
+];
+
+$data = [
+    ['Month',          'Premium', 'Revenue'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+    [HtmlValue::any(), '$0.00',   '$0.00'],
+];
