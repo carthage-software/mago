@@ -5,16 +5,34 @@ use mago_token::GetPrecedence;
 
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::binaryish::should_flatten;
 
 impl<'a> FormatterState<'a> {
     pub(crate) fn wrap_parens(&mut self, document: Document<'a>, node: Node<'a>) -> Document<'a> {
         if self.need_parens(node) {
-            Document::Group(Group::new(vec![Document::String("("), document, Document::String(")")]))
+            if self.should_indent(node) {
+                Document::Group(Group::new(vec![
+                    Document::String("("),
+                    Document::Indent(vec![Document::Line(Line::soft()), document]),
+                    Document::Line(Line::soft()),
+                    Document::String(")"),
+                ]))
+            } else {
+                Document::Group(Group::new(vec![Document::String("("), document, Document::String(")")]))
+            }
         } else {
             document
         }
+    }
+
+    fn should_indent(&self, node: Node<'a>) -> bool {
+        if matches!(node, Node::Program(_)) || node.is_statement() {
+            return false;
+        }
+
+        self.is_unary_or_binary_or_ternary(node)
     }
 
     fn need_parens(&mut self, node: Node<'a>) -> bool {
@@ -52,7 +70,7 @@ impl<'a> FormatterState<'a> {
             return false;
         };
 
-        self.is_unary_or_binary_or_ternary(parent_node)
+        self.is_unary_or_binary_or_ternary(parent_node) || matches!(parent_node, Node::VariadicArrayElement(_))
     }
 
     fn binary_node_needs_parens(&self, node: Node<'a>) -> bool {
@@ -62,6 +80,9 @@ impl<'a> FormatterState<'a> {
         };
 
         let parent_operator = match self.nth_parent_kind(2) {
+            Some(Node::VariadicArrayElement(_)) => {
+                return true;
+            }
             Some(Node::Binary(e)) => {
                 if let BinaryOperator::NullCoalesce(_) = e.operator {
                     // Add parentheses if parent is a coalesce operator,

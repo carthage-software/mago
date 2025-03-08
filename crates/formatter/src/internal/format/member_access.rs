@@ -1,4 +1,5 @@
 use mago_ast::*;
+use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::document::Document;
@@ -114,10 +115,6 @@ impl MemberAccessChain<'_> {
 
     #[inline]
     fn must_break(&self, f: &FormatterState) -> bool {
-        if self.is_first_link_static_method_call() {
-            return true;
-        }
-
         let must_break = match self.base {
             Expression::Instantiation(_) => {
                 self.accesses.iter().all(|access| {
@@ -294,32 +291,43 @@ pub(super) fn print_member_access_chain<'a>(
             vec![] // No newline if in fluent chain and last was property
         };
 
-        contents.extend(match chain_link {
+        let (operator, selector) = match chain_link {
             MemberAccess::PropertyAccess(c) => {
                 last_was_property = true;
 
-                [format_op(f, c.arrow, "->"), c.property.format(f)]
+                (format_op(f, c.arrow, "->"), &c.property)
             }
             MemberAccess::NullSafePropertyAccess(c) => {
                 last_was_property = true;
-                [format_op(f, c.question_mark_arrow, "?->"), c.property.format(f)]
+                (format_op(f, c.question_mark_arrow, "?->"), &c.property)
             }
             MemberAccess::MethodCall(c) => {
                 last_was_property = false;
-                [format_op(f, c.arrow, "->"), c.method.format(f)]
+                (format_op(f, c.arrow, "->"), &c.method)
             }
             MemberAccess::NullSafeMethodCall(c) => {
                 last_was_property = false;
-                [format_op(f, c.question_mark_arrow, "?->"), c.method.format(f)]
+                (format_op(f, c.question_mark_arrow, "?->"), &c.method)
             }
             MemberAccess::StaticMethodCall(c) => {
                 last_was_property = false;
-                [format_op(f, c.double_colon, "::"), c.method.format(f)]
+                (format_op(f, c.double_colon, "::"), &c.method)
             }
-        });
+        };
+
+        contents.push(operator);
+        contents.push(selector.format(f));
+        if let Some(comments) = f.print_trailing_comments(selector.span()) {
+            contents.push(comments);
+        }
 
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            contents.push(Document::Group(Group::new(vec![print_argument_list(f, argument_list, false)])));
+            let mut formatted_argument_list = vec![print_argument_list(f, argument_list, false)];
+            if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
+                formatted_argument_list.push(comments);
+            }
+
+            contents.push(Document::Group(Group::new(formatted_argument_list)));
         }
 
         parts.push(Document::Indent(contents));

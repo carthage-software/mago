@@ -127,3 +127,5 @@ test_case!(hooks_always_break);
 // GitHub issue test cases
 test_case!(issue_122);
 test_case!(issue_123);
+test_case!(issue_128);
+test_case!(issue_130);

@@ -112,7 +112,7 @@ pub(super) fn print_argument_list<'a>(
         })
         .collect();
 
-    let get_printed_arguments = |f: &mut FormatterState<'a>, skip_index: isize| {
+    let get_printed_arguments = |f: &mut FormatterState<'a>, should_break: bool, skip_index: isize| {
         let mut printed_arguments = vec![];
         let mut length = argument_list.arguments.len();
         let arguments_range: Box<dyn Iterator<Item = (usize, usize)>> = match skip_index {
@@ -137,6 +137,8 @@ pub(super) fn print_argument_list<'a>(
                     argument.push(Document::Line(Line::hard()));
                     argument.push(Document::Line(Line::hard()));
                     argument.push(Document::BreakParent);
+                } else if should_break {
+                    argument.push(Document::Line(Line::hard()));
                 } else {
                     argument.push(Document::Line(Line::default()));
                 }
@@ -152,18 +154,18 @@ pub(super) fn print_argument_list<'a>(
         let mut parts = vec![];
         parts.push(left_parenthesis.clone());
         parts.push(Document::Indent(vec![
-            Document::Line(Line::default()),
-            Document::Array(get_printed_arguments(f, 0)),
+            Document::Line(Line::hard()),
+            Document::Group(Group::new(get_printed_arguments(f, true, 0))),
             if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
         ]));
 
-        parts.push(Document::Line(Line::default()));
+        parts.push(Document::Line(Line::hard()));
         if let Some(leading_comments) = f.print_leading_comments(argument_list.right_parenthesis) {
             parts.push(leading_comments);
         }
         parts.push(Document::String(")"));
 
-        Document::Group(Group::new(parts).with_break(true))
+        Document::Group(Group::new(parts))
     };
 
     if should_break_all {
@@ -177,11 +179,11 @@ pub(super) fn print_argument_list<'a>(
         return Document::IfBreak(IfBreak::new(
             Document::Group(Group::new(vec![
                 left_parenthesis.clone(),
-                Document::Indent(vec![
+                Document::IndentIfBreak(IndentIfBreak::new(vec![
                     Document::Line(Line::default()),
                     Document::Group(Group::new(vec![single_argument.clone()])),
                     if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
-                ]),
+                ])),
                 Document::Line(Line::default()),
                 right_parenthesis.clone(),
             ])),
@@ -206,7 +208,7 @@ pub(super) fn print_argument_list<'a>(
         let mut first_doc = formatted_arguments[0].clone();
 
         if will_break(&mut first_doc) {
-            let last_doc = get_printed_arguments(f, 1).pop().unwrap();
+            let last_doc = get_printed_arguments(f, false, 1).pop().unwrap();
 
             return Document::Array(vec![
                 Document::BreakParent,
@@ -225,7 +227,7 @@ pub(super) fn print_argument_list<'a>(
     }
 
     if should_expand_last {
-        let mut printed_arguments = get_printed_arguments(f, -1);
+        let mut printed_arguments = get_printed_arguments(f, false, -1);
         if printed_arguments.iter_mut().any(will_break) {
             return all_arguments_broken_out(f);
         }
@@ -260,7 +262,7 @@ pub(super) fn print_argument_list<'a>(
                     left_parenthesis.clone(),
                     if argument_list.arguments.len() > 1 {
                         Document::Array(vec![
-                            Document::Array(get_printed_arguments(f, -1)),
+                            Document::Array(get_printed_arguments(f, false, -1)),
                             Document::String(","),
                             Document::Line(Line::default()),
                         ])
@@ -275,10 +277,10 @@ pub(super) fn print_argument_list<'a>(
         ));
     }
 
-    let mut printed_arguments = get_printed_arguments(f, 0);
+    let mut printed_arguments = get_printed_arguments(f, false, 0);
 
     printed_arguments.insert(0, Document::Line(Line::soft()));
-    contents.push(Document::Indent(printed_arguments));
+    contents.push(Document::IndentIfBreak(IndentIfBreak::new(printed_arguments)));
     if f.settings.trailing_comma {
         contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
     }
