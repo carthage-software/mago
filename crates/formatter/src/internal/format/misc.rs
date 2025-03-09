@@ -4,6 +4,7 @@ use mago_span::Span;
 
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::document::Separator;
 use crate::internal::FormatterState;
@@ -355,10 +356,10 @@ pub(super) fn adjust_clause<'a>(
 pub(super) fn print_condition<'a>(f: &mut FormatterState<'a>, condition: &'a Expression) -> Document<'a> {
     Document::Group(Group::new(vec![
         Document::String("("),
-        Document::Indent(vec![
+        Document::IndentIfBreak(IndentIfBreak::new(vec![
             Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::soft() }),
             condition.format(f),
-        ]),
+        ])),
         Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::soft() }),
         Document::String(")"),
     ]))

@@ -115,6 +115,10 @@ impl MemberAccessChain<'_> {
 
     #[inline]
     fn must_break(&self, f: &FormatterState) -> bool {
+        if self.is_first_link_static_method_call() && self.accesses.len() > 3 {
+            return true;
+        }
+
         let must_break = match self.base {
             Expression::Instantiation(_) => {
                 self.accesses.iter().all(|access| {

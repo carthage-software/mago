@@ -89,7 +89,10 @@ pub(super) fn print_assignment<'a>(
             Document::Group(Group::new(vec![lhs])),
             Document::space(),
             operator,
-            Document::Group(Group::new(vec![Document::Indent(vec![Document::Line(Line::default()), rhs])])),
+            Document::Group(Group::new(vec![Document::IndentIfBreak(IndentIfBreak::new(vec![
+                Document::Line(Line::default()),
+                rhs,
+            ]))])),
         ])),
         Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec![
             Document::Group(Group::new(vec![lhs])),

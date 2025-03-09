@@ -6,6 +6,7 @@ use crate::document::IndentIfBreak;
 use crate::document::Separator;
 use crate::internal::FormatterState;
 
+#[inline]
 pub const fn has_naked_left_side(expression: &Expression) -> bool {
     matches!(
         expression,
@@ -21,6 +22,7 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
     )
 }
 
+#[inline]
 pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
     match expression {
         Expression::Binary(binary) => Some(&binary.lhs),
@@ -50,6 +52,7 @@ pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
     }
 }
 
+#[inline]
 pub fn is_at_call_like_expression(f: &FormatterState<'_>) -> bool {
     let Some(grant_parent) = f.grandparent_node() else {
         return false;
@@ -76,6 +79,7 @@ pub const fn unwrap_parenthesized(mut expression: &Expression) -> &Expression {
     expression
 }
 
+#[inline]
 pub fn is_at_callee(f: &FormatterState<'_>) -> bool {
     let Node::Expression(expression) = f.parent_node() else {
         return false;
@@ -97,6 +101,7 @@ pub fn is_at_callee(f: &FormatterState<'_>) -> bool {
     }
 }
 
+#[inline]
 pub fn will_break(document: &mut Document<'_>) -> bool {
     let check_array = |array: &mut Vec<Document<'_>>| array.iter_mut().rev().any(|doc| will_break(doc));
 
@@ -125,10 +130,43 @@ pub fn will_break(document: &mut Document<'_>) -> bool {
     }
 }
 
+#[inline]
 pub fn replace_end_of_line(document: Document<'_>, replacement: Separator) -> Document<'_> {
     let Document::String(text) = document else {
         return document;
     };
 
     Document::Array(Document::join(text.split("\n").map(Document::String).collect(), replacement))
+}
+
+#[inline]
+pub fn could_expand_value(value: &Expression, arrow_chain_recursion: bool) -> bool {
+    match value {
+        Expression::Array(expr) => !expr.elements.is_empty(),
+        Expression::LegacyArray(expr) => !expr.elements.is_empty(),
+        Expression::List(expr) => !expr.elements.is_empty(),
+        Expression::Closure(_) => true,
+        Expression::Match(m) => !m.arms.is_empty(),
+        Expression::Binary(operation) => could_expand_value(&operation.lhs, arrow_chain_recursion),
+        Expression::ArrowFunction(arrow_function) if !arrow_chain_recursion => match arrow_function.expression.as_ref()
+        {
+            Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {
+                could_expand_value(&arrow_function.expression, true)
+            }
+            Expression::Call(_) | Expression::Conditional(_) => true,
+            _ => false,
+        },
+        Expression::Instantiation(instantiation) => {
+            let Expression::Identifier(_) = instantiation.class.as_ref() else {
+                return false;
+            };
+
+            let Some(arguments) = instantiation.arguments.as_ref() else {
+                return false;
+            };
+
+            arguments.arguments.len() > 2
+        }
+        _ => false,
+    }
 }

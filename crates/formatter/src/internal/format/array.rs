@@ -395,6 +395,9 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
                 | Expression::LegacyArray(LegacyArray { elements, .. }) = element.value.as_ref()
                 {
                     let size = elements.len();
+                    if 0 == size {
+                        return false; // Empty row
+                    }
 
                     // Check if row size is consistent
                     row_size = row_size.max(size);
@@ -438,19 +441,11 @@ fn is_table_style<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) ->
 
     // Check if row size is within reasonable bounds (3-10 columns)
     if !(3..=12).contains(&row_size) {
-        println!("Row size: {}", row_size);
-
         return false;
     }
 
     // At least 60% of the rows should have the same size
-    let is = (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6;
-
-    println!("Row size: {}", row_size);
-    println!("Sizes: {:?}", sizes);
-    println!("Is: {}", is);
-
-    is
+    (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6
 }
 
 fn calculate_column_widths<'a>(f: &mut FormatterState<'a>, array_like: &ArrayLike<'a>) -> Option<Vec<usize>> {

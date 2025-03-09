@@ -533,3 +533,19 @@ If enabled, the formatter will not attempt to collapse attribute lists onto a si
   ```toml
   preserve_breaking_attribute_list = true
   ```
+
+### `preserve_breaking_conditional_expression`
+
+Controls whether to preserve line breaks in conditional ( ternary ) expressions, even if they could fit on a single line.
+
+If enabled, the formatter will not attempt to collapse conditional expressions onto a single line if they
+were originally written with line breaks. This can be useful for preserving the original formatting
+of complex or lengthy conditional expressions.
+
+- Default: `false`
+- Type: `boolean`
+- Example:
+
+  ```toml
+  preserve_breaking_conditional_expression = true
+  ```

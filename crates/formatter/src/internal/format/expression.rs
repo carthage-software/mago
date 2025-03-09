@@ -27,6 +27,7 @@ use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
 use crate::internal::utils;
+use crate::internal::utils::could_expand_value;
 use crate::settings::*;
 use crate::wrap;
 
@@ -837,27 +838,65 @@ impl<'a> Format<'a> for Match {
 impl<'a> Format<'a> for Conditional {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Conditional, {
+            let must_break = f.settings.preserve_breaking_conditional_expression && {
+                misc::has_new_line_in_range(
+                    f.source_text,
+                    self.condition.span().end.offset,
+                    self.question_mark.start.offset,
+                ) || self.then.as_ref().is_some_and(|t| {
+                    misc::has_new_line_in_range(f.source_text, self.question_mark.start.offset, t.span().start.offset)
+                })
+            };
+
             match &self.then {
-                Some(then) => Document::Group(Group::new(vec![
-                    self.condition.format(f),
-                    Document::Indent(vec![
-                        Document::Line(Line::default()),
-                        Document::String("? "),
-                        then.format(f),
-                        Document::Line(Line::default()),
-                        Document::String(": "),
-                        self.r#else.format(f),
-                    ]),
-                ])),
+                Some(then) => {
+                    let inline_colon = !misc::has_new_line_in_range(
+                        f.source_text,
+                        then.span().end.offset,
+                        self.r#else.span().start.offset,
+                    ) && could_expand_value(then, false);
+
+                    let conditional_id = f.next_id();
+                    let then_id = f.next_id();
+
+                    Document::Group(
+                        Group::new(vec![
+                            self.condition.format(f),
+                            Document::Indent(vec![
+                                Document::Line(if must_break { Line::hard() } else { Line::default() }),
+                                Document::String("? "),
+                                Document::Group(Group::new(vec![then.format(f)]).with_id(then_id)),
+                                {
+                                    if inline_colon {
+                                        if must_break {
+                                            Document::space()
+                                        } else {
+                                            Document::IfBreak(
+                                                IfBreak::new(Document::space(), {
+                                                    Document::IfBreak(
+                                                        IfBreak::new(Document::Line(Line::hard()), Document::space())
+                                                            .with_id(conditional_id),
+                                                    )
+                                                })
+                                                .with_id(then_id),
+                                            )
+                                        }
+                                    } else {
+                                        Document::Line(if must_break { Line::hard() } else { Line::default() })
+                                    }
+                                },
+                                Document::String(": "),
+                                self.r#else.format(f),
+                            ]),
+                        ])
+                        .with_id(conditional_id),
+                    )
+                }
                 None => Document::Group(Group::new(vec![
                     self.condition.format(f),
                     Document::Indent(vec![
-                        Document::space(),
-                        Document::Group(Group::new(vec![
-                            Document::String("?:"),
-                            Document::Line(Line::default()),
-                            self.r#else.format(f),
-                        ])),
+                        Document::Line(if must_break { Line::hard() } else { Line::default() }),
+                        Document::Group(Group::new(vec![Document::String("?: "), self.r#else.format(f)])),
                     ]),
                 ])),
             }

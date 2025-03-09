@@ -716,6 +716,16 @@ pub struct FormatSettings {
     /// Default: `false`
     #[serde(default = "default_false")]
     pub preserve_breaking_attribute_list: bool,
+
+    /// Controls whether to preserve line breaks in conditional ( ternary ) expressions, even if they could fit on a single line.
+    ///
+    /// If enabled, the formatter will not attempt to collapse conditional expressions onto a single line if they
+    /// were originally written with line breaks. This can be useful for preserving the original formatting
+    /// of complex or lengthy conditional expressions.
+    ///
+    /// Default: `false`
+    #[serde(default = "default_false")]
+    pub preserve_breaking_conditional_expression: bool,
 }
 
 impl Default for FormatSettings {
@@ -763,6 +773,7 @@ impl Default for FormatSettings {
             preserve_breaking_array_like: true,
             preserve_breaking_parameter_list: false,
             preserve_breaking_attribute_list: false,
+            preserve_breaking_conditional_expression: false,
         }
     }
 }

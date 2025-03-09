@@ -10,6 +10,7 @@ use crate::internal::format::misc;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
+use crate::internal::utils::could_expand_value;
 use crate::internal::utils::will_break;
 
 pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: &CallLikeNode<'a>) -> Document<'a> {
@@ -384,7 +385,7 @@ fn should_expand_first_arg<'a>(f: &FormatterState<'a>, argument_list: &'a Argume
     match second_argument.value() {
         Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => false,
         Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::Conditional(_) => false,
-        expression => is_hopefully_short_call_argument(expression) && !could_expand_argument_value(expression, false),
+        expression => is_hopefully_short_call_argument(expression) && !could_expand_value(expression, false),
     }
 }
 
@@ -407,7 +408,7 @@ fn should_expand_last_arg<'a>(f: &FormatterState<'a>, argument_list: &'a Argumen
         .map(|a| f.has_comment(a.span(), CommentFlags::Leading | CommentFlags::Trailing))
         .unwrap_or(false);
 
-    could_expand_argument_value(last_argument_value, false)
+    could_expand_value(last_argument_value, false)
         // If the last two arguments are of the same type,
         // disable last element expansion.
         && (penultimate_argument.is_none()
@@ -548,36 +549,6 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
             } else {
                 false
             }
-        }
-        _ => false,
-    }
-}
-
-fn could_expand_argument_value(argument_value: &Expression, arrow_chain_recursion: bool) -> bool {
-    match argument_value {
-        Expression::Array(expr) => !expr.elements.is_empty(),
-        Expression::LegacyArray(expr) => !expr.elements.is_empty(),
-        Expression::List(expr) => !expr.elements.is_empty(),
-        Expression::Closure(_) => true,
-        Expression::Match(m) => !m.arms.is_empty(),
-        Expression::Binary(operation) => could_expand_argument_value(&operation.lhs, arrow_chain_recursion),
-        Expression::ArrowFunction(arrow_function) => match arrow_function.expression.as_ref() {
-            Expression::Array(_) | Expression::List(_) | Expression::LegacyArray(_) => {
-                could_expand_argument_value(&arrow_function.expression, true)
-            }
-            Expression::Call(_) | Expression::Conditional(_) => !arrow_chain_recursion,
-            _ => false,
-        },
-        Expression::Instantiation(instantiation) => {
-            let Expression::Identifier(_) = instantiation.class.as_ref() else {
-                return false;
-            };
-
-            let Some(arguments) = instantiation.arguments.as_ref() else {
-                return false;
-            };
-
-            arguments.arguments.len() > 1 && arguments.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
         }
         _ => false,
     }
