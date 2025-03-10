@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_fixer::FixPlan;
+use mago_fixer::SafetyClassification;
 use toml::Value;
 
 use mago_ast::*;
@@ -141,7 +143,22 @@ impl Rule for RequireStrictTypesRule {
                 )
                 .with_annotation(Annotation::primary(program.span()))
                 .with_note("The `strict_types` directive enforces strict type checking, which can prevent subtle bugs.")
-                .with_help("Add `declare(strict_types=1);` at the top of your file."),
+                .with_help("Add `declare(strict_types=1);` at the top of your file.")
+                .with_suggestion(program.source, {
+                    let mut plan = FixPlan::new();
+                    let opening_tag = program.statements.iter().find_map(|statement| match statement {
+                        Statement::OpeningTag(tag) => Some(tag),
+                        _ => None,
+                    });
+
+                    plan.insert(
+                        opening_tag.map(|tag| tag.span().end).unwrap_or_else(|| program.span().start).offset,
+                        "\n\ndeclare(strict_types=1);",
+                        SafetyClassification::Unsafe,
+                    );
+
+                    plan
+                }),
             );
         }
 
