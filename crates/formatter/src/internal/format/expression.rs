@@ -105,11 +105,7 @@ impl<'a> Format<'a> for Binary {
 impl<'a> Format<'a> for UnaryPrefix {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, UnaryPrefix, {
-            if self.operator.is_cast() || (self.operator.is_not() && f.settings.space_after_not_operator) {
-                Document::Group(Group::new(vec![self.operator.format(f), Document::space(), self.operand.format(f)]))
-            } else {
-                Document::Group(Group::new(vec![self.operator.format(f), self.operand.format(f)]))
-            }
+            Document::Group(Group::new(vec![self.operator.format(f), self.operand.format(f)]))
         })
     }
 }
@@ -117,9 +113,37 @@ impl<'a> Format<'a> for UnaryPrefix {
 impl<'a> Format<'a> for UnaryPrefixOperator {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, UnaryPrefixOperator, {
+            let space_after = match self {
+                UnaryPrefixOperator::ErrorControl(_) => f.settings.space_after_error_control_unary_prefix_operator,
+                UnaryPrefixOperator::Reference(_) => f.settings.space_after_reference_unary_prefix_operator,
+                UnaryPrefixOperator::BitwiseNot(_) => f.settings.space_after_bitwise_not_unary_prefix_operator,
+                UnaryPrefixOperator::Not(_) => f.settings.space_after_logical_not_unary_prefix_operator,
+                UnaryPrefixOperator::PreIncrement(_) => f.settings.space_after_increment_unary_prefix_operator,
+                UnaryPrefixOperator::PreDecrement(_) => f.settings.space_after_decrement_unary_prefix_operator,
+                UnaryPrefixOperator::Plus(_) | UnaryPrefixOperator::Negation(_) => {
+                    f.settings.space_after_additive_unary_prefix_operator
+                }
+                UnaryPrefixOperator::ArrayCast(_, _)
+                | UnaryPrefixOperator::BoolCast(_, _)
+                | UnaryPrefixOperator::BooleanCast(_, _)
+                | UnaryPrefixOperator::DoubleCast(_, _)
+                | UnaryPrefixOperator::RealCast(_, _)
+                | UnaryPrefixOperator::FloatCast(_, _)
+                | UnaryPrefixOperator::IntCast(_, _)
+                | UnaryPrefixOperator::IntegerCast(_, _)
+                | UnaryPrefixOperator::ObjectCast(_, _)
+                | UnaryPrefixOperator::UnsetCast(_, _)
+                | UnaryPrefixOperator::StringCast(_, _)
+                | UnaryPrefixOperator::BinaryCast(_, _) => f.settings.space_after_cast_unary_prefix_operators,
+            };
+
             let value = self.as_str(f.interner);
 
-            Document::String(f.as_str(value.to_lowercase()))
+            if space_after {
+                Document::Array(vec![Document::String(f.as_str(value.to_lowercase())), Document::space()])
+            } else {
+                Document::String(f.as_str(value.to_lowercase()))
+            }
         })
     }
 }
@@ -134,7 +158,18 @@ impl<'a> Format<'a> for UnaryPostfix {
 
 impl<'a> Format<'a> for UnaryPostfixOperator {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, UnaryPostfixOperator, { Document::String(self.as_str()) })
+        wrap!(f, self, UnaryPostfixOperator, {
+            let space_before = match self {
+                UnaryPostfixOperator::PostIncrement(_) => f.settings.space_before_increment_unary_postfix_operator,
+                UnaryPostfixOperator::PostDecrement(_) => f.settings.space_before_decrement_unary_postfix_operator,
+            };
+
+            if space_before {
+                Document::Array(vec![Document::space(), Document::String(self.as_str())])
+            } else {
+                Document::String(self.as_str())
+            }
+        })
     }
 }
 
@@ -442,16 +477,22 @@ impl<'a> Format<'a> for PositionalArgument {
 impl<'a> Format<'a> for NamedArgument {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, NamedArgument, {
-            match self.ellipsis {
-                Some(_) => Document::Group(Group::new(vec![
-                    self.name.format(f),
-                    Document::String(": ..."),
-                    self.value.format(f),
-                ])),
-                None => {
-                    Document::Group(Group::new(vec![self.name.format(f), Document::String(": "), self.value.format(f)]))
-                }
+            let mut content = vec![self.name.format(f)];
+            if f.settings.space_before_colon_in_named_argument {
+                content.push(Document::space());
             }
+            content.push(Document::String(":"));
+            if f.settings.space_after_colon_in_named_argument {
+                content.push(Document::space());
+            }
+
+            if self.ellipsis.is_some() {
+                content.push(Document::String("..."));
+            }
+
+            content.push(self.value.format(f));
+
+            Document::Group(Group::new(content))
         })
     }
 }
@@ -499,7 +540,7 @@ impl<'a> Format<'a> for ClosureUseClause {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, ClosureUseClause, {
             let mut contents = vec![self.r#use.format(f)];
-            if f.settings.space_after_closure_use {
+            if f.settings.space_before_closure_use_clause_parenthesis {
                 contents.push(Document::space());
             }
 
@@ -548,7 +589,7 @@ impl<'a> Format<'a> for Closure {
             }
 
             signature.push(self.function.format(f));
-            if f.settings.space_before_closure_params {
+            if f.settings.space_before_closure_parameter_list_parenthesis {
                 signature.push(Document::space());
             }
 
@@ -598,7 +639,7 @@ impl<'a> Format<'a> for ArrowFunction {
             }
 
             contents.push(self.r#fn.format(f));
-            if f.settings.space_before_arrow_function_params {
+            if f.settings.space_before_arrow_function_parameter_list_parenthesis {
                 contents.push(Document::space());
             }
 
@@ -731,7 +772,9 @@ impl<'a> Format<'a> for ArrayAccess {
             Document::Group(Group::new(vec![
                 self.array.format(f),
                 Document::String("["),
+                if f.settings.space_within_array_access_brackets { Document::space() } else { Document::empty() },
                 self.index.format(f),
+                if f.settings.space_within_array_access_brackets { Document::space() } else { Document::empty() },
                 Document::String("]"),
             ]))
         })
@@ -798,7 +841,15 @@ impl<'a> Format<'a> for MatchExpressionArm {
 impl<'a> Format<'a> for Match {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Match, {
-            let mut contents = vec![self.r#match.format(f), Document::space(), print_condition(f, &self.expression)];
+            let mut contents = vec![
+                self.r#match.format(f),
+                print_condition(
+                    f,
+                    &self.expression,
+                    f.settings.space_before_match_parenthesis,
+                    f.settings.space_within_match_parenthesis,
+                ),
+            ];
 
             match f.settings.control_brace_style {
                 BraceStyle::SameLine => {

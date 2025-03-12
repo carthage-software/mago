@@ -1,4 +1,4 @@
 FormatSettings {
-  space_after_not_operator: true,
+  space_after_logical_not_unary_prefix_operator: true,
   ..Default::default()
 }

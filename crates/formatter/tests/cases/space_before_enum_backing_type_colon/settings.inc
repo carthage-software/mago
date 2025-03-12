@@ -1,1 +1,1 @@
-FormatSettings { space_before_enum_backing_type_hint_colon: true, ..Default::default() }
+FormatSettings { space_before_colon_in_enum_backing_type: true, ..Default::default() }

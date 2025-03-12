@@ -15,12 +15,29 @@ impl<'a> FormatterState<'a> {
             if self.should_indent(node) {
                 Document::Group(Group::new(vec![
                     Document::String("("),
-                    Document::Indent(vec![Document::Line(Line::soft()), document]),
-                    Document::Line(Line::soft()),
+                    Document::Indent(vec![
+                        if self.settings.space_within_grouping_parenthesis {
+                            Document::Line(Line::default())
+                        } else {
+                            Document::Line(Line::soft())
+                        },
+                        document,
+                    ]),
+                    if self.settings.space_within_grouping_parenthesis {
+                        Document::Line(Line::default())
+                    } else {
+                        Document::Line(Line::soft())
+                    },
                     Document::String(")"),
                 ]))
             } else {
-                Document::Group(Group::new(vec![Document::String("("), document, Document::String(")")]))
+                Document::Group(Group::new(vec![
+                    Document::String("("),
+                    if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
+                    document,
+                    if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
+                    Document::String(")"),
+                ]))
             }
         } else {
             document

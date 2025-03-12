@@ -18,8 +18,12 @@ impl<'a> Format<'a> for If {
         wrap!(f, self, If, {
             Document::Group(Group::new(vec![
                 self.r#if.format(f),
-                Document::space(),
-                misc::print_condition(f, &self.condition),
+                misc::print_condition(
+                    f,
+                    &self.condition,
+                    f.settings.space_before_if_parenthesis,
+                    f.settings.space_within_if_parenthesis,
+                ),
                 self.body.format(f),
             ]))
         })
@@ -68,8 +72,12 @@ impl<'a> Format<'a> for IfStatementBodyElseIfClause {
         wrap!(f, self, IfStatementBodyElseIfClause, {
             Document::Group(Group::new(vec![
                 self.elseif.format(f),
-                Document::space(),
-                misc::print_condition(f, &self.condition),
+                misc::print_condition(
+                    f,
+                    &self.condition,
+                    f.settings.space_before_if_parenthesis,
+                    f.settings.space_within_if_parenthesis,
+                ),
                 misc::print_clause(f, &self.statement, false),
             ]))
         })
@@ -127,9 +135,14 @@ impl<'a> Format<'a> for IfColonDelimitedBody {
 impl<'a> Format<'a> for IfColonDelimitedBodyElseIfClause {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, IfColonDelimitedBodyElseIfClause, {
-            let mut parts = vec![self.elseif.format(f), Document::space()];
+            let mut parts = vec![self.elseif.format(f)];
 
-            let condition = misc::print_condition(f, &self.condition);
+            let condition = misc::print_condition(
+                f,
+                &self.condition,
+                f.settings.space_before_if_parenthesis,
+                f.settings.space_within_if_parenthesis,
+            );
             let is_first_stmt_closing_tag = matches!(self.statements.first(), Some(Statement::ClosingTag(_)));
             if is_first_stmt_closing_tag {
                 parts.push(Document::Indent(vec![condition, Document::String(":")]));
@@ -182,8 +195,12 @@ impl<'a> Format<'a> for DoWhile {
                 self.r#do.format(f),
                 misc::print_clause(f, &self.statement, false),
                 self.r#while.format(f),
-                Document::space(),
-                misc::print_condition(f, &self.condition),
+                misc::print_condition(
+                    f,
+                    &self.condition,
+                    f.settings.space_before_while_parenthesis,
+                    f.settings.space_within_while_parenthesis,
+                ),
                 self.terminator.format(f),
             ]))
         })
@@ -193,7 +210,12 @@ impl<'a> Format<'a> for DoWhile {
 impl<'a> Format<'a> for For {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, For, {
-            let mut contents = vec![self.r#for.format(f), Document::String(" (")];
+            let mut contents = vec![
+                self.r#for.format(f),
+                if f.settings.space_before_for_parenthesis { Document::space() } else { Document::empty() },
+                Document::String("("),
+                if f.settings.space_within_for_parenthesis { Document::space() } else { Document::empty() },
+            ];
 
             let format_expressions = |f: &mut FormatterState<'a>, expressions: &'a [Expression]| {
                 let Some(first) = expressions.first() else {
@@ -223,15 +245,33 @@ impl<'a> Format<'a> for For {
                 Document::Indent(vec![
                     Document::Line(Line::soft()),
                     format_expressions(f, self.initializations.as_slice()),
+                    if f.settings.space_before_for_semicolon { Document::space() } else { Document::empty() },
                     Document::String(";"),
-                    if self.conditions.is_empty() { Document::empty() } else { Document::Line(Line::default()) },
+                    if self.conditions.is_empty() {
+                        Document::empty()
+                    } else if f.settings.space_after_for_semicolon {
+                        Document::Line(Line::default())
+                    } else {
+                        Document::Line(Line::soft())
+                    },
                     format_expressions(f, self.conditions.as_slice()),
+                    if f.settings.space_before_for_semicolon { Document::space() } else { Document::empty() },
                     Document::String(";"),
-                    if self.increments.is_empty() { Document::empty() } else { Document::Line(Line::default()) },
+                    if self.increments.is_empty() {
+                        Document::empty()
+                    } else if f.settings.space_after_for_semicolon {
+                        Document::Line(Line::default())
+                    } else {
+                        Document::Line(Line::soft())
+                    },
                     format_expressions(f, self.increments.as_slice()),
                 ]),
                 Document::Line(Line::soft()),
             ])));
+
+            if f.settings.space_within_for_parenthesis {
+                contents.push(Document::space());
+            }
 
             contents.push(Document::String(")"));
             contents.push(self.body.format(f));
@@ -269,10 +309,12 @@ impl<'a> Format<'a> for Switch {
         wrap!(f, self, Switch, {
             Document::Array(vec![
                 self.switch.format(f),
-                Document::space(),
-                Document::String("("),
-                self.expression.format(f),
-                Document::String(")"),
+                misc::print_condition(
+                    f,
+                    &self.expression,
+                    f.settings.space_before_switch_parenthesis,
+                    f.settings.space_within_switch_parenthesis,
+                ),
                 self.body.format(f),
             ])
         })
@@ -387,8 +429,12 @@ impl<'a> Format<'a> for While {
         wrap!(f, self, While, {
             Document::Array(vec![
                 self.r#while.format(f),
-                Document::space(),
-                misc::print_condition(f, &self.condition),
+                misc::print_condition(
+                    f,
+                    &self.condition,
+                    f.settings.space_before_while_parenthesis,
+                    f.settings.space_within_while_parenthesis,
+                ),
                 self.body.format(f),
             ])
         })
@@ -419,13 +465,15 @@ impl<'a> Format<'a> for Foreach {
         wrap!(f, self, Foreach, {
             Document::Array(vec![
                 self.foreach.format(f),
-                Document::space(),
+                if f.settings.space_before_foreach_parenthesis { Document::space() } else { Document::empty() },
                 Document::String("("),
+                if f.settings.space_within_foreach_parenthesis { Document::space() } else { Document::empty() },
                 self.expression.format(f),
                 Document::space(),
                 self.r#as.format(f),
                 Document::space(),
                 self.target.format(f),
+                if f.settings.space_within_foreach_parenthesis { Document::space() } else { Document::empty() },
                 Document::String(")"),
                 self.body.format(f),
             ])

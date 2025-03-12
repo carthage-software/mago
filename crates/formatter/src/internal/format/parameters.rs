@@ -45,6 +45,10 @@ pub(super) fn print_function_like_parameters<'a>(
 ) -> Document<'a> {
     if parameter_list.parameters.is_empty() {
         let mut contents = vec![Document::String("(")];
+        if f.settings.space_within_parameter_list_parenthesis {
+            contents.push(Document::space());
+        }
+
         if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
             contents.push(comments);
         }
@@ -79,6 +83,10 @@ pub(super) fn print_function_like_parameters<'a>(
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
     let mut parts = vec![Document::String("(")];
+    if f.settings.space_within_parameter_list_parenthesis {
+        parts.push(Document::space());
+    }
+
     let mut printed = vec![];
     let len = parameter_list.parameters.len();
     for (i, parameter) in parameter_list.parameters.iter().enumerate() {
@@ -97,11 +105,14 @@ pub(super) fn print_function_like_parameters<'a>(
     }
 
     if should_hug_the_parameters {
-        let mut contents = vec![Document::String("(")];
-        contents.extend(printed);
-        contents.push(Document::String(")"));
+        parts.extend(printed);
+        if f.settings.space_within_parameter_list_parenthesis {
+            parts.push(Document::space());
+        }
 
-        return Document::Array(contents);
+        parts.push(Document::String(")"));
+
+        return Document::Array(parts);
     }
 
     if !parameter_list.parameters.is_empty() {
@@ -118,6 +129,8 @@ pub(super) fn print_function_like_parameters<'a>(
         f.print_dangling_comments(parameter_list.left_parenthesis.join(parameter_list.right_parenthesis), true)
     {
         parts.push(comments);
+    } else if f.settings.space_within_parameter_list_parenthesis {
+        parts.push(Document::Line(Line::default()));
     } else {
         parts.push(Document::Line(Line::soft()));
     }

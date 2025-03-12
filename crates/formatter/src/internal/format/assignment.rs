@@ -65,47 +65,56 @@ pub(super) fn print_assignment<'a>(
     operator: Document<'a>,
     rhs_expression: &'a Expression,
 ) -> Document<'a> {
+    let needs_spacing = if matches!(assignment_node, AssignmentLikeNode::AssignmentOperation(_)) {
+        f.settings.space_around_assignment_operators
+    } else {
+        true
+    };
+
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
     let rhs = rhs_expression.format(f);
 
     match layout {
         Layout::Chain => Document::Array(vec![
             Document::Group(Group::new(vec![lhs])),
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             operator,
-            Document::Line(Line::default()),
+            if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
             rhs,
         ]),
-        Layout::ChainTailArrowChain => {
-            Document::Array(vec![Document::Group(Group::new(vec![lhs])), Document::space(), operator, rhs])
-        }
+        Layout::ChainTailArrowChain => Document::Array(vec![
+            Document::Group(Group::new(vec![lhs])),
+            if needs_spacing { Document::space() } else { Document::empty() },
+            operator,
+            rhs,
+        ]),
         Layout::ChainTail => Document::Group(Group::new(vec![
             lhs,
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             Document::Indent(vec![Document::Line(Line::hard()), rhs]),
         ])),
         Layout::BreakAfterOperator => Document::Group(Group::new(vec![
             Document::Group(Group::new(vec![lhs])),
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             Document::Group(Group::new(vec![Document::IndentIfBreak(IndentIfBreak::new(vec![
-                Document::Line(Line::default()),
+                if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
                 rhs,
             ]))])),
         ])),
         Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec![
             Document::Group(Group::new(vec![lhs])),
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             operator,
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             Document::Group(Group::new(vec![rhs])),
         ])),
         Layout::BreakLhs => Document::Group(Group::new(vec![
             lhs,
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             operator,
-            Document::space(),
+            if needs_spacing { Document::space() } else { Document::empty() },
             Document::Group(Group::new(vec![rhs])),
         ])),
         Layout::Fluid => {
@@ -113,10 +122,15 @@ pub(super) fn print_assignment<'a>(
 
             Document::Group(Group::new(vec![
                 lhs,
-                Document::space(),
+                if needs_spacing { Document::space() } else { Document::empty() },
                 operator,
                 Document::Group(
-                    Group::new(vec![Document::Indent(vec![Document::Line(Line::default())])]).with_id(assignment_id),
+                    Group::new(vec![Document::Indent(vec![if needs_spacing {
+                        Document::Line(Line::default())
+                    } else {
+                        Document::Line(Line::soft())
+                    }])])
+                    .with_id(assignment_id),
                 ),
                 Document::IndentIfBreak(IndentIfBreak::new(vec![rhs]).with_id(assignment_id)),
             ]))

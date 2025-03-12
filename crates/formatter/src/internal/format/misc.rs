@@ -355,14 +355,20 @@ pub(super) fn adjust_clause<'a>(
     }
 }
 
-pub(super) fn print_condition<'a>(f: &mut FormatterState<'a>, condition: &'a Expression) -> Document<'a> {
+pub(super) fn print_condition<'a>(
+    f: &mut FormatterState<'a>,
+    condition: &'a Expression,
+    space_before: bool,
+    space_within: bool,
+) -> Document<'a> {
     Document::Group(Group::new(vec![
+        if space_before { Document::space() } else { Document::empty() },
         Document::String("("),
         Document::IndentIfBreak(IndentIfBreak::new(vec![
-            Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::soft() }),
+            Document::Line(if space_within { Line::default() } else { Line::soft() }),
             condition.format(f),
         ])),
-        Document::Line(if f.settings.control_space_parens { Line::default() } else { Line::soft() }),
+        Document::Line(if space_within { Line::default() } else { Line::soft() }),
         Document::String(")"),
     ]))
 }

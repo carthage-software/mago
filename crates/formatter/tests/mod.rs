@@ -127,6 +127,8 @@ test_case!(preserve_breaking_conditional_expression_disabled);
 test_case!(hooks_always_break);
 test_case!(comments_are_preserved);
 test_case!(array_comment);
+test_case!(spacing_options);
+test_case!(spacing_options_flipped);
 
 // GitHub issue test cases
 test_case!(issue_122);

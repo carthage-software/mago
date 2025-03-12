@@ -137,24 +137,52 @@ pub(super) fn print_binaryish_expressions<'a>(
 
     let should_inline = should_inline_logical_or_coalesce_rhs(right, operator);
 
-    let seperated = match operator {
-        BinaryOperator::StringConcat(_) => f.settings.space_concatenation,
-        _ => true,
+    let has_space_around = match operator {
+        BinaryOperator::And(_)
+        | BinaryOperator::Or(_)
+        | BinaryOperator::LowAnd(_)
+        | BinaryOperator::LowOr(_)
+        | BinaryOperator::LowXor(_) => f.settings.space_around_logical_binary_operators,
+        BinaryOperator::Equal(_)
+        | BinaryOperator::NotEqual(_)
+        | BinaryOperator::Identical(_)
+        | BinaryOperator::NotIdentical(_)
+        | BinaryOperator::AngledNotEqual(_)
+        | BinaryOperator::Spaceship(_) => f.settings.space_around_equality_binary_operators,
+        BinaryOperator::LessThan(_)
+        | BinaryOperator::LessThanOrEqual(_)
+        | BinaryOperator::GreaterThan(_)
+        | BinaryOperator::GreaterThanOrEqual(_) => f.settings.space_around_comparison_binary_operators,
+        BinaryOperator::BitwiseAnd(_) | BinaryOperator::BitwiseOr(_) | BinaryOperator::BitwiseXor(_) => {
+            f.settings.space_around_bitwise_binary_operators
+        }
+        BinaryOperator::Multiplication(_) | BinaryOperator::Division(_) | BinaryOperator::Modulo(_) => {
+            f.settings.space_around_multiplicative_binary_operators
+        }
+        BinaryOperator::Exponentiation(_) => f.settings.space_around_exponentiation_binary_operators,
+        BinaryOperator::Addition(_) | BinaryOperator::Subtraction(_) => {
+            f.settings.space_around_additive_binary_operators
+        }
+        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => f.settings.space_around_shift_binary_operators,
+        BinaryOperator::StringConcat(_) => f.settings.space_around_concatenation_binary_operator,
+        BinaryOperator::Elvis(_) => f.settings.space_around_elvis_binary_operator,
+        BinaryOperator::NullCoalesce(_) => f.settings.space_around_null_coalescing_binary_operator,
+        BinaryOperator::Instanceof(_) => true,
     };
 
     let line_before_operator = f.settings.line_before_binary_operator && !f.has_leading_own_line_comment(right.span());
 
     let right_document = vec![
         if line_before_operator && !should_inline {
-            Document::Line(if seperated { Line::default() } else { Line::soft() })
+            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         } else {
-            Document::String(if seperated { " " } else { "" })
+            Document::String(if has_space_around { " " } else { "" })
         },
         Document::String(operator.as_str(f.interner)),
         if line_before_operator || should_inline {
-            Document::String(if seperated { " " } else { "" })
+            Document::String(if has_space_around { " " } else { "" })
         } else {
-            Document::Line(if seperated { Line::default() } else { Line::soft() })
+            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         },
         if should_inline { Document::Group(Group::new(vec![right.format(f)])) } else { right.format(f) },
     ];

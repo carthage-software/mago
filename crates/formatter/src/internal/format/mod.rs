@@ -217,9 +217,9 @@ impl<'a> Format<'a> for DeclareItem {
         wrap!(f, self, DeclareItem, {
             Document::Array(vec![
                 self.name.format(f),
-                if f.settings.space_around_declare_equals { Document::space() } else { Document::empty() },
+                if f.settings.space_around_assignment_in_declare { Document::space() } else { Document::empty() },
                 Document::String("="),
-                if f.settings.space_around_declare_equals { Document::space() } else { Document::empty() },
+                if f.settings.space_around_assignment_in_declare { Document::space() } else { Document::empty() },
                 self.value.format(f),
             ])
         })
@@ -871,6 +871,10 @@ impl<'a> Format<'a> for Method {
             let has_parameters_or_inner_parameter_comments =
                 !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
 
+            if f.settings.space_before_method_parameter_list_parenthesis {
+                signature.push(Document::space());
+            }
+
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
@@ -1036,7 +1040,11 @@ impl<'a> Format<'a> for Interface {
 impl<'a> Format<'a> for EnumBackingTypeHint {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, EnumBackingTypeHint, {
-            Document::Group(Group::new(vec![Document::String(":"), Document::space(), self.hint.format(f)]))
+            Document::Group(Group::new(vec![
+                Document::String(":"),
+                if f.settings.space_after_colon_in_enum_backing_type { Document::space() } else { Document::empty() },
+                self.hint.format(f),
+            ]))
         })
     }
 }
@@ -1123,7 +1131,7 @@ impl<'a> Format<'a> for Enum {
                 Document::space(),
                 self.name.format(f),
                 if let Some(backing_type_hint) = &self.backing_type_hint {
-                    if f.settings.space_before_enum_backing_type_hint_colon {
+                    if f.settings.space_before_colon_in_enum_backing_type {
                         Document::Array(vec![Document::space(), backing_type_hint.format(f)])
                     } else {
                         backing_type_hint.format(f)
@@ -1254,32 +1262,16 @@ impl<'a> Format<'a> for Attribute {
 impl<'a> Format<'a> for Hint {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Hint, {
-            let k = |v: &str| Document::String(f.as_str(v.to_ascii_lowercase()));
-
             match self {
                 Hint::Identifier(identifier) => identifier.format(f),
-                Hint::Parenthesized(parenthesized_hint) => {
-                    let spacing = if f.settings.type_spacing > 0 {
-                        Document::String(f.as_str(" ".repeat(f.settings.type_spacing)))
-                    } else {
-                        Document::empty()
-                    };
-
-                    Document::Group(Group::new(vec![
-                        Document::String("("),
-                        spacing.clone(),
-                        parenthesized_hint.hint.format(f),
-                        spacing,
-                        Document::String(")"),
-                    ]))
-                }
+                Hint::Parenthesized(parenthesized_hint) => Document::Group(Group::new(vec![
+                    Document::String("("),
+                    if f.settings.space_within_type_parenthesis { Document::space() } else { Document::empty() },
+                    parenthesized_hint.hint.format(f),
+                    if f.settings.space_within_type_parenthesis { Document::space() } else { Document::empty() },
+                    Document::String(")"),
+                ])),
                 Hint::Nullable(nullable_hint) => {
-                    let spacing = if f.settings.type_spacing > 0 {
-                        Document::String(f.as_str(" ".repeat(f.settings.type_spacing)))
-                    } else {
-                        Document::empty()
-                    };
-
                     // If the nullable type is nested inside another type hint,
                     // we cannot use `?` syntax.
                     let force_long_syntax = matches!(f.parent_node(), Node::Hint(_))
@@ -1290,36 +1282,50 @@ impl<'a> Format<'a> for Hint {
 
                     if force_long_syntax {
                         return Document::Group(Group::new(vec![
-                            k("null"),
-                            spacing.clone(),
+                            Document::String("null"),
+                            if f.settings.space_around_pipe_in_union_type {
+                                Document::space()
+                            } else {
+                                Document::empty()
+                            },
                             Document::String("|"),
-                            spacing,
+                            if f.settings.space_around_pipe_in_union_type {
+                                Document::space()
+                            } else {
+                                Document::empty()
+                            },
                             nullable_hint.hint.format(f),
                         ]));
                     }
 
                     match f.settings.null_type_hint {
                         NullTypeHint::NullPipe => Document::Group(Group::new(vec![
-                            k("null"),
-                            spacing.clone(),
+                            Document::String("null"),
+                            if f.settings.space_around_pipe_in_union_type {
+                                Document::space()
+                            } else {
+                                Document::empty()
+                            },
                             Document::String("|"),
-                            spacing,
+                            if f.settings.space_around_pipe_in_union_type {
+                                Document::space()
+                            } else {
+                                Document::empty()
+                            },
                             nullable_hint.hint.format(f),
                         ])),
                         NullTypeHint::Question => Document::Group(Group::new(vec![
                             Document::String("?"),
-                            spacing,
+                            if f.settings.space_after_nullable_type_question_mark {
+                                Document::space()
+                            } else {
+                                Document::empty()
+                            },
                             nullable_hint.hint.format(f),
                         ])),
                     }
                 }
                 Hint::Union(union_hint) => {
-                    let spacing = if f.settings.type_spacing > 0 {
-                        Document::String(f.as_str(" ".repeat(f.settings.type_spacing)))
-                    } else {
-                        Document::empty()
-                    };
-
                     let force_long_syntax = matches!(f.parent_node(), Node::Hint(_))
                         || matches!(
                             union_hint.left.as_ref(),
@@ -1335,7 +1341,11 @@ impl<'a> Format<'a> for Hint {
                             if f.settings.null_type_hint.is_question() {
                                 return Document::Group(Group::new(vec![
                                     Document::String("?"),
-                                    spacing,
+                                    if f.settings.space_after_nullable_type_question_mark {
+                                        Document::space()
+                                    } else {
+                                        Document::empty()
+                                    },
                                     union_hint.right.format(f),
                                 ]));
                             }
@@ -1345,7 +1355,11 @@ impl<'a> Format<'a> for Hint {
                             if f.settings.null_type_hint.is_question() {
                                 return Document::Group(Group::new(vec![
                                     Document::String("?"),
-                                    spacing,
+                                    if f.settings.space_after_nullable_type_question_mark {
+                                        Document::space()
+                                    } else {
+                                        Document::empty()
+                                    },
                                     union_hint.left.format(f),
                                 ]));
                             }
@@ -1354,44 +1368,44 @@ impl<'a> Format<'a> for Hint {
 
                     Document::Group(Group::new(vec![
                         union_hint.left.format(f),
-                        spacing.clone(),
+                        if f.settings.space_around_pipe_in_union_type { Document::space() } else { Document::empty() },
                         Document::String("|"),
-                        spacing,
+                        if f.settings.space_around_pipe_in_union_type { Document::space() } else { Document::empty() },
                         union_hint.right.format(f),
                     ]))
                 }
-                Hint::Intersection(intersection_hint) => {
-                    let spacing = if f.settings.type_spacing > 0 {
-                        Document::String(f.as_str(" ".repeat(f.settings.type_spacing)))
+                Hint::Intersection(intersection_hint) => Document::Group(Group::new(vec![
+                    intersection_hint.left.format(f),
+                    if f.settings.space_around_ampersand_in_intersection_type {
+                        Document::space()
                     } else {
                         Document::empty()
-                    };
-
-                    Document::Group(Group::new(vec![
-                        intersection_hint.left.format(f),
-                        spacing.clone(),
-                        Document::String("&"),
-                        spacing,
-                        intersection_hint.right.format(f),
-                    ]))
-                }
-                Hint::Null(_) => k("null"),
-                Hint::True(_) => k("true"),
-                Hint::False(_) => k("false"),
-                Hint::Array(_) => k("array"),
-                Hint::Callable(_) => k("callable"),
-                Hint::Static(_) => k("static"),
-                Hint::Self_(_) => k("self"),
-                Hint::Parent(_) => k("parent"),
-                Hint::Void(_) => k("void"),
-                Hint::Never(_) => k("never"),
-                Hint::Float(_) => k("float"),
-                Hint::Bool(_) => k("bool"),
-                Hint::Integer(_) => k("int"),
-                Hint::String(_) => k("string"),
-                Hint::Object(_) => k("object"),
-                Hint::Mixed(_) => k("mixed"),
-                Hint::Iterable(_) => k("iterable"),
+                    },
+                    Document::String("&"),
+                    if f.settings.space_around_ampersand_in_intersection_type {
+                        Document::space()
+                    } else {
+                        Document::empty()
+                    },
+                    intersection_hint.right.format(f),
+                ])),
+                Hint::Null(_) => Document::String("null"),
+                Hint::True(_) => Document::String("true"),
+                Hint::False(_) => Document::String("false"),
+                Hint::Array(_) => Document::String("array"),
+                Hint::Callable(_) => Document::String("callable"),
+                Hint::Static(_) => Document::String("static"),
+                Hint::Self_(_) => Document::String("self"),
+                Hint::Parent(_) => Document::String("parent"),
+                Hint::Void(_) => Document::String("void"),
+                Hint::Never(_) => Document::String("never"),
+                Hint::Float(_) => Document::String("float"),
+                Hint::Bool(_) => Document::String("bool"),
+                Hint::Integer(_) => Document::String("int"),
+                Hint::String(_) => Document::String("string"),
+                Hint::Object(_) => Document::String("object"),
+                Hint::Mixed(_) => Document::String("mixed"),
+                Hint::Iterable(_) => Document::String("iterable"),
             }
         })
     }
@@ -1531,6 +1545,10 @@ impl<'a> Format<'a> for PropertyHook {
 
                 contents.push(self.name.format(f));
                 if let Some(parameters) = &self.parameters {
+                    if f.settings.space_before_hook_parameter_list_parenthesis {
+                        contents.push(Document::space());
+                    }
+
                     contents.push(parameters.format(f));
                 }
 
@@ -1637,7 +1655,12 @@ impl<'a> Format<'a> for FunctionLikeParameterList {
 impl<'a> Format<'a> for FunctionLikeReturnTypeHint {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, FunctionLikeReturnTypeHint, {
-            Document::Group(Group::new(vec![Document::String(":"), Document::space(), self.hint.format(f)]))
+            Document::Group(Group::new(vec![
+                if f.settings.space_before_colon_in_return_type { Document::space() } else { Document::empty() },
+                Document::String(":"),
+                if f.settings.space_after_colon_in_return_type { Document::space() } else { Document::empty() },
+                self.hint.format(f),
+            ]))
         })
     }
 }
@@ -1661,6 +1684,10 @@ impl<'a> Format<'a> for Function {
             signature.push(self.name.format(f));
             let has_parameters_or_inner_parameter_comments =
                 !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
+
+            if f.settings.space_before_function_parameter_list_parenthesis {
+                signature.push(Document::space());
+            }
 
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
@@ -1720,18 +1747,22 @@ impl<'a> Format<'a> for Try {
 impl<'a> Format<'a> for TryCatchClause {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, TryCatchClause, {
-            let mut context = vec![self.hint.format(f)];
-            if let Some(variable) = &self.variable {
-                context.push(Document::space());
-                context.push(variable.format(f));
-            }
-
             Document::Group(Group::new(vec![
                 self.catch.format(f),
-                Document::space(),
+                if f.settings.space_before_catch_parenthesis { Document::space() } else { Document::empty() },
                 f.print_leading_comments(self.left_parenthesis).unwrap_or(Document::empty()),
                 Document::String("("),
-                Document::Group(Group::new(context)),
+                if f.settings.space_within_catch_parenthesis { Document::space() } else { Document::empty() },
+                Document::Group(Group::new({
+                    let mut context = vec![self.hint.format(f)];
+                    if let Some(variable) = &self.variable {
+                        context.push(Document::space());
+                        context.push(variable.format(f));
+                    }
+
+                    context
+                })),
+                if f.settings.space_within_catch_parenthesis { Document::space() } else { Document::empty() },
                 Document::String(")"),
                 f.print_trailing_comments(self.right_parenthesis).unwrap_or(Document::empty()),
                 Document::space(),
