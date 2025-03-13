@@ -1060,6 +1060,84 @@ pub struct FormatSettings {
     /// Default: false
     #[serde(default = "default_false")]
     pub space_within_match_parenthesis: bool,
+
+    /// Whether to an empty line after control structures (if, for, foreach, while, do, switch).
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_control_structure: bool,
+
+    /// Whether to an empty line after opening tag.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_opening_tag: bool,
+
+    /// Whether to an empty line after declare statement.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_declare: bool,
+
+    /// Whether to an empty line after namespace name.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_namespace: bool,
+
+    /// Whether to an empty line after use statements.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_use: bool,
+
+    /// Whether to an empty line after symbols (class, enum, interface, trait, function, const).
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_symbols: bool,
+
+    /// Whether to an empty line after class-like constant.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_class_like_constant: bool,
+
+    /// Whether to an empty line after enum case.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_enum_case: bool,
+
+    /// Whether to an empty line after trait use.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_trait_use: bool,
+
+    /// Whether to an empty line after property.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_property: bool,
+
+    /// Whether to an empty line after method.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_after_method: bool,
+
+    /// Whether to an empty line after property declarations.
+    ///
+    /// Default: true
+    #[serde(default = "default_false")]
+    pub empty_line_before_return: bool,
+
+    /// Whether to an empty line before return statements.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_before_dangling_comments: bool,
 }
 
 impl Default for FormatSettings {
@@ -1164,6 +1242,19 @@ impl Default for FormatSettings {
             space_after_decrement_unary_prefix_operator: false,
             space_after_additive_unary_prefix_operator: false,
             space_after_nullable_type_question_mark: false,
+            empty_line_after_control_structure: false,
+            empty_line_after_opening_tag: false,
+            empty_line_after_declare: true,
+            empty_line_after_namespace: true,
+            empty_line_after_use: true,
+            empty_line_after_symbols: true,
+            empty_line_after_class_like_constant: false,
+            empty_line_after_enum_case: false,
+            empty_line_after_trait_use: false,
+            empty_line_after_property: false,
+            empty_line_after_method: true,
+            empty_line_before_return: false,
+            empty_line_before_dangling_comments: true,
         }
     }
 }

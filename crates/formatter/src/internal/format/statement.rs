@@ -5,6 +5,7 @@ use crate::document::Align;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
+use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
@@ -33,7 +34,10 @@ fn print_statement_slice<'a>(f: &mut FormatterState<'a>, stmts: &[&'a Statement]
         if !use_statements.is_empty() {
             parts.extend(print_use_statements(f, std::mem::take(&mut use_statements)));
             parts.push(Document::Line(Line::hard()));
-            parts.push(Document::Line(Line::hard()));
+
+            if f.settings.empty_line_after_use {
+                parts.push(Document::Line(Line::hard()));
+            }
         }
 
         let mut formatted_statement = format_statement_with_spacing(f, i, stmt, stmts, last_non_noop_index);
@@ -108,14 +112,63 @@ fn format_statement_with_spacing<'a>(
         if let Some(index) = last_non_noop_index {
             if i != index {
                 statement_parts.push(Document::Line(Line::hard()));
-                if f.is_next_line_empty(stmt.span()) {
+                if should_add_empty_line_after(f, stmt) || f.is_next_line_empty(stmt.span()) {
                     statement_parts.push(Document::Line(Line::hard()));
                 }
             }
         }
     }
 
+    if should_add_empty_line_before(f, stmt) {
+        statement_parts.insert(
+            0,
+            Document::Array(vec![
+                Document::Trim(Trim::Newlines),
+                Document::Line(Line::hard()),
+                Document::Line(Line::hard()),
+            ]),
+        );
+    }
+
     statement_parts
+}
+
+#[inline(always)]
+const fn should_add_empty_line_after<'a>(f: &FormatterState<'a>, stmt: &'a Statement) -> bool {
+    match stmt {
+        Statement::OpeningTag(_) => f.settings.empty_line_after_opening_tag,
+        Statement::Namespace(_) => f.settings.empty_line_after_namespace,
+        Statement::Use(_) => f.settings.empty_line_after_use,
+        Statement::Constant(_)
+        | Statement::Function(_)
+        | Statement::Class(_)
+        | Statement::Interface(_)
+        | Statement::Trait(_)
+        | Statement::Enum(_) => f.settings.empty_line_after_symbols,
+        Statement::Declare(_) => f.settings.empty_line_after_declare,
+        Statement::Try(_)
+        | Statement::Foreach(_)
+        | Statement::For(_)
+        | Statement::While(_)
+        | Statement::DoWhile(_)
+        | Statement::If(_)
+        | Statement::Switch(_) => f.settings.empty_line_after_control_structure,
+        _ => false,
+    }
+}
+
+#[inline(always)]
+fn should_add_empty_line_before<'a>(f: &FormatterState<'a>, stmt: &'a Statement) -> bool {
+    match stmt {
+        Statement::Return(_) => {
+            if !f.settings.empty_line_before_return {
+                return false;
+            }
+
+            f.has_newline(stmt.span().start.offset, /* backwards */ true)
+        }
+        _ => false,
+    }
 }
 
 fn should_add_new_line_or_space_after_stmt<'a>(

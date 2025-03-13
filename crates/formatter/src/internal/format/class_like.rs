@@ -33,10 +33,7 @@ pub fn print_class_like_body<'a>(
 
             if i < (length - 1) {
                 members.push(Document::Line(Line::hard()));
-                // Add an empty line in the following cases:
-                // - The item is a method.
-                // - The next line is already empty.
-                if item.is_method() || f.is_next_line_empty(item.span()) {
+                if should_add_empty_line_after(f, item) || f.is_next_line_empty(item.span()) {
                     members.push(Document::Line(Line::hard()));
                 }
             }
@@ -46,7 +43,7 @@ pub fn print_class_like_body<'a>(
     }
 
     if let Some(comments) = f.print_dangling_comments(left_brace.join(*right_brace), true) {
-        if length > 0 {
+        if length > 0 && f.settings.empty_line_before_dangling_comments {
             contents.push(Document::Line(Line::soft()));
         }
 
@@ -61,4 +58,15 @@ pub fn print_class_like_body<'a>(
     }
 
     Document::Group(Group::new(contents))
+}
+
+#[inline(always)]
+const fn should_add_empty_line_after<'a>(f: &mut FormatterState<'a>, class_like_member: &'a ClassLikeMember) -> bool {
+    match class_like_member {
+        ClassLikeMember::TraitUse(_) => f.settings.empty_line_after_trait_use,
+        ClassLikeMember::Constant(_) => f.settings.empty_line_after_class_like_constant,
+        ClassLikeMember::Property(_) => f.settings.empty_line_after_property,
+        ClassLikeMember::EnumCase(_) => f.settings.empty_line_after_enum_case,
+        ClassLikeMember::Method(_) => f.settings.empty_line_after_method,
+    }
 }

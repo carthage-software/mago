@@ -129,6 +129,10 @@ test_case!(comments_are_preserved);
 test_case!(array_comment);
 test_case!(spacing_options);
 test_case!(spacing_options_flipped);
+test_case!(line_options);
+test_case!(line_options_flipped);
+test_case!(line_options_all_on);
+test_case!(line_options_all_off);
 
 // GitHub issue test cases
 test_case!(issue_122);

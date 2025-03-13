@@ -39,7 +39,7 @@ pub(super) fn print_block_of_nodes<'a, T: Format<'a> + HasSpan>(
     }
 
     if let Some(comments) = f.print_dangling_comments(left_brace.join(*right_brace), true) {
-        if length > 0 {
+        if length > 0 && f.settings.empty_line_before_dangling_comments {
             contents.push(Document::Line(Line::soft()));
         }
 
@@ -116,7 +116,7 @@ pub(super) fn print_block<'a>(
     };
 
     if let Some(comments) = f.print_dangling_comments(left_brace.join(*right_brace), true) {
-        if has_body {
+        if has_body && f.settings.empty_line_before_dangling_comments {
             contents.push(Document::Line(Line::soft()));
         }
 
