@@ -39,6 +39,7 @@ body:
     attributes:
       label: "⚙️ Configuration (mago.toml)"
       description: "Provide your **full Mago configuration file** (`mago.toml`)."
+      render: toml
       placeholder: |
         [linter]
         plugins = ["php-unit"]
