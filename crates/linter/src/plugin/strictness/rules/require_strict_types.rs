@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_fixer::SafetyClassification;
 use toml::Value;
 
 use mago_ast::*;
@@ -134,15 +135,64 @@ impl Rule for RequireStrictTypesRule {
         }
 
         if !found {
-            context.report(
-                Issue::new(
-                    context.level(),
-                    "Missing `declare(strict_types=1);` statement at the beginning of the file",
-                )
-                .with_annotation(Annotation::primary(program.span()))
-                .with_note("The `strict_types` directive enforces strict type checking, which can prevent subtle bugs.")
-                .with_help("Add `declare(strict_types=1);` at the top of your file."),
-            );
+            let issue = Issue::new(
+                context.level(),
+                "Missing `declare(strict_types=1);` statement at the beginning of the file",
+            )
+            .with_annotation(Annotation::primary(program.span()))
+            .with_note("The `strict_types` directive enforces strict type checking, which can prevent subtle bugs.")
+            .with_help("Add `declare(strict_types=1);` at the top of your file.");
+
+            context.propose(issue, |plan| {
+                // If first statement is opening tag, insert after it
+                let opening_tag = program.statements.iter().find_map(|statement| match statement {
+                    Statement::OpeningTag(tag) => Some(tag),
+                    _ => None,
+                });
+
+                if opening_tag.is_some() {
+                    plan.insert(
+                        opening_tag.map(|tag| tag.span().end).unwrap().offset,
+                        "\n\ndeclare(strict_types=1);",
+                        SafetyClassification::Unsafe,
+                    );
+
+                    return;
+                }
+
+                // If first statement is inline:
+                let inline = program.statements.iter().find_map(|statement| match statement {
+                    Statement::Inline(inline) => Some(inline),
+                    _ => None,
+                });
+
+                if let Some(inline) = inline {
+                    // If inline is a shebang, look for first opening tag, and insert after it.
+                    if inline.value.to_string().starts_with("#!") {
+                        let opening_tag = program.statements.iter().find_map(|statement| match statement {
+                            Statement::OpeningTag(tag) => Some(tag),
+                            _ => None,
+                        });
+
+                        if opening_tag.is_some() {
+                            plan.insert(
+                                opening_tag.map(|tag| tag.span().end).unwrap().offset,
+                                "\n\ndeclare(strict_types=1);",
+                                SafetyClassification::Unsafe,
+                            );
+
+                            return;
+                        }
+                    }
+
+                    // Insert opening tag, declare, and closing tag before inline,
+                    plan.insert(
+                        inline.span().start.offset,
+                        "<?php\n\ndeclare(strict_types=1);\n\n",
+                        SafetyClassification::Unsafe,
+                    );
+                }
+            });
         }
 
         LintDirective::Abort
