@@ -168,6 +168,142 @@ pub struct FormatSettings {
     #[serde(default = "BraceStyle::next_line")]
     pub classlike_brace_style: BraceStyle,
 
+    /// Place empty control structure bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// if ($expr)
+    /// {
+    /// }
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// if ($expr) {}
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub inline_empty_control_braces: bool,
+
+    /// Place empty closure bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// $closure = function()
+    /// {
+    /// };
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// $closure = function() {};
+    /// ```
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub inline_empty_closure_braces: bool,
+
+    /// Place empty function bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// function foo()
+    /// {
+    /// }
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// function foo() {}
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub inline_empty_function_braces: bool,
+
+    /// Place empty method bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// class Foo
+    /// {
+    ///     public function bar()
+    ///     {
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// class Foo
+    /// {
+    ///     public function bar() {}
+    /// }
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub inline_empty_method_braces: bool,
+
+    /// Place empty constructor bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// class Foo {
+    ///     public function __construct()
+    ///     {
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// class Foo {
+    ///     public function __construct() {}
+    /// }
+    /// ```
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub inline_empty_constructor_braces: bool,
+
+    /// Place empty class-like bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// class Foo
+    /// {
+    /// }
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// class Foo {}
+    /// ```
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub inline_empty_classlike_braces: bool,
+
+    /// Place empty anonymous class bodies on the same line.
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// $anon = new class
+    /// {
+    /// };
+    /// ```
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// $anon = new class {};
+    /// ```
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub inline_empty_anonymous_class_braces: bool,
+
     /// How to format broken method/property chains.
     ///
     /// When `next_line`, the first method/property starts on a new line:
@@ -1197,6 +1333,13 @@ impl Default for FormatSettings {
             method_brace_style: BraceStyle::NextLine,
             classlike_brace_style: BraceStyle::NextLine,
             control_brace_style: BraceStyle::SameLine,
+            inline_empty_control_braces: false,
+            inline_empty_closure_braces: true,
+            inline_empty_function_braces: false,
+            inline_empty_method_braces: false,
+            inline_empty_constructor_braces: true,
+            inline_empty_classlike_braces: false,
+            inline_empty_anonymous_class_braces: true,
             static_before_visibility: false,
             null_type_hint: NullTypeHint::default(),
             break_promoted_properties_list: true,

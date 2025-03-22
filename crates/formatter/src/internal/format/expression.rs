@@ -1232,7 +1232,7 @@ impl<'a> Format<'a> for AnonymousClass {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, AnonymousClass, {
             let initialization = {
-                let mut contents = vec![Document::BreakParent, self.new.format(f)];
+                let mut contents = vec![self.new.format(f)];
                 if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                     contents.push(Document::Line(Line::default()));
                     contents.push(attributes);
@@ -1267,22 +1267,11 @@ impl<'a> Format<'a> for AnonymousClass {
             let signature_id = f.next_id();
             let signature = Document::Group(Group::new(signature).with_id(signature_id));
 
-            let body = Document::Group(Group::new(vec![
-                // we follow the same brace style as closures, not classes
-                match f.settings.closure_brace_style {
-                    BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::IfBreak(
-                        IfBreak::new(
-                            Document::space(),
-                            Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
-                        )
-                        .with_id(signature_id),
-                    ),
-                },
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace),
-            ]));
-
-            Document::Group(Group::new(vec![initialization, signature, body]))
+            Document::Group(Group::new(vec![
+                initialization,
+                signature,
+                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id)),
+            ]))
         })
     }
 }

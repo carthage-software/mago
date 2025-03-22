@@ -14,6 +14,8 @@ use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::settings::BraceStyle;
 
+use super::block::block_is_empty;
+
 pub(super) fn has_new_line_in_range(text: &str, start: usize, end: usize) -> bool {
     text[start..end].contains('\n')
 }
@@ -325,12 +327,19 @@ pub(super) fn adjust_clause<'a>(
 
     let clause = match node {
         Statement::Noop(_) => clause,
-        Statement::Block(_) => {
+        Statement::Block(block) => {
             is_block = true;
 
+            let is_block_empty = block_is_empty(f, &block.left_brace, &block.right_brace);
             match f.settings.control_brace_style {
                 BraceStyle::SameLine => Document::Array(vec![Document::space(), clause]),
-                BraceStyle::NextLine => Document::Array(vec![Document::Line(Line::default()), clause]),
+                BraceStyle::NextLine => {
+                    if f.settings.inline_empty_control_braces && is_block_empty {
+                        Document::Array(vec![Document::space(), clause])
+                    } else {
+                        Document::Array(vec![Document::Line(Line::default()), clause])
+                    }
+                }
             }
         }
         _ => {

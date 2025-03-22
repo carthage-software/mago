@@ -1,3 +1,4 @@
+use block::block_is_empty;
 use mago_ast::*;
 use mago_span::HasSpan;
 
@@ -878,16 +879,28 @@ impl<'a> Format<'a> for Method {
             let signature_document = Document::Group(Group::new(signature).with_id(signature_id));
 
             let mut body = vec![];
-            if let MethodBody::Concrete(_) = self.body {
-                body.push(match f.settings.method_brace_style {
-                    BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => {
-                        if !has_parameters_or_inner_parameter_comments {
-                            Document::Line(Line::hard())
-                        } else {
-                            Document::IfBreak(
-                                IfBreak::new(Document::space(), Document::Line(Line::hard())).with_id(signature_id),
-                            )
+            if let MethodBody::Concrete(block) = &self.body {
+                let is_constructor = f.interner.lookup(&self.name.value).eq_ignore_ascii_case("__construct");
+
+                let inlined_braces = if is_constructor {
+                    f.settings.inline_empty_constructor_braces
+                } else {
+                    f.settings.inline_empty_method_braces
+                } && block_is_empty(f, &block.left_brace, &block.right_brace);
+
+                body.push(if inlined_braces {
+                    Document::space()
+                } else {
+                    match f.settings.method_brace_style {
+                        BraceStyle::SameLine => Document::space(),
+                        BraceStyle::NextLine => {
+                            if !has_parameters_or_inner_parameter_comments {
+                                Document::Line(Line::hard())
+                            } else {
+                                Document::IfBreak(
+                                    IfBreak::new(Document::space(), Document::Line(Line::hard())).with_id(signature_id),
+                                )
+                            }
                         }
                     }
                 });
@@ -1014,18 +1027,10 @@ impl<'a> Format<'a> for Interface {
                 },
             ];
 
-            let body = vec![
-                match f.settings.classlike_brace_style {
-                    BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
-                },
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace),
-            ];
-
             Document::Group(Group::new(vec![
                 Document::Group(Group::new(attributes)),
                 Document::Group(Group::new(signature)),
-                Document::Group(Group::new(body)),
+                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, None),
             ]))
         })
     }
@@ -1068,15 +1073,7 @@ impl<'a> Format<'a> for Class {
 
             let class = Document::Group(Group::new(vec![
                 Document::Group(Group::new(signature)),
-                Document::Group(Group::new(vec![
-                    match f.settings.classlike_brace_style {
-                        BraceStyle::SameLine => Document::space(),
-                        BraceStyle::NextLine => {
-                            Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent])
-                        }
-                    },
-                    print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace),
-                ])),
+                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, None),
             ]));
 
             if let Some(attributes) = attributes {
@@ -1097,19 +1094,10 @@ impl<'a> Format<'a> for Trait {
                 attributes.push(Document::Line(Line::hard()));
             }
 
-            let signature = vec![self.r#trait.format(f), Document::space(), self.name.format(f)];
-            let body = vec![
-                match f.settings.classlike_brace_style {
-                    BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
-                },
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace),
-            ];
-
             Document::Group(Group::new(vec![
                 Document::Group(Group::new(attributes)),
-                Document::Group(Group::new(signature)),
-                Document::Group(Group::new(body)),
+                Document::Group(Group::new(vec![self.r#trait.format(f), Document::space(), self.name.format(f)])),
+                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, None),
             ]))
         })
     }
@@ -1144,18 +1132,10 @@ impl<'a> Format<'a> for Enum {
                 },
             ];
 
-            let body = vec![
-                match f.settings.classlike_brace_style {
-                    BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
-                },
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace),
-            ];
-
             Document::Group(Group::new(vec![
                 Document::Group(Group::new(attributes)),
                 Document::Group(Group::new(signature)),
-                Document::Group(Group::new(body)),
+                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, None),
             ]))
         })
     }
@@ -1692,23 +1672,30 @@ impl<'a> Format<'a> for Function {
             let signature_id = f.next_id();
             let signature_document = Document::Group(Group::new(signature).with_id(signature_id));
 
+            let inlined_braces = f.settings.inline_empty_function_braces
+                && block_is_empty(f, &self.body.left_brace, &self.body.right_brace);
+
             Document::Group(Group::new(vec![
                 Document::Group(Group::new(attributes)),
                 signature_document,
                 Document::Group(Group::new(vec![
-                    match f.settings.function_brace_style {
-                        BraceStyle::SameLine => Document::space(),
-                        BraceStyle::NextLine => {
-                            if !has_parameters_or_inner_parameter_comments {
-                                Document::Line(Line::hard())
-                            } else {
-                                Document::IfBreak(
-                                    IfBreak::new(
-                                        Document::space(),
-                                        Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
+                    if inlined_braces {
+                        Document::space()
+                    } else {
+                        match f.settings.function_brace_style {
+                            BraceStyle::SameLine => Document::space(),
+                            BraceStyle::NextLine => {
+                                if !has_parameters_or_inner_parameter_comments {
+                                    Document::Line(Line::hard())
+                                } else {
+                                    Document::IfBreak(
+                                        IfBreak::new(
+                                            Document::space(),
+                                            Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
+                                        )
+                                        .with_id(signature_id),
                                     )
-                                    .with_id(signature_id),
-                                )
+                                }
                             }
                         }
                     },

@@ -137,6 +137,10 @@ test_case!(line_options_all_off);
 test_case!(whitespace_in_heredoc);
 test_case!(shell_style_comments);
 test_case!(double_slash_comments);
+test_case!(inline_empty_braces_enabled);
+test_case!(inline_empty_braces_disabled);
+test_case!(inline_empty_braces_default);
+test_case!(inline_empty_braces_swapped);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);

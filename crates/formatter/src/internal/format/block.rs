@@ -68,12 +68,14 @@ pub(super) fn print_block<'a>(
         contents.push(c);
     }
 
-    let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
-    let has_inline_body = has_body && {
+    let has_statements = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
+    let is_empty = !has_statements && block_is_empty(f, left_brace, right_brace);
+
+    let has_inline_body = has_statements && {
         matches!((stmts.first(), stmts.last()), (Some(Statement::ClosingTag(_)), Some(Statement::OpeningTag(_))))
     };
 
-    let should_break = if has_body {
+    let should_break = if has_statements {
         let mut statements = statement::print_statement_sequence(f, stmts);
         if has_inline_body {
             statements.insert(0, Document::space());
@@ -84,13 +86,28 @@ pub(super) fn print_block<'a>(
         contents.push(Document::Indent(statements));
 
         true
+    } else if !is_empty {
+        true
     } else {
         let parent = f.parent_node();
         // in case the block is empty, we still want to add a new line
         // in some cases.
         match &parent {
             // functions, and methods
-            Node::Function(_) | Node::MethodBody(_) | Node::PropertyHookConcreteBody(_) => true,
+            Node::MethodBody(_) => {
+                if let Some(Node::Method(method)) = f.grandparent_node() {
+                    if f.interner.lookup(&method.name.value).eq_ignore_ascii_case("__construct") {
+                        !f.settings.inline_empty_constructor_braces
+                    } else {
+                        !f.settings.inline_empty_method_braces
+                    }
+                } else {
+                    !f.settings.inline_empty_method_braces
+                }
+            }
+            Node::Closure(_) => !f.settings.inline_empty_closure_braces,
+            Node::PropertyHookConcreteBody(_) => !f.settings.inline_empty_method_braces,
+            Node::Function(_) => !f.settings.inline_empty_function_braces,
             // try, catch, finally
             Node::Try(_) | Node::TryCatchClause(_) | Node::TryFinallyClause(_) => true,
             Node::Statement(_) => {
@@ -107,7 +124,7 @@ pub(super) fn print_block<'a>(
                         | Node::IfStatementBodyElseClause(_)
                         | Node::IfStatementBodyElseIfClause(_)
                         | Node::ForeachBody(_),
-                    ) => true,
+                    ) => !f.settings.inline_empty_control_braces,
                     _ => false,
                 }
             }
@@ -116,7 +133,7 @@ pub(super) fn print_block<'a>(
     };
 
     if let Some(comments) = f.print_dangling_comments(left_brace.join(*right_brace), true) {
-        if has_body && f.settings.empty_line_before_dangling_comments {
+        if has_statements && f.settings.empty_line_before_dangling_comments {
             contents.push(Document::Line(Line::soft()));
         }
 
@@ -139,4 +156,16 @@ pub(super) fn print_block_body<'a>(f: &mut FormatterState<'a>, stmts: &'a Sequen
     let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
 
     if has_body { Some(Document::Array(statement::print_statement_sequence(f, stmts))) } else { None }
+}
+
+pub fn block_is_empty(f: &mut FormatterState<'_>, left_brace: &Span, right_brace: &Span) -> bool {
+    let content = &f.source_text[left_brace.end.offset..right_brace.start.offset];
+
+    for c in content.chars() {
+        if !c.is_whitespace() || matches!(c, ';') {
+            return false;
+        }
+    }
+
+    true
 }

@@ -11,6 +11,5 @@ class Foo
         private Qux $qux,
         #[QuuxAttr(['type' => Quux::class])]
         private Quux $quux,
-    ) {
-    }
+    ) {}
 }

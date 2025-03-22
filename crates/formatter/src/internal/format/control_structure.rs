@@ -328,7 +328,13 @@ impl<'a> Format<'a> for SwitchBody {
                 SwitchBody::BraceDelimited(b) => Document::Array(vec![
                     match f.settings.control_brace_style {
                         BraceStyle::SameLine => Document::space(),
-                        BraceStyle::NextLine => Document::Line(Line::hard()),
+                        BraceStyle::NextLine => {
+                            if b.cases.is_empty() && f.settings.inline_empty_control_braces {
+                                Document::space()
+                            } else {
+                                Document::Line(Line::hard())
+                            }
+                        }
                     },
                     b.format(f),
                 ]),
@@ -363,7 +369,13 @@ impl<'a> Format<'a> for SwitchColonDelimitedBody {
 impl<'a> Format<'a> for SwitchBraceDelimitedBody {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, SwitchBraceDelimitedBody, {
-            print_block_of_nodes(f, &self.left_brace, &self.cases, &self.right_brace, false)
+            print_block_of_nodes(
+                f,
+                &self.left_brace,
+                &self.cases,
+                &self.right_brace,
+                f.settings.inline_empty_control_braces,
+            )
         })
     }
 }

@@ -2,9 +2,7 @@
 
 final class Issue166FirstCase
 {
-    public function __construct(#[Eager] public BWithEager $b)
-    {
-    }
+    public function __construct(#[Eager] public BWithEager $b) {}
 
     #[ConsoleCommand]
     public function test(
@@ -26,8 +24,7 @@ final class Issue166SecondCase
     public function __construct(
         #[Eager]
         public BWithEager $b,
-    ) {
-    }
+    ) {}
 
     #[ConsoleCommand]
     public function test(
