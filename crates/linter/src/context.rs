@@ -447,6 +447,9 @@ impl<'a> LintContext<'a> {
     {
         let mut plan = FixPlan::new();
         f(&mut plan);
+        if plan.is_empty() {
+            return self.report(issue);
+        }
 
         let issue = issue.with_suggestion(self.module.source.identifier, plan);
 

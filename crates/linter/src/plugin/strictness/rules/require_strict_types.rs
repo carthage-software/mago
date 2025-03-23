@@ -1,8 +1,8 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
 use toml::Value;
 
 use mago_ast::*;
+use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
@@ -81,12 +81,7 @@ impl Rule for RequireStrictTypesRule {
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(program) = node else { return LintDirective::default() };
 
-        if program.statements.len() < 2 {
-            return LintDirective::Abort;
-        }
-
         let mut found = false;
-
         for statement in program.statements.iter() {
             if let Statement::Declare(declare) = statement {
                 for item in declare.items.iter() {
@@ -113,15 +108,17 @@ impl Rule for RequireStrictTypesRule {
                                     .and_then(|o| o.as_bool())
                                     .unwrap_or(ALLOW_DISABLING_DEFAULT)
                             {
-                                context.report(
-                                    Issue::new(context.level(), "The `strict_types` directive is disabled.")
-                                        .with_annotation(
-                                            Annotation::primary(item.span())
-                                                .with_message("The `strict_types` is disabled here."),
-                                        )
-                                        .with_note("Disabling `strict_types` can lead to type safety issues.")
-                                        .with_help("Consider setting `strict_types` to `1` to enforce strict typing."),
-                                );
+                                let issue = Issue::new(context.level(), "The `strict_types` directive is disabled.")
+                                    .with_annotation(
+                                        Annotation::primary(item.span())
+                                            .with_message("The `strict_types` is disabled here."),
+                                    )
+                                    .with_note("Disabling `strict_types` can lead to type safety issues.")
+                                    .with_help("Consider setting `strict_types` to `1` to enforce strict typing.");
+
+                                context.propose(issue, |plan| {
+                                    plan.replace(integer.span.to_range(), "1", SafetyClassification::PotentiallyUnsafe);
+                                });
                             }
                         }
                         _ => {
@@ -144,53 +141,69 @@ impl Rule for RequireStrictTypesRule {
             .with_help("Add `declare(strict_types=1);` at the top of your file.");
 
             context.propose(issue, |plan| {
-                // If first statement is opening tag, insert after it
-                let opening_tag = program.statements.iter().find_map(|statement| match statement {
-                    Statement::OpeningTag(tag) => Some(tag),
-                    _ => None,
-                });
-
-                if opening_tag.is_some() {
-                    plan.insert(
-                        opening_tag.map(|tag| tag.span().end).unwrap().offset,
-                        "\n\ndeclare(strict_types=1);",
-                        SafetyClassification::Unsafe,
-                    );
+                let Some(mut first_statement) = program.statements.first() else {
+                    // The file is completely empty, insert an opening tag and declare statement
+                    // This change is safe because the file is empty.
+                    plan.insert(0, "<?php\n\ndeclare(strict_types=1);\n", SafetyClassification::Safe);
 
                     return;
-                }
+                };
 
-                // If first statement is inline:
-                let inline = program.statements.iter().find_map(|statement| match statement {
-                    Statement::Inline(inline) => Some(inline),
-                    _ => None,
-                });
+                // If the first statement is a shebang.
+                if let Statement::Inline(Inline { kind: InlineKind::Shebang, value, span, .. }) = first_statement {
+                    // Skip the shebang and look for the first PHP statement.
+                    first_statement = match program.statements.get(1) {
+                        Some(statement) => statement,
+                        None => {
+                            let ends_in_newline = context.interner.lookup(value).ends_with('\n');
 
-                if let Some(inline) = inline {
-                    // If inline is a shebang, look for first opening tag, and insert after it.
-                    if inline.value.to_string().starts_with("#!") {
-                        let opening_tag = program.statements.iter().find_map(|statement| match statement {
-                            Statement::OpeningTag(tag) => Some(tag),
-                            _ => None,
-                        });
+                            // If there are no statements after the shebang, insert an opening tag and declare statement.
+                            let content = if ends_in_newline {
+                                "<?php\n\ndeclare(strict_types=1);\n"
+                            } else {
+                                "\n<?php\n\ndeclare(strict_types=1);\n"
+                            };
 
-                        if opening_tag.is_some() {
-                            plan.insert(
-                                opening_tag.map(|tag| tag.span().end).unwrap().offset,
-                                "\n\ndeclare(strict_types=1);",
-                                SafetyClassification::Unsafe,
-                            );
+                            // This is safe because the shebang is the only statement in the file.
+                            plan.insert(span.end.offset, content, SafetyClassification::Safe);
 
                             return;
                         }
-                    }
+                    };
+                }
 
-                    // Insert opening tag, declare, and closing tag before inline,
-                    plan.insert(
-                        inline.span().start.offset,
-                        "<?php\n\ndeclare(strict_types=1);\n\n",
-                        SafetyClassification::Unsafe,
-                    );
+                match first_statement {
+                    Statement::Inline(inline) => {
+                        // If the first statement is an inline statement, insert the declare statement before it.
+                        let starts_with_newline = context.interner.lookup(&inline.value).starts_with('\n');
+                        let content = if !starts_with_newline {
+                            "<?php\n\ndeclare(strict_types=1);\n\n?>\n"
+                        } else {
+                            "<?php\n\ndeclare(strict_types=1);\n\n?>"
+                        };
+
+                        plan.insert(inline.span.start.offset, content, SafetyClassification::PotentiallyUnsafe);
+                    }
+                    Statement::OpeningTag(opening_tag) => match opening_tag {
+                        OpeningTag::Full(FullOpeningTag { span, .. }) | OpeningTag::Short(ShortOpeningTag { span }) => {
+                            // If the first statement is an opening tag, insert the declare statement after it.
+                            plan.insert(
+                                span.end.offset,
+                                "\n\ndeclare(strict_types=1);\n",
+                                SafetyClassification::PotentiallyUnsafe,
+                            );
+                        }
+                        OpeningTag::Echo(echo_opening_tag) => {
+                            // If the first statement is an echo opening tag, insert an opening tag and declare statement
+                            // and a closing tag before it.
+                            plan.insert(
+                                echo_opening_tag.span.start.offset,
+                                "<?php\n\ndeclare(strict_types=1);\n\n?>\n",
+                                SafetyClassification::PotentiallyUnsafe,
+                            );
+                        }
+                    },
+                    _ => unreachable!(),
                 }
             });
         }
