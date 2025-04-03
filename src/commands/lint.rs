@@ -203,6 +203,19 @@ pub struct LintCommand {
         conflicts_with = "fix",
     )]
     pub reporting_format: ReportingFormat,
+
+    /// Choose the failling threshold level for reported issues.
+    #[arg(
+        long,
+        short = 'm',
+        help = "Choose the failling threshold level for reported issues",
+        default_value_t = Level::Error,
+        value_parser = enum_variants!(Level),
+        conflicts_with = "explain",
+        conflicts_with = "list_rules",
+        conflicts_with = "fix",
+    )]
+    pub minimum_level: Level,
 }
 
 impl LintCommand {
@@ -296,7 +309,7 @@ pub async fn execute(command: LintCommand, mut configuration: Configuration) -> 
         });
     }
 
-    let issues_contain_errors = issues.has_minimum_level(Level::Error);
+    let issues_contain_errors = issues.has_minimum_level(command.minimum_level);
 
     let reporter = Reporter::new(interner, source_manager, command.reporting_target);
 

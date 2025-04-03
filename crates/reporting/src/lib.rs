@@ -1,11 +1,13 @@
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::iter::Once;
+use std::str::FromStr;
 
 use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
+use strum::VariantNames;
 
 use mago_fixer::FixPlan;
 use mago_source::SourceIdentifier;
@@ -37,7 +39,8 @@ pub struct Annotation {
 }
 
 /// Represents the severity level of an issue.
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, Display)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, Display, VariantNames)]
+#[strum(serialize_all = "lowercase")]
 pub enum Level {
     /// A note, providing additional information or context.
     Note,
@@ -47,6 +50,20 @@ pub enum Level {
     Warning,
     /// An error, indicating a problem that prevents the code from functioning correctly.
     Error,
+}
+
+impl FromStr for Level {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "note" => Ok(Self::Note),
+            "help" => Ok(Self::Help),
+            "warning" => Ok(Self::Warning),
+            "error" => Ok(Self::Error),
+            _ => todo!("Recheck what we want to do here ? A `const &str` ?"),
+        }
+    }
 }
 
 /// Represents an issue identified in the code.
