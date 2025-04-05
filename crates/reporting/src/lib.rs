@@ -61,7 +61,7 @@ impl FromStr for Level {
             "help" => Ok(Self::Help),
             "warning" => Ok(Self::Warning),
             "error" => Ok(Self::Error),
-            _ => todo!("Recheck what we want to do here ? A `const &str` ?"),
+            _ => Err(()),
         }
     }
 }
