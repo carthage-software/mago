@@ -2,8 +2,8 @@ use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_ast::*;
 use mago_interner::ThreadedInterner;
+use mago_syntax::ast::*;
 
 use crate::kind::NameKind;
 

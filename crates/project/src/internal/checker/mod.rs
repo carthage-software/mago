@@ -1,5 +1,5 @@
-use mago_ast::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::consts::*;
 use crate::internal::context::Context;
@@ -56,7 +56,7 @@ fn returns_generator<'ast>(context: &mut Context<'_>, block: &'ast Block, hint: 
         return true;
     }
 
-    mago_ast_utils::block_has_yield(block)
+    mago_syntax::utils::block_has_yield(block)
 }
 
 #[inline]

@@ -11,7 +11,6 @@ use std::collections::HashSet;
 
 use serde::Serialize;
 
-use mago_ast::Program;
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_interner::StringIdentifier;
@@ -23,6 +22,7 @@ use mago_project::module::ModuleBuildOptions;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
+use mago_syntax::ast::Program;
 
 /// Represents the result of analyzing and formatting PHP code.
 ///

@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_reflection::constant::ConstantReflection;
 use mago_reflection::identifier::Name;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 use crate::internal::reflector::attribute::reflect_attributes;

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-use mago_ast::Node;
 use mago_reporting::Level;
+use mago_syntax::ast::Node;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

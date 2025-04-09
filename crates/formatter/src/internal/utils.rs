@@ -1,6 +1,6 @@
 use unicode_width::UnicodeWidthStr;
 
-use mago_ast::*;
+use mago_syntax::ast::*;
 
 use crate::document::Align;
 use crate::document::Document;

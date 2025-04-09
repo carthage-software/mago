@@ -4,11 +4,11 @@ use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_ast::Program;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_span::HasPosition;
 use mago_span::Position;
+use mago_syntax::ast::Program;
 
 use crate::resolver::NameResolver;
 

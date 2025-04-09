@@ -1,5 +1,5 @@
-use mago_ast::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::document::Document;
 use crate::document::Line;

@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 
@@ -23,7 +23,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
 
     match &return_hint.hint {
         Hint::Void(_) => {
-            for r#return in mago_ast_utils::find_returns_in_block(&function.body) {
+            for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
                 if let Some(val) = &r#return.value {
                     context.issues.push(
                         Issue::error(format!("Function `{}` with return type `void` must not return a value.", name))
@@ -38,7 +38,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
             }
         }
         Hint::Never(_) => {
-            for r#return in mago_ast_utils::find_returns_in_block(&function.body) {
+            for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
                 context.issues.push(
                     Issue::error(format!("Function `{}` with return type `never` must not return.", name))
                         .with_annotation(
@@ -53,7 +53,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
             }
         }
         _ if !returns_generator(context, &function.body, &return_hint.hint) => {
-            for r#return in mago_ast_utils::find_returns_in_block(&function.body) {
+            for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
                 if r#return.value.is_none() {
                     context.issues.push(
                         Issue::error(format!("Function `{}` with a return type must return a value.", name))
@@ -150,7 +150,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
         return;
     };
 
-    let returns = mago_ast_utils::find_returns_in_block(&closure.body);
+    let returns = mago_syntax::utils::find_returns_in_block(&closure.body);
 
     match &hint {
         Hint::Void(_) => {

@@ -2,15 +2,15 @@ use mago_names::resolver::NameResolver;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
-use mago_parser::error::ParseError;
 use mago_php_version::PHPVersion;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
 use mago_source::SourceCategory;
+use mago_syntax::ast::Program;
+use mago_syntax::error::ParseError;
 
 use crate::internal;
 
@@ -100,7 +100,7 @@ impl Module {
         source: Source,
         options: ModuleBuildOptions,
     ) -> (Self, Program) {
-        let (program, parse_error) = mago_parser::parse_source(interner, &source);
+        let (program, parse_error) = mago_syntax::parser::parse_source(interner, &source);
         let resolver = NameResolver::new(interner);
         let names = resolver.resolve(&program);
         let (reflection, issues) = internal::build(interner, version, &source, &program, &names, options);
@@ -122,7 +122,7 @@ impl Module {
     ///
     /// A `Program` representing the abstract syntax tree (AST) of the module.
     pub fn parse(&self, interner: &ThreadedInterner) -> Program {
-        mago_parser::parse_source(interner, &self.source).0
+        mago_syntax::parser::parse_source(interner, &self.source).0
     }
 
     /// Retrieves the category of the module's source.

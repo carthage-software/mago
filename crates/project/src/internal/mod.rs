@@ -1,12 +1,12 @@
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
-use mago_walker::MutWalker;
-use mago_walker::Walker;
+use mago_syntax::ast::Program;
+use mago_syntax::walker::MutWalker;
+use mago_syntax::walker::Walker;
 
 use crate::internal::context::Context;
 use crate::internal::walker::building::ModuleBuildingWalker;

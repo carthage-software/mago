@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! wrap {
     ($f:ident, $self:expr, $node:ident, $block:block) => {{
-        let node = mago_ast::Node::$node($self);
+        let node = mago_syntax::ast::Node::$node($self);
         $f.enter_node(node);
         let leading = $f.print_leading_comments(node.span());
         let doc = $block;

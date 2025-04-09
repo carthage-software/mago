@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
 use crate::internal::context::Context;

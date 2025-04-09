@@ -1,10 +1,10 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -365,7 +365,7 @@ impl Rule for RedundantMathematicalOperationRule {
 const fn get_expression_value(expression: &Expression) -> Option<isize> {
     match expression {
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_expression_value(expression),
-        Expression::Literal(Literal::Integer(LiteralInteger { value: Some(value), .. })) => Some(*value as isize),
+        Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => Some(*value as isize),
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
             let value = match get_expression_value(operand) {
                 Some(it) => it,

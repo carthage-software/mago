@@ -1,9 +1,9 @@
 use indoc::indoc;
 
-use mago_ast::*;
-use mago_ast_utils::assignment::get_assignment_from_expression;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
+use mago_syntax::utils::assignment::get_assignment_from_expression;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

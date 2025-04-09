@@ -1,4 +1,4 @@
-use mago_ast::Node;
+use mago_syntax::ast::Node;
 
 /// A precomputed tree node for the AST.
 ///

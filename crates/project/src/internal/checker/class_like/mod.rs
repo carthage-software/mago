@@ -1,8 +1,8 @@
-use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::consts::*;
 use crate::internal::context::Context;

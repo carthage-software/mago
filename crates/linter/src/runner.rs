@@ -1,10 +1,10 @@
-use mago_ast::Node;
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 use mago_project::module::Module;
 use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::Program;
 
 use crate::ast::AstNode;
 use crate::context::LintContext;

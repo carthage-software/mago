@@ -1,9 +1,9 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 use toml::Value;
 
 use crate::context::LintContext;

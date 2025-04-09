@@ -1,8 +1,8 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -210,7 +210,7 @@ fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTermi
     match statement {
         Statement::Block(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
         Statement::Break(break_stmt) => match break_stmt.level {
-            None | Some(Expression::Literal(Literal::Integer(LiteralInteger { value: Some(1), .. }))) => {
+            None | Some(Expression::Literal(Literal::Integer(LiteralInteger { value: 1, .. }))) => {
                 Some(LoopTerminator::Break(break_stmt))
             }
             Some(_) => None,

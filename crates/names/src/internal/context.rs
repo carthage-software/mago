@@ -1,6 +1,6 @@
-use mago_ast::Use;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
+use mago_syntax::ast::Use;
 
 use crate::kind::NameKind;
 use crate::scope::NamespaceScope;

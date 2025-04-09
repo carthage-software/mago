@@ -1,8 +1,8 @@
 use bitflags::bitflags;
 
-use mago_ast::Trivia;
-use mago_ast::TriviaKind;
 use mago_source::Source;
+use mago_syntax::ast::Trivia;
+use mago_syntax::ast::TriviaKind;
 
 pub mod format;
 

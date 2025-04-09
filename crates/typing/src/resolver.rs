@@ -1,6 +1,5 @@
 use ahash::HashSet;
 
-use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
@@ -11,6 +10,7 @@ use mago_reflection::r#type::kind::*;
 use mago_source::Source;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 use mago_trinary::Trinary;
 
 use crate::constant::ConstantTypeResolver;

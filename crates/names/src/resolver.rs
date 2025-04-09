@@ -1,6 +1,6 @@
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
-use mago_walker::MutWalker;
+use mago_syntax::ast::Program;
+use mago_syntax::walker::MutWalker;
 
 use crate::ResolvedNames;
 use crate::internal::context::NameResolutionContext;

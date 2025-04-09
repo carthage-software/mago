@@ -7,13 +7,13 @@ use clap::Parser;
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_interner::ThreadedInterner;
-use mago_parser::parse_source;
 use mago_php_version::PHPVersion;
 use mago_source::Source;
 use mago_source::SourceCategory;
 use mago_source::SourceIdentifier;
 use mago_source::SourceManager;
 use mago_source::error::SourceError;
+use mago_syntax::parser::parse_source;
 
 use crate::config::Configuration;
 use crate::error::Error;

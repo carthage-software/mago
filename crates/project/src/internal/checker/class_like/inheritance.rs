@@ -1,6 +1,6 @@
-use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::consts::RESERVED_KEYWORDS;
 use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;

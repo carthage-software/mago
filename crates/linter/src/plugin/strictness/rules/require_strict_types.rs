@@ -1,11 +1,11 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -93,16 +93,7 @@ impl Rule for RequireStrictTypesRule {
 
                     match &item.value {
                         Expression::Literal(Literal::Integer(integer)) => {
-                            let disabled = match &integer.value {
-                                Some(val) => *val == 0,
-                                None => {
-                                    // ignore invalid values, as they will be caught by the semantics checker
-
-                                    continue;
-                                }
-                            };
-
-                            if disabled
+                            if integer.value == 0
                                 && !context
                                     .option(ALLOW_DISABLING)
                                     .and_then(|o| o.as_bool())

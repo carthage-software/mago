@@ -1,6 +1,6 @@
 use block::block_is_empty;
-use mago_ast::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::document::*;
 use crate::internal::FormatterState;

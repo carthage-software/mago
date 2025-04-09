@@ -4,8 +4,8 @@ use mago_interner::ThreadedInterner;
 use mago_trinary::Trinary;
 use ordered_float::OrderedFloat;
 
-use mago_ast::*;
 use mago_reflection::r#type::kind::*;
+use mago_syntax::ast::*;
 use sequence::TokenSeparatedSequence;
 
 #[inline]
@@ -784,15 +784,11 @@ pub fn get_literal_kind(interner: &ThreadedInterner, literal: &Literal) -> TypeK
     match &literal {
         Literal::String(string) => get_literal_string_value_kind(interner, string.value, true),
         Literal::Integer(integer) => {
-            if let Some(value) = integer.value {
-                if value > i64::MAX as u64 {
-                    integer_kind()
-                } else {
-                    // we can safely cast `value` to an `i64`
-                    value_integer_kind(value as i64)
-                }
-            } else {
+            if integer.value > i64::MAX as u64 {
                 integer_kind()
+            } else {
+                // we can safely cast `value` to an `i64`
+                value_integer_kind(integer.value as i64)
             }
         }
         Literal::Float(literal_float) => value_float_kind(literal_float.value),

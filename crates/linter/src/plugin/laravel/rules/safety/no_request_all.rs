@@ -1,9 +1,9 @@
 use indoc::indoc;
 
-use mago_ast::*;
-use mago_ast_utils::reference::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
+use mago_syntax::utils::reference::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

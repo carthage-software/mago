@@ -1,7 +1,7 @@
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
 use mago_project::module::Module;
 use mago_span::Span;
+use mago_syntax::ast::Program;
 
 use crate::utils::comment_lines;
 

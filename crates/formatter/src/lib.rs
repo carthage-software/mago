@@ -1,9 +1,9 @@
-use mago_ast::Program;
 use mago_interner::ThreadedInterner;
-use mago_parser::error::ParseError;
-use mago_parser::parse_source;
 use mago_php_version::PHPVersion;
 use mago_source::Source;
+use mago_syntax::ast::Program;
+use mago_syntax::error::ParseError;
+use mago_syntax::parser::parse_source;
 
 use crate::document::Document;
 use crate::internal::FormatterState;

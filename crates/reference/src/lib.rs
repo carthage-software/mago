@@ -1,13 +1,13 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_ast::Program;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_project::module::Module;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_walker::Walker;
+use mago_syntax::ast::Program;
+use mago_syntax::walker::Walker;
 
 use crate::internal::context::Context;
 use crate::internal::walker::ReferenceFindingWalker;

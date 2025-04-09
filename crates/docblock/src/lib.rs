@@ -1,7 +1,7 @@
-use mago_ast::Trivia;
-use mago_ast::TriviaKind;
 use mago_interner::ThreadedInterner;
 use mago_span::Span;
+use mago_syntax::ast::Trivia;
+use mago_syntax::ast::TriviaKind;
 
 use crate::document::Document;
 use crate::error::ParseError;

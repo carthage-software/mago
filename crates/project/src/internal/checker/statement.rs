@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::consts::*;
 use crate::internal::context::Context;
@@ -185,7 +185,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
         match name.to_ascii_lowercase().as_str() {
             STRICT_TYPES_DECLARE_DIRECTIVE => {
                 let value = match &item.value {
-                    Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => *value,
+                    Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => Some(*value),
                     _ => None,
                 };
 

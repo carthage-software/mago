@@ -1,5 +1,5 @@
-use mago_ast::LiteralStringKind;
 use mago_interner::StringIdentifier;
+use mago_syntax::ast::LiteralStringKind;
 
 use crate::internal::FormatterState;
 

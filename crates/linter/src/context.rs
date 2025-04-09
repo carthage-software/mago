@@ -1,6 +1,5 @@
 use toml::value::Value;
 
-use mago_ast::*;
 use mago_fixer::FixPlan;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
@@ -13,6 +12,7 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::ast::AstNode;
 use crate::directive::LintDirective;

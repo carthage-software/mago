@@ -1,9 +1,9 @@
-use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reflection::r#type::kind::*;
 use mago_reflection::r#type::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 

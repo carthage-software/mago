@@ -1543,20 +1543,19 @@ dependencies = [
  "futures",
  "glob-match",
  "indicatif",
- "mago-ast",
  "mago-composer",
  "mago-fixer",
  "mago-formatter",
  "mago-interner",
  "mago-linter",
  "mago-names",
- "mago-parser",
  "mago-php-version",
  "mago-project",
  "mago-reference",
  "mago-reflection",
  "mago-reporting",
  "mago-source",
+ "mago-syntax",
  "num_cpus",
  "openssl",
  "self_update",
@@ -1569,28 +1568,6 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "mago-ast"
-version = "0.22.2"
-dependencies = [
- "mago-interner",
- "mago-php-version",
- "mago-source",
- "mago-span",
- "mago-token",
- "ordered-float",
- "serde",
- "strum",
-]
-
-[[package]]
-name = "mago-ast-utils"
-version = "0.22.2"
-dependencies = [
- "mago-ast",
- "mago-span",
 ]
 
 [[package]]
@@ -1613,9 +1590,9 @@ dependencies = [
 name = "mago-docblock"
 version = "0.22.2"
 dependencies = [
- "mago-ast",
  "mago-interner",
  "mago-span",
+ "mago-syntax",
  "serde",
 ]
 
@@ -1636,13 +1613,11 @@ dependencies = [
  "ahash",
  "bitflags",
  "indoc",
- "mago-ast",
  "mago-interner",
- "mago-parser",
  "mago-php-version",
  "mago-source",
  "mago-span",
- "mago-token",
+ "mago-syntax",
  "pretty_assertions",
  "serde",
  "unicode-width 0.2.0",
@@ -1658,28 +1633,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-lexer"
-version = "0.22.2"
-dependencies = [
- "mago-interner",
- "mago-reporting",
- "mago-source",
- "mago-span",
- "mago-token",
- "memchr",
- "pretty_assertions",
- "serde",
- "strum",
-]
-
-[[package]]
 name = "mago-linter"
 version = "0.22.2"
 dependencies = [
  "ahash",
  "indoc",
- "mago-ast",
- "mago-ast-utils",
  "mago-casing",
  "mago-docblock",
  "mago-fixer",
@@ -1690,7 +1648,7 @@ dependencies = [
  "mago-reporting",
  "mago-source",
  "mago-span",
- "mago-walker",
+ "mago-syntax",
  "regex",
  "serde",
  "toml",
@@ -1702,31 +1660,11 @@ name = "mago-names"
 version = "0.22.2"
 dependencies = [
  "ahash",
- "mago-ast",
  "mago-interner",
  "mago-span",
- "mago-walker",
+ "mago-syntax",
  "serde",
  "strum",
-]
-
-[[package]]
-name = "mago-parser"
-version = "0.22.2"
-dependencies = [
- "either",
- "mago-ast",
- "mago-interner",
- "mago-lexer",
- "mago-reporting",
- "mago-source",
- "mago-span",
- "mago-token",
- "ordered-float",
- "pretty_assertions",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
@@ -1742,18 +1680,15 @@ name = "mago-project"
 version = "0.22.2"
 dependencies = [
  "ahash",
- "mago-ast",
- "mago-ast-utils",
  "mago-interner",
  "mago-names",
- "mago-parser",
  "mago-php-version",
  "mago-reflection",
  "mago-reporting",
  "mago-source",
  "mago-span",
+ "mago-syntax",
  "mago-typing",
- "mago-walker",
  "serde",
 ]
 
@@ -1761,11 +1696,10 @@ dependencies = [
 name = "mago-reference"
 version = "0.22.2"
 dependencies = [
- "mago-ast",
  "mago-interner",
  "mago-project",
  "mago-span",
- "mago-walker",
+ "mago-syntax",
  "serde",
 ]
 
@@ -1821,13 +1755,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-token"
+name = "mago-syntax"
 version = "0.22.2"
 dependencies = [
+ "either",
  "mago-interner",
+ "mago-php-version",
+ "mago-reporting",
+ "mago-source",
  "mago-span",
+ "mago-syntax-core",
+ "memchr",
+ "ordered-float",
+ "paste",
+ "pretty_assertions",
  "serde",
  "strum",
+]
+
+[[package]]
+name = "mago-syntax-core"
+version = "0.22.2"
+dependencies = [
+ "mago-source",
+ "mago-span",
+ "memchr",
 ]
 
 [[package]]
@@ -1839,26 +1791,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-type-syntax"
+version = "0.22.2"
+dependencies = [
+ "mago-source",
+ "mago-span",
+ "mago-syntax-core",
+ "ordered-float",
+ "serde",
+ "strum",
+]
+
+[[package]]
 name = "mago-typing"
 version = "0.22.2"
 dependencies = [
  "ahash",
- "mago-ast",
  "mago-interner",
  "mago-names",
  "mago-reflection",
  "mago-source",
  "mago-span",
+ "mago-syntax",
  "mago-trinary",
  "ordered-float",
-]
-
-[[package]]
-name = "mago-walker"
-version = "0.22.2"
-dependencies = [
- "mago-ast",
- "paste",
 ]
 
 [[package]]
@@ -1866,15 +1822,14 @@ name = "mago-wasm"
 version = "0.22.2"
 dependencies = [
  "getrandom 0.2.15",
- "mago-ast",
  "mago-formatter",
  "mago-interner",
  "mago-linter",
- "mago-parser",
  "mago-php-version",
  "mago-project",
  "mago-reporting",
  "mago-source",
+ "mago-syntax",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -3138,19 +3093,7 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "socket2",
- "tokio-macros",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

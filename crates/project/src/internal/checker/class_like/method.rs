@@ -1,8 +1,8 @@
 #![allow(clippy::too_many_arguments)]
 
-use mago_ast::*;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
@@ -389,7 +389,7 @@ pub fn check_method(
                 return;
             };
 
-            let returns = mago_ast_utils::find_returns_in_block(body);
+            let returns = mago_syntax::utils::find_returns_in_block(body);
 
             match &hint {
                 Hint::Void(_) => {

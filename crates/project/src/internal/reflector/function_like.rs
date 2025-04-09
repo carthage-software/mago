@@ -1,4 +1,3 @@
-use mago_ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reflection::function_like::parameter::*;
 use mago_reflection::function_like::r#return::*;
@@ -6,6 +5,7 @@ use mago_reflection::function_like::*;
 use mago_reflection::identifier::FunctionLikeName;
 use mago_reflection::identifier::Name;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 use crate::internal::reflector::attribute::reflect_attributes;
@@ -35,8 +35,8 @@ pub fn reflect_function<'ast>(
         parameters: reflect_function_like_parameter_list(&function.parameter_list, context, scope),
         return_type_reflection: reflect_function_like_return_type_hint(&function.return_type_hint, context, scope),
         returns_by_reference: function.ampersand.is_some(),
-        has_yield: mago_ast_utils::block_has_yield(&function.body),
-        has_throws: mago_ast_utils::block_has_throws(&function.body),
+        has_yield: mago_syntax::utils::block_has_yield(&function.body),
+        has_throws: mago_syntax::utils::block_has_throws(&function.body),
         is_anonymous: false,
         is_static: true,
         is_final: true,
@@ -65,8 +65,8 @@ pub fn reflect_closure<'ast>(
         parameters: reflect_function_like_parameter_list(&closure.parameter_list, context, scope),
         return_type_reflection: reflect_function_like_return_type_hint(&closure.return_type_hint, context, scope),
         returns_by_reference: closure.ampersand.is_some(),
-        has_yield: mago_ast_utils::block_has_yield(&closure.body),
-        has_throws: mago_ast_utils::block_has_throws(&closure.body),
+        has_yield: mago_syntax::utils::block_has_yield(&closure.body),
+        has_throws: mago_syntax::utils::block_has_throws(&closure.body),
         is_anonymous: true,
         is_static: closure.r#static.is_some(),
         is_final: true,
@@ -99,8 +99,8 @@ pub fn reflect_arrow_function<'ast>(
             scope,
         ),
         returns_by_reference: arrow_function.ampersand.is_some(),
-        has_yield: mago_ast_utils::expression_has_yield(&arrow_function.expression),
-        has_throws: mago_ast_utils::expression_has_throws(&arrow_function.expression),
+        has_yield: mago_syntax::utils::expression_has_yield(&arrow_function.expression),
+        has_throws: mago_syntax::utils::expression_has_throws(&arrow_function.expression),
         is_anonymous: true,
         is_static: arrow_function.r#static.is_some(),
         is_final: true,

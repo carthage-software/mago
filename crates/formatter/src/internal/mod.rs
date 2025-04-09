@@ -1,13 +1,13 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-use mago_ast::Node;
-use mago_ast::Trivia;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 use mago_source::Source;
 use mago_span::Span;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::Trivia;
 
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;

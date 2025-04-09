@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
-use mago_ast::Argument;
-use mago_ast::Attribute;
-use mago_ast::AttributeList;
-use mago_ast::Expression;
-use mago_ast::Literal;
-use mago_ast::Sequence;
 use mago_php_version::PHPVersion;
 use mago_span::HasPosition;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Sequence;
 
 use crate::internal::context::Context;
 

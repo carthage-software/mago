@@ -26,29 +26,26 @@ print_stderr = { level = "forbid" }
 dbg_macro = { level = "forbid" }
 
 [workspace.dependencies]
-mago-ast = { path = "crates/ast", version = "0.22.2" }
-mago-ast-utils = { path = "crates/ast-utils", version = "0.22.2" }
+mago-syntax-core = { path = "crates/syntax-core", version = "0.22.2" }
+mago-syntax = { path = "crates/syntax", version = "0.22.2" }
+mago-type-syntax = { path = "crates/type-syntax", version = "0.22.2" }
 mago-casing = { path = "crates/casing", version = "0.22.2" }
 mago-composer = { path = "crates/composer", version = "0.22.2" }
 mago-docblock = { path = "crates/docblock", version = "0.22.2" }
 mago-fixer = { path = "crates/fixer", version = "0.22.2" }
 mago-formatter = { path = "crates/formatter", version = "0.22.2" }
 mago-interner = { path = "crates/interner", version = "0.22.2" }
-mago-lexer = { path = "crates/lexer", version = "0.22.2" }
 mago-linter = { path = "crates/linter", version = "0.22.2" }
 mago-names = { path = "crates/names", version = "0.22.2" }
-mago-parser = { path = "crates/parser", version = "0.22.2" }
 mago-reflection = { path = "crates/reflection", version = "0.22.2" }
 mago-reporting = { path = "crates/reporting", version = "0.22.2" }
 mago-project = { path = "crates/project", version = "0.22.2" }
 mago-source = { path = "crates/source", version = "0.22.2" }
 mago-span = { path = "crates/span", version = "0.22.2" }
 mago-symbol-table = { path = "crates/symbol-table", version = "0.22.2" }
-mago-token = { path = "crates/token", version = "0.22.2" }
 mago-traverser = { path = "crates/traverser", version = "0.22.2" }
 mago-trinary = { path = "crates/trinary", version = "0.22.2" }
 mago-typing = { path = "crates/typing", version = "0.22.2" }
-mago-walker = { path = "crates/walker", version = "0.22.2" }
 mago-wasm = { path = "crates/wasm", version = "0.22.2" }
 mago-php-version = { path = "crates/php-version", version = "0.22.2" }
 mago-reference = { path = "crates/reference", version = "0.22.2" }
@@ -95,7 +92,7 @@ dialoguer = "0.11.0"
 unicode-width = { version = "0.2.0", default-features = false }
 
 [dependencies]
-mago-ast = { workspace = true }
+mago-syntax = { workspace = true }
 mago-reporting = { workspace = true }
 mago-interner = { workspace = true }
 mago-source = { workspace = true }
@@ -104,7 +101,6 @@ mago-linter = { workspace = true }
 mago-reflection = { workspace = true }
 mago-names = { workspace = true }
 mago-formatter = { workspace = true }
-mago-parser = { workspace = true }
 mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
 mago-reference = { workspace = true }

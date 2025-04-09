@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 

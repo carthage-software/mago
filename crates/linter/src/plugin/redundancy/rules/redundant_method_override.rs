@@ -1,10 +1,10 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_interner::StringIdentifier;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

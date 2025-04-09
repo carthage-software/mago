@@ -1,9 +1,9 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -45,7 +45,7 @@ impl Rule for RedundantIfStatementRule {
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::If(r#if) = node else { return LintDirective::default() };
 
-        if mago_ast_utils::condition::is_truthy(&r#if.condition) {
+        if mago_syntax::utils::condition::is_truthy(&r#if.condition) {
             // this condition always evaluates, given:
             //
             // if ($expr) { block } elseif ($expr2) { block2 } else { block3 }
@@ -99,7 +99,7 @@ impl Rule for RedundantIfStatementRule {
             return LintDirective::default();
         }
 
-        if mago_ast_utils::condition::is_falsy(&r#if.condition) {
+        if mago_syntax::utils::condition::is_falsy(&r#if.condition) {
             // if the `if` statement has no else if/else clauses, and the body contains only
             // definitions, then we should not report it as redundant.
             //
@@ -113,7 +113,9 @@ impl Rule for RedundantIfStatementRule {
                 IfBody::Statement(if_statement_body) => {
                     if if_statement_body.else_if_clauses.is_empty()
                         && if_statement_body.else_clause.is_none()
-                        && mago_ast_utils::definition::statement_contains_only_definitions(&if_statement_body.statement)
+                        && mago_syntax::utils::definition::statement_contains_only_definitions(
+                            &if_statement_body.statement,
+                        )
                     {
                         return LintDirective::Prune;
                     }
@@ -121,7 +123,7 @@ impl Rule for RedundantIfStatementRule {
                 IfBody::ColonDelimited(if_colon_delimited_body) => {
                     if if_colon_delimited_body.else_if_clauses.is_empty()
                         && if_colon_delimited_body.else_clause.is_none()
-                        && mago_ast_utils::definition::statement_sequence_contains_only_definitions(
+                        && mago_syntax::utils::definition::statement_sequence_contains_only_definitions(
                             &if_colon_delimited_body.statements,
                         )
                     {

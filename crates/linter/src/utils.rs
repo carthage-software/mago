@@ -1,5 +1,5 @@
-use mago_ast::*;
 use mago_interner::ThreadedInterner;
+use mago_syntax::ast::*;
 
 /// A utility function to get the content of a comment trivia.
 ///

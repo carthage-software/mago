@@ -40,14 +40,11 @@ publish:
     cargo publish -p mago-span --allow-dirty
     cargo publish -p mago-reporting --allow-dirty
     cargo publish -p mago-reflection --allow-dirty
-    cargo publish -p mago-token --allow-dirty
-    cargo publish -p mago-ast --allow-dirty
-    cargo publish -p mago-walker --allow-dirty
-    cargo publish -p mago-ast-utils --allow-dirty
+    cargo publish -p mago-syntax-core --allow-dirty
+    cargo publish -p mago-syntax --allow-dirty
+    cargo publish -p mago-type-syntax --allow-dirty
     cargo publish -p mago-composer --allow-dirty
     cargo publish -p mago-docblock --allow-dirty
-    cargo publish -p mago-lexer --allow-dirty
-    cargo publish -p mago-parser --allow-dirty
     cargo publish -p mago-formatter --allow-dirty
     cargo publish -p mago-names --allow-dirty
     cargo publish -p mago-typing --allow-dirty

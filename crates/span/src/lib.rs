@@ -63,7 +63,7 @@ impl Position {
     /// # Returns
     ///
     /// The position moved by the given offset.
-    pub fn forward(&self, offset: usize) -> Self {
+    pub const fn forward(&self, offset: usize) -> Self {
         Self { source: self.source, offset: self.offset + offset }
     }
 

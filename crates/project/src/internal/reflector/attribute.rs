@@ -1,9 +1,9 @@
-use mago_ast::*;
 use mago_reflection::attribute::AttributeArgumentListReflection;
 use mago_reflection::attribute::AttributeArgumentReflection;
 use mago_reflection::attribute::AttributeReflection;
 use mago_reflection::identifier::Name;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 

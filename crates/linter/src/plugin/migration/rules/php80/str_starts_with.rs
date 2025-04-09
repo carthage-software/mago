@@ -1,10 +1,10 @@
 use indoc::indoc;
 
-use mago_ast::*;
 use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -68,12 +68,12 @@ impl Rule for StrStartsWithRule {
         // if one side is `0` and the other is a `strpos($a, $b)` call, we can suggest using `str_starts_with($a, $b)`
         let (left, call) = match (binary.lhs.as_ref(), binary.rhs.as_ref()) {
             (
-                Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
+                Expression::Literal(Literal::Integer(LiteralInteger { value: 0, .. })),
                 Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
             ) if arguments.arguments.len() == 2 => (false, call),
             (
                 Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
-                Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
+                Expression::Literal(Literal::Integer(LiteralInteger { value: 0, .. })),
             ) if arguments.arguments.len() == 2 => (true, call),
             _ => {
                 return LintDirective::default();

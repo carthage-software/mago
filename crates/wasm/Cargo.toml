@@ -19,12 +19,11 @@ workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-mago-ast = { workspace = true }
+mago-syntax = { workspace = true }
 mago-interner = { workspace = true }
 mago-reporting = { workspace = true }
 mago-project = { workspace = true }
 mago-source = { workspace = true }
-mago-parser = { workspace = true }
 mago-php-version = { workspace = true }
 mago-linter = { workspace = true }
 mago-formatter = { workspace = true }

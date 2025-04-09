@@ -1,10 +1,10 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::Node;
-use mago_ast::ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;
@@ -34,7 +34,7 @@ impl Rule for TooManyPropertiesRule {
                 default: Value::Integer(THRESHOLD_DEFAULT),
             })
     }
-    fn lint_node(&self, node: mago_ast::Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
+    fn lint_node(&self, node: mago_syntax::ast::Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let (kind, members) = match node {
             Node::Class(class) => ("Class", class.members.as_slice()),
             Node::Trait(r#trait) => ("Trait", r#trait.members.as_slice()),

@@ -1,4 +1,3 @@
-use mago_ast::Program;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
@@ -8,6 +7,7 @@ use mago_source::Source;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
+use mago_syntax::ast::Program;
 
 #[derive(Debug)]
 pub struct Context<'a> {

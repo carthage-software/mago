@@ -1,4 +1,4 @@
-use mago_ast::*;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 

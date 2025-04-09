@@ -1,9 +1,8 @@
 #![allow(clippy::too_many_arguments)]
 
-use mago_ast::ast::*;
-use mago_ast::*;
 use mago_span::HasSpan;
-use mago_walker::Walker;
+use mago_syntax::ast::*;
+use mago_syntax::walker::Walker;
 
 use crate::internal::checker;
 use crate::internal::context::Context;

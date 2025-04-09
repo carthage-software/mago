@@ -1,6 +1,6 @@
-use mago_ast::*;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
+use mago_syntax::ast::*;
 
 use crate::internal::checker::expression::check_for_new_without_parenthesis;
 use crate::internal::context::Context;

@@ -1,10 +1,10 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::Node;
-use mago_ast::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

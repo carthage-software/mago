@@ -1,0 +1,30 @@
+[package]
+name = "mago-syntax"
+description = "A correct, fast, and memory-efficient PHP syntax implementation, including Lexer, Parser, AST, and utilities for Mago."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-syntax-core = { workspace = true }
+mago-span = { workspace = true }
+mago-interner = { workspace = true }
+mago-reporting = { workspace = true }
+mago-source = { workspace = true }
+mago-php-version = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+memchr = { workspace = true }
+either = { workspace = true }
+paste = { workspace = true }
+ordered-float = { workspace = true, features = ["serde", "rand"] }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

@@ -1,7 +1,7 @@
 use unicode_width::UnicodeWidthStr;
 
-use mago_ast::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::document::Document;
 use crate::document::Group;

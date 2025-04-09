@@ -1,10 +1,10 @@
 use indoc::indoc;
 use toml::Value;
 
-use mago_ast::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::context::LintContext;
 use crate::definition::RuleDefinition;

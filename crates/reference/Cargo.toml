@@ -15,7 +15,6 @@ workspace = true
 [dependencies]
 mago-interner = { workspace = true }
 mago-span = { workspace = true }
-mago-ast = { workspace = true }
-mago-walker = { workspace = true }
+mago-syntax = { workspace = true }
 mago-project = { workspace = true }
 serde = { workspace = true }

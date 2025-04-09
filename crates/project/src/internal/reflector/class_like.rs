@@ -1,6 +1,5 @@
 use ahash::HashMap;
 
-use mago_ast::*;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_reflection::class_like::constant::ClassLikeConstantReflection;
 use mago_reflection::class_like::enum_case::EnumCaseReflection;
@@ -11,6 +10,7 @@ use mago_reflection::class_like::property::PropertyReflection;
 use mago_reflection::function_like::FunctionLikeReflection;
 use mago_reflection::identifier::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::internal::context::Context;
 use crate::internal::reflector::attribute::reflect_attributes;
@@ -329,7 +329,7 @@ fn reflect_class_like_method<'ast>(
     let (has_yield, has_throws, is_abstract) = match &method.body {
         MethodBody::Abstract(_) => (false, false, true),
         MethodBody::Concrete(block) => {
-            (mago_ast_utils::block_has_yield(block), mago_ast_utils::block_has_throws(block), false)
+            (mago_syntax::utils::block_has_yield(block), mago_syntax::utils::block_has_throws(block), false)
         }
     };
 
@@ -481,12 +481,13 @@ fn reflect_class_like_property<'ast>(
                         let (has_yield, has_throws) = match &hook.body {
                             PropertyHookBody::Abstract(_) => (false, false),
                             PropertyHookBody::Concrete(body) => match &body {
-                                PropertyHookConcreteBody::Block(block) => {
-                                    (mago_ast_utils::block_has_yield(block), mago_ast_utils::block_has_throws(block))
-                                }
+                                PropertyHookConcreteBody::Block(block) => (
+                                    mago_syntax::utils::block_has_yield(block),
+                                    mago_syntax::utils::block_has_throws(block),
+                                ),
                                 PropertyHookConcreteBody::Expression(body) => (
-                                    mago_ast_utils::expression_has_yield(&body.expression),
-                                    mago_ast_utils::expression_has_throws(&body.expression),
+                                    mago_syntax::utils::expression_has_yield(&body.expression),
+                                    mago_syntax::utils::expression_has_throws(&body.expression),
                                 ),
                             },
                         };

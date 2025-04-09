@@ -1,0 +1,18 @@
+[package]
+name = "mago-syntax-core"
+description = "Provides core utilities useful for building lexers and parsers within Mago."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-source = { workspace = true }
+mago-span = { workspace = true }
+memchr = { workspace = true }

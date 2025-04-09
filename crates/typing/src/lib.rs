@@ -1,4 +1,3 @@
-use mago_ast::Expression;
 use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_reflection::CodebaseReflection;
@@ -6,6 +5,7 @@ use mago_reflection::r#type::TypeReflection;
 use mago_reflection::r#type::kind::TypeKind;
 use mago_source::Source;
 use mago_span::HasSpan;
+use mago_syntax::ast::Expression;
 
 use crate::resolver::TypeResolver;
 

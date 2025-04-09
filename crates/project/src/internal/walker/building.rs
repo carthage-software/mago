@@ -1,9 +1,8 @@
-use mago_ast::ast::*;
-use mago_ast::*;
 use mago_reflection::CodebaseReflection;
 use mago_reflection::class_like::ClassLikeReflection;
 use mago_span::HasSpan;
-use mago_walker::MutWalker;
+use mago_syntax::ast::*;
+use mago_syntax::walker::MutWalker;
 
 use crate::internal::checker;
 use crate::internal::context::Context;

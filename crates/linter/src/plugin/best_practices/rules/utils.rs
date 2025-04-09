@@ -1,6 +1,6 @@
-use mago_ast::*;
 use mago_interner::StringIdentifier;
-use mago_walker::Walker;
+use mago_syntax::ast::*;
+use mago_syntax::walker::Walker;
 
 use crate::context::LintContext;
 use crate::plugin::best_practices::rules::utils::internal::FunctionCallWalker;
@@ -162,9 +162,9 @@ pub fn get_foreign_variable_names(block: &Block, context: &LintContext<'_>) -> V
 mod internal {
     use super::is_predefined_variable;
 
-    use mago_ast::*;
     use mago_interner::StringIdentifier;
-    use mago_walker::Walker;
+    use mago_syntax::ast::*;
+    use mago_syntax::walker::Walker;
 
     use crate::context::LintContext;
 

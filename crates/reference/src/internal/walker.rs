@@ -1,6 +1,6 @@
-use mago_ast::*;
 use mago_span::*;
-use mago_walker::Walker;
+use mago_syntax::ast::*;
+use mago_syntax::walker::Walker;
 
 use crate::Reference;
 use crate::ReferenceKind;

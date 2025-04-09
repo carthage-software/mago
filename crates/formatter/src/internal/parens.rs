@@ -1,7 +1,7 @@
-use mago_ast::*;
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
-use mago_token::GetPrecedence;
+use mago_syntax::ast::*;
+use mago_syntax::token::GetPrecedence;
 
 use crate::document::Document;
 use crate::document::Group;

@@ -1,5 +1,5 @@
-use mago_ast::*;
-use mago_ast_utils::reference::*;
+use mago_syntax::ast::*;
+use mago_syntax::utils::reference::*;
 
 use crate::context::LintContext;
 

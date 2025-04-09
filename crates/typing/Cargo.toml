@@ -13,7 +13,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-mago-ast = { workspace = true }
+mago-syntax = { workspace = true }
 mago-reflection = { workspace = true }
 mago-source = { workspace = true }
 mago-span = { workspace = true }

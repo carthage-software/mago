@@ -1,5 +1,5 @@
-use mago_ast::*;
 use mago_span::*;
+use mago_syntax::ast::*;
 
 use crate::document::*;
 use crate::internal::FormatterState;

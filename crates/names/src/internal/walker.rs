@@ -1,6 +1,6 @@
-use mago_ast::*;
 use mago_span::HasSpan;
-use mago_walker::MutWalker;
+use mago_syntax::ast::*;
+use mago_syntax::walker::MutWalker;
 
 use crate::ResolvedNames;
 use crate::internal::context::NameResolutionContext;
