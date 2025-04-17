@@ -1820,7 +1820,6 @@ dependencies = [
 name = "mago-wasm"
 version = "0.23.0"
 dependencies = [
- "getrandom 0.2.15",
  "mago-formatter",
  "mago-interner",
  "mago-linter",

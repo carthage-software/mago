@@ -9,9 +9,6 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[package.metadata.cargo-machete]
-ignored = ["getrandom"]
-
 [lints]
 workspace = true
 
@@ -29,5 +26,4 @@ mago-linter = { workspace = true }
 mago-formatter = { workspace = true }
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-getrandom = { workspace = true }
 serde = { workspace = true }
