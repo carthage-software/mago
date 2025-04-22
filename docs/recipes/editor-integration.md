@@ -4,3 +4,4 @@ Mago can be integrated with various code editors to provide seamless code format
 
 - [VS Code](/recipes/editor-integration/vs-code.md)
 - [Zed](/recipes/editor-integration/zed.md)
+- [Helix](/recipes/editor-integration/helix.md)
