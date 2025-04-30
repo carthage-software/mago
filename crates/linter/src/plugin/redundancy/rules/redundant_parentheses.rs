@@ -139,7 +139,7 @@ impl Rule for RedundantParenthesesRule {
         let issue = Issue::new(context.level(), "Redundant parentheses around expression.")
             .with_annotation(
                 Annotation::primary(parenthesized.expression.span())
-                    .with_message("expression does not need to be parenthesized."),
+                    .with_message("Expression does not need to be parenthesized."),
             )
             .with_help("Remove the redundant inner parentheses.");
 
