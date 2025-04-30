@@ -43,11 +43,11 @@ impl Rule for NoShorthandTernary {
         let issue = match node {
             Node::BinaryOperator(BinaryOperator::Elvis(_)) => Issue::new(context.level(), "Use of the elvis operator.")
                 .with_annotation(
-                    Annotation::primary(node.span()).with_message("Ambigous check due to `?:` loose comparison."),
+                    Annotation::primary(node.span()).with_message("Ambiguous check due to `?:` loose comparison."),
                 ),
             Node::Conditional(Conditional { then: None, .. }) => {
                 Issue::new(context.level(), "Use of the shorthand ternary operator.").with_annotation(
-                    Annotation::primary(node.span()).with_message("Ambigous check due to `? :` loose comparison."),
+                    Annotation::primary(node.span()).with_message("Ambiguous check due to `? :` loose comparison."),
                 )
             }
             _ => return LintDirective::default(),

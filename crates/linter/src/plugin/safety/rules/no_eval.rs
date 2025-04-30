@@ -36,8 +36,8 @@ impl Rule for NoEvalRule {
 
         context.report(
             Issue::new(context.level(), "Unsafe use of `eval` construct.")
-                .with_annotation(Annotation::primary(eval_construct.eval.span).with_message("this `eval` construct is unsafe."))
-                .with_annotation(Annotation::secondary(eval_construct.value.span()).with_message("the evaluated code is here."))
+                .with_annotation(Annotation::primary(eval_construct.eval.span).with_message("This `eval` construct is unsafe."))
+                .with_annotation(Annotation::secondary(eval_construct.value.span()).with_message("The evaluated code is here."))
                 .with_note("The `eval` construct executes arbitrary code, which can be a major security risk if not used carefully.")
                 .with_note("It can potentially lead to remote code execution vulnerabilities if the evaluated code is not properly sanitized.")
                 .with_note("Consider using safer alternatives whenever possible.")

@@ -42,10 +42,10 @@ impl Rule for NoEmptyConstruct {
 
         let issue = Issue::new(context.level(), "Use of the `empty` construct.")
             .with_annotation(
-                Annotation::primary(construct.span()).with_message("Ambigous check due to `empty()` loose semantic."),
+                Annotation::primary(construct.span()).with_message("Ambiguous check due to `empty()` loose semantic."),
             )
             .with_note("`empty()` exhibits unexpected behavior on specific value.")
-            .with_note("It is unclear what codition is being treated with `empty()`.")
+            .with_note("It is unclear what condition is being treated with `empty()`.")
             .with_help("Use strict comparison or specific predicate function to clearly convey your intent.");
 
         context.report(issue);
