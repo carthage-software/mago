@@ -126,6 +126,10 @@ indicatif = { workspace = true }
 colored = { workspace = true }
 dialoguer = { workspace = true }
 
+[dev-dependencies]
+temp-env = "0.3.6"
+pretty_assertions = { workspace = true }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { workspace = true }
 

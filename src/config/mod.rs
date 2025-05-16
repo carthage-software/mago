@@ -64,9 +64,9 @@ impl Configuration {
     ///
     /// This function attempts to load the configuration from the following sources, in order of precedence:
     ///
-    /// 1. A TOML file specified by the `file` argument.
-    /// 2. A TOML file named `mago.toml` in the current directory.
-    /// 3. Environment variables with the prefix `MAGO_`.
+    /// 1. Environment variables with the prefix `MAGO_`.
+    /// 2. A TOML file specified by the `file` argument.
+    /// 3. A TOML file named `mago.toml` in the current directory.
     ///
     /// The loaded configuration is then normalized and validated.
     ///
@@ -224,5 +224,68 @@ impl ConfigurationEntry for Configuration {
         self.linter.normalize()?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use pretty_assertions::assert_eq;
+    use tempfile::env::temp_dir;
+
+    use super::*;
+
+    /// Test that the configuration takes default values when no overrides are provided.
+    #[test]
+    fn test_take_defaults() {
+        let config = temp_env::with_vars([("HOME", temp_dir().to_str()), ("MAGO_THREADS", None)], || {
+            Configuration::load(None, None, None, None, false).unwrap()
+        });
+
+        assert_eq!(config.threads, *LOGICAL_CPUS)
+    }
+
+    /// Test that environment variable overrides settings from all other sources.
+    #[test]
+    fn test_env_config_override_all_others() {
+        let workspace = create_tmp_file("threads = 2", &temp_dir().join("workspace-1")).parent().unwrap().to_path_buf();
+        let file = create_tmp_file("threads = 1", &temp_dir().join("file-1"));
+        let config = temp_env::with_var("MAGO_THREADS", Some("3"), || {
+            Configuration::load(Some(workspace), Some(file), None, None, false).unwrap()
+        });
+
+        assert_eq!(config.threads, 3);
+    }
+
+    /// Test using `--config` option cancels out what is set in workspace configuration
+    #[test]
+    fn test_config_cancel_workspace() {
+        let workspace = create_tmp_file("threads = 2\nphp_version = \"7.4.0\"", &temp_dir().join("workspace-2"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let file = create_tmp_file("threads = 1", &temp_dir().join("file-2"));
+        let config = temp_env::with_var_unset("MAGO_THREADS", || {
+            Configuration::load(Some(workspace), Some(file), None, None, false).unwrap()
+        });
+
+        assert_eq!(config.threads, 1);
+        assert_eq!(
+            config.php_version.to_string(),
+            DEFAULT_PHP_VERSION.to_string(),
+            "workspace PHP version should not be used, because `--config` options is set"
+        );
+    }
+
+    /// Helper function to create a temporary file with the given content.
+    ///
+    /// # Returns
+    /// The path to the created temporary file.
+    fn create_tmp_file(config_content: &str, folder: &PathBuf) -> PathBuf {
+        fs::create_dir_all(folder).unwrap();
+        let config_path = folder.join(CONFIGURATION_FILE);
+        fs::write(&config_path, config_content).unwrap();
+        config_path
     }
 }
