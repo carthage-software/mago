@@ -1,3 +1,4 @@
+use std::env::home_dir;
 use std::path::PathBuf;
 
 use config::Config;
@@ -67,6 +68,9 @@ impl Configuration {
     /// 1. Environment variables with the prefix `MAGO_`.
     /// 2. A TOML file specified by the `file` argument.
     /// 3. A TOML file named `mago.toml` in the current directory.
+    /// 4. A TOML file named `mago.toml` in the `$HOME/.config/` directory.
+    ///
+    /// When the `file` argument is set, 3 and 4 are not used at all.
     ///
     /// The loaded configuration is then normalized and validated.
     ///
@@ -90,12 +94,21 @@ impl Configuration {
     ) -> Result<Configuration, Error> {
         let workspace_dir = workspace.clone().unwrap_or_else(|| CURRENT_DIR.to_path_buf());
 
-        let builder = Config::builder()
-            .add_source(match file {
-                Some(file) => File::from(file).required(true).format(FileFormat::Toml),
-                None => File::from(workspace_dir.join(CONFIGURATION_FILE)).required(false).format(FileFormat::Toml),
-            })
-            .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX));
+        let mut builder = Config::builder();
+        if let Some(file) = file {
+            builder = builder.add_source(File::from(file).required(true).format(FileFormat::Toml));
+        } else {
+            if let Some(home_dir) = home_dir() {
+                builder = builder.add_source(
+                    File::from(home_dir.join(PathBuf::from(".config")).join(CONFIGURATION_FILE))
+                        .required(false)
+                        .format(FileFormat::Toml),
+                );
+            }
+            builder = builder
+                .add_source(File::from(workspace_dir.join(CONFIGURATION_FILE)).required(false).format(FileFormat::Toml))
+        }
+        builder = builder.add_source(Environment::with_prefix(ENVIRONMENT_PREFIX));
 
         let mut configuration = Configuration::from_workspace(workspace_dir);
 
@@ -276,6 +289,22 @@ mod tests {
             DEFAULT_PHP_VERSION.to_string(),
             "workspace PHP version should not be used, because `--config` options is set"
         );
+    }
+
+    #[test]
+    fn test_merge_workspace_override_global() {
+        let home_path = temp_dir().join("home-3");
+        let _global = create_tmp_file("threads = 3\nphp_version = \"7.4.0\"", &home_path.join(".config"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let workspace = create_tmp_file("threads = 2", &temp_dir().join("workspace-3")).parent().unwrap().to_path_buf();
+        let config = temp_env::with_var("HOME", Some(home_path), || {
+            Configuration::load(Some(workspace), None, None, None, false).unwrap()
+        });
+
+        assert_eq!(config.threads, 2);
+        assert_eq!(config.php_version.to_string(), "7.4.0".to_string());
     }
 
     /// Helper function to create a temporary file with the given content.
