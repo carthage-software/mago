@@ -165,7 +165,34 @@ fn should_add_empty_line_before<'a>(f: &FormatterState<'a>, stmt: &'a Statement)
                 return false;
             }
 
-            f.has_newline(stmt.span().start.offset, /* backwards */ true)
+            // Check if this return statement is likely the only statement in a method/function
+            // by checking if it's the first non-whitespace content after the opening brace
+            let start_offset = stmt.span().start.offset;
+            let line_start = f.source.line_number(start_offset);
+
+            if let Some(line_start_offset) = f.source.get_line_start_offset(line_start) {
+                // Check if there's only whitespace between the line start and the return statement
+                let prefix = &f.source_text[line_start_offset..start_offset];
+                if prefix.trim().is_empty() {
+                    // This return statement is at the beginning of a line
+                    // Now check if the previous non-whitespace character is a brace
+                    let mut idx = line_start_offset;
+                    while idx > 0 {
+                        idx -= 1;
+                        let c = f.source_text.as_bytes()[idx] as char;
+                        if !c.is_whitespace() {
+                            // If the previous non-whitespace character is an opening brace,
+                            // this is likely the first statement in a block
+                            if c == '{' {
+                                return false;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            f.has_newline(start_offset, /* backwards */ true)
         }
         _ => false,
     }
