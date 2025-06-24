@@ -1,7 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\Pure;
-
 class Gmagick
 {
     public const COLOR_BLACK = 0;
@@ -717,8 +715,9 @@ class Gmagick
      * @return string Returns a string containing the copyright notice of GraphicsMagick and Magickwand C API.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getcopyright()
     {
     }
@@ -731,8 +730,9 @@ class Gmagick
      * @return string Returns a string on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfilename()
     {
     }
@@ -745,8 +745,9 @@ class Gmagick
      * @return GmagickPixel Returns a GmagickPixel set to the background color of the image.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagebackgroundcolor()
     {
     }
@@ -759,8 +760,9 @@ class Gmagick
      * @return array Array consisting of "x" and "y" coordinates of point.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageblueprimary()
     {
     }
@@ -773,8 +775,9 @@ class Gmagick
      * @return GmagickPixel GmagickPixel object representing the color of the border.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagebordercolor()
     {
     }
@@ -789,8 +792,9 @@ class Gmagick
      * @return int Depth of image channel.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagechanneldepth($channel_type)
     {
     }
@@ -803,8 +807,9 @@ class Gmagick
      * @return int The number of colors in image.
      *
      * @throws GmagickException On error
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagecolors()
     {
     }
@@ -817,8 +822,9 @@ class Gmagick
      * @return int Colorspace
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagecolorspace()
     {
     }
@@ -831,8 +837,9 @@ class Gmagick
      * @return int Returns the composite operator associated with the image.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagecompose()
     {
     }
@@ -845,8 +852,9 @@ class Gmagick
      * @return int Returns the composite operator associated with the image.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagedelay()
     {
     }
@@ -859,8 +867,9 @@ class Gmagick
      * @return int Image depth.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagedepth()
     {
     }
@@ -873,8 +882,9 @@ class Gmagick
      * @return int Returns the dispose method on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagedispose()
     {
     }
@@ -887,8 +897,9 @@ class Gmagick
      * @return array Returns an associative array with the keys "min" and "max".
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageextrema()
     {
     }
@@ -901,8 +912,9 @@ class Gmagick
      * @return string Returns a string with the filename of the image
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagefilename()
     {
     }
@@ -915,8 +927,9 @@ class Gmagick
      * @return string Returns a string containing the image format on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageformat()
     {
     }
@@ -929,8 +942,9 @@ class Gmagick
      * @return float Returns the image gamma on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagegamma()
     {
     }
@@ -943,8 +957,9 @@ class Gmagick
      * @return array Returns an array with the keys "x" and "y" on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagegreenprimary()
     {
     }
@@ -957,8 +972,9 @@ class Gmagick
      * @return int Returns the image height in pixels.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageheight()
     {
     }
@@ -971,8 +987,9 @@ class Gmagick
      * @return array Returns the image histogram as an array of GmagickPixel objects.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagehistogram()
     {
     }
@@ -985,8 +1002,9 @@ class Gmagick
      * @return int Index of current active image.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageindex()
     {
     }
@@ -999,8 +1017,9 @@ class Gmagick
      * @return int Returns the interlace scheme as an integer on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageinterlacescheme()
     {
     }
@@ -1013,8 +1032,9 @@ class Gmagick
      * @return int Returns the image iterations as an integer.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageiterations()
     {
     }
@@ -1027,8 +1047,9 @@ class Gmagick
      * @return bool Returns TRUE if the image has a matte channel, otherwise FALSE.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagematte()
     {
     }
@@ -1041,8 +1062,9 @@ class Gmagick
      * @return GmagickPixel Returns GmagickPixel object on success.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagemattecolor()
     {
     }
@@ -1057,8 +1079,9 @@ class Gmagick
      * @return string Returns a string containing the image profile.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageprofile($name)
     {
     }
@@ -1071,8 +1094,9 @@ class Gmagick
      * @return array Returns the chromaticity red primary point as an array with the keys "x" and "y".
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageredprimary()
     {
     }
@@ -1085,8 +1109,9 @@ class Gmagick
      * @return int Extracts a region of the image and returns it as a a new wand.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagerenderingintent()
     {
     }
@@ -1099,8 +1124,9 @@ class Gmagick
      * @return array Returns the resolution as an array.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageresolution()
     {
     }
@@ -1113,8 +1139,9 @@ class Gmagick
      * @return int Returns the image scene.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagescene()
     {
     }
@@ -1127,8 +1154,9 @@ class Gmagick
      * @return string Returns a string containing the SHA-256 hash of the file.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagesignature()
     {
     }
@@ -1141,8 +1169,9 @@ class Gmagick
      * @return int Returns the potential image type.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagetype()
     {
     }
@@ -1153,8 +1182,9 @@ class Gmagick
      * @link https://php.net/manual/en/gmagick.getimageunits.php
      *
      * @return int Returns the image units of resolution.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimageunits()
     {
     }
@@ -1167,8 +1197,9 @@ class Gmagick
      * @return array Returns the chromaticity white point as an associative array with the keys "x" and "y".
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagewhitepoint()
     {
     }
@@ -1181,8 +1212,9 @@ class Gmagick
      * @return int Returns the image width.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getimagewidth()
     {
     }
@@ -1195,8 +1227,9 @@ class Gmagick
      * @return string Returns the GraphicsMagick package name as a string.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getpackagename()
     {
     }
@@ -1209,8 +1242,9 @@ class Gmagick
      * @return array Returns the Gmagick quantum depth.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getquantumdepth()
     {
     }
@@ -1223,8 +1257,9 @@ class Gmagick
      * @return string Returns the GraphicsMagick release date as a string.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getreleasedate()
     {
     }
@@ -1237,8 +1272,9 @@ class Gmagick
      * @return array Returns an associative array with the horizontal and vertical sampling factors of the image.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getsamplingfactors()
     {
     }
@@ -1251,8 +1287,9 @@ class Gmagick
      * @return array Returns the size associated with the Gmagick object as an array with the keys "columns" and "rows".
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getsize()
     {
     }
@@ -1265,8 +1302,9 @@ class Gmagick
      * @return array Returns the GraphicsMagick API version as a string and as a number.
      *
      * @throws GmagickException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getversion()
     {
     }
@@ -2608,8 +2646,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfillcolor.php
      *
      * @return GmagickPixel The GmagickPixel fill color used for drawing filled objects.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfillcolor()
     {
     }
@@ -2620,8 +2659,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfillopacity.php
      *
      * @return float The opacity used when drawing using the fill color or fill texture. Fully opaque is 1.0.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfillopacity()
     {
     }
@@ -2632,8 +2672,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfont.php
      *
      * @return string|false A string on success and false if no font is set.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfont()
     {
     }
@@ -2644,8 +2685,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfontsize.php
      *
      * @return float The font size associated with the current GmagickDraw object.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfontsize()
     {
     }
@@ -2656,8 +2698,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfontstyle.php
      *
      * @return int The font style constant (STYLE_) associated with the GmagickDraw object or 0 if no style is set.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfontstyle()
     {
     }
@@ -2668,8 +2711,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getfontweight.php
      *
      * @return int An int on success and 0 if no weight is set.
+     *
+     * @pure
      */
-    #[Pure]
     public function getfontweight()
     {
     }
@@ -2680,8 +2724,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getstrokecolor.php
      *
      * @return GmagickPixel Returns an GmagickPixel object which describes the color.
+     *
+     * @pure
      */
-    #[Pure]
     public function getstrokecolor()
     {
     }
@@ -2692,8 +2737,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getstrokeopacity.php
      *
      * @return float Returns a float describing the opacity.
+     *
+     * @pure
      */
-    #[Pure]
     public function getstrokeopacity()
     {
     }
@@ -2704,8 +2750,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.getstrokewidth.php
      *
      * @return float Returns a float describing the stroke width.
+     *
+     * @pure
      */
-    #[Pure]
     public function getstrokewidth()
     {
     }
@@ -2716,8 +2763,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.gettextdecoration.php
      *
      * @return int Returns one of the DECORATION_ constants and 0 if no decoration is set.
+     *
+     * @pure
      */
-    #[Pure]
     public function gettextdecoration()
     {
     }
@@ -2728,8 +2776,9 @@ class GmagickDraw
      * @link https://php.net/manual/en/gmagickdraw.gettextencoding.php
      *
      * @return string|false Returns a string specifying the code set or false if text encoding is not set.
+     *
+     * @pure
      */
-    #[Pure]
     public function gettextencoding()
     {
     }
@@ -3035,8 +3084,9 @@ class GmagickPixel
      * @return mixed A string or array of channel values, each normalized if TRUE is given as param.
      *
      * @throws GmagickPixelException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getcolor($as_array = null, $normalize_array = null)
     {
     }
@@ -3049,8 +3099,9 @@ class GmagickPixel
      * @return int The color count as an integer.
      *
      * @throws GmagickPixelException On failure.
+     *
+     * @pure
      */
-    #[Pure]
     public function getcolorcount()
     {
     }
@@ -3065,8 +3116,9 @@ class GmagickPixel
      * @return float The value of the color channel specified, as a floating-point number between 0 and 1.
      *
      * @throws GmagickPixelException On error.
+     *
+     * @pure
      */
-    #[Pure]
     public function getcolorvalue($color)
     {
     }

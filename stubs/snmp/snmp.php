@@ -1,77 +1,47 @@
 <?php
 
-// Start of snmp v.0.1
-
-/**
- * Represents SNMP session.
- * @link https://php.net/manual/en/class.snmp.php
- */
 class SNMP
 {
     /**
-     * @var int Maximum OID per GET/SET/GETBULK request
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.max-oids
+     * @var int
      */
     public $max_oids;
 
     /**
-     * @var int Controls the method how the SNMP values will be returned
-     * <dl>
-     * <dt>SNMP_VALUE_LIBRARY</dt><dd>The return values will be as returned by the Net-SNMP library.</dd>
-     * <dt>SNMP_VALUE_PLAIN</dt><dd>The return values will be the plain value without the SNMP type hint.</dd>
-     * <dt>SNMP_VALUE_OBJECT</dt><dd>The return values will be objects with the properties "value" and "type", where the latter is one of the SNMP_OCTET_STR, SNMP_COUNTER etc. constants. The way "value" is returned is based on which one of SNMP_VALUE_LIBRARY, SNMP_VALUE_PLAIN is set</dd>
-     * <dl>
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.max-oids
+     * @var int
      */
     public $valueretrieval;
 
     /**
-     * @var bool Value of quick_print within the NET-SNMP library
-     * <p>Sets the value of quick_print within the NET-SNMP library. When this is set (1), the SNMP library will return 'quick printed' values. This means that just the value will be printed. When quick_print is not enabled (default) the UCD SNMP library prints extra information including the type of the value (i.e. IpAddress or OID). Additionally, if quick_print is not enabled, the library prints additional hex values for all strings of three characters or less.
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.quick-print
+     * @var bool
      */
     public $quick_print;
 
     /**
-     * @var bool Controls the way enum values are printed
-     * <p>Parameter toggles if walk/get etc. should automatically lookup enum values in the MIB and return them together with their human readable string.
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.enum-print
+     * @var bool
      */
     public $enum_print;
 
     /**
-     * @var int Controls OID output format
-     * <p>OID .1.3.6.1.2.1.1.3.0 representation for various oid_output_format values
-     * <dl>
-     * <dt>SNMP_OID_OUTPUT_FULL</dt><dd>.iso.org.dod.internet.mgmt.mib-2.system.sysUpTime.sysUpTimeInstance</dd>
-     * <dt>SNMP_OID_OUTPUT_NUMERIC</dt><dd>.1.3.6.1.2.1.1.3.0</dd>
-     * <dt>SNMP_OID_OUTPUT_MODULE</dt><dd>DISMAN-EVENT-MIB::sysUpTimeInstance</dd>
-     * <dt>SNMP_OID_OUTPUT_SUFFIX</dt><dd>sysUpTimeInstance</dd>
-     * <dt>SNMP_OID_OUTPUT_UCD</dt><dd>system.sysUpTime.sysUpTimeInstance</dd>
-     * <dt>SNMP_OID_OUTPUT_NONE</dt><dd>Undefined</dd>
-     * </dl>
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.oid-output-format
+     * @var int
      */
     public $oid_output_format;
 
     /**
-     * @var bool Controls disabling check for increasing OID while walking OID tree
-     * <p> Some SNMP agents are known for returning OIDs out of order but can complete the walk anyway. Other agents return OIDs that are out of order and can cause SNMP::walk() to loop indefinitely until memory limit will be reached. PHP SNMP library by default performs OID increasing check and stops walking on OID tree when it detects possible loop with issuing warning about non-increasing OID faced. Set oid_increasing_check to <b>FALSE</b> to disable this check.
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.oid-increasing-check
+     * @var bool
      */
     public $oid_increasing_check;
 
     /**
-     * @var int Controls which failures will raise SNMPException instead of warning. Use bitwise OR'ed SNMP::ERRNO_* constants. By default all SNMP exceptions are disabled.
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.exceptions-enabled
+     * @var int
      */
     public $exceptions_enabled;
 
     /**
-     * @var array Read-only property with remote agent configuration: hostname, port, default timeout, default retries count
-     * @link https://secure.php.net/manual/en/class.snmp.php#snmp.props.info
+     * @var array
      */
     public $info;
+
     public const VERSION_1 = 0;
     public const VERSION_2c = 1;
     public const VERSION_2C = 1;
@@ -119,9 +89,8 @@ class SNMP
      * <tr><td>SNMP::VERSION_3</td><td><acronym title="Simple Network Management Protocol">SNMP</acronym>v3 securityName</td></tr>
      * </tbody>
      * </table>
-     * @param int $timeout [optional] The number of microseconds until the first timeout.
-     * @param int $retries [optional] The number of retries in case timeout occurs.
-     * @since 5.4
+     * @param int $timeout
+     * @param int $retries
      */
     public function __construct($version, $hostname, $community, $timeout = 1000000, $retries = 5) {}
 

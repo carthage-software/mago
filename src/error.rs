@@ -1,5 +1,6 @@
 use dialoguer::Error as DialoguerError;
 
+use mago_analyzer::error::AnalysisError;
 use mago_php_version::PHPVersion;
 use mago_php_version::error::ParsingError;
 use mago_reporting::error::ReportingError;
@@ -25,6 +26,7 @@ pub enum Error {
     WritingConfiguration(std::io::Error),
     ReadingComposerJson(std::io::Error),
     ParsingComposerJson(serde_json::Error),
+    AnalysisError(AnalysisError),
 }
 
 impl std::fmt::Display for Error {
@@ -54,6 +56,7 @@ impl std::fmt::Display for Error {
             Self::WritingConfiguration(error) => write!(f, "Failed to write the configuration file: {error}"),
             Self::ReadingComposerJson(error) => write!(f, "Failed to read the `composer.json` file: {error}"),
             Self::ParsingComposerJson(error) => write!(f, "Failed to parse the `composer.json` file: {error}"),
+            Self::AnalysisError(error) => write!(f, "Failed to analyze the source code: {error}"),
         }
     }
 }
@@ -139,5 +142,11 @@ impl From<self_update::errors::Error> for Error {
 impl From<DialoguerError> for Error {
     fn from(error: DialoguerError) -> Self {
         Self::Dialoguer(error)
+    }
+}
+
+impl From<AnalysisError> for Error {
+    fn from(error: AnalysisError) -> Self {
+        Self::AnalysisError(error)
     }
 }

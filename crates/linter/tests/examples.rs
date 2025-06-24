@@ -1,14 +1,17 @@
+use mago_codex::populator::populate_codebase;
+use mago_codex::reference::SymbolReferences;
+use mago_codex::scanner::scan_program;
 use mago_interner::ThreadedInterner;
 use mago_linter::Linter;
 use mago_linter::definition::RuleUsageExample;
 use mago_linter::rule::Rule;
 use mago_linter::settings::RuleSettings;
 use mago_linter::settings::Settings;
+use mago_names::resolver::NameResolver;
 use mago_php_version::PHPVersion;
-use mago_project::Project;
-use mago_project::module::Module;
 use mago_reporting::Level;
 use mago_source::Source;
+use mago_syntax::parser::parse_source;
 
 pub mod plugins;
 
@@ -50,23 +53,19 @@ pub fn test_rule_usage_example(rule: Box<dyn Rule>, usage_example: &RuleUsageExa
 
     let settings = Settings::new(php_version).with_rule(format!("test/{}", definition.get_slug()), rule_settings);
 
-    let Project { modules, reflection } = {
-        let mut builder = Project::builder(interner.clone());
-        builder.add_module(Module::build(&interner, php_version, source, Default::default()));
+    let (program, parse_error) = parse_source(&interner, &source);
+    assert!(parse_error.is_none(), "Failed to parse source: {parse_error:?}");
 
-        builder.build(true)
-    };
+    let resolved_names = NameResolver::new(&interner).resolve(&program);
+    let mut codebase = scan_program(&interner, &source, &program, &resolved_names);
 
-    let mut linter = Linter::new(settings, interner.clone(), reflection);
+    populate_codebase(&mut codebase, &interner, &mut SymbolReferences::new(), Default::default(), Default::default());
+
+    let mut linter = Linter::new(settings, interner.clone(), codebase);
 
     linter.add_rule("test", rule);
 
-    let mut issues = Vec::new();
-    for module in modules {
-        assert!(module.parse_error.is_none(), "Failed to parse module: {:?}", module.parse_error);
-
-        issues.extend(linter.lint(&module));
-    }
+    let issues = linter.lint(&source, &program, &resolved_names);
 
     if usage_example.valid {
         assert!(

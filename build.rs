@@ -6,6 +6,8 @@ use std::path::Path;
 
 pub fn main() -> io::Result<()> {
     println!("cargo:rustc-env=TARGET={}", std::env::var("TARGET").unwrap());
+    println!("cargo:rerun-if-changed=stubs");
+
     // Determine the stubs directory and output path
     let stubs_dir = Path::new("stubs");
 
@@ -19,6 +21,8 @@ pub fn main() -> io::Result<()> {
 
     // Collect all PHP stub files
     let mut stubs_map = Vec::new();
+    stubs_map.push(("mago-internal".to_string(), "./../../../../../composer/functions.php".to_string()));
+
     collect_files(stubs_dir, stubs_dir, &mut stubs_map)?;
 
     // Prepare the map content

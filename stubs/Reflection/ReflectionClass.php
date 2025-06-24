@@ -9,64 +9,32 @@ use JetBrains\PhpStorm\Pure;
 
 /**
  * @template T of object
- * The <b>ReflectionClass</b> class reports information about a class.
- *
- * @link https://php.net/manual/en/class.reflectionclass.php
  */
 class ReflectionClass implements Reflector
 {
     /**
-     * @var class-string<T> Name of the class, same as calling the {@see ReflectionClass::getName()} method
+     * @var class-string<T>
      */
-    #[Immutable]
-    #[LanguageLevelTypeAware(['8.1' => 'string'], default: '')]
-    public $name;
+    public string $name;
 
-    /**
-     * Indicates class that is abstract because it has some abstract methods.
-     *
-     * @link https://www.php.net/manual/en/class.reflectionclass.php#reflectionclass.constants.is-implicit-abstract
-     */
     public const IS_IMPLICIT_ABSTRACT = 16;
 
-    /**
-     * Indicates class that is abstract because of its definition.
-     *
-     * @link https://www.php.net/manual/en/class.reflectionclass.php#reflectionclass.constants.is-explicit-abstract
-     */
     public const IS_EXPLICIT_ABSTRACT = 64;
 
-    /**
-     * Indicates final class.
-     *
-     * @link https://www.php.net/manual/en/class.reflectionclass.php#reflectionclass.constants.is-final
-     */
     public const IS_FINAL = 32;
 
-    /**
-     * @since 8.2
-     */
     public const IS_READONLY = 65536;
 
-    /**
-     * @since 8.4
-     */
     public const int SKIP_INITIALIZATION_ON_SERIALIZE = 0;
 
-    /**
-     * @since 8.4
-     */
     public const int SKIP_DESTRUCTOR = 0;
 
     /**
-     * Constructs a ReflectionClass
+     * @param class-string<T>|T $objectOrClass
      *
-     * @link https://php.net/manual/en/reflectionclass.construct.php
-     * @param class-string<T>|T $objectOrClass Either a string containing the name of
-     * the class to reflect, or an object.
-     * @throws ReflectionException if the class does not exist.
+     * @throws ReflectionException
      */
-    public function __construct(#[LanguageLevelTypeAware(['8.0' => 'object|string'], default: '')]  $objectOrClass) {}
+    public function __construct(object|string $objectOrClass) {}
 
     /**
      * Returns the string representation of the ReflectionClass object.
@@ -74,7 +42,6 @@ class ReflectionClass implements Reflector
      * @link https://php.net/manual/en/reflectionclass.tostring.php
      * @return string A string representation of this {@see ReflectionClass} instance.
      */
-    #[TentativeType]
     public function __toString(): string
     {
     }
@@ -86,7 +53,6 @@ class ReflectionClass implements Reflector
      * @return string The class name.
      */
     #[Pure]
-    #[TentativeType]
     public function getName(): string
     {
     }
@@ -98,7 +64,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isInternal(): bool
     {
     }
@@ -110,7 +75,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isUserDefined(): bool
     {
     }
@@ -122,7 +86,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isInstantiable(): bool
     {
     }
@@ -135,7 +98,6 @@ class ReflectionClass implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function isCloneable(): bool
     {
     }
@@ -149,7 +111,6 @@ class ReflectionClass implements Reflector
      * is returned.
      */
     #[Pure]
-    #[TentativeType]
     public function getFileName(): string|false
     {
     }
@@ -161,7 +122,6 @@ class ReflectionClass implements Reflector
      * @return int The starting line number, as an integer.
      */
     #[Pure]
-    #[TentativeType]
     public function getStartLine(): int|false
     {
     }
@@ -174,7 +134,6 @@ class ReflectionClass implements Reflector
      * {@see false} if unknown.
      */
     #[Pure]
-    #[TentativeType]
     public function getEndLine(): int|false
     {
     }
@@ -186,7 +145,6 @@ class ReflectionClass implements Reflector
      * @return string|false The doc comment if it exists, otherwise {@see false}
      */
     #[Pure]
-    #[TentativeType]
     public function getDocComment(): string|false
     {
     }
@@ -199,7 +157,6 @@ class ReflectionClass implements Reflector
      * the class' constructor, or {@see null} if the class has no constructor.
      */
     #[Pure]
-    #[TentativeType]
     public function getConstructor(): null|ReflectionMethod
     {
     }
@@ -211,8 +168,7 @@ class ReflectionClass implements Reflector
      * @param string $name Name of the method being checked for.
      * @return bool Returns {@see true} if it has the method, otherwise {@see false}
      */
-    #[TentativeType]
-    public function hasMethod(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): bool
+    public function hasMethod(string $name): bool
     {
     }
 
@@ -225,8 +181,7 @@ class ReflectionClass implements Reflector
      * @throws ReflectionException if the method does not exist.
      */
     #[Pure]
-    #[TentativeType]
-    public function getMethod(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): ReflectionMethod
+    public function getMethod(string $name): ReflectionMethod
     {
     }
 
@@ -240,7 +195,6 @@ class ReflectionClass implements Reflector
      * reflecting each method.
      */
     #[Pure]
-    #[TentativeType]
     public function getMethods(#[LanguageLevelTypeAware(['8.0' => 'int|null'], default: '')]  $filter = null): array
     {
     }
@@ -252,8 +206,7 @@ class ReflectionClass implements Reflector
      * @param string $name Name of the property being checked for.
      * @return bool Returns {@see true} if it has the property, otherwise {@see false}
      */
-    #[TentativeType]
-    public function hasProperty(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): bool
+    public function hasProperty(string $name): bool
     {
     }
 
@@ -266,8 +219,7 @@ class ReflectionClass implements Reflector
      * @throws ReflectionException If no property exists by that name.
      */
     #[Pure]
-    #[TentativeType]
-    public function getProperty(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): ReflectionProperty
+    public function getProperty(string $name): ReflectionProperty
     {
     }
 
@@ -281,7 +233,6 @@ class ReflectionClass implements Reflector
      * @return ReflectionProperty[]
      */
     #[Pure]
-    #[TentativeType]
     public function getProperties(#[LanguageLevelTypeAware(['8.0' => 'int|null'], default: '')]  $filter = null): array
     {
     }
@@ -295,7 +246,6 @@ class ReflectionClass implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getReflectionConstant(string $name): ReflectionClassConstant|false
     {
     }
@@ -309,7 +259,6 @@ class ReflectionClass implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getReflectionConstants(#[PhpStormStubsElementAvailable(from: '8.0')] null|int $filter = null): array
     {
     }
@@ -321,8 +270,7 @@ class ReflectionClass implements Reflector
      * @param string $name The name of the constant being checked for.
      * @return bool Returns {@see true} if the constant is defined, otherwise {@see false}
      */
-    #[TentativeType]
-    public function hasConstant(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): bool
+    public function hasConstant(string $name): bool
     {
     }
 
@@ -335,7 +283,6 @@ class ReflectionClass implements Reflector
      * the values the value of the constants.
      */
     #[Pure]
-    #[TentativeType]
     public function getConstants(#[PhpStormStubsElementAvailable(from: '8.0')] null|int $filter = null): array
     {
     }
@@ -349,8 +296,7 @@ class ReflectionClass implements Reflector
      * Returns {@see false} if the constant was not found in the class.
      */
     #[Pure]
-    #[TentativeType]
-    public function getConstant(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name): mixed
+    public function getConstant(string $name): mixed
     {
     }
 
@@ -362,7 +308,6 @@ class ReflectionClass implements Reflector
      * names and the array values as {@see ReflectionClass} objects.
      */
     #[Pure]
-    #[TentativeType]
     public function getInterfaces(): array
     {
     }
@@ -374,7 +319,6 @@ class ReflectionClass implements Reflector
      * @return string[] A numerical array with interface names as the values.
      */
     #[Pure]
-    #[TentativeType]
     public function getInterfaceNames(): array
     {
     }
@@ -387,7 +331,6 @@ class ReflectionClass implements Reflector
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
     public function isAnonymous(): bool
     {
     }
@@ -399,7 +342,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isInterface(): bool
     {
     }
@@ -413,7 +355,6 @@ class ReflectionClass implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function getTraits(): array
     {
     }
@@ -427,7 +368,6 @@ class ReflectionClass implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function getTraitNames(): array
     {
     }
@@ -442,7 +382,6 @@ class ReflectionClass implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function getTraitAliases(): array
     {
     }
@@ -456,7 +395,6 @@ class ReflectionClass implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function isTrait(): bool
     {
     }
@@ -468,7 +406,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isAbstract(): bool
     {
     }
@@ -480,7 +417,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isFinal(): bool
     {
     }
@@ -501,7 +437,6 @@ class ReflectionClass implements Reflector
      * @return int bitmask of modifier constants.
      */
     #[Pure]
-    #[TentativeType]
     public function getModifiers(): int
     {
     }
@@ -514,7 +449,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isInstance(#[LanguageLevelTypeAware(['8.0' => 'object'], default: '')]  $object): bool
     {
     }
@@ -544,7 +478,6 @@ class ReflectionClass implements Reflector
      * onwards, this exception is limited only to internal classes that are final.
      * @since 5.4
      */
-    #[TentativeType]
     public function newInstanceWithoutConstructor(): object
     {
     }
@@ -560,7 +493,6 @@ class ReflectionClass implements Reflector
      * one or more parameters.
      * @since 5.1.3
      */
-    #[TentativeType]
     public function newInstanceArgs(array $args = []): null|object
     {
     }
@@ -573,7 +505,6 @@ class ReflectionClass implements Reflector
      * if there's no parent.
      */
     #[Pure]
-    #[TentativeType]
     public function getParentClass(): ReflectionClass|false
     {
     }
@@ -587,7 +518,6 @@ class ReflectionClass implements Reflector
      * @return bool {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isSubclassOf(
         #[LanguageLevelTypeAware(['8.0' => 'ReflectionClass|string'], default: '')]  $class,
     ): bool {
@@ -601,7 +531,6 @@ class ReflectionClass implements Reflector
      * the name and the values the value of the properties.
      */
     #[Pure]
-    #[TentativeType]
     #[LanguageLevelTypeAware(['8.3' => 'array'], default: 'array|null')]
     public function getStaticProperties()
     {
@@ -618,11 +547,8 @@ class ReflectionClass implements Reflector
      * @return mixed The value of the static property.
      */
     #[Pure]
-    #[TentativeType]
-    public function getStaticPropertyValue(
-        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')]  $default,
-    ): mixed {
+    public function getStaticPropertyValue(string $name, mixed $default): mixed
+    {
     }
 
     /**
@@ -633,11 +559,8 @@ class ReflectionClass implements Reflector
      * @param mixed $value New property value.
      * @return void No value is returned.
      */
-    #[TentativeType]
-    public function setStaticPropertyValue(
-        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')]  $value,
-    ): void {
+    public function setStaticPropertyValue(string $name, mixed $value): void
+    {
     }
 
     /**
@@ -651,7 +574,6 @@ class ReflectionClass implements Reflector
      * not take visibility modifiers into account.
      */
     #[Pure]
-    #[TentativeType]
     public function getDefaultProperties(): array
     {
     }
@@ -663,7 +585,6 @@ class ReflectionClass implements Reflector
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
     #[Pure]
-    #[TentativeType]
     public function isIterateable(): bool
     {
     }
@@ -676,7 +597,6 @@ class ReflectionClass implements Reflector
      * @since 7.2
      */
     #[Pure]
-    #[TentativeType]
     public function isIterable(): bool
     {
     }
@@ -688,7 +608,6 @@ class ReflectionClass implements Reflector
      * @param string $interface The interface name.
      * @return bool Returns {@see true} on success or {@see false} on failure.
      */
-    #[TentativeType]
     public function implementsInterface(
         #[LanguageLevelTypeAware(['8.0' => 'ReflectionClass|string'], default: '')]  $interface,
     ): bool {
@@ -702,7 +621,6 @@ class ReflectionClass implements Reflector
      * the extension which defined the class, or {@see null} for user-defined classes.
      */
     #[Pure]
-    #[TentativeType]
     public function getExtension(): null|ReflectionExtension
     {
     }
@@ -715,7 +633,6 @@ class ReflectionClass implements Reflector
      * or {@see false} for user-defined classes.
      */
     #[Pure]
-    #[TentativeType]
     public function getExtensionName(): string|false
     {
     }
@@ -726,7 +643,6 @@ class ReflectionClass implements Reflector
      * @link https://php.net/manual/en/reflectionclass.innamespace.php
      * @return bool {@see true} on success or {@see false} on failure.
      */
-    #[TentativeType]
     public function inNamespace(): bool
     {
     }
@@ -738,7 +654,6 @@ class ReflectionClass implements Reflector
      * @return string The namespace name.
      */
     #[Pure]
-    #[TentativeType]
     public function getNamespaceName(): string
     {
     }
@@ -750,7 +665,6 @@ class ReflectionClass implements Reflector
      * @return string The class short name.
      */
     #[Pure]
-    #[TentativeType]
     public function getShortName(): string
     {
     }
@@ -797,9 +711,6 @@ class ReflectionClass implements Reflector
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function newLazyGhost(callable $initializer, int $options = 0): object
     {
     }
@@ -812,44 +723,26 @@ class ReflectionClass implements Reflector
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function resetAsLazyGhost(object $object, callable $initializer, int $options = 0): void
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function resetAsLazyProxy(object $object, callable $factory, int $options = 0): void
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function initializeLazyObject(object $object): object
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function isUninitializedLazyObject(object $object): bool
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function markLazyObjectAsInitialized(object $object): object
     {
     }
 
-    /**
-     * @since 8.4
-     */
     public function getLazyInitializer(object $object): null|callable
     {
     }

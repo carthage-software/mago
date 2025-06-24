@@ -336,30 +336,7 @@ function stream_socket_shutdown($stream, int $mode): bool
 }
 
 /**
- * Creates a pair of connected, indistinguishable socket streams
- * @link https://php.net/manual/en/function.stream-socket-pair.php
- * @param int $domain <p>
- * The protocol family to be used: STREAM_PF_INET,
- * STREAM_PF_INET6 or
- * STREAM_PF_UNIX
- * </p>
- * @param int $type <p>
- * The type of communication to be used:
- * STREAM_SOCK_DGRAM,
- * STREAM_SOCK_RAW,
- * STREAM_SOCK_RDM,
- * STREAM_SOCK_SEQPACKET or
- * STREAM_SOCK_STREAM
- * </p>
- * @param int $protocol <p>
- * The protocol to be used: STREAM_IPPROTO_ICMP,
- * STREAM_IPPROTO_IP,
- * STREAM_IPPROTO_RAW,
- * STREAM_IPPROTO_TCP or
- * STREAM_IPPROTO_UDP
- * </p>
- * @return array|false an array with the two socket resources on success, or
- * false on failure.
+ * @return list{resource, resource}|false
  */
 function stream_socket_pair(int $domain, int $type, int $protocol): array|false
 {

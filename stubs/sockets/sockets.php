@@ -1,76 +1,38 @@
 <?php
 
-// Start of sockets v.
-use JetBrains\PhpStorm\ArrayShape;
-use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
+/**
+ * @return AddressInfo[]|false
+ */
+function socket_addrinfo_lookup(string $host, null|string $service, array $hints = []): array|false
+{
+}
+
+function socket_addrinfo_connect(AddressInfo $address): Socket|false
+{
+}
+
+function socket_addrinfo_bind(AddressInfo $address): Socket|false
+{
+}
 
 /**
- * (PHP 7 &gt;= 7.2.0)<br/>
- * Get array with contents of getaddrinfo about the given hostname.
- * @link https://www.php.net/manual/en/function.socket-addrinfo-lookup.php
- * @param string $host <p>
- * Hostname to search.
- * </p>
- * @param string $service [optional] <p>
- * The service to connect to. If service is a name, it is translated to the corresponding port number.
- * </p>
- * @param array $hints <p>
- * Hints provide criteria for selecting addresses returned. You may specify the hints as defined by getadrinfo.
- * </p>
- * @return AddressInfo[]|false of AddrInfo resource handles that can be used with the other socket_addrinfo functions.
- * @since 7.2
+ * @return array{
+ *   'ai_flags': int,
+ *   'ai_family': int,
+ *   'ai_socktype': int,
+ *   'ai_protocol': int,
+ *   'ai_canonname': string,
+ *   'ai_addr': array{
+ *       'sin_port': int,
+ *       'sin_addr': string,
+ *       'sin6_port': int,
+ *       'sin6_addr': string,
+ *   },
+ * }
  */
-function socket_addrinfo_lookup(string $host, ?string $service, array $hints = []): array|false {}
-
-/**
- * Create a Socket resource, and connect it to the provided AddrInfo resource.<br/>
- * The return value of this function may be used with the rest of the socket functions.
- * @link https://www.php.net/manual/en/function.socket-addrinfo-connect.php
- * @param resource|AddressInfo $address <p>
- * Resource created from {@see socket_addrinfo_lookup()}
- * </p>
- * @return resource|Socket|null|false Socket resource on success or NULL on failure.
- * @since 7.2
- */
-function socket_addrinfo_connect(AddressInfo $address): Socket|false {}
-
-/**
- * (PHP 7 &gt;= 7.2.0)<br/>
- * Create a Socket resource, and bind it to the provided AddrInfo resource.<br/>
- * The return value of this function may be used with {@see socket_listen()}.
- * @link https://www.php.net/manual/en/function.socket-addrinfo-bind.php
- * @param resource|AddressInfo $address <p>
- * Resource created from {@see socket_addrinfo_lookup()}
- * </p>
- * @return resource|Socket|null|false Socket resource on success or NULL on failure.
- * @since 7.2
- */
-function socket_addrinfo_bind(AddressInfo $address): Socket|false {}
-
-/**
- * (PHP 7 &gt;= 7.2.0)<br/>
- * Get information about addrinfo
- * @link https://www.php.net/manual/en/function.socket-addrinfo-explain.php
- * @param resource|AddressInfo $address <p>
- * Resource created from {@see socket_addrinfo_lookup()}
- * </p>
- * @return array containing the fields in the addrinfo structure.
- * @since 7.2
- */
-#[ArrayShape([
-    'ai_flags' => 'int',
-    'ai_family' => 'int',
-    'ai_socktype' => 'int',
-    'ai_protocol' => 'int',
-    'ai_canonname' => 'string',
-    'ai_addr' => [
-        'sin_port' => 'int',
-        'sin_addr' => 'string',
-        'sin6_port' => 'int',
-        'sin6_addr' => 'string',
-    ]
-])]
-function socket_addrinfo_explain(AddressInfo $address): array {}
+function socket_addrinfo_explain(AddressInfo $address): array
+{
+}
 
 /**
  * Runs the select() system call on the given arrays of sockets with a specified timeout
@@ -120,7 +82,14 @@ function socket_addrinfo_explain(AddressInfo $address): array {}
  * }
  * </code>
  */
-function socket_select(?array &$read, ?array &$write, ?array &$except, ?int $seconds, int $microseconds = 0): int|false {}
+function socket_select(
+    null|array &$read,
+    null|array &$write,
+    null|array &$except,
+    null|int $seconds,
+    int $microseconds = 0,
+): int|false {
+}
 
 /**
  * Create a socket (endpoint for communication)
@@ -258,13 +227,17 @@ function socket_select(?array &$read, ?array &$write, ?array &$except, ?int $sec
  * <b>socket_strerror</b> to get a textual explanation of the
  * error.
  */
-function socket_create(int $domain, int $type, int $protocol): Socket|false {}
+function socket_create(int $domain, int $type, int $protocol): Socket|false
+{
+}
 
 /**
  * @param resource|Socket $socket
  * @return resource|Socket|false
  */
-function socket_export_stream(Socket $socket) {}
+function socket_export_stream(Socket $socket)
+{
+}
 
 /**
  * Opens a socket on port to accept connections
@@ -285,7 +258,9 @@ function socket_export_stream(Socket $socket) {}
  * <b>socket_strerror</b> to get a textual explanation of the
  * error.
  */
-function socket_create_listen(int $port, int $backlog = 128): Socket|false {}
+function socket_create_listen(int $port, int $backlog = 128): Socket|false
+{
+}
 
 /**
  * Creates a pair of indistinguishable sockets and stores them in an array
@@ -318,7 +293,9 @@ function socket_create_listen(int $port, int $backlog = 128): Socket|false {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function socket_create_pair(int $domain, int $type, int $protocol, &$pair): bool {}
+function socket_create_pair(int $domain, int $type, int $protocol, &$pair): bool
+{
+}
 
 /**
  * Accepts a connection on a socket
@@ -332,7 +309,9 @@ function socket_create_pair(int $domain, int $type, int $protocol, &$pair): bool
  * <b>socket_strerror</b> to get a textual explanation of the
  * error.
  */
-function socket_accept(Socket $socket): Socket|false {}
+function socket_accept(Socket $socket): Socket|false
+{
+}
 
 /**
  * Sets nonblocking mode for file descriptor fd
@@ -343,7 +322,9 @@ function socket_accept(Socket $socket): Socket|false {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function socket_set_nonblock(Socket $socket): bool {}
+function socket_set_nonblock(Socket $socket): bool
+{
+}
 
 /**
  * Sets blocking mode on a socket resource
@@ -354,7 +335,9 @@ function socket_set_nonblock(Socket $socket): bool {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function socket_set_block(Socket $socket): bool {}
+function socket_set_block(Socket $socket): bool
+{
+}
 
 /**
  * Listens for a connection on a socket
@@ -383,7 +366,9 @@ function socket_set_block(Socket $socket): bool {}
  * <b>socket_strerror</b> to get a textual explanation of the
  * error.
  */
-function socket_listen(Socket $socket, int $backlog = 0): bool {}
+function socket_listen(Socket $socket, int $backlog = 0): bool
+{
+}
 
 /**
  * Closes a socket resource
@@ -394,7 +379,9 @@ function socket_listen(Socket $socket, int $backlog = 0): bool {}
  * </p>
  * @return void No value is returned.
  */
-function socket_close(Socket $socket): void {}
+function socket_close(Socket $socket): void
+{
+}
 
 /**
  * Write to a socket
@@ -421,7 +408,9 @@ function socket_close(Socket $socket): void {}
  * === operator to check for <b>FALSE</b> in case of an
  * error.
  */
-function socket_write(Socket $socket, string $data, ?int $length = null): int|false {}
+function socket_write(Socket $socket, string $data, null|int $length = null): int|false
+{
+}
 
 /**
  * Reads a maximum of length bytes from a socket
@@ -452,7 +441,9 @@ function socket_write(Socket $socket, string $data, ?int $length = null): int|fa
  * <b>socket_read</b> returns a zero length string ("")
  * when there is no more data to read.</p>
  */
-function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): string|false {}
+function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): string|false
+{
+}
 
 /**
  * Queries the local side of the given socket which may either result in host/port or in a Unix filesystem path, dependent on its type
@@ -483,7 +474,9 @@ function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): 
  * <b>AF_INET6</b>, or <b>AF_UNIX</b>, in which
  * case the last socket error code is not updated.
  */
-function socket_getsockname(Socket $socket, &$address, &$port = null): bool {}
+function socket_getsockname(Socket $socket, &$address, &$port = null): bool
+{
+}
 
 /**
  * Queries the remote side of the given socket which may either result in host/port or in a Unix filesystem path, dependent on its type
@@ -516,7 +509,9 @@ function socket_getsockname(Socket $socket, &$address, &$port = null): bool {}
  * <b>AF_INET6</b>, or <b>AF_UNIX</b>, in which
  * case the last socket error code is not updated.
  */
-function socket_getpeername(Socket $socket, &$address, &$port = null): bool {}
+function socket_getpeername(Socket $socket, &$address, &$port = null): bool
+{
+}
 
 /**
  * Initiates a connection on a socket
@@ -546,7 +541,9 @@ function socket_getpeername(Socket $socket, &$address, &$port = null): bool {}
  * If the socket is non-blocking then this function returns <b>FALSE</b> with an
  * error Operation now in progress.
  */
-function socket_connect(Socket $socket, string $address, ?int $port = null): bool {}
+function socket_connect(Socket $socket, string $address, null|int $port = null): bool
+{
+}
 
 /**
  * Return a string describing a socket error
@@ -558,7 +555,9 @@ function socket_connect(Socket $socket, string $address, ?int $port = null): boo
  * @return string the error message associated with the <i>errno</i>
  * parameter.
  */
-function socket_strerror(int $error_code): string {}
+function socket_strerror(int $error_code): string
+{
+}
 
 /**
  * Binds a name to a socket
@@ -588,7 +587,9 @@ function socket_strerror(int $error_code): string {}
  * textual explanation of the error.
  * </p>
  */
-function socket_bind(Socket $socket, string $address, int $port = 0): bool {}
+function socket_bind(Socket $socket, string $address, int $port = 0): bool
+{
+}
 
 /**
  * Receives data from a connected socket
@@ -652,7 +653,9 @@ function socket_bind(Socket $socket, string $address, int $port = 0): bool {}
  * passed to <b>socket_strerror</b> to get a textual explanation
  * of the error.
  */
-function socket_recv(Socket $socket, &$data, int $length, int $flags): int|false {}
+function socket_recv(Socket $socket, &$data, int $length, int $flags): int|false
+{
+}
 
 /**
  * Sends data to a connected socket
@@ -704,7 +707,9 @@ function socket_recv(Socket $socket, &$data, int $length, int $flags): int|false
  * </p>
  * @return int|false <b>socket_send</b> returns the number of bytes sent, or <b>FALSE</b> on error.
  */
-function socket_send(Socket $socket, string $data, int $length, int $flags): int|false {}
+function socket_send(Socket $socket, string $data, int $length, int $flags): int|false
+{
+}
 
 /**
  * (PHP 5 &gt;=5.5.0)<br/>
@@ -720,8 +725,9 @@ function socket_sendmsg(
     Socket $socket,
     array $message,
     #[PhpStormStubsElementAvailable(from: '5.5', to: '7.4')] int $flags,
-    #[PhpStormStubsElementAvailable(from: '8.0')] int $flags = 0
-): int|false {}
+    #[PhpStormStubsElementAvailable(from: '8.0')] int $flags = 0,
+): int|false {
+}
 
 /**
  * Receives data from a socket whether or not it is connection-oriented
@@ -795,7 +801,9 @@ function socket_sendmsg(
  * passed to <b>socket_strerror</b> to get a textual explanation
  * of the error.
  */
-function socket_recvfrom(Socket $socket, &$data, int $length, int $flags, &$address, &$port = null): int|false {}
+function socket_recvfrom(Socket $socket, &$data, int $length, int $flags, &$address, &$port = null): int|false
+{
+}
 
 /**
  * Read a message
@@ -810,8 +818,9 @@ function socket_recvmsg(
     Socket $socket,
     array &$message,
     #[PhpStormStubsElementAvailable(from: '5.5', to: '7.4')] int $flags,
-    #[PhpStormStubsElementAvailable(from: '8.0')] int $flags = 0
-): int|false {}
+    #[PhpStormStubsElementAvailable(from: '8.0')] int $flags = 0,
+): int|false {
+}
 
 /**
  * Sends a message to a socket, whether it is connected or not
@@ -870,7 +879,15 @@ function socket_recvmsg(
  * @return int|false <b>socket_sendto</b> returns the number of bytes sent to the
  * remote host, or <b>FALSE</b> if an error occurred.
  */
-function socket_sendto(Socket $socket, string $data, int $length, int $flags, string $address, ?int $port = null): int|false {}
+function socket_sendto(
+    Socket $socket,
+    string $data,
+    int $length,
+    int $flags,
+    string $address,
+    null|int $port = null,
+): int|false {
+}
 
 /**
  * Gets socket options for the socket
@@ -1236,7 +1253,9 @@ function socket_sendto(Socket $socket, string $data, int $length, int $flags, st
  * </table>
  * @return array|int|false the value of the given option, or <b>FALSE</b> on errors.
  */
-function socket_get_option(Socket $socket, int $level, int $option): array|int|false {}
+function socket_get_option(Socket $socket, int $level, int $option): array|int|false
+{
+}
 
 /**
  * Sets socket options for the socket
@@ -1263,7 +1282,9 @@ function socket_get_option(Socket $socket, int $level, int $option): array|int|f
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function socket_set_option(Socket $socket, int $level, int $option, $value): bool {}
+function socket_set_option(Socket $socket, int $level, int $option, $value): bool
+{
+}
 
 /**
  * Shuts down a socket for receiving, sending, or both
@@ -1297,7 +1318,9 @@ function socket_set_option(Socket $socket, int $level, int $option, $value): boo
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function socket_shutdown(Socket $socket, int $mode = 2): bool {}
+function socket_shutdown(Socket $socket, int $mode = 2): bool
+{
+}
 
 /**
  * Returns the last error on the socket
@@ -1307,7 +1330,9 @@ function socket_shutdown(Socket $socket, int $mode = 2): bool {}
  * </p>
  * @return int This function returns a socket error code.
  */
-function socket_last_error(?Socket $socket = null): int {}
+function socket_last_error(null|Socket $socket = null): int
+{
+}
 
 /**
  * Clears the error on the socket or the last error code
@@ -1317,7 +1342,9 @@ function socket_last_error(?Socket $socket = null): int {}
  * </p>
  * @return void No value is returned.
  */
-function socket_clear_error(?Socket $socket = null): void {}
+function socket_clear_error(null|Socket $socket = null): void
+{
+}
 
 /**
  * Import a stream
@@ -1328,7 +1355,9 @@ function socket_clear_error(?Socket $socket = null): void {}
  * @return resource|Socket|false|null <b>FALSE</b> or <b>NULL</b> on failure.
  * @since 5.4
  */
-function socket_import_stream($stream): Socket|false {}
+function socket_import_stream($stream): Socket|false
+{
+}
 
 /**
  * Calculate message buffer size
@@ -1339,11 +1368,9 @@ function socket_import_stream($stream): Socket|false {}
  * @return int|null
  * @since 5.5
  */
-function socket_cmsg_space(
-    int $level,
-    int $type,
-    #[PhpStormStubsElementAvailable(from: '8.0')] int $num = 0
-): ?int {}
+function socket_cmsg_space(int $level, int $type, #[PhpStormStubsElementAvailable(from: '8.0')] int $num = 0): null|int
+{
+}
 
 /**
  * Alias of {@see socket_get_option}
@@ -1351,7 +1378,9 @@ function socket_cmsg_space(
  * @param int $level
  * @param int $option
  */
-function socket_getopt(Socket $socket, int $level, int $option): array|int|false {}
+function socket_getopt(Socket $socket, int $level, int $option): array|int|false
+{
+}
 
 /**
  * Alias of {@see socket_set_option}
@@ -1361,7 +1390,9 @@ function socket_getopt(Socket $socket, int $level, int $option): array|int|false
  * @param $value
  * @return bool
  */
-function socket_setopt(Socket $socket, int $level, int $option, $value): bool {}
+function socket_setopt(Socket $socket, int $level, int $option, $value): bool
+{
+}
 
 /**
  * Exports the WSAPROTOCOL_INFO Structure
@@ -1374,7 +1405,9 @@ function socket_setopt(Socket $socket, int $level, int $option, $value): bool {}
  *
  * @since 7.3
  */
-function socket_wsaprotocol_info_export($socket, $target_pid) {}
+function socket_wsaprotocol_info_export($socket, $target_pid)
+{
+}
 
 /**
  * Imports a Socket from another Process
@@ -1386,7 +1419,9 @@ function socket_wsaprotocol_info_export($socket, $target_pid) {}
  *
  * @since 7.3
  */
-function socket_wsaprotocol_info_import($info_id) {}
+function socket_wsaprotocol_info_import($info_id)
+{
+}
 
 /**
  * Releases an exported WSAPROTOCOL_INFO Structure
@@ -1398,12 +1433,16 @@ function socket_wsaprotocol_info_import($info_id) {}
  *
  * @since 7.3
  */
-function socket_wsaprotocol_info_release($info_id) {}
+function socket_wsaprotocol_info_release($info_id)
+{
+}
 
 /**
  * @since 8.3
  */
-function socket_atmark(Socket $socket): bool {}
+function socket_atmark(Socket $socket): bool
+{
+}
 
 define('AF_UNIX', 1);
 define('AF_INET', 2);

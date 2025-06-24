@@ -52,7 +52,11 @@ impl<'input> TypeLexer<'input> {
 
         let (kind, length) = match self.input.read(3) {
             [b'n' | b'N', b'o' | b'O', b'n' | b'N'] => {
-                if self.input.is_at(b"non-empty-literal-string", true) {
+                if self.input.is_at(b"non-positive-int", true) {
+                    (TypeTokenKind::NonPositiveInt, 16)
+                } else if self.input.is_at(b"non-negative-int", true) {
+                    (TypeTokenKind::NonNegativeInt, 16)
+                } else if self.input.is_at(b"non-empty-literal-string", true) {
                     (TypeTokenKind::NonEmptyUnspecifiedLiteralString, 26)
                 } else if self.input.is_at(b"non-empty-string", true) {
                     (TypeTokenKind::NonEmptyString, 16)

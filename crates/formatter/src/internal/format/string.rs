@@ -55,7 +55,11 @@ fn make_string(raw_text: &str, enclosing_quote: char) -> String {
     result
 }
 
-pub(super) fn print_string<'a>(f: &FormatterState<'a>, kind: &LiteralStringKind, value: &StringIdentifier) -> &'a str {
+pub(super) fn print_string<'a>(
+    f: &FormatterState<'a>,
+    kind: Option<LiteralStringKind>,
+    value: &StringIdentifier,
+) -> &'a str {
     let text = f.lookup(value);
 
     let quote = unsafe { text.chars().next().unwrap_unchecked() };
@@ -63,8 +67,9 @@ pub(super) fn print_string<'a>(f: &FormatterState<'a>, kind: &LiteralStringKind,
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);
 
     match kind {
-        LiteralStringKind::SingleQuoted if enclosing_quote == '\'' => text,
-        LiteralStringKind::DoubleQuoted if enclosing_quote == '"' => text,
+        None => text,
+        Some(LiteralStringKind::SingleQuoted) if enclosing_quote == '\'' => text,
+        Some(LiteralStringKind::DoubleQuoted) if enclosing_quote == '"' => text,
         _ => f.as_str(make_string(raw_text, enclosing_quote)),
     }
 }

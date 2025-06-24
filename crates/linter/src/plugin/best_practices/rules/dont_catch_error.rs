@@ -1,5 +1,7 @@
 use indoc::indoc;
 
+use mago_codex::class_exists;
+use mago_codex::is_instance_of;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -57,16 +59,18 @@ fn get_error_identifiers_from_hint<'a>(hint: &'a Hint, context: &LintContext<'_>
     let mut errors = Vec::new();
     match hint {
         Hint::Identifier(identifier) => {
-            let classname = context.module.names.get(identifier);
-            let Some(reflection) = context.codebase.get_class(context.interner, classname) else {
-                return errors;
-            };
+            let exception_id = context.resolved_names.get(identifier);
+            let error_id = context.interner.intern(ERROR_CLASS);
 
-            if reflection.name.get_key(context.interner).eq_ignore_ascii_case(ERROR_CLASS)
-                || reflection
-                    .inheritance
-                    .extends_class_with_name(context.interner, &context.interner.intern(ERROR_CLASS))
-            {
+            if !class_exists(context.codebase, context.interner, exception_id) {
+                return errors;
+            }
+
+            if !class_exists(context.codebase, context.interner, &error_id) {
+                return errors;
+            }
+
+            if is_instance_of(context.codebase, context.interner, exception_id, &error_id) {
                 errors.push(identifier);
             }
         }

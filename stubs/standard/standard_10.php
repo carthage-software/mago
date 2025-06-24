@@ -81,16 +81,10 @@ function request_parse_body(null|array $options = null): array
 {
 }
 
-/**
- * @since 8.4
- */
 function fpow(float $num, float $exponent): float
 {
 }
 
-/**
- * @since 8.4
- */
 enum RoundingMode implements UnitEnum
 {
     case HalfAwayFromZero;

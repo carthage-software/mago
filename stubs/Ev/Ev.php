@@ -217,7 +217,9 @@ final class Ev
      *
      * @return int Bit mask describing the backend used by libev, see Ev::BACKEND_* flags.
      */
-    final public static function backend() {}
+    final public static function backend()
+    {
+    }
 
     /**
      * Returns recursion depth
@@ -228,14 +230,18 @@ final class Ev
      *
      * @return int Recursion depth of the default loop.
      */
-    final public static function depth() {}
+    final public static function depth()
+    {
+    }
 
     /**
      * Returns the set of backends that are embeddable in other event loops.
      *
      * @return int Bit mask which can contain Ev::BACKEND_* flags combined using bitwise OR operator.
      */
-    final public static function embeddableBackends() {}
+    final public static function embeddableBackends()
+    {
+    }
 
     /**
      * Feed signal event into Ev
@@ -248,7 +254,9 @@ final class Ev
      * @param int $signum Signal number. See signal(7) man page for details. You can use constants exported by pcntl
      *      extension.
      */
-    final public static function feedSignal(int $signum) {}
+    final public static function feedSignal(int $signum)
+    {
+    }
 
     /**
      * Feed signal event into the default loop
@@ -259,7 +267,9 @@ final class Ev
      * @param int $signum Signal number. See signal(7) man page for details. See also constants exported by pcntl
      *      extension.
      */
-    final public static function feedSignalEvent(int $signum) {}
+    final public static function feedSignalEvent(int $signum)
+    {
+    }
 
     /**
      * Return the number of times the default event loop has polled for new events.
@@ -268,7 +278,9 @@ final class Ev
      *
      * @return int Number of polls of the default event loop.
      */
-    final public static function iteration() {}
+    final public static function iteration()
+    {
+    }
 
     /**
      * Returns the time when the last iteration of the default event loop has started.
@@ -279,7 +291,9 @@ final class Ev
      * @return float Number of seconds(fractional) representing the time when the last iteration of the default event
      *      loop has started.
      */
-    final public static function now() {}
+    final public static function now()
+    {
+    }
 
     /**
      * Establishes the current time by querying the kernel, updating the time returned by Ev::now in the progress.
@@ -290,7 +304,9 @@ final class Ev
      * This method is rarely useful, but when some event callback runs for a very long time without entering the event
      * loop, updating libev's consideration of the current time is a good idea.
      */
-    final public static function nowUpdate() {}
+    final public static function nowUpdate()
+    {
+    }
 
     /**
      * Returns a bit mask of recommended backends for current platform.
@@ -303,7 +319,9 @@ final class Ev
      *
      * @return int Bit mask which can contain Ev::BACKEND_* flags combined using bitwise OR operator.
      */
-    final public static function recommendedBackends() {}
+    final public static function recommendedBackends()
+    {
+    }
 
     /**
      * Resume previously suspended default event loop.
@@ -318,7 +336,9 @@ final class Ev
      *
      * Calling suspend / resume has the side effect of updating the event loop time (see Ev::nowUpdate()).
      */
-    final public static function resume() {}
+    final public static function resume()
+    {
+    }
 
     /**
      * Begin checking for events and calling callbacks for the default loop.
@@ -330,28 +350,36 @@ final class Ev
      *
      * @param int $flags One of the Ev::FLAG_* flags
      */
-    final public static function run(int $flags = self::FLAG_AUTO) {}
+    final public static function run(int $flags = self::FLAG_AUTO)
+    {
+    }
 
     /**
      * Block the process for the given number of seconds.
      *
      * @param float $seconds Fractional number of seconds
      */
-    final public static function sleep(float $seconds) {}
+    final public static function sleep(float $seconds)
+    {
+    }
 
     /**
      * Stops the default event loop
      *
      * @param int $how One of the Ev::BREAK_* constants
      */
-    final public static function stop(int $how = self::BREAK_ONE) {}
+    final public static function stop(int $how = self::BREAK_ONE)
+    {
+    }
 
     /**
      * Returns the set of backends supported by current libev configuration.
      *
      * @return int Bit mask which can contain Ev::BACKEND_* flags combined using bitwise OR operator.
      */
-    final public static function supportedBackends() {}
+    final public static function supportedBackends()
+    {
+    }
 
     /**
      * Suspend the default event loop.
@@ -364,7 +392,9 @@ final class Ev
      * After calling Ev::suspend() it is not allowed to call any function on the given loop other than Ev::resume().
      * Also it is not allowed to call Ev::resume() without a previous call to Ev::suspend().
      */
-    final public static function suspend() {}
+    final public static function suspend()
+    {
+    }
 
     /**
      * Returns the current time in fractional seconds since the epoch.
@@ -373,7 +403,9 @@ final class Ev
      *
      * @return float The current time in fractional seconds since the epoch.
      */
-    final public static function time() {}
+    final public static function time()
+    {
+    }
 
     /**
      * Performs internal consistency checks (for debugging).
@@ -381,7 +413,9 @@ final class Ev
      * Performs internal consistency checks (for debugging libev) and abort the program if any data structures were
      * found to be corrupted.
      */
-    final public static function verify() {}
+    final public static function verify()
+    {
+    }
 }
 
 /**
@@ -433,7 +467,9 @@ abstract class EvWatcher
      * @return int In case if the watcher is pending, returns revents bitset as if the watcher callback had been
      *      invoked. Otherwise returns 0 .
      */
-    public function clear() {}
+    public function clear()
+    {
+    }
 
     /**
      * Feeds the given revents set into the event loop.
@@ -442,21 +478,27 @@ abstract class EvWatcher
      *
      * @param int $revents Bit mask of watcher received events.
      */
-    public function feed(#[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $revents) {}
+    public function feed(int $revents)
+    {
+    }
 
     /**
      * Returns the loop responsible for the watcher.
      *
      * @return EvLoop Event loop object responsible for the watcher.
      */
-    public function getLoop() {}
+    public function getLoop()
+    {
+    }
 
     /**
      * Invokes the watcher callback with the given received events bit mask.
      *
      * @param int $revents Bit mask of watcher received events.
      */
-    public function invoke(#[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $revents) {}
+    public function invoke(int $revents)
+    {
+    }
 
     /**
      * Configures whether to keep the loop from returning.
@@ -472,28 +514,36 @@ abstract class EvWatcher
      * @param bool $value With keepalive value set to FALSE the watcher won't keep Ev::run() / EvLoop::run() from
      *      returning even though the watcher is active.
      */
-    public function keepalive(#[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $value = true) {}
+    public function keepalive(bool $value = true)
+    {
+    }
 
     /**
      * Sets new callback for the watcher.
      *
      * @param callable $callback void callback ([ object $watcher = NULL [, int $revents = NULL ]] )
      */
-    public function setCallback(#[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback) {}
+    public function setCallback(mixed $callback)
+    {
+    }
 
     /**
      * Starts the watcher.
      *
      * Marks the watcher as active. Note that only active watchers will receive events.
      */
-    public function start() {}
+    public function start()
+    {
+    }
 
     /**
      * Stops the watcher.
      *
      * Marks the watcher as inactive. Note that only active watchers will receive events.
      */
-    public function stop() {}
+    public function stop()
+    {
+    }
 }
 
 /**
@@ -524,11 +574,7 @@ final class EvCheck extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * @param callable $callback
@@ -536,7 +582,9 @@ final class EvCheck extends EvWatcher
      * @param int $priority
      * @return EvCheck
      */
-    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -595,13 +643,7 @@ final class EvChild extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $pid,
-        #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $trace,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(int $pid, bool $trace, mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Create instance of a stopped EvCheck watcher.
@@ -617,7 +659,14 @@ final class EvChild extends EvWatcher
      *
      * @return EvChild
      */
-    final public static function createStopped(int $pid, bool $trace, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(
+        int $pid,
+        bool $trace,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 
     /**
      * Configures the watcher
@@ -626,10 +675,9 @@ final class EvChild extends EvWatcher
      * @param bool $trace If FALSE, only activate the watcher when the process terminates. Otherwise(TRUE) additionally
      *      activate the watcher when the process is stopped or continued.
      */
-    public function set(
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $pid,
-        #[LanguageLevelTypeAware(['8.0' => 'bool'], default: '')] $trace
-    ) {}
+    public function set(int $pid, bool $trace)
+    {
+    }
 }
 
 /**
@@ -662,24 +710,23 @@ final class EvEmbed extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        EvLoop $other,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(EvLoop $other, mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Configures the watcher.
      *
      * @param EvLoop $other The loop to embed, this loop must be embeddable(see Ev::embeddableBackends()).
      */
-    public function set(EvLoop $other) {}
+    public function set(EvLoop $other)
+    {
+    }
 
     /**
      * Make a single, non-blocking sweep over the embedded loop.
      */
-    public function sweep() {}
+    public function sweep()
+    {
+    }
 
     /**
      * Create stopped EvEmbed watcher object
@@ -693,7 +740,9 @@ final class EvEmbed extends EvWatcher
      *
      * @return EvEmbed
      */
-    final public static function createStopped(EvLoop $other, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(EvLoop $other, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -744,13 +793,7 @@ final class EvIo extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $fd,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $events,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(mixed $fd, int $events, mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Configures the watcher.
@@ -758,10 +801,9 @@ final class EvIo extends EvWatcher
      * @param resource $fd  A stream opened with fopen() or similar functions, numeric file descriptor, or socket.
      * @param int $events Ev::READ and/or Ev::WRITE. See the bit masks.
      */
-    public function set(
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $fd,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $events
-    ) {}
+    public function set(mixed $fd, int $events)
+    {
+    }
 
     /**
      * Create stopped EvIo watcher object.
@@ -776,7 +818,14 @@ final class EvIo extends EvWatcher
      *
      * @return EvIo
      */
-    final public static function createStopped(mixed $fd, int $events, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(
+        mixed $fd,
+        int $events,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 }
 
 /**
@@ -832,12 +881,12 @@ final class EvPeriodic extends EvWatcher
      * @param int $priority
      */
     public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $offset,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $interval,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $reschedule_cb,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
+        float $offset,
+        float $interval,
+        mixed $reschedule_cb,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
     ) {}
 
     /**
@@ -847,7 +896,9 @@ final class EvPeriodic extends EvWatcher
      *
      * @return void
      */
-    public function again() {}
+    public function again()
+    {
+    }
 
     /**
      * Returns the absolute time that this watcher is supposed to trigger next.
@@ -858,7 +909,9 @@ final class EvPeriodic extends EvWatcher
      *
      * @return float Rhe absolute time this watcher is supposed to trigger next in seconds.
      */
-    public function at() {}
+    public function at()
+    {
+    }
 
     /**
      * Create a stopped EvPeriodic watcher
@@ -879,7 +932,15 @@ final class EvPeriodic extends EvWatcher
      *
      * @return EvPeriodic
      */
-    final public static function createStopped(float $offset, float $interval, mixed $reschedule_cb, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(
+        float $offset,
+        float $interval,
+        mixed $reschedule_cb,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 
     /**
      * Configures the watcher
@@ -888,11 +949,9 @@ final class EvPeriodic extends EvWatcher
      * @param null|callable $reschedule_cb The same meaning as for {@see EvPeriodic::__construct}
      * @return void
      */
-    public function set(
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $offset,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $interval,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $reschedule_cb = null
-    ) {}
+    public function set(float $offset, float $interval, mixed $reschedule_cb = null)
+    {
+    }
 }
 
 /**
@@ -928,11 +987,7 @@ final class EvPrepare extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Creates a stopped instance of EvPrepare watcher.
@@ -946,7 +1001,9 @@ final class EvPrepare extends EvWatcher
      *
      * @return EvPrepare
      */
-    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -980,19 +1037,16 @@ final class EvSignal extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $signum,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(int $signum, mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Configures the watcher.
      *
      * @param int $signum Signal number. See the constants exported by pcntl extension. See also signal(7) man page.
      */
-    public function set(#[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $signum) {}
+    public function set(int $signum)
+    {
+    }
 
     /**
      * Creates a stopped instance of EvSignal watcher.
@@ -1007,7 +1061,9 @@ final class EvSignal extends EvWatcher
      *
      * @return EvSignal
      */
-    final public static function createStopped(int $signum, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(int $signum, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -1060,22 +1116,26 @@ final class EvStat extends EvWatcher
      * @param int $priority
      */
     public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $path,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $interval,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
+        string $path,
+        float $interval,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
     ) {}
 
     /**
      * @return array The values most recently detect by Ev (without actual stat'ing). See stat(2) man page for details.
      */
-    public function attr() {}
+    public function attr()
+    {
+    }
 
     /**
      * @return array Just like EvStat::attr() , but returns the previous set of values.
      */
-    public function prev() {}
+    public function prev()
+    {
+    }
 
     /**
      * Configures the watcher.
@@ -1084,10 +1144,9 @@ final class EvStat extends EvWatcher
      * @param float $interval Hint on how quickly a change is expected to be detected and should normally be specified
      *      as 0.0 to let libev choose a suitable value.
      */
-    public function set(
-        #[LanguageLevelTypeAware(['8.0' => 'string'], default: '')] $path,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $interval
-    ) {}
+    public function set(string $path, float $interval)
+    {
+    }
 
     /**
      * Initiates the stat call.
@@ -1097,7 +1156,9 @@ final class EvStat extends EvWatcher
      *
      * @return bool TRUE if path exists. Otherwise FALSE.
      */
-    public function stat() {}
+    public function stat()
+    {
+    }
 
     /**
      * Create a stopped EvStat watcher object.
@@ -1113,7 +1174,14 @@ final class EvStat extends EvWatcher
      *
      * @return EvStat
      */
-    final public static function createStopped(string $path, float $interval, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(
+        string $path,
+        float $interval,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 }
 
 /**
@@ -1167,13 +1235,7 @@ final class EvTimer extends EvWatcher
      * @param mixed $data
      * @param int $priority
      */
-    public function __construct(
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $after,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $repeat,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $callback,
-        #[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')] $data = null,
-        #[LanguageLevelTypeAware(['8.0' => 'int'], default: '')] $priority = 0
-    ) {}
+    public function __construct(float $after, float $repeat, mixed $callback, mixed $data = null, int $priority = 0) {}
 
     /**
      * Restarts the timer watcher.
@@ -1185,7 +1247,9 @@ final class EvTimer extends EvWatcher
      * - if the timer is repeating, either start it if necessary (with the repeat value), or reset the running timer to
      *   the repeat value.
      */
-    public function again() {}
+    public function again()
+    {
+    }
 
     /**
      * Configures the watcher.
@@ -1195,10 +1259,9 @@ final class EvTimer extends EvWatcher
      *      is positive, then the timer will automatically be configured to trigger again every repeat seconds later,
      *      until stopped manually.
      */
-    public function set(
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $after,
-        #[LanguageLevelTypeAware(['8.0' => 'float'], default: '')] $repeat
-    ) {}
+    public function set(float $after, float $repeat)
+    {
+    }
 
     /**
      * Creates a stopped EvTimer watcher object.
@@ -1213,7 +1276,14 @@ final class EvTimer extends EvWatcher
      *
      * @return EvTimer
      */
-    final public static function createStopped(float $after, float $repeat, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(
+        float $after,
+        float $repeat,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 }
 
 /**
@@ -1254,7 +1324,9 @@ final class EvIdle extends EvWatcher
      *
      * @return EvIdle
      */
-    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -1285,7 +1357,9 @@ final class EvFork extends EvWatcher
      *
      * @return EvFork
      */
-    final public static function createStopped(EvLoop $loop, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public static function createStopped(EvLoop $loop, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 }
 
 /**
@@ -1305,7 +1379,16 @@ final class EvLoop
      * @var int The Ev::BACKEND_* flag indicating the event backend in use.
      */
     #[Immutable]
-    #[ExpectedValues(flags: [Ev::BACKEND_ALL, Ev::BACKEND_DEVPOLL, Ev::BACKEND_EPOLL, Ev::BACKEND_KQUEUE, Ev::BACKEND_MASK, Ev::BACKEND_POLL, Ev::BACKEND_PORT, Ev::BACKEND_SELECT])]
+    #[ExpectedValues(flags: [
+        Ev::BACKEND_ALL,
+        Ev::BACKEND_DEVPOLL,
+        Ev::BACKEND_EPOLL,
+        Ev::BACKEND_KQUEUE,
+        Ev::BACKEND_MASK,
+        Ev::BACKEND_POLL,
+        Ev::BACKEND_PORT,
+        Ev::BACKEND_SELECT,
+    ])]
     public $backend;
 
     /**
@@ -1358,14 +1441,21 @@ final class EvLoop
      * @param float $io_interval
      * @param float $timeout_interval
      */
-    public function __construct(int $flags = Ev::FLAG_AUTO, mixed $data = null, float $io_interval = 0.0, float $timeout_interval = 0.0) {}
+    public function __construct(
+        int $flags = Ev::FLAG_AUTO,
+        mixed $data = null,
+        float $io_interval = 0.0,
+        float $timeout_interval = 0.0,
+    ) {}
 
     /**
      * Returns an integer describing the backend used by libev.
      *
      * @return int An integer describing the backend used by libev. See Ev::backend().
      */
-    public function backend() {}
+    public function backend()
+    {
+    }
 
     /**
      * Creates EvCheck object associated with the current event loop instance.
@@ -1375,7 +1465,9 @@ final class EvLoop
      * @param int $priority
      * @return EvCheck
      */
-    final public function check(callable $callback, $data = null, $priority = 0) {}
+    final public function check(callable $callback, $data = null, $priority = 0)
+    {
+    }
 
     /**
      * Creates EvChild object associated with the current event loop instance;
@@ -1387,7 +1479,9 @@ final class EvLoop
      * @param int $priority
      * @return EvChild
      */
-    final public function child(int $pid, bool $trace, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function child(int $pid, bool $trace, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Creates EvEmbed object associated with the current event loop instance.
@@ -1398,7 +1492,9 @@ final class EvLoop
      * @param int $priority
      * @return EvEmbed
      */
-    final public function embed(EvLoop $other, callable $callback, $data = null, $priority = 0) {}
+    final public function embed(EvLoop $other, callable $callback, $data = null, $priority = 0)
+    {
+    }
 
     /**
      * Creates EvFork object associated with the current event loop instance.
@@ -1408,7 +1504,9 @@ final class EvLoop
      * @param int $priority
      * @return EvFork
      */
-    final public function fork(callable $callback, $data = null, $priority = 0) {}
+    final public function fork(callable $callback, $data = null, $priority = 0)
+    {
+    }
 
     /**
      * Creates EvIdle object associated with the current event loop instance.
@@ -1418,12 +1516,16 @@ final class EvLoop
      * @param int $priority
      * @return EvIdle
      */
-    final public function idle(mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function idle(mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Invoke all pending watchers while resetting their pending state.
      */
-    public function invokePending() {}
+    public function invokePending()
+    {
+    }
 
     /**
      * Creates EvIo object associated with the current event loop instance.
@@ -1435,7 +1537,9 @@ final class EvLoop
      * @param int $priority
      * @return EvIo
      */
-    final public function io(mixed $fd, int $events, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function io(mixed $fd, int $events, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Must be called after a fork.
@@ -1444,7 +1548,9 @@ final class EvLoop
      * Ev::FLAG_FORKCHECK which calls this function automatically, at some performance loss (refer to the libev
      * documentation).
      */
-    public function loopFork() {}
+    public function loopFork()
+    {
+    }
 
     /**
      * Returns the current "event loop time".
@@ -1456,7 +1562,9 @@ final class EvLoop
      *
      * @return float Time of the event loop in (fractional) seconds.
      */
-    public function now() {}
+    public function now()
+    {
+    }
 
     /**
      * Establishes the current time by querying the kernel, updating the time returned by Ev::now in the progress.
@@ -1467,7 +1575,9 @@ final class EvLoop
      * This method is rarely useful, but when some event callback runs for a very long time without entering the event
      * loop, updating libev's consideration of the current time is a good idea.
      */
-    public function nowUpdate() {}
+    public function nowUpdate()
+    {
+    }
 
     /**
      * Creates EvPeriodic object associated with the current event loop instance.
@@ -1479,7 +1589,15 @@ final class EvLoop
      * @param mixed $data
      * @param int $priority
      */
-    final public function periodic(float $offset, float $interval, mixed $reschedule_cb, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function periodic(
+        float $offset,
+        float $interval,
+        mixed $reschedule_cb,
+        mixed $callback,
+        mixed $data = null,
+        int $priority = 0,
+    ) {
+    }
 
     /**
      * Creates EvPrepare object associated with the current event loop instance.
@@ -1488,14 +1606,18 @@ final class EvLoop
      * @param mixed $data
      * @param int $priority
      */
-    final public function prepare(callable $callback, $data = null, $priority = 0) {}
+    final public function prepare(callable $callback, $data = null, $priority = 0)
+    {
+    }
 
     /**
      * Resume previously suspended default event loop.
      *
      * EvLoop::suspend() and EvLoop::resume() methods suspend and resume a loop correspondingly.
      */
-    public function resume() {}
+    public function resume()
+    {
+    }
 
     /**
      * Begin checking for events and calling callbacks for the loop.
@@ -1507,7 +1629,9 @@ final class EvLoop
      *
      * @param int $flags One of the Ev::RUN_* flags.
      */
-    public function run(int $flags = Ev::FLAG_AUTO) {}
+    public function run(int $flags = Ev::FLAG_AUTO)
+    {
+    }
 
     /**
      * Creates EvSignal object associated with the current event loop instance.
@@ -1518,7 +1642,9 @@ final class EvLoop
      * @param int $priority
      * @return EvSignal
      */
-    final public function signal(int $signum, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function signal(int $signum, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Creates EvStats object associated with the current event loop instance.
@@ -1530,21 +1656,27 @@ final class EvLoop
      * @param int $priority
      * @return EvStat
      */
-    final public function stat(string $path, float $interval, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function stat(string $path, float $interval, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Stops the event loop.
      *
      * @param int $how One of the Ev::BREAK_* flags.
      */
-    public function stop(int $how = Ev::BREAK_ALL) {}
+    public function stop(int $how = Ev::BREAK_ALL)
+    {
+    }
 
     /**
      * Suspend the loop.
      *
      * EvLoop::suspend() and EvLoop::resume() methods suspend and resume a loop correspondingly.
      */
-    public function suspend() {}
+    public function suspend()
+    {
+    }
 
     /**
      * Creates EvTimer object associated with the current event loop instance.
@@ -1556,7 +1688,9 @@ final class EvLoop
      * @param int $priority
      * @return EvTimer
      */
-    final public function timer(float $after, float $repeat, mixed $callback, mixed $data = null, int $priority = 0) {}
+    final public function timer(float $after, float $repeat, mixed $callback, mixed $data = null, int $priority = 0)
+    {
+    }
 
     /**
      * Performs internal consistency checks (for debugging).
@@ -1564,7 +1698,9 @@ final class EvLoop
      * Performs internal consistency checks (for debugging libev) and abort the program if any data structures were
      * found to be corrupted.
      */
-    public function verify() {}
+    public function verify()
+    {
+    }
 
     /**
      * Returns or creates the default event loop.
@@ -1582,6 +1718,7 @@ final class EvLoop
         int $flags = Ev::FLAG_AUTO,
         mixed $data = null,
         float $io_interval = 0.0,
-        float $timeout_interval = 0.0
-    ): EvLoop {}
+        float $timeout_interval = 0.0,
+    ): EvLoop {
+    }
 }

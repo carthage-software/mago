@@ -176,7 +176,7 @@ checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -379,7 +379,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -638,7 +638,7 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -675,6 +675,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "derive_arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,7 +693,7 @@ checksum = "30542c1ad912e0e3d22a1935c290e12e8a29d704a420177a31faad4a601a0800"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -731,7 +742,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -965,7 +976,7 @@ checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -1348,6 +1359,7 @@ checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.4",
+ "serde",
 ]
 
 [[package]]
@@ -1411,6 +1423,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1459,6 +1480,16 @@ name = "libc"
 version = "0.2.174"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1171693293099992e19cddea4e8b849964e9846f4acee11b3948bcc337be8776"
+
+[[package]]
+name = "libmimalloc-sys"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88cd67e9de251c1781dbe2f641a1a3ad66eaae831b8a2c38fbdc5ddae16d4d"
+dependencies = [
+ "cc",
+ "libc",
+]
 
 [[package]]
 name = "libredox"
@@ -1519,6 +1550,8 @@ dependencies = [
  "futures",
  "glob-match",
  "indicatif",
+ "mago-analyzer",
+ "mago-codex",
  "mago-composer",
  "mago-fixer",
  "mago-formatter",
@@ -1526,12 +1559,12 @@ dependencies = [
  "mago-linter",
  "mago-names",
  "mago-php-version",
- "mago-project",
  "mago-reference",
- "mago-reflection",
  "mago-reporting",
+ "mago-semantics",
  "mago-source",
  "mago-syntax",
+ "mimalloc",
  "num_cpus",
  "openssl",
  "pretty_assertions",
@@ -1549,10 +1582,73 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-algebra"
+version = "0.26.1"
+dependencies = [
+ "ahash",
+ "indexmap",
+ "itertools 0.14.0",
+ "mago-codex",
+ "mago-interner",
+ "mago-span",
+ "rand 0.9.1",
+]
+
+[[package]]
+name = "mago-analyzer"
+version = "0.26.1"
+dependencies = [
+ "ahash",
+ "either",
+ "indexmap",
+ "indoc",
+ "itertools 0.14.0",
+ "mago-algebra",
+ "mago-codex",
+ "mago-docblock",
+ "mago-fixer",
+ "mago-interner",
+ "mago-names",
+ "mago-php-version",
+ "mago-reporting",
+ "mago-source",
+ "mago-span",
+ "mago-syntax",
+ "regex",
+ "serde",
+ "strsim",
+ "strum",
+ "tracing",
+]
+
+[[package]]
 name = "mago-casing"
 version = "0.26.1"
 dependencies = [
  "cruet",
+]
+
+[[package]]
+name = "mago-codex"
+version = "0.26.1"
+dependencies = [
+ "ahash",
+ "bitflags",
+ "derivative",
+ "indexmap",
+ "itertools 0.14.0",
+ "mago-docblock",
+ "mago-interner",
+ "mago-names",
+ "mago-reporting",
+ "mago-source",
+ "mago-span",
+ "mago-syntax",
+ "mago-type-syntax",
+ "ordered-float",
+ "serde",
+ "strum",
+ "tracing",
 ]
 
 [[package]]
@@ -1618,12 +1714,12 @@ dependencies = [
  "ahash",
  "indoc",
  "mago-casing",
+ "mago-codex",
  "mago-docblock",
  "mago-fixer",
  "mago-interner",
+ "mago-names",
  "mago-php-version",
- "mago-project",
- "mago-reflection",
  "mago-reporting",
  "mago-source",
  "mago-span",
@@ -1655,44 +1751,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-project"
-version = "0.26.1"
-dependencies = [
- "ahash",
- "mago-interner",
- "mago-names",
- "mago-php-version",
- "mago-reflection",
- "mago-reporting",
- "mago-source",
- "mago-span",
- "mago-syntax",
- "mago-typing",
- "serde",
-]
-
-[[package]]
 name = "mago-reference"
 version = "0.26.1"
 dependencies = [
  "mago-interner",
- "mago-project",
+ "mago-names",
  "mago-span",
  "mago-syntax",
- "serde",
-]
-
-[[package]]
-name = "mago-reflection"
-version = "0.26.1"
-dependencies = [
- "ahash",
- "mago-interner",
- "mago-reporting",
- "mago-source",
- "mago-span",
- "mago-trinary",
- "ordered-float",
  "serde",
 ]
 
@@ -1711,6 +1776,19 @@ dependencies = [
  "serde_json",
  "strum",
  "termcolor",
+]
+
+[[package]]
+name = "mago-semantics"
+version = "0.26.1"
+dependencies = [
+ "mago-interner",
+ "mago-names",
+ "mago-php-version",
+ "mago-reporting",
+ "mago-source",
+ "mago-span",
+ "mago-syntax",
 ]
 
 [[package]]
@@ -1761,14 +1839,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-trinary"
-version = "0.26.1"
-dependencies = [
- "serde",
- "strum",
-]
-
-[[package]]
 name = "mago-type-syntax"
 version = "0.26.1"
 dependencies = [
@@ -1781,30 +1851,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-typing"
-version = "0.26.1"
-dependencies = [
- "ahash",
- "mago-interner",
- "mago-names",
- "mago-reflection",
- "mago-source",
- "mago-span",
- "mago-syntax",
- "mago-trinary",
- "ordered-float",
-]
-
-[[package]]
 name = "mago-wasm"
 version = "0.26.1"
 dependencies = [
+ "mago-codex",
  "mago-formatter",
  "mago-interner",
  "mago-linter",
+ "mago-names",
  "mago-php-version",
- "mago-project",
  "mago-reporting",
+ "mago-semantics",
  "mago-source",
  "mago-syntax",
  "serde",
@@ -1826,6 +1883,15 @@ name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
+
+[[package]]
+name = "mimalloc"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1791cbe101e95af5764f06f20f6760521f7158f69dbf9d6baf941ee1bf6bc40"
+dependencies = [
+ "libmimalloc-sys",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -1964,7 +2030,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2100,7 +2166,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2708,7 +2774,7 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2849,7 +2915,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2857,6 +2923,17 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
 
 [[package]]
 name = "syn"
@@ -2886,7 +2963,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2973,7 +3050,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2984,7 +3061,7 @@ checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3212,7 +3289,7 @@ checksum = "81383ab64e72a7a8b8e13130c49e3dab29def6d0c7d76a03087b3cf71c5c6903"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3411,7 +3488,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
  "wasm-bindgen-shared",
 ]
 
@@ -3446,7 +3523,7 @@ checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -3746,7 +3823,7 @@ checksum = "38da3c9736e16c5d3c8c597a9aaa5d1fa565d0532ae05e27c24aa62fb32c0ab6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
  "synstructure",
 ]
 
@@ -3767,7 +3844,7 @@ checksum = "9ecf5b4cc5364572d7f4c329661bcc82724222973f2cab6f050a4e5c22f75181"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3787,7 +3864,7 @@ checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
  "synstructure",
 ]
 
@@ -3827,7 +3904,7 @@ checksum = "5b96237efa0c878c64bd89c436f661be4e46b2f3eff1ebb976f7ef2321d2f58f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]

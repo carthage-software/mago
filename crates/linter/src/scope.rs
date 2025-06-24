@@ -1,13 +1,22 @@
+use mago_codex::get_anonymous_class;
+use mago_codex::get_class;
+use mago_codex::get_closure;
+use mago_codex::get_enum;
+use mago_codex::get_function;
+use mago_codex::get_interface;
+use mago_codex::get_method;
+use mago_codex::get_trait;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_interner::StringIdentifier;
-use mago_reflection::class_like::ClassLikeReflection;
-use mago_reflection::function_like::FunctionLikeReflection;
+use mago_span::Position;
 use mago_span::Span;
 
 use crate::context::LintContext;
 
 /// Represents a scope related to class-like constructs.
 /// This includes classes, interfaces, traits, enums, and anonymous classes.
-/// The identifier or span stored in each variant is used to retrieve the corresponding reflection.
+/// The identifier or span stored in each variant is used to retrieve the corresponding metadata.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ClassLikeScope {
     /// A regular class identified by its name.
@@ -24,17 +33,15 @@ pub enum ClassLikeScope {
 
 /// Represents a scope related to function-like constructs.
 /// This includes functions, methods, closures, and arrow functions.
-/// The identifier or span stored in each variant is used to retrieve the corresponding reflection.
+/// The identifier or span stored in each variant is used to retrieve the corresponding metadata.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FunctionLikeScope {
     /// A regular function identified by its name.
     Function(StringIdentifier),
     /// A method identified by its name.
     Method(StringIdentifier),
-    /// A closure identified by its source code span.
-    Closure(Span),
-    /// An arrow function identified by its source code span.
-    ArrowFunction(Span),
+    /// A closure or an arrow function identified by its source code span.
+    Closure(Position),
 }
 
 /// Represents an entry in the scope stack. It can be either class-like or function-like.
@@ -49,8 +56,8 @@ pub enum Scope {
 /// A stack that tracks the scopes entered during linting.
 ///
 /// The `ScopeStack` supports pushing and popping scope entries, and provides
-/// methods to retrieve the reflection for the most recently entered scope of a
-/// particular kind. For example, calling `get_class_reflection` returns the reflection
+/// methods to retrieve the metadata for the most recently entered scope of a
+/// particular kind. For example, calling `get_class_metadata` returns the metadata
 /// for the last entered class scope (if any), and similar for function-like scopes.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScopeStack {
@@ -111,9 +118,9 @@ impl ScopeStack {
         })
     }
 
-    /// Retrieves the reflection for the most recent class-like scope, regardless of its specific variant.
+    /// Retrieves the metadata for the most recent class-like scope, regardless of its specific variant.
     ///
-    /// This method uses the provided `context` to look up the corresponding reflection in the codebase.
+    /// This method uses the provided `context` to look up the corresponding metadata in the codebase.
     ///
     /// # Parameters
     ///
@@ -121,22 +128,22 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if the reflection is found.
-    /// - `None` if no matching reflection is found.
-    pub fn get_class_like_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    /// - `Some(&ClassLikeMetadata)` if the metadata is found.
+    /// - `None` if no matching metadata is found.
+    pub fn get_class_like_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.get_class_like_scope().and_then(|class_like| match class_like {
-            ClassLikeScope::Class(name) => context.codebase.get_class(context.interner, name),
-            ClassLikeScope::Interface(name) => context.codebase.get_interface(context.interner, name),
-            ClassLikeScope::Trait(name) => context.codebase.get_trait(context.interner, name),
-            ClassLikeScope::Enum(name) => context.codebase.get_enum(context.interner, name),
-            ClassLikeScope::AnonymousClass(span) => context.codebase.get_anonymous_class(span),
+            ClassLikeScope::Class(name) => get_class(context.codebase, context.interner, name),
+            ClassLikeScope::Interface(name) => get_interface(context.codebase, context.interner, name),
+            ClassLikeScope::Trait(name) => get_trait(context.codebase, context.interner, name),
+            ClassLikeScope::Enum(name) => get_enum(context.codebase, context.interner, name),
+            ClassLikeScope::AnonymousClass(span) => get_anonymous_class(context.codebase, context.interner, *span),
         })
     }
 
-    /// Retrieves the reflection for the most recent class scope.
+    /// Retrieves the metadata for the most recent class scope.
     ///
     /// This method searches the scope stack (in reverse order) for the first entry that
-    /// is a `Class` variant in a class-like scope, and returns its reflection using the
+    /// is a `Class` variant in a class-like scope, and returns its metadata using the
     /// given context.
     ///
     /// # Parameters
@@ -145,19 +152,21 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if a class reflection is found.
+    /// - `Some(&ClassLikeMetadata)` if a class metadata is found.
     /// - `None` if no class scope is present in the stack.
-    pub fn get_class_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    pub fn get_class_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::Class(name)) => context.codebase.get_class(context.interner, name),
+            Scope::ClassLike(ClassLikeScope::Class(name)) => {
+                context.codebase.class_likes.get(&context.interner.lowered(name)).filter(|metadata| metadata.is_class())
+            }
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent interface scope.
+    /// Retrieves the metadata for the most recent interface scope.
     ///
     /// This method searches the scope stack for the first occurrence of an `Interface` variant
-    /// within a class-like scope and returns its reflection using the provided context.
+    /// within a class-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -165,19 +174,21 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if an interface reflection is found.
+    /// - `Some(&ClassLikeMetadata)` if an interface metadata is found.
     /// - `None` if no interface scope is present.
-    pub fn get_interface_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    pub fn get_interface_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::Interface(name)) => context.codebase.get_interface(context.interner, name),
+            Scope::ClassLike(ClassLikeScope::Interface(name)) => {
+                get_interface(context.codebase, context.interner, name)
+            }
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent trait scope.
+    /// Retrieves the metadata for the most recent trait scope.
     ///
     /// This method searches the scope stack for the first occurrence of a `Trait` variant
-    /// within a class-like scope and returns its reflection using the provided context.
+    /// within a class-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -185,19 +196,19 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if a trait reflection is found.
+    /// - `Some(&ClassLikeMetadata)` if a trait metadata is found.
     /// - `None` if no trait scope is present.
-    pub fn get_trait_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    pub fn get_trait_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::Trait(name)) => context.codebase.get_trait(context.interner, name),
+            Scope::ClassLike(ClassLikeScope::Trait(name)) => get_trait(context.codebase, context.interner, name),
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent enum scope.
+    /// Retrieves the metadata for the most recent enum scope.
     ///
     /// This method searches the scope stack for the first occurrence of an `Enum` variant
-    /// within a class-like scope and returns its reflection using the provided context.
+    /// within a class-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -205,19 +216,19 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if an enum reflection is found.
+    /// - `Some(&ClassLikeMetadata)` if an enum metadata is found.
     /// - `None` if no enum scope is present.
-    pub fn get_enum_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    pub fn get_enum_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::Enum(name)) => context.codebase.get_enum(context.interner, name),
+            Scope::ClassLike(ClassLikeScope::Enum(name)) => get_enum(context.codebase, context.interner, name),
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent anonymous class scope.
+    /// Retrieves the metadata for the most recent anonymous class scope.
     ///
     /// This method searches the scope stack for the first occurrence of an `AnonymousClass` variant
-    /// within a class-like scope and returns its reflection using the provided context.
+    /// within a class-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -225,19 +236,21 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&ClassLikeReflection)` if an anonymous class reflection is found.
+    /// - `Some(&ClassLikeMetadata)` if an anonymous class metadata is found.
     /// - `None` if no anonymous class scope is present.
-    pub fn get_anonymous_class_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeReflection> {
+    pub fn get_anonymous_class_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::AnonymousClass(span)) => context.codebase.get_anonymous_class(span),
+            Scope::ClassLike(ClassLikeScope::AnonymousClass(span)) => {
+                get_anonymous_class(context.codebase, context.interner, *span)
+            }
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent function-like scope,
+    /// Retrieves the metadata for the most recent function-like scope,
     /// regardless of its specific variant (function, method, closure, or arrow function).
     ///
-    /// This method uses the provided context to fetch the corresponding reflection from the codebase.
+    /// This method uses the provided context to fetch the corresponding metadata from the codebase.
     ///
     /// # Parameters
     ///
@@ -245,24 +258,24 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&FunctionLikeReflection)` if a function-like reflection is found.
+    /// - `Some(&FunctionLikeMetadata)` if a function-like metadata is found.
     /// - `None` if no function-like scope is present.
-    pub fn get_function_like_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeReflection> {
+    pub fn get_function_like_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeMetadata> {
         self.get_function_like_scope().and_then(|function_like| match function_like {
-            FunctionLikeScope::Function(name) => context.codebase.get_function(context.interner, name),
-            FunctionLikeScope::Closure(span) => context.codebase.get_closure(span),
-            FunctionLikeScope::ArrowFunction(span) => context.codebase.get_arrow_function(span),
+            FunctionLikeScope::Function(name) => get_function(context.codebase, context.interner, name),
+            FunctionLikeScope::Closure(position) => get_closure(context.codebase, context.interner, position),
             FunctionLikeScope::Method(name) => {
-                let class_like = self.get_class_like_reflection(context)?;
-                context.codebase.get_method(context.interner, class_like, name)
+                let class_like = self.get_class_like_metadata(context)?;
+
+                get_method(context.codebase, context.interner, &class_like.name, name)
             }
         })
     }
 
-    /// Retrieves the reflection for the most recent function scope.
+    /// Retrieves the metadata for the most recent function scope.
     ///
     /// This method searches the scope stack for the first occurrence of a `Function` variant
-    /// within a function-like scope and returns its reflection using the provided context.
+    /// within a function-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -270,21 +283,21 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&FunctionLikeReflection)` if a function reflection is found.
+    /// - `Some(&FunctionLikeMetadata)` if a function metadata is found.
     /// - `None` if no function scope is present.
-    pub fn get_function_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeReflection> {
+    pub fn get_function_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
             Scope::FunctionLike(FunctionLikeScope::Function(name)) => {
-                context.codebase.get_function(context.interner, name)
+                get_function(context.codebase, context.interner, name)
             }
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent closure scope.
+    /// Retrieves the metadata for the most recent closure scope.
     ///
     /// This method searches the scope stack for the first occurrence of a `Closure` variant
-    /// within a function-like scope and returns its reflection using the provided context.
+    /// within a function-like scope and returns its metadata using the provided context.
     ///
     /// # Parameters
     ///
@@ -292,40 +305,22 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&FunctionLikeReflection)` if a closure reflection is found.
+    /// - `Some(&FunctionLikeMetadata)` if a closure metadata is found.
     /// - `None` if no closure scope is present.
-    pub fn get_closure_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeReflection> {
+    pub fn get_closure_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::FunctionLike(FunctionLikeScope::Closure(span)) => context.codebase.get_closure(span),
+            Scope::FunctionLike(FunctionLikeScope::Closure(position)) => {
+                get_closure(context.codebase, context.interner, position)
+            }
             _ => None,
         })
     }
 
-    /// Retrieves the reflection for the most recent arrow function scope.
-    ///
-    /// This method searches the scope stack for the first occurrence of an `ArrowFunction` variant
-    /// within a function-like scope and returns its reflection using the provided context.
-    ///
-    /// # Parameters
-    ///
-    /// - `context`: The linting context containing the codebase and interner.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(&FunctionLikeReflection)` if an arrow function reflection is found.
-    /// - `None` if no arrow function scope is present.
-    pub fn get_arrow_function_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeReflection> {
-        self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::FunctionLike(FunctionLikeScope::ArrowFunction(span)) => context.codebase.get_arrow_function(span),
-            _ => None,
-        })
-    }
-
-    /// Retrieves the reflection for the most recent method scope.
+    /// Retrieves the metadata for the most recent method scope.
     ///
     /// This method searches the scope stack for the first occurrence of a `Method` variant
-    /// within a function-like scope. It then retrieves the reflection for the containing
-    /// class-like scope and uses it to obtain the method reflection from the context's codebase.
+    /// within a function-like scope. It then retrieves the metadata for the containing
+    /// class-like scope and uses it to obtain the method metadata from the context's codebase.
     ///
     /// # Parameters
     ///
@@ -333,13 +328,14 @@ impl ScopeStack {
     ///
     /// # Returns
     ///
-    /// - `Some(&FunctionLikeReflection)` if a method reflection is found.
-    /// - `None` if no method scope is present or if the containing class-like reflection is not available.
-    pub fn get_method_reflection<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeReflection> {
+    /// - `Some(&FunctionLikeMetadata)` if a method metadata is found.
+    /// - `None` if no method scope is present or if the containing class-like metadata is not available.
+    pub fn get_method_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a FunctionLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
             Scope::FunctionLike(FunctionLikeScope::Method(name)) => {
-                let class_like = self.get_class_like_reflection(context)?;
-                context.codebase.get_method(context.interner, class_like, name)
+                let class_like = self.get_class_like_metadata(context)?;
+
+                get_method(context.codebase, context.interner, &class_like.name, name)
             }
             _ => None,
         })

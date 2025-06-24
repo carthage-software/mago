@@ -43,7 +43,7 @@ const PCRE_JIT_SUPPORT = 1;
  *
  * @return int|false
  */
-function preg_match(string $pattern, string $subject, &$matches, int $flags = 0, int $offset = 0): int|false
+function preg_match(string $pattern, string $subject, &$matches = [], int $flags = 0, int $offset = 0): int|false
 {
 }
 

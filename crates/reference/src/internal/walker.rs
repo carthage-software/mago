@@ -86,7 +86,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
     #[inline]
     fn walk_in_class(&self, class: &Class, context: &mut Context<'a>) {
-        let class_name_id = context.module.names.get(&class.name);
+        let class_name_id = context.resolved_names.get(&class.name);
         let class_name = context.interner.lookup(class_name_id);
 
         if context.query.matches(class_name) {
@@ -99,7 +99,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
         if let Some(extends) = class.extends.as_ref() {
             for extended in &extends.types.nodes {
-                let extended_name_id = context.module.names.get(&extended);
+                let extended_name_id = context.resolved_names.get(&extended);
                 let extended_name = context.interner.lookup(extended_name_id);
 
                 if context.query.matches(extended_name) {
@@ -114,7 +114,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
         if let Some(implements) = class.implements.as_ref() {
             for implemented in &implements.types.nodes {
-                let implemented_name_id = context.module.names.get(&implemented);
+                let implemented_name_id = context.resolved_names.get(&implemented);
                 let implemented_name = context.interner.lookup(implemented_name_id);
 
                 if context.query.matches(implemented_name) {
@@ -130,7 +130,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
     #[inline]
     fn walk_in_interface(&self, interface: &Interface, context: &mut Context<'a>) {
-        let interface_name_id = context.module.names.get(&interface.name);
+        let interface_name_id = context.resolved_names.get(&interface.name);
         let interface_name = context.interner.lookup(interface_name_id);
 
         if context.query.matches(interface_name) {
@@ -143,7 +143,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
         if let Some(extends) = interface.extends.as_ref() {
             for extended in &extends.types.nodes {
-                let extended_name_id = context.module.names.get(&extended);
+                let extended_name_id = context.resolved_names.get(&extended);
                 let extended_name = context.interner.lookup(extended_name_id);
 
                 if context.query.matches(extended_name) {
@@ -159,7 +159,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
     #[inline]
     fn walk_in_trait(&self, r#trait: &Trait, context: &mut Context<'a>) {
-        let trait_name_id = context.module.names.get(&r#trait.name);
+        let trait_name_id = context.resolved_names.get(&r#trait.name);
         let trait_name = context.interner.lookup(trait_name_id);
 
         if context.query.matches(trait_name) {
@@ -173,7 +173,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
     #[inline]
     fn walk_in_enum(&self, r#enum: &Enum, context: &mut Context<'a>) {
-        let enum_name_id = context.module.names.get(&r#enum.name);
+        let enum_name_id = context.resolved_names.get(&r#enum.name);
         let enum_name = context.interner.lookup(enum_name_id);
 
         if context.query.matches(enum_name) {
@@ -186,7 +186,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
         if let Some(implements) = r#enum.implements.as_ref() {
             for implemented in &implements.types.nodes {
-                let implemented_name_id = context.module.names.get(&implemented);
+                let implemented_name_id = context.resolved_names.get(&implemented);
                 let implemented_name = context.interner.lookup(implemented_name_id);
 
                 if context.query.matches(implemented_name) {
@@ -202,7 +202,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
 
     #[inline]
     fn walk_in_function(&self, function: &Function, context: &mut Context<'a>) {
-        let function_name_id = context.module.names.get(&function.name);
+        let function_name_id = context.resolved_names.get(&function.name);
         let function_name = context.interner.lookup(function_name_id);
 
         if context.query.matches(function_name) {
@@ -217,7 +217,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
     #[inline]
     fn walk_in_constant(&self, constant: &Constant, context: &mut Context<'a>) {
         for item in &constant.items.nodes {
-            let item_name_id = context.module.names.get(&item.name);
+            let item_name_id = context.resolved_names.get(&item.name);
             let item_name = context.interner.lookup(item_name_id);
 
             if context.query.matches(item_name) {
@@ -233,7 +233,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
     #[inline]
     fn walk_in_trait_use(&self, trait_use: &TraitUse, context: &mut Context<'a>) {
         for r#trait in &trait_use.trait_names.nodes {
-            let trait_name_id = context.module.names.get(&r#trait);
+            let trait_name_id = context.resolved_names.get(&r#trait);
             let trait_name = context.interner.lookup(trait_name_id);
 
             if context.query.matches(trait_name) {
@@ -328,7 +328,7 @@ impl<'a> Walker<Context<'a>> for ReferenceFindingWalker {
     }
 
     fn walk_in_attribute(&self, attribute: &Attribute, context: &mut Context<'a>) {
-        let attribute_name_id = context.module.names.get(&attribute.name);
+        let attribute_name_id = context.resolved_names.get(&attribute.name);
         let attribute_name = context.interner.lookup(attribute_name_id);
 
         if context.query.matches(attribute_name) {
@@ -352,7 +352,7 @@ fn check_expression(expression: &Expression, context: &mut Context<'_>) {
 
 #[inline]
 fn check_identifier(identifier: &Identifier, context: &mut Context<'_>) {
-    let identifier_name_id = context.module.names.get(identifier);
+    let identifier_name_id = context.resolved_names.get(identifier);
     let identifier_name = context.interner.lookup(identifier_name_id);
 
     if context.query.matches(identifier_name) {

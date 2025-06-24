@@ -14,15 +14,15 @@ workspace = true
 
 [dependencies]
 mago-fixer = { workspace = true }
-mago-project = { workspace = true }
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
 mago-interner = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-source = { workspace = true }
-mago-reflection = { workspace = true }
 mago-casing = { workspace = true }
+mago-codex = { workspace = true }
+mago-names = { workspace = true }
 mago-php-version = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }

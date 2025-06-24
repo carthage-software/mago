@@ -1,47 +1,22 @@
 <?php
 
-// Start of SPL v.0.2
-use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Pure;
+/**
+ * @return list<class-string>
+ */
+function spl_classes(): array
+{
+}
 
 /**
- * Return available SPL classes
- * @link https://php.net/manual/en/function.spl-classes.php
- * @return array
+ * @param class-string $class
  */
-#[Pure]
-function spl_classes(): array {}
+function spl_autoload(string $class, null|string $file_extensions = null): void
+{
+}
 
-/**
- * Default implementation for __autoload()
- * @link https://php.net/manual/en/function.spl-autoload.php
- * @param string $class <p>
- * </p>
- * @param string|null $file_extensions [optional] <p>
- * By default it checks all include paths to
- * contain filenames built up by the lowercase class name appended by the
- * filename extensions .inc and .php.
- * </p>
- * @return void
- * @since 5.1.2
- */
-function spl_autoload(string $class, ?string $file_extensions): void {}
-
-/**
- * Register and return default file extensions for spl_autoload
- * @link https://php.net/manual/en/function.spl-autoload-extensions.php
- * @param string|null $file_extensions [optional] <p>
- * When calling without an argument, it simply returns the current list
- * of extensions each separated by comma. To modify the list of file
- * extensions, simply invoke the functions with the new list of file
- * extensions to use in a single string with each extensions separated
- * by comma.
- * </p>
- * @return string A comma delimited list of default file extensions for
- * spl_autoload.
- * @since 5.1.2
- */
-function spl_autoload_extensions(?string $file_extensions): string {}
+function spl_autoload_extensions(null|string $file_extensions = null): string
+{
+}
 
 /**
  * Register given function as __autoload() implementation
@@ -59,7 +34,9 @@ function spl_autoload_extensions(?string $file_extensions): string {}
  * @throws TypeError Since 8.0.
  * @since 5.1.2
  */
-function spl_autoload_register(?callable $callback, bool $throw = true, bool $prepend = false): bool {}
+function spl_autoload_register(null|callable $callback, bool $throw = true, bool $prepend = false): bool
+{
+}
 
 /**
  * Unregister given function as __autoload() implementation
@@ -70,7 +47,9 @@ function spl_autoload_register(?callable $callback, bool $throw = true, bool $pr
  * @return bool true on success or false on failure.
  * @since 5.1.2
  */
-function spl_autoload_unregister(callable $callback): bool {}
+function spl_autoload_unregister(callable $callback): bool
+{
+}
 
 /**
  * Return all registered __autoload() functions
@@ -80,19 +59,16 @@ function spl_autoload_unregister(callable $callback): bool {}
  * If no function is registered the return value will be an empty array.
  * @since 5.1.2
  */
-#[LanguageLevelTypeAware(["8.0" => "array"], default: "array|false")]
-function spl_autoload_functions() {}
+function spl_autoload_functions(): array
+{
+}
 
 /**
- * Try all registered __autoload() functions to load the requested class
- * @link https://php.net/manual/en/function.spl-autoload-call.php
- * @param string $class <p>
- * The class name being searched.
- * </p>
- * @return void
- * @since 5.1.2
+ * @param class-string $class
  */
-function spl_autoload_call(string $class): void {}
+function spl_autoload_call(string $class): void
+{
+}
 
 /**
  * Return the parent classes of the given class
@@ -106,9 +82,12 @@ function spl_autoload_call(string $class): void {}
  * method.
  * </p>
  * @return string[]|false An array on success, or false on error.
+ *
+ * @pure
  */
-#[Pure]
-function class_parents($object_or_class, bool $autoload = true): array|false {}
+function class_parents($object_or_class, bool $autoload = true): array|false
+{
+}
 
 /**
  * Return the interfaces which are implemented by the given class
@@ -124,7 +103,9 @@ function class_parents($object_or_class, bool $autoload = true): array|false {}
  * @return string[]|false An array on success, or false on error.
  */
 #[Pure]
-function class_implements($object_or_class, bool $autoload = true): array|false {}
+function class_implements($object_or_class, bool $autoload = true): array|false
+{
+}
 
 /**
  * Return hash id for given object
@@ -134,31 +115,28 @@ function class_implements($object_or_class, bool $autoload = true): array|false 
  * the same object.
  */
 #[Pure]
-function spl_object_hash(object $object): string {}
+function spl_object_hash(object $object): string
+{
+}
 
 /**
- * Copy the iterator into an array
- * @link https://php.net/manual/en/function.iterator-to-array.php
- * @param Traversable $iterator <p>
- * The iterator being copied.
- * </p>
- * @param bool $preserve_keys [optional] <p>
- * Whether to use the iterator element keys as index.
- * </p>
- * @return array An array containing the elements of the iterator.
+ * @template K as array-key
+ * @template V
+ *
+ * @param Traversable<K, V>|array<K, V> $iterator <p>
+ *
+ * @return ($preserve_keys is true ? array<K, V> : list<V>)
  */
-function iterator_to_array(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array'], default: 'Traversable')] $iterator, bool $preserve_keys = true): array {}
+function iterator_to_array(Traversable|array $iterator, bool $preserve_keys = true): array
+{
+}
 
 /**
- * Count the elements in an iterator
- * @link https://php.net/manual/en/function.iterator-count.php
- * @param Traversable $iterator <p>
- * The iterator being counted.
- * </p>
- * @return int The number of elements in iterator.
+ * @return int<0, max>
  */
-#[Pure]
-function iterator_count(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array'], default: 'Traversable')] $iterator): int {}
+function iterator_count(Traversable|array $iterator): int
+{
+}
 
 /**
  * Call a function for every element in an iterator
@@ -171,31 +149,25 @@ function iterator_count(#[LanguageLevelTypeAware(['8.2' => 'Traversable|array'],
  * The function must return true in order to
  * continue iterating over the iterator.
  * </p>
- * @param array|null $args [optional] <p>
- * Arguments to pass to the callback function.
- * </p>
+ * @param array|null $args
+ *
  * @return int the iteration count.
  */
-function iterator_apply(Traversable $iterator, callable $callback, ?array $args): int {}
-
-// End of SPL v.0.2
-
-/**
- * Return the traits used by the given class
- * @param object|string $object_or_class An object (class instance) or a string (class name).
- * @param bool $autoload Whether to allow this function to load the class automatically through the __autoload() magic method.
- * @return string[]|false An array on success, or false on error.
- * @link https://php.net/manual/en/function.class-uses.php
- * @see class_parents()
- * @see get_declared_traits()
- * @since 5.4
- */
-function class_uses($object_or_class, bool $autoload = true): array|false {}
+function iterator_apply(Traversable $iterator, callable $callback, null|array $args = null): int
+{
+}
 
 /**
- * return the integer object handle for given object
- * @param object $object
- * @return int
- * @since 7.2
+ * @param object|class-string $object_or_class
+ *
+ * @return list<trait-string>|false
+ *
+ * @pure
  */
-function spl_object_id(object $object): int {}
+function class_uses($object_or_class, bool $autoload = true): array|false
+{
+}
+
+function spl_object_id(object $object): int
+{
+}

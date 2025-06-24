@@ -50,6 +50,11 @@ pub struct FullyQualifiedIdentifier {
 
 impl Identifier {
     #[inline]
+    pub const fn is_local(&self) -> bool {
+        matches!(self, Identifier::Local(_))
+    }
+
+    #[inline]
     pub const fn is_fully_qualified(&self) -> bool {
         matches!(self, Identifier::FullyQualified(_))
     }

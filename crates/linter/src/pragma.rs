@@ -1,5 +1,5 @@
 use mago_interner::ThreadedInterner;
-use mago_project::module::Module;
+use mago_source::Source;
 use mago_span::Span;
 use mago_syntax::ast::Program;
 
@@ -48,7 +48,7 @@ impl PragmaKind {
     }
 }
 
-/// Extracts and returns all linter pragmas from the given module.
+/// Extracts and returns all linter pragmas from the given program's AST.
 ///
 /// This function looks at every trivia (non-code) element in the AST, filtering for comments.
 /// For each comment, it:
@@ -64,8 +64,8 @@ impl PragmaKind {
 ///
 /// # Parameters
 ///
-/// - `module`: The module to inspect (which contains the AST trivia and source content).
-/// - `program`: The program AST.
+/// - `source`: The source to inspect.
+/// - `program`: The program containing the AST to inspect for comments.
 /// - `interner`: The interner used to resolve the source code string.
 ///
 /// # Returns
@@ -73,12 +73,12 @@ impl PragmaKind {
 /// A vector of `Pragma` structs, each containing a parsed pragma and its location information.
 #[inline]
 pub fn get_pragmas<'s, 'a>(
-    module: &'s Module,
+    source: &'s Source,
     program: &'s Program,
     interner: &'a ThreadedInterner,
 ) -> Vec<Pragma<'a>> {
     // Get the full source code from the interner.
-    let source_code: &'a str = interner.lookup(&module.source.content);
+    let source_code: &'a str = interner.lookup(&source.content);
 
     program
         .trivia
@@ -91,9 +91,9 @@ pub fn get_pragmas<'s, 'a>(
                 return None;
             }
 
-            let start_line = module.source.line_number(trivia.span.start.offset);
-            let end_line = module.source.line_number(trivia.span.end.offset);
-            let line_start = module.source.get_line_start_offset(start_line).unwrap_or(0);
+            let start_line = source.line_number(trivia.span.start.offset);
+            let end_line = source.line_number(trivia.span.end.offset);
+            let line_start = source.get_line_start_offset(start_line).unwrap_or(0);
             let prefix = &source_code[line_start..trivia.span.start.offset];
             let own_line = prefix.trim().is_empty();
 

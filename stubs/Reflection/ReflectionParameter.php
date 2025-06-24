@@ -39,7 +39,6 @@ class ReflectionParameter implements Reflector
      * @link https://php.net/manual/en/reflectionparameter.tostring.php
      * @return string
      */
-    #[TentativeType]
     public function __toString(): string
     {
     }
@@ -51,7 +50,6 @@ class ReflectionParameter implements Reflector
      * @return string The name of the reflected parameter.
      */
     #[Pure]
-    #[TentativeType]
     public function getName(): string
     {
     }
@@ -63,7 +61,6 @@ class ReflectionParameter implements Reflector
      * @return bool {@see true} if the parameter is passed in by reference, otherwise {@see false}
      */
     #[Pure]
-    #[TentativeType]
     public function isPassedByReference(): bool
     {
     }
@@ -76,7 +73,6 @@ class ReflectionParameter implements Reflector
      * Returns {@see null} in case of an error.
      * @since 5.4
      */
-    #[TentativeType]
     public function canBePassedByValue(): bool
     {
     }
@@ -89,7 +85,6 @@ class ReflectionParameter implements Reflector
      * @since 5.2.3
      */
     #[Pure]
-    #[TentativeType]
     public function getDeclaringFunction(): ReflectionFunctionAbstract
     {
     }
@@ -102,7 +97,6 @@ class ReflectionParameter implements Reflector
      * called on function.
      */
     #[Pure]
-    #[TentativeType]
     public function getDeclaringClass(): null|ReflectionClass
     {
     }
@@ -119,7 +113,6 @@ class ReflectionParameter implements Reflector
         since: '8.0',
     )]
     #[Pure]
-    #[TentativeType]
     public function getClass(): null|ReflectionClass
     {
     }
@@ -131,7 +124,6 @@ class ReflectionParameter implements Reflector
      * @return bool {@see true} if a type is specified, {@see false} otherwise.
      * @since 7.0
      */
-    #[TentativeType]
     public function hasType(): bool
     {
     }
@@ -150,7 +142,6 @@ class ReflectionParameter implements Reflector
         '8.0' => 'ReflectionNamedType|ReflectionUnionType|null',
         '8.1' => 'ReflectionNamedType|ReflectionUnionType|ReflectionIntersectionType|null',
     ], default: 'ReflectionType|null')]
-    #[TentativeType]
     public function getType(): null|ReflectionType
     {
     }
@@ -167,7 +158,6 @@ class ReflectionParameter implements Reflector
         since: '8.0',
     )]
     #[Pure]
-    #[TentativeType]
     public function isArray(): bool
     {
     }
@@ -186,7 +176,6 @@ class ReflectionParameter implements Reflector
         since: '8.0',
     )]
     #[Pure]
-    #[TentativeType]
     public function isCallable(): bool
     {
     }
@@ -198,7 +187,6 @@ class ReflectionParameter implements Reflector
      * @return bool Returns {@see true} if {@see null} is allowed,
      * otherwise {@see false}
      */
-    #[TentativeType]
     public function allowsNull(): bool
     {
     }
@@ -211,7 +199,6 @@ class ReflectionParameter implements Reflector
      * @since 5.2.3
      */
     #[Pure]
-    #[TentativeType]
     public function getPosition(): int
     {
     }
@@ -224,7 +211,6 @@ class ReflectionParameter implements Reflector
      * @since 5.0.3
      */
     #[Pure]
-    #[TentativeType]
     public function isOptional(): bool
     {
     }
@@ -237,7 +223,6 @@ class ReflectionParameter implements Reflector
      * @since 5.0.3
      */
     #[Pure]
-    #[TentativeType]
     public function isDefaultValueAvailable(): bool
     {
     }
@@ -251,7 +236,6 @@ class ReflectionParameter implements Reflector
      * @since 5.0.3
      */
     #[Pure]
-    #[TentativeType]
     public function getDefaultValue(): mixed
     {
     }
@@ -264,7 +248,6 @@ class ReflectionParameter implements Reflector
      * @since 5.4.6
      */
     #[Pure]
-    #[TentativeType]
     public function isDefaultValueConstant(): bool
     {
     }
@@ -278,7 +261,6 @@ class ReflectionParameter implements Reflector
      * @since 5.4.6
      */
     #[Pure]
-    #[TentativeType]
     public function getDefaultValueConstantName(): null|string
     {
     }
@@ -291,7 +273,6 @@ class ReflectionParameter implements Reflector
      * @since 5.6
      */
     #[Pure]
-    #[TentativeType]
     public function isVariadic(): bool
     {
     }

@@ -2,11 +2,13 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::RwLockReadGuard;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_interner::ThreadedInterner;
-use mago_project::module::Module;
-use mago_reflection::CodebaseReflection;
+use mago_names::ResolvedNames;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
+use mago_source::Source;
+use mago_syntax::ast::Program;
 
 use crate::plugin::Plugin;
 use crate::rule::ConfiguredRule;
@@ -33,7 +35,7 @@ mod utils;
 pub struct Linter {
     settings: Settings,
     interner: ThreadedInterner,
-    codebase: Arc<CodebaseReflection>,
+    codebase: Arc<CodebaseMetadata>,
     rules: Arc<RwLock<Vec<ConfiguredRule>>>,
 }
 
@@ -45,13 +47,13 @@ impl Linter {
     /// # Parameters
     ///
     /// - `settings`: The settings to use for the linter.
-    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the module.
-    /// - `codebase`: The codebase reflection to use for the linter.
+    /// - `interner`: The interner to use for the linter, usually the same one used by the parser.
+    /// - `codebase`: The codebase metadata to use for the linter.
     ///
     /// # Returns
     ///
     /// A new linter.
-    pub fn new(settings: Settings, interner: ThreadedInterner, codebase: CodebaseReflection) -> Self {
+    pub fn new(settings: Settings, interner: ThreadedInterner, codebase: CodebaseMetadata) -> Self {
         Self { settings, interner, codebase: Arc::new(codebase), rules: Arc::new(RwLock::new(Vec::new())) }
     }
 
@@ -63,13 +65,13 @@ impl Linter {
     /// # Parameters
     ///
     /// - `settings`: The settings to use for the linter.
-    /// - `interner`: The interner to use for the linter, usually the same one used by the parser, and the module.
-    /// - `codebase`: The codebase reflection to use for the linter.
+    /// - `interner`: The interner to use for the linter, usually the same one used by the parser.
+    /// - `codebase`: The codebase metadata to use for the linter.
     ///
     /// # Returns
     ///
     /// A new linter with all plugins enabled.
-    pub fn with_all_plugins(settings: Settings, interner: ThreadedInterner, codebase: CodebaseReflection) -> Self {
+    pub fn with_all_plugins(settings: Settings, interner: ThreadedInterner, codebase: CodebaseMetadata) -> Self {
         let mut linter = Self::new(settings, interner, codebase);
 
         crate::foreach_plugin!(|plugin| linter.add_plugin(plugin));
@@ -213,18 +215,20 @@ impl Linter {
         configured_rules.iter().find(|r| r.slug == slug).map(|r| r.level)
     }
 
-    /// Lints the given module.
+    /// Lints the given program.
     ///
-    /// This method will lint the given module and return a collection of issues.
+    /// This method will lint the given program and return a collection of issues.
     ///
     /// # Parameters
     ///
-    /// - `module`: The module to lint.
+    /// - `source`: The source of the program to lint.
+    /// - `program`: The program to lint.
+    /// - `resolved_names`: The resolved names of the program.
     ///
     /// # Returns
     ///
     /// A collection of issues.
-    pub fn lint(&self, module: &Module) -> IssueCollection {
+    pub fn lint(&self, source: &Source, program: &Program, resolved_names: &ResolvedNames) -> IssueCollection {
         let configured_rules = self.rules.read().expect("Unable to read rules: poisoned lock");
         if configured_rules.is_empty() {
             tracing::warn!("Linting aborted - no rules configured.");
@@ -232,8 +236,9 @@ impl Linter {
             return IssueCollection::new();
         }
 
-        let program = module.parse(&self.interner);
-        let mut runner = Runner::new(self.settings.php_version, &self.interner, &self.codebase, module, &program);
+        let mut runner =
+            Runner::new(self.settings.php_version, &self.interner, &self.codebase, source, program, resolved_names);
+
         for configured_rule in configured_rules.iter() {
             runner.run(configured_rule);
         }

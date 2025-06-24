@@ -1,5 +1,6 @@
 use indoc::indoc;
 
+use mago_codex::*;
 use mago_fixer::SafetyClassification;
 use mago_interner::StringIdentifier;
 use mago_reporting::*;
@@ -141,15 +142,15 @@ impl Rule for RedundantInstanceOfRule {
                 continue;
             };
 
-            let Some(class_reflection) = context.codebase.get_named_class_like(context.interner, class_name) else {
+            if !class_exists(context.codebase, context.interner, object_name) {
                 continue;
             };
 
-            let Some(object_reflection) = context.codebase.get_named_class_like(context.interner, object_name) else {
+            if !class_like_exists(context.codebase, context.interner, class_name) {
                 continue;
             };
 
-            if object_reflection.inheritance.is_instance_of(context.interner, class_reflection) {
+            if is_instance_of(context.codebase, context.interner, object_name, class_name) {
                 let issue = Issue::new(context.level(), "Redundant `instanceof` assertion.")
                     .with_annotation(Annotation::primary(reference.span()).with_message(format!(
                         "This `instanceof` assertion is redundant because `{}` is always an instance of `{}`.",
@@ -222,7 +223,7 @@ fn get_class_name<'a>(expression: &Expression, context: &'a LintContext) -> Opti
         return None;
     }
 
-    Some(context.module.names.get(&class_name.position()))
+    Some(context.resolved_names.get(&class_name.position()))
 }
 
 /// Returns the name of the object instantiated by the given expression.
@@ -247,5 +248,5 @@ fn get_object_name<'a>(expression: &Expression, context: &'a LintContext) -> Opt
         return None;
     };
 
-    Some(context.module.names.get(&class_name.position()))
+    Some(context.resolved_names.get(&class_name.position()))
 }

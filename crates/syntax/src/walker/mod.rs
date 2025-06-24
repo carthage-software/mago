@@ -667,7 +667,7 @@ generate_ast_walker! {
         }
 
         walker.walk_property_item(&hooked_property.item, context);
-        walker.walk_property_hook_list(&hooked_property.hooks, context);
+        walker.walk_property_hook_list(&hooked_property.hook_list, context);
     }
 
     PropertyHookList as property_hook_list => {

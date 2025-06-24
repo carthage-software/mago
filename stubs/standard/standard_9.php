@@ -249,43 +249,32 @@ function array_unique(array $array, int $flags = SORT_STRING): array
 }
 
 /**
- * Computes the intersection of arrays
- * @link https://php.net/manual/en/function.array-intersect.php
- * @param array $array <p>
- * The array with main values to check.
- * </p>
- * @param array ...$arrays arrays to compare values against.
- * @return array an array containing all the values of
- * <code>array</code> that are present in all the arguments.
- * Note that keys are preserved.
- * @meta
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
  */
-#[Pure]
-function array_intersect(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_intersect(array $array, array ...$arrays): array
+{
 }
 
 /**
- * Computes the intersection of arrays using keys for comparison
- * @link https://php.net/manual/en/function.array-intersect-key.php
- * @param array $array <p>
- * The array with main keys to check.
- * </p>
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
  * @param array ...$arrays
- * @return array an array containing all the entries of
- * <code>array</code>  which have keys that are present in all the
- * arguments.
- * @meta
+ *
+ * @return array<K, V>
+ *
+ * @pure
  */
-#[Pure]
-function array_intersect_key(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_intersect_key(array $array, array ...$arrays): array
+{
 }
 
 /**
@@ -306,12 +295,8 @@ function array_intersect_key(
  * in all the arguments.
  * @meta
  */
-function array_intersect_ukey(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_intersect_ukey(array $array, ...$rest): array
+{
 }
 
 /**
@@ -337,31 +322,22 @@ function array_intersect_ukey(
  * that are present in all the arguments.
  * @meta
  */
-function array_uintersect(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_uintersect(array $array, ...$rest): array
+{
 }
 
 /**
- * Computes the intersection of arrays with additional index check
- * @link https://php.net/manual/en/function.array-intersect-assoc.php
- * @param array $array <p>
- * The array with main values to check.
- * </p>
- * @param array $arrays
- * @return array an associative array containing all the values in
- * <code>array</code> that are present in all of the arguments.
- * @meta
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
  */
-#[Pure]
-function array_intersect_assoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_intersect_assoc(array $array, array ...$arrays): array
+{
 }
 
 /**
@@ -385,12 +361,8 @@ function array_intersect_assoc(
  * <code>array</code> that are present in all the arguments.
  * @meta
  */
-function array_uintersect_assoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_uintersect_assoc(array $array, ...$rest): array
+{
 }
 
 /**
@@ -409,12 +381,8 @@ function array_uintersect_assoc(
  * @return array the values of <code>array</code> whose values exist in all of the arguments.
  * @meta
  */
-function array_intersect_uassoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_intersect_uassoc(array $array, ...$rest): array
+{
 }
 
 /**
@@ -442,54 +410,36 @@ function array_intersect_uassoc(
  * @meta
  */
 #[Pure]
-function array_uintersect_uassoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_uintersect_uassoc(array $array, ...$rest): array
+{
 }
 
 /**
- * Computes the difference of arrays
- * @link https://php.net/manual/en/function.array-diff.php
- * @param array $array <p>
- * The array to compare from
- * </p>
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
  * @param array ...$arrays
- * @return array an array containing all the entries from
- * <code>array</code> that are not present in any of the other
- * arrays. Keys in the array <code>array</code> are preserved.
- * @meta
+ *
+ * @return array<K, V>
+ * @pure
  */
-#[Pure]
-function array_diff(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_diff(array $array, array ...$arrays): array
+{
 }
 
 /**
- * Computes the difference of arrays using keys for comparison
- * @link https://php.net/manual/en/function.array-diff-key.php
- * @param array $array <p>
- * The array to compare from
- * </p>
- * @param array $arrays <p>
- * An array to compare against
- * </p>
- * @return array an array containing all the entries from
- * <code>array</code> whose keys are absent from all of the other arrays.
- * @meta
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
  */
-#[Pure]
-function array_diff_key(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_diff_key(array $array, array ...$arrays): array
+{
 }
 
 /**
@@ -512,12 +462,8 @@ function array_diff_key(
  * <code>array</code> that are not present in any of the other arrays.
  * @meta
  */
-function array_diff_ukey(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_diff_ukey(array $array, ...$rest): array
+{
 }
 
 /**
@@ -543,33 +489,22 @@ function array_diff_ukey(
  * <code>array</code> that are not present in any of the other arguments.
  * @meta
  */
-function array_udiff(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_udiff(array $array, ...$rest): array
+{
 }
 
 /**
- * Computes the difference of arrays with additional index check
- * @link https://php.net/manual/en/function.array-diff-assoc.php
- * @param array $array <p>
- * The array to compare from
- * </p>
- * @param array $arrays <p>
- * An array to compare against
- * </p>
- * @return array an array containing all the values from
- * <code>array</code> that are not present in any of the other arrays.
- * @meta
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
  */
-#[Pure]
-function array_diff_assoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $arrays,
-    array ...$arrays,
-): array {
+function array_diff_assoc(array $array, array ...$arrays): array
+{
 }
 
 /**
@@ -601,12 +536,8 @@ function array_diff_assoc(
  * comparison.
  * @meta
  */
-function array_udiff_assoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_udiff_assoc(array $array, ...$rest): array
+{
 }
 
 /**
@@ -629,12 +560,8 @@ function array_udiff_assoc(
  * <code>array</code> that are not present in any of the other arrays.
  * @meta
  */
-function array_diff_uassoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_diff_uassoc(array $array, ...$rest): array
+{
 }
 
 /**
@@ -674,13 +601,8 @@ function array_diff_uassoc(
  * arguments.
  * @meta
  */
-function array_udiff_uassoc(
-    array $array,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] array $array2,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $data_compare_func,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] callable $key_compare_func,
-    #[PhpStormStubsElementAvailable(from: '8.0')]  ...$rest,
-): array {
+function array_udiff_uassoc(array $array, ...$rest): array
+{
 }
 
 /**
@@ -753,20 +675,21 @@ function array_map(null|callable $callback, array $array, array ...$arrays): arr
  * </p>
  * @return array a multidimensional numerically indexed array, starting with zero,
  * with each dimension containing size elements.
+ *
+ * @pure
  */
-#[Pure]
 function array_chunk(array $array, int $length, bool $preserve_keys = false): array
 {
 }
 
 /**
- * @template Tk as array-key
- * @template Tv
+ * @template K as array-key
+ * @template V
  *
- * @param array<Tk> $keys
- * @param array<Tv> $values
+ * @param array<K> $keys
+ * @param array<V> $values
  *
- * @return array<Tk, Tv>
+ * @return ($keys is non-empty-array ? non-empty-array<K, V> : array<K, V>)
  *
  * @pure
  */
@@ -808,20 +731,6 @@ function array_key_last(array $array): string|int|null
 }
 
 /**
- * @template T
- *
- * @param array<int, T> $array
- *
- * @return bool
- *
- * @assert-if-true list<T> $array
- * @pure
- */
-function array_is_list(array $array): bool
-{
-}
-
-/**
  * @pure
  */
 function pos(object|array $array): mixed
@@ -838,101 +747,28 @@ function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int
 }
 
 /**
- * Checks if the given key or index exists in the array. The name of this function is array_key_exists() in PHP > 4.0.6.
- * @link https://php.net/manual/en/function.array-key-exists.php
- * @param int|string $key <p>
- * Value to check.
- * </p>
- * @param array $array <p>
- * An array with keys to check.
- * </p>
- * @return bool true on success or false on failure.
+ * @template K as array-key
+ * @template V
+ *
+ * @param K $key
+ * @param array<K, V> $array
  */
-#[Pure]
 function key_exists($key, array $array): bool
 {
 }
 
 /**
- * Checks if assertion is <b>FALSE</b>
- * @link https://php.net/manual/en/function.assert.php
- * @param Throwable|string|null $assertion <p>
- * The assertion.
- * In PHP 5, this must be either a string to be evaluated or a boolean to be tested.
- * In PHP 7, this may also be any expression that returns a value,
- * which will be executed and the result used to indicate whether the assertion succeeded or failed.<br/>
- * Since 7.2.0 using string is deprecated.
- * </p>
- * @param string $description [optional]
- * <p>An optional description that will be included in the failure message if the assertion fails.</p>
- * @return bool false if the assertion is false, true otherwise.
+ * @assert truthy $assertion
  */
-function assert(mixed $assertion, #[PhpStormStubsElementAvailable(from: '7.0')]
-    #[LanguageLevelTypeAware(['7.0' => 'Throwable|string|null'], default: 'string')]  $description = null): bool
+function assert(mixed $assertion, Throwable|string|null $description = null): bool
 {
 }
 
-/**
- * AssertionError is thrown when an assertion made via {@see assert()} fails.
- * @link https://php.net/manual/en/class.assertionerror.php
- * @since 7.0
- */
 class AssertionError extends Error
 {
 }
 
 /**
- * Set/get the various assert flags
- * @link https://php.net/manual/en/function.assert-options.php
- * @param int $option <p>
- * <table>
- * Assert Options
- * <tr valign="top">
- * <td>Option</td>
- * <td>INI Setting</td>
- * <td>Default value</td>
- * <td>Description</td>
- * </tr>
- * <tr valign="top">
- * <td>ASSERT_ACTIVE</td>
- * <td>assert.active</td>
- * <td>1</td>
- * <td>enable assert evaluation</td>
- * </tr>
- * <tr valign="top">
- * <td>ASSERT_WARNING</td>
- * <td>assert.warning</td>
- * <td>1</td>
- * <td>issue a PHP warning for each failed assertion</td>
- * </tr>
- * <tr valign="top">
- * <td>ASSERT_BAIL</td>
- * <td>assert.bail</td>
- * <td>0</td>
- * <td>terminate execution on failed assertions</td>
- * </tr>
- * <tr valign="top">
- * <td>ASSERT_QUIET_EVAL</td>
- * <td>assert.quiet_eval</td>
- * <td>0</td>
- * <td>
- * disable error_reporting during assertion expression
- * evaluation
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>ASSERT_CALLBACK</td>
- * <td>assert.callback</td>
- * <td>null</td>
- * <td>Callback to call on failed assertions</td>
- * </tr>
- * </table>
- * </p>
- * @param mixed $value [optional] <p>
- * An optional new value for the option.
- * </p>
- * @return mixed The original setting of any option.
- *
  * @deprecated
  */
 function assert_options(int $option, mixed $value): mixed
@@ -950,19 +786,6 @@ function version_compare(string $version1, string $version2, null|string $operat
 {
 }
 
-/**
- * Convert a pathname and a project identifier to a System V IPC key
- * @link https://php.net/manual/en/function.ftok.php
- * @param string $filename <p>
- * Path to an accessible file.
- * </p>
- * @param string $project_id <p>
- * Project identifier. This must be a one character string.
- * </p>
- * @return int On success the return value will be the created key value, otherwise
- * -1 is returned.
- */
-#[Pure(true)]
 function ftok(string $filename, string $project_id): int
 {
 }
@@ -975,239 +798,58 @@ function str_rot13(string $string): string
 }
 
 /**
- * Retrieve list of registered filters
- * @link https://php.net/manual/en/function.stream-get-filters.php
- * @return list<string> an indexed array containing the name of all stream filters
- * available.
+ * @return list<string>
  */
-#[Pure(true)]
 function stream_get_filters(): array
 {
 }
 
 /**
- * Check if a stream is a TTY
- * @link https://php.net/manual/en/function.stream-isatty.php
  * @param resource $stream
- * @return bool
- * @since 7.2
  */
-#[Pure]
 function stream_isatty($stream): bool
 {
 }
 
 /**
- * Register a user defined stream filter
- * @link https://php.net/manual/en/function.stream-filter-register.php
- * @param string $filter_name <p>
- * The filter name to be registered.
- * </p>
- * @param string $class <p>
- * To implement a filter, you need to define a class as an extension of
- * php_user_filter with a number of member functions
- * as defined below. When performing read/write operations on the stream
- * to which your filter is attached, PHP will pass the data through your
- * filter (and any other filters attached to that stream) so that the
- * data may be modified as desired. You must implement the methods
- * exactly as described below - doing otherwise will lead to undefined
- * behaviour.
- * </p>
- * intfilter
- * resourcein
- * resourceout
- * intconsumed
- * boolclosing
- * <p>
- * This method is called whenever data is read from or written to
- * the attached stream (such as with fread or fwrite).
- * in is a resource pointing to a bucket brigade
- * which contains one or more bucket objects containing data to be filtered.
- * out is a resource pointing to a second bucket brigade
- * into which your modified buckets should be placed.
- * consumed, which must always
- * be declared by reference, should be incremented by the length of the data
- * which your filter reads in and alters. In most cases this means you will
- * increment consumed by $bucket->datalen
- * for each $bucket. If the stream is in the process of closing
- * (and therefore this is the last pass through the filterchain),
- * the closing parameter will be set to true.
- * The filter method must return one of
- * three values upon completion.
- * <tr valign="top">
- * <td>Return Value</td>
- * <td>Meaning</td>
- * </tr>
- * <tr valign="top">
- * <td>PSFS_PASS_ON</td>
- * <td>
- * Filter processed successfully with data available in the
- * out bucket brigade.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>PSFS_FEED_ME</td>
- * <td>
- * Filter processed successfully, however no data was available to
- * return. More data is required from the stream or prior filter.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>PSFS_ERR_FATAL (default)</td>
- * <td>
- * The filter experienced an unrecoverable error and cannot continue.
- * </td>
- * </tr>
- * </p>
- * boolonCreate
- * This method is called during instantiation of the filter class
- * object. If your filter allocates or initializes any other resources
- * (such as a buffer), this is the place to do it. Your implementation of
- * this method should return false on failure, or true on success.
- * When your filter is first instantiated, and
- * yourfilter-&gt;onCreate() is called, a number of properties
- * will be available as shown in the table below.
- * <p>
- * <tr valign="top">
- * <td>Property</td>
- * <td>Contents</td>
- * </tr>
- * <tr valign="top">
- * <td>FilterClass-&gt;filtername</td>
- * <td>
- * A string containing the name the filter was instantiated with.
- * Filters may be registered under multiple names or under wildcards.
- * Use this property to determine which name was used.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>FilterClass-&gt;params</td>
- * <td>
- * The contents of the params parameter passed
- * to stream_filter_append
- * or stream_filter_prepend.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>FilterClass-&gt;stream</td>
- * <td>
- * The stream resource being filtered. Maybe available only during
- * filter calls when the
- * closing parameter is set to false.
- * </td>
- * </tr>
- * </p>
- * voidonClose
- * <p>
- * This method is called upon filter shutdown (typically, this is also
- * during stream shutdown), and is executed after
- * the flush method is called. If any resources
- * were allocated or initialized during onCreate()
- * this would be the time to destroy or dispose of them.
- * </p>
- * @return bool true on success or false on failure.
- * <p>
- * stream_filter_register will return false if the
- * filtername is already defined.
- * </p>
+ * @param class-string $class
  */
 function stream_filter_register(string $filter_name, string $class): bool
 {
 }
 
 /**
- * Return a bucket object from the brigade for operating on
- * @link https://php.net/manual/en/function.stream-bucket-make-writeable.php
  * @param resource $brigade
- * @return object|null
  */
-#[LanguageLevelTypeAware(['8.4' => 'StreamBucket|null'], default: 'object|null')]
-function stream_bucket_make_writeable($brigade)
+function stream_bucket_make_writeable($brigade): StreamBucket|null
 {
 }
 
 /**
- * Prepend bucket to brigade
- * @link https://php.net/manual/en/function.stream-bucket-prepend.php
  * @param resource $brigade
- * @param object $bucket
- * @return void
  */
-function stream_bucket_prepend(
-    $brigade,
-    #[LanguageLevelTypeAware(['8.4' => 'StreamBucket'], default: 'object')]  $bucket,
-): void {
+function stream_bucket_prepend($brigade, StreamBucket $bucket): void
+{
 }
 
 /**
- * Append bucket to brigade
- * @link https://php.net/manual/en/function.stream-bucket-append.php
  * @param resource $brigade
- * @param object $bucket
- * @return void
  */
-function stream_bucket_append(
-    $brigade,
-    #[LanguageLevelTypeAware(['8.4' => 'StreamBucket'], default: 'object')]  $bucket,
-): void {
+function stream_bucket_append($brigade, StreamBucket $bucket): void
+{
 }
 
 /**
- * Create a new bucket for use on the current stream
- * @link https://php.net/manual/en/function.stream-bucket-new.php
  * @param resource $stream
- * @param string $buffer
- * @return object
  */
-#[LanguageLevelTypeAware(['8.4' => 'StreamBucket'], default: 'object')]
-function stream_bucket_new($stream, string $buffer)
+function stream_bucket_new($stream, string $buffer): StreamBucket
 {
 }
 
-/**
- * Add URL rewriter values
- * @link https://php.net/manual/en/function.output-add-rewrite-var.php
- * @param string $name <p>
- * The variable name.
- * </p>
- * @param string $value <p>
- * The variable value.
- * </p>
- * @return bool true on success or false on failure.
- */
 function output_add_rewrite_var(string $name, string $value): bool
 {
 }
 
-/**
- * Reset URL rewriter values
- * <table>
- * <thead>
- * <tr>
- * <th>Version</th>
- * <th>Description</th>
- * </tr>
- *
- * </thead>
- *
- * <tbody>
- * <tr>
- * <td>7.1.0</td>
- * <td>
- * Before PHP 7.1.0, rewrite vars set by <span class="function"><a href="function.output-add-rewrite-var.php" class="function">output_add_rewrite_var()</a></span>
- * use the same Session module trans sid output buffer. Since PHP 7.1.0,
- * dedicated output buffer is used and {@see output_reset_rewrite_vars()}
- * only removes rewrite vars defined by {@see output_add_rewrite_var()}.
- * </td>
- * </tr>
- *
- * </tbody>
- *
- * </table>
- *
- * @link https://php.net/manual/en/function.output-reset-rewrite-vars.php
- * @return bool true on success or false on failure.
- */
 function output_reset_rewrite_vars(): bool
 {
 }
@@ -1219,66 +861,32 @@ function sys_get_temp_dir(): string
 {
 }
 
-/**
- */
-#[Pure(true)]
 function realpath_cache_get(): array
 {
 }
 
-/**
- * Get the amount of memory used by the realpath cache.
- * @link https://php.net/manual/en/function.realpath-cache-size.php
- * @return int Returns how much memory realpath cache is using.
- * @since 5.3.2
- */
-#[Pure(true)]
 function realpath_cache_size(): int
 {
 }
 
-/**
- * It returns the same result as (array) $object, with the
- * exception that it ignores overloaded array casts, such as used by
- * ArrayObject.
- * @param object $object
- * @return array returns the mangled object properties
- * @since 7.4
- */
 function get_mangled_object_vars(object $object): array
 {
 }
 
 /**
- * Get the type or object name of a variable
+ * @return non-empty-string
  *
- * @param mixed $value The variable being type checked.
- * @return string Possibles values for the returned string are:
- *  - "int"
- *  - "float"
- *  - "bool"
- *  - "string"
- *  - "array"
- *  - "null"
- *  - A class name for named classes
- *  - "class@anonymous" for an anonymous classes
- *  - "resource (xxx)" for any resources where "xxx" is a name of resource
- *  - "resource (closed)" for closed resources
- * @since 8.0
+ * @pure
  */
-#[Pure]
 function get_debug_type(mixed $value): string
 {
 }
 
 /**
- * A more obvious and type-safe form of "(int) $resource"
- *
  * @param resource $resource
- * @return int
- * @since 8.0
+ *
+ * @pure
  */
-#[Pure]
 function get_resource_id($resource): int
 {
 }

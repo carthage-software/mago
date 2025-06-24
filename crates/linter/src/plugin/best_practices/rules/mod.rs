@@ -15,5 +15,6 @@ pub mod no_hash_emoji;
 pub mod no_multi_assignments;
 pub mod no_sprintf_concatenation;
 pub mod no_unused_parameter;
+pub mod override_attribute;
 pub mod use_while_instead_of_for;
 pub mod utils;

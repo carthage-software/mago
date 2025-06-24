@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use crate::definition::PluginDefinition;
 use crate::rule::Rule;
 
-pub mod analysis;
 pub mod best_practices;
 pub mod comment;
 pub mod consistency;
@@ -23,7 +22,6 @@ pub mod symfony;
 #[macro_export]
 macro_rules! foreach_plugin {
     ($do:expr) => {
-        $do($crate::plugin::analysis::AnalysisPlugin);
         $do($crate::plugin::best_practices::BestPracticesPlugin);
         $do($crate::plugin::comment::CommentPlugin);
         $do($crate::plugin::consistency::ConsistencyPlugin);

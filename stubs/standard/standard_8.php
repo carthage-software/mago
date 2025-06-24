@@ -332,6 +332,8 @@ function array_walk_recursive(object|array &$array, callable $callback, mixed $a
 
 /**
  * @return int<0, max>
+ *
+ * @pure
  */
 function count(Countable|array $value, int $mode = COUNT_NORMAL): int
 {
@@ -652,29 +654,28 @@ function array_push(array &$array, mixed ...$values): int
 }
 
 /**
- * Pop the element off the end of array
- * @link https://php.net/manual/en/function.array-pop.php
- * @param array &$array <p>
- * The array to get the value from.
- * </p>
- * @return mixed|null the last value of array.
- * If array is empty (or is not an array),
- * null will be returned.
- * @meta
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param-out ($array is list ? list<V> : array<K, V>) $array
+ *
+ * @return V|null
  */
 function array_pop(array &$array): mixed
 {
 }
 
 /**
- * Shift an element off the beginning of array
- * @link https://php.net/manual/en/function.array-shift.php
- * @param array &$array <p>
- * The input array.
- * </p>
- * @return mixed|null the shifted value, or null if array is
- * empty or is not an array.
- * @meta
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param-out ($array is list ? list<V> : array<K, V>) $array
+ *
+ * @return V|null
+ *
+ * @pure
  */
 function array_shift(array &$array): mixed
 {

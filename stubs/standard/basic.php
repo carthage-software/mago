@@ -16,14 +16,6 @@ function cli_get_process_title(): null|string
 }
 
 /**
- * @assert-if-true iterable $values
- * @pure
- */
-function is_iterable(mixed $value): bool
-{
-}
-
-/**
  * @deprecated
  * @pure
  */

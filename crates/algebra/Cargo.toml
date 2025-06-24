@@ -1,0 +1,22 @@
+[package]
+name = "mago-algebra"
+description = ""
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-codex = { workspace = true }
+mago-interner = { workspace = true }
+mago-span = { workspace = true }
+ahash = { workspace = true }
+rand = { workspace = true }
+itertools = { workspace = true }
+indexmap = { workspace = true }

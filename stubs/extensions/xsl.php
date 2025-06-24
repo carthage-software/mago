@@ -1,36 +1,114 @@
 <?php
 
+/**
+ * @var int
+ */
+const XSL_CLONE_AUTO = 0;
+
+/**
+ * @var int
+ */
+const XSL_CLONE_NEVER = -1;
+
+/**
+ * @var int
+ */
+const XSL_CLONE_ALWAYS = 1;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_NONE = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_READ_FILE = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_WRITE_FILE = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_CREATE_DIRECTORY = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_READ_NETWORK = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_WRITE_NETWORK = UNKNOWN;
+
+/**
+ * @var int
+ */
+const XSL_SECPREF_DEFAULT = UNKNOWN;
+
+/**
+ * @var int
+ */
+const LIBXSLT_VERSION = UNKNOWN;
+
+/**
+ * @var string
+ */
+const LIBXSLT_DOTTED_VERSION = UNKNOWN;
+
+/**
+ * @var int
+ */
+const LIBEXSLT_VERSION = UNKNOWN;
+
+/**
+ * @var string
+ */
+const LIBEXSLT_DOTTED_VERSION = UNKNOWN;
+
 class XSLTProcessor
 {
+    public bool $doXInclude = false;
+
+    public bool $cloneDocument = false;
+
+    public int $maxTemplateDepth;
+
+    public int $maxTemplateVars;
+
     /**
-     * @template T as DOMDocument|SimpleXMLElement
-     *
-     * @param T $stylesheet
+     * @param DOMDocument|DOM\Document|SimpleXMLElement $stylesheet
      */
     public function importStylesheet(object $stylesheet): bool
     {
     }
 
     /**
-     * @template T of object
-     *
-     * @param T $document
-     * @param null|class-string<T> $returnClass
-     * @return T|false
+     * @param DOMDocument|DOM\Document|SimpleXMLElement $document
      */
-    public function transformToDoc(object $document, string|null $returnClass = null): object|false
+    public function transformToDoc(object $document, null|string $returnClass = null): object|false
     {
     }
 
+    /**
+     * @param DOMDocument|DOM\Document|SimpleXMLElement $document
+     */
     public function transformToUri(object $document, string $uri): int
     {
     }
 
-    public function transformToXml(object $document): string|false|null
+    /**
+     * @param DOMDocument|DOM\Document|SimpleXMLElement $document
+     */
+    public function transformToXml(object $document): string|null|false
     {
     }
 
-    public function setParameter(string $namespace, array|string $name, string|null $value = null): bool
+    public function setParameter(string $namespace, array|string $name, null|string $value = null): bool
     {
     }
 
@@ -50,7 +128,11 @@ class XSLTProcessor
     {
     }
 
-    public function setProfiling(string|null $filename)
+    public function registerPHPFunctionNS(string $namespaceURI, string $name, callable $callable): void
+    {
+    }
+
+    public function setProfiling(null|string $filename): true
     {
     }
 
@@ -62,31 +144,3 @@ class XSLTProcessor
     {
     }
 }
-
-const XSL_CLONE_AUTO = 0;
-
-const XSL_CLONE_NEVER = -1;
-
-const XSL_CLONE_ALWAYS = 1;
-
-const XSL_SECPREF_NONE = 0;
-
-const XSL_SECPREF_READ_FILE = 2;
-
-const XSL_SECPREF_WRITE_FILE = 4;
-
-const XSL_SECPREF_CREATE_DIRECTORY = 8;
-
-const XSL_SECPREF_READ_NETWORK = 16;
-
-const XSL_SECPREF_WRITE_NETWORK = 32;
-
-const XSL_SECPREF_DEFAULT = 44;
-
-const LIBXSLT_VERSION = 10128;
-
-const LIBXSLT_DOTTED_VERSION = '1.1.28';
-
-const LIBEXSLT_VERSION = 817;
-
-const LIBEXSLT_DOTTED_VERSION = '1.1.28';

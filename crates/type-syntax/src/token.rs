@@ -59,6 +59,8 @@ pub enum TypeTokenKind {
     ProtectedPropertiesOf,
     PositiveInt,
     NegativeInt,
+    NonPositiveInt,
+    NonNegativeInt,
     As,
     Is,
     Not,
@@ -175,6 +177,8 @@ impl TypeTokenKind {
                 | Self::ProtectedPropertiesOf
                 | Self::PositiveInt
                 | Self::NegativeInt
+                | Self::NonPositiveInt
+                | Self::NonNegativeInt
         )
     }
 

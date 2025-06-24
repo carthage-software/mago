@@ -89,7 +89,9 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
         }
         Statement::Block(block) => block_has_yield(block),
         Statement::Try(r#try) => {
-            if r#try.catch_clauses.iter().any(|catch| block_has_yield(&catch.block)) {
+            if r#try.block.statements.iter().any(statement_has_yield)
+                || r#try.catch_clauses.iter().any(|catch| block_has_yield(&catch.block))
+            {
                 return true;
             }
 

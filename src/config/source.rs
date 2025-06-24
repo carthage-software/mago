@@ -86,23 +86,23 @@ impl ConfigurationEntry for SourceConfiguration {
         self.paths = self
             .paths
             .iter()
-            .map(|p| {
+            .filter_map(|p| {
                 let path = if p.is_absolute() { p.clone() } else { self.workspace.join(p) };
 
-                path.canonicalize().map_err(|e| Error::CanonicalizingPath(p.clone(), e))
+                path.canonicalize().ok()
             })
-            .collect::<Result<Vec<PathBuf>, Error>>()?;
+            .collect::<Vec<PathBuf>>();
 
         // Normalize include paths
         self.includes = self
             .includes
             .iter()
-            .map(|p| {
+            .filter_map(|p| {
                 let path = if p.is_absolute() { p.clone() } else { self.workspace.join(p) };
 
-                path.canonicalize().map_err(|e| Error::CanonicalizingPath(p.clone(), e))
+                path.canonicalize().ok()
             })
-            .collect::<Result<Vec<PathBuf>, Error>>()?;
+            .collect::<Vec<PathBuf>>();
 
         Ok(())
     }

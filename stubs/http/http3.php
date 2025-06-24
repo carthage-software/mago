@@ -6,9 +6,6 @@ use Countable;
 use SplObjectStorage;
 use SplSubject;
 
-/**
- * The HTTP client. See Client\Curl's [options](http/Client/Curl#Options:) which is the only driver currently supported.
- */
 class Client implements SplSubject, Countable
 {
     public const DEBUG_INFO = 0;
@@ -52,7 +49,7 @@ class Client implements SplSubject, Countable
 
     /**
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function addCookies(array $cookies = null)
     {
@@ -64,7 +61,7 @@ class Client implements SplSubject, Countable
      *
      * @param array $ssl_options Add this SSL options.
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function addSslOptions(array $ssl_options = null)
     {
@@ -77,7 +74,7 @@ class Client implements SplSubject, Countable
      * @param \SplObserver $observer An implementation of SplObserver.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      */
     public function attach(\SplObserver $observer)
     {
@@ -93,7 +90,7 @@ class Client implements SplSubject, Countable
      *    See f.e. the [configuration options for the Curl driver](http/Client/Curl#Configuration:).
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      */
     public function configure(array $configuration)
     {
@@ -120,7 +117,7 @@ class Client implements SplSubject, Countable
      * @throws Exception\InvalidArgumentException
      * @throws Exception\BadMethodCallException
      * @throws Exception\RuntimeException
-     * @return Client self.
+     * @return Client
      */
     public function dequeue(Client\Request $request)
     {
@@ -132,7 +129,7 @@ class Client implements SplSubject, Countable
      * @param \SplObserver $observer Previously attached instance of SplObserver implementation.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      */
     public function detach(\SplObserver $observer)
     {
@@ -144,7 +141,7 @@ class Client implements SplSubject, Countable
      * @param bool $enable Whether to enable libevent usage.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      * @see Client::configure()
      */
     #[Deprecated('This method has been deprecated in 2.3.0. Use Client::configure() instead')]
@@ -158,7 +155,7 @@ class Client implements SplSubject, Countable
      * @param bool $enable Whether to enable pipelining.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      * @see Client::configure()
      */
     #[Deprecated('This method has been deprecated in 2.3.0. Use Client::configure() instead')]
@@ -186,7 +183,7 @@ class Client implements SplSubject, Countable
      * @throws Exception\InvalidArgumentException
      * @throws Exception\BadMethodCallException
      * @throws Exception\RuntimeException
-     * @return Client self.
+     * @return Client
      */
     public function enqueue(Client\Request $request, callable $cb = null)
     {
@@ -327,7 +324,7 @@ class Client implements SplSubject, Countable
      * @param object $progress stdClass instance holding progress information.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\UnexpectedValueException
-     * @return Client self.
+     * @return Client
      */
     public function notify(Client\Request $request = null, $progress = null)
     {
@@ -353,7 +350,7 @@ class Client implements SplSubject, Countable
      *   A callback to automatically call when the request has finished.
      * @throws Exception\InvalidArgumentException
      * @throws Exception\RuntimeException
-     * @return Client self.
+     * @return Client
      */
     public function requeue(Client\Request $request, callable $cb = null)
     {
@@ -362,7 +359,7 @@ class Client implements SplSubject, Countable
     /**
      * Reset the client to the initial state.
      *
-     * @return Client self.
+     * @return Client
      */
     public function reset()
     {
@@ -374,7 +371,7 @@ class Client implements SplSubject, Countable
      *
      * @throws Exception\InvalidArgumentException
      * @throws Exception\RuntimeException
-     * @return Client self.
+     * @return Client
      */
     public function send()
     {
@@ -386,7 +383,7 @@ class Client implements SplSubject, Countable
      *
      * @param array $cookies Set the custom cookies to this array.
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function setCookies(array $cookies = null)
     {
@@ -401,7 +398,7 @@ class Client implements SplSubject, Countable
      * @param callable $callback as function(http\Client $c, Client\Request $r, int $type, string $data)
      *   The debug callback. For $type see Client::DEBUG_* constants.
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function setDebug(callable $callback)
     {
@@ -416,7 +413,7 @@ class Client implements SplSubject, Countable
      *
      * @param array $options The options to set.
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function setOptions(array $options = null)
     {
@@ -428,7 +425,7 @@ class Client implements SplSubject, Countable
      *
      * @param array $ssl_options Set SSL options to this array.
      * @throws Exception\InvalidArgumentException
-     * @return Client self.
+     * @return Client
      */
     public function setSslOptions(array $ssl_options = null)
     {
@@ -439,7 +436,7 @@ class Client implements SplSubject, Countable
      * This is the completion call to Client::once().
      *
      * @param float $timeout Seconds to wait for data on open sockets.
-     * @return bool success.
+     * @return bool
      */
     public function wait(float $timeout = 0)
     {
@@ -3516,7 +3513,7 @@ class Response extends Message
      *
      * @param string $data The data output.
      * @param int $ob_flags Output buffering flags passed from the output buffering control layer.
-     * @return bool success.
+     * @return bool
      */
     public function __invoke(string $data, int $ob_flags = 0)
     {
@@ -3549,7 +3546,7 @@ class Response extends Message
      * Flushes all output buffers.
      *
      * @param resource $stream A writable stream to send the response through.
-     * @return bool success.
+     * @return bool
      */
     public function send($stream = null)
     {

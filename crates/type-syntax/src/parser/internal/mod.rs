@@ -101,6 +101,8 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         }
         TypeTokenKind::PositiveInt => Type::PositiveInt(Keyword::from(stream.consume()?)),
         TypeTokenKind::NegativeInt => Type::NegativeInt(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(Keyword::from(stream.consume()?)),
         TypeTokenKind::String => Type::String(Keyword::from(stream.consume()?)),
         TypeTokenKind::NumericString => Type::NumericString(Keyword::from(stream.consume()?)),
         TypeTokenKind::NonEmptyString => Type::NonEmptyString(Keyword::from(stream.consume()?)),

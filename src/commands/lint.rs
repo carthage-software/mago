@@ -4,38 +4,29 @@ use std::process::ExitCode;
 use clap::Parser;
 use colored::Colorize;
 
-use mago_fixer::FixPlan;
-use mago_fixer::SafetyClassification;
-use mago_formatter::Formatter;
-use mago_formatter::settings::FormatSettings;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_interner::ThreadedInterner;
 use mago_linter::Linter;
 use mago_linter::settings::RuleSettings;
 use mago_linter::settings::Settings;
+use mago_names::resolver::NameResolver;
 use mago_php_version::PHPVersion;
-use mago_project::Project;
-use mago_project::ProjectBuilder;
-use mago_project::module::Module;
-use mago_project::module::ModuleBuildOptions;
-use mago_reflection::CodebaseReflection;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_reporting::reporter::Reporter;
-use mago_reporting::reporter::ReportingFormat;
-use mago_reporting::reporter::ReportingTarget;
+use mago_semantics::SemanticsChecker;
 use mago_source::SourceCategory;
 use mago_source::SourceIdentifier;
 use mago_source::SourceManager;
-use mago_source::error::SourceError;
+use mago_syntax::parser::parse_source;
 
+use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::config::linter::LinterLevel;
-use crate::enum_variants;
 use crate::error::Error;
-use crate::reflection::reflect_non_user_sources;
+use crate::metadata::compile_codebase_for_sources;
 use crate::source;
-use crate::utils;
 use crate::utils::indent_multiline;
 use crate::utils::progress::ProgressBarTheme;
 use crate::utils::progress::create_progress_bar;
@@ -61,17 +52,6 @@ pub struct LintCommand {
     /// Lint specific files or directories, overriding the source configuration.
     #[arg(help = "Lint specific files or directories, overriding the source configuration")]
     pub path: Vec<PathBuf>,
-
-    /// Filter the output to only show issues that can be automatically fixed with `mago fix`.
-    #[arg(
-        long,
-        short = 'f',
-        help = "Filter the output to only show fixable issues",
-        default_value_t = false,
-        conflicts_with = "semantics_only",
-        conflicts_with = "compilation"
-    )]
-    pub fixable_only: bool,
 
     /// Perform only parsing and semantic checks.
     #[arg(
@@ -120,14 +100,6 @@ pub struct LintCommand {
     pub list_rules: bool,
 
     #[arg(
-        long,
-        help = "Sort the reported issues by level, code, and location",
-        conflicts_with = "explain",
-        conflicts_with = "list_rules"
-    )]
-    pub sort: bool,
-
-    #[arg(
         short,
         long,
         help = "Do not load default plugins, only load the ones specified in the configuration.",
@@ -145,96 +117,12 @@ pub struct LintCommand {
     )]
     pub plugins: Vec<String>,
 
-    #[arg(
-        long,
-        help = "Apply fixes to the source code where possible.",
-        conflicts_with = "semantics_only",
-        conflicts_with = "compilation",
-        conflicts_with = "fixable_only"
-    )]
-    pub fix: bool,
-
-    /// Apply fixes that are marked as unsafe, including potentially unsafe fixes.
-    #[arg(
-        long,
-        help = "Apply fixes marked as unsafe, including those with potentially destructive changes",
-        requires = "fix"
-    )]
-    pub r#unsafe: bool,
-
-    /// Apply fixes that are marked as potentially unsafe.
-    #[arg(long, help = "Apply fixes marked as potentially unsafe, which may require manual review", requires = "fix")]
-    pub potentially_unsafe: bool,
-
-    #[arg(long, help = "Format the fixed files after applying the changes.", requires = "fix", alias = "fmt")]
-    pub format: bool,
-
-    /// Run the command without writing any changes to disk.
-    #[arg(
-        long,
-        short = 'd',
-        help = "Preview the fixes without applying them, showing what changes would be made",
-        requires = "fix"
-    )]
-    pub dry_run: bool,
-
-    /// Specify where the results should be reported.
-    #[arg(
-        long,
-        default_value_t,
-        help = "Specify where the results should be reported",
-        ignore_case = true,
-        value_parser = enum_variants!(ReportingTarget),
-        conflicts_with = "explain",
-        conflicts_with = "list_rules",
-        conflicts_with = "fix",
-    )]
-    pub reporting_target: ReportingTarget,
-
-    /// Choose the format for reporting issues.
-    #[arg(
-        long,
-        default_value_t,
-        help = "Choose the format for reporting issues",
-        ignore_case = true,
-        value_parser = enum_variants!(ReportingFormat),
-        conflicts_with = "explain",
-        conflicts_with = "list_rules",
-        conflicts_with = "fix",
-    )]
-    pub reporting_format: ReportingFormat,
-
-    /// Choose the failling threshold level for reported issues.
-    #[arg(
-        long,
-        short = 'm',
-        help = "Choose the failling threshold level for reported issues",
-        default_value_t = Level::Error,
-        value_parser = enum_variants!(Level),
-        conflicts_with = "explain",
-        conflicts_with = "list_rules",
-        conflicts_with = "fix",
-    )]
-    pub minimum_level: Level,
-}
-
-impl LintCommand {
-    pub const fn get_fix_classification(&self) -> SafetyClassification {
-        if self.r#unsafe {
-            SafetyClassification::Unsafe
-        } else if self.potentially_unsafe {
-            SafetyClassification::PotentiallyUnsafe
-        } else {
-            SafetyClassification::Safe
-        }
-    }
+    #[clap(flatten)]
+    pub reporting: ReportingArgs,
 }
 
 pub async fn execute(command: LintCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
     let interner = ThreadedInterner::new();
-
-    // Determine the safety classification for the fixes.
-    let fix_classification = command.get_fix_classification();
 
     if command.no_default_plugins {
         configuration.linter.default_plugins = Some(false);
@@ -259,78 +147,22 @@ pub async fn execute(command: LintCommand, mut configuration: Configuration) -> 
         source::load(&interner, &configuration.source, !command.semantics_only, !command.semantics_only).await?
     };
 
-    let mut issues = if command.semantics_only {
-        semantics_check(&interner, &source_manager, configuration.php_version).await?
+    let issues = if command.semantics_only {
+        get_semantics_issues_only(&interner, &source_manager, configuration.php_version).await?
     } else if command.compilation {
-        compilation_check(&interner, &source_manager, configuration.php_version).await?
+        get_compilation_and_semantic_issues(&interner, &source_manager, configuration.php_version).await?
     } else {
-        lint_check(&interner, &source_manager, &configuration).await?
+        lint_codebase(&interner, &source_manager, &configuration).await?
     };
 
-    if command.fix {
-        let (changed, skipped_unsafe, skipped_potentially_unsafe) = fix_issues(
-            &interner,
-            &source_manager,
-            issues,
-            fix_classification,
-            if command.format { Some((configuration.php_version, configuration.format.settings)) } else { None },
-            command.dry_run,
-        )
-        .await?;
-
-        if skipped_unsafe > 0 {
-            tracing::warn!(
-                "Skipped {} fixes because they were marked as unsafe. To apply those fixes, use the `--unsafe` flag.",
-                skipped_unsafe
-            );
-        }
-
-        if skipped_potentially_unsafe > 0 {
-            tracing::warn!(
-                "Skipped {} fixes because they were marked as potentially unsafe. To apply those fixes, use the `--potentially-unsafe` flag.",
-                skipped_potentially_unsafe
-            );
-        }
-
-        if changed == 0 {
-            tracing::info!("No fixes were applied");
-
-            return Ok(ExitCode::SUCCESS);
-        }
-
-        return Ok(if command.dry_run {
-            tracing::info!("Found {} fixes that can be applied", changed);
-
-            ExitCode::FAILURE
-        } else {
-            tracing::info!("Applied {} fixes successfully", changed);
-
-            ExitCode::SUCCESS
-        });
-    }
-
-    let issues_contain_errors = issues.has_minimum_level(command.minimum_level);
-
-    let reporter = Reporter::new(interner, source_manager, command.reporting_target);
-
-    if command.sort {
-        issues = issues.sorted();
-    }
-
-    if command.fixable_only {
-        reporter.report(issues.only_fixable(), command.reporting_format)?;
-    } else {
-        reporter.report(issues, command.reporting_format)?;
-    }
-
-    Ok(if issues_contain_errors { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+    command.reporting.process_issues(issues, configuration, interner, source_manager).await
 }
 
 #[inline]
 pub(super) fn create_linter(
     interner: &ThreadedInterner,
     configuration: &Configuration,
-    codebase: CodebaseReflection,
+    codebase: CodebaseMetadata,
 ) -> Linter {
     let mut settings = Settings::new(configuration.php_version);
 
@@ -375,7 +207,7 @@ pub(super) fn explain_rule(
     rule: &str,
     configuration: &Configuration,
 ) -> Result<ExitCode, Error> {
-    let linter = create_linter(interner, configuration, CodebaseReflection::new());
+    let linter = create_linter(interner, configuration, CodebaseMetadata::new());
     let configured_rules = linter.get_configured_rules();
 
     // Attempt to locate the rule
@@ -501,7 +333,7 @@ pub(super) fn explain_rule(
 
 #[inline]
 pub(super) fn list_rules(interner: &ThreadedInterner, configuration: &Configuration) -> Result<ExitCode, Error> {
-    let linter = create_linter(interner, configuration, CodebaseReflection::new());
+    let linter = create_linter(interner, configuration, CodebaseMetadata::new());
     let configured_rules = linter.get_configured_rules();
     if configured_rules.is_empty() {
         println!("{}", "No rules are currently configured or enabled.".bright_red());
@@ -541,84 +373,7 @@ pub(super) fn list_rules(interner: &ThreadedInterner, configuration: &Configurat
 }
 
 #[inline]
-pub(super) async fn lint_check(
-    interner: &ThreadedInterner,
-    manager: &SourceManager,
-    configuration: &Configuration,
-) -> Result<IssueCollection, Error> {
-    let php_version = configuration.php_version;
-    let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
-    let length = sources.len();
-
-    let mut builder = ProjectBuilder::from_reflection(
-        interner.clone(),
-        reflect_non_user_sources(interner, php_version, manager).await?,
-    );
-
-    let scan_progress = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Yellow);
-    let mut handles = Vec::with_capacity(length);
-    for source_id in sources {
-        handles.push(tokio::spawn({
-            let interner = interner.clone();
-            let manager = manager.clone();
-            let scan_progress = scan_progress.clone();
-
-            async move {
-                // Step 1: load the source
-                let source = manager.load(&source_id)?;
-                // Step 2: build module
-                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::default());
-
-                scan_progress.inc(1);
-
-                Result::<_, Error>::Ok(module)
-            }
-        }));
-    }
-
-    for handle in handles {
-        builder.add_module(handle.await??);
-    }
-
-    remove_progress_bar(scan_progress);
-
-    let Project { modules, mut reflection } = builder.build(true);
-    let length = modules.len();
-    let mut results = Vec::with_capacity(length + 1);
-    results.push(reflection.take_issues());
-    let linter = create_linter(interner, configuration, reflection);
-    let lint_progress = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
-    let mut handles = Vec::with_capacity(length);
-    for module in modules {
-        handles.push(tokio::spawn({
-            let linter = linter.clone();
-            let lint_progress = lint_progress.clone();
-
-            async move {
-                let mut issues = linter.lint(&module);
-                issues.extend(module.issues);
-                if let Some(error) = &module.parse_error {
-                    issues.push(Into::<Issue>::into(error));
-                }
-
-                lint_progress.inc(1);
-
-                Result::<_, SourceError>::Ok(issues)
-            }
-        }));
-    }
-
-    for handle in handles {
-        results.push(handle.await??);
-    }
-
-    remove_progress_bar(lint_progress);
-
-    Ok(IssueCollection::from(results.into_iter().flatten()))
-}
-
-#[inline]
-pub(super) async fn semantics_check(
+pub(super) async fn get_semantics_issues_only(
     interner: &ThreadedInterner,
     manager: &SourceManager,
     php_version: PHPVersion,
@@ -638,10 +393,19 @@ pub(super) async fn semantics_check(
 
             async move {
                 let source = manager.load(&source_id)?;
-                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::validation());
+                let name_resolver = NameResolver::new(&interner);
+                let semantics_checker = SemanticsChecker::new(&php_version, &interner);
+                let (program, parse_error) = parse_source(&interner, &source);
+                let resolved_names = name_resolver.resolve(&program);
+
+                let mut semantic_issues = semantics_checker.check(&source, &program, &resolved_names);
+                if let Some(error) = &parse_error {
+                    semantic_issues.push(Into::<Issue>::into(error));
+                }
+
                 progress_bar.inc(1);
 
-                Result::<_, Error>::Ok(module)
+                Result::<_, Error>::Ok(semantic_issues)
             }
         }));
     }
@@ -649,13 +413,9 @@ pub(super) async fn semantics_check(
     let mut results = Vec::with_capacity(length);
 
     for handle in handles {
-        let module = handle.await??;
+        let issue_collection = handle.await??;
 
-        if let Some(error) = &module.parse_error {
-            results.push(Into::<Issue>::into(error));
-        }
-
-        results.extend(module.issues);
+        results.extend(issue_collection);
     }
 
     remove_progress_bar(progress_bar);
@@ -664,173 +424,88 @@ pub(super) async fn semantics_check(
 }
 
 #[inline]
-pub(super) async fn compilation_check(
+pub(super) async fn get_compilation_and_semantic_issues(
     interner: &ThreadedInterner,
     manager: &SourceManager,
     php_version: PHPVersion,
 ) -> Result<IssueCollection, Error> {
+    // Compile the codebase.
+    let mut codebase = compile_codebase_for_sources(manager, &mut SymbolReferences::new(), interner).await?;
+
+    // Collect all semantics issues only.
+    let mut issues = get_semantics_issues_only(interner, manager, php_version).await?;
+
+    // Add the compilation issues.
+    issues.extend(codebase.take_issues(true));
+
+    Ok(issues)
+}
+
+#[inline]
+pub(super) async fn lint_codebase(
+    interner: &ThreadedInterner,
+    manager: &SourceManager,
+    configuration: &Configuration,
+) -> Result<IssueCollection, Error> {
+    let php_version = configuration.php_version;
     let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
     let length = sources.len();
 
-    let mut project_builder = ProjectBuilder::from_reflection(
-        interner.clone(),
-        reflect_non_user_sources(interner, php_version, manager).await?,
-    );
+    let mut results = Vec::with_capacity(length + 1);
 
-    let scan_progress = create_progress_bar(length, "🔎  Scanning", ProgressBarTheme::Yellow);
+    let mut codebase = compile_codebase_for_sources(manager, &mut SymbolReferences::new(), interner).await?;
+    results.push(codebase.take_issues(true));
+
+    let linter = create_linter(interner, configuration, codebase);
+    let lint_progress = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
     let mut handles = Vec::with_capacity(length);
     for source_id in sources {
         handles.push(tokio::spawn({
             let interner = interner.clone();
             let manager = manager.clone();
-            let scan_progress = scan_progress.clone();
+            let linter = linter.clone();
+            let lint_progress = lint_progress.clone();
 
             async move {
-                // Step 1: load the source
-                let source = manager.load(&source_id)?;
-                // Step 2: build module
-                let module = Module::build(&interner, php_version, source, ModuleBuildOptions::default());
-
-                scan_progress.inc(1);
-
-                Result::<_, Error>::Ok(module)
-            }
-        }));
-    }
-
-    let mut results = Vec::with_capacity(length);
-    for handle in handles {
-        let mut module = handle.await??;
-
-        if let Some(error) = &module.parse_error {
-            results.push(Into::<Issue>::into(error));
-        }
-
-        results.extend(std::mem::take(&mut module.issues));
-
-        project_builder.add_module(module);
-    }
-
-    let Project { mut reflection, .. } = project_builder.build(true);
-    results.extend(reflection.take_issues());
-
-    remove_progress_bar(scan_progress);
-
-    Ok(IssueCollection::from(results.into_iter()))
-}
-
-#[inline]
-pub(super) async fn fix_issues(
-    interner: &ThreadedInterner,
-    source_manager: &SourceManager,
-    issues: IssueCollection,
-    fix_classification: SafetyClassification,
-    format_settings: Option<(PHPVersion, FormatSettings)>,
-    dry_run: bool,
-) -> Result<(usize, usize, usize), Error> {
-    let (plans, skipped_unsafe, skipped_potentially_unsafe) = filter_fix_plans(interner, issues, fix_classification);
-
-    let total = plans.len();
-    let progress_bar = create_progress_bar(total, "✨  Fixing", ProgressBarTheme::Cyan);
-    let mut handles = Vec::with_capacity(total);
-    for (source, plan) in plans.into_iter() {
-        handles.push(tokio::spawn({
-            let source_manager = source_manager.clone();
-            let interner = interner.clone();
-            let progress_bar = progress_bar.clone();
-
-            async move {
-                let source = source_manager.load(&source)?;
-                let source_content = interner.lookup(&source.content);
-                let mut new_content = plan.execute(source_content).get_fixed();
-                if let Some((php_version, format_settings)) = format_settings {
-                    let formatter = Formatter::new(&interner, php_version, format_settings);
-
-                    new_content = match formatter.format_code(interner.lookup(&source.identifier.0), &new_content) {
-                        Ok(content) => content,
-                        Err(error) => {
-                            tracing::error!("Failed to format the fixed code: {}", error);
-
-                            new_content
-                        }
-                    };
-                }
-
-                let result = utils::apply_changes(&interner, &source_manager, &source, new_content, dry_run);
-
-                progress_bar.inc(1);
+                let result = lint_single_source(&manager, &interner, &linter, &php_version, source_id);
+                lint_progress.inc(1);
 
                 result
             }
         }));
     }
 
-    let mut changed = 0;
     for handle in handles {
-        if handle.await?? {
-            changed += 1;
-        }
+        results.push(handle.await??);
     }
 
-    remove_progress_bar(progress_bar);
+    remove_progress_bar(lint_progress);
 
-    Ok((changed, skipped_unsafe, skipped_potentially_unsafe))
+    Ok(IssueCollection::from(results.into_iter().flatten()))
 }
 
-#[inline]
-pub(super) fn filter_fix_plans(
+fn lint_single_source(
+    source_manager: &SourceManager,
     interner: &ThreadedInterner,
-    issues: IssueCollection,
-    classification: SafetyClassification,
-) -> (Vec<(SourceIdentifier, FixPlan)>, usize, usize) {
-    let mut skipped_unsafe = 0;
-    let mut skipped_potentially_unsafe = 0;
+    linter: &Linter,
+    php_version: &PHPVersion,
+    source_id: SourceIdentifier,
+) -> Result<Vec<Issue>, Error> {
+    let source = source_manager.load(&source_id)?;
 
-    let mut results = vec![];
-    for (source, plan) in issues.to_fix_plans() {
-        if plan.is_empty() {
-            continue;
-        }
+    let name_resolver = NameResolver::new(interner);
+    let semantics_checker = SemanticsChecker::new(php_version, interner);
 
-        let mut operations = vec![];
-        for operation in plan.take_operations() {
-            match operation.get_safety_classification() {
-                SafetyClassification::Unsafe => {
-                    if classification == SafetyClassification::Unsafe {
-                        operations.push(operation);
-                    } else {
-                        skipped_unsafe += 1;
+    let (program, parsing_error) = parse_source(interner, &source);
+    let resolved_names = name_resolver.resolve(&program);
 
-                        tracing::warn!(
-                            "Skipping a fix for `{}` because it contains unsafe changes.",
-                            interner.lookup(&source.0)
-                        );
-                    }
-                }
-                SafetyClassification::PotentiallyUnsafe => {
-                    if classification == SafetyClassification::Unsafe
-                        || classification == SafetyClassification::PotentiallyUnsafe
-                    {
-                        operations.push(operation);
-                    } else {
-                        skipped_potentially_unsafe += 1;
-
-                        tracing::warn!(
-                            "Skipping a fix for `{}` because it contains potentially unsafe changes.",
-                            interner.lookup(&source.0)
-                        );
-                    }
-                }
-                SafetyClassification::Safe => {
-                    operations.push(operation);
-                }
-            }
-        }
-
-        if !operations.is_empty() {
-            results.push((source, FixPlan::from_operations(operations)));
-        }
+    let mut issues = Vec::new();
+    if let Some(error) = &parsing_error {
+        issues.push(Into::<Issue>::into(error));
     }
 
-    (results, skipped_unsafe, skipped_potentially_unsafe)
+    issues.extend(semantics_checker.check(&source, &program, &resolved_names));
+    issues.extend(linter.lint(&source, &program, &resolved_names));
+
+    Ok(issues)
 }

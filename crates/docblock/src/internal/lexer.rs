@@ -60,14 +60,14 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
                 continue;
             }
 
-            let line_indent_length = trimmed_line.chars().take_while(|c| c.is_whitespace()).count();
-
+            // Find the byte length of the whitespace prefix.
+            let line_indent_length = trimmed_line.find(|c: char| !c.is_whitespace()).unwrap_or(trimmed_line.len());
             let line_indent = &trimmed_line[..line_indent_length];
 
             match indent {
-                Some(indent) => {
-                    if indent != line_indent {
-                        let expected = indent.len();
+                Some(i) => {
+                    if i != line_indent {
+                        let expected = i.len();
                         let found = line_indent.len();
                         let error_span = span.subspan(
                             content_start + line_start_in_content,
@@ -98,10 +98,22 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
                 if !first_char.is_whitespace() {
                     let error_span = span.subspan(
                         content_start + line_start_in_content + line_indent_length + 1,
-                        content_start + line_start_in_content + line_indent_length + 2,
+                        content_start + line_start_in_content + line_indent_length + 1 + first_char.len_utf8(),
                     );
                     return Err(ParseError::MissingWhitespaceAfterAsterisk(error_span));
                 }
+
+                let content_start_in_line = line_indent_length + 1 + first_char.len_utf8();
+                let content_end_in_line = trimmed_line.len();
+
+                let content_start_in_comment = content_start + line_start_in_content + content_start_in_line;
+                let content_end_in_comment = content_start + line_start_in_content + content_end_in_line;
+
+                let content_str = &comment[content_start_in_comment..content_end_in_comment];
+
+                let content_span = span.subspan(content_start_in_comment, content_end_in_comment);
+
+                comment_lines.push(Token::Line { content: content_str, span: content_span });
             } else {
                 comment_lines.push(Token::EmptyLine {
                     span: span.subspan(content_start + line_start_in_content, content_start + line_start_in_content),
@@ -109,18 +121,6 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
 
                 continue;
             }
-
-            let content_start_in_line = line_indent_length + 2;
-            let content_end_in_line = trimmed_line.len();
-
-            let content_start_in_comment = content_start + line_start_in_content + content_start_in_line;
-            let content_end_in_comment = content_start + line_start_in_content + content_end_in_line;
-
-            let content_str = &comment[content_start_in_comment..content_end_in_comment];
-
-            let content_span = span.subspan(content_start_in_comment, content_end_in_comment);
-
-            comment_lines.push(Token::Line { content: content_str, span: content_span });
         }
 
         Ok(comment_lines)

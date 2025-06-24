@@ -76,197 +76,46 @@ function forward_static_call_array(callable $callback, array $args): mixed
 }
 
 /**
- * Generates a storable representation of a value
- * @link https://php.net/manual/en/function.serialize.php
- * @param mixed $value <p>
- * The value to be serialized. serialize
- * handles all types, except the resource-type.
- * You can even serialize arrays that contain
- * references to itself. Circular references inside the array/object you
- * are serializing will also be stored. Any other
- * reference will be lost.
- * </p>
- * <p>
- * When serializing objects, PHP will attempt to call the member function
- * __sleep prior to serialization.
- * This is to allow the object to do any last minute clean-up, etc. prior
- * to being serialized. Likewise, when the object is restored using
- * unserialize the __wakeup member function is called.
- * </p>
- * <p>
- * Object's private members have the class name prepended to the member
- * name; protected members have a '*' prepended to the member name.
- * These prepended values have null bytes on either side.
- * </p>
- * @return string a string containing a byte-stream representation of
- * value that can be stored anywhere.
+ * @return non-empty-string
  */
 function serialize(mixed $value): string
 {
 }
 
-/**
- * Creates a PHP value from a stored representation
- * @link https://php.net/manual/en/function.unserialize.php
- * @param string $data <p>
- * The serialized string.
- * </p>
- * <p>
- * If the variable being unserialized is an object, after successfully
- * reconstructing the object PHP will automatically attempt to call the
- * __wakeup member function (if it exists).
- * </p>
- * <p>
- * unserialize_callback_func directive
- * </p>
- * <p>
- * It's possible to set a callback-function which will be called,
- * if an undefined class should be instantiated during unserializing.
- * (to prevent getting an incomplete object "__PHP_Incomplete_Class".)
- * Use your "php.ini", ini_set or ".htaccess"
- * to define 'unserialize_callback_func'. Everytime an undefined class
- * should be instantiated, it'll be called. To disable this feature just
- * empty this setting.
- * </p>
- * @param array $options [optional]
- * <p>Any options to be provided to unserialize(), as an associative array.</p>
- * <p>
- * The 'allowed_classes' option key may be set to a value that is
- * either an array of class names which should be accepted, FALSE to
- * accept no classes, or TRUE to accept all classes. If this option is defined
- * and unserialize() encounters an object of a class that isn't to be accepted,
- * then the object will be instantiated as __PHP_Incomplete_Class instead.
- * Omitting this option is the same as defining it as TRUE: PHP will attempt
- * to instantiate objects of any class.
- * </p>
- * @return mixed <p>The converted value is returned, and can be a boolean,
- * integer, float, string,
- * array or object.
- * </p>
- * <p>
- * In case the passed string is not unserializeable, false is returned and
- * E_NOTICE is issued.</p>
- */
-function unserialize(string $data, #[PhpStormStubsElementAvailable(from: '7.0')] array $options = []): mixed
+function unserialize(string $data, array $options = []): mixed
 {
 }
 
-/**
- * Dumps information about a variable
- * @link https://php.net/manual/en/function.var-dump.php
- * @param mixed $value <p>
- * The variable you want to export.
- * </p>
- * @param mixed ...$values [optional]
- * @return void
- */
-#[PhpStormStubsElementAvailable(from: '8.0')]
 function var_dump(mixed $value, mixed ...$values): void
 {
 }
 
 /**
- * Dumps information about a variable
- * @link https://php.net/manual/en/function.var-dump.php
- * @param mixed ...$vars <p>
- * The variable you want to export.
- * </p>
- * @return void
- */
-#[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]
-function var_dump(...$vars): void
-{
-}
-
-/**
- * Outputs or returns a parsable string representation of a variable
- * @link https://php.net/manual/en/function.var-export.php
- * @param mixed $value <p>
- * The variable you want to export.
- * </p>
- * @param bool $return [optional] <p>
- * If used and set to true, var_export will return
- * the variable representation instead of outputting it.
- * </p>
- * @return string|null the variable representation when the return
- * parameter is used and evaluates to true. Otherwise, this function will
- * return null.
+ * @return ($return is true ? non-empty-string : null)
  */
 function var_export(mixed $value, bool $return = false): null|string
 {
 }
 
-/**
- * Dumps a string representation of an internal zend value to output
- * @link https://php.net/manual/en/function.debug-zval-dump.php
- * @param mixed $value The variable being evaluated.
- * @param mixed ...$values <p>
- * The other variable being evaluated.
- * </p>
- * @return void
- */
-function debug_zval_dump(
-    #[PhpStormStubsElementAvailable(from: '8.0')] mixed $value,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $values,
-    mixed ...$values,
-): void {
-}
-
-/**
- * Prints human-readable information about a variable
- * @link https://php.net/manual/en/function.print-r.php
- * @param mixed $value <p>
- * The expression to be printed.
- * </p>
- * @param bool $return [optional] <p>
- * If you would like to capture the output of print_r,
- * use the return parameter. If this parameter is set
- * to true, print_r will return its output, instead of
- * printing it (which it does by default).
- * </p>
- * @return string|bool If given a string, integer or float,
- * the value itself will be printed. If given an array, values
- * will be presented in a format that shows keys and elements. Similar
- * notation is used for objects.
- */
-#[LanguageLevelTypeAware(['8.4' => 'string|true'], default: 'string|bool')]
-function print_r(mixed $value, bool $return = false)
+function debug_zval_dump(mixed $value, mixed ...$values): void
 {
 }
 
 /**
- * Returns the amount of memory allocated to PHP
- * @link https://php.net/manual/en/function.memory-get-usage.php
- * @param bool $real_usage [optional] <p>
- * Set this to true to get the real size of memory allocated from
- * system. If not set or false only the memory used by
- * emalloc() is reported.
- * </p>
- * @return int the memory amount in bytes.
+ * @return ($return is true ? non-empty-string : bool)
  */
-#[Pure(true)]
+function print_r(mixed $value, bool $return = false): string|bool
+{
+}
+
 function memory_get_usage(bool $real_usage = false): int
 {
 }
 
-/**
- * Returns the peak of memory allocated by PHP
- * @link https://php.net/manual/en/function.memory-get-peak-usage.php
- * @param bool $real_usage [optional] <p>
- * Set this to true to get the real size of memory allocated from
- * system. If not set or false only the memory used by
- * emalloc() is reported.
- * </p>
- * @return int the memory peak in bytes.
- */
-#[Pure(true)]
 function memory_get_peak_usage(bool $real_usage = false): int
 {
 }
 
-/**
- * @since 8.2
- */
 function memory_reset_peak_usage(): void
 {
 }
@@ -294,8 +143,7 @@ function memory_reset_peak_usage(): void
  * </p>
  * @return bool|null
  */
-#[LanguageLevelTypeAware(['8.2' => 'void'], default: 'null|bool')]
-function register_shutdown_function(callable $callback, mixed ...$args): null|bool
+function register_shutdown_function(callable $callback, mixed ...$args): void
 {
 }
 
@@ -328,83 +176,35 @@ function unregister_tick_function(callable $callback): void
 }
 
 /**
- * Syntax highlighting of a file
- * @link https://php.net/manual/en/function.highlight-file.php
- * @param string $filename <p>
- * Path to the PHP file to be highlighted.
- * </p>
- * @param bool $return [optional] <p>
- * Set this parameter to true to make this function return the
- * highlighted code.
- * </p>
- * @return string|bool If return is set to true, returns the highlighted
- * code as a string instead of printing it out. Otherwise, it will return
- * true on success, false on failure.
+ * @return ($return is true ? string|false : bool)
  */
 function highlight_file(string $filename, bool $return = false): string|bool
 {
 }
 
 /**
- * Alias:
- * {@see highlight_file}
- * @link https://php.net/manual/en/function.show-source.php
- * @param string $filename
- * @param bool $return [optional]
- * @return string|bool
+ * @return ($return is true ? string|false : bool)
  */
 function show_source(string $filename, bool $return = false): string|bool
 {
 }
 
 /**
- * Syntax highlighting of a string
- * @link https://php.net/manual/en/function.highlight-string.php
- * @param string $string <p>
- * The PHP code to be highlighted. This should include the opening tag.
- * </p>
- * @param bool $return [optional] <p>
- * Set this parameter to true to make this function return the
- * highlighted code.
- * </p>
- * @return string|bool If return is set to true, returns the highlighted
- * code as a string instead of printing it out. Otherwise, it will return
- * true on success, false on failure.
+ * @return ($return is true ? string|false : bool)
  */
-#[LanguageLevelTypeAware(['8.4' => 'string|true'], default: 'string|bool')]
-function highlight_string(string $string, bool $return = false)
+function highlight_string(string $string, bool $return = false): string|bool
 {
 }
 
 /**
- * Get the system's high resolution time
- * @link https://secure.php.net/manual/en/function.hrtime.php
- * @param bool $as_number <p>Whether the high resolution time should be returned as array or number.<p>
- * @since 7.3
- * @return int[]|int|float|false Returns an array of integers in the form [seconds, nanoseconds], if the parameter get_as_number is false.
- * Otherwise the nanoseconds are returned as integer (64bit platforms) or float (32bit platforms).
+ * @return ($as_number is true ? int|float|false : list{int, int}|false)
+ *
+ * @mutation-free
  */
-#[Pure(true)]
 function hrtime(bool $as_number = false): array|int|float|false
 {
 }
 
-/**
- * Return source with stripped comments and whitespace
- * @link https://php.net/manual/en/function.php-strip-whitespace.php
- * @param string $filename <p>
- * Path to the PHP file.
- * </p>
- * @return string The stripped source code will be returned on success, or an empty string
- * on failure.
- * </p>
- * <p>
- * This function works as described as of PHP 5.0.1. Before this it would
- * only return an empty string. For more information on this bug and its
- * prior behavior, see bug report
- * #29606.
- */
-#[Pure(true)]
 function php_strip_whitespace(string $filename): string
 {
 }
@@ -425,124 +225,32 @@ function ini_get(string $option): string|false
 }
 
 /**
- * Gets all configuration options
- * @link https://php.net/manual/en/function.ini-get-all.php
- * @link https://php.net/manual/en/ini.list.php
- * @param string|null $extension [optional] <p>
- * An optional extension name. If set, the function return only options
- * specific for that extension.
- * </p>
- * @param bool $details [optional] <p>
- * Retrieve details settings or only the current value for each setting.
- * Default is true (retrieve details).
- * </p>
- * @return array|false an associative array with directive name as the array key.
- * <p>
- * When details is true (default) the array will
- * contain global_value (set in
- * "php.ini"), local_value (perhaps set with
- * ini_set or ".htaccess"), and
- * access (the access level).
- * </p>
- * <p>
- * When details is false the value will be the
- * current value of the option.
- * </p>
- * <p>
- * See the manual section
- * for information on what access levels mean.
- * </p>
- * <p>
- * It's possible for a directive to have multiple access levels, which is
- * why access shows the appropriate bitmask values.
- * </p>
+ * @return array{'global_value': string, 'local_value': string, 'access': int}|false
  */
-#[Pure(true)]
-#[ArrayShape(['global_value' => 'string', 'local_value' => 'string', 'access' => 'int'])]
-function ini_get_all(
-    null|string $extension,
-    #[PhpStormStubsElementAvailable(from: '7.0')] bool $details = true,
-): array|false {
+function ini_get_all(null|string $extension, bool $details = true): array|false
+{
 }
 
-/**
- * Sets the value of a configuration option
- * @link https://php.net/manual/en/function.ini-set.php
- * @link https://php.net/manual/en/ini.list.php
- * @param string $option <p>
- * </p>
- * <p>
- * Not all the available options can be changed using
- * ini_set. There is a list of all available options
- * in the appendix.
- * </p>
- * @param string $value <p>
- * The new value for the option.
- * </p>
- * @return string|false the old value on success, false on failure.
- */
-function ini_set(
-    string $option,
-    #[LanguageLevelTypeAware(['8.1' => 'string|int|float|bool|null'], default: 'string')]  $value,
-): string|false {
+function ini_set(string $option, string|int|float|bool|null $value): string|false
+{
 }
 
-/**
- * Alias:
- * {@see ini_set}
- * @link https://php.net/manual/en/function.ini-alter.php
- * @link https://php.net/manual/en/ini.list.php
- * @param string $option
- * @param string $value
- * @return string|false
- */
-function ini_alter(
-    string $option,
-    #[LanguageLevelTypeAware(['8.1' => 'string|int|float|bool|null'], default: 'string')]  $value,
-): string|false {
+function ini_alter(string $option, string|int|float|bool|null $value): string|false
+{
 }
 
-/**
- * Restores the value of a configuration option
- * @link https://php.net/manual/en/function.ini-restore.php
- * @link https://php.net/manual/en/ini.list.php
- * @param string $option <p>
- * The configuration option name.
- * </p>
- * @return void
- */
 function ini_restore(string $option): void
 {
 }
 
-/**
- * @param string $shorthand
- * @return int
- * @since 8.2
- */
 function ini_parse_quantity(string $shorthand): int
 {
 }
 
-/**
- * Gets the current include_path configuration option
- * @link https://php.net/manual/en/function.get-include-path.php
- * @return string|false the path, as a string.
- */
-#[Pure(true)]
 function get_include_path(): string|false
 {
 }
 
-/**
- * Sets the include_path configuration option
- * @link https://php.net/manual/en/function.set-include-path.php
- * @param string $include_path <p>
- * The new value for the include_path
- * </p>
- * @return string|false the old include_path on
- * success or false on failure.
- */
 function set_include_path(string $include_path): string|false
 {
 }
@@ -1121,177 +829,13 @@ function getmxrr(string $hostname, &$hosts, &$weights): bool
  * </p>
  * @param array &$additional_records [optional] <p>
  * Passed by reference and, if given, will be populated with any
- * Additional Records.
- * </p>
- * @param bool $raw [optional] <p>
- * In case of raw mode, we query only the requested type
- * instead of looping type by type before going with the additional info stuff.
- * </p>
- * @return array|false This function returns an array of associative arrays. Each associative array contains
- * at minimum the following keys:
- * <table>
- * Basic DNS attributes
- * <tr valign="top">
- * <td>Attribute</td>
- * <td>Meaning</td>
- * </tr>
- * <tr valign="top">
- * <td>host</td>
- * <td>
- * The record in the DNS namespace to which the rest of the associated data refers.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>class</td>
- * <td>
- * dns_get_record only returns Internet class records and as
- * such this parameter will always return IN.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>type</td>
- * <td>
- * String containing the record type. Additional attributes will also be contained
- * in the resulting array dependant on the value of type. See table below.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>ttl</td>
- * <td>
- * "Time To Live" remaining for this record. This will not equal
- * the record's original ttl, but will rather equal the original ttl minus whatever
- * length of time has passed since the authoritative name server was queried.
- * </td>
- * </tr>
- * </table>
- * </p>
- * <p>
- * <table>
- * Other keys in associative arrays dependant on 'type'
- * <tr valign="top">
- * <td>Type</td>
- * <td>Extra Columns</td>
- * </tr>
- * <tr valign="top">
- * <td>A</td>
- * <td>
- * ip: An IPv4 addresses in dotted decimal notation.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>MX</td>
- * <td>
- * pri: Priority of mail exchanger.
- * Lower numbers indicate greater priority.
- * target: FQDN of the mail exchanger.
- * See also dns_get_mx.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>CNAME</td>
- * <td>
- * target: FQDN of location in DNS namespace to which
- * the record is aliased.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>NS</td>
- * <td>
- * target: FQDN of the name server which is authoritative
- * for this hostname.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>PTR</td>
- * <td>
- * target: Location within the DNS namespace to which
- * this record points.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>TXT</td>
- * <td>
- * txt: Arbitrary string data associated with this record.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>HINFO</td>
- * <td>
- * cpu: IANA number designating the CPU of the machine
- * referenced by this record.
- * os: IANA number designating the Operating System on
- * the machine referenced by this record.
- * See IANA's Operating System
- * Names for the meaning of these values.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>SOA</td>
- * <td>
- * mname: FQDN of the machine from which the resource
- * records originated.
- * rname: Email address of the administrative contain
- * for this domain.
- * serial: Serial # of this revision of the requested
- * domain.
- * refresh: Refresh interval (seconds) secondary name
- * servers should use when updating remote copies of this domain.
- * retry: Length of time (seconds) to wait after a
- * failed refresh before making a second attempt.
- * expire: Maximum length of time (seconds) a secondary
- * DNS server should retain remote copies of the zone data without a
- * successful refresh before discarding.
- * minimum-ttl: Minimum length of time (seconds) a
- * client can continue to use a DNS resolution before it should request
- * a new resolution from the server. Can be overridden by individual
- * resource records.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>AAAA</td>
- * <td>
- * ipv6: IPv6 address
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>A6(PHP &gt;= 5.1.0)</td>
- * <td>
- * masklen: Length (in bits) to inherit from the target
- * specified by chain.
- * ipv6: Address for this specific record to merge with
- * chain.
- * chain: Parent record to merge with
- * ipv6 data.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>SRV</td>
- * <td>
- * pri: (Priority) lowest priorities should be used first.
- * weight: Ranking to weight which of commonly prioritized
- * targets should be chosen at random.
- * target and port: hostname and port
- * where the requested service can be found.
- * For additional information see: RFC 2782
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>NAPTR</td>
- * <td>
- * order and pref: Equivalent to
- * pri and weight above.
- * flags, services, regex,
- * and replacement: Parameters as defined by
- * RFC 2915.
- * </td>
- * </tr>
- * </table>
+ * Additional Records. *
  */
 function dns_get_record(
     string $hostname,
     int $type = DNS_ANY,
-    &$authoritative_name_servers,
-    &$additional_records,
+    &$authoritative_name_servers = null,
+    &$additional_records = null,
     bool $raw = false,
 ): array|false {
 }

@@ -1,8 +1,9 @@
+use mago_codex::metadata::CodebaseMetadata;
 use mago_interner::ThreadedInterner;
+use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
-use mago_project::module::Module;
-use mago_reflection::CodebaseReflection;
 use mago_reporting::IssueCollection;
+use mago_source::Source;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::Program;
 
@@ -14,7 +15,7 @@ use crate::rule::ConfiguredRule;
 
 /// The `Runner` is responsible for executing a lint rule on the AST of a PHP program.
 ///
-/// It holds contextual data such as the PHP version, interner, codebase, module, and a collection
+/// It holds contextual data such as the PHP version, interner, codebase, source, ast, names and a collection
 /// of issues discovered during linting. To optimize repeated calls to [`Node::children()`], the runner
 /// precomputes a tree representation of the AST using the [`AstNode`] structure.
 ///
@@ -26,8 +27,9 @@ use crate::rule::ConfiguredRule;
 pub struct Runner<'a> {
     php_version: PHPVersion,
     interner: &'a ThreadedInterner,
-    codebase: &'a CodebaseReflection,
-    module: &'a Module,
+    codebase: &'a CodebaseMetadata,
+    source: &'a Source,
+    resolved_names: &'a ResolvedNames,
     issues: IssueCollection,
     ast: AstNode<'a>,
     pragmas: Vec<Pragma<'a>>,
@@ -36,15 +38,17 @@ pub struct Runner<'a> {
 impl<'a> Runner<'a> {
     /// Creates a new `Runner` instance.
     ///
-    /// This method converts the program AST (found in `module`) into a precomputed tree
+    /// This method converts the program AST into a precomputed tree
     /// representation to avoid repeated calls to [`Node::children()`] during linting.
     ///
     /// # Parameters
     ///
     /// - `php_version`: The PHP version used during linting.
     /// - `interner`: A reference to the threaded interner for resolving interned strings.
-    /// - `codebase`: A reference to the codebase reflection, providing additional context.
-    /// - `module`: The module of the program to be linted.
+    /// - `codebase`: A reference to the codebase metadata, providing additional context.
+    /// - `source`: The source of the program to be linted.
+    /// - `program`: The program AST to be linted.
+    /// - `resolved_names`: The resolved names for the program, used for name resolution during linting.
     ///
     /// # Returns
     ///
@@ -52,17 +56,19 @@ impl<'a> Runner<'a> {
     pub fn new(
         php_version: PHPVersion,
         interner: &'a ThreadedInterner,
-        codebase: &'a CodebaseReflection,
-        module: &'a Module,
+        codebase: &'a CodebaseMetadata,
+        source: &'a Source,
         program: &'a Program,
+        resolved_names: &'a ResolvedNames,
     ) -> Self {
         Self {
             php_version,
             interner,
             codebase,
-            module,
+            source,
+            resolved_names,
             ast: AstNode::from(Node::Program(program)),
-            pragmas: get_pragmas(module, program, interner),
+            pragmas: get_pragmas(source, program, interner),
             issues: IssueCollection::default(),
         }
     }
@@ -78,7 +84,8 @@ impl<'a> Runner<'a> {
             configured_rule,
             self.interner,
             self.codebase,
-            self.module,
+            self.source,
+            self.resolved_names,
             // Filter the pragmas to only those that are relevant to this rule.
             self.pragmas
                 .iter()

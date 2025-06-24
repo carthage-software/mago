@@ -1,0 +1,38 @@
+[package]
+name = "mago-analyzer"
+description = "A PHP type checker that can detect type errors in PHP code, and provide suggestions for fixing them."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-codex = { workspace = true }
+mago-reporting = { workspace = true }
+mago-fixer = { workspace = true }
+mago-syntax = { workspace = true }
+mago-interner = { workspace = true }
+mago-span = { workspace = true }
+mago-names = { workspace = true }
+mago-source = { workspace = true }
+mago-algebra = { workspace = true }
+mago-php-version = { workspace = true }
+mago-docblock = { workspace = true }
+ahash = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+itertools = { workspace = true }
+strum = { workspace = true }
+indexmap = { workspace = true }
+strsim = { workspace = true }
+either = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }

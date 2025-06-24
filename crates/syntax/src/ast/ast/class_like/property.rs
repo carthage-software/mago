@@ -78,7 +78,7 @@ pub struct HookedProperty {
     pub var: Option<Keyword>,
     pub hint: Option<Hint>,
     pub item: PropertyItem,
-    pub hooks: PropertyHookList,
+    pub hook_list: PropertyHookList,
 }
 
 /// Represents a property item in a class-like property declaration in PHP.
@@ -300,27 +300,27 @@ impl HasSpan for PlainProperty {
 impl HasSpan for HookedProperty {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
-            return Span::between(attribute_list.span(), self.hooks.span());
+            return Span::between(attribute_list.span(), self.hook_list.span());
         }
 
         match (self.modifiers.first(), &self.var) {
             (Some(modifiers), Some(var)) => {
                 if var.span().start < modifiers.span().start {
-                    return Span::between(var.span(), self.hooks.span());
+                    return Span::between(var.span(), self.hook_list.span());
                 }
 
-                return Span::between(modifiers.span(), self.hooks.span());
+                return Span::between(modifiers.span(), self.hook_list.span());
             }
-            (Some(modifiers), _) => return Span::between(modifiers.span(), self.hooks.span()),
-            (_, Some(var)) => return Span::between(var.span(), self.hooks.span()),
+            (Some(modifiers), _) => return Span::between(modifiers.span(), self.hook_list.span()),
+            (_, Some(var)) => return Span::between(var.span(), self.hook_list.span()),
             _ => {}
         }
 
         if let Some(type_hint) = &self.hint {
-            return Span::between(type_hint.span(), self.hooks.span());
+            return Span::between(type_hint.span(), self.hook_list.span());
         }
 
-        Span::between(self.item.span(), self.hooks.span())
+        Span::between(self.item.span(), self.hook_list.span())
     }
 }
 

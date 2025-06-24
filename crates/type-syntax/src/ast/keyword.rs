@@ -22,7 +22,8 @@ impl<'input> From<TypeToken<'input>> for Keyword<'input> {
     #[inline]
     fn from(token: TypeToken<'input>) -> Self {
         debug_assert!(
-            token.kind.is_keyword() || (token.kind.is_identifier() && token.value.ends_with("Closure")),
+            token.kind.is_keyword()
+                || (token.kind.is_identifier() && token.value.to_ascii_lowercase().ends_with("closure")),
             "Expected a keyword or identifier, found: {:?} ( `{}` )",
             token.kind,
             token.value

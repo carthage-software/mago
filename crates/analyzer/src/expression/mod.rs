@@ -1,0 +1,329 @@
+use std::collections::BTreeMap;
+
+use ahash::HashMap;
+use ahash::HashSet;
+
+use mago_algebra::clause::Clause;
+use mago_algebra::find_satisfying_assignments;
+use mago_codex::data_flow::graph::GraphKind;
+use mago_codex::data_flow::node::DataFlowNode;
+use mago_codex::data_flow::path::PathKind;
+use mago_codex::get_anonymous_class;
+use mago_codex::ttype::get_named_object;
+use mago_codex::ttype::get_never;
+use mago_codex::ttype::union::TUnion;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::*;
+
+use crate::analyzable::Analyzable;
+use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::get_expression_range;
+use crate::context::Context;
+use crate::context::block::BlockContext;
+use crate::context::scope::var_has_root;
+use crate::error::AnalysisError;
+use crate::formula::get_formula;
+use crate::issue::TypingIssueKind;
+use crate::reconciler::ReconcilationContext;
+use crate::reconciler::reconcile_keyed_types;
+use crate::statement::attributes::AttributeTarget;
+use crate::statement::attributes::analyze_attributes;
+use crate::statement::class_like::analyze_class_like;
+use crate::utils::misc::check_for_paradox;
+
+pub mod access;
+pub mod argument_list;
+pub mod array;
+pub mod array_access;
+pub mod arrow_function;
+pub mod assignment;
+pub mod binary;
+pub mod call;
+pub mod clone;
+pub mod closure;
+pub mod closure_creation;
+pub mod composite_string;
+pub mod conditional;
+pub mod constant_access;
+pub mod construct;
+pub mod instantiation;
+pub mod literal;
+pub mod magic_constant;
+pub mod r#match;
+pub mod throw;
+pub mod unary;
+pub mod variable;
+pub mod r#yield;
+
+impl Analyzable for Expression {
+    fn analyze<'a>(
+        &self,
+        context: &mut Context<'a>,
+        block_context: &mut BlockContext<'a>,
+        artifacts: &mut AnalysisArtifacts,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Expression::Parenthesized(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Literal(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Binary(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::UnaryPrefix(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::UnaryPostfix(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::CompositeString(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Assignment(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Conditional(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Array(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::LegacyArray(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::ArrayAccess(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::ArrayAppend(_) => {
+                context.buffer.report(
+                    TypingIssueKind::ArrayAppendInReadContext,
+                    Issue::error("Array append syntax `[]` cannot be used in a read context.")
+                    .with_annotation(
+                        Annotation::primary(self.span()).with_message("This syntax is for appending elements, not for reading a value.")
+                    )
+                    .with_note("The `[]` syntax after an array (e.g., `$array[]`) is used exclusively on the left-hand side of an assignment to append a new element (e.g., `$array[] = $value;`). It does not represent a readable value itself.")
+                    .with_help("If you intended to access an array element, provide an index (e.g., `$array[0]`, `$array['key']`). If you intended to append, use this syntax on the left side of an assignment."),
+                );
+
+                Ok(())
+            }
+            Expression::AnonymousClass(anonymous_class) => {
+                analyze_attributes(
+                    context,
+                    block_context,
+                    artifacts,
+                    anonymous_class.attribute_lists.as_slice(),
+                    AttributeTarget::ClassLike,
+                )?;
+
+                let Some(class_like_metadata) = get_anonymous_class(context.codebase, context.interner, self.span())
+                else {
+                    return Ok(());
+                };
+
+                analyze_class_like(
+                    context,
+                    artifacts,
+                    None,
+                    anonymous_class.span(),
+                    anonymous_class.extends.as_ref(),
+                    anonymous_class.implements.as_ref(),
+                    class_like_metadata,
+                    anonymous_class.members.as_slice(),
+                )?;
+
+                artifacts
+                    .set_expression_type(&self, get_named_object(context.interner, class_like_metadata.name, None));
+
+                Ok(())
+            }
+            Expression::Closure(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::ArrowFunction(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Variable(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::ConstantAccess(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Match(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Yield(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Construct(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Throw(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Clone(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Call(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Access(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::ClosureCreation(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Instantiation(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::MagicConstant(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::Pipe(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::List(list_expr) => {
+                context.buffer.report(
+                    TypingIssueKind::ListUsedInReadContext,
+                    Issue::error("`list()` construct cannot be used as a value.")
+                        .with_annotation(
+                            Annotation::primary(list_expr.span())
+                                .with_message("`list()` used here in a read context"),
+                        )
+                        .with_note(
+                            "`list()` is a language construct for destructuring an array on the left side of an assignment."
+                        )
+                        .with_help(
+                            "It is not a function and does not return a value. To create an array, use `[]` or `array()`."
+                        ),
+                );
+
+                artifacts.set_expression_type(&list_expr, get_never());
+
+                Ok(())
+            }
+            Expression::Self_(keyword) | Expression::Static(keyword) | Expression::Parent(keyword) => {
+                let keyword_str = context.interner.lookup(&keyword.value);
+
+                context.buffer.report(
+                    TypingIssueKind::InvalidScopeKeywordContext,
+                    Issue::error(format!("The `{keyword_str}` keyword cannot be used as a standalone value."))
+                        .with_annotation(
+                            Annotation::primary(keyword.span)
+                                .with_message(format!("`{keyword_str}` used as a value here")),
+                        )
+                        .with_note(
+                            format!("The `{keyword_str}` keyword is used to refer to a class scope and must be used with the `::` operator.")
+                        )
+                        .with_help(
+                            format!("Use `{keyword_str}::CONSTANT`, `{keyword_str}::method()`, or `new {keyword_str}()` instead.")
+                        ),
+                );
+
+                artifacts.set_expression_type(&self, get_never());
+
+                Ok(())
+            }
+            Expression::Identifier(_) => {
+                unreachable!(
+                    "Parser should not produce a bare `Identifier` as a standalone expression in this context."
+                );
+            }
+        }
+    }
+}
+
+impl Analyzable for Parenthesized {
+    fn analyze<'a>(
+        &self,
+        context: &mut Context<'a>,
+        block_context: &mut BlockContext<'a>,
+        artifacts: &mut AnalysisArtifacts,
+    ) -> Result<(), AnalysisError> {
+        self.expression.analyze(context, block_context, artifacts)?;
+        if let Some(u) = artifacts.get_expression_type(&self.expression) {
+            artifacts.set_expression_type(&self, u.clone());
+        }
+
+        Ok(())
+    }
+}
+
+pub fn find_expression_logic_issues<'a>(
+    expression: &Expression,
+    context: &mut Context<'a>,
+    block_context: &mut BlockContext<'a>,
+    artifacts: &mut AnalysisArtifacts,
+) {
+    let mut if_block_context = block_context.clone();
+    let mut cond_referenced_var_ids = if_block_context.conditionally_referenced_variable_ids.clone();
+
+    let mut expression_clauses = get_formula(
+        expression.span(),
+        expression.span(),
+        expression,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+    );
+
+    let mut mixed_var_ids = Vec::new();
+    for (var_id, var_type) in &block_context.locals {
+        if var_type.is_mixed() && block_context.locals.contains_key(var_id) {
+            mixed_var_ids.push(var_id);
+        }
+    }
+
+    expression_clauses = expression_clauses
+        .into_iter()
+        .map(|c| {
+            let keys = &c.possibilities.keys().collect::<Vec<&String>>();
+
+            let mut new_mixed_var_ids = vec![];
+            for i in mixed_var_ids.clone() {
+                if !keys.contains(&i) {
+                    new_mixed_var_ids.push(i);
+                }
+            }
+            mixed_var_ids = new_mixed_var_ids;
+
+            for key in keys {
+                for mixed_var_id in &mixed_var_ids {
+                    if var_has_root(key, mixed_var_id) {
+                        return Clause::new(
+                            BTreeMap::new(),
+                            expression.span(),
+                            expression.span(),
+                            Some(true),
+                            None,
+                            None,
+                        );
+                    }
+                }
+            }
+
+            c
+        })
+        .collect::<Vec<Clause>>();
+
+    let expression_span = expression.span();
+    // this will see whether any of the clauses in set A conflict with the clauses in set B
+    check_for_paradox(
+        context.interner,
+        &mut context.buffer,
+        &block_context.clauses,
+        &expression_clauses,
+        &expression_span,
+        &HashMap::default(),
+    );
+
+    expression_clauses.extend(block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>());
+
+    let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
+        expression_clauses.iter().as_slice(),
+        Some(expression.span()),
+        &mut cond_referenced_var_ids,
+    );
+
+    let mut reconcilation_context =
+        ReconcilationContext::new(context.interner, context.codebase, &mut context.buffer, artifacts);
+
+    reconcile_keyed_types(
+        &mut reconcilation_context,
+        &reconcilable_if_types,
+        active_if_types,
+        &mut if_block_context,
+        &mut HashSet::default(),
+        &cond_referenced_var_ids,
+        &expression_span,
+        true,
+        false,
+    );
+}
+
+pub(crate) fn add_decision_dataflow(
+    artifacts: &mut AnalysisArtifacts,
+    left_expression: &Expression,
+    right_expression: Option<&Expression>,
+    expression_span: Span,
+    mut expression_type: TUnion,
+) {
+    if let GraphKind::WholeProgram = &artifacts.data_flow_graph.kind {
+        return;
+    }
+
+    let decision_node = DataFlowNode::get_for_unlabelled_sink(expression_span);
+
+    if let Some(lhs_type) = artifacts.expression_types.get(&get_expression_range(left_expression)) {
+        expression_type.parent_nodes.push(decision_node.clone());
+
+        for old_parent_node in &lhs_type.parent_nodes {
+            artifacts.data_flow_graph.add_path(old_parent_node, &decision_node, PathKind::Default);
+        }
+    }
+
+    if let Some(rhs_expr) = right_expression
+        && let Some(rhs_type) = artifacts.expression_types.get(&get_expression_range(rhs_expr))
+    {
+        expression_type.parent_nodes.push(decision_node.clone());
+
+        for old_parent_node in &rhs_type.parent_nodes {
+            artifacts.data_flow_graph.add_path(old_parent_node, &decision_node, PathKind::Default);
+        }
+    }
+
+    artifacts.set_expression_type(&expression_span, expression_type);
+    artifacts.data_flow_graph.add_node(decision_node);
+}

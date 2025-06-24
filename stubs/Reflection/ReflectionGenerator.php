@@ -28,8 +28,9 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getExecutingLine(): int {}
+    public function getExecutingLine(): int
+    {
+    }
 
     /**
      * Gets the file name of the currently executing generator
@@ -40,8 +41,9 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getExecutingFile(): string {}
+    public function getExecutingFile(): string
+    {
+    }
 
     /**
      * Gets the trace of the executing generator
@@ -60,8 +62,9 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getTrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT): array {}
+    public function getTrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT): array
+    {
+    }
 
     /**
      * Gets the function name of the generator
@@ -73,8 +76,9 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getFunction(): ReflectionFunctionAbstract {}
+    public function getFunction(): ReflectionFunctionAbstract
+    {
+    }
 
     /**
      * Gets the function name of the generator
@@ -85,8 +89,9 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getThis(): ?object {}
+    public function getThis(): null|object
+    {
+    }
 
     /**
      * Gets the executing Generator object
@@ -96,11 +101,14 @@ final class ReflectionGenerator
      * @since 7.0
      */
     #[Pure]
-    #[TentativeType]
-    public function getExecutingGenerator(): Generator {}
+    public function getExecutingGenerator(): Generator
+    {
+    }
 
     /**
      * @since 8.4
      */
-    public function isClosed(): bool {}
+    public function isClosed(): bool
+    {
+    }
 }

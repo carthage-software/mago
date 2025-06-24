@@ -1,5 +1,6 @@
 use indoc::indoc;
 
+use mago_codex::*;
 use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::HasSpan;
@@ -46,22 +47,22 @@ impl Rule for RequirePropertyTypeRule {
     }
 
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
-        let (reflection, members) = match node {
+        let (metadata, members) = match node {
             Node::Class(class) => {
-                let name = context.module.names.get(&class.name);
-                let Some(reflection) = context.codebase.get_class(context.interner, name) else {
+                let name = context.resolved_names.get(&class.name);
+                let Some(metadata) = get_class(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                (reflection, class.members.as_slice())
+                (metadata, class.members.as_slice())
             }
             Node::Trait(r#trait) => {
-                let name = context.module.names.get(&r#trait.name);
-                let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
+                let name = context.resolved_names.get(&r#trait.name);
+                let Some(metadata) = get_trait(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                (reflection, r#trait.members.as_slice())
+                (metadata, r#trait.members.as_slice())
             }
             _ => return LintDirective::default(),
         };
@@ -76,12 +77,10 @@ impl Rule for RequirePropertyTypeRule {
             }
 
             for variable in property.variables() {
-                let Some(property_reflection) = reflection.properties.members.get(&variable.name) else {
-                    continue;
-                };
-
-                if property_reflection.is_overriding {
-                    // This property is overriding a property from a parent class.
+                if metadata
+                    .get_appearing_property_id(&variable.name)
+                    .is_none_or(|appearing_class_id| appearing_class_id != &metadata.name)
+                {
                     continue;
                 }
 

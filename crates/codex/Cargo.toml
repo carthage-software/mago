@@ -1,0 +1,32 @@
+[package]
+name = "mago-codex"
+description = "PHP Codebase Metadata"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-reporting = { workspace = true }
+mago-docblock = { workspace = true }
+mago-interner = { workspace = true }
+mago-span = { workspace = true }
+mago-syntax = { workspace = true }
+mago-type-syntax = { workspace = true }
+mago-names = { workspace = true }
+mago-source = { workspace = true }
+ahash = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+derivative = { workspace = true }
+itertools = { workspace = true }
+strum = { workspace = true }
+indexmap = { workspace = true }
+ordered-float = { workspace = true }
+bitflags = { workspace = true }

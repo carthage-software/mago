@@ -9,6 +9,12 @@
 
 use std::collections::HashSet;
 
+use mago_codex::populator::populate_codebase;
+use mago_codex::reference::SymbolReferences;
+use mago_codex::scanner::scan_program;
+use mago_names::resolver::NameResolver;
+use mago_semantics::SemanticsChecker;
+use mago_syntax::parser::parse_source;
 use serde::Serialize;
 
 use mago_formatter::Formatter;
@@ -17,8 +23,6 @@ use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_linter::Linter;
 use mago_linter::settings::Settings;
-use mago_project::module::Module;
-use mago_project::module::ModuleBuildOptions;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_source::Source;
@@ -110,27 +114,43 @@ impl AnalysisResults {
     pub fn analyze(code: String, lint_settings: Settings, format_settings: FormatSettings) -> Self {
         let interner = ThreadedInterner::new();
         let source = Source::standalone(&interner, "code.php", &code);
-        let (mut module, program) =
-            Module::build_with_ast(&interner, lint_settings.php_version, source, ModuleBuildOptions::validation());
+        let (program, parse_error) = parse_source(&interner, &source);
+        let resolved_names = NameResolver::new(&interner).resolve(&program);
+        let semantic_issues =
+            SemanticsChecker::new(&lint_settings.php_version, &interner).check(&source, &program, &resolved_names);
+
+        let mut codebase = scan_program(&interner, &source, &program, &resolved_names);
+
+        populate_codebase(
+            &mut codebase,
+            &interner,
+            &mut SymbolReferences::new(),
+            Default::default(),
+            Default::default(),
+        );
+
         let mut formatted = None;
-        if module.parse_error.is_none() {
+        if parse_error.is_none() {
             let formatter = Formatter::new(&interner, lint_settings.php_version, format_settings);
 
             // Only format if there are no parse errors
-            formatted = Some(formatter.format(&module.source, &program));
+            formatted = Some(formatter.format(&source, &program));
         }
 
-        let linter =
-            Linter::with_all_plugins(lint_settings, interner.clone(), module.reflection.take().unwrap_or_default());
-        let linter_issues = linter.lint(&module);
+        let linter = Linter::with_all_plugins(lint_settings, interner.clone(), codebase);
+        let linter_issues = linter.lint(&source, &program, &resolved_names);
 
         Self {
             strings: interner.all().into_iter().map(|(id, value)| (id, value.to_string())).collect(),
             program,
-            parse_error: module.parse_error.as_ref().map(|e| e.into()),
-            names: module.names.all().into_iter().map(|(offset, (id, imported))| (*offset, (*id, *imported))).collect(),
+            parse_error: parse_error.as_ref().map(|e| e.into()),
+            names: resolved_names
+                .all()
+                .into_iter()
+                .map(|(offset, (id, imported))| (*offset, (*id, *imported)))
+                .collect(),
             formatted,
-            semantic_issues: module.issues,
+            semantic_issues,
             linter_issues,
         }
     }

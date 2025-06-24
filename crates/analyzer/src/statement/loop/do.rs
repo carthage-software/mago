@@ -1,0 +1,125 @@
+use std::collections::BTreeMap;
+
+use ahash::HashSet;
+
+use mago_algebra::clause::Clause;
+use mago_algebra::find_satisfying_assignments;
+use mago_algebra::negate_formula;
+use mago_algebra::saturate_clauses;
+use mago_span::HasSpan;
+use mago_syntax::ast::*;
+
+use crate::analyzable::Analyzable;
+use crate::artifacts::AnalysisArtifacts;
+use crate::context::Context;
+use crate::context::block::BlockContext;
+use crate::context::block::BreakContext;
+use crate::context::scope::loop_scope::LoopScope;
+use crate::error::AnalysisError;
+use crate::formula::get_formula;
+use crate::formula::remove_clauses_with_mixed_variables;
+use crate::reconciler::ReconcilationContext;
+use crate::reconciler::reconcile_keyed_types;
+use crate::statement::r#loop;
+
+impl Analyzable for DoWhile {
+    fn analyze<'a>(
+        &self,
+        context: &mut Context<'a>,
+        block_context: &mut BlockContext<'a>,
+        artifacts: &mut AnalysisArtifacts,
+    ) -> Result<(), AnalysisError> {
+        let mut loop_block_context = block_context.clone();
+        loop_block_context.break_types.push(BreakContext::Loop);
+        loop_block_context.inside_loop = true;
+
+        let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
+
+        let mut mixed_variable_ids = vec![];
+        for (variable_id, variable_type) in &loop_scope.parent_context_variables {
+            if variable_type.is_mixed() {
+                mixed_variable_ids.push(variable_id);
+            }
+        }
+
+        let mut while_clauses = get_formula(
+            self.condition.span(),
+            self.condition.span(),
+            &self.condition,
+            context.get_assertion_context_from_block(block_context),
+            artifacts,
+        );
+
+        while_clauses = remove_clauses_with_mixed_variables(while_clauses, mixed_variable_ids, self.condition.span());
+        if while_clauses.is_empty() {
+            while_clauses.push(Clause::new(
+                BTreeMap::new(),
+                self.condition.span(),
+                self.condition.span(),
+                Some(true),
+                None,
+                None,
+            ));
+        }
+
+        let span = self.span();
+        let previous_loop_bounds = loop_block_context.loop_bounds;
+        loop_block_context.loop_bounds = (span.start.offset, span.end.offset);
+
+        let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
+            context,
+            std::slice::from_ref(self.statement.as_ref()),
+            vec![],
+            r#loop::get_and_expressions(&self.condition),
+            loop_scope,
+            &mut loop_block_context,
+            block_context,
+            artifacts,
+            true,
+            true,
+        )?;
+
+        loop_block_context.loop_bounds = previous_loop_bounds;
+
+        let clauses_to_simplify = {
+            let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
+            c.extend(negate_formula(while_clauses));
+            c
+        };
+
+        let (negated_while_types, _) = find_satisfying_assignments(
+            saturate_clauses(&clauses_to_simplify).as_slice(),
+            None,
+            &mut HashSet::default(),
+        );
+
+        if !negated_while_types.is_empty() {
+            let mut reconcilation_context =
+                ReconcilationContext::new(context.interner, context.codebase, &mut context.buffer, artifacts);
+
+            reconcile_keyed_types(
+                &mut reconcilation_context,
+                &negated_while_types,
+                BTreeMap::new(),
+                &mut inner_loop_block_context,
+                &mut HashSet::default(),
+                &HashSet::default(),
+                &self.condition.span(),
+                true,
+                false,
+            );
+        }
+
+        r#loop::inherit_loop_block_context(
+            context,
+            block_context,
+            loop_block_context,
+            inner_loop_block_context,
+            loop_scope,
+            /* always_enters_loop = */ true,
+            /* infinite_loop = */ false,
+        );
+
+        Ok(())
+    }
+}
