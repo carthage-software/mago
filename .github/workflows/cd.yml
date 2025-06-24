@@ -60,34 +60,45 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          # Windows ( MinGW )
-          - { target: x86_64-pc-windows-gnu, os: windows-2019 }
-          # Windows ( MSVC )
-          - { target: i686-pc-windows-msvc, os: windows-2019, test: true }
-          - { target: x86_64-pc-windows-msvc, os: windows-2019, test: true }
-          # macOS
-          - { target: aarch64-apple-darwin, os: macos-15, test: true }
-          - { target: x86_64-apple-darwin, os: macos-15, test: true }
-          # FreeBSD
+          # Each job in this matrix defines a build target. The following custom keys control the pipeline steps:
+          # - `test: true`: Enables the test suite to be run for this build.
+          # - `wasm: true`: Triggers an additional WebAssembly build and packaging for this release.
+          # - `debian-package: true`: Generates a Debian package for the release.
+
+          # Tier 1 targets:
+
+          ## Windows MSVC: x86_64, i686
+          - { target: i686-pc-windows-msvc, os: windows-latest, test: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true }
+          ## macOS: aarch64, x86_64
+          - { target: aarch64-apple-darwin, os: macos-latest, test: true }
+          - { target: x86_64-apple-darwin, os: macos-latest, test: true }
+          ## Linux: aarch64, i686, x86_64
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
+          - { target: i686-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
+          - { target: i686-unknown-linux-musl, os: ubuntu-latest, test: true }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true, wasm: true, debian-package: true }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
+
+          # Tier 2 targets:
+
+          # Windows MinGW: x86_64
+          - { target: x86_64-pc-windows-gnu, os: windows-latest }
+          # FreeBSD: x86_64, i686
           - { target: i686-unknown-freebsd, os: ubuntu-latest }
           - { target: x86_64-unknown-freebsd, os: ubuntu-latest }
-          # Linux
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true }
+          # Linux: arm, armv7, powerpc, powerpc64, powerpc64le, s390x
           - { target: arm-unknown-linux-gnueabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-gnueabihf, os: ubuntu-latest }
-          - { target: armv7-unknown-linux-gnueabihf, os: ubuntu-latest }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
           - { target: arm-unknown-linux-musleabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-musleabihf, os: ubuntu-latest }
+          - { target: armv7-unknown-linux-gnueabihf, os: ubuntu-latest }
           - { target: armv7-unknown-linux-musleabihf, os: ubuntu-latest }
-          - { target: i686-unknown-linux-gnu, os: ubuntu-latest, test: true }
-          - { target: i686-unknown-linux-musl, os: ubuntu-latest, test: true }
           - { target: powerpc-unknown-linux-gnu, os: ubuntu-latest }
           - { target: powerpc64-unknown-linux-gnu, os: ubuntu-latest }
           - { target: powerpc64le-unknown-linux-gnu, os: ubuntu-latest }
           - { target: s390x-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
 
     env:
       BUILD_CMD: cargo
@@ -121,21 +132,41 @@ jobs:
           targets: ${{ matrix.job.target }}
 
       - name: install cross
-        if: startsWith(matrix.job.os, 'ubuntu') && matrix.job.target != 'x86_64-unknown-linux-gnu'
+        if: startsWith(matrix.job.os, 'ubuntu')
         uses: taiki-e/install-action@v2
         with:
           tool: cross
 
       - name: overwrite build command env variable (for cross)
-        if: startsWith(matrix.job.os, 'ubuntu') && matrix.job.target != 'x86_64-unknown-linux-gnu'
+        if: startsWith(matrix.job.os, 'ubuntu')
         shell: bash
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
+
+      - name: Configure cross-rs container image for glibc 2.17
+        if: contains(matrix.job.target, 'linux-gnu')
+        shell: bash
+        run: |
+          IMAGE=""
+          case ${{ matrix.job.target }} in
+            x86_64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_x86_64" ;;
+            i686-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_i686" ;;
+            aarch64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_aarch64" ;;
+            powerpc64le-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_ppc64le" ;;
+            s390x-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_s390x" ;;
+          esac
+          if [[ -n "$IMAGE" ]]; then
+            echo "Using custom image for glibc 2.17: $IMAGE"
+            echo "CROSS_IMAGE=$IMAGE" >> $GITHUB_ENV
+          else
+            echo "::warning:: No manylinux2014 image found for target ${{ matrix.job.target }}. Build will use default cross image, which may have a newer glibc."
+          fi
 
       - name: show version information (Rust, cargo, GCC)
         shell: bash
         run: |
           set -x
           gcc --version || true
+          ldd --version || true
           rustup -V
           rustup toolchain list
           rustup default
@@ -161,6 +192,13 @@ jobs:
           echo "BIN_PATH=${BIN_PATH}" >> $GITHUB_OUTPUT
           echo "BIN_NAME=${BIN_NAME}" >> $GITHUB_OUTPUT
 
+      - name: check GLIBC version requirements
+        if: contains(matrix.job.target, 'linux-gnu')
+        shell: bash
+        run: |
+          echo "binary for target '${{ matrix.job.target }}' requires the following GLIBC versions:"
+          strings "${{ steps.bin.outputs.BIN_PATH }}" | grep GLIBC_ || echo "No GLIBC version strings found."
+
       - name: run tests
         if: matrix.job.test
         shell: bash
@@ -168,7 +206,7 @@ jobs:
 
       # Build the WASM artifacts only for x86_64-unknown-linux-gnu
       - name: Install wasm-pack and build WASM
-        if: matrix.job.target == 'x86_64-unknown-linux-gnu'
+        if: matrix.job.wasm
         run: |
           cargo install wasm-pack --version 0.13.1 --locked
           cd crates/wasm
@@ -217,7 +255,7 @@ jobs:
 
       - name: create WASM tarball
         id: wasm_package
-        if: matrix.job.target == 'x86_64-unknown-linux-gnu'
+        if: matrix.job.wasm
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
@@ -235,7 +273,7 @@ jobs:
       - name: create Debian package
         id: debian-package
         shell: bash
-        if: startsWith(matrix.job.os, 'ubuntu') && !endsWith(matrix.job.target, 'freebsd')
+        if: matrix.job.debian-package
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           TARGET="${{ matrix.job.target }}"
@@ -290,7 +328,7 @@ jobs:
           path: ${{ steps.package.outputs.PKG_PATH }}
 
       - name: "Artifact upload: WASM"
-        if: matrix.job.target == 'x86_64-unknown-linux-gnu' && steps.wasm_package.outputs.WASM_PKG_NAME
+        if: matrix.job.wasm
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.wasm_package.outputs.WASM_PKG_NAME }}
