@@ -1,2 +1,4 @@
 * text=auto eol=lf
+crates/formatter/tests/cases/issue_225/before.php -text eol=crlf
+crates/formatter/tests/cases/issue_225/after.php -text eol=crlf
 stubs/** linguist-vendored
