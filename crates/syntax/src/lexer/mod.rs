@@ -742,7 +742,12 @@ impl<'a, 'i> Lexer<'a, 'i> {
                         let mut token_kind = TokenKind::StringPart;
                         loop {
                             match self.input.peek(length, 2) {
-                                [b'\n', ..] => {
+                                [b'\r', b'\n'] => {
+                                    length += 2;
+
+                                    break;
+                                }
+                                [b'\n', ..] | [b'\r', ..] => {
                                     length += 1;
 
                                     break;
@@ -1003,8 +1008,12 @@ fn matches_start_of_heredoc_document(input: &Input) -> bool {
             return false; // Unexpected EOF
         }
 
-        if *input.read_at(pos) == b'\n' {
+        let byte = *input.read_at(pos);
+        if byte == b'\n' {
             return true; // Newline found: valid heredoc opener.
+        } else if byte == b'\r' {
+            // Handle CRLF: treat '\r' followed by '\n' as a newline as well.
+            return pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if is_part_of_identifier(input.read_at(pos)) {
             length += 1;
         } else {
@@ -1047,6 +1056,9 @@ fn matches_start_of_double_quote_heredoc_document(input: &Input) -> bool {
         if *byte == b'\n' {
             // End of line: valid only if a closing double quote was encountered.
             return terminated;
+        } else if *byte == b'\r' {
+            // Handle CRLF sequences.
+            return terminated && pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if !terminated && is_part_of_identifier(byte) {
             length += 1;
         } else if !terminated && *byte == b'"' {
@@ -1091,6 +1103,8 @@ fn matches_start_of_nowdoc_document(input: &Input) -> bool {
         let byte = *input.read_at(pos);
         if byte == b'\n' {
             return terminated;
+        } else if byte == b'\r' {
+            return terminated && pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if !terminated && is_part_of_identifier(&byte) {
             length += 1;
         } else if !terminated && byte == b'\'' {
@@ -1172,6 +1186,14 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
             // Newline ends the label.
             length += 1;
             return (length, whitespaces, label_length);
+        } else if byte == b'\r' {
+            // Handle CRLF sequences
+            if pos + 1 < total && *input.read_at(pos + 1) == b'\n' {
+                length += 2;
+            } else {
+                length += 1;
+            }
+            return (length, whitespaces, label_length);
         } else if is_part_of_identifier(&byte) && (!double_quoted || !terminated) {
             // For both unquoted and double-quoted (before the closing quote) heredoc,
             // a valid identifier character is part of the label.
@@ -1217,6 +1239,14 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
         if byte == b'\n' {
             // A newline indicates the end of the label.
             length += 1;
+            return (length, whitespaces, label_length);
+        } else if byte == b'\r' {
+            // Handle CRLF sequences
+            if pos + 1 < total && *input.read_at(pos + 1) == b'\n' {
+                length += 2;
+            } else {
+                length += 1;
+            }
             return (length, whitespaces, label_length);
         } else if is_part_of_identifier(&byte) && !terminated {
             // For nowdoc, identifier characters contribute to the label until terminated.
