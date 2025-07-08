@@ -829,8 +829,13 @@ impl<'a, 'i> Lexer<'a, 'i> {
                     let mut only_whitespaces = true;
 
                     loop {
-                        match self.input.peek(length, 1) {
-                            [b'\n', ..] => {
+                        match self.input.peek(length, 2) {
+                            [b'\r', b'\n'] => {
+                                length += 2;
+
+                                break;
+                            }
+                            [b'\n', ..] | [b'\r', ..] => {
                                 length += 1;
 
                                 break;
