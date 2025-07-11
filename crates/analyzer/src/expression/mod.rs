@@ -9,11 +9,13 @@ use mago_codex::data_flow::graph::GraphKind;
 use mago_codex::data_flow::node::DataFlowNode;
 use mago_codex::data_flow::path::PathKind;
 use mago_codex::get_anonymous_class;
+use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_named_object;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
+use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -177,10 +179,22 @@ impl Analyzable for Expression {
 
                 Ok(())
             }
-            Expression::Identifier(_) => {
-                unreachable!(
-                    "Parser should not produce a bare `Identifier` as a standalone expression in this context."
+            Expression::Identifier(identifier) => {
+                if !identifier.is_local() {
+                    unreachable!(
+                        "Parser should not produce a bare `Identifier` as a standalone expression in this context. \nIf you see this, it indicates a bug in the parser or the analysis logic. \nPlease report this issue with the following identifier: `{}` line `{}`, column `{}`.",
+                        context.interner.lookup(&context.source.identifier.0),
+                        context.source.line_number(self.offset()),
+                        context.source.column_number(self.offset()),
+                    );
+                }
+
+                artifacts.set_expression_type(
+                    &self,
+                    get_literal_string(context.interner.lookup(identifier.value()).to_owned()),
                 );
+
+                Ok(())
             }
         }
     }
@@ -326,4 +340,23 @@ pub(crate) fn add_decision_dataflow(
 
     artifacts.set_expression_type(&expression_span, expression_type);
     artifacts.data_flow_graph.add_node(decision_node);
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = bare_identifier_in_array_access,
+        code = indoc! {r#"
+            <?php
+
+
+            $item = ['link' => 'https://example.com', 'description' => 'Example description'];
+
+            echo "<a href='$item[link]' title='$item[description]'>";
+        "#},
+    }
 }
