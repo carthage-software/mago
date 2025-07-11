@@ -540,7 +540,7 @@ fn scrape_lesser_than_assertions(
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let maximum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
-                    number_on_right.wrapping_sub(1)
+                    number_on_right.saturating_sub(1)
                 } else {
                     number_on_right
                 };
@@ -561,7 +561,7 @@ fn scrape_lesser_than_assertions(
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let minimum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
-                    number_on_left.wrapping_add(1)
+                    number_on_left.saturating_add(1)
                 } else {
                     number_on_left
                 };
@@ -629,7 +629,7 @@ fn scrape_greater_than_assertions(
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let minimum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
-                    number_on_right.wrapping_add(1)
+                    number_on_right.saturating_add(1)
                 } else {
                     number_on_right
                 };
@@ -651,7 +651,7 @@ fn scrape_greater_than_assertions(
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let maximum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
-                    number_on_left.wrapping_sub(1)
+                    number_on_left.saturating_sub(1)
                 } else {
                     number_on_left
                 };

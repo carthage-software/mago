@@ -1468,13 +1468,13 @@ fn reconcile_integer_comparison(
                 existing_var_type.types.push(TAtomic::Scalar(TScalar::Integer(TInteger::To(if or_equal {
                     *value
                 } else {
-                    *value - 1
+                    value.saturating_sub(1)
                 }))));
             } else {
                 existing_var_type.types.push(TAtomic::Scalar(TScalar::Integer(TInteger::From(if or_equal {
                     *value
                 } else {
-                    *value + 1
+                    value.saturating_add(1)
                 }))));
             }
         } else {
