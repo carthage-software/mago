@@ -132,7 +132,7 @@ impl TUnion {
         self.types
             .iter()
             .filter_map(|t| match t {
-                TAtomic::Null => None,
+                TAtomic::Null | TAtomic::Void => None,
                 TAtomic::GenericParameter(parameter) => Some(TAtomic::GenericParameter(TGenericParameter {
                     parameter_name: parameter.parameter_name,
                     defining_entity: parameter.defining_entity,
@@ -307,6 +307,27 @@ impl TUnion {
 
     pub fn has_mixed(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
+    }
+
+    pub fn has_nullable_mixed(&self) -> bool {
+        self.types.iter().any(|t| matches!(t, TAtomic::Mixed(mixed) if !mixed.is_non_null())) && !self.types.is_empty()
+    }
+
+    pub fn has_void(&self) -> bool {
+        self.types.iter().any(|t| matches!(t, TAtomic::Void)) && !self.types.is_empty()
+    }
+
+    pub fn has_null(&self) -> bool {
+        self.types.iter().any(|t| matches!(t, TAtomic::Null)) && !self.types.is_empty()
+    }
+
+    pub fn has_nullish(&self) -> bool {
+        self.types.iter().any(|t| match t {
+            TAtomic::Null | TAtomic::Void => true,
+            TAtomic::Mixed(mixed) => !mixed.is_non_null(),
+            TAtomic::GenericParameter(parameter) => parameter.constraint.has_nullish(),
+            _ => false,
+        }) && !self.types.is_empty()
     }
 
     pub fn is_mixed_with_any(&self, has_any: &mut bool) -> bool {

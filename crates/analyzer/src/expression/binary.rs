@@ -1310,7 +1310,7 @@ fn analyze_null_coalesce_operation<'a>(
         if let Some(rhs_parents) = artifacts.get_expression_type(&binary.rhs).map(|t| &t.parent_nodes) {
             decision_node_parents.extend(rhs_parents.iter().cloned());
         }
-    } else if !lhs_type.is_nullable() && !lhs_type.possibly_undefined && !lhs_type.possibly_undefined_from_try {
+    } else if !lhs_type.has_nullish() && !lhs_type.possibly_undefined && !lhs_type.possibly_undefined_from_try {
         context.buffer.report(
             TypingIssueKind::RedundantNullCoalesce,
             Issue::help(
@@ -1342,6 +1342,7 @@ fn analyze_null_coalesce_operation<'a>(
             .get_expression_type(&binary.rhs)
             .map(Cow::Borrowed)
             .unwrap_or_else(|| Cow::Owned(get_mixed_any()));
+
         result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, context.interner, false);
 
         if let Some(rhs_parents) = artifacts.get_expression_type(&binary.rhs).map(|t| &t.parent_nodes) {
@@ -2985,6 +2986,17 @@ mod tests {
                 }
 
                 return $string;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = null_coalescing_mixed,
+        code = indoc! {r#"
+            <?php
+
+            function test($foo = null) {
+                return $foo ?? 'bar';
             }
         "#},
     }
