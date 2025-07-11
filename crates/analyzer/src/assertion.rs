@@ -209,6 +209,38 @@ fn scrape_equality_assertions(
     artifacts: &mut AnalysisArtifacts,
     assertion_context: AssertionContext<'_>,
 ) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+        (None, Some(number_on_right)) => {
+            let mut if_types = HashMap::default();
+
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
+                if number_on_right == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                } else {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasExactCount(number_on_right as usize)]]);
+                }
+            }
+
+            return if if_types.is_empty() { vec![] } else { vec![if_types] };
+        }
+        (Some(number_on_left), None) => {
+            let mut if_types = HashMap::default();
+
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
+                if number_on_left == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                } else {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasExactCount(number_on_left as usize)]]);
+                }
+            }
+
+            return if if_types.is_empty() { vec![] } else { vec![if_types] };
+        }
+        _ => {
+            // Continue to check for other conditions
+        }
+    };
+
     if let Some(null_position) = has_null_variable(left, right) {
         return get_null_equality_assertions(left, right, assertion_context, null_position);
     }
@@ -246,6 +278,44 @@ fn scrape_inequality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_>,
 ) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+        (None, Some(number_on_right)) => {
+            let mut if_types = HashMap::default();
+
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
+                if number_on_right == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                } else {
+                    if_types.insert(
+                        array_variable_id,
+                        vec![vec![Assertion::DoesNotHaveExactCount(number_on_right as usize)]],
+                    );
+                }
+            }
+
+            return if if_types.is_empty() { vec![] } else { vec![if_types] };
+        }
+        (Some(number_on_left), None) => {
+            let mut if_types = HashMap::default();
+
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
+                if number_on_left == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                } else {
+                    if_types.insert(
+                        array_variable_id,
+                        vec![vec![Assertion::DoesNotHaveExactCount(number_on_left as usize)]],
+                    );
+                }
+            }
+
+            return if if_types.is_empty() { vec![] } else { vec![if_types] };
+        }
+        _ => {
+            // Continue to check for other conditions
+        }
+    };
+
     if let Some(null_position) = has_null_variable(left, right) {
         return get_null_inequality_assertions(left, right, assertion_context, null_position);
     }
@@ -464,71 +534,54 @@ fn scrape_lesser_than_assertions(
     artifacts: &mut AnalysisArtifacts,
     assertion_context: AssertionContext<'_>,
 ) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
-    match has_non_empty_count_equality_check(left, operator, right, artifacts, assertion_context) {
-        (Some(minimum_count), None) => {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+        (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
-            let counter_variable_id = get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                assertion_context.interner,
-                Some(assertion_context.codebase),
-            );
-
-            if let Some(counter_variable_id) = counter_variable_id {
-                if minimum_count == 1 {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
-                } else if minimum_count > 1 {
-                    if_types
-                        .insert(counter_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
+                let maximum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
+                    number_on_right.wrapping_sub(1)
                 } else {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    number_on_right
+                };
+
+                if maximum_count < 0 {
+                    // This branch is logically unreachable, e.g. `count($arr) < 0`.
+                } else if maximum_count == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                } else {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasAtMostCount(maximum_count as usize)]]);
                 }
             }
 
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
-        (None, None) => {
-            // Continue to check for other conditions
+        (Some(number_on_left), None) => {
+            let mut if_types = HashMap::default();
+
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
+                let minimum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
+                    number_on_left.wrapping_add(1)
+                } else {
+                    number_on_left
+                };
+
+                if minimum_count == 1 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                } else if minimum_count > 1 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
+                } else {
+                    // A minimum_count of 0 or less (e.g. from `0 <= count($arr)`) is a tautology
+                    // and provides no new information, so we do nothing.
+                }
+            }
+
+            return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         _ => {
-            unreachable!("unexpected non-empty count equality check")
+            // Continue to check for other conditions
         }
     }
-
-    match has_less_than_count_equality_check(left, operator, right, artifacts, assertion_context) {
-        (None, Some(maximum_count)) => {
-            let mut if_types = HashMap::default();
-
-            let counter_variable_id = get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                assertion_context.interner,
-                Some(assertion_context.codebase),
-            );
-
-            if let Some(counter_variable_id) = counter_variable_id {
-                if maximum_count > 0 {
-                    if_types.insert(
-                        counter_variable_id,
-                        vec![vec![Assertion::DoesNotHaveAtLeastCount(maximum_count as usize + 1)]],
-                    );
-                } else {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::EmptyCountable]]);
-                }
-            }
-
-            return if if_types.is_empty() { vec![] } else { vec![if_types] };
-        }
-        (None, None) => {
-            // Continue to check for other conditions
-        }
-        _ => {
-            unreachable!("unexpected less than count equality check")
-        }
-    };
 
     let (count, variable, is_left) = match get_comparison_literal_operand(artifacts, left, right) {
         (Some(count), None) => (count, right, true),
@@ -570,69 +623,52 @@ fn scrape_greater_than_assertions(
     artifacts: &mut AnalysisArtifacts,
     assertion_context: AssertionContext<'_>,
 ) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
-    match has_non_empty_count_equality_check(left, operator, right, artifacts, assertion_context) {
-        (None, Some(minimum_count)) => {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+        (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
-            let counter_variable_id = get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                assertion_context.interner,
-                Some(assertion_context.codebase),
-            );
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
+                let minimum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
+                    number_on_right.wrapping_add(1)
+                } else {
+                    number_on_right
+                };
 
-            if let Some(counter_variable_id) = counter_variable_id {
                 if minimum_count == 1 {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
-                    if_types
-                        .insert(counter_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
                 } else {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    // A minimum_count of 0 or less (e.g. from `count($arr) >= 0`) is a tautology
+                    // and provides no new information, so we do nothing.
                 }
             }
 
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
-        (None, None) => {
-            // Continue to check for other conditions
-        }
-        _ => {
-            unreachable!("unexpected non-empty count equality check")
-        }
-    }
-
-    match has_less_than_count_equality_check(left, operator, right, artifacts, assertion_context) {
-        (Some(maximum_count), None) => {
+        (Some(number_on_left), None) => {
             let mut if_types = HashMap::default();
 
-            let counter_variable_id = get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                assertion_context.interner,
-                Some(assertion_context.codebase),
-            );
-
-            if let Some(counter_variable_id) = counter_variable_id {
-                if maximum_count > 0 {
-                    if_types.insert(
-                        counter_variable_id,
-                        vec![vec![Assertion::DoesNotHaveAtLeastCount(maximum_count as usize + 1)]],
-                    );
+            if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
+                let maximum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
+                    number_on_left.wrapping_sub(1)
                 } else {
-                    if_types.insert(counter_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                    number_on_left
+                };
+
+                if maximum_count < 0 {
+                    // This branch is logically unreachable, e.g. `-1 > count($arr)`.
+                } else if maximum_count == 0 {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                } else {
+                    if_types.insert(array_variable_id, vec![vec![Assertion::HasAtMostCount(maximum_count as usize)]]);
                 }
             }
 
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
-        (None, None) => {
-            // Continue to check for other conditions
-        }
         _ => {
-            unreachable!("unexpected less than count equality check")
+            // Continue to check for other conditions
         }
     }
 
@@ -753,83 +789,36 @@ fn scrape_instanceof_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn has_non_empty_count_equality_check(
+/// Checks if a binary operation is a comparison between a `count()` or `sizeof()`
+/// call and an integer literal. It looks for `<`, `<=`, `>`, and `>=` operators.
+///
+/// # Returns
+///
+/// A tuple `(Option<i64>, Option<i64>)`.
+///
+/// If the `count()` call is on the left, it returns `(None, Some(right_value))`.
+/// If the `count()` call is on the right, it returns `(Some(left_value), None)`.
+///
+/// If the expression is not a size comparison, or the other operand is not an
+/// integer literal, it returns `(None, None)`. The returned tuple will never
+/// contain a value for both the left and right sides.
+fn resolve_count_comparison(
     left: &Expression,
-    operator: &BinaryOperator,
     right: &Expression,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_>,
 ) -> (Option<i64>, Option<i64>) {
-    let is_greater_than = matches!(operator, BinaryOperator::GreaterThan(_));
-    let is_greater_than_or_equal = matches!(operator, BinaryOperator::GreaterThanOrEqual(_));
-
-    if !is_greater_than && !is_greater_than_or_equal {
-        return (None, None);
-    }
-
     if is_count_or_size_of_call(assertion_context, left) {
-        let right_value =
-            get_expression_integer_value(artifacts, right).filter(|v| if is_greater_than { *v > 0 } else { *v > 1 });
-
-        if is_greater_than {
-            return (None, right_value.map(|v| v.wrapping_add(1)));
-        } else {
-            return (None, right_value);
-        }
+        (None, get_expression_integer_value(artifacts, right))
+    } else if is_count_or_size_of_call(assertion_context, right) {
+        (get_expression_integer_value(artifacts, left), None)
+    } else {
+        (None, None)
     }
-
-    if is_count_or_size_of_call(assertion_context, right) {
-        let left_value =
-            get_expression_integer_value(artifacts, left).filter(|v| if is_greater_than { *v > 0 } else { *v > 1 });
-
-        if is_greater_than {
-            return (left_value.map(|v| v.wrapping_add(1)), None);
-        } else {
-            return (left_value, None);
-        }
-    }
-
-    (None, None)
-}
-
-fn has_less_than_count_equality_check(
-    left: &Expression,
-    operator: &BinaryOperator,
-    right: &Expression,
-    artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
-) -> (Option<i64>, Option<i64>) {
-    let is_less_than = matches!(operator, BinaryOperator::LessThan(_));
-    let is_less_than_or_equal = matches!(operator, BinaryOperator::LessThanOrEqual(_));
-
-    if (is_less_than_or_equal || is_less_than) && is_count_or_size_of_call(assertion_context, left) {
-        let right_value = get_expression_integer_value(artifacts, right);
-
-        if is_less_than {
-            return (None, right_value);
-        } else {
-            return (None, right_value.map(|v| v - 1));
-        }
-    }
-
-    let is_greater_than = matches!(operator, BinaryOperator::GreaterThan(_));
-    let is_greater_than_or_equal = matches!(operator, BinaryOperator::GreaterThanOrEqual(_));
-
-    if (is_greater_than_or_equal || is_greater_than) && is_count_or_size_of_call(assertion_context, right) {
-        let left_value = get_expression_integer_value(artifacts, left);
-
-        if is_greater_than {
-            return (left_value.map(|v| v - 1), None);
-        } else {
-            return (left_value, None);
-        }
-    }
-
-    (None, None)
 }
 
 fn get_comparison_literal_operand(
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     left: &Expression,
     right: &Expression,
 ) -> (Option<i64>, Option<i64>) {
@@ -844,7 +833,7 @@ fn get_comparison_literal_operand(
     (None, None)
 }
 
-fn get_expression_integer_value(artifacts: &mut AnalysisArtifacts, expression: &Expression) -> Option<i64> {
+fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<i64> {
     if let Some(value) = artifacts.get_expression_type(expression).and_then(|t| t.get_single_literal_int_value()) {
         return Some(value);
     }
@@ -1175,6 +1164,28 @@ fn get_typed_value_inequality_assertions(
     }
 
     if !if_types.is_empty() { vec![if_types] } else { vec![] }
+}
+
+#[inline]
+fn get_first_argument_expression_id(
+    assertion_context: AssertionContext<'_>,
+    expression: &Expression,
+) -> Option<String> {
+    let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression else {
+        return None;
+    };
+
+    if argument_list.arguments.len() != 1 {
+        return None;
+    }
+
+    get_expression_id(
+        argument_list.arguments.first()?.value(),
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        assertion_context.interner,
+        Some(assertion_context.codebase),
+    )
 }
 
 #[inline]

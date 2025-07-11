@@ -46,7 +46,7 @@ pub enum Assertion {
     HasExactCount(usize),
     HasAtLeastCount(usize),
     DoesNotHaveExactCount(usize),
-    DoesNotHaveAtLeastCount(usize),
+    HasAtMostCount(usize),
     IsLessThan(i64),
     IsLessThanOrEqual(i64),
     IsGreaterThan(i64),
@@ -93,7 +93,7 @@ impl Assertion {
             Assertion::HasExactCount(number) => "has-exactly-".to_string() + &number.to_string(),
             Assertion::HasAtLeastCount(number) => "has-at-least-".to_string() + &number.to_string(),
             Assertion::DoesNotHaveExactCount(number) => "!has-exactly-".to_string() + &number.to_string(),
-            Assertion::DoesNotHaveAtLeastCount(number) => "!has-at-least-".to_string() + &number.to_string(),
+            Assertion::HasAtMostCount(number) => "has-at-most-".to_string() + &number.to_string(),
             Assertion::IsLessThan(number) => "is-less-than-".to_string() + &number.to_string(),
             Assertion::IsLessThanOrEqual(number) => "is-less-than-or-equal-".to_string() + &number.to_string(),
             Assertion::IsGreaterThan(number) => "is-greater-than-".to_string() + &number.to_string(),
@@ -123,7 +123,7 @@ impl Assertion {
                 | Assertion::DoesNotHaveArrayKey(_)
                 | Assertion::DoesNotHaveExactCount(_)
                 | Assertion::DoesNotHaveNonnullEntryForKey(_)
-                | Assertion::DoesNotHaveAtLeastCount(_)
+                | Assertion::HasAtMostCount(_)
                 | Assertion::HasExactCount(_)
                 | Assertion::HasAtLeastCount(_)
                 | Assertion::EmptyCountable
@@ -349,10 +349,10 @@ impl Assertion {
                 _ => false,
             },
             Assertion::HasAtLeastCount(number) => match other {
-                Assertion::DoesNotHaveAtLeastCount(other_number) => other_number == number,
+                Assertion::HasAtMostCount(other_number) => other_number == number,
                 _ => false,
             },
-            Assertion::DoesNotHaveAtLeastCount(number) => match other {
+            Assertion::HasAtMostCount(number) => match other {
                 Assertion::HasAtLeastCount(other_number) => other_number == number,
                 _ => false,
             },
@@ -406,8 +406,8 @@ impl Assertion {
             Assertion::NotInArray(union) => Assertion::InArray(union.clone()),
             Assertion::HasExactCount(size) => Assertion::DoesNotHaveExactCount(*size),
             Assertion::DoesNotHaveExactCount(size) => Assertion::HasExactCount(*size),
-            Assertion::HasAtLeastCount(size) => Assertion::DoesNotHaveAtLeastCount(*size),
-            Assertion::DoesNotHaveAtLeastCount(size) => Assertion::HasAtLeastCount(*size),
+            Assertion::HasAtLeastCount(size) => Assertion::HasAtMostCount(*size),
+            Assertion::HasAtMostCount(size) => Assertion::HasAtLeastCount(*size),
             Assertion::HasArrayKey(str) => Assertion::DoesNotHaveArrayKey(str.clone()),
             Assertion::DoesNotHaveArrayKey(str) => Assertion::HasArrayKey(str.clone()),
             Assertion::HasNonnullEntryForKey(str) => Assertion::DoesNotHaveNonnullEntryForKey(str.clone()),
