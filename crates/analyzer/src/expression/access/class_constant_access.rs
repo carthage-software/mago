@@ -231,7 +231,7 @@ mod tests {
         name = const_access_class_on_string_variable,
         code = indoc! {r#"
             <?php
-            $className = "MyClass"; /
+            $className = "MyClass";
             $_ = $className::class;
         "#},
         issues = [
