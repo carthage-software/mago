@@ -29,6 +29,7 @@ use crate::issue::TypingIssueKind;
 use crate::resolver::selector::resolve_member_selector;
 use crate::visibility::check_method_visibility;
 
+#[derive(Debug)]
 pub struct ResolvedMethod {
     /// The name of the class this method is called on, not necessarily the same
     /// as the class of the method itself, especially in cases of inheritance.
@@ -40,7 +41,7 @@ pub struct ResolvedMethod {
 }
 
 /// Holds the results of resolving a method call, including valid targets and summary flags.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MethodResolutionResult {
     /// The template result containing any type variables and bounds.
     pub template_result: TemplateResult,
@@ -102,7 +103,7 @@ pub fn resolve_method_targets<'a>(
     if let Some(object_type) = artifacts.get_expression_type(object) {
         let mut object_atomics = object_type.types.iter().collect::<Vec<_>>();
 
-        for object_atomic in &object_type.types {
+        while let Some(object_atomic) = object_atomics.pop() {
             if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = object_atomic {
                 object_atomics.extend(constraint.types.iter());
                 continue;

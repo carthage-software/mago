@@ -237,6 +237,39 @@ mod tests {
     }
 
     test_analysis! {
+        name = method_call_on_generic_parameter,
+        code = indoc! {r#"
+            <?php
+
+            class A
+            {
+                public function getString(): string
+                {
+                    return 'Hello, world!';
+                }
+            }
+
+            class B
+            {
+                public function getString(): string
+                {
+                    return 'Hello, world!';
+                }
+            }
+
+            /**
+             * @template T of A|B
+             *
+             * @param T $object
+             */
+            function foo(A|B $object): string
+            {
+                return $object->getString();
+            }
+        "#},
+    }
+
+    test_analysis! {
         name = ambiguous_object_method_call,
         code = indoc! {r#"
             <?php
