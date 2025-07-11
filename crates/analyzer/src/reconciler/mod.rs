@@ -960,9 +960,9 @@ pub(crate) fn trigger_issue_for_impossible(
             report_redundant_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
         }
     } else if not_operator {
-        report_impossible_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
-    } else {
         report_redundant_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
+    } else {
+        report_impossible_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
     }
 }
 

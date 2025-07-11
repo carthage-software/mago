@@ -559,11 +559,11 @@ impl TUnion {
     }
 
     pub fn is_always_truthy(&self) -> bool {
-        self.types.iter().all(|atomic| atomic.is_truthy())
+        self.types.iter().all(|atomic| atomic.is_truthy()) && !self.types.is_empty()
     }
 
     pub fn is_always_falsy(&self) -> bool {
-        self.types.iter().all(|atomic| atomic.is_falsy())
+        self.types.iter().all(|atomic| atomic.is_falsy()) && !self.types.is_empty()
     }
 
     pub fn is_literal_of(&self, other: &TUnion) -> bool {
