@@ -165,8 +165,6 @@ impl TType for TKeyedArray {
 
             str.to_string()
         } else {
-            debug_assert!(!self.non_empty, "Keyed array without known items or parameters should not be non-empty");
-
             String::from("array{}")
         }
     }
