@@ -1,6 +1,7 @@
 use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
+
 use mago_codex::data_flow::node::DataFlowNode;
 use mago_codex::data_flow::path::PathKind;
 use mago_codex::get_class_like;
@@ -35,6 +36,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::issue::TypingIssueKind;
+use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::expression::get_expression_id;
 use crate::utils::template::get_template_types_for_class_member;
@@ -116,7 +118,14 @@ pub fn resolve_instance_properties<'a>(
         }
     }
 
-    for object_atomic in &object_type.types {
+    let mut object_atomics = object_type.types.iter().collect::<Vec<_>>();
+    while let Some(object_atomic) = object_atomics.pop() {
+        if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = object_atomic {
+            object_atomics.extend(constraint.types.iter());
+
+            continue;
+        }
+
         if object_atomic.is_null() || object_atomic.is_void() {
             result.encountered_null = true;
 
@@ -200,8 +209,12 @@ fn find_property_in_class<'a>(
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
     let declaring_class_id =
         get_declaring_class_for_property(context.codebase, context.interner, class_id, prop_name).unwrap_or(*class_id);
-    let declaring_class_metadata = get_class_like(context.codebase, context.interner, &declaring_class_id)
-        .expect("Declaring class metadata must exist");
+
+    let Some(declaring_class_metadata) = get_class_like(context.codebase, context.interner, &declaring_class_id) else {
+        report_non_existent_class_like(context, object_expr.span(), &declaring_class_id);
+
+        return Ok(None);
+    };
 
     let Some(property_metadata) = declaring_class_metadata.get_property(prop_name) else {
         result.has_invalid_path = true;

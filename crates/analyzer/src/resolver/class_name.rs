@@ -8,6 +8,7 @@ use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -320,4 +321,17 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
     }
 
     get_class_name_from_atomic_impl(interner, atomic, false)
+}
+
+pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: &StringIdentifier) {
+    let class_name_str = context.interner.lookup(classname);
+
+    context.buffer.report(
+        TypingIssueKind::NonExistentClassLike,
+        Issue::error(format!("Class, Interface, or Trait `{class_name_str}` does not exist."))
+            .with_annotation(
+                Annotation::primary(span).with_message("This expression refers to a non-existent class-like type"),
+            )
+            .with_help(format!("Ensure the `{class_name_str}` is defined in the codebase.")),
+    );
 }

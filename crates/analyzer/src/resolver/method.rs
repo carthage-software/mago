@@ -26,6 +26,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::issue::TypingIssueKind;
+use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
 use crate::visibility::check_method_visibility;
 
@@ -336,19 +337,6 @@ fn report_call_on_ambiguous_object(context: &mut Context, obj_span: Span, select
                 Annotation::secondary(obj_span).with_message("This expression has the general type `object`"),
             )
             .with_help("Provide a more specific type hint for the object for robust analysis."),
-    );
-}
-
-fn report_non_existent_class_like(context: &mut Context, obj_span: Span, classname: &StringIdentifier) {
-    let class_name_str = context.interner.lookup(classname);
-
-    context.buffer.report(
-        TypingIssueKind::NonExistentClassLike,
-        Issue::error(format!("Class, interface, or trait `{class_name_str}` does not exist."))
-            .with_annotation(
-                Annotation::primary(obj_span).with_message("This expression refers to a non-existent class-like type"),
-            )
-            .with_help(format!("Ensure the `{class_name_str}` is defined in the codebase.")),
     );
 }
 

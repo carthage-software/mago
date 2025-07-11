@@ -558,4 +558,21 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = accessing_non_existent_class_property,
+        code = indoc! {r#"
+            <?php
+
+            function example($class): void {
+                if ($class instanceof NonExistingClass) {
+                    $class->bar;
+                }
+            }
+        "#},
+        issues = [
+            TypingIssueKind::NonExistentClassLike,
+            TypingIssueKind::UnusedStatement,
+        ]
+    }
 }
