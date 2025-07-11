@@ -518,6 +518,10 @@ impl TUnion {
         self.types.iter().any(|t| t.is_resource())
     }
 
+    pub fn is_resource(&self) -> bool {
+        self.types.iter().all(|t| t.is_resource()) && !self.types.is_empty()
+    }
+
     pub fn is_array(&self) -> bool {
         self.types.iter().all(|t| t.is_array()) && !self.types.is_empty()
     }

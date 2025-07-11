@@ -1037,7 +1037,7 @@ fn check_logical_operand(
                 )
                 .with_help("Consider using `empty()` or `count()` for explicit checks, or cast to `bool`."),
         );
-    } else if operand_type.has_object_type() {
+    } else if operand_type.is_objecty() {
         context.buffer.report(
             TypingIssueKind::InvalidOperand,
             Issue::warning(format!("{side} operand in `{operator_name}` operation is an `object`."))
@@ -1047,7 +1047,7 @@ fn check_logical_operand(
                 )
                 .with_help("If specific truthiness is required, implement a method on the object or cast explicitly."),
         );
-    } else if operand_type.has_resource() {
+    } else if operand_type.is_resource() {
         context.buffer.report(
             TypingIssueKind::InvalidOperand,
             Issue::warning(format!("{side} operand in `{operator_name}` operation is a `resource`."))
