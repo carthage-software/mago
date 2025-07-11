@@ -83,7 +83,7 @@ impl Analyzable for DoWhile {
 
         let clauses_to_simplify = {
             let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
-            c.extend(negate_formula(while_clauses));
+            c.extend(negate_formula(while_clauses).unwrap_or_default());
             c
         };
 

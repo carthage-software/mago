@@ -43,7 +43,9 @@ pub fn check_for_paradox(
         previous_clauses.entry(formula_2_clause).or_insert(formula_2_clause.condition_span);
     }
 
-    let negated_formula_2 = negate_formula(formula_2.to_vec());
+    let Some(negated_formula_2) = negate_formula(formula_2.to_vec()) else {
+        return;
+    };
 
     let formula_1_clauses = formula_1.iter().map(|c| &**c).collect::<Vec<_>>();
 
@@ -113,12 +115,11 @@ fn report_paradoxical_condition(
     negated_conflicting_clause: &Clause,
     paradox_span: Span,
 ) {
-    let new_condition_str = negate_formula(vec![negated_conflicting_clause.clone()])
-        .iter()
-        .map(|c| c.to_string(interner))
-        .collect::<Vec<_>>()
-        .join(" && ");
+    let Some(conflicting_clause) = negate_formula(vec![negated_conflicting_clause.clone()]) else {
+        return;
+    };
 
+    let new_condition_str = conflicting_clause.iter().map(|c| c.to_string(interner)).collect::<Vec<_>>().join(" && ");
     let established_fact_str = original_clause.to_string(interner);
 
     buffer.report(

@@ -665,7 +665,8 @@ fn analyze<'a, 'b>(
         // if the loop contains an assertion and there are no break statements, we can negate that assertion
         // and apply it to the current context
 
-        let negated_pre_condition_clauses = negate_formula(pre_condition_clauses.into_iter().flatten().collect());
+        let negated_pre_condition_clauses =
+            negate_formula(pre_condition_clauses.into_iter().flatten().collect()).unwrap_or_default();
 
         let (negated_pre_condition_types, _) =
             find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut HashSet::default());

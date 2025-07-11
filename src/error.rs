@@ -26,7 +26,7 @@ pub enum Error {
     WritingConfiguration(std::io::Error),
     ReadingComposerJson(std::io::Error),
     ParsingComposerJson(serde_json::Error),
-    AnalysisError(AnalysisError),
+    Analysis(AnalysisError),
 }
 
 impl std::fmt::Display for Error {
@@ -56,7 +56,7 @@ impl std::fmt::Display for Error {
             Self::WritingConfiguration(error) => write!(f, "Failed to write the configuration file: {error}"),
             Self::ReadingComposerJson(error) => write!(f, "Failed to read the `composer.json` file: {error}"),
             Self::ParsingComposerJson(error) => write!(f, "Failed to parse the `composer.json` file: {error}"),
-            Self::AnalysisError(error) => write!(f, "Failed to analyze the source code: {error}"),
+            Self::Analysis(error) => write!(f, "Failed to analyze the source code: {error}"),
         }
     }
 }
@@ -147,6 +147,6 @@ impl From<DialoguerError> for Error {
 
 impl From<AnalysisError> for Error {
     fn from(error: AnalysisError) -> Self {
-        Self::AnalysisError(error)
+        Self::Analysis(error)
     }
 }

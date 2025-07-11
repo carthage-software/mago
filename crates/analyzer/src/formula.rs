@@ -104,6 +104,27 @@ pub fn get_formula(
     )]
 }
 
+pub fn negate_or_synthesize(
+    clauses: Vec<Clause>,
+    conditional: &Expression,
+    assertion_context: AssertionContext<'_>,
+    artifacts: &mut AnalysisArtifacts,
+) -> Vec<Clause> {
+    match negate_formula(clauses) {
+        Some(negated_clauses) => negated_clauses,
+        None => get_formula(
+            conditional.span(),
+            conditional.span(),
+            &Expression::UnaryPrefix(UnaryPrefix {
+                operator: UnaryPrefixOperator::Not(conditional.span()),
+                operand: Box::new(conditional.clone()),
+            }),
+            assertion_context,
+            artifacts,
+        ),
+    }
+}
+
 #[inline]
 fn handle_binary_operation(
     conditional_object_id: Span,
@@ -214,7 +235,7 @@ fn handle_unary_prefix(
         let original_clauses =
             self::get_formula(conditional_object_id, unary_oprand_span, unary_oprand, assertion_context, artifacts);
 
-        return Some(negate_formula(original_clauses));
+        return negate_formula(original_clauses);
     }
 
     None

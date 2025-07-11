@@ -474,9 +474,10 @@ pub fn disjoin_clauses(
 ///
 /// # Returns
 ///
-/// A `Vec<Clause>` representing the negated and simplified CNF formula.
+/// A `Some(Vec<Clause>)` representing the negated and simplified CNF formula,
+/// or `None` if the negation is not possible due to complexity or other constraints.
 #[inline]
-pub fn negate_formula(mut clauses: Vec<Clause>) -> Vec<Clause> {
+pub fn negate_formula(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
     clauses.retain(|clause| clause.reconcilable);
 
     if clauses.is_empty() {
@@ -484,29 +485,29 @@ pub fn negate_formula(mut clauses: Vec<Clause>) -> Vec<Clause> {
 
         let n2: u32 = rng.random();
 
-        return vec![Clause::new(
+        return Some(vec![Clause::new(
             BTreeMap::new(),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Some(true),
             None,
             None,
-        )];
+        )]);
     }
 
-    let impossible_clauses = group_impossibilities(clauses);
+    let impossible_clauses = group_impossibilities(clauses)?;
     if impossible_clauses.is_empty() {
         let mut rng = rand::rng();
 
         let n2: u32 = rng.random();
-        return vec![Clause::new(
+        return Some(vec![Clause::new(
             BTreeMap::new(),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Some(true),
             None,
             None,
-        )];
+        )]);
     }
 
     let negated = saturate_clauses(impossible_clauses.iter().as_slice());
@@ -515,25 +516,28 @@ pub fn negate_formula(mut clauses: Vec<Clause>) -> Vec<Clause> {
         let mut rng = rand::rng();
 
         let n2: u32 = rng.random();
-        return vec![Clause::new(
+        return Some(vec![Clause::new(
             BTreeMap::new(),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Span::new(Position::dummy(n2 as usize), Position::dummy(n2 as usize)),
             Some(true),
             None,
             None,
-        )];
+        )]);
     }
 
-    negated
+    Some(negated)
 }
 
 #[inline]
-fn group_impossibilities(mut clauses: Vec<Clause>) -> Vec<Clause> {
-    let mut seed_clauses = vec![];
+fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
+    const MAX_COMPLEXITY: usize = 50_000;
+
+    let mut seed_clauses = Vec::new();
+    let mut complexity = 1usize;
 
     let Some(clause) = clauses.pop() else {
-        return seed_clauses;
+        return Some(seed_clauses);
     };
 
     if !clause.wedge {
@@ -554,17 +558,38 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Vec<Clause> {
     }
 
     if clauses.is_empty() || seed_clauses.is_empty() {
-        return seed_clauses;
+        return Some(seed_clauses);
+    }
+
+    let mut complexity_upper_bound = seed_clauses.len();
+    for clause in &clauses {
+        let mut possibilities_count = 0;
+        let impossibilities = clause.get_impossibilities();
+        for impossible_types in impossibilities.values() {
+            possibilities_count += impossible_types.len();
+        }
+
+        complexity_upper_bound = complexity_upper_bound.saturating_mul(possibilities_count);
+
+        if complexity_upper_bound > MAX_COMPLEXITY {
+            // If the complexity is too high, bail out early
+            return None;
+        }
     }
 
     while let Some(clause) = clauses.pop() {
-        let mut new_clauses = vec![];
-
+        let mut new_clauses = Vec::with_capacity(seed_clauses.len() * 4);
         for grouped_clause in &seed_clauses {
             let clause_impossibilities = clause.get_impossibilities();
 
             for (var, impossible_types) in clause_impossibilities {
                 'next: for impossible_type in impossible_types {
+                    complexity += 1;
+                    if complexity > MAX_COMPLEXITY {
+                        // Early bailout
+                        return None;
+                    }
+
                     if let Some(new_insert_value) = grouped_clause.possibilities.get(&var) {
                         for (_, a) in new_insert_value {
                             if a.is_negation_of(&impossible_type) {
@@ -597,7 +622,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Vec<Clause> {
 
     seed_clauses.reverse();
 
-    seed_clauses
+    Some(seed_clauses)
 }
 
 #[inline]

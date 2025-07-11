@@ -6,7 +6,6 @@ use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_algebra::find_satisfying_assignments;
-use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::data_flow::node::DataFlowNode;
 use mago_codex::data_flow::path::PathKind;
@@ -49,6 +48,7 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::expression::add_decision_dataflow;
 use crate::formula::get_formula;
+use crate::formula::negate_or_synthesize;
 use crate::issue::TypingIssueKind;
 use crate::reconciler;
 use crate::reconciler::ReconcilationContext;
@@ -2221,7 +2221,13 @@ fn analyze_logical_or_operation<'a>(
         artifacts,
     );
 
-    let mut negated_left_clauses = negate_formula(left_clauses);
+    let mut negated_left_clauses = negate_or_synthesize(
+        left_clauses,
+        &binary.lhs,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+    );
+
     if !left_block_context.reconciled_expression_clauses.is_empty() {
         let left_reconciled_clauses_hashed =
             left_block_context.reconciled_expression_clauses.iter().map(|v| &**v).collect::<HashSet<_>>();

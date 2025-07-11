@@ -5,7 +5,6 @@ use ahash::HashSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
-use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::combine_optional_union_types;
@@ -21,6 +20,7 @@ use crate::context::block::BlockContext;
 use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
+use crate::formula::negate_or_synthesize;
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::assertion_reconciler;
 use crate::reconciler::reconcile_keyed_types;
@@ -118,7 +118,13 @@ impl Analyzable for Conditional {
             }
         }
 
-        if_scope.negated_clauses = negate_formula(if_clauses);
+        if_scope.negated_clauses = negate_or_synthesize(
+            if_clauses,
+            self.condition.as_ref(),
+            context.get_assertion_context_from_block(block_context),
+            artifacts,
+        );
+
         if_scope.negated_types = find_satisfying_assignments(
             saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()))
                 .as_slice(),

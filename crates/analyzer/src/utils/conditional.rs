@@ -94,12 +94,7 @@ pub(crate) fn analyze<'a>(
     externally_applied_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
     externally_applied_context.inside_conditional = was_inside_conditional;
 
-    let mut if_body_context = if let Some(if_body_context) = if_body_context {
-        Some(if_body_context)
-    } else {
-        Some(externally_applied_context.clone())
-    }
-    .unwrap();
+    let mut if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
 
     let tmp_if_body_context_nested = if_body_context.if_body_context;
     if_body_context.if_body_context = None;

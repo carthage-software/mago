@@ -26,6 +26,7 @@ use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula;
+use crate::formula::negate_or_synthesize;
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::analyze_statements;
@@ -131,7 +132,12 @@ impl Analyzable for If {
         }
 
         if_scope.reasonable_clauses = if_block_context.clauses.to_vec();
-        if_scope.negated_clauses = negate_formula(if_clauses);
+        if_scope.negated_clauses = negate_or_synthesize(
+            if_clauses,
+            &self.condition,
+            context.get_assertion_context_from_block(block_context),
+            artifacts,
+        );
 
         let all_negated_clauses =
             saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()));
@@ -649,8 +655,15 @@ fn analyze_else_if_clause<'a>(
         &mut conditionally_referenced_variable_ids,
     );
 
+    let negated_if_clauses = negate_or_synthesize(
+        else_if_clauses.clone(),
+        else_if_clause.0,
+        context.get_assertion_context_from_block(&else_if_block_context),
+        artifacts,
+    );
+
     let (negated_else_if_types, _) =
-        find_satisfying_assignments(negate_formula(else_if_clauses.clone()).as_slice(), None, &mut HashSet::default());
+        find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut HashSet::default());
 
     let all_negated_variables =
         HashSet::from_iter(negated_else_if_types.keys().cloned().chain(if_scope.negated_types.keys().cloned()));
@@ -835,8 +848,10 @@ fn analyze_else_if_clause<'a>(
         outer_block_context.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
     }
 
-    if_scope.negated_clauses =
-        saturate_clauses(if_scope.negated_clauses.iter().chain(negate_formula(else_if_clauses).iter()));
+    if_scope.negated_clauses = match negate_formula(else_if_clauses) {
+        Some(negated_formula) => saturate_clauses(if_scope.negated_clauses.iter().chain(negated_formula.iter())),
+        None => vec![],
+    };
 
     Ok(())
 }

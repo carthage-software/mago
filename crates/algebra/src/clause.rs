@@ -107,23 +107,23 @@ impl Clause {
         let mut impossibilities = BTreeMap::new();
 
         for (variable, possiblity) in &self.possibilities {
-            let mut impossibility = vec![];
+            let mut negations = vec![];
 
             for (_, assertion) in possiblity {
                 match assertion {
                     Assertion::IsIdentical(atomic) | Assertion::IsNotIdentical(atomic) => {
                         if atomic.is_literal() {
-                            impossibility.push(assertion.get_negation());
+                            negations.push(assertion.get_negation());
                         }
                     }
                     _ => {
-                        impossibility.push(assertion.get_negation());
+                        negations.push(assertion.get_negation());
                     }
                 }
             }
 
-            if !impossibility.is_empty() {
-                impossibilities.insert(variable.clone(), impossibility);
+            if !negations.is_empty() {
+                impossibilities.insert(variable.clone(), negations);
             }
         }
 

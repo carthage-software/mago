@@ -5,7 +5,6 @@ use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_algebra::find_satisfying_assignments;
-use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -27,6 +26,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::formula::get_formula;
+use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::resolver::resolve_invocation_type;
@@ -413,13 +413,18 @@ fn resolve_invocation_assertion<'a>(
                         ),
                         Assertion::IsNotType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) })))
                         | Assertion::IsType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })))
-                        | Assertion::Falsy => negate_formula(get_formula(
-                            assertion_expression.span(),
-                            assertion_expression.span(),
+                        | Assertion::Falsy => negate_or_synthesize(
+                            get_formula(
+                                assertion_expression.span(),
+                                assertion_expression.span(),
+                                assertion_expression,
+                                context.get_assertion_context_from_block(block_context),
+                                artifacts,
+                            ),
                             assertion_expression,
                             context.get_assertion_context_from_block(block_context),
                             artifacts,
-                        )),
+                        ),
                         _ => {
                             continue; // Unsupported assertion kind for expression
                         }
