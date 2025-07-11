@@ -1,4 +1,4 @@
-php_version = "7.4"
+php_version = "8.1"
 
 [source]
 paths = ["composer"]
@@ -20,3 +20,7 @@ threshold = 1.9
 [[linter.rules]]
 name = "maintainability/halstead"
 effort_threshold = 7000
+
+[[linter.rules]]
+name = "best-practices/literal-named-argument"
+level = "off"
