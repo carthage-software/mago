@@ -118,7 +118,7 @@ fn add_dataflow(
         } else {
             metadata.get_name_span()
         },
-        if metadata.is_specialize_call() { Some(call_span) } else { None },
+        if metadata.specialize_call { Some(call_span) } else { None },
     );
 
     data_flow_graph.add_node(function_call_node.clone());

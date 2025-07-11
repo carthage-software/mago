@@ -951,11 +951,12 @@ fn scan_class_like(
     if class_like_metadata.has_consistent_constructor() && !has_constructor {
         let constructor_name = context.interner.intern("__construct");
 
-        let function_like_metadata =
-            FunctionLikeMetadata::new(FunctionLikeKind::Method, class_like_metadata.get_span())
-                .with_method_metadata(Some(MethodMetadata::new(Visibility::Public)))
-                .with_is_mutation_free(true)
-                .with_is_external_mutation_free(true);
+        let mut function_like_metadata =
+            FunctionLikeMetadata::new(FunctionLikeKind::Method, class_like_metadata.get_span());
+
+        function_like_metadata.method_metadata = Some(MethodMetadata::new(Visibility::Public));
+        function_like_metadata.is_mutation_free = true;
+        function_like_metadata.is_external_mutation_free = true;
 
         class_like_metadata.add_method(constructor_name);
         class_like_metadata.add_declaring_method_id(constructor_name, class_like_metadata.name);

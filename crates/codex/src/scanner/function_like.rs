@@ -38,8 +38,6 @@ pub fn scan_method(
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span)
         .with_name(Some(method.name.value), Some(method.name.span))
-        .with_attributes(scan_attribute_lists(&method.attribute_lists, context))
-        .with_type_resolution_context(type_resolution_context)
         .with_parameters(
             method
                 .parameter_list
@@ -48,8 +46,11 @@ pub fn scan_method(
                 .map(|p| scan_function_like_parameter(p, Some(&class_like_metadata.name), context)),
         );
 
+    metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
+    metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
+
     if let Some(return_hint) = method.return_type_hint.as_ref() {
-        metadata = metadata.with_return_type_signature(Some(get_type_metadata_from_hint(
+        metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
             Some(&class_like_metadata.name),
             context,
@@ -67,13 +68,13 @@ pub fn scan_method(
     .as_constructor(context.interner.lookup(&method.name.value).eq_ignore_ascii_case("__construct"));
 
     if let MethodBody::Concrete(block) = &method.body {
-        metadata =
-            metadata.with_has_yield(utils::block_has_yield(block)).with_has_throw(utils::block_has_throws(block));
+        metadata.has_yield = utils::block_has_yield(block);
+        metadata.has_throw = utils::block_has_throws(block);
     } else {
         method_metadata = method_metadata.with_abstract(true);
     }
 
-    metadata = metadata.with_method_metadata(Some(method_metadata));
+    metadata.method_metadata = Some(method_metadata);
 
     scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(&class_like_metadata.name), context, scope);
 
@@ -91,20 +92,18 @@ pub fn scan_function(
 ) -> FunctionLikeMetadata {
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span())
         .with_name(Some(functionlike_id.1), Some(function.name.span))
-        .with_attributes(scan_attribute_lists(&function.attribute_lists, context))
-        .with_has_yield(utils::block_has_yield(&function.body))
-        .with_has_throw(utils::block_has_throws(&function.body))
-        .with_type_resolution_context(if type_resolution_context.is_empty() {
-            None
-        } else {
-            Some(type_resolution_context)
-        })
         .with_parameters(
             function.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
         );
 
+    metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);
+    metadata.type_resolution_context =
+        if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
+    metadata.has_yield = utils::block_has_yield(&function.body);
+    metadata.has_throw = utils::block_has_throws(&function.body);
+
     if let Some(return_hint) = function.return_type_hint.as_ref() {
-        metadata = metadata.with_return_type_signature(Some(get_type_metadata_from_hint(
+        metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
             classname,
             context,
@@ -127,17 +126,18 @@ pub fn scan_closure(
 ) -> FunctionLikeMetadata {
     let span = closure.span();
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span)
-        .with_type_resolution_context(Some(type_resolution_context))
-        .with_attributes(scan_attribute_lists(&closure.attribute_lists, context))
-        .with_has_yield(utils::block_has_yield(&closure.body))
-        .with_has_throw(utils::block_has_throws(&closure.body))
-        .with_parameters(
-            closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
-        );
+    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span).with_parameters(
+        closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
+    );
+
+    metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context);
+    metadata.type_resolution_context =
+        if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
+    metadata.has_yield = utils::block_has_yield(&closure.body);
+    metadata.has_throw = utils::block_has_throws(&closure.body);
 
     if let Some(return_hint) = closure.return_type_hint.as_ref() {
-        metadata = metadata.with_return_type_signature(Some(get_type_metadata_from_hint(
+        metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
             classname,
             context,
@@ -160,21 +160,18 @@ pub fn scan_arrow_function(
 ) -> FunctionLikeMetadata {
     let span = arrow_function.span();
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, span)
-        .with_attributes(scan_attribute_lists(&arrow_function.attribute_lists, context))
-        .with_has_yield(utils::expression_has_yield(&arrow_function.expression))
-        .with_has_throw(utils::expression_has_throws(&arrow_function.expression))
-        .with_type_resolution_context(Some(type_resolution_context))
-        .with_parameters(
-            arrow_function
-                .parameter_list
-                .parameters
-                .iter()
-                .map(|p| scan_function_like_parameter(p, classname, context)),
-        );
+    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, span).with_parameters(
+        arrow_function.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
+    );
+
+    metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context);
+    metadata.type_resolution_context =
+        if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
+    metadata.has_yield = utils::expression_has_yield(&arrow_function.expression);
+    metadata.has_throw = utils::expression_has_throws(&arrow_function.expression);
 
     if let Some(return_hint) = arrow_function.return_type_hint.as_ref() {
-        metadata = metadata.with_return_type_signature(Some(get_type_metadata_from_hint(
+        metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
             classname,
             context,
@@ -198,15 +195,15 @@ fn scan_function_like_docblock(
         return;
     };
 
-    metadata.set_is_deprecated(docblock.is_deprecated);
-    metadata.set_is_internal(docblock.is_internal);
-    metadata.set_is_pure(docblock.is_pure);
-    metadata.set_is_mutation_free(docblock.is_mutation_free);
-    metadata.set_is_external_mutation_free(docblock.is_external_mutation_free);
-    metadata.set_ignore_falsable_return(docblock.ignore_falsable_return);
-    metadata.set_ignore_nullable_return(docblock.ignore_nullable_return);
-    metadata.set_inherits_docs(docblock.inherits_docs);
-    metadata.set_allows_named_arguments(docblock.allows_named_arguments);
+    metadata.is_deprecated |= docblock.is_deprecated;
+    metadata.is_internal |= docblock.is_internal;
+    metadata.is_pure |= docblock.is_pure;
+    metadata.is_mutation_free |= docblock.is_mutation_free;
+    metadata.is_external_mutation_free |= docblock.is_external_mutation_free;
+    metadata.ignore_falsable_return |= docblock.ignore_falsable_return;
+    metadata.ignore_nullable_return |= docblock.ignore_nullable_return;
+    metadata.inherits_docs |= docblock.inherits_docs;
+    metadata.allows_named_arguments |= docblock.allows_named_arguments;
 
     let mut type_context = metadata.get_type_resolution_context().cloned().unwrap_or_default();
     for template in docblock.templates.iter() {
@@ -223,7 +220,7 @@ fn scan_function_like_docblock(
                 ) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
-                        metadata.add_issue(Issue::error("Invalid `@template` type string.").with_annotation(
+                        metadata.issues.push(Issue::error("Invalid `@template` type string.").with_annotation(
                             Annotation::primary(type_string.span).with_message(typing_error.to_string()),
                         ));
 
@@ -258,7 +255,7 @@ fn scan_function_like_docblock(
         let param_type_span = param_type_string.span;
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
-            metadata.add_issue(
+            metadata.issues.push(
                 Issue::error("Invalid `@param` docblock tag.").with_annotation(
                     Annotation::primary(parameter_tag.span)
                         .with_message(format!("Parameter `{parameter_name_str}` is not defined")),
@@ -271,7 +268,7 @@ fn scan_function_like_docblock(
         if is_variadic && !parameter_metadata.is_variadic() {
             let parameter_span = parameter_metadata.get_span();
 
-            metadata.add_issue(
+            metadata.issues.push(
                 Issue::error("Invalid `@param` docblock tag.")
                     .with_annotation(Annotation::primary(parameter_tag.span).with_message(format!(
                         "Parameter `{parameter_name_str}` is marked as variadic, it is not declared as such."
@@ -306,7 +303,7 @@ fn scan_function_like_docblock(
                 parameter_metadata.set_type_signature(Some(resulting_type));
             }
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@param` type string.")
                         .with_annotation(Annotation::primary(param_type_span).with_message(typing_error.to_string()))
                         .with_note(typing_error.note())
@@ -320,7 +317,7 @@ fn scan_function_like_docblock(
         let param_name = context.interner.intern(&param_out.name);
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
-            metadata.add_issue(
+            metadata.issues.push(
                 Issue::error("Invalid `@param-out` docblock tag.").with_annotation(
                     Annotation::primary(param_out.span)
                         .with_message(format!("Parameter `{}` does not exist", param_out.name)),
@@ -338,7 +335,7 @@ fn scan_function_like_docblock(
                 parameter_metadata.set_out_type(Some(parameter_out_type));
             }
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@param-out` type string.")
                         .with_annotation(
                             Annotation::primary(param_out_type_span).with_message(typing_error.to_string()),
@@ -355,9 +352,11 @@ fn scan_function_like_docblock(
         let this_out_type_span = this_out_type_string.span;
 
         match get_type_metadata_from_type_string(this_out_type_string, classname, &type_context, context, scope) {
-            Ok(out_type_metadata) => metadata.set_this_out_type(Some(out_type_metadata)),
+            Ok(out_type_metadata) => {
+                metadata.this_out_type = Some(out_type_metadata);
+            }
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@this-out` type string.")
                         .with_annotation(Annotation::primary(this_out_type_span).with_message(typing_error.to_string()))
                         .with_note(typing_error.note())
@@ -372,9 +371,9 @@ fn scan_function_like_docblock(
         let return_type_span = return_type_string.span;
 
         match get_type_metadata_from_type_string(return_type_string, classname, &type_context, context, scope) {
-            Ok(return_type_signature) => metadata.set_return_type_signature(Some(return_type_signature)),
+            Ok(return_type_signature) => metadata.set_return_type_metadata(Some(return_type_signature)),
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@return` type string.")
                         .with_annotation(Annotation::primary(return_type_span).with_message(typing_error.to_string()))
                         .with_note(typing_error.note())
@@ -390,10 +389,10 @@ fn scan_function_like_docblock(
 
         match get_type_metadata_from_type_string(if_this_is_type_string, classname, &type_context, context, scope) {
             Ok(constraint_type) => {
-                metadata.set_if_this_is_type(Some(constraint_type));
+                metadata.if_this_is_type = Some(constraint_type);
             }
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@if-this-is` type string.")
                         .with_annotation(
                             Annotation::primary(if_this_is_type_span).with_message(typing_error.to_string()),
@@ -410,9 +409,11 @@ fn scan_function_like_docblock(
         let thrown_type_span = thrown_type_string.span;
 
         match get_type_metadata_from_type_string(thrown_type_string, classname, &type_context, context, scope) {
-            Ok(thrown_type) => metadata.add_thrown_type(thrown_type),
+            Ok(thrown_type) => {
+                metadata.thrown_types.push(thrown_type);
+            }
             Err(typing_error) => {
-                metadata.add_issue(
+                metadata.issues.push(
                     Issue::error("Invalid `@throws` type string.")
                         .with_annotation(Annotation::primary(thrown_type_span).with_message(typing_error.to_string()))
                         .with_note(typing_error.note())
@@ -429,7 +430,7 @@ fn scan_function_like_docblock(
             parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
 
         for assertion in assertions {
-            metadata.add_assertion(assertion_param_name, assertion);
+            metadata.assertions.entry(assertion_param_name).or_default().push(assertion);
         }
     }
 
@@ -440,7 +441,7 @@ fn scan_function_like_docblock(
             parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
 
         for assertion in assertions {
-            metadata.add_if_true_assertion(assertion_param_name, assertion);
+            metadata.if_true_assertions.entry(assertion_param_name).or_default().push(assertion);
         }
     }
 
@@ -451,11 +452,11 @@ fn scan_function_like_docblock(
             parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
 
         for assertion in assertions {
-            metadata.add_if_false_assertion(assertion_param_name, assertion);
+            metadata.if_false_assertions.entry(assertion_param_name).or_default().push(assertion);
         }
     }
 
-    metadata.set_type_resolution_context(Some(type_context));
+    metadata.type_resolution_context = Some(type_context);
 
     if let Some(return_type) = metadata.get_return_type_metadata_mut() {
         return_type.type_union.ignore_nullable_issues = docblock.ignore_nullable_return;
@@ -522,7 +523,7 @@ fn parse_assertion_string(
             }
         },
         Err(typing_error) => {
-            function_like_metadata.add_issue(
+            function_like_metadata.issues.push(
                 Issue::error("Invalid `@assert`/`@assert-if-true`/`@assert-if-false` type string.")
                     .with_annotation(Annotation::primary(type_string.span).with_message(typing_error.to_string())),
             );

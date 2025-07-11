@@ -74,7 +74,7 @@ pub fn post_invocation_process<'a>(
     };
 
     // Report if the called entity is deprecated
-    if metadata.is_deprecated() {
+    if metadata.is_deprecated {
         let issue_kind = match identifier {
             FunctionLikeIdentifier::Function(_) => TypingIssueKind::DeprecatedFunction,
             FunctionLikeIdentifier::Method(_, _) => TypingIssueKind::DeprecatedMethod,
@@ -97,9 +97,8 @@ pub fn post_invocation_process<'a>(
     }
 
     if context.settings.analyze_effects {
-        // Report if a non-mutation-free entity is called in a mutation-free context
         if block_context.is_mutation_free() {
-            if !metadata.is_mutation_free() && !metadata.is_pure() {
+            if !metadata.is_mutation_free && !metadata.is_pure {
                 context.buffer.report(
                     TypingIssueKind::ImpureCallInPureContext,
                     Issue::error(format!(
@@ -115,12 +114,10 @@ pub fn post_invocation_process<'a>(
                     ),
                 );
             }
-        }
-        // Report if a non-external-mutation-free entity is called in an external-mutation-free context
-        else if block_context.is_external_mutation_free()
-            && !metadata.is_external_mutation_free()
-            && !metadata.is_mutation_free()
-            && !metadata.is_pure()
+        } else if block_context.is_external_mutation_free()
+            && !metadata.is_external_mutation_free
+            && !metadata.is_mutation_free
+            && !metadata.is_pure
         {
             context.buffer.report(
                     TypingIssueKind::ExternalImpureCallInExternalPureContext,
@@ -145,7 +142,7 @@ pub fn post_invocation_process<'a>(
     }
 
     // Report if named arguments are used where not allowed
-    if !metadata.allows_named_arguments()
+    if !metadata.allows_named_arguments
         && let InvocationArgumentsSource::ArgumentList(argument_list) = invoication.arguments_source
     {
         for argument in argument_list.arguments.iter() {

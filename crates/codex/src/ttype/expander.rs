@@ -349,7 +349,7 @@ fn get_signature_of_function_like_metadata(
         })
         .collect();
 
-    let return_type = if let Some(type_metadata) = function_like_metadata.get_return_type_metadata() {
+    let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
         expand_union(codebase, interner, &mut return_type, options);
         Some(Box::new(return_type))
@@ -357,8 +357,7 @@ fn get_signature_of_function_like_metadata(
         None
     };
 
-    let mut signature = TCallableSignature::new(function_like_metadata.is_pure(), true)
-        .with_pure(function_like_metadata.is_pure())
+    let mut signature = TCallableSignature::new(function_like_metadata.is_pure, true)
         .with_parameters(parameters)
         .with_return_type(return_type)
         .with_source(Some(*function_like_identifier));

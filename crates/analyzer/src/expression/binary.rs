@@ -794,7 +794,10 @@ fn analyze_string_concat_operand(
                         .with_help("For clarity, consider explicit casting `(string) $object` or calling the `__toString` method directly."),
                     );
 
-                    if block_context.is_mutation_free() && !method_metadata.is_mutation_free() {
+                    if context.settings.analyze_effects
+                        && block_context.is_mutation_free()
+                        && !method_metadata.is_mutation_free
+                    {
                         context.buffer.report(
                             TypingIssueKind::ImpureCallInPureContext,
                             Issue::error(format!(

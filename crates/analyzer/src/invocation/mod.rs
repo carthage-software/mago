@@ -322,7 +322,7 @@ impl<'a> InvocationTarget<'a> {
     #[allow(dead_code)]
     pub const fn has_throw(&self) -> bool {
         match self {
-            InvocationTarget::FunctionLike { metadata, .. } => metadata.has_throw(),
+            InvocationTarget::FunctionLike { metadata, .. } => metadata.has_throw,
             _ => false,
         }
     }
@@ -340,7 +340,7 @@ impl<'a> InvocationTarget<'a> {
     #[inline]
     pub const fn allows_named_arguments(&self) -> bool {
         match self {
-            InvocationTarget::FunctionLike { metadata, .. } => metadata.allows_named_arguments(),
+            InvocationTarget::FunctionLike { metadata, .. } => metadata.allows_named_arguments,
             _ => false,
         }
     }

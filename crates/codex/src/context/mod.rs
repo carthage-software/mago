@@ -36,7 +36,7 @@ impl<'a> ScopeContext<'a> {
     #[inline]
     pub const fn is_mutation_free(&self) -> bool {
         if let Some(function_like) = self.function_like
-            && (function_like.is_pure() || function_like.is_mutation_free())
+            && (function_like.is_pure || function_like.is_mutation_free)
         {
             return true;
         }
@@ -54,9 +54,7 @@ impl<'a> ScopeContext<'a> {
     #[inline]
     pub const fn is_external_mutation_free(&self) -> bool {
         if let Some(function_like) = self.function_like
-            && (function_like.is_pure()
-                || function_like.is_mutation_free()
-                || function_like.is_external_mutation_free())
+            && (function_like.is_pure || function_like.is_mutation_free || function_like.is_external_mutation_free)
         {
             return true;
         }

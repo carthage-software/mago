@@ -158,35 +158,44 @@ pub fn handle_return_value<'a>(
         artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 
-    let mut expected_return_type = if let Some(expected_return_type) = function_like_metadata.get_return_type_metadata()
-    {
-        let mut expected_type = expected_return_type.type_union.clone();
+    let require_return_value;
+    let mut expected_return_type =
+        if let Some(expected_return_type) = function_like_metadata.return_type_metadata.as_ref() {
+            let mut expected_type = expected_return_type.type_union.clone();
 
-        expand_union(
-            context.codebase,
-            context.interner,
-            &mut expected_type,
-            &TypeExpansionOptions {
-                self_class: block_context.scope.get_class_like_name(),
-                static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
-                    StaticClassType::Name(*calling_class)
-                } else {
-                    StaticClassType::None
+            expand_union(
+                context.codebase,
+                context.interner,
+                &mut expected_type,
+                &TypeExpansionOptions {
+                    self_class: block_context.scope.get_class_like_name(),
+                    static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
+                        StaticClassType::Name(*calling_class)
+                    } else {
+                        StaticClassType::None
+                    },
+                    function_is_final: if let Some(method_metadata) = function_like_metadata.get_method_metadata() {
+                        method_metadata.is_final()
+                    } else {
+                        false
+                    },
+                    file_path: Some(&context.source.identifier),
+                    ..Default::default()
                 },
-                function_is_final: if let Some(method_metadata) = function_like_metadata.get_method_metadata() {
-                    method_metadata.is_final()
-                } else {
-                    false
-                },
-                file_path: Some(&context.source.identifier),
-                ..Default::default()
-            },
-        );
+            );
 
-        expected_type
-    } else {
-        get_mixed_any()
-    };
+            if function_like_metadata.return_type_declaration_metadata.is_some() {
+                require_return_value = !expected_type.is_void();
+            } else {
+                require_return_value = !expected_type.has_nullish();
+            }
+
+            expected_type
+        } else {
+            require_return_value = false;
+
+            get_mixed_any()
+        };
 
     let function_like_metadata = function_like_metadata.clone();
     let function_name = block_context.scope.get_function_like_identifier().unwrap().as_string(context.interner);
@@ -498,7 +507,7 @@ pub fn handle_return_value<'a>(
                 );
             }
         }
-    } else if !expected_return_type.is_void()
+    } else if require_return_value
         && !function_like_metadata.has_yield()
         && !matches!(
             block_context.scope.get_function_like_identifier(),
@@ -776,6 +785,74 @@ mod tests {
                 }
 
                 return null;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = return_no_value_from_untyped_functions,
+        code = indoc! {r#"
+            <?php
+
+            function foo() {
+                return;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = return_no_value_from_typed_void_functions,
+        code = indoc! {r#"
+            <?php
+
+            function foo(): void {
+                return;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = return_no_value_from_mixed_docblock_typed_functions,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @return mixed
+             */
+            function foo() {
+                return;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = return_no_value_from_null_docblock_typed_functions,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @return null
+             */
+            function foo() {
+                return;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = return_no_value_from_nullable_docblock_typed_functions,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @return null|string
+             */
+            function foo() {
+                if (foo() === "a") {
+                    return;
+                }
+
+                return "a";
             }
         "#},
     }

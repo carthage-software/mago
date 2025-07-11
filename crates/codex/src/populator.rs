@@ -302,7 +302,18 @@ fn populate_function_like_metadata(
         }
     }
 
-    if let Some(return_type) = metadata.get_return_type_metadata_mut() {
+    if let Some(return_type) = metadata.return_type_declaration_metadata.as_mut() {
+        populate_union_type(
+            &mut return_type.type_union,
+            codebase_symbols,
+            interner,
+            Some(reference_source),
+            symbol_references,
+            force_type_population,
+        );
+    }
+
+    if let Some(return_type) = metadata.return_type_metadata.as_mut() {
         populate_union_type(
             &mut return_type.type_union,
             codebase_symbols,
@@ -314,7 +325,7 @@ fn populate_function_like_metadata(
     }
 
     for parameter_metadata in metadata.get_parameters_mut() {
-        if let Some(type_metadata) = parameter_metadata.get_type_signature_mut() {
+        if let Some(type_metadata) = parameter_metadata.type_metadata.as_mut() {
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
@@ -325,7 +336,7 @@ fn populate_function_like_metadata(
             );
         }
 
-        if let Some(type_metadata) = parameter_metadata.get_out_type_mut() {
+        if let Some(type_metadata) = parameter_metadata.out_type.as_mut() {
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
@@ -336,7 +347,7 @@ fn populate_function_like_metadata(
             );
         }
 
-        if let Some(type_metadata) = parameter_metadata.get_default_type_mut() {
+        if let Some(type_metadata) = parameter_metadata.default_type.as_mut() {
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
@@ -347,7 +358,7 @@ fn populate_function_like_metadata(
             );
         }
 
-        for attribute_metadata in parameter_metadata.get_attributes() {
+        for attribute_metadata in &parameter_metadata.attributes {
             match reference_source {
                 ReferenceSource::Symbol(in_signature, a) => {
                     symbol_references.add_symbol_reference_to_symbol(*a, attribute_metadata.get_name(), *in_signature)
@@ -358,7 +369,7 @@ fn populate_function_like_metadata(
         }
     }
 
-    for (_, type_parameter_map) in metadata.get_template_types_mut() {
+    for (_, type_parameter_map) in &mut metadata.template_types {
         for (_, type_parameter) in type_parameter_map {
             if force_type_population || type_parameter.needs_population() {
                 populate_union_type(
@@ -373,7 +384,7 @@ fn populate_function_like_metadata(
         }
     }
 
-    if let Some(type_resolution_context) = metadata.get_type_resolution_context_mut() {
+    if let Some(type_resolution_context) = metadata.type_resolution_context.as_mut() {
         for (_, type_parameter_map) in type_resolution_context.get_template_definitions_mut() {
             for (_, type_parameter) in type_parameter_map {
                 if force_type_population || type_parameter.needs_population() {
@@ -390,7 +401,7 @@ fn populate_function_like_metadata(
         }
     }
 
-    if let Some(type_metadata) = metadata.get_if_this_is_type_mut() {
+    if let Some(type_metadata) = metadata.if_this_is_type.as_mut() {
         populate_union_type(
             &mut type_metadata.type_union,
             codebase_symbols,
@@ -401,7 +412,7 @@ fn populate_function_like_metadata(
         );
     }
 
-    if let Some(type_metadata) = metadata.get_this_out_type_mut() {
+    if let Some(type_metadata) = metadata.this_out_type.as_mut() {
         populate_union_type(
             &mut type_metadata.type_union,
             codebase_symbols,
@@ -412,7 +423,7 @@ fn populate_function_like_metadata(
         );
     }
 
-    for thrown_type in metadata.get_thrown_types_mut() {
+    for thrown_type in &mut metadata.thrown_types {
         populate_union_type(
             &mut thrown_type.type_union,
             codebase_symbols,

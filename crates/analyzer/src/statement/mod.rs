@@ -291,7 +291,7 @@ fn detect_unused_statement_expressions(
                 return;
             };
 
-            if function.is_pure() && function.get_thrown_types().is_empty() && !function.has_throw() {
+            if function.is_pure && function.get_thrown_types().is_empty() && !function.has_throw {
                 "Calling a pure function without using its result has no effect (consider using the result or removing the call)."
             } else {
                 return;
@@ -328,7 +328,7 @@ fn has_unused_must_use<'a>(
     match functionlike_id_from_call {
         FunctionLikeIdentifier::Function(function_id) => {
             let function_metadata = get_function(context.codebase, context.interner, &function_id)?;
-            if function_metadata.must_use() { Some((TypingIssueKind::UnusedFunctionCall, function_id)) } else { None }
+            if function_metadata.must_use { Some((TypingIssueKind::UnusedFunctionCall, function_id)) } else { None }
         }
         FunctionLikeIdentifier::Method(method_class, method_name) => {
             let method_metadata = get_method_by_id(
@@ -337,7 +337,7 @@ fn has_unused_must_use<'a>(
                 &MethodIdentifier::new(method_class, method_name),
             )?;
 
-            if method_metadata.must_use() { Some((TypingIssueKind::UnusedMethodCall, method_name)) } else { None }
+            if method_metadata.must_use { Some((TypingIssueKind::UnusedMethodCall, method_name)) } else { None }
         }
         FunctionLikeIdentifier::Closure(_) => None,
     }
