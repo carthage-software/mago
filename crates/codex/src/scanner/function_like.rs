@@ -191,8 +191,19 @@ fn scan_function_like_docblock(
     context: &mut Context<'_>,
     scope: &mut NamespaceScope,
 ) {
-    let Some(docblock) = FunctionLikeDocblockComment::create(context, span, scope) else {
-        return;
+    let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
+        Ok(Some(docblock)) => docblock,
+        Ok(None) => return,
+        Err(parse_error) => {
+            metadata.issues.push(
+                Issue::error("Invalid function-like docblock comment.")
+                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                    .with_note(parse_error.note())
+                    .with_help(parse_error.help()),
+            );
+
+            return;
+        }
     };
 
     metadata.is_deprecated |= docblock.is_deprecated;

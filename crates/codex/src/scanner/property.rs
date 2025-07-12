@@ -76,7 +76,19 @@ pub fn scan_properties(
     context: &mut Context<'_>,
     scope: &NamespaceScope,
 ) -> Vec<PropertyMetadata> {
-    let docblock = PropertyDocblockComment::create(context, property);
+    let docblock = match PropertyDocblockComment::create(context, property) {
+        Ok(docblock) => docblock,
+        Err(parse_error) => {
+            class_like_metadata.issues.push(
+                Issue::error("Invalid property docblock comment.")
+                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                    .with_note(parse_error.note())
+                    .with_help(parse_error.help()),
+            );
+
+            None
+        }
+    };
 
     match property {
         Property::Plain(plain_property) => plain_property

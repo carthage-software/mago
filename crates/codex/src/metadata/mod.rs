@@ -311,6 +311,14 @@ impl CodebaseMetadata {
             issues.extend(metadata.take_issues());
         }
 
+        for metadata in self.constants.values_mut() {
+            if user_defined && !metadata.user_defined {
+                continue;
+            }
+
+            issues.extend(metadata.take_issues());
+        }
+
         issues
     }
 }

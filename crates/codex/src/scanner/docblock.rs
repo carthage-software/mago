@@ -268,8 +268,10 @@ impl FunctionLikeDocblockComment {
         context: &Context<'_>,
         function: impl HasSpan,
         scope: &mut NamespaceScope,
-    ) -> Option<FunctionLikeDocblockComment> {
-        let docblock = context.get_docblock(function)?;
+    ) -> Result<Option<FunctionLikeDocblockComment>, ParseError> {
+        let Some(docblock) = context.get_docblock(function) else {
+            return Ok(None);
+        };
 
         let mut is_deprecated = false;
         let mut is_internal = false;
@@ -292,16 +294,7 @@ impl FunctionLikeDocblockComment {
         let mut if_false_assertions: Vec<AssertionTag> = Vec::new();
         let mut unchecked = false;
 
-        let Ok(parsed_docblock) = parse_trivia(context.interner, docblock) else {
-            tracing::trace!(
-                "Failed to parse docblock for function-like in {} at {}:{}",
-                context.interner.lookup(&context.source.identifier.0),
-                context.source.line_number(docblock.span.start.offset),
-                context.source.column_number(docblock.span.start.offset),
-            );
-
-            return None;
-        };
+        let parsed_docblock = parse_trivia(context.interner, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -451,7 +444,7 @@ impl FunctionLikeDocblockComment {
             }
         }
 
-        Some(FunctionLikeDocblockComment {
+        Ok(Some(FunctionLikeDocblockComment {
             span: docblock.span,
             is_deprecated,
             is_internal,
@@ -473,13 +466,18 @@ impl FunctionLikeDocblockComment {
             if_true_assertions,
             if_false_assertions,
             unchecked,
-        })
+        }))
     }
 }
 
 impl PropertyDocblockComment {
-    pub fn create(context: &Context<'_>, property: impl HasSpan) -> Option<PropertyDocblockComment> {
-        let docblock = context.get_docblock(property)?;
+    pub fn create(
+        context: &Context<'_>,
+        property: impl HasSpan,
+    ) -> Result<Option<PropertyDocblockComment>, ParseError> {
+        let Some(docblock) = context.get_docblock(property) else {
+            return Ok(None);
+        };
 
         let mut is_deprecated = false;
         let mut is_internal = false;
@@ -487,16 +485,7 @@ impl PropertyDocblockComment {
         let mut type_string: Option<TypeString> = None;
         let mut allows_private_mutation = false;
 
-        let Ok(parsed_docblock) = parse_trivia(context.interner, docblock) else {
-            tracing::trace!(
-                "Failed to parse docblock for class-like property in {} at {}:{}",
-                context.interner.lookup(&context.source.identifier.0),
-                context.source.line_number(docblock.span.start.offset),
-                context.source.column_number(docblock.span.start.offset),
-            );
-
-            return None;
-        };
+        let parsed_docblock = parse_trivia(context.interner, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -538,35 +527,31 @@ impl PropertyDocblockComment {
             }
         }
 
-        Some(PropertyDocblockComment {
+        Ok(Some(PropertyDocblockComment {
             span: docblock.span,
             type_string,
             is_deprecated,
             is_internal,
             is_readonly,
             allows_private_mutation,
-        })
+        }))
     }
 }
 
 impl ConstantDocblockComment {
-    pub fn create(context: &Context<'_>, constant: impl HasSpan) -> Option<ConstantDocblockComment> {
-        let docblock = context.get_docblock(constant)?;
+    pub fn create(
+        context: &Context<'_>,
+        constant: impl HasSpan,
+    ) -> Result<Option<ConstantDocblockComment>, ParseError> {
+        let Some(docblock) = context.get_docblock(constant) else {
+            return Ok(None);
+        };
 
         let mut is_deprecated = false;
         let mut is_internal = false;
         let mut is_final = false;
 
-        let Ok(parsed_docblock) = parse_trivia(context.interner, docblock) else {
-            tracing::trace!(
-                "Failed to parse docblock for constant in {} at {}:{}",
-                context.interner.lookup(&context.source.identifier.0),
-                context.source.line_number(docblock.span.start.offset),
-                context.source.column_number(docblock.span.start.offset),
-            );
-
-            return None;
-        };
+        let parsed_docblock = parse_trivia(context.interner, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -587,6 +572,6 @@ impl ConstantDocblockComment {
             }
         }
 
-        Some(ConstantDocblockComment { span: docblock.span, is_deprecated, is_internal, is_final })
+        Ok(Some(ConstantDocblockComment { span: docblock.span, is_deprecated, is_internal, is_final }))
     }
 }

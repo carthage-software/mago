@@ -221,11 +221,11 @@ pub fn populate_codebase(
     }
 
     for (name, constant) in codebase.constants.iter_mut() {
-        for attribute_metadata in constant.get_attributes() {
+        for attribute_metadata in &constant.attributes {
             symbol_references.add_symbol_reference_to_symbol(*name, attribute_metadata.get_name(), true);
         }
 
-        if let Some(inferred_type) = constant.get_inferred_type_mut() {
+        if let Some(inferred_type) = &mut constant.inferred_type {
             populate_union_type(
                 inferred_type,
                 &codebase.symbols,

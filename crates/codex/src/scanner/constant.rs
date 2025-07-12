@@ -1,3 +1,5 @@
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -19,15 +21,31 @@ pub fn scan_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<Cons
         .map(|item| {
             let name = lower_constant_name(context.interner, context.resolved_names.get(&item.name));
 
-            let metadata = ConstantMetadata::new(name, item.span())
-                .with_inferred_type(infer(context.interner, context.resolved_names, &item.value))
-                .with_attributes(attributes.clone());
+            let mut metadata = ConstantMetadata::new(name, item.span());
+            metadata.attributes = attributes.clone();
+            metadata.inferred_type = infer(context.interner, context.resolved_names, &item.value);
 
-            if let Some(ref docblock) = docblock {
-                metadata.with_is_deprecated(docblock.is_deprecated).with_is_internal(docblock.is_internal)
-            } else {
-                metadata
+            match &docblock {
+                Ok(Some(docblock)) => {
+                    metadata.is_deprecated = docblock.is_deprecated;
+                    metadata.is_internal = docblock.is_internal;
+                }
+                Ok(None) => {
+                    // No docblock comment found, continue without it
+                }
+                Err(parse_error) => {
+                    metadata.issues.push(
+                        Issue::error("Invalid constant docblock comment.")
+                            .with_annotation(
+                                Annotation::primary(parse_error.span()).with_message(parse_error.to_string()),
+                            )
+                            .with_note(parse_error.note())
+                            .with_help(parse_error.help()),
+                    );
+                }
             }
+
+            metadata
         })
         .collect()
 }
@@ -55,10 +73,8 @@ pub fn scan_defined_constant(define: &FunctionCall, context: &mut Context<'_>) -
     let name = context.interner.intern(name_string.value.as_deref()?);
     let name = lower_constant_name(context.interner, &name);
 
-    Some(
-        ConstantMetadata::new(name, define.span())
-            .with_inferred_type(infer(context.interner, context.resolved_names, arguments[1].value()))
-            .with_is_deprecated(false)
-            .with_is_internal(false),
-    )
+    let mut metadata = ConstantMetadata::new(name, define.span());
+    metadata.inferred_type = infer(context.interner, context.resolved_names, arguments[1].value());
+
+    Some(metadata)
 }

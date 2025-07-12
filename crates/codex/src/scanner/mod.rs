@@ -211,14 +211,14 @@ impl MutWalker<Context<'_>> for Scanner {
     #[inline]
     fn walk_in_constant(&mut self, constant: &Constant, context: &mut Context<'_>) {
         for metadata in scan_constant(constant, context) {
-            self.codebase.constants.insert(*metadata.get_name(), metadata);
+            self.codebase.constants.insert(metadata.name, metadata);
         }
     }
 
     #[inline]
     fn walk_in_function_call(&mut self, function_call: &FunctionCall, context: &mut Context<'_>) {
         if let Some(metadata) = scan_defined_constant(function_call, context) {
-            self.codebase.constants.insert(*metadata.get_name(), metadata);
+            self.codebase.constants.insert(metadata.name, metadata);
         }
     }
 

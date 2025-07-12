@@ -337,7 +337,7 @@ fn scan_class_like(
         Err(parse_error) => {
             class_like_metadata.add_issue(
                 Issue::error("Invalid class-like docblock comment.")
-                    .with_annotation(Annotation::primary(span).with_message(parse_error.to_string()))
+                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
             );
@@ -751,7 +751,7 @@ fn scan_class_like(
     for member in members.iter() {
         match member {
             ClassLikeMember::Constant(constant) => {
-                for constant_metadata in scan_class_like_constants(constant, &class_like_metadata.name, context) {
+                for constant_metadata in scan_class_like_constants(&mut class_like_metadata, constant, context) {
                     let constant_name = constant_metadata.get_name();
                     if class_like_metadata.has_constant(constant_name) {
                         continue;
