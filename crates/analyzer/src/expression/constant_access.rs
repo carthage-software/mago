@@ -52,7 +52,19 @@ impl Analyzable for ConstantAccess {
             return Ok(());
         };
 
-        let mut constant_type = constant_metadata.get_inferred_type().cloned().unwrap_or_else(get_mixed);
+        if constant_metadata.is_deprecated {
+            let constant_name = context.interner.lookup(name);
+
+            context.buffer.report(
+                TypingIssueKind::DeprecatedConstant,
+                Issue::warning(format!("Using deprecated constant: `{constant_name}`."))
+                    .with_annotation(Annotation::primary(self.span()).with_message("This constant is deprecated."))
+                    .with_note("Consider using an alternative constant or variable.")
+                    .with_help("Check `{constant_name}` documentation for alternatives or updates."),
+            );
+        }
+
+        let mut constant_type = constant_metadata.inferred_type.clone().unwrap_or_else(get_mixed);
 
         expander::expand_union(
             context.codebase,

@@ -289,6 +289,7 @@ pub(crate) enum TypingIssueKind {
     IncompatiblePropertyType,
     InvalidPropertyWrite,
     InvalidPropertyRead,
+    DeprecatedConstant,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
