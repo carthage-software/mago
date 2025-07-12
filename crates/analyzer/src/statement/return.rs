@@ -801,6 +801,27 @@ mod tests {
     }
 
     test_analysis! {
+        name = return_class_string_array,
+        code = indoc! {r#"
+            <?php
+
+            class A {}
+            class B extends A {}
+
+            /**
+             * @return array<class-string<A>, class-string<A>>
+             */
+            function example(): array {
+
+
+                return [
+                    A::class => B::class,
+                ];
+            }
+        "#},
+    }
+
+    test_analysis! {
         name = return_no_value_from_typed_void_functions,
         code = indoc! {r#"
             <?php

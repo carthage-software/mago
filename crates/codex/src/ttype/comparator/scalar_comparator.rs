@@ -97,14 +97,11 @@ pub fn is_contained_by(
         {
             return true;
         }
-        (
-            TAtomic::Scalar(TScalar::ClassLikeString(container_class_string)),
-            TAtomic::Scalar(TScalar::ClassLikeString(input_class_string)),
-        ) => {
+        (TAtomic::Scalar(TScalar::ClassLikeString(container_class_string)), TAtomic::Scalar(input_scalar)) => {
             return class_string_comparator::is_contained_by(
                 codebase,
                 interner,
-                input_class_string,
+                input_scalar,
                 container_class_string,
                 inside_assertion,
                 atomic_comparison_result,
