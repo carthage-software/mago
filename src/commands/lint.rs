@@ -451,10 +451,8 @@ pub(super) async fn lint_codebase(
     let sources: Vec<_> = manager.source_ids_for_category(SourceCategory::UserDefined);
     let length = sources.len();
 
-    let mut results = Vec::with_capacity(length + 1);
-
     let mut codebase = compile_codebase_for_sources(manager, &mut SymbolReferences::new(), interner).await?;
-    results.push(codebase.take_issues(true));
+    let mut result = codebase.take_issues(true);
 
     let linter = create_linter(interner, configuration, codebase);
     let lint_progress = create_progress_bar(length, "🧹  Linting", ProgressBarTheme::Red);
@@ -476,12 +474,12 @@ pub(super) async fn lint_codebase(
     }
 
     for handle in handles {
-        results.push(handle.await??);
+        result.extend(handle.await??);
     }
 
     remove_progress_bar(lint_progress);
 
-    Ok(IssueCollection::from(results.into_iter().flatten()))
+    Ok(result)
 }
 
 fn lint_single_source(

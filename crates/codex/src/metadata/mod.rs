@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
-use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
 use mago_source::SourceIdentifier;
 
 use crate::get_closure;
@@ -292,8 +292,8 @@ impl CodebaseMetadata {
         self.infer_types_from_usage |= other.infer_types_from_usage;
     }
 
-    pub fn take_issues(&mut self, user_defined: bool) -> Vec<Issue> {
-        let mut issues = Vec::new();
+    pub fn take_issues(&mut self, user_defined: bool) -> IssueCollection {
+        let mut issues = IssueCollection::new();
 
         for metadata in self.class_likes.values_mut() {
             if user_defined && !metadata.is_user_defined() {

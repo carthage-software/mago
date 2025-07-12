@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -726,17 +727,17 @@ impl TUnion {
         }
     }
 
-    pub fn get_single_value_of_array_like(self) -> Option<TUnion> {
+    pub fn get_single_value_of_array_like(&self) -> Option<Cow<'_, TUnion>> {
         if !self.is_single() {
             return None;
         }
 
-        match self.get_single_owned() {
+        match self.get_single() {
             TAtomic::Array(array) => match array {
-                TArray::List(list) => Some(*list.element_type),
-                TArray::Keyed(keyed_array) => match keyed_array.parameters {
-                    Some((_, v)) => Some(*v),
-                    None => Some(get_mixed()),
+                TArray::List(list) => Some(Cow::Borrowed(&list.element_type)),
+                TArray::Keyed(keyed_array) => match &keyed_array.parameters {
+                    Some((_, v)) => Some(Cow::Borrowed(v)),
+                    None => Some(Cow::Owned(get_mixed())),
                 },
             },
             _ => None,

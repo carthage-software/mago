@@ -25,6 +25,7 @@ pub mod data_flow;
 pub mod diff;
 pub mod flags;
 pub mod identifier;
+pub mod issue;
 pub mod metadata;
 pub mod misc;
 pub mod populator;

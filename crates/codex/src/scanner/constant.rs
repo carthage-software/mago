@@ -3,6 +3,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
+use crate::issue::ScanningIssueKind;
 use crate::lower_constant_name;
 use crate::metadata::constant::ConstantMetadata;
 use crate::scanner::Context;
@@ -35,7 +36,8 @@ pub fn scan_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<Cons
                 }
                 Err(parse_error) => {
                     metadata.issues.push(
-                        Issue::error("Invalid constant docblock comment.")
+                        Issue::error("Failed to parse constant docblock comment.")
+                            .with_code(ScanningIssueKind::MalformedDocblockComment)
                             .with_annotation(
                                 Annotation::primary(parse_error.span()).with_message(parse_error.to_string()),
                             )

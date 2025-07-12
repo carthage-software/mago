@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
 
+use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::property::PropertyMetadata;
@@ -80,7 +81,8 @@ pub fn scan_properties(
         Ok(docblock) => docblock,
         Err(parse_error) => {
             class_like_metadata.issues.push(
-                Issue::error("Invalid property docblock comment.")
+                Issue::error("Failed to parse property docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
                     .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
@@ -137,13 +139,15 @@ pub fn scan_properties(
                             Ok(property_type_metadata) => {
                                 metadata.set_type_metadata(Some(property_type_metadata));
                             }
-                            Err(typing_error) => {
-                                class_like_metadata.add_issue(
-                                    Issue::error("Invalid `@var` type string.").with_annotation(
-                                        Annotation::primary(type_string.span).with_message(typing_error.to_string()),
-                                    ),
-                                );
-                            }
+                            Err(typing_error) => class_like_metadata.issues.push(
+                                Issue::error("Could not resolve the type for the @var tag.")
+                                    .with_code(ScanningIssueKind::InvalidVarTag)
+                                    .with_annotation(
+                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                    )
+                                    .with_note(typing_error.note())
+                                    .with_help(typing_error.help()),
+                            ),
                         }
                     }
 
@@ -193,9 +197,15 @@ pub fn scan_properties(
                             metadata.set_type_metadata(Some(property_type));
                         }
                         Err(typing_error) => {
-                            class_like_metadata.add_issue(Issue::error("Invalid `@var` type string.").with_annotation(
-                                Annotation::primary(type_string.span).with_message(typing_error.to_string()),
-                            ));
+                            class_like_metadata.issues.push(
+                                Issue::error("Could not resolve the type for the @var tag.")
+                                    .with_code(ScanningIssueKind::InvalidVarTag)
+                                    .with_annotation(
+                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                    )
+                                    .with_note(typing_error.note())
+                                    .with_help(typing_error.help()),
+                            );
                         }
                     }
                 }

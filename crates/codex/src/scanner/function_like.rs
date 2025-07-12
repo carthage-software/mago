@@ -9,6 +9,7 @@ use mago_syntax::ast::*;
 use mago_syntax::utils;
 
 use crate::assertion::Assertion;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -196,7 +197,8 @@ fn scan_function_like_docblock(
         Ok(None) => return,
         Err(parse_error) => {
             metadata.issues.push(
-                Issue::error("Invalid function-like docblock comment.")
+                Issue::error("Failed to parse function-like docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
                     .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
@@ -219,28 +221,33 @@ fn scan_function_like_docblock(
     let mut type_context = metadata.get_type_resolution_context().cloned().unwrap_or_default();
     for template in docblock.templates.iter() {
         let template_name = context.interner.intern(&template.name);
-        let template_as_type =
-            if let Some(type_string) = &template.type_string {
-                match builder::get_type_from_string(
-                    &type_string.value,
-                    type_string.span,
-                    scope,
-                    &type_context,
-                    classname,
-                    context.interner,
-                ) {
-                    Ok(tunion) => tunion,
-                    Err(typing_error) => {
-                        metadata.issues.push(Issue::error("Invalid `@template` type string.").with_annotation(
-                            Annotation::primary(type_string.span).with_message(typing_error.to_string()),
-                        ));
+        let template_as_type = if let Some(type_string) = &template.type_string {
+            match builder::get_type_from_string(
+                &type_string.value,
+                type_string.span,
+                scope,
+                &type_context,
+                classname,
+                context.interner,
+            ) {
+                Ok(tunion) => tunion,
+                Err(typing_error) => {
+                    metadata.issues.push(
+                        Issue::error("Invalid `@template` type string.")
+                            .with_code(ScanningIssueKind::InvalidTemplateTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
 
-                        continue;
-                    }
+                    continue;
                 }
-            } else {
-                get_mixed()
-            };
+            }
+        } else {
+            get_mixed()
+        };
 
         let definition = vec![(GenericParent::FunctionLike(functionlike_id), template_as_type)];
 
@@ -251,26 +258,29 @@ fn scan_function_like_docblock(
     for parameter_tag in docblock.parameters {
         let parameter_name;
         let parameter_name_str;
-        let is_variadic;
-        if parameter_tag.name.starts_with("...") {
-            is_variadic = true;
+        let is_variadic = parameter_tag.name.starts_with("...");
+        if is_variadic {
             parameter_name_str = &parameter_tag.name[3..];
             parameter_name = context.interner.intern(parameter_name_str);
         } else {
-            is_variadic = false;
             parameter_name_str = &parameter_tag.name;
             parameter_name = context.interner.intern(parameter_name_str);
         }
 
         let param_type_string = &parameter_tag.type_string;
-        let param_type_span = param_type_string.span;
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
             metadata.issues.push(
-                Issue::error("Invalid `@param` docblock tag.").with_annotation(
-                    Annotation::primary(parameter_tag.span)
-                        .with_message(format!("Parameter `{parameter_name_str}` is not defined")),
-                ),
+                Issue::error("The @param tag references an unknown parameter.")
+                    .with_code(ScanningIssueKind::InvalidParamTag)
+                    .with_annotation(
+                        Annotation::primary(parameter_tag.span)
+                            .with_message(format!("Parameter `{parameter_name_str}` is not defined in this function")),
+                    )
+                    .with_note(
+                        "Each `@param` tag in a docblock must correspond to a parameter in the function's signature.",
+                    )
+                    .with_help("Please check for typos or add the parameter to the function signature."),
             );
 
             continue;
@@ -280,14 +290,17 @@ fn scan_function_like_docblock(
             let parameter_span = parameter_metadata.get_span();
 
             metadata.issues.push(
-                Issue::error("Invalid `@param` docblock tag.")
-                    .with_annotation(Annotation::primary(parameter_tag.span).with_message(format!(
-                        "Parameter `{parameter_name_str}` is marked as variadic, it is not declared as such."
-                    )))
+                Issue::error("@param tag has a variadic mismatch.")
+                    .with_code(ScanningIssueKind::InvalidParamTag)
+                    .with_annotation(Annotation::primary(parameter_tag.span).with_message(
+                        "This docblock declares the parameter as variadic, but the function signature does not",
+                    ))
                     .with_annotation(
                         Annotation::secondary(parameter_span)
-                            .with_message(format!("Parameter `{parameter_name_str}` is not declared as variadic.")),
-                    ),
+                            .with_message("The parameter is declared here without being variadic"),
+                    )
+                    .with_note("The use of `...` in the `@param` tag must match the function's parameter declaration.")
+                    .with_help("Either add `...` to the parameter in the function signature or remove it from the `@param` tag."),
             );
 
             continue;
@@ -297,16 +310,10 @@ fn scan_function_like_docblock(
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.is_variadic()
-                    && (provided_type.type_union.is_keyed_array() || provided_type.type_union.is_list())
-                    && provided_type.type_union.is_single()
+                    && let Some(array_value) = provided_type.type_union.get_single_value_of_array_like()
                 {
-                    if let Some(array_value) = provided_type.type_union.get_single_value_of_array_like() {
-                        provided_type.type_union = array_value;
-
-                        provided_type
-                    } else {
-                        unreachable!("Expected a single value in the array")
-                    }
+                    provided_type.type_union = array_value.into_owned();
+                    provided_type
                 } else {
                     provided_type
                 };
@@ -315,8 +322,11 @@ fn scan_function_like_docblock(
             }
             Err(typing_error) => {
                 metadata.issues.push(
-                    Issue::error("Invalid `@param` type string.")
-                        .with_annotation(Annotation::primary(param_type_span).with_message(typing_error.to_string()))
+                    Issue::error("Could not resolve the type for the @param tag.")
+                        .with_code(ScanningIssueKind::InvalidParamTag)
+                        .with_annotation(
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                        )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
                 );
@@ -329,27 +339,44 @@ fn scan_function_like_docblock(
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
             metadata.issues.push(
-                Issue::error("Invalid `@param-out` docblock tag.").with_annotation(
-                    Annotation::primary(param_out.span)
-                        .with_message(format!("Parameter `{}` does not exist", param_out.name)),
-                ),
+                Issue::error("@param-out tag references an unknown parameter.")
+                    .with_code(ScanningIssueKind::InvalidParamOutTag)
+                    .with_annotation(
+                        Annotation::primary(param_out.span)
+                            .with_message(format!("Parameter `{}` does not exist", param_out.name)),
+                    )
+                    .with_note("The `@param-out` tag specifies the type of a by-reference parameter after the function has executed.")
+                    .with_help("Check for typos or ensure this parameter exists in the function signature."),
             );
 
             continue;
         };
 
-        let param_out_type_string = &param_out.type_string;
-        let param_out_type_span = param_out_type_string.span;
+        if !parameter_metadata.is_by_reference {
+            metadata.issues.push(
+                Issue::error("@param-out tag used on a non-by-reference parameter")
+                    .with_code(ScanningIssueKind::InvalidParamOutTag)
+                    .with_annotation(
+                        Annotation::primary(param_out.span)
+                            .with_message("This parameter is not declared as by-reference"),
+                    )
+                    .with_note("The `@param-out` tag can only be used with parameters that are passed by reference.")
+                    .with_help("Ensure the parameter is declared with `&` in the function signature."),
+            );
 
-        match get_type_metadata_from_type_string(param_out_type_string, classname, &type_context, context, scope) {
+            continue;
+        }
+
+        match get_type_metadata_from_type_string(&param_out.type_string, classname, &type_context, context, scope) {
             Ok(parameter_out_type) => {
                 parameter_metadata.set_out_type(Some(parameter_out_type));
             }
             Err(typing_error) => {
                 metadata.issues.push(
                     Issue::error("Invalid `@param-out` type string.")
+                        .with_code(ScanningIssueKind::InvalidParamOutTag)
                         .with_annotation(
-                            Annotation::primary(param_out_type_span).with_message(typing_error.to_string()),
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                         )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
@@ -358,18 +385,53 @@ fn scan_function_like_docblock(
         }
     }
 
-    if let Some(this_out) = docblock.this_out {
-        let this_out_type_string = &this_out.type_string;
-        let this_out_type_span = this_out_type_string.span;
+    'this_out: {
+        let Some(this_out) = docblock.this_out else {
+            // If there is no `@this-out` tag, we can skip this section.
+            break 'this_out;
+        };
 
-        match get_type_metadata_from_type_string(this_out_type_string, classname, &type_context, context, scope) {
+        let Some(method_metadata) = metadata.get_method_metadata_mut() else {
+            metadata.issues.push(
+                Issue::error("`@this-out` tag used in a non-method function-like.")
+                    .with_code(ScanningIssueKind::InvalidThisOutTag)
+                    .with_annotation(
+                        Annotation::primary(this_out.type_string.span)
+                            .with_message("`@this-out` can only be used in methods, not in functions or closures"),
+                    )
+                    .with_note("The `@this-out` tag is specific to methods that modify the instance state.")
+                    .with_help("Ensure this tag is only used in method docblocks."),
+            );
+
+            break 'this_out;
+        };
+
+        if method_metadata.is_static() {
+            metadata.issues.push(
+                Issue::error("`@this-out` tag used in a static method.")
+                    .with_code(ScanningIssueKind::InvalidThisOutTag)
+                    .with_annotation(
+                        Annotation::primary(this_out.type_string.span)
+                            .with_message("`@this-out` cannot be used in static methods"),
+                    )
+                    .with_note("The `@this-out` tag is intended for instance methods that modify the instance state.")
+                    .with_help("Remove the `@this-out` tag from static method docblocks."),
+            );
+
+            break 'this_out;
+        }
+
+        match get_type_metadata_from_type_string(&this_out.type_string, classname, &type_context, context, scope) {
             Ok(out_type_metadata) => {
                 metadata.this_out_type = Some(out_type_metadata);
             }
             Err(typing_error) => {
                 metadata.issues.push(
-                    Issue::error("Invalid `@this-out` type string.")
-                        .with_annotation(Annotation::primary(this_out_type_span).with_message(typing_error.to_string()))
+                    Issue::error("Failed to resolve `@this-out` type string.")
+                        .with_code(ScanningIssueKind::InvalidThisOutTag)
+                        .with_annotation(
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                        )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
                 );
@@ -378,15 +440,15 @@ fn scan_function_like_docblock(
     }
 
     if let Some(return_type) = docblock.return_type.as_ref() {
-        let return_type_string = &return_type.type_string;
-        let return_type_span = return_type_string.span;
-
-        match get_type_metadata_from_type_string(return_type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&return_type.type_string, classname, &type_context, context, scope) {
             Ok(return_type_signature) => metadata.set_return_type_metadata(Some(return_type_signature)),
             Err(typing_error) => {
                 metadata.issues.push(
-                    Issue::error("Invalid `@return` type string.")
-                        .with_annotation(Annotation::primary(return_type_span).with_message(typing_error.to_string()))
+                    Issue::error("Failed to resolve `@return` type string.")
+                        .with_code(ScanningIssueKind::InvalidReturnTag)
+                        .with_annotation(
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                        )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
                 );
@@ -394,19 +456,52 @@ fn scan_function_like_docblock(
         }
     }
 
-    if let Some(if_this_is) = docblock.if_this_is {
-        let if_this_is_type_string = &if_this_is.type_string;
-        let if_this_is_type_span = if_this_is_type_string.span;
+    'if_this_is: {
+        let Some(if_this_is) = docblock.if_this_is else {
+            // If there is no `@if-this-is` tag, we can skip this section.
+            break 'if_this_is;
+        };
 
-        match get_type_metadata_from_type_string(if_this_is_type_string, classname, &type_context, context, scope) {
+        let Some(method_metadata) = metadata.get_method_metadata_mut() else {
+            metadata.issues.push(
+                Issue::error("`@if-this-is` tag used in a non-method function-like.")
+                    .with_code(ScanningIssueKind::InvalidIfThisIsTag)
+                    .with_annotation(
+                        Annotation::primary(if_this_is.type_string.span)
+                            .with_message("`@if-this-is` can only be used in methods, not in functions or closures"),
+                    )
+                    .with_note("The `@if-this-is` tag is specific to methods that check the type of `this`.")
+                    .with_help("Ensure this tag is only used in method docblocks."),
+            );
+
+            break 'if_this_is;
+        };
+
+        if method_metadata.is_static() {
+            metadata.issues.push(
+                Issue::error("`@if-this-is` tag used in a static method.")
+                    .with_code(ScanningIssueKind::InvalidIfThisIsTag)
+                    .with_annotation(
+                        Annotation::primary(if_this_is.type_string.span)
+                            .with_message("`@if-this-is` cannot be used in static methods"),
+                    )
+                    .with_note("The `@if-this-is` tag is intended for instance methods that check the type of `this`.")
+                    .with_help("Remove the `@if-this-is` tag from static method docblocks."),
+            );
+
+            break 'if_this_is;
+        }
+
+        match get_type_metadata_from_type_string(&if_this_is.type_string, classname, &type_context, context, scope) {
             Ok(constraint_type) => {
                 metadata.if_this_is_type = Some(constraint_type);
             }
             Err(typing_error) => {
                 metadata.issues.push(
-                    Issue::error("Invalid `@if-this-is` type string.")
+                    Issue::error("Failed to resolve `@if-this-is` type string.")
+                        .with_code(ScanningIssueKind::InvalidIfThisIsTag)
                         .with_annotation(
-                            Annotation::primary(if_this_is_type_span).with_message(typing_error.to_string()),
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                         )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
@@ -416,17 +511,17 @@ fn scan_function_like_docblock(
     }
 
     for thrown in docblock.throws {
-        let thrown_type_string = &thrown.type_string;
-        let thrown_type_span = thrown_type_string.span;
-
-        match get_type_metadata_from_type_string(thrown_type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&thrown.type_string, classname, &type_context, context, scope) {
             Ok(thrown_type) => {
                 metadata.thrown_types.push(thrown_type);
             }
             Err(typing_error) => {
                 metadata.issues.push(
                     Issue::error("Invalid `@throws` type string.")
-                        .with_annotation(Annotation::primary(thrown_type_span).with_message(typing_error.to_string()))
+                        .with_code(ScanningIssueKind::InvalidThrowsTag)
+                        .with_annotation(
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                        )
                         .with_note(typing_error.note())
                         .with_help(typing_error.help()),
                 );
@@ -535,8 +630,11 @@ fn parse_assertion_string(
         },
         Err(typing_error) => {
             function_like_metadata.issues.push(
-                Issue::error("Invalid `@assert`/`@assert-if-true`/`@assert-if-false` type string.")
-                    .with_annotation(Annotation::primary(type_string.span).with_message(typing_error.to_string())),
+                Issue::error("Failed to resolve assertion type string.")
+                    .with_code(ScanningIssueKind::InvalidAssertionTag)
+                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
+                    .with_note(typing_error.note())
+                    .with_help(typing_error.help()),
             );
         }
     }

@@ -13,7 +13,6 @@ use mago_codex::reference::SymbolReferences;
 use mago_interner::ThreadedInterner;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
-use mago_reporting::IssueCollection;
 use mago_source::Source;
 use mago_source::SourceCategory;
 use mago_source::SourceManager;
@@ -128,7 +127,7 @@ pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> R
     };
 
     tracing::debug!("Compiling codebase...");
-    let codebase = compile_codebase_for_sources(&source_manager, &mut symbol_references, &interner).await?;
+    let mut codebase = compile_codebase_for_sources(&source_manager, &mut symbol_references, &interner).await?;
 
     tracing::debug!("Analyzing sources...");
     let analysis_result = analyze_user_sources(
@@ -141,7 +140,8 @@ pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> R
     )
     .await?;
 
-    let issues = analysis_result.emitted_issues.into_values().flatten().collect::<IssueCollection>();
+    let mut issues = codebase.take_issues(true);
+    issues.extend(analysis_result.emitted_issues.into_values().flatten());
 
     command.reporting.process_issues(issues, configuration, interner, source_manager).await
 }

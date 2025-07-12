@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
 
+use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeKind;
@@ -335,8 +336,9 @@ fn scan_class_like(
     let docblock = match ClassLikeDocblockComment::create(context, span, scope) {
         Ok(docblock) => docblock,
         Err(parse_error) => {
-            class_like_metadata.add_issue(
-                Issue::error("Invalid class-like docblock comment.")
+            class_like_metadata.issues.push(
+                Issue::error("Failed to parse class-like docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
                     .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
@@ -375,10 +377,11 @@ fn scan_class_like(
                 ) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
-                        class_like_metadata.add_issue(
-                            Issue::error("Invalid `@template` type string.")
+                        class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the constraint type for the `@template` tag.")
+                                .with_code(ScanningIssueKind::InvalidTemplateTag)
                                 .with_annotation(
-                                    Annotation::primary(type_string.span).with_message(typing_error.to_string()),
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                                 )
                                 .with_note(typing_error.note())
                                 .with_help(typing_error.help()),
@@ -422,10 +425,11 @@ fn scan_class_like(
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Invalid `@extends` type string.")
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the generic type in the `@extends` tag.")
+                            .with_code(ScanningIssueKind::InvalidExtendsTag)
                             .with_annotation(
-                                Annotation::primary(extended_type.span).with_message(typing_error.to_string()),
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                             )
                             .with_note(typing_error.note())
                             .with_help(typing_error.help()),
@@ -436,10 +440,14 @@ fn scan_class_like(
             };
 
             if !extended_union.is_single() {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@extends` type cannot be a union type.").with_annotation(
-                        Annotation::primary(extended_type.span).with_message("Template type cannot be a union type."),
-                    ),
+                class_like_metadata.issues.push(
+                    Issue::error("The `@extends` tag must specify a single parent class.")
+                        .with_code(ScanningIssueKind::InvalidExtendsTag)
+                        .with_annotation(
+                            Annotation::primary(extended_type.span).with_message("Union types are not allowed here."),
+                        )
+                        .with_note("The `@extends` tag provides concrete types for generics from a direct parent type.")
+                        .with_help("Provide a single parent type, e.g., `@extends Box<string>`."),
                 );
 
                 continue;
@@ -450,10 +458,17 @@ fn scan_class_like(
                     (name, parameters)
                 }
                 _ => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Template `@extends` type must be a named type.").with_annotation(
-                            Annotation::primary(extended_type.span).with_message("Template type must be a named type."),
-                        ),
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@extends` tag expects a generic class type.")
+                            .with_code(ScanningIssueKind::InvalidExtendsTag)
+                            .with_annotation(
+                                Annotation::primary(extended_type.span)
+                                    .with_message("This must be a class name, not a primitive or other complex type."),
+                            )
+                            .with_note(
+                                "The `@extends` tag provides concrete types for type parameters from a direct parent class.",
+                            )
+                            .with_help("For example: `@extends Box<string>`."),
                     );
 
                     continue;
@@ -463,7 +478,6 @@ fn scan_class_like(
             let parent_name_str = context.interner.lookup(&parent_name);
             let parent_name = context.interner.lowered(&parent_name);
 
-            // Ensure that we do actually extend the class or interface
             let has_parent = if class_like_metadata.is_interface() {
                 class_like_metadata.has_parent_interface(&parent_name)
             } else {
@@ -471,12 +485,14 @@ fn scan_class_like(
             };
 
             if !has_parent {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@extends` type must be a direct parent class or interface.")
+                class_like_metadata.issues.push(
+                    Issue::error("`@extends` tag must refer to a direct parent class or interface.")
+                        .with_code(ScanningIssueKind::InvalidExtendsTag)
                         .with_annotation(Annotation::primary(extended_type.span).with_message(format!(
-                            "Template type `{parent_name_str}` is not a direct parent class or interface."
+                            "The class `{parent_name_str}` is not a direct parent."
                         )))
-                        .with_help(format!("Did you forget to implement or extend `{parent_name_str}`?")),
+                        .with_note("The `@extends` tag is used to provide type information for the class or interface that is directly extended.")
+                        .with_help(format!("Ensure this type's definition includes `extends {parent_name_str}`.")),
                 );
 
                 continue;
@@ -499,10 +515,11 @@ fn scan_class_like(
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Invalid `@implements` type string.")
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the interface name in the `@implements` tag.")
+                            .with_code(ScanningIssueKind::InvalidImplementsTag)
                             .with_annotation(
-                                Annotation::primary(implemented_type.span).with_message(typing_error.to_string()),
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                             )
                             .with_note(typing_error.note())
                             .with_help(typing_error.help()),
@@ -513,11 +530,14 @@ fn scan_class_like(
             };
 
             if !implemented_union.is_single() {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@implements` type cannot be a union type.").with_annotation(
-                        Annotation::primary(implemented_type.span)
-                            .with_message("Template type cannot be a union type."),
-                    ),
+                class_like_metadata.issues.push(
+                    Issue::error("The `@implements` tag expects a single interface type.")
+                        .with_code(ScanningIssueKind::InvalidImplementsTag)
+                        .with_annotation(
+                            Annotation::primary(implemented_type.span).with_message("Union types are not supported here."),
+                        )
+                        .with_note("The `@implements` tag provides concrete types for generics from a direct parent interface.")
+                        .with_help("Provide a single parent interface, e.g., `@implements Serializable<string>`."),
                 );
 
                 continue;
@@ -528,15 +548,17 @@ fn scan_class_like(
                     (name, parameters)
                 }
                 atomic => {
-                    class_like_metadata.add_issue(
-                        Issue::error(format!(
-                            "Template `@implements` type must be a named type, found `{}`.",
-                            atomic.get_id(Some(context.interner))
-                        ))
-                        .with_annotation(
-                            Annotation::primary(implemented_type.span)
-                                .with_message("Template type must be a named type."),
-                        ),
+                    let atomic_str = atomic.get_id(Some(context.interner));
+
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@implements` tag expects a single interface type.")
+                            .with_code(ScanningIssueKind::InvalidImplementsTag)
+                            .with_annotation(
+                                Annotation::primary(implemented_type.span)
+                                    .with_message(format!("This must be an interface, not `{atomic_str}`.")),
+                            )
+                            .with_note("The `@implements` tag provides concrete types for type parameters from a direct parent interface.")
+                            .with_help("Provide the single, interface name that this class implements."),
                     );
 
                     continue;
@@ -547,12 +569,14 @@ fn scan_class_like(
             let parent_name = context.interner.lowered(&parent_name);
 
             if !class_like_metadata.has_parent_interface(&context.interner.lowered(&parent_name)) {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@implements` type must be a direct parent interface.")
+                class_like_metadata.issues.push(
+                    Issue::error("The `@implements` tag must refer to a direct parent interface.")
+                        .with_code(ScanningIssueKind::InvalidImplementsTag)
                         .with_annotation(Annotation::primary(implemented_type.span).with_message(format!(
-                            "Template type `{parent_name_str}` is not a direct parent interface."
+                            "The interface `{parent_name_str}` is not a direct parent."
                         )))
-                        .with_help(format!("Did you forget to implement `{parent_name_str}`?")),
+                        .with_note("The `@implements` tag is used to provide type information for the interface that is directly implemented.")
+                        .with_help(format!("Ensure this type's definition includes `implements {parent_name_str}`.")),
                 );
 
                 continue;
@@ -575,10 +599,11 @@ fn scan_class_like(
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Invalid `@require-extends` type string.")
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the class name in the `@require-extends` tag.")
+                            .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                             .with_annotation(
-                                Annotation::primary(require_extend.span).with_message(typing_error.to_string()),
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                             )
                             .with_note(typing_error.note())
                             .with_help(typing_error.help()),
@@ -589,10 +614,15 @@ fn scan_class_like(
             };
 
             if !required_union.is_single() {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@require-extends` type cannot be a union type.").with_annotation(
-                        Annotation::primary(require_extend.span).with_message("Template type cannot be a union type."),
-                    ),
+                class_like_metadata.issues.push(
+                    Issue::error("The `@require-extends` tag expects a single class name.")
+                        .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
+                        .with_annotation(
+                            Annotation::primary(require_extend.span)
+                                .with_message("Union types are not supported here."),
+                        )
+                        .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
+                        .with_help("A class can only extend one other class. Provide a single parent class name."),
                 );
 
                 continue;
@@ -601,12 +631,15 @@ fn scan_class_like(
             let (required_name, required_params) = match required_union.get_single_owned() {
                 TAtomic::Object(TObject::Named(named_object)) => {
                     if named_object.is_intersection() {
-                        class_like_metadata.add_issue(
-                            Issue::error("Template `@require-extends` type cannot be an intersection type.")
+                        class_like_metadata.issues.push(
+                            Issue::error("The `@require-extends` tag expects a single class name.")
+                                .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                                 .with_annotation(
                                     Annotation::primary(require_extend.span)
-                                        .with_message("Template type cannot be an intersection type."),
-                                ),
+                                        .with_message("Intersection types are not supported here."),
+                                )
+                                .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
+                                .with_help("A class can only extend one other class. Provide a single parent class name."),
                         );
 
                         continue;
@@ -615,11 +648,15 @@ fn scan_class_like(
                     (named_object.name, named_object.type_parameters)
                 }
                 _ => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Template `@require-extends` type must be a named type.").with_annotation(
-                            Annotation::primary(require_extend.span)
-                                .with_message("Template type must be a named type."),
-                        ),
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@require-extends` tag expects a single class name.")
+                            .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
+                            .with_annotation(
+                                Annotation::primary(require_extend.span)
+                                    .with_message("This must be a class name, not a primitive or other complex type.")
+                            )
+                            .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
+                            .with_help("Provide the single, class name that all inheriting classes must extend."),
                     );
 
                     continue;
@@ -643,10 +680,11 @@ fn scan_class_like(
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Invalid `@require-implements` type string.")
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
+                            .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                             .with_annotation(
-                                Annotation::primary(require_implements.span).with_message(typing_error.to_string()),
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                             )
                             .with_note(typing_error.note())
                             .with_help(typing_error.help()),
@@ -657,25 +695,32 @@ fn scan_class_like(
             };
 
             if !required_union.is_single() {
-                class_like_metadata.add_issue(
-                    Issue::error("Template `@require-implements` type cannot be a union type.").with_annotation(
-                        Annotation::primary(require_implements.span)
-                            .with_message("Template type cannot be a union type."),
-                    ),
+                class_like_metadata.issues.push(
+                    Issue::error("The `@require-implements` tag expects a single interface name.")
+                        .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
+                        .with_annotation(
+                            Annotation::primary(require_implements.span)
+                                .with_message("Union types are not supported here."),
+                        )
+                        .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
+                        .with_help("To require that inheriting types implement multiple interfaces, use a separate `@require-implements` tag for each one."),
                 );
 
                 continue;
             }
 
-            let (required_name, required_params) = match required_union.get_single_owned() {
+            let (required_name, required_parameters) = match required_union.get_single_owned() {
                 TAtomic::Object(TObject::Named(named_object)) => {
                     if named_object.is_intersection() {
-                        class_like_metadata.add_issue(
-                            Issue::error("Template `@require-implements` type cannot be an intersection type.")
+                        class_like_metadata.issues.push(
+                            Issue::error("The `@require-implements` tag expects a single interface name.")
+                                .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                                 .with_annotation(
                                     Annotation::primary(require_implements.span)
-                                        .with_message("Template type cannot be an intersection type."),
-                                ),
+                                        .with_message("Intersection types are not supported here."),
+                                )
+                                .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
+                                .with_help("To require that inheriting types implement multiple interfaces, use a separate `@require-implements` tag for each one."),
                         );
 
                         continue;
@@ -684,11 +729,15 @@ fn scan_class_like(
                     (named_object.name, named_object.type_parameters)
                 }
                 _ => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Template `@require-implements` type must be a named type.").with_annotation(
-                            Annotation::primary(require_implements.span)
-                                .with_message("Template type must be a named type."),
-                        ),
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@require-implements` tag expects a single interface name.")
+                            .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
+                            .with_annotation(
+                                Annotation::primary(require_implements.span)
+                                    .with_message("This must be an interface, not a primitive or other complex type."),
+                            )
+                            .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
+                            .with_help("Provide the single, interface name that all inheriting classes must implement."),
                     );
 
                     continue;
@@ -696,8 +745,8 @@ fn scan_class_like(
             };
 
             class_like_metadata.add_require_implement(context.interner.lowered(&required_name));
-            if let Some(required_params) = required_params {
-                class_like_metadata.add_template_extended_offset(required_name, required_params);
+            if let Some(required_parameters) = required_parameters {
+                class_like_metadata.add_template_extended_offset(required_name, required_parameters);
             }
         }
 
@@ -724,21 +773,24 @@ fn scan_class_like(
                                     .insert(context.interner.lowered(&name));
                             }
                             _ => {
-                                class_like_metadata.add_issue(
-                                    Issue::error("Invalid `@inheritors` type string.").with_annotation(
-                                        Annotation::primary(inheritors.span)
-                                            .with_message("Template type must be a named type."),
-                                    ),
+                                class_like_metadata.issues.push(
+                                    Issue::error("The `@inheritors` tag only accepts class, interface, or enum names.")
+                                        .with_code(ScanningIssueKind::InvalidInheritorsTag)
+                                        .with_annotation(
+                                            Annotation::primary(inheritors.span)
+                                                .with_message("This type is not a simple class-like name."),
+                                        ),
                                 );
                             }
                         }
                     }
                 }
                 Err(typing_error) => {
-                    class_like_metadata.add_issue(
-                        Issue::error("Invalid `@inheritors` type string.")
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@inheritors` tag.")
+                            .with_code(ScanningIssueKind::InvalidInheritorsTag)
                             .with_annotation(
-                                Annotation::primary(inheritors.span).with_message(typing_error.to_string()),
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
                             )
                             .with_note(typing_error.note())
                             .with_help(typing_error.help()),

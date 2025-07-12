@@ -3,6 +3,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeConstant;
 
+use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::scanner::Context;
@@ -29,7 +30,8 @@ pub fn scan_class_like_constants(
         Ok(docblock) => docblock,
         Err(parse_error) => {
             class_like_metadata.issues.push(
-                Issue::error("Class constant docblock could not be parsed")
+                Issue::error("Failed to parse constant docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
                     .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
