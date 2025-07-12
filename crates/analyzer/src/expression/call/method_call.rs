@@ -345,4 +345,57 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = intersection_template_resolution,
+        code = indoc! {r#"
+            <?php
+
+            interface MockObject
+            {
+            }
+
+            abstract class TestCase
+            {
+                /**
+                 * @template T of object
+                 *
+                 * @param class-string<T> $className
+                 *
+                 * @return MockObject&T
+                 */
+                protected function createMock(string $className): MockObject
+                {
+                    exit('Not implemented');
+                }
+
+                /**
+                 * @template T of object
+                 *
+                 * @param class-string<T> $className
+                 *
+                 * @return T&MockObject
+                 */
+                protected function createMockTwo(string $className): MockObject
+                {
+                    exit('Not implemented');
+                }
+            }
+
+            interface ServiceInterface
+            {
+            }
+
+            class MyTestCase extends TestCase
+            {
+                private null|(MockObject&ServiceInterface) $service = null;
+
+                public function setup(): void
+                {
+                    $this->service = $this->createMock(ServiceInterface::class);
+                    $this->service = $this->createMockTwo(ServiceInterface::class);
+                }
+            }
+        "#},
+    }
 }

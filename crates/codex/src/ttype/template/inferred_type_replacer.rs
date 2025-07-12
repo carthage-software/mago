@@ -9,6 +9,7 @@ use mago_interner::ThreadedInterner;
 use crate::get_class_like;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
+use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::callable::TCallable;
@@ -245,12 +246,24 @@ fn replace_atomic(
 
             let value_type = iterable.get_value_type_mut();
             *value_type = replace(value_type, template_result, codebase, interner);
+
+            if let Some(intersection_types) = iterable.get_intersection_types_mut() {
+                let old_intersection_types = TUnion::new(intersection_types.clone());
+
+                *intersection_types = replace(&old_intersection_types, template_result, codebase, interner).types;
+            }
         }
         TAtomic::Object(TObject::Named(named_object)) => {
             if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                 for parameter in type_parameters {
                     *parameter = replace(parameter, template_result, codebase, interner);
                 }
+            }
+
+            if let Some(intersection_types) = named_object.get_intersection_types_mut() {
+                let old_intersection_types = TUnion::new(intersection_types.clone());
+
+                *intersection_types = replace(&old_intersection_types, template_result, codebase, interner).types;
             }
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
