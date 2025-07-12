@@ -57,6 +57,28 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
             Literal::False(_) => Some(get_false()),
             Literal::Null(_) => Some(get_null()),
         },
+        Expression::CompositeString(composite_string) => {
+            let mut contains_content = false;
+            for part in composite_string.parts().iter() {
+                match part {
+                    StringPart::Literal(literal_string_part) => {
+                        if !literal_string_part.value.is_empty() {
+                            contains_content = true;
+                            break;
+                        }
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
+
+            if contains_content {
+                Some(wrap_atomic(TAtomic::Scalar(TScalar::String(TString::non_empty()))))
+            } else {
+                Some(wrap_atomic(TAtomic::Scalar(TScalar::String(TString::general()))))
+            }
+        }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
             let operand_type = infer(interner, resolved_names, operand)?;
 

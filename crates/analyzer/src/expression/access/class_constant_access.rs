@@ -302,4 +302,29 @@ mod tests {
             $_ = ConstantsInterface::MY_CONST;
         "#},
     }
+
+    test_analysis! {
+        name = const_type_inference,
+        code = indoc! {r#"
+            <?php
+
+            class A
+            {
+                public const FOO = <<<'XML'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <foo>
+                        <bar>baz</bar>
+                    </foo>
+                XML;
+
+                /**
+                 * @return non-empty-string
+                 */
+                public function getFoo(): string
+                {
+                    return self::FOO;
+                }
+            }
+        "#},
+    }
 }
