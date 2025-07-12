@@ -306,8 +306,16 @@ impl TUnion {
         self.types.iter().all(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
     }
 
+    pub fn is_mixed_template(&self) -> bool {
+        self.types.iter().all(|t| t.is_templated_as_mixed(&mut false)) && !self.types.is_empty()
+    }
+
     pub fn has_mixed(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
+    }
+
+    pub fn has_mixed_template(&self) -> bool {
+        self.types.iter().any(|t| t.is_templated_as_mixed(&mut false)) && !self.types.is_empty()
     }
 
     pub fn has_nullable_mixed(&self) -> bool {

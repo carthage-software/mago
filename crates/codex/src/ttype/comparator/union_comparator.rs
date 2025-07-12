@@ -306,7 +306,8 @@ pub fn can_expression_types_be_identical(
     type2: &TUnion,
     inside_assertion: bool,
 ) -> bool {
-    if type1.is_mixed() || type2.is_mixed() {
+    // If either type is mixed, they can be identical
+    if type1.has_mixed() || type1.has_mixed_template() || type2.has_mixed() || type2.has_mixed_template() {
         return true;
     }
 

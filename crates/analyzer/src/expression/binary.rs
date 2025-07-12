@@ -2731,13 +2731,13 @@ pub(super) fn is_always_identical_to(
 }
 
 pub fn are_definitely_not_identical(lhs: &TUnion, rhs: &TUnion, cb: &CodebaseMetadata, i: &ThreadedInterner) -> bool {
-    if !can_expression_types_be_identical(cb, i, lhs, rhs, true) {
-        return true;
+    // If either type is mixed, we cannot determine non-identity.
+    if lhs.has_mixed() || lhs.has_mixed_template() || rhs.has_mixed() || rhs.has_mixed_template() {
+        return false;
     }
 
-    // If either type is mixed, we cannot determine non-identity.
-    if lhs.is_mixed() || rhs.is_mixed() {
-        return false;
+    if !can_expression_types_be_identical(cb, i, lhs, rhs, true) {
+        return true;
     }
 
     if (lhs.is_never() && !rhs.is_never()) || (!lhs.is_never() && rhs.is_never()) {
@@ -3006,6 +3006,25 @@ mod tests {
 
             function test($foo = null) {
                 return $foo ?? 'bar';
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = cant_determine_if_types_are_identical_for_mixed_template,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template T
+             * @param T $x
+             */
+            function x(mixed $x): void {
+                if (false === $x) {
+                    echo 'X is false';
+                } else {
+                    echo 'X is not false';
+                }
             }
         "#},
     }
