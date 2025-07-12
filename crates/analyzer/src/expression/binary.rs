@@ -2780,10 +2780,16 @@ pub fn are_definitely_not_identical(lhs: &TUnion, rhs: &TUnion, cb: &CodebaseMet
         return l != r;
     }
 
-    if let Some(l) = lhs.get_single_literal_string_value()
-        && let Some(r) = rhs.get_single_literal_string_value()
+    if let Some(l) = lhs.get_single_literal_string_value() {
+        if let Some(r) = rhs.get_single_literal_string_value() {
+            return l != r;
+        } else if let Some(r) = rhs.get_single_class_string_value() {
+            return !l.eq_ignore_ascii_case(i.lookup(&r));
+        }
+    } else if let Some(r) = rhs.get_single_literal_string_value()
+        && let Some(l) = lhs.get_single_class_string_value()
     {
-        return l != r;
+        return !r.eq_ignore_ascii_case(i.lookup(&l));
     }
 
     false
@@ -3027,5 +3033,197 @@ mod tests {
                 }
             }
         "#},
+    }
+
+    test_analysis! {
+        name = class_string_is_never_equal_to_literal_string,
+        code = indoc! {r#"
+            <?php
+
+            class B
+            {
+            }
+
+            class C
+            {
+            }
+
+            class D
+            {
+            }
+
+            class E
+            {
+            }
+
+            class F
+            {
+            }
+
+            class G
+            {
+            }
+
+            class H
+            {
+            }
+
+            class I
+            {
+            }
+
+            class J
+            {
+            }
+
+            class K
+            {
+            }
+
+            class L
+            {
+            }
+
+            class M
+            {
+            }
+
+            class N
+            {
+            }
+
+            class O
+            {
+            }
+
+            class P
+            {
+            }
+
+            class Q
+            {
+            }
+
+            class R
+            {
+            }
+
+            class S
+            {
+            }
+
+            class T
+            {
+            }
+
+            class U
+            {
+            }
+
+            class V
+            {
+            }
+
+            class W
+            {
+            }
+
+            class X
+            {
+            }
+
+            class Y
+            {
+            }
+
+            class Z
+            {
+            }
+
+            $type = '';
+            if ($type === '1') {
+            } elseif (
+                $type === B::class ||
+                    $type === C::class ||
+                    $type === D::class ||
+                    $type === E::class ||
+                    $type === F::class ||
+                    $type === G::class ||
+                    $type === H::class ||
+                    $type === I::class ||
+                    $type === J::class ||
+                    $type === K::class ||
+                    $type === L::class ||
+                    $type === M::class ||
+                    $type === N::class ||
+                    $type === O::class ||
+                    $type === P::class ||
+                    $type === Q::class ||
+                    $type === R::class ||
+                    $type === S::class ||
+                    $type === T::class ||
+                    $type === U::class ||
+                    $type === V::class ||
+                    $type === W::class ||
+                    $type === X::class ||
+                    $type === Y::class ||
+                    $type === Z::class
+            ) {
+            }
+        "#},
+        issues = [
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantLogicalOperation,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::RedundantComparison,
+            TypingIssueKind::ImpossibleCondition,
+            TypingIssueKind::ImpossibleCondition,
+        ]
     }
 }
