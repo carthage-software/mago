@@ -9,8 +9,8 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
         return Err(ParseError::InvalidComment(span));
     }
 
-    let content_start = 3;
-    let content_end = comment.len() - 2;
+    let mut content_start = 3;
+    let mut content_end = comment.len() - 2;
 
     let content = &comment[content_start..content_end];
 
@@ -19,30 +19,28 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
             return Ok(Vec::new());
         }
 
-        if !content.starts_with(' ') {
-            let error_span = span.subspan(content_start, content_start + 1);
-            return Err(ParseError::MissingWhitespaceAfterOpeningAsterisk(error_span));
-        }
+        let content = if let Some(content) = content.strip_prefix(' ') {
+            content_start += 1; // Adjust start position to skip leading space
+            content
+        } else {
+            content
+        };
 
-        if !content.ends_with(' ') {
-            let error_span = span.subspan(content_end - 1, content_end);
-            return Err(ParseError::MissingWhitespaceBeforeClosingAsterisk(error_span));
-        }
+        let content = if let Some(content) = content.strip_suffix(' ') {
+            content_end -= 1; // Adjust end position to skip trailing space
+            content
+        } else {
+            content
+        };
 
-        let content_len = content.len();
-
-        if content_len < 3 {
+        if content.is_empty() {
             return Ok(Vec::new());
         }
 
-        Ok(vec![Token::Line {
-            content: &content[1..content_len - 1],
-            span: span.subspan(content_start + 1, content_end - 1),
-        }])
+        Ok(vec![Token::Line { content, span: span.subspan(content_start, content_end) }])
     } else {
         let lines: Vec<&'a str> = content.lines().collect();
 
-        let mut indent: Option<&str> = None;
         let mut lines_with_positions = Vec::new();
         let mut pos_in_content = 0;
 
@@ -62,55 +60,28 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
 
             // Find the byte length of the whitespace prefix.
             let line_indent_length = trimmed_line.find(|c: char| !c.is_whitespace()).unwrap_or(trimmed_line.len());
-            let line_indent = &trimmed_line[..line_indent_length];
-
-            match indent {
-                Some(i) => {
-                    if i != line_indent {
-                        let expected = i.len();
-                        let found = line_indent.len();
-                        let error_span = span.subspan(
-                            content_start + line_start_in_content,
-                            content_start + line_start_in_content + line_indent_length,
-                        );
-
-                        return Err(ParseError::InconsistentIndentation(error_span, expected, found));
-                    }
-                }
-                None => {
-                    indent = Some(line_indent);
-                }
-            }
-
             let line_content_after_indent = &trimmed_line[line_indent_length..];
 
-            if !line_content_after_indent.starts_with('*') {
-                let error_span = span.subspan(
-                    content_start + line_start_in_content + line_indent_length,
-                    content_start + line_start_in_content + line_indent_length + 1,
-                );
-                return Err(ParseError::MissingAsterisk(error_span));
-            }
+            let mut content_start_in_line = line_indent_length;
+            let line_after_asterisk = if let Some(line_after_asterisk) = line_content_after_indent.strip_prefix("*") {
+                content_start_in_line += 1; // Skip the asterisk
 
-            let line_after_asterisk = &line_content_after_indent[1..];
+                line_after_asterisk
+            } else {
+                line_content_after_indent // No asterisk, use the whole line
+            };
 
             if let Some(first_char) = line_after_asterisk.chars().next() {
-                if !first_char.is_whitespace() {
-                    let error_span = span.subspan(
-                        content_start + line_start_in_content + line_indent_length + 1,
-                        content_start + line_start_in_content + line_indent_length + 1 + first_char.len_utf8(),
-                    );
-                    return Err(ParseError::MissingWhitespaceAfterAsterisk(error_span));
+                if first_char.is_whitespace() {
+                    content_start_in_line += first_char.len_utf8();
                 }
 
-                let content_start_in_line = line_indent_length + 1 + first_char.len_utf8();
                 let content_end_in_line = trimmed_line.len();
 
                 let content_start_in_comment = content_start + line_start_in_content + content_start_in_line;
                 let content_end_in_comment = content_start + line_start_in_content + content_end_in_line;
 
                 let content_str = &comment[content_start_in_comment..content_end_in_comment];
-
                 let content_span = span.subspan(content_start_in_comment, content_end_in_comment);
 
                 comment_lines.push(Token::Line { content: content_str, span: content_span });
@@ -191,11 +162,15 @@ mod tests {
         let span = Span::new(Position::dummy(0), Position::dummy(comment.len()));
 
         match tokenize(comment, span) {
-            Ok(_) => {
-                panic!("Expected an error, but got success");
-            }
-            Err(ParseError::MissingWhitespaceAfterOpeningAsterisk { .. }) => {
-                // Expected
+            Ok(tokens) => {
+                assert_eq!(tokens.len(), 1);
+
+                let Token::Line { content, span } = &tokens[0] else {
+                    panic!("Expected a line, but got something else");
+                };
+
+                assert_eq!(*content, "This is a single-line comment");
+                assert!(comment[span.start.offset..span.end.offset].eq(*content));
             }
             Err(e) => {
                 panic!("Error parsing comment: {e:?}");
@@ -209,11 +184,15 @@ mod tests {
         let span = Span::new(Position::dummy(0), Position::dummy(comment.len()));
 
         match tokenize(comment, span) {
-            Ok(_) => {
-                panic!("Expected an error, but got success");
-            }
-            Err(ParseError::MissingWhitespaceBeforeClosingAsterisk { .. }) => {
-                // Expected
+            Ok(tokens) => {
+                assert_eq!(tokens.len(), 1);
+
+                let Token::Line { content, span } = &tokens[0] else {
+                    panic!("Expected a line, but got something else");
+                };
+
+                assert_eq!(*content, "This is a single-line comment");
+                assert!(comment[span.start.offset..span.end.offset].eq(*content));
             }
             Err(e) => {
                 panic!("Error parsing comment: {e:?}");
@@ -317,11 +296,20 @@ mod tests {
         let span = Span::new(Position::dummy(0), Position::dummy(comment.len()));
 
         match tokenize(comment, span) {
-            Ok(_) => {
-                panic!("Parsing should have failed due to inconsistent indentation.");
-            }
-            Err(ParseError::InconsistentIndentation { .. }) => {
-                // Correctly identified inconsistent indentation
+            Ok(tokens) => {
+                assert_eq!(tokens.len(), 3);
+
+                let expected_contents =
+                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+
+                for (i, line) in tokens.iter().enumerate() {
+                    let Token::Line { content, span } = line else {
+                        panic!("Expected a line, but got something else");
+                    };
+
+                    assert_eq!(*content, expected_contents[i]);
+                    assert!(comment[span.start.offset..span.end.offset].eq(*content));
+                }
             }
             Err(e) => {
                 panic!("Unexpected error: {e:?}");
@@ -340,11 +328,20 @@ mod tests {
         let span = Span::new(Position::dummy(0), Position::dummy(comment.len()));
 
         match tokenize(comment, span) {
-            Ok(_) => {
-                panic!("Parsing should have failed due to missing asterisk.");
-            }
-            Err(ParseError::MissingAsterisk { .. }) => {
-                // Correctly identified missing asterisk
+            Ok(tokens) => {
+                assert_eq!(tokens.len(), 3);
+
+                let expected_contents =
+                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+
+                for (i, line) in tokens.iter().enumerate() {
+                    let Token::Line { content, span } = line else {
+                        panic!("Expected a line, but got something else");
+                    };
+
+                    assert_eq!(*content, expected_contents[i]);
+                    assert!(comment[span.start.offset..span.end.offset].eq(*content));
+                }
             }
             Err(e) => {
                 panic!("Unexpected error: {e:?}");
@@ -363,11 +360,20 @@ mod tests {
         let span = Span::new(Position::dummy(0), Position::dummy(comment.len()));
 
         match tokenize(comment, span) {
-            Ok(_) => {
-                panic!("Parsing should have failed due to missing whitespace after asterisk.");
-            }
-            Err(ParseError::MissingWhitespaceAfterAsterisk { .. }) => {
-                // Correctly identified missing whitespace after asterisk
+            Ok(tokens) => {
+                assert_eq!(tokens.len(), 3);
+
+                let expected_contents =
+                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+
+                for (i, line) in tokens.iter().enumerate() {
+                    let Token::Line { content, span } = line else {
+                        panic!("Expected a line, but got something else");
+                    };
+
+                    assert_eq!(*content, expected_contents[i]);
+                    assert!(comment[span.start.offset..span.end.offset].eq(*content));
+                }
             }
             Err(e) => {
                 panic!("Unexpected error: {e:?}");

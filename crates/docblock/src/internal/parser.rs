@@ -86,7 +86,7 @@ fn parse_tag(
         description_start = span.start.forward(1 + tag_name_str.len());
     }
 
-    if tag_name_str.is_empty() || !tag_name_str.chars().all(|c| c.is_alphanumeric() || c == '-') {
+    if tag_name_str.is_empty() || !tag_name_str.chars().all(|c| c.is_alphanumeric() || c == '-' || c == ':') {
         return Err(ParseError::InvalidTagName(span.subspan(0, tag_name_str.len() + 1)));
     }
 
@@ -420,10 +420,9 @@ fn parse_text_segments(
         }
 
         let paragraph_content = &text_content[paragraph_start_pos..paragraph_end_pos];
-        let paragraph_span = base_span.subspan(paragraph_start_pos, paragraph_end_pos);
         let content_id = interner.intern(paragraph_content);
 
-        segments.push(TextSegment::Paragraph { span: paragraph_span, content: content_id });
+        segments.push(TextSegment::Paragraph { span: base_span, content: content_id });
     }
 
     Ok(segments)
