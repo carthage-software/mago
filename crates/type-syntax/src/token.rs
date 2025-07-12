@@ -92,6 +92,7 @@ pub enum TypeTokenKind {
     Variable,
     Whitespace,
     SingleLineComment,
+    Asterisk,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]

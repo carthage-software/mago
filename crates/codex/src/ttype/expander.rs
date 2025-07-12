@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use itertools::Itertools;
 
 use mago_interner::StringIdentifier;
@@ -7,7 +5,7 @@ use mago_interner::ThreadedInterner;
 use mago_source::SourceIdentifier;
 
 use crate::enum_exists;
-use crate::get_class_constant_type;
+use crate::get_class_like;
 use crate::get_closure;
 use crate::get_declaring_method;
 use crate::get_function;
@@ -26,6 +24,7 @@ use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
+use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
@@ -101,6 +100,10 @@ pub fn expand_union(
         });
 
         new_return_type_parts.extend(return_type.types.drain(..).collect_vec());
+
+        if new_return_type_parts.is_empty() {
+            new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+        }
 
         if new_return_type_parts.len() > 1 {
             return_type.types = combiner::combine(new_return_type_parts, codebase, interner, false)
@@ -206,29 +209,197 @@ fn expand_atomic(
                 *constraint = Box::new(atomic_return_type_parts.remove(0));
             }
         }
-        TAtomic::Reference(TReference::Member { class_like_name, member_name }) => {
+        TAtomic::Reference(TReference::Member { class_like_name, member_selector }) => {
             *skip_key = true;
 
-            if let Some(literal_value) = codebase.get_classconst_literal_value(class_like_name, member_name) {
-                let mut literal_value = literal_value.clone();
+            match member_selector {
+                TReferenceMemberSelector::Wildcard => {
+                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                        new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
 
-                expand_atomic(&mut literal_value, codebase, interner, options, skip_key, new_return_type_parts);
-
-                new_return_type_parts.push(literal_value);
-            } else {
-                let const_type = get_class_constant_type(codebase, interner, class_like_name, member_name);
-
-                if let Some(const_type) = const_type {
-                    let mut const_type = match const_type {
-                        Cow::Owned(t) => t,
-                        Cow::Borrowed(t) => t.clone(),
+                        return;
                     };
 
-                    expand_union(codebase, interner, &mut const_type, options);
+                    for constant in class_like.constants.values() {
+                        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+                            let mut inferred_type = inferred_type.clone();
 
-                    new_return_type_parts.extend(const_type.types);
-                } else {
-                    new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                            let mut skip_inferred_type = false;
+                            expand_atomic(
+                                &mut inferred_type,
+                                codebase,
+                                interner,
+                                options,
+                                &mut skip_inferred_type,
+                                new_return_type_parts,
+                            );
+
+                            if !skip_inferred_type {
+                                new_return_type_parts.push(inferred_type);
+                            }
+                        } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
+                            let mut constant_type = type_metadata.type_union.clone();
+
+                            expand_union(codebase, interner, &mut constant_type, options);
+
+                            new_return_type_parts.extend(constant_type.types);
+                        } else {
+                            new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                        }
+                    }
+
+                    for enum_case_name in class_like.enum_cases.keys() {
+                        new_return_type_parts
+                            .push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
+                    }
+                }
+                TReferenceMemberSelector::StartsWith(prefix) => {
+                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                        new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+
+                        return;
+                    };
+
+                    let prefix_str = interner.lookup(prefix);
+
+                    for (constant_name, constant) in class_like.constants.iter() {
+                        let constant_name_str = interner.lookup(constant_name);
+
+                        if !constant_name_str.starts_with(prefix_str) {
+                            continue;
+                        }
+
+                        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+                            let mut inferred_type = inferred_type.clone();
+
+                            let mut skip_inferred_type = false;
+                            expand_atomic(
+                                &mut inferred_type,
+                                codebase,
+                                interner,
+                                options,
+                                &mut skip_inferred_type,
+                                new_return_type_parts,
+                            );
+
+                            if !skip_inferred_type {
+                                new_return_type_parts.push(inferred_type);
+                            }
+                        } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
+                            let mut constant_type = type_metadata.type_union.clone();
+
+                            expand_union(codebase, interner, &mut constant_type, options);
+
+                            new_return_type_parts.extend(constant_type.types);
+                        } else {
+                            new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                        }
+                    }
+
+                    for enum_case_name in class_like.enum_cases.keys() {
+                        let enum_case_name_str = interner.lookup(enum_case_name);
+
+                        if !enum_case_name_str.starts_with(prefix_str) {
+                            continue;
+                        }
+
+                        new_return_type_parts
+                            .push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
+                    }
+                }
+                TReferenceMemberSelector::EndsWith(suffix) => {
+                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                        new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+
+                        return;
+                    };
+
+                    let suffix_str = interner.lookup(suffix);
+
+                    for (constant_name, constant) in class_like.constants.iter() {
+                        let constant_name_str = interner.lookup(constant_name);
+
+                        if !constant_name_str.ends_with(suffix_str) {
+                            continue;
+                        }
+
+                        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+                            let mut inferred_type = inferred_type.clone();
+
+                            let mut skip_inferred_type = false;
+                            expand_atomic(
+                                &mut inferred_type,
+                                codebase,
+                                interner,
+                                options,
+                                &mut skip_inferred_type,
+                                new_return_type_parts,
+                            );
+
+                            if !skip_inferred_type {
+                                new_return_type_parts.push(inferred_type);
+                            }
+                        } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
+                            let mut constant_type = type_metadata.type_union.clone();
+
+                            expand_union(codebase, interner, &mut constant_type, options);
+
+                            new_return_type_parts.extend(constant_type.types);
+                        } else {
+                            new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                        }
+                    }
+
+                    for enum_case_name in class_like.enum_cases.keys() {
+                        let enum_case_name_str = interner.lookup(enum_case_name);
+
+                        if !enum_case_name_str.ends_with(suffix_str) {
+                            continue;
+                        }
+
+                        new_return_type_parts
+                            .push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
+                    }
+                }
+                TReferenceMemberSelector::Identifier(member_name) => {
+                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                        new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+
+                        return;
+                    };
+
+                    if class_like.enum_cases.contains_key(member_name) {
+                        new_return_type_parts
+                            .push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *member_name)));
+                    } else if let Some(constant) = class_like.constants.get(member_name) {
+                        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+                            let mut inferred_type = inferred_type.clone();
+
+                            let mut skip_inferred_type = false;
+                            expand_atomic(
+                                &mut inferred_type,
+                                codebase,
+                                interner,
+                                options,
+                                &mut skip_inferred_type,
+                                new_return_type_parts,
+                            );
+
+                            if !skip_inferred_type {
+                                new_return_type_parts.push(inferred_type);
+                            }
+                        } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
+                            let mut constant_type = type_metadata.type_union.clone();
+
+                            expand_union(codebase, interner, &mut constant_type, options);
+
+                            new_return_type_parts.extend(constant_type.types);
+                        } else {
+                            new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                        }
+                    } else {
+                        new_return_type_parts.push(TAtomic::Mixed(TMixed::vanilla()));
+                    }
                 }
             }
         }

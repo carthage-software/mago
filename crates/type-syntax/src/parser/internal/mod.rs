@@ -219,11 +219,36 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::QualifiedIdentifier => {
             let identifier = Identifier::from(stream.consume()?);
             if stream.is_at(TypeTokenKind::ColonColon)? {
-                Type::MemberReference(MemberReferenceType {
-                    class: identifier,
-                    double_colon: stream.consume()?.span,
-                    member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
-                })
+                let double_colon = stream.consume()?.span;
+
+                if stream.is_at(TypeTokenKind::Asterisk)? {
+                    let asterisk = stream.consume()?.span;
+
+                    Type::MemberReference(MemberReferenceType {
+                        class: identifier,
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Identifier)? {
+                            MemberReferenceSelector::EndsWith(
+                                asterisk,
+                                Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                            )
+                        } else {
+                            MemberReferenceSelector::Wildcard(asterisk)
+                        },
+                    })
+                } else {
+                    let identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                    Type::MemberReference(MemberReferenceType {
+                        class: identifier,
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                            MemberReferenceSelector::StartsWith(identifier, stream.consume()?.span)
+                        } else {
+                            MemberReferenceSelector::Identifier(identifier)
+                        },
+                    })
+                }
             } else {
                 Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
             }
@@ -240,11 +265,36 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
             } else {
                 let identifier = Identifier::from(stream.consume()?);
                 if stream.is_at(TypeTokenKind::ColonColon)? {
-                    Type::MemberReference(MemberReferenceType {
-                        class: identifier,
-                        double_colon: stream.consume()?.span,
-                        member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
-                    })
+                    let double_colon = stream.consume()?.span;
+
+                    if stream.is_at(TypeTokenKind::Asterisk)? {
+                        let asterisk = stream.consume()?.span;
+
+                        Type::MemberReference(MemberReferenceType {
+                            class: identifier,
+                            double_colon,
+                            member: if stream.is_at(TypeTokenKind::Identifier)? {
+                                MemberReferenceSelector::EndsWith(
+                                    asterisk,
+                                    Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                                )
+                            } else {
+                                MemberReferenceSelector::Wildcard(asterisk)
+                            },
+                        })
+                    } else {
+                        let member_identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                        Type::MemberReference(MemberReferenceType {
+                            class: identifier,
+                            double_colon,
+                            member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                                MemberReferenceSelector::StartsWith(member_identifier, stream.consume()?.span)
+                            } else {
+                                MemberReferenceSelector::Identifier(member_identifier)
+                            },
+                        })
+                    }
                 } else {
                     Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
                 }
@@ -263,10 +313,31 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
                 let identifier = Identifier::from(stream.consume()?);
 
                 if stream.is_at(TypeTokenKind::ColonColon)? {
+                    let double_colon = stream.consume()?.span;
+
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
-                        double_colon: stream.consume()?.span,
-                        member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                            let asterisk = stream.consume()?.span;
+
+                            if stream.is_at(TypeTokenKind::Identifier)? {
+                                MemberReferenceSelector::EndsWith(
+                                    asterisk,
+                                    Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                                )
+                            } else {
+                                MemberReferenceSelector::Wildcard(asterisk)
+                            }
+                        } else {
+                            let identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                            if stream.is_at(TypeTokenKind::Asterisk)? {
+                                MemberReferenceSelector::StartsWith(identifier, stream.consume()?.span)
+                            } else {
+                                MemberReferenceSelector::Identifier(identifier)
+                            }
+                        },
                     })
                 } else {
                     Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })

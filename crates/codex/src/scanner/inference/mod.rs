@@ -10,6 +10,7 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::reference::TReference;
+use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::float::TFloat;
@@ -154,10 +155,11 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
             constant: ClassLikeConstantSelector::Identifier(identifier),
             ..
         })) => {
-            let class_name = match class.as_ref() {
-                Expression::Identifier(identifier) => Some(resolved_names.get(identifier)),
-                _ => return None,
-            }?;
+            let class_name = if let Expression::Identifier(identifier) = class.as_ref() {
+                resolved_names.get(identifier)
+            } else {
+                return None;
+            };
 
             let class_name_str = interner.lookup(class_name);
             let member_name = interner.lookup(&identifier.value);
@@ -181,11 +183,14 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
                     Some(bits) => TAtomic::Scalar(TScalar::literal_int(bits as i64)),
                     None => TAtomic::Reference(TReference::Member {
                         class_like_name: *class_name,
-                        member_name: identifier.value,
+                        member_selector: TReferenceMemberSelector::Identifier(identifier.value),
                     }),
                 }
             } else {
-                TAtomic::Reference(TReference::Member { class_like_name: *class_name, member_name: identifier.value })
+                TAtomic::Reference(TReference::Member {
+                    class_like_name: *class_name,
+                    member_selector: TReferenceMemberSelector::Identifier(identifier.value),
+                })
             }))
         }
         Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. })

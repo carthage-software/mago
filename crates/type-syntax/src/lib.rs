@@ -387,7 +387,7 @@ mod tests {
         match do_parse("MyClass::MY_CONST") {
             Ok(Type::MemberReference(m)) => {
                 assert_eq!(m.class.value, "MyClass");
-                assert_eq!(m.member.value, "MY_CONST");
+                assert_eq!(m.member.to_string(), "MY_CONST");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
         }
@@ -395,7 +395,7 @@ mod tests {
         match do_parse("\\Fully\\Qualified::class") {
             Ok(Type::MemberReference(m)) => {
                 assert_eq!(m.class.value, "\\Fully\\Qualified"); // Check if lexer keeps leading \
-                assert_eq!(m.member.value, "class");
+                assert_eq!(m.member.to_string(), "class");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
         }

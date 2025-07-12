@@ -51,6 +51,7 @@ impl<'input> TypeLexer<'input> {
         }
 
         let (kind, length) = match self.input.read(3) {
+            [b'*', ..] => (TypeTokenKind::Asterisk, 1),
             [b'n' | b'N', b'o' | b'O', b'n' | b'N'] => {
                 if self.input.is_at(b"non-positive-int", true) {
                     (TypeTokenKind::NonPositiveInt, 16)

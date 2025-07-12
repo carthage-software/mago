@@ -23,6 +23,7 @@ use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
@@ -257,11 +258,39 @@ pub fn get_union_from_type_ast<'i>(
             interner,
         )?,
         Type::MemberReference(member_reference) => {
-            let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
-            let class_like_name = interner.intern(&class_like_name);
-            let member_name = interner.intern(member_reference.member.value);
+            let class_like_name = if member_reference.class.value.eq_ignore_ascii_case("self")
+                || member_reference.class.value.eq_ignore_ascii_case("static")
+                || member_reference.class.value.eq("this")
+                || member_reference.class.value.eq("$this")
+            {
+                let Some(classname) = classname else {
+                    return Err(TypeError::InvalidType(
+                        "Cannot resolve `self` type reference outside of a class context".to_string(),
+                        member_reference.span(),
+                    ));
+                };
 
-            wrap_atomic(TAtomic::Reference(TReference::Member { class_like_name, member_name }))
+                *classname
+            } else {
+                let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
+
+                interner.intern(&class_like_name)
+            };
+
+            let member_selector = match member_reference.member {
+                MemberReferenceSelector::Wildcard(_) => TReferenceMemberSelector::Wildcard,
+                MemberReferenceSelector::Identifier(identifier) => {
+                    TReferenceMemberSelector::Identifier(interner.intern(identifier.value))
+                }
+                MemberReferenceSelector::StartsWith(identifier, _) => {
+                    TReferenceMemberSelector::StartsWith(interner.intern(identifier.value))
+                }
+                MemberReferenceSelector::EndsWith(_, identifier) => {
+                    TReferenceMemberSelector::EndsWith(interner.intern(identifier.value))
+                }
+            };
+
+            wrap_atomic(TAtomic::Reference(TReference::Member { class_like_name, member_selector }))
         }
         Type::Shape(shape_type) => {
             wrap_atomic(get_shape_from_ast(shape_type, scope, type_context, classname, interner)?)
@@ -673,7 +702,6 @@ fn get_reference_from_ast<'i>(
 ) -> Result<TAtomic, TypeError> {
     let reference_name = reference_identifier.value;
 
-    // static & self are used in class type constants
     if reference_name == "this" || reference_name == "static" || reference_name == "self" {
         let class_name = if let Some(classname) = classname { *classname } else { interner.intern("$this") };
 

@@ -24,6 +24,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
+use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::resource::TResource;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -1178,8 +1179,10 @@ pub fn populate_atomic_type(
                     }
                 }
             }
-            TReference::Member { class_like_name, member_name } => {
-                if let Some(reference_source) = reference_source {
+            TReference::Member { class_like_name, member_selector } => {
+                if let TReferenceMemberSelector::Identifier(member_name) = member_selector
+                    && let Some(reference_source) = reference_source
+                {
                     match reference_source {
                         ReferenceSource::Symbol(in_signature, a) => symbol_references
                             .add_symbol_reference_to_class_member(*a, (*class_like_name, *member_name), *in_signature),

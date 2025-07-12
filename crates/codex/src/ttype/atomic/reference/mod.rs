@@ -9,6 +9,18 @@ use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::union::TUnion;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum TReferenceMemberSelector {
+    /// A wildcard member selector, e.g., `Foo::*`.
+    Wildcard,
+    /// A specific member name, e.g., `Foo::bar`.
+    Identifier(StringIdentifier),
+    /// A member that starts with a specific prefix, e.g., `Foo::bar*`.
+    StartsWith(StringIdentifier),
+    /// A member that ends with a specific suffix, e.g., `*::bar`.
+    EndsWith(StringIdentifier),
+}
+
 /// Represents an unresolved reference to a symbol or a class-like member.
 /// These require context (e.g., symbol tables, codebase analysis) to be resolved
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).
@@ -32,7 +44,7 @@ pub enum TReference {
         /// The FQCN of the class-like structure containing the member.
         class_like_name: StringIdentifier,
         /// The name of the member being referenced (constant name, case name).
-        member_name: StringIdentifier,
+        member_selector: TReferenceMemberSelector,
     },
 }
 
@@ -51,8 +63,8 @@ impl TReference {
 
     /// Creates a class-like member reference.
     #[inline]
-    pub fn new_member(class_like_name: StringIdentifier, member_name: StringIdentifier) -> Self {
-        TReference::Member { class_like_name, member_name }
+    pub fn new_member(class_like_name: StringIdentifier, member_selector: TReferenceMemberSelector) -> Self {
+        TReference::Member { class_like_name, member_selector }
     }
 
     /// Checks if this is a reference to a symbol name.
@@ -79,9 +91,11 @@ impl TReference {
 
     /// Returns the class-like name and member name if this is a Member reference.
     #[inline]
-    pub const fn get_member_data(&self) -> Option<(&StringIdentifier, &StringIdentifier)> {
+    pub const fn get_member_data(&self) -> Option<(&StringIdentifier, &TReferenceMemberSelector)> {
         match self {
-            TReference::Member { class_like_name: classlike_name, member_name } => Some((classlike_name, member_name)),
+            TReference::Member { class_like_name: classlike_name, member_selector } => {
+                Some((classlike_name, member_selector))
+            }
             _ => None,
         }
     }
@@ -161,7 +175,7 @@ impl TType for TReference {
                     str += name.to_string().as_str();
                 }
             }
-            TReference::Member { class_like_name, member_name } => {
+            TReference::Member { class_like_name, member_selector } => {
                 if let Some(interner) = interner {
                     str += interner.lookup(class_like_name);
                 } else {
@@ -169,10 +183,22 @@ impl TType for TReference {
                 }
 
                 str += "::";
-                if let Some(interner) = interner {
-                    str += interner.lookup(member_name);
-                } else {
-                    str += member_name.to_string().as_str();
+
+                match member_selector {
+                    TReferenceMemberSelector::Wildcard => str += "*",
+                    TReferenceMemberSelector::Identifier(member_name) => {
+                        if let Some(interner) = interner {
+                            str += interner.lookup(member_name);
+                        } else {
+                            str += member_name.to_string().as_str();
+                        }
+                    }
+                    TReferenceMemberSelector::StartsWith(member_name) => {
+                        str += &format!("{member_name}*");
+                    }
+                    TReferenceMemberSelector::EndsWith(member_name) => {
+                        str += &format!("*{member_name}");
+                    }
                 }
             }
         }

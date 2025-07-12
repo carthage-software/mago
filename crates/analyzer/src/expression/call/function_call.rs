@@ -804,4 +804,123 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = member_reference_argument,
+        code = indoc! {r#"
+            <?php
+
+            class ChangeKind {
+                public const ADD = 'add';
+                public const REMOVE = 'remove';
+                public const UPDATE = 'update';
+                public const RENAME = 'rename';
+                public const MOVE = 'move';
+            }
+
+            /**
+             * @param ChangeKind::ADD|ChangeKind::*ME|ChangeKind::U* $kind
+             */
+            function foo(string $kind): string {
+                return $kind;
+            }
+
+            foo(ChangeKind::ADD);    // OK (literal matches)
+            foo('add');              // OK (literal matches)
+            foo(ChangeKind::UPDATE); // OK (starts with 'U')
+            foo('update');           // OK (starts with 'U')
+            foo(ChangeKind::RENAME); // OK (ends with 'ME')
+            foo('rename');           // OK (ends with 'ME')
+        "#},
+    }
+
+    test_analysis! {
+        name = invalid_member_reference_argument,
+        code = indoc! {r#"
+            <?php
+
+            class ChangeKind {
+                public const ADD = 'add';
+                public const REMOVE = 'remove';
+                public const UPDATE = 'update';
+                public const RENAME = 'rename';
+                public const MOVE = 'move';
+            }
+
+            /**
+             * @param ChangeKind::ADD|ChangeKind::*ME|ChangeKind::U* $kind
+             */
+            function foo(string $kind): string {
+                return $kind;
+            }
+
+            foo(ChangeKind::MOVE);   // Error: 'move' does not match any pattern
+            foo('move');             // Error: 'move' does not match any pattern
+            foo(ChangeKind::REMOVE); // Error: 'remove' does not match any pattern
+            foo('remove');           // Error: 'remove' does not match any pattern
+            foo('unknown');          // Error: 'unknown' does not match any pattern
+        "#},
+        issues = [
+            TypingIssueKind::InvalidArgument,
+            TypingIssueKind::InvalidArgument,
+            TypingIssueKind::InvalidArgument,
+            TypingIssueKind::InvalidArgument,
+            TypingIssueKind::InvalidArgument,
+        ],
+    }
+
+    test_analysis! {
+        name = enum_member_reference_argument,
+        code = indoc! {r#"
+            <?php
+
+            enum ChangeKind {
+                case ADD;
+                case REMOVE;
+                case UPDATE;
+                case RENAME;
+                case MOVE;
+            }
+
+            /**
+             * @param ChangeKind::ADD|ChangeKind::*ME|ChangeKind::U* $kind
+             */
+            function foo(ChangeKind $kind): ChangeKind {
+                return $kind;
+            }
+
+            foo(ChangeKind::ADD);    // OK (literal matches)
+            foo(ChangeKind::UPDATE); // OK (starts with 'U')
+            foo(ChangeKind::RENAME); // OK (ends with 'ME')
+        "#},
+    }
+
+    test_analysis! {
+        name = invalid_enum_member_reference_argument,
+        code = indoc! {r#"
+            <?php
+
+            enum ChangeKind {
+                case ADD;
+                case REMOVE;
+                case UPDATE;
+                case RENAME;
+                case MOVE;
+            }
+
+            /**
+             * @param ChangeKind::ADD|ChangeKind::*ME|ChangeKind::U* $kind
+             */
+            function foo(ChangeKind $kind): ChangeKind {
+                return $kind;
+            }
+
+            foo(ChangeKind::MOVE);   // Error: 'move' does not match any pattern
+            foo(ChangeKind::REMOVE); // Error: 'remove' does not match any pattern
+        "#},
+        issues = [
+            TypingIssueKind::PossiblyInvalidArgument,
+            TypingIssueKind::PossiblyInvalidArgument,
+        ],
+    }
 }
