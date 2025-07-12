@@ -462,7 +462,7 @@ impl TScalar {
             TScalar::Numeric => true,
             TScalar::Number => true,
             TScalar::ArrayKey => true,
-            TScalar::Bool(bool_scalar) => !bool_scalar.is_true(),
+            TScalar::Bool(bool_scalar) => bool_scalar.is_general(),
             TScalar::Integer(int_scalar) => int_scalar.is_unspecified(),
             TScalar::Float(float_scalar) => float_scalar.is_general(),
             TScalar::String(string_scalar) => string_scalar.is_boring(),

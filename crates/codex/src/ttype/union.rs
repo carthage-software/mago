@@ -548,7 +548,7 @@ impl TUnion {
     }
 
     pub fn has_bool(&self) -> bool {
-        self.types.iter().any(|t| t.is_bool()) && !self.types.is_empty()
+        self.types.iter().any(|t| t.is_bool() || t.is_generic_scalar()) && !self.types.is_empty()
     }
 
     pub fn has_scalar(&self) -> bool {
@@ -564,7 +564,10 @@ impl TUnion {
     }
 
     pub fn has_num(&self) -> bool {
-        self.types.iter().any(|atomic| atomic.is_numeric())
+        self.types
+            .iter()
+            .any(|atomic| atomic.is_numeric() || atomic.is_number() || atomic.is_int() || atomic.is_float())
+            && !self.types.is_empty()
     }
 
     pub fn is_always_truthy(&self) -> bool {

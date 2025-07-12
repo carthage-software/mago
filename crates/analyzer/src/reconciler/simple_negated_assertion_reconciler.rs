@@ -984,31 +984,43 @@ fn subtract_false(
     let mut existing_var_type = existing_var_type.clone();
 
     for atomic in existing_var_types {
-        if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = atomic {
-            if !is_equality && !constraint.is_mixed() {
-                let atomic = atomic.replace_template_constraint(subtract_false(
-                    context,
-                    assertion,
-                    constraint,
-                    None,
-                    false,
-                    None,
-                    is_equality,
-                ));
+        match atomic {
+            TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
+                if !is_equality && !constraint.is_mixed() {
+                    let atomic = atomic.replace_template_constraint(subtract_false(
+                        context,
+                        assertion,
+                        constraint,
+                        None,
+                        false,
+                        None,
+                        is_equality,
+                    ));
 
-                existing_var_type.remove_type(&atomic);
-                existing_var_type.types.push(atomic)
-            } else {
+                    existing_var_type.remove_type(&atomic);
+                    existing_var_type.types.push(atomic)
+                } else {
+                    did_remove_type = true;
+                }
+            }
+            TAtomic::Scalar(TScalar::Generic) => {
+                existing_var_type.remove_type(atomic);
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::r#true()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::string()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::int()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::float()));
                 did_remove_type = true;
             }
-        } else if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general()) {
-            existing_var_type.remove_type(atomic);
-            existing_var_type.types.push(TAtomic::Scalar(TScalar::r#true()));
-            did_remove_type = true;
-        } else if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false()) {
-            did_remove_type = true;
-
-            existing_var_type.remove_type(atomic);
+            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
+                existing_var_type.remove_type(atomic);
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::r#true()));
+                did_remove_type = true;
+            }
+            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => {
+                did_remove_type = true;
+                existing_var_type.remove_type(atomic);
+            }
+            _ => {}
         }
     }
 
@@ -1066,8 +1078,13 @@ fn subtract_true(
                     did_remove_type = true;
                 }
             }
-            TAtomic::Variable { .. } => {
+            TAtomic::Scalar(TScalar::Generic) => {
                 did_remove_type = true;
+                existing_var_type.remove_type(atomic);
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::r#false()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::string()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::int()));
+                existing_var_type.types.push(TAtomic::Scalar(TScalar::float()));
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
                 existing_var_type.remove_type(atomic);
@@ -1114,8 +1131,6 @@ fn reconcile_falsy(
     let mut acceptable_types = vec![];
 
     for atomic in existing_var_types {
-        // if any atomic in the union is either always falsy, we remove it.
-        // If not always truthy, we mark the check as not redundant.
         if atomic.is_truthy() && !new_var_type.possibly_undefined_from_try {
             did_remove_type = true;
         } else if !atomic.is_falsy() {
