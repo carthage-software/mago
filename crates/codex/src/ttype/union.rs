@@ -801,7 +801,7 @@ impl TType for TUnion {
             .iter()
             .map(|atomic| {
                 let id = atomic.get_id(interner);
-                if atomic.has_intersection_types() && len > 1 { format!("({})", id) } else { id }
+                if atomic.has_intersection_types() && len > 1 { format!("({id})") } else { id }
             })
             .join("|")
     }
