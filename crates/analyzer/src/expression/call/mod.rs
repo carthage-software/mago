@@ -96,21 +96,21 @@ fn analyze_invocation_targets<'a>(
             }
         }
 
-        let invoication = Invocation::new(target, invocation_arguments, call_span);
+        let invocation = Invocation::new(target, invocation_arguments, call_span);
         let mut argument_types = HashMap::default();
 
         analyze_invocation(
             context,
             block_context,
             artifacts,
-            &invoication,
+            &invocation,
             None,
             &mut template_result,
             &mut argument_types,
         )?;
 
         resulting_type = Some(add_optional_union_type(
-            fetch_invocation_return_type(context, artifacts, &invoication, &template_result, &argument_types),
+            fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &argument_types),
             resulting_type.as_ref(),
             context.codebase,
             context.interner,
@@ -120,10 +120,11 @@ fn analyze_invocation_targets<'a>(
             context,
             block_context,
             artifacts,
-            &invoication,
+            &invocation,
             None,
             &template_result,
             &argument_types,
+            true,
         );
     }
 

@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::ops::Add;
 use std::ops::Sub;
 
-use mago_codex::is_instance_of;
+use mago_codex::get_class_like;
+use mago_codex::get_declaring_method_id;
+use mago_codex::get_method;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
@@ -28,6 +31,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::add_decision_dataflow;
 use crate::expression::assignment::assign_to_expression;
+use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::issue::TypingIssueKind;
 use crate::utils::expression::get_expression_id;
 use crate::utils::php_emulation::str_increment;
@@ -57,7 +61,7 @@ impl Analyzable for UnaryPrefix {
         block_context.inside_general_use = was_in_general_use;
         block_context.inside_variable_reference = was_in_variable_reference;
 
-        let operand_type = artifacts.get_expression_type(&self.operand);
+        let operand_type = artifacts.get_rc_expression_type(&self.operand).cloned();
         match self.operator {
             UnaryPrefixOperator::Reference(reference_span) => {
                 context.buffer.report(
@@ -75,14 +79,26 @@ impl Analyzable for UnaryPrefix {
                         .with_help("Avoid explicit `&` here; use objects for shared mutable state if needed."),
                 );
 
-                artifacts.set_expression_type(self, operand_type.cloned().unwrap_or_else(get_mixed));
+                if let Some(operand_type) = operand_type {
+                    artifacts.set_rc_expression_type(self, operand_type);
+                } else {
+                    artifacts.set_expression_type(self, get_mixed());
+                }
             }
             // operators that always retain the type of the operand
             UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::Plus(_) => {
-                artifacts.set_expression_type(self, operand_type.cloned().unwrap_or_else(get_mixed));
+                if let Some(operand_type) = operand_type {
+                    artifacts.set_rc_expression_type(self, operand_type);
+                } else {
+                    artifacts.set_expression_type(self, get_mixed());
+                }
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
-                artifacts.set_expression_type(self, operand_type.cloned().unwrap_or_else(get_mixed));
+                if let Some(operand_type) = operand_type {
+                    artifacts.set_rc_expression_type(self, operand_type);
+                } else {
+                    artifacts.set_expression_type(self, get_mixed());
+                }
             }
             UnaryPrefixOperator::Not(_) => {
                 let resulting_type = match operand_type {
@@ -95,7 +111,7 @@ impl Analyzable for UnaryPrefix {
             }
             UnaryPrefixOperator::Negation(_) => {
                 let mut resulting_types = vec![];
-                for operand_part in operand_type.map(|o| o.types.as_slice()).unwrap_or_default() {
+                for operand_part in operand_type.as_ref().map(|o| o.types.as_slice()).unwrap_or_default() {
                     match operand_part {
                         TAtomic::Null | TAtomic::Void => {
                             // -null results in int(0).
@@ -160,10 +176,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_int() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_int(t, context)
+                        cast_type_to_int(&t, context)
                     }
                     None => get_int(),
                 };
@@ -174,10 +190,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_array() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_array(t, context, self)
+                        cast_type_to_array(&t, context, self)
                     }
                     None => wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new()))),
                 };
@@ -188,10 +204,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_bool() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_bool(t, context, self)
+                        cast_type_to_bool(&t, context, self)
                     }
                     None => get_bool(),
                 };
@@ -204,10 +220,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_float() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_float(t, context, self)
+                        cast_type_to_float(&t, context, self)
                     }
                     None => get_float(),
                 };
@@ -218,10 +234,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_objecty() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_object(t, context, self)
+                        cast_type_to_object(&t, context, self)
                     }
                     None => get_object(),
                 };
@@ -232,10 +248,10 @@ impl Analyzable for UnaryPrefix {
                 let resulting_type = match operand_type {
                     Some(t) => {
                         if t.is_any_string() {
-                            report_redundant_type_cast(&self.operator, self, t, context);
+                            report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_string(t, context, self.span())
+                        cast_type_to_string(&t, context, block_context, artifacts, self.span())?
                     }
                     None => get_string(),
                 };
@@ -766,8 +782,6 @@ fn report_redundant_type_cast(
     );
 }
 
-/// Converts a `TUnion` type to its array representation based on PHP's casting rules.
-/// Reports issues for problematic or disallowed conversions.
 fn cast_type_to_array(operand_type: &TUnion, context: &mut Context<'_>, cast_expression: &UnaryPrefix) -> TUnion {
     if operand_type.is_never() {
         context.buffer.report(
@@ -1206,7 +1220,13 @@ fn cast_type_to_object(operand_type: &TUnion, context: &mut Context<'_>, cast_ex
     TUnion::new(combine(possibilities, context.codebase, context.interner, false))
 }
 
-pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, expression_span: Span) -> TUnion {
+pub fn cast_type_to_string<'a>(
+    operand_type: &TUnion,
+    context: &mut Context<'a>,
+    block_context: &mut BlockContext<'a>,
+    artifacts: &mut AnalysisArtifacts,
+    expression_span: Span,
+) -> Result<TUnion, AnalysisError> {
     let mut possibilities = vec![];
     for t in &operand_type.types {
         let possible = match t {
@@ -1263,7 +1283,7 @@ pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, exp
                             .with_help("Remove the cast or ensure the expression being cast is not a `Closure`."),
                     );
 
-                    get_never()
+                    Ok(get_never())
                 } else {
                     context.buffer.report(
                         TypingIssueKind::InvalidTypeCast,
@@ -1279,7 +1299,7 @@ pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, exp
                             .with_help("Ensure the callable can be represented as a string or use a specific callable type that guarantees string representation."),
                     );
 
-                    get_string()
+                    Ok(get_string())
                 };
             }
             TAtomic::Object(object) => {
@@ -1302,24 +1322,72 @@ pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, exp
                             ),
                         );
 
-                        return get_string();
+                        return Ok(get_string());
                     }
                     TObject::Named(named_object) => named_object.get_name(),
                     TObject::Enum(enum_instance) => enum_instance.get_name(),
                 };
 
-                let stringable = context.interner.intern("Stringable");
-                if !is_instance_of(context.codebase, context.interner, &class_like_name, &stringable) {
+                let Some(class_metadata) = get_class_like(context.codebase, context.interner, &class_like_name) else {
                     context.buffer.report(
                         TypingIssueKind::InvalidTypeCast,
                         Issue::error(format!(
-                            "Cannot cast object of type `{}` to `string` because it does not implement `Stringable`.",
+                            "Cannot cast object of type `{}` to `string` because the class does not exist.",
                             context.interner.lookup(&class_like_name)
+                        ))
+                        .with_annotation(
+                            Annotation::primary(expression_span.span())
+                                .with_message(format!("Class `{}` does not exist.", context.interner.lookup(&class_like_name)))
+                        )
+                        .with_note("Casting an object to `string` requires the class to exist and implement `Stringable` or have a `__toString()` method.")
+                        .with_help("Ensure the class exists or avoid casting this object type to `string`."),
+                    );
+
+                    return Ok(get_string());
+                };
+
+                if class_metadata.is_enum() {
+                    context.buffer.report(
+                        TypingIssueKind::InvalidTypeCast,
+                        Issue::error(format!(
+                            "Cannot cast enum instance of type `{}` to `string`.",
+                            object.get_id(Some(context.interner)),
+                        ))
+                        .with_annotation(
+                            Annotation::primary(expression_span.span())
+                                .with_message(format!("Enum `{}` cannot be cast to `string`.", context.interner.lookup(&class_like_name)))
+                        )
+                        .with_note("Casting an enum instance to `string` is not allowed and will throw a fatal error at runtime.")
+                        .with_help("Use the enum's name or value instead, or avoid casting the enum instance to `string`."),
+                    );
+
+                    return Ok(get_string());
+                }
+
+                let to_string_method_id = context.interner.intern("__toString");
+                let declaring_method_id = get_declaring_method_id(
+                    context.codebase,
+                    context.interner,
+                    &MethodIdentifier::new(class_metadata.original_name, to_string_method_id),
+                );
+
+                let Some(to_string_metadata) = get_method(
+                    context.codebase,
+                    context.interner,
+                    declaring_method_id.get_class_name(),
+                    declaring_method_id.get_method_name(),
+                ) else {
+                    let class_name_str = context.interner.lookup(&class_metadata.original_name);
+
+                    context.buffer.report(
+                        TypingIssueKind::InvalidTypeCast,
+                        Issue::error(format!(
+                            "Cannot cast object of type `{class_name_str}` to `string` because it does not implement `Stringable`.",
                         ))
                         .with_code(TypingIssueKind::InvalidTypeCast)
                         .with_annotation(
                             Annotation::primary(expression_span.span())
-                                .with_message(format!("`{}` does not implement `Stringable`.", context.interner.lookup(&class_like_name)))
+                                .with_message(format!("`{class_name_str}` does not implement `Stringable`."))
                         )
                         .with_note(
                             "Casting an object to `string` requires it to have a `__toString()` method (implicitly via `Stringable` interface)."
@@ -1329,14 +1397,24 @@ pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, exp
                         )
                         .with_help(
                             format!(
-                                "Implement the `Stringable` interface (or add a `__toString()` method) on class `{}` or avoid casting this object type to `string`.",
-                                context.interner.lookup(&class_like_name)
+                                "Implement the `Stringable` interface (or add a `__toString()` method) on class `{class_name_str}` or avoid casting this object type to `string`.",
                             )
                         ),
                     );
-                }
 
-                return get_string();
+                    return Ok(get_string());
+                };
+
+                return analyze_implicit_method_call(
+                    context,
+                    block_context,
+                    artifacts,
+                    object,
+                    declaring_method_id,
+                    class_metadata,
+                    to_string_metadata,
+                    expression_span,
+                );
             }
             TAtomic::Array(_) => {
                 context.buffer.report(
@@ -1359,14 +1437,14 @@ pub fn cast_type_to_string(operand_type: &TUnion, context: &mut Context<'_>, exp
             }
             TAtomic::Null | TAtomic::Void => TAtomic::Scalar(TScalar::literal_string("".to_string())),
             TAtomic::Resource(_) => TAtomic::Scalar(TScalar::non_empty_string()),
-            TAtomic::Never => return get_never(),
-            _ => return get_string(),
+            TAtomic::Never => return Ok(get_never()),
+            _ => return Ok(get_string()),
         };
 
         possibilities.push(possible);
     }
 
-    TUnion::new(combine(possibilities, context.codebase, context.interner, false))
+    Ok(TUnion::new(combine(possibilities, context.codebase, context.interner, false)))
 }
 
 #[cfg(test)]
@@ -1419,6 +1497,54 @@ mod tests {
             $arr['c'] = ++$arr['c'];
 
             example($arr['a'], $arr['b'], $arr['c']);
+        "#}
+    }
+
+    test_analysis! {
+        name = implicit_to_string_call,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @param non-empty-string $command
+             * @param non-empty-list<non-empty-string> $args
+             * @param non-empty-string $cwd
+             */
+            function shell_execute(string $command, array $args, string $cwd = ''): void {
+                echo "Executing command: $command [" . $args[0] . ", ..] in directory: $cwd\n";
+            }
+
+            final class CheckedOutRepository {
+                /** @param non-empty-string $path */
+                private function __construct(
+                    private readonly string $path,
+                ) {}
+
+                /** @param non-empty-string $path */
+                public static function fromPath(string $path): self {
+                    return new self($path);
+                }
+
+                /** @return non-empty-string */
+                public function __toString(): string {
+                    return $this->path;
+                }
+            }
+
+            final class GetVersionCollectionFromGitRepository {
+                private CheckedOutRepository $repoPath;
+
+                public function __construct(CheckedOutRepository $repoPath) {
+                    $this->repoPath = $repoPath;
+                }
+
+                /** @param non-empty-string $tagName */
+                public function makeTag(string $tagName): void {
+                    $path = (string) $this->repoPath;
+
+                    shell_execute('git', ['tag', $tagName], $path);
+                }
+            }
         "#}
     }
 }

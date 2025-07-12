@@ -48,7 +48,7 @@ impl Analyzable for CompositeString {
                     expression.analyze(context, block_context, artifacts)?;
                     block_context.inside_general_use = was_inside_general_use;
 
-                    artifacts.get_expression_type(expression)
+                    artifacts.get_rc_expression_type(expression).cloned()
                 }
                 StringPart::BracedExpression(braced_expression) => {
                     let was_inside_general_use = block_context.inside_general_use;
@@ -56,7 +56,7 @@ impl Analyzable for CompositeString {
                     braced_expression.expression.analyze(context, block_context, artifacts)?;
                     block_context.inside_general_use = was_inside_general_use;
 
-                    artifacts.get_expression_type(&braced_expression.expression)
+                    artifacts.get_rc_expression_type(&braced_expression.expression).cloned()
                 }
             };
 
@@ -68,7 +68,7 @@ impl Analyzable for CompositeString {
                 continue;
             };
 
-            let casted_part_type = cast_type_to_string(part_type, context, part.span());
+            let casted_part_type = cast_type_to_string(&part_type, context, block_context, artifacts, part.span())?;
             if casted_part_type.is_never() {
                 impossible = true;
 

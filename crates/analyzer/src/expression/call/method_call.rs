@@ -1,6 +1,16 @@
+use ahash::HashMap;
+
 use mago_codex::get_class_like;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::get_never;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -11,10 +21,15 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
+use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
+use crate::invocation::analyzer::populate_template_result_from_invocation;
+use crate::invocation::post_process::post_invocation_process;
+use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::resolver::method::resolve_method_targets;
+use crate::visibility::check_method_visibility;
 
 impl Analyzable for MethodCall {
     fn analyze<'a>(
@@ -54,6 +69,99 @@ impl Analyzable for NullSafeMethodCall {
             self.span(),
         )
     }
+}
+
+/// Analyzes an implicit method call that doesn't correspond to a direct call expression
+/// in the source code.
+///
+/// This function simulates a method invocation to determine its return type and analyze
+/// potential side effects. It is primarily used for operations that trigger "magic methods"
+/// at runtime.
+///
+/// ### Use Cases
+///
+/// - **String Casting**: Analyzing the `__toString()` method when an object is cast
+///   to a string (e.g., `(string) $obj`).
+/// - **Cloning**: Analyzing the `__clone()` method when an object is cloned
+///   (e.g., `clone $obj`).
+///
+/// ### Process
+///
+/// 1. Checks if the method is visible from the current context.
+/// 2. Constructs a synthetic `Invocation` to represent the call with no arguments.
+/// 3. Resolves template parameters from the target object type.
+/// 4. Fetches the method's return type.
+/// 5. Performs post-invocation analysis.
+///
+/// ### Arguments
+///
+/// - `object_type`: The type of the object on which the method is implicitly called.
+/// - `method_identifier`: The identifier for the method (e.g., `__toString`).
+/// - `span`: The code span of the expression triggering the call (e.g., the cast expression).
+///
+/// ### Returns
+///
+/// A `Result` containing the `TUnion` type of the method's return value. If the method
+/// is not visible, it returns the `never` type.
+pub fn analyze_implicit_method_call<'a>(
+    context: &mut Context<'a>,
+    block_context: &mut BlockContext<'a>,
+    artifacts: &mut AnalysisArtifacts,
+    object_type: &TObject,
+    method_identifier: MethodIdentifier,
+    class_like_metadata: &ClassLikeMetadata,
+    method_metadata: &FunctionLikeMetadata,
+    span: Span,
+) -> Result<TUnion, AnalysisError> {
+    if !check_method_visibility(
+        context,
+        block_context,
+        method_identifier.get_class_name(),
+        method_identifier.get_method_name(),
+        span,
+        None,
+    ) {
+        return Ok(get_never()); // Not visible, return never type.
+    }
+
+    let mut template_result = TemplateResult::default();
+
+    let method_target_context = MethodTargetContext {
+        declaring_method_id: Some(method_identifier),
+        class_like_metadata,
+        class_type: StaticClassType::Object(object_type.clone()),
+    };
+
+    let invocation = Invocation::new(
+        InvocationTarget::FunctionLike {
+            identifier: FunctionLikeIdentifier::Method(
+                *method_identifier.get_class_name(),
+                *method_identifier.get_method_name(),
+            ),
+            metadata: method_metadata,
+            method_context: Some(method_target_context),
+            span,
+        },
+        InvocationArgumentsSource::None(span),
+        span,
+    );
+
+    populate_template_result_from_invocation(&invocation, &mut template_result);
+
+    let result = fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &Default::default());
+
+    post_invocation_process(
+        context,
+        block_context,
+        artifacts,
+        &invocation,
+        None,
+        &template_result,
+        &HashMap::default(),
+        false,
+    );
+
+    Ok(result)
 }
 
 fn analyze_method_call<'a>(

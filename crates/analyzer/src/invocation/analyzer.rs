@@ -131,47 +131,7 @@ pub fn analyze_invocation<'a>(
         parameters.get(argument_offset).copied().map(|parameter| (argument_offset, parameter))
     }
 
-    if let InvocationTarget::FunctionLike { metadata, method_context, .. } = &invocation.target {
-        for (template_name, template_details) in metadata.template_types.iter() {
-            template_result.template_types.insert(*template_name, template_details.clone());
-        }
-
-        if let Some(method_metadata) = &metadata.method_metadata
-            && !method_metadata.is_static()
-            && let Some(method_context) = method_context
-        {
-            for (template_name, template_defaults) in method_context.class_like_metadata.template_types.iter() {
-                template_result
-                    .template_types
-                    .entry(*template_name)
-                    .or_default()
-                    .extend(template_defaults.iter().cloned());
-            }
-
-            if let StaticClassType::Object(object_type) = &method_context.class_type
-                && let TObject::Named(named_object) = object_type
-                && let Some(type_parameters) = &named_object.type_parameters
-            {
-                for (template_index, template_type) in type_parameters.iter().enumerate() {
-                    let Some(template_name) = method_context
-                        .class_like_metadata
-                        .template_types
-                        .iter()
-                        .enumerate()
-                        .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
-                    else {
-                        break;
-                    };
-
-                    template_result.add_lower_bound(
-                        template_name,
-                        GenericParent::ClassLike(method_context.class_like_metadata.name),
-                        template_type.clone(),
-                    );
-                }
-            }
-        }
-    }
+    populate_template_result_from_invocation(invocation, template_result);
 
     let parameter_refs = invocation.target.get_parameters();
     let mut analyzed_argument_types: HashMap<usize, (TUnion, Span)> = HashMap::default();
@@ -653,6 +613,65 @@ pub fn analyze_invocation<'a>(
     check_template_result(context, template_result, invocation.span);
 
     Ok(())
+}
+
+/// Populates the `TemplateResult` with template types from the invocation target.
+///
+/// This function extracts template types from the metadata of the invocation target,
+/// including any method context if applicable. It also adds lower bounds for
+/// template types based on the class-like metadata and the type parameters of the class.
+///
+/// # Arguments
+///
+/// * `invocation` - The invocation whose target metadata is used to populate the template result.
+/// * `template_result` - The mutable `TemplateResult` to be populated with template types and bounds.
+///
+/// # Note
+///
+/// This function assumes that the `TemplateResult` is initially empty and will be populated with
+/// template types and bounds derived from the invocation's target metadata.
+pub fn populate_template_result_from_invocation(invocation: &Invocation<'_>, template_result: &mut TemplateResult) {
+    if let InvocationTarget::FunctionLike { metadata, method_context, .. } = &invocation.target {
+        for (template_name, template_details) in metadata.template_types.iter() {
+            template_result.template_types.insert(*template_name, template_details.clone());
+        }
+
+        if let Some(method_metadata) = &metadata.method_metadata
+            && !method_metadata.is_static()
+            && let Some(method_context) = method_context
+        {
+            for (template_name, template_defaults) in method_context.class_like_metadata.template_types.iter() {
+                template_result
+                    .template_types
+                    .entry(*template_name)
+                    .or_default()
+                    .extend(template_defaults.iter().cloned());
+            }
+
+            if let StaticClassType::Object(object_type) = &method_context.class_type
+                && let TObject::Named(named_object) = object_type
+                && let Some(type_parameters) = &named_object.type_parameters
+            {
+                for (template_index, template_type) in type_parameters.iter().enumerate() {
+                    let Some(template_name) = method_context
+                        .class_like_metadata
+                        .template_types
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
+                    else {
+                        break;
+                    };
+
+                    template_result.add_lower_bound(
+                        template_name,
+                        GenericParent::ClassLike(method_context.class_like_metadata.name),
+                        template_type.clone(),
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Analyzes a single argument expression and stores its inferred type and span.

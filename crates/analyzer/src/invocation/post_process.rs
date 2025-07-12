@@ -44,6 +44,7 @@ pub fn post_invocation_process<'a>(
     this_variable: Option<String>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
+    apply_assertions: bool,
 ) {
     update_by_reference_argument_types(context, block_context, invoication, template_result, parameters);
 
@@ -55,7 +56,6 @@ pub fn post_invocation_process<'a>(
         return;
     };
 
-    // Create a human-readable description of the callable (function, method, or closure)
     let (callable_kind_str, full_callable_name) = match identifier {
         FunctionLikeIdentifier::Function(name_id) => ("function", format!("`{}`", context.interner.lookup(name_id))),
         FunctionLikeIdentifier::Method(class_name_id, method_name_id) => (
@@ -65,7 +65,7 @@ pub fn post_invocation_process<'a>(
         FunctionLikeIdentifier::Closure(position) => (
             "closure",
             format!(
-                "defined at `{}:{}:{}`", // More descriptive for closures
+                "defined at `{}:{}:{}`",
                 context.interner.lookup(&position.source.0),
                 context.source.line_number(position.offset),
                 context.source.column_number(position.offset)
@@ -73,7 +73,6 @@ pub fn post_invocation_process<'a>(
         ),
     };
 
-    // Report if the called entity is deprecated
     if metadata.is_deprecated {
         let issue_kind = match identifier {
             FunctionLikeIdentifier::Function(_) => TypingIssueKind::DeprecatedFunction,
@@ -162,9 +161,12 @@ pub fn post_invocation_process<'a>(
         }
     }
 
+    if !apply_assertions {
+        return;
+    }
+
     let range = (invoication.span.start.offset, invoication.span.end.offset);
 
-    // Add if-true assertions to the artifacts
     let resolved_if_true_assertions = resolve_invocation_assertion(
         context,
         block_context,
@@ -186,7 +188,6 @@ pub fn post_invocation_process<'a>(
             .extend(assertions.into_iter().flatten());
     }
 
-    // Add if-false assertions to the artifacts
     let resolved_if_false_assertions = resolve_invocation_assertion(
         context,
         block_context,
