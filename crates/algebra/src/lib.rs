@@ -47,8 +47,16 @@ pub type ActiveTruths = BTreeMap<String, HashSet<usize>>;
 /// A new `Vec<Clause>` containing the simplified, owned clauses.
 #[inline]
 pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Vec<Clause> {
-    pub fn saturate_clauses_inner(unique_clauses: Vec<&Clause>) -> Vec<Clause> {
-        let mut removed_clauses = HashSet::with_capacity(unique_clauses.len());
+    const COMPLEXITY_THRESHOLD: usize = 65_536;
+
+    fn saturate_clauses_inner(unique_clauses: Vec<&Clause>) -> Vec<Clause> {
+        let unique_clauses_len = unique_clauses.len();
+        if unique_clauses_len > COMPLEXITY_THRESHOLD {
+            // If the complexity is too high, bail out early
+            return vec![];
+        }
+
+        let mut removed_clauses = HashSet::with_capacity(unique_clauses_len);
         let mut added_clauses = vec![];
 
         // Main simplification loop for resolution and unit propagation.
@@ -371,12 +379,24 @@ pub fn disjoin_clauses(
     right_clauses: Vec<Clause>,
     conditional_object_id: Span,
 ) -> Vec<Clause> {
-    if left_clauses.is_empty() {
+    const COMPLEXITY_THRESHOLD: usize = 50_000;
+
+    let left_clauses_len = left_clauses.len();
+    let right_clauses_len = right_clauses.len();
+
+    if left_clauses_len == 0 {
+        // If there are no left clauses, return the right ones.
         return right_clauses;
     }
 
-    if right_clauses.is_empty() {
+    if right_clauses_len == 0 {
+        // If there are no right clauses, return the left ones.
         return left_clauses;
+    }
+
+    if left_clauses_len > COMPLEXITY_THRESHOLD || right_clauses_len > COMPLEXITY_THRESHOLD {
+        // If either side is too complex, bail out early.
+        return vec![];
     }
 
     let mut clauses = vec![];
