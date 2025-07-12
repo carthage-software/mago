@@ -746,7 +746,7 @@ fn scrape_type_properties(
 
     if let TAtomic::Object(TObject::Named(named_object)) = &atomic {
         let fq_class_name = named_object.get_name();
-        let extra_types = named_object.get_intersection_types();
+        let intersection_types = named_object.get_intersection_types();
 
         if !combination.has_object_top_type {
             if combination.value_types.contains_key(&atomic.get_id(None)) {
@@ -777,7 +777,7 @@ fn scrape_type_properties(
             if let TAtomic::Object(TObject::Named(existing_object)) = &existing_type {
                 let existing_name = existing_object.get_name();
 
-                if extra_types.is_some() || existing_object.has_intersection_types() {
+                if intersection_types.is_some() || existing_object.has_intersection_types() {
                     if object_comparator::is_shallowly_contained_by(
                         codebase,
                         interner,

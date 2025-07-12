@@ -794,8 +794,16 @@ impl TType for TUnion {
 
     fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
         let mut types = self.types.clone();
+        let len = types.len();
+
         types.sort();
-        types.iter().map(|atomic| atomic.get_id(interner)).join("|")
+        types
+            .iter()
+            .map(|atomic| {
+                let id = atomic.get_id(interner);
+                if atomic.has_intersection_types() && len > 1 { format!("({})", id) } else { id }
+            })
+            .join("|")
     }
 }
 

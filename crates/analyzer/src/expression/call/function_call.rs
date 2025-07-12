@@ -923,4 +923,66 @@ mod tests {
             TypingIssueKind::PossiblyInvalidArgument,
         ],
     }
+
+    test_analysis! {
+        name = type_logic_sanity_test,
+        code = indoc! {r#"
+            <?php
+
+            interface A {}
+            interface B {}
+
+            function i_take_a(A $a): A {
+                i_take_a_or_b($a);
+                i_take_b_or_a($a);
+
+                return $a;
+            }
+
+            function i_take_b(B $b): B {
+                i_take_b_or_a($b);
+                i_take_a_or_b($b);
+
+                return $b;
+            }
+
+            function i_take_a_or_b(A|B $aOrB): B|A {
+                if ($aOrB instanceof A) {
+                    i_take_a($aOrB);
+                } else {
+                    i_take_b($aOrB);
+                }
+
+                return $aOrB;
+            }
+
+            function i_take_b_or_a(B|A $bOrA): A|B {
+                if ($bOrA instanceof B) {
+                    i_take_b($bOrA);
+                } else {
+                    i_take_a($bOrA);
+                }
+
+                return $bOrA;
+            }
+
+            function i_take_a_and_b(A&B $aAndB): B&A {
+                i_take_a($aAndB);
+                i_take_b($aAndB);
+                i_take_a_or_b($aAndB);
+                i_take_b_or_a($aAndB);
+
+                return $aAndB;
+            }
+
+            function i_take_b_and_a(B&A $bAndA): A&B {
+                i_take_b($bAndA);
+                i_take_a($bAndA);
+                i_take_a_or_b($bAndA);
+                i_take_b_or_a($bAndA);
+
+                return $bAndA;
+            }
+        "#},
+    }
 }

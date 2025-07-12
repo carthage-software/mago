@@ -56,6 +56,7 @@ pub fn replace(
                     interner,
                     constraint,
                     intersection_types,
+                    template_result,
                     key,
                 );
 
@@ -140,6 +141,7 @@ fn replace_template_parameter(
     interner: &ThreadedInterner,
     constraint: &TUnion,
     intersection_types: &Option<Vec<TAtomic>>,
+    template_result: &TemplateResult,
     key: &StringIdentifier,
 ) -> Option<TUnion> {
     let mut template_type = None;
@@ -153,15 +155,48 @@ fn replace_template_parameter(
     );
 
     if let Some(traversed_type) = traversed_type {
-        let template_type_inner = if !constraint.is_mixed() && traversed_type.is_mixed() {
+        let mut template_type_inner = if !constraint.is_mixed() && traversed_type.is_mixed() {
             if constraint.is_array_key() { wrap_atomic(TAtomic::Scalar(TScalar::ArrayKey)) } else { constraint.clone() }
         } else {
             traversed_type.clone()
         };
 
-        if let Some(_intersection_types) = intersection_types {
-            for _atomic_template_type in &template_type_inner.types {
-                // todo handle extra types
+        if let Some(intersection_types) = intersection_types {
+            let replaced_intersection_parts: Vec<TAtomic> = intersection_types
+                .iter()
+                .cloned()
+                .map(|part| replace_atomic(part, template_result, codebase, interner))
+                .collect();
+
+            for atomic_template_type in &mut template_type_inner.types {
+                if !atomic_template_type.can_be_intersected() {
+                    continue;
+                }
+
+                match atomic_template_type {
+                    TAtomic::Object(TObject::Named(n)) => {
+                        if let Some(existing) = n.get_intersection_types_mut() {
+                            existing.extend(replaced_intersection_parts.clone());
+                        } else {
+                            n.intersection_types = Some(replaced_intersection_parts.clone());
+                        }
+                    }
+                    TAtomic::Iterable(i) => {
+                        if let Some(existing) = i.get_intersection_types_mut() {
+                            existing.extend(replaced_intersection_parts.clone());
+                        } else {
+                            i.intersection_types = Some(replaced_intersection_parts.clone());
+                        }
+                    }
+                    TAtomic::GenericParameter(g) => {
+                        if let Some(existing) = &mut g.intersection_types {
+                            existing.extend(replaced_intersection_parts.clone());
+                        } else {
+                            g.intersection_types = Some(replaced_intersection_parts.clone());
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 

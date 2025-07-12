@@ -39,6 +39,49 @@ pub fn is_contained_by(
         return true;
     }
 
+    // `T <= A & B`
+    if let Some(container_intersection_types) = container_type_part.get_intersection_types()
+        && !container_intersection_types.is_empty()
+    {
+        for container_intersection_type in container_intersection_types {
+            if !is_contained_by(
+                codebase,
+                interner,
+                input_type_part,
+                container_intersection_type,
+                inside_assertion,
+                atomic_comparison_result,
+            ) {
+                return false;
+            }
+        }
+
+        // intersection <= intersection (e.g., A&B <= C&D)
+        if input_type_part.has_intersection_types() {
+            // We have proven the input is a subtype of all the container's parts.
+            // This is sufficient.
+            return true;
+        }
+    }
+
+    // `A & B <= T`
+    if let Some(input_intersection_types) = input_type_part.get_intersection_types()
+        && !input_intersection_types.is_empty()
+    {
+        for input_intersection_type in input_intersection_types {
+            if is_contained_by(
+                codebase,
+                interner,
+                input_intersection_type,
+                container_type_part,
+                inside_assertion,
+                atomic_comparison_result,
+            ) {
+                return true;
+            }
+        }
+    }
+
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         if let TAtomic::Object(TObject::Enum(enum_input)) = input_type_part {
             if !is_instance_of(codebase, interner, enum_input.get_name_ref(), enum_container.get_name_ref()) {
@@ -57,23 +100,6 @@ pub fn is_contained_by(
         }
 
         return false;
-    }
-
-    if (matches!(container_type_part, TAtomic::Object(TObject::Named(named_object)) if named_object.has_intersection_types())
-        || matches!(container_type_part, TAtomic::GenericParameter(parameter) if parameter.has_intersection_types())
-        || matches!(container_type_part, TAtomic::Iterable(iterable) if iterable.has_intersection_types()))
-        && (matches!(input_type_part, TAtomic::Object(TObject::Named(named_object)) if named_object.has_intersection_types())
-            || matches!(input_type_part, TAtomic::GenericParameter(parameter) if parameter.has_intersection_types())
-            || matches!(input_type_part, TAtomic::Iterable(iterable) if iterable.has_intersection_types()))
-    {
-        return object_comparator::is_shallowly_contained_by(
-            codebase,
-            interner,
-            input_type_part,
-            container_type_part,
-            inside_assertion,
-            atomic_comparison_result,
-        );
     }
 
     if container_type_part.is_mixed() || container_type_part.is_templated_as_mixed(&mut false) {
@@ -233,7 +259,7 @@ pub fn is_contained_by(
         && (matches!(container_type_part, TAtomic::Object(TObject::Named(_) | TObject::Enum(_)))
             || container_type_part.is_templated_as_object())
     {
-        if object_comparator::is_shallowly_contained_by(
+        if !object_comparator::is_intersection_shallowly_contained_by(
             codebase,
             interner,
             input_type_part,
@@ -241,22 +267,23 @@ pub fn is_contained_by(
             inside_assertion,
             atomic_comparison_result,
         ) {
-            if matches!(container_type_part,  TAtomic::Object(TObject::Named(named_object)) if named_object.has_type_parameters())
-            {
-                return generic_comparator::is_contained_by(
-                    codebase,
-                    interner,
-                    input_type_part,
-                    container_type_part,
-                    inside_assertion,
-                    atomic_comparison_result,
-                );
-            }
-
-            return true;
+            return false;
         }
 
-        return false;
+        if matches!(container_type_part, TAtomic::Object(TObject::Named(obj)) if obj.has_type_parameters())
+            && !generic_comparator::is_contained_by(
+                codebase,
+                interner,
+                input_type_part,
+                container_type_part,
+                inside_assertion,
+                atomic_comparison_result,
+            )
+        {
+            return false;
+        }
+
+        return true;
     }
 
     if let TAtomic::Object(TObject::Any) = input_type_part

@@ -138,13 +138,17 @@ impl TType for TGenericParameter {
         str += &self.constraint.get_id(interner);
 
         if let Some(intersection_types) = &self.intersection_types {
-            str = format!("(({str})");
+            str = format!("({str})");
             for atomic in intersection_types {
-                str += "&(";
+                str += "&";
+                if atomic.has_intersection_types() {
+                    str += "(";
+                }
                 str += &atomic.get_id(interner);
-                str += ")";
+                if atomic.has_intersection_types() {
+                    str += ")";
+                }
             }
-            str += ")";
         }
 
         str
