@@ -321,7 +321,7 @@ pub fn get_atomic_of_function_like_identifier(
     Some(TAtomic::Callable(TCallable::Signature(signature)))
 }
 
-fn get_signature_of_function_like_metadata(
+pub fn get_signature_of_function_like_metadata(
     function_like_identifier: &FunctionLikeIdentifier,
     function_like_metadata: &FunctionLikeMetadata,
     codebase: &CodebaseMetadata,

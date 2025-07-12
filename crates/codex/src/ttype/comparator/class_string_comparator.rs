@@ -125,10 +125,8 @@ fn is_valid_class_string(str: &str) -> bool {
             }
 
             part_start = false;
-        } else {
-            if !(b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80) {
-                return false;
-            }
+        } else if !(b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80) {
+            return false;
         }
 
         i += 1;

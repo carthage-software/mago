@@ -10,8 +10,11 @@ use mago_codex::data_flow::path::PathKind;
 use mago_codex::get_closure;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::VariableIdentifier;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_syntax::ast::ArrowFunction;
@@ -99,7 +102,7 @@ impl Analyzable for ArrowFunction {
             imported_variables.insert(variable_str.to_string(), local_type);
         }
 
-        analyze_function_like(
+        let (_, inner_artifacts) = analyze_function_like(
             context,
             artifacts,
             scope,
@@ -109,10 +112,37 @@ impl Analyzable for ArrowFunction {
             imported_variables,
         )?;
 
-        artifacts.set_expression_type(
-            self,
-            TUnion::new(vec![TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Closure(span.start)))]),
-        );
+        let function_identifier = FunctionLikeIdentifier::Closure(span.start);
+
+        let resulting_closure = if function_metadata.template_types.is_empty() {
+            let mut signature = get_signature_of_function_like_metadata(
+                &function_identifier,
+                function_metadata,
+                context.codebase,
+                context.interner,
+                &TypeExpansionOptions::default(),
+            );
+
+            let mut inferred_return_type = None;
+            for inferred_return in inner_artifacts.inferred_return_types {
+                inferred_return_type = Some(add_optional_union_type(
+                    inferred_return,
+                    inferred_return_type.as_ref(),
+                    context.codebase,
+                    context.interner,
+                ));
+            }
+
+            if let Some(inferred_return_type) = inferred_return_type {
+                signature.return_type = Some(Box::new(inferred_return_type));
+            }
+
+            TUnion::new(vec![TAtomic::Callable(TCallable::Signature(signature))])
+        } else {
+            TUnion::new(vec![TAtomic::Callable(TCallable::Alias(function_identifier))])
+        };
+
+        artifacts.set_expression_type(self, resulting_closure);
 
         Ok(())
     }
@@ -179,6 +209,24 @@ mod tests {
             function foo(Closure $f, Closure $g): Closure {
                 return fn(int $x): int => $f($g($x));
             }
+        "#}
+    }
+
+    test_analysis! {
+        name = inferred_arrow_function_return_type,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @param (Closure(): 'Hello, World!') $fn
+             */
+            function x(Closure $fn)
+            {
+                echo $fn();
+            }
+
+            x(fn(): string => 'Hello, World!');
+            x(fn() => 'Hello, World!');
         "#}
     }
 

@@ -71,7 +71,7 @@ pub fn analyze_function_like<'a, 'ast>(
     parameter_list: &'ast FunctionLikeParameterList,
     body: FunctionLikeBody<'ast>,
     import_variables: HashMap<String, Rc<TUnion>>,
-) -> Result<BlockContext<'a>, AnalysisError> {
+) -> Result<(BlockContext<'a>, AnalysisArtifacts), AnalysisError> {
     let mut previous_type_resolution_context = std::mem::replace(
         &mut context.type_resolution_context,
         function_like_metadata.get_type_resolution_context().cloned().unwrap_or_default(),
@@ -230,8 +230,11 @@ pub fn analyze_function_like<'a, 'ast>(
     }
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
+    for (expression_range, expression_type) in std::mem::take(&mut artifacts.expression_types) {
+        parent_artifacts.expression_types.insert(expression_range, expression_type);
+    }
 
-    Ok(block_context)
+    Ok((block_context, artifacts))
 }
 
 fn add_parameter_types_to_context<'a>(
