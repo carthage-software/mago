@@ -189,11 +189,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
      * @since 5.4
      */
     #[Pure]
-    public function getClosure(
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '7.3')]  $object,
-        #[PhpStormStubsElementAvailable(from: '7.4')]
-        #[LanguageLevelTypeAware(['8.0' => 'object|null'], default: '')]  $object = null,
-    ): Closure {
+    public function getClosure(object|null $object = null): Closure
+    {
     }
 
     /**

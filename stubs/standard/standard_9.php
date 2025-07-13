@@ -53,7 +53,7 @@ function array_replace_recursive(array $array, array ...$replacements): array
  * @param V $filter_value
  * @param bool $strict
  *
- * @return list<K>
+ * @return ($array is non-empty-array ? non-empty-list<K> : list<K>)
  *
  * @no-named-arguments
  * @pure
@@ -68,7 +68,7 @@ function array_keys(array $array, mixed $filter_value = null, bool $strict = fal
  *
  * @param array<K, V> $array
  *
- * @return list<V>
+ * @return ($array is non-empty-array ? non-empty-list<V> : list<V>)
  *
  * @no-named-arguments
  * @pure
@@ -185,49 +185,44 @@ function array_pad(array $array, int $length, mixed $value): array
 }
 
 /**
- * Exchanges all keys with their associated values in an array
- * @link https://php.net/manual/en/function.array-flip.php
- * @param int[]|string[] $array <p>
- * An array of key/value pairs to be flipped.
- * </p>
- * @return int[]|string[] Returns the flipped array.
+ * @template K as array-key
+ * @template V as array-key
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($array is non-empty-array ? non-empty-array<V, K> : array<V, K>)
+ *
+ * @pure
  */
-#[Pure]
 function array_flip(array $array): array
 {
 }
 
 /**
- * Changes the case of all keys in an array
- * @link https://php.net/manual/en/function.array-change-key-case.php
- * @param array $array <p>
- * The array to work on
- * </p>
- * @param int $case <p>
- * Either CASE_UPPER or
- * CASE_LOWER (default)
- * </p>
- * @return array an array with its keys lower or uppercased
- * @meta
+ *
+ * @template V
+ *
+ * @param array<string, V> $array
+ * @param int $case
+ *
+ * @return ($array is non-empty-array ? non-empty-array<string, V> : array<string, V>)
+ *
+ * @pure
  */
-#[Pure]
 function array_change_key_case(array $array, int $case = CASE_LOWER): array
 {
 }
 
 /**
- * Pick one or more random keys out of an array
- * @link https://php.net/manual/en/function.array-rand.php
- * @param array $array <p>
- * The input array.
- * </p>
- * @param int $num [optional] <p>
- * Specifies how many entries you want to pick.
- * </p>
- * @return int|string|array If you are picking only one entry, array_rand
- * returns the key for a random entry. Otherwise, it returns an array
- * of keys for the random entries. This is done so that you can pick
- * random keys as well as values out of the array.
+ * @template K as array-key
+ * @template V as array-key
+ *
+ * @param array<K, V> $array
+ * @param int<0, max> $num
+ *
+ * @return ($num is 1 ? K : array<K>)
+ *
+ * @pure
  */
 function array_rand(array $array, int $num = 1): array|string|int
 {
@@ -652,7 +647,7 @@ function array_filter(array $array, null|callable $callback, int $mode = 0): arr
  *
  * @param (callable(V, S): U)|null $callback
  * @param array<K, V> $array
- * @param array<array-key, S> ...$arrays
+ * @param array<S> ...$arrays
  *
  * @return array<K, U>
  */

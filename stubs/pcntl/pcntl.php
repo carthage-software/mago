@@ -14,7 +14,9 @@ use JetBrains\PhpStorm\Pure;
  * parent's context, no child process will be created, and a PHP
  * error is raised.
  */
-function pcntl_fork(): int {}
+function pcntl_fork(): int
+{
+}
 
 /**
  * Waits on or returns the status of a forked child
@@ -95,12 +97,9 @@ function pcntl_fork(): int {}
  * child which exited, -1 on error or zero if <b>WNOHANG</b> was used and no
  * child was available
  */
-function pcntl_waitpid(
-    int $process_id,
-    &$status,
-    int $flags = 0,
-    #[PhpStormStubsElementAvailable(from: '7.0')] &$resource_usage = []
-): int {}
+function pcntl_waitpid(int $process_id, &$status, int $flags = 0, &$resource_usage = []): int
+{
+}
 
 /**
  * Waits on or returns the status of a forked child
@@ -146,12 +145,9 @@ function pcntl_waitpid(
  * child which exited, -1 on error or zero if WNOHANG was provided as an
  * option (on wait3-available systems) and no child was available.
  */
-function pcntl_wait(
-    &$status,
-    int $flags = 0,
-    #[PhpStormStubsElementAvailable(from: '7.0')] &$resource_usage
-= []
-): int {}
+function pcntl_wait(&$status, int $flags = 0, &$resource_usage = []): int
+{
+}
 
 /**
  * Installs a signal handler
@@ -181,14 +177,18 @@ function pcntl_wait(
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function pcntl_signal(int $signal, $handler, bool $restart_syscalls = true): bool {}
+function pcntl_signal(int $signal, $handler, bool $restart_syscalls = true): bool
+{
+}
 
 /**
  * Calls signal handlers for pending signals
  * @link https://php.net/manual/en/function.pcntl-signal-dispatch.php
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function pcntl_signal_dispatch(): bool {}
+function pcntl_signal_dispatch(): bool
+{
+}
 
 /**
  * Checks if status code represents a normal exit
@@ -200,7 +200,9 @@ function pcntl_signal_dispatch(): bool {}
  * otherwise.
  */
 #[Pure]
-function pcntl_wifexited(int $status): bool {}
+function pcntl_wifexited(int $status): bool
+{
+}
 
 /**
  * Checks whether the child process is currently stopped
@@ -212,7 +214,9 @@ function pcntl_wifexited(int $status): bool {}
  * currently stopped, <b>FALSE</b> otherwise.
  */
 #[Pure]
-function pcntl_wifstopped(int $status): bool {}
+function pcntl_wifstopped(int $status): bool
+{
+}
 
 /**
  * Checks whether the status code represents a termination due to a signal
@@ -224,7 +228,9 @@ function pcntl_wifstopped(int $status): bool {}
  * not caught, <b>FALSE</b> otherwise.
  */
 #[Pure]
-function pcntl_wifsignaled(int $status): bool {}
+function pcntl_wifsignaled(int $status): bool
+{
+}
 
 /**
  * Returns the return code of a terminated child
@@ -235,14 +241,18 @@ function pcntl_wifsignaled(int $status): bool {}
  * @return int|false the return code, as an integer.
  */
 #[Pure]
-function pcntl_wexitstatus(int $status): int|false {}
+function pcntl_wexitstatus(int $status): int|false
+{
+}
 
 /**
  * @param int $status
  * @return bool
  */
 #[Pure]
-function pcntl_wifcontinued(int $status): bool {}
+function pcntl_wifcontinued(int $status): bool
+{
+}
 
 /**
  * Returns the signal which caused the child to terminate
@@ -253,7 +263,9 @@ function pcntl_wifcontinued(int $status): bool {}
  * @return int|false the signal number, as an integer.
  */
 #[Pure]
-function pcntl_wtermsig(int $status): int|false {}
+function pcntl_wtermsig(int $status): int|false
+{
+}
 
 /**
  * Returns the signal which caused the child to stop
@@ -264,7 +276,9 @@ function pcntl_wtermsig(int $status): int|false {}
  * @return int|false the signal number.
  */
 #[Pure]
-function pcntl_wstopsig(int $status): int|false {}
+function pcntl_wstopsig(int $status): int|false
+{
+}
 
 /**
  * Executes specified program in current process space
@@ -287,7 +301,9 @@ function pcntl_wstopsig(int $status): int|false {}
  * </p>
  * @return bool <b>FALSE</b> on error and does not return on success.
  */
-function pcntl_exec(string $path, array $args = [], array $env_vars = []): bool {}
+function pcntl_exec(string $path, array $args = [], array $env_vars = []): bool
+{
+}
 
 /**
  * Set an alarm clock for delivery of a signal
@@ -300,7 +316,9 @@ function pcntl_exec(string $path, array $args = [], array $env_vars = []): bool 
  * remaining before it was to be delivered, or 0 if there
  * was no previously scheduled alarm.
  */
-function pcntl_alarm(int $seconds): int {}
+function pcntl_alarm(int $seconds): int
+{
+}
 
 /**
  * Retrieve the error number set by the last pcntl function which failed
@@ -309,7 +327,9 @@ function pcntl_alarm(int $seconds): int {}
  * @since 5.3.4
  */
 #[Pure(true)]
-function pcntl_get_last_error(): int {}
+function pcntl_get_last_error(): int
+{
+}
 
 /**
  * Alias of <b>pcntl_get_last_error</b>
@@ -318,7 +338,9 @@ function pcntl_get_last_error(): int {}
  * @since 5.3.4
  */
 #[Pure(true)]
-function pcntl_errno(): int {}
+function pcntl_errno(): int
+{
+}
 
 /**
  * Retrieve the system error message associated with the given errno
@@ -329,8 +351,10 @@ function pcntl_errno(): int {}
  * @since 5.3.4
  */
 #[Pure]
-#[LanguageLevelTypeAware(["8.0" => "string"], default: "string|false")]
-function pcntl_strerror(int $error_code): false|string {}
+#[LanguageLevelTypeAware(['8.0' => 'string'], default: 'string|false')]
+function pcntl_strerror(int $error_code): false|string
+{
+}
 
 /**
  * Get the priority of any process
@@ -347,7 +371,9 @@ function pcntl_strerror(int $error_code): false|string {}
  * scheduling.
  */
 #[Pure]
-function pcntl_getpriority(?int $process_id, int $mode = PRIO_PROCESS): int|false {}
+function pcntl_getpriority(null|int $process_id, int $mode = PRIO_PROCESS): int|false
+{
+}
 
 /**
  * Change the priority of any process
@@ -369,7 +395,9 @@ function pcntl_getpriority(?int $process_id, int $mode = PRIO_PROCESS): int|fals
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function pcntl_setpriority(int $priority, ?int $process_id, int $mode = PRIO_PROCESS): bool {}
+function pcntl_setpriority(int $priority, null|int $process_id, int $mode = PRIO_PROCESS): bool
+{
+}
 
 /**
  * Sets and retrieves blocked signals
@@ -393,7 +421,9 @@ function pcntl_setpriority(int $priority, ?int $process_id, int $mode = PRIO_PRO
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool {}
+function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool
+{
+}
 
 /**
  * Waits for signals
@@ -433,7 +463,9 @@ function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool {}
  * </p>
  * @return int|false On success, <b>pcntl_sigwaitinfo</b> returns a signal number.
  */
-function pcntl_sigwaitinfo(array $signals, &$info = []): int|false {}
+function pcntl_sigwaitinfo(array $signals, &$info = []): int|false
+{
+}
 
 /**
  * Waits for signals, with a timeout
@@ -454,7 +486,9 @@ function pcntl_sigwaitinfo(array $signals, &$info = []): int|false {}
  * </p>
  * @return int|false On success, <b>pcntl_sigtimedwait</b> returns a signal number.
  */
-function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $nanoseconds = 0): int|false {}
+function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $nanoseconds = 0): int|false
+{
+}
 
 /**
  * Enable/disable asynchronous signal handling or return the old setting.<br>
@@ -469,10 +503,9 @@ function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $
  * @return bool
  * @since 7.1
  */
-function pcntl_async_signals(
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] ?bool $enable,
-    #[PhpStormStubsElementAvailable(from: '8.0')] ?bool $enable = null
-): bool {}
+function pcntl_async_signals(null|bool $enable = null): bool
+{
+}
 
 /**
  * Get the current handler for specified signal.
@@ -485,30 +518,46 @@ function pcntl_async_signals(
  * @return bool|resource
  * @since 7.1
  */
-function pcntl_signal_get_handler(int $signal) {}
+function pcntl_signal_get_handler(int $signal)
+{
+}
 
 /**
  * @param int $flags
  * @return bool
  * @since 7.4
  */
-function pcntl_unshare(int $flags): bool {}
+function pcntl_unshare(int $flags): bool
+{
+}
+
 /**
  * @since 8.4
  */
-function pcntl_waitid(int $idtype = P_ALL, ?int $id = null, &$info = [], int $flags = WEXITED): bool {}
+function pcntl_waitid(int $idtype = P_ALL, null|int $id = null, &$info = [], int $flags = WEXITED): bool
+{
+}
+
 /**
  * @since 8.4
  */
-function pcntl_getcpuaffinity(?int $process_id = null): array|false {}
+function pcntl_getcpuaffinity(null|int $process_id = null): array|false
+{
+}
+
 /**
  * @since 8.4
  */
-function pcntl_setcpuaffinity(?int $process_id = null, array $cpu_ids = []): bool {}
+function pcntl_setcpuaffinity(null|int $process_id = null, array $cpu_ids = []): bool
+{
+}
+
 /**
  * @since 8.4
  */
-function pcntl_getcpu(): int {}
+function pcntl_getcpu(): int
+{
+}
 
 define('WNOHANG', 1);
 define('WUNTRACED', 2);
@@ -884,4 +933,5 @@ define('P_PGID', 2);
  * @since 8.4
  */
 define('P_PIDFD', 3);
+
 // End of pcntl v.

@@ -1818,11 +1818,8 @@ namespace {
          * processing them with PHP.
          */
         #[TentativeType]
-        public function fetchAll(
-            int $mode = PDO::FETCH_DEFAULT,
-            #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')]  $fetch_argument = null,
-            mixed ...$args,
-        ): array {
+        public function fetchAll(int $mode = PDO::FETCH_DEFAULT, mixed ...$args): array
+        {
         }
 
         /**

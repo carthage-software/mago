@@ -226,20 +226,16 @@ function is_scalar(mixed $value): bool
 }
 
 /**
- * Verify that the contents of a variable can be called as a function
- * @link https://php.net/manual/en/function.is-callable.php
  * @param mixed $value
  * @param bool $syntax_only
- * @param string &$callable_name [optional] <p>
- * Receives the "callable name". In the example below it is
- * "someClass::someMethod". Note, however, that despite the implication
- * that someClass::SomeMethod() is a callable static method, this is not
- * the case.
- * </p>
- * @return bool <b>TRUE</b> if $var is callable, <b>FALSE</b>
- * otherwise.
+ *
+ * @param-out string $callable_name
+ *
+ * @assert-if-true callable $value
+ *
+ * @pure
  */
-function is_callable(mixed $value, bool $syntax_only = false, &$callable_name): bool
+function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = null): bool
 {
 }
 

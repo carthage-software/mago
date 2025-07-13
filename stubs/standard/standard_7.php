@@ -63,14 +63,8 @@ function fsockopen(string $hostname, int $port = -1, &$error_code, &$error_messa
  * @param float|null $timeout [optional]
  * @return resource|false
  */
-function pfsockopen(
-    string $hostname,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] int $port,
-    #[PhpStormStubsElementAvailable(from: '7.1')] int $port = -1,
-    &$error_code,
-    &$error_message,
-    null|float $timeout,
-) {
+function pfsockopen(string $hostname, int $port = -1, &$error_code, &$error_message, null|float $timeout)
+{
 }
 
 /**

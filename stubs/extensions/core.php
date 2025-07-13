@@ -1219,7 +1219,7 @@ function debug_backtrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT, int $lim
 {
 }
 
-function debug_print_backtrace(int $options = 0, #[PhpStormStubsElementAvailable(from: '7.0')] int $limit = 0): void
+function debug_print_backtrace(int $options = 0, int $limit = 0): void
 {
 }
 

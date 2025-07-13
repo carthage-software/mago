@@ -79,10 +79,8 @@ class SQLite3
      */
     public function open(
         string $filename,
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')]  $flags,
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')]  $encryptionKey,
-        #[PhpStormStubsElementAvailable(from: '7.0')] int $flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,
-        #[PhpStormStubsElementAvailable(from: '7.0')] string $encryptionKey = '',
+        int $flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,
+        string $encryptionKey = '',
     ): void {
     }
 
@@ -275,7 +273,7 @@ class SQLite3
         string $name,
         #[LanguageLevelTypeAware(['8.0' => 'callable'], default: '')]  $callback,
         int $argCount = -1,
-        #[PhpStormStubsElementAvailable(from: '7.1')] int $flags = 0,
+        int $flags = 0,
     ): bool {
     }
 
@@ -345,7 +343,7 @@ class SQLite3
         string $column,
         int $rowid,
         string $database = 'main',
-        #[PhpStormStubsElementAvailable(from: '7.2')] int $flags = SQLITE3_OPEN_READONLY,
+        int $flags = SQLITE3_OPEN_READONLY,
     ) {
     }
 
@@ -355,10 +353,8 @@ class SQLite3
      * @param bool $enable
      * @return bool Returns the old value; true if exceptions were enabled, false otherwise.
      */
-    public function enableExceptions(
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')]  $enable,
-        #[PhpStormStubsElementAvailable(from: '7.0')] bool $enable = false,
-    ): bool {
+    public function enableExceptions(bool $enable = false): bool
+    {
     }
 
     /**
@@ -382,10 +378,8 @@ class SQLite3
      */
     public function __construct(
         string $filename,
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')]  $flags,
-        #[PhpStormStubsElementAvailable(from: '5.3', to: '5.6')]  $encryptionKey,
-        #[PhpStormStubsElementAvailable(from: '7.0')] int $flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,
-        #[PhpStormStubsElementAvailable(from: '7.0')] string $encryptionKey = '',
+        int $flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,
+        string $encryptionKey = '',
     ) {}
 
     /**
@@ -400,10 +394,8 @@ class SQLite3
      * @param bool $enable
      * @since 7.4
      */
-    public function enableExtendedResultCodes(
-        #[PhpStormStubsElementAvailable(from: '7.4', to: '7.4')] bool $enable,
-        #[PhpStormStubsElementAvailable(from: '8.0')] bool $enable = true,
-    ): bool {
+    public function enableExtendedResultCodes(bool $enable = true): bool
+    {
     }
 
     /**

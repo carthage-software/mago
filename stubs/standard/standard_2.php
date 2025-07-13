@@ -1,11 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\ArrayShape;
-use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Internal\ReturnTypeContract as TypeContract;
-use JetBrains\PhpStorm\Pure;
-
 /**
  * @pure
  */
@@ -47,16 +41,8 @@ function ord(string $character): int
 }
 
 /**
- * Parses the string into variables
- * @link https://php.net/manual/en/function.parse-str.php
- * @param string $string <p>
- * The input string.
- * </p>
- * @param array &$result <p>
- * If the second parameter arr is present,
- * variables are stored in this variable as array elements instead.<br/>
- * Since 7.2.0 this parameter is not optional.
- * </p>
+ * @param-out array<string, string> $result
+ *
  * @return void
  */
 function parse_str(string $string, &$result): void
@@ -64,23 +50,6 @@ function parse_str(string $string, &$result): void
 }
 
 /**
- * Parse a CSV string into an array
- * @link https://php.net/manual/en/function.str-getcsv.php
- * @param string $string <p>
- * The string to parse.
- * </p>
- * @param string $separator [optional] <p>
- * Set the field delimiter (one character only).
- * </p>
- * @param string $enclosure [optional] <p>
- * Set the field enclosure character (one character only).
- * </p>
- * @param string $escape [optional] <p>
- * Set the escape character (one character only).
- * Defaults as a backslash (\)
- * </p>
- * @return array an indexed array containing the fields read.
- *
  * @pure
  */
 function str_getcsv(string $string, string $separator = ',', string $enclosure = '"', string $escape = "\\"): array
@@ -158,56 +127,15 @@ function vfprintf($stream, string $format, array $values): int
 {
 }
 
-/**
- * Parses input from a string according to a format
- * @link https://php.net/manual/en/function.sscanf.php
- * @param string $string <p>
- * The input string being parsed.
- * </p>
- * @param string $format <p>
- * The interpreted format for str, which is
- * described in the documentation for sprintf with
- * following differences:
- * Function is not locale-aware.
- * F, g, G and
- * b are not supported.
- * D stands for decimal number.
- * i stands for integer with base detection.
- * n stands for number of characters processed so far.
- * </p>
- * @param mixed &...$vars [optional]
- * @return array|int|null If only
- * two parameters were passed to this function, the values parsed
- * will be returned as an array. Otherwise, if optional parameters are passed,
- * the function will return the number of assigned values. The optional
- * parameters must be passed by reference.
- */
-function sscanf(
-    string $string,
-    string $format,
-    #[TypeContract(exists: 'int|null', notExists: 'array|null')] mixed &...$vars,
-): array|int|null {
+function sscanf(string $string, string $format, mixed &...$vars): array|int|null
+{
 }
 
 /**
- * Parses input from a file according to a format
- * @link https://php.net/manual/en/function.fscanf.php
- * @param resource $stream &fs.file.pointer;
- * @param string $format <p>
- * The specified format as described in the
- * sprintf documentation.
- * </p>
- * @param mixed &...$vars [optional]
- * @return array|int|false|null If only two parameters were passed to this function, the values parsed will be
- * returned as an array. Otherwise, if optional parameters are passed, the
- * function will return the number of assigned values. The optional
- * parameters must be passed by reference.
+ * @param resource $stream
  */
-function fscanf(
-    $stream,
-    string $format,
-    #[TypeContract(exists: 'int|false|null', notExists: 'array|false|null')] mixed &...$vars,
-): array|int|false|null {
+function fscanf($stream, string $format, mixed &...$vars): array|int|false|null
+{
 }
 
 /**
@@ -355,143 +283,34 @@ function proc_close($process): int
 }
 
 /**
- * Kills a process opened by proc_open
- * @link https://php.net/manual/en/function.proc-terminate.php
- * @param resource $process <p>
- * The proc_open resource that will
- * be closed.
- * </p>
- * @param int $signal [optional] <p>
- * This optional parameter is only useful on POSIX
- * operating systems; you may specify a signal to send to the process
- * using the kill(2) system call. The default is
- * SIGTERM.
- * </p>
- * @return bool the termination status of the process that was run.
+ * @param resource $process
  */
 function proc_terminate($process, int $signal = 15): bool
 {
 }
 
 /**
- * Get information about a process opened by {@see proc_open}
- * @link https://php.net/manual/en/function.proc-get-status.php
- * @param resource $process <p>
- * The proc_open resource that will
- * be evaluated.
- * </p>
- * @return array|false An array of collected information on success, and false
- * on failure. The returned array contains the following elements:
- * </p>
- * <p>
- * <tr valign="top"><td>element</td><td>type</td><td>description</td></tr>
- * <tr valign="top">
- * <td>command</td>
- * <td>string</td>
- * <td>
- * The command string that was passed to proc_open.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>pid</td>
- * <td>int</td>
- * <td>process id</td>
- * </tr>
- * <tr valign="top">
- * <td>running</td>
- * <td>bool</td>
- * <td>
- * true if the process is still running, false if it has
- * terminated.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>signaled</td>
- * <td>bool</td>
- * <td>
- * true if the child process has been terminated by
- * an uncaught signal. Always set to false on Windows.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>stopped</td>
- * <td>bool</td>
- * <td>
- * true if the child process has been stopped by a
- * signal. Always set to false on Windows.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>exitcode</td>
- * <td>int</td>
- * <td>
- * The exit code returned by the process (which is only
- * meaningful if running is false).
- * Only first call of this function return real value, next calls return
- * -1.
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>termsig</td>
- * <td>int</td>
- * <td>
- * The number of the signal that caused the child process to terminate
- * its execution (only meaningful if signaled is true).
- * </td>
- * </tr>
- * <tr valign="top">
- * <td>stopsig</td>
- * <td>int</td>
- * <td>
- * The number of the signal that caused the child process to stop its
- * execution (only meaningful if stopped is true).
- * </td>
- * </tr>
+ * @param resource $process
+ *
+ * @return array{
+ *  'command': string,
+ *  'pid': int,
+ *  'running': bool,
+ *  'signaled': bool,
+ *  'stopped': bool,
+ *  'exitcode': int,
+ *  'termsig': int,
+ *  'stopsig': int,
+ * }
  */
-#[ArrayShape([
-    'command' => 'string',
-    'pid' => 'int',
-    'running' => 'bool',
-    'signaled' => 'bool',
-    'stopped' => 'bool',
-    'exitcode' => 'int',
-    'termsig' => 'int',
-    'stopsig' => 'int',
-])]
-#[LanguageLevelTypeAware(['8.0' => 'array'], default: 'array|false')]
-function proc_get_status($process)
+function proc_get_status($process): array
 {
 }
 
-/**
- * Change the priority of the current process. <br/>
- * Since 7.2.0 supported on Windows platforms.
- * @link https://php.net/manual/en/function.proc-nice.php
- * @param int $priority <p>
- * The increment value of the priority change.
- * </p>
- * @return bool true on success or false on failure.
- * If an error occurs, like the user lacks permission to change the priority,
- * an error of level E_WARNING is also generated.
- */
 function proc_nice(int $priority): bool
 {
 }
 
-/**
- * Get port number associated with an Internet service and protocol
- * @link https://php.net/manual/en/function.getservbyname.php
- * @param string $service <p>
- * The Internet service name, as a string.
- * </p>
- * @param string $protocol <p>
- * protocol is either "tcp"
- * or "udp" (in lowercase).
- * </p>
- * @return int|false the port number, or false if service or
- * protocol is not found.
- */
-#[Pure]
 function getservbyname(string $service, string $protocol): int|false
 {
 }

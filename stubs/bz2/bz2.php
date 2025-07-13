@@ -20,7 +20,9 @@ use JetBrains\PhpStorm\Pure;
  * it returns a pointer to the newly opened file.
  */
 #[Pure]
-function bzopen($file, string $mode) {}
+function bzopen($file, string $mode)
+{
+}
 
 /**
  * Binary safe bzip2 file read
@@ -36,7 +38,9 @@ function bzopen($file, string $mode) {}
  * </p>
  * @return string|false the uncompressed data, or <b>FALSE</b> on error.
  */
-function bzread($bz, int $length = 1024): string|false {}
+function bzread($bz, int $length = 1024): string|false
+{
+}
 
 /**
  * Binary safe bzip2 file write
@@ -55,7 +59,9 @@ function bzread($bz, int $length = 1024): string|false {}
  * </p>
  * @return int|false the number of bytes written, or <b>FALSE</b> on error.
  */
-function bzwrite($bz, string $data, ?int $length): int|false {}
+function bzwrite($bz, string $data, null|int $length): int|false
+{
+}
 
 /**
  * Force a write of all buffered data
@@ -66,7 +72,9 @@ function bzwrite($bz, string $data, ?int $length): int|false {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function bzflush($bz): bool {}
+function bzflush($bz): bool
+{
+}
 
 /**
  * Close a bzip2 file
@@ -77,7 +85,9 @@ function bzflush($bz): bool {}
  * </p>
  * @return bool <b>TRUE</b> on success or <b>FALSE</b> on failure.
  */
-function bzclose($bz): bool {}
+function bzclose($bz): bool
+{
+}
 
 /**
  * Returns a bzip2 error number
@@ -90,7 +100,9 @@ function bzclose($bz): bool {}
  */
 #[Pure]
 #[LanguageLevelTypeAware(['8.0' => 'int|false', '8.1' => 'int'], default: 'int')]
-function bzerrno($bz): int {}
+function bzerrno($bz): int
+{
+}
 
 /**
  * Returns a bzip2 error string
@@ -103,7 +115,9 @@ function bzerrno($bz): int {}
  */
 #[Pure]
 #[LanguageLevelTypeAware(['8.0' => 'string|false', '8.1' => 'string'], default: 'string')]
-function bzerrstr($bz): string {}
+function bzerrstr($bz): string
+{
+}
 
 /**
  * Returns the bzip2 error number and error string in an array
@@ -117,9 +131,11 @@ function bzerrstr($bz): string {}
  * errstr entry.
  */
 #[Pure]
-#[ArrayShape(["errno" => "int", "errstr" => "string"])]
+#[ArrayShape(['errno' => 'int', 'errstr' => 'string'])]
 #[LanguageLevelTypeAware(['8.0' => 'array|false', '8.1' => 'array'], default: 'array')]
-function bzerror($bz): array {}
+function bzerror($bz): array
+{
+}
 
 /**
  * Compress a string into bzip2 encoded data
@@ -144,12 +160,9 @@ function bzerror($bz): array {}
  * @return string|int The compressed string, or an error number if an error occurred.
  */
 #[Pure]
-function bzcompress(
-    string $data,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] int $blocksize,
-    #[PhpStormStubsElementAvailable(from: '7.1')] int $block_size = 4,
-    int $work_factor = 0
-): string|int {}
+function bzcompress(string $data, int $block_size = 4, int $work_factor = 0): string|int
+{
+}
 
 /**
  * Decompresses bzip2 encoded data
@@ -169,4 +182,6 @@ function bzcompress(
  * @return string|int|false The decompressed string, or an error number if an error occurred.
  */
 #[Pure]
-function bzdecompress(string $data, bool $use_less_memory = false): string|int|false {}
+function bzdecompress(string $data, bool $use_less_memory = false): string|int|false
+{
+}

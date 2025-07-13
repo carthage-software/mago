@@ -531,10 +531,8 @@ class mysqli
      * For other successful queries <b>mysqli_query</b> will
      * return true.
      */
-    public function query(
-        string $query,
-        #[PhpStormStubsElementAvailable(from: '7.1')] int $result_mode = MYSQLI_STORE_RESULT,
-    ): mysqli_result|bool {
+    public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT): mysqli_result|bool
+    {
     }
 
     /**
@@ -1188,7 +1186,7 @@ class mysqli_result implements IteratorAggregate
      * </p>
      * @return array an array of associative or numeric arrays holding result rows.
      */
-    public function fetch_all(#[PhpStormStubsElementAvailable(from: '7.0')] int $mode = MYSQLI_NUM): array
+    public function fetch_all(int $mode = MYSQLI_NUM): array
     {
     }
 
@@ -1953,10 +1951,8 @@ function mysqli_fetch_lengths(mysqli_result $result): array|false
  * @param int $mode
  * @return array Returns an array of associative or numeric arrays holding result rows.
  */
-function mysqli_fetch_all(
-    mysqli_result $result,
-    #[PhpStormStubsElementAvailable(from: '7.0')] int $mode = MYSQLI_NUM,
-): array {
+function mysqli_fetch_all(mysqli_result $result, int $mode = MYSQLI_NUM): array
+{
 }
 
 /**
@@ -2114,11 +2110,8 @@ function mysqli_get_charset(mysqli $mysql): null|object
  * @param mysqli|null $mysql A link identifier returned by mysqli_connect() or mysqli_init()
  * @return string|null A string that represents the MySQL client library version
  */
-#[LanguageLevelTypeAware(['8.0' => 'string'], default: 'string|null')]
-function mysqli_get_client_info(
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.1')] mysqli $mysql,
-    #[PhpStormStubsElementAvailable(from: '8.0')] null|mysqli $mysql = null,
-) {
+function mysqli_get_client_info(null|mysqli $mysql = null): string
+{
 }
 
 /**
@@ -2126,7 +2119,7 @@ function mysqli_get_client_info(
  * @link https://php.net/manual/en/mysqli.get-client-version.php
  * @return int
  */
-function mysqli_get_client_version(#[PhpStormStubsElementAvailable(from: '5.3', to: '7.3')]  $link): int
+function mysqli_get_client_version(): int
 {
 }
 
@@ -2283,12 +2276,8 @@ function mysqli_more_results(mysqli $mysql): bool
  * @param string $query A string containing the queries to be executed. Multiple queries must be separated by a semicolon.
  * @return bool Returns FALSE if the first statement failed. To retrieve subsequent errors from other statements you have to call mysqli_next_result() first.
  */
-function mysqli_multi_query(
-    mysqli $mysql,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] string $query,
-    #[PhpStormStubsElementAvailable(from: '7.1', to: '7.4')] string $query = null,
-    #[PhpStormStubsElementAvailable(from: '8.0')] string $query,
-): bool {
+function mysqli_multi_query(mysqli $mysql, string $query): bool
+{
 }
 
 /**
@@ -2430,11 +2419,8 @@ function mysqli_report(int $flags)
  * For other successful queries mysqli_query() will return TRUE.
  * Returns FALSE on failure.
  */
-function mysqli_query(
-    mysqli $mysql,
-    string $query,
-    #[PhpStormStubsElementAvailable(from: '7.1')] int $result_mode = MYSQLI_STORE_RESULT,
-): mysqli_result|bool {
+function mysqli_query(mysqli $mysql, string $query, int $result_mode = MYSQLI_STORE_RESULT): mysqli_result|bool
+{
 }
 
 /**
@@ -2481,12 +2467,8 @@ function mysqli_real_escape_string(mysqli $mysql, string $string): string
  * @param string $query
  * @return bool
  */
-function mysqli_real_query(
-    mysqli $mysql,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.0')] string $query,
-    #[PhpStormStubsElementAvailable(from: '7.1', to: '7.4')] string $query = null,
-    #[PhpStormStubsElementAvailable(from: '8.0')] string $query,
-): bool {
+function mysqli_real_query(mysqli $mysql, string $query): bool
+{
 }
 
 /**
@@ -2684,12 +2666,8 @@ function mysqli_stmt_send_long_data(mysqli_stmt $statement, int $param_num, stri
  * @param mixed &...$vars
  * @return bool true on success or false on failure.
  */
-function mysqli_stmt_bind_param(
-    mysqli_stmt $statement,
-    string $types,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] mixed &$vars,
-    mixed &...$vars,
-): bool {
+function mysqli_stmt_bind_param(mysqli_stmt $statement, string $types, mixed &...$vars): bool
+{
 }
 
 /**
@@ -2699,11 +2677,8 @@ function mysqli_stmt_bind_param(
  * @param mixed &...$vars The variables to be bound.
  * @return bool
  */
-function mysqli_stmt_bind_result(
-    mysqli_stmt $statement,
-    #[PhpStormStubsElementAvailable(from: '5.3', to: '7.4')] mixed &$vars,
-    mixed &...$vars,
-): bool {
+function mysqli_stmt_bind_result(mysqli_stmt $statement, mixed &...$vars): bool
+{
 }
 
 /**
@@ -2981,11 +2956,8 @@ function mysqli_refresh(mysqli $mysql, int $flags): bool
  * @param string $string The string to be escaped
  * @return string
  */
-function mysqli_escape_string(
-    mysqli $mysql,
-    string $string,
-    #[PhpStormStubsElementAvailable(from: '7.1', to: '7.4')]  $resultmode = null,
-): string {
+function mysqli_escape_string(mysqli $mysql, string $string): string
+{
 }
 
 /**

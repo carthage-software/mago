@@ -216,15 +216,6 @@ function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|
  *
  * @return false|array{0: int, 1: int, 2: int, 3: string, bits: int, channels: int, mime: string}
  */
-#[ArrayShape([
-    0 => 'int',
-    1 => 'int',
-    2 => 'int',
-    3 => 'string',
-    'bits' => 'int',
-    'channels' => 'int',
-    'mime' => 'string',
-])]
 function getimagesize(string $filename, &$image_info): array|false
 {
 }
