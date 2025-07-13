@@ -877,4 +877,47 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = complex_type_return,
+        code = indoc! {r#"
+            <?php
+
+            interface Foo {}
+
+            interface Bar {}
+
+            class Baz implements Foo, Bar {}
+
+            class BarImpl implements Bar {}
+
+            function get_bool(): bool {
+                return false;
+            }
+
+            /**
+             * @return string[][]|int|(Foo&Bar)|Bar[]
+             */
+            function foo(): mixed {
+                if (get_bool()) {
+                    return 42;
+                }
+
+                if (get_bool()) {
+                    return new Baz();
+                }
+
+                if (get_bool()) {
+                    return [new BarImpl(), ['f']];
+                }
+
+                return [
+                    ['a', 'b', 'c'],
+                    ['a', 'b', 'c'],
+                    ['a', 'b', 'c'],
+                    ['a', 'b', 'c'],
+                ];
+            }
+        "#},
+    }
 }

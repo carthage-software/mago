@@ -674,6 +674,26 @@ mod tests {
     }
 
     #[test]
+    fn test_slice_of_slice_of_slice_type() {
+        match do_parse("string[][][]") {
+            Ok(Type::Slice(s)) => {
+                assert!(matches!(*s.inner, Type::Slice(_)));
+                if let Type::Slice(inner_slice) = *s.inner {
+                    assert!(matches!(*inner_slice.inner, Type::Slice(_)));
+                    if let Type::Slice(inner_inner_slice) = *inner_slice.inner {
+                        assert!(matches!(*inner_inner_slice.inner, Type::String(_)));
+                    } else {
+                        panic!("Expected inner slice to be a Slice");
+                    }
+                } else {
+                    panic!("Expected outer slice to be a Slice");
+                }
+            }
+            res => panic!("Expected Ok(Type::Slice), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_int_range() {
         match do_parse("int<0, 100>") {
             Ok(Type::IntRange(r)) => {

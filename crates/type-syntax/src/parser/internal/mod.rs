@@ -22,7 +22,7 @@ pub mod stream;
 #[inline]
 pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
     let next = stream.peek()?;
-    let inner = match next.kind {
+    let mut inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from(stream.consume()?)),
         TypeTokenKind::Question => {
             Type::Nullable(NullableType { question_mark: stream.consume()?.span, inner: Box::new(parse_type(stream)?) })
@@ -355,46 +355,51 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         }
     };
 
-    // Nullable types can't be used in unions or intersections
-    if let Type::Nullable(_) = inner {
-        return Ok(inner);
-    }
+    loop {
+        let is_inner_nullable = matches!(inner, Type::Nullable(_));
 
-    Ok(match stream.lookahead(0)?.map(|t| t.kind) {
-        Some(TypeTokenKind::Pipe) => Type::Union(UnionType {
-            left: Box::new(inner),
-            pipe: stream.consume()?.span,
-            right: Box::new(parse_type(stream)?),
-        }),
-        Some(TypeTokenKind::Ampersand) => Type::Intersection(IntersectionType {
-            left: Box::new(inner),
-            ampersand: stream.consume()?.span,
-            right: Box::new(parse_type(stream)?),
-        }),
-        Some(TypeTokenKind::LeftBracket) => {
-            let left_bracket = stream.consume()?.span;
+        inner = match stream.lookahead(0)?.map(|t| t.kind) {
+            Some(TypeTokenKind::Pipe) if !is_inner_nullable => Type::Union(UnionType {
+                left: Box::new(inner),
+                pipe: stream.consume()?.span,
+                right: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::Ampersand) if !is_inner_nullable => Type::Intersection(IntersectionType {
+                left: Box::new(inner),
+                ampersand: stream.consume()?.span,
+                right: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::Is) if !is_inner_nullable => Type::Conditional(ConditionalType {
+                subject: Box::new(inner),
+                is: Keyword::from(stream.consume()?),
+                not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
+                target: Box::new(parse_type(stream)?),
+                question_mark: stream.eat(TypeTokenKind::Question)?.span,
+                then: Box::new(parse_type(stream)?),
+                colon: stream.eat(TypeTokenKind::Colon)?.span,
+                otherwise: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::LeftBracket) => {
+                let left_bracket = stream.consume()?.span;
 
-            if stream.is_at(TypeTokenKind::RightBracket)? {
-                Type::Slice(SliceType { inner: Box::new(inner), left_bracket, right_bracket: stream.consume()?.span })
-            } else {
-                Type::IndexAccess(IndexAccessType {
-                    target: Box::new(inner),
-                    left_bracket,
-                    index: Box::new(parse_type(stream)?),
-                    right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
-                })
+                if stream.is_at(TypeTokenKind::RightBracket)? {
+                    Type::Slice(SliceType {
+                        inner: Box::new(inner),
+                        left_bracket,
+                        right_bracket: stream.consume()?.span,
+                    })
+                } else {
+                    Type::IndexAccess(IndexAccessType {
+                        target: Box::new(inner),
+                        left_bracket,
+                        index: Box::new(parse_type(stream)?),
+                        right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
+                    })
+                }
             }
-        }
-        Some(TypeTokenKind::Is) => Type::Conditional(ConditionalType {
-            subject: Box::new(inner),
-            is: Keyword::from(stream.consume()?),
-            not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
-            target: Box::new(parse_type(stream)?),
-            question_mark: stream.eat(TypeTokenKind::Question)?.span,
-            then: Box::new(parse_type(stream)?),
-            colon: stream.eat(TypeTokenKind::Colon)?.span,
-            otherwise: Box::new(parse_type(stream)?),
-        }),
-        _ => inner,
-    })
+            _ => {
+                return Ok(inner);
+            }
+        };
+    }
 }
