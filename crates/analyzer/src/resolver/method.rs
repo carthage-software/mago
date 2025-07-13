@@ -188,7 +188,6 @@ pub fn resolve_method_from_object<'a>(
     object_type: &TObject,
     method_name: StringIdentifier,
     access_span: Span,
-
     result: &mut MethodResolutionResult,
 ) -> Vec<ResolvedMethod> {
     let mut resolved_methods = vec![];
@@ -290,18 +289,41 @@ pub fn get_method_ids_from_object<'a, 'b>(
 
     if let Some(intersection_types) = object_type.get_intersection_types() {
         for intersected_atomic in intersection_types {
-            if let TAtomic::Object(intersected_object) = intersected_atomic {
-                // Recursively search in the intersection types
-                ids.extend(get_method_ids_from_object(
-                    context,
-                    block_context,
-                    object,
-                    selector,
-                    intersected_object,
-                    method_name,
-                    access_span,
-                    result,
-                ));
+            match intersected_atomic {
+                TAtomic::Object(intersected_object) => {
+                    // Recursively search in the intersection types
+                    ids.extend(get_method_ids_from_object(
+                        context,
+                        block_context,
+                        object,
+                        selector,
+                        intersected_object,
+                        method_name,
+                        access_span,
+                        result,
+                    ));
+                }
+                TAtomic::GenericParameter(generic_parameter) => {
+                    // If the intersection type is a generic parameter, we need to check its constraint
+                    for constraint_atomic in &generic_parameter.constraint.types {
+                        if let TAtomic::Object(intersected_object) = constraint_atomic {
+                            // Recursively search in the intersection types
+                            ids.extend(get_method_ids_from_object(
+                                context,
+                                block_context,
+                                object,
+                                selector,
+                                intersected_object,
+                                method_name,
+                                access_span,
+                                result,
+                            ));
+                        }
+                    }
+                }
+                _ => {
+                    // For other atomic types, we do not need to do anything special
+                }
             }
         }
     }

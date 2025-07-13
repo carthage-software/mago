@@ -591,6 +591,18 @@ fn parse_assertion_string(
         return assertions;
     }
 
+    if type_string.value.eq_ignore_ascii_case("empty") || type_string.value.eq_ignore_ascii_case("!non-empty") {
+        assertions.push(Assertion::Empty);
+
+        return assertions;
+    }
+
+    if type_string.value.eq_ignore_ascii_case("non-empty") || type_string.value.eq_ignore_ascii_case("!empty") {
+        assertions.push(Assertion::NonEmpty);
+
+        return assertions;
+    }
+
     let mut is_equal = false;
     let mut is_negation = false;
     if type_string.value.starts_with("!") {

@@ -52,7 +52,7 @@ pub enum ResolutionOrigin {
 /// `<expr>::$property`, or `<expr>::CONSTANT`, where `<expr>` must resolve to a valid class identifier.
 /// It carries the resolved fully-qualified class name (if known) and metadata about how the
 /// resolution was performed via `ResolutionOrigin`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct ResolvedClassname {
     /// The fully qualified class name (`StringIdentifier`) if a specific class could be identified.
@@ -60,19 +60,21 @@ pub struct ResolvedClassname {
     pub fq_class_id: Option<StringIdentifier>,
     /// Describes how the class name was resolved.
     pub origin: ResolutionOrigin,
+    /// A list of other `ResolvedClassname` instances that this class name intersects with.
+    pub intersections: Vec<ResolvedClassname>,
 }
 
 impl ResolvedClassname {
     /// Creates a new `ResolvedClassname`.
     #[inline]
     const fn new(fq_class_id: Option<StringIdentifier>, origin: ResolutionOrigin) -> Self {
-        Self { fq_class_id, origin }
+        Self { fq_class_id, origin, intersections: Vec::new() }
     }
 
     /// Creates a `ResolvedClassname` that is definitively invalid.
     #[inline]
     const fn invalid() -> Self {
-        Self { fq_class_id: None, origin: ResolutionOrigin::Invalid }
+        Self { fq_class_id: None, origin: ResolutionOrigin::Invalid, intersections: Vec::new() }
     }
 
     /// Creates a `ResolvedClassname` that is definitively invalid.
@@ -267,57 +269,75 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
         atomic: &TAtomic,
         from_generic_class_string: bool,
     ) -> Option<ResolvedClassname> {
-        if let Some(literal_string) = atomic.get_literal_string_value() {
-            // A literal string value is treated as a generic string because, while its value
-            // is known, it's not guaranteed to be a class name without further checks.
-            // It's different from `MyClass::class` which is guaranteed.
-            return Some(ResolvedClassname::new(
-                Some(interner.intern(literal_string)),
-                ResolutionOrigin::GenericString,
-            ));
-        }
+        let mut class_name = match atomic {
+            TAtomic::Object(object) => match object {
+                TObject::Any => ResolvedClassname::new(None, ResolutionOrigin::GenericObject),
+                TObject::Enum(enum_object) => {
+                    let origin = if from_generic_class_string {
+                        ResolutionOrigin::GenericClassString
+                    } else {
+                        ResolutionOrigin::Object { is_this: atomic.is_this() }
+                    };
 
-        if let TAtomic::Scalar(TScalar::ClassLikeString(class_string)) = atomic {
-            return Some(match class_string {
-                TClassLikeString::Any { .. } => ResolvedClassname::new(None, ResolutionOrigin::GenericClassString),
-                TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. } => {
-                    // This is a `class-string<T>`. We resolve `T` to get the class name.
-                    get_class_name_from_atomic_impl(interner, constraint.as_ref(), true)?
+                    ResolvedClassname::new(Some(enum_object.name), origin)
                 }
-                TClassLikeString::Literal { value } => {
-                    ResolvedClassname::new(Some(*value), ResolutionOrigin::LiteralClassString)
+                TObject::Named(named_object) => {
+                    let origin = if from_generic_class_string {
+                        ResolutionOrigin::GenericClassString
+                    } else {
+                        ResolutionOrigin::Object { is_this: atomic.is_this() }
+                    };
+
+                    ResolvedClassname::new(Some(named_object.name), origin)
                 }
-            });
+            },
+            TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
+                match class_string {
+                    TClassLikeString::Any { .. } => ResolvedClassname::new(None, ResolutionOrigin::GenericClassString),
+                    TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. } => {
+                        // This is a `class-string<T>`. We resolve `T` to get the class name.
+                        get_class_name_from_atomic_impl(interner, constraint.as_ref(), true)?
+                    }
+                    TClassLikeString::Literal { value } => {
+                        ResolvedClassname::new(Some(*value), ResolutionOrigin::LiteralClassString)
+                    }
+                }
+            }
+            TAtomic::Scalar(scalar) => {
+                if let Some(literal_string) = atomic.get_literal_string_value() {
+                    // A literal string value is treated as a generic string because, while its value
+                    // is known, it's not guaranteed to be a class name without further checks.
+                    // It's different from `MyClass::class` which is guaranteed.
+                    ResolvedClassname::new(Some(interner.intern(literal_string)), ResolutionOrigin::GenericString)
+                } else if scalar.is_any_string() {
+                    ResolvedClassname::new(None, ResolutionOrigin::GenericString)
+                } else {
+                    return None; // This type cannot be interpreted as a class name.
+                }
+            }
+            TAtomic::Mixed(mixed) => {
+                if mixed.is_any() {
+                    ResolvedClassname::new(None, ResolutionOrigin::Any)
+                } else {
+                    ResolvedClassname::new(None, ResolutionOrigin::Mixed)
+                }
+            }
+            _ => {
+                // This type cannot be interpreted as a class name.
+                return None;
+            }
+        };
+
+        if let Some(intersections) = atomic.get_intersection_types() {
+            let intersection_class_names = intersections
+                .iter()
+                .filter_map(|intersection| get_class_name_from_atomic_impl(interner, intersection, false))
+                .collect::<Vec<_>>();
+
+            class_name.intersections = intersection_class_names;
         }
 
-        if let Some(object_name) = atomic.get_object_or_enum_name() {
-            let origin = if from_generic_class_string {
-                ResolutionOrigin::GenericClassString
-            } else {
-                ResolutionOrigin::Object { is_this: atomic.is_this() }
-            };
-
-            return Some(ResolvedClassname::new(Some(object_name), origin));
-        }
-
-        if let TAtomic::Object(TObject::Any) = atomic {
-            return Some(ResolvedClassname::new(None, ResolutionOrigin::GenericObject));
-        }
-
-        if atomic.is_any_string() {
-            return Some(ResolvedClassname::new(None, ResolutionOrigin::GenericString));
-        }
-
-        if atomic.is_any() {
-            return Some(ResolvedClassname::new(None, ResolutionOrigin::Any));
-        }
-
-        if atomic.is_mixed() {
-            return Some(ResolvedClassname::new(None, ResolutionOrigin::Mixed));
-        }
-
-        // This type cannot be interpreted as a class name.
-        None
+        Some(class_name)
     }
 
     get_class_name_from_atomic_impl(interner, atomic, false)

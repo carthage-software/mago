@@ -58,9 +58,7 @@ pub(crate) fn reconcile(
     negated: bool,
     inside_loop: bool,
 ) -> Option<TUnion> {
-    let assertion_type = assertion.get_type();
-
-    if let Some(assertion_type) = assertion_type {
+    if let Some(assertion_type) = assertion.get_type() {
         match assertion_type {
             TAtomic::Scalar(TScalar::Generic) => {
                 return intersect_simple!(
@@ -236,7 +234,9 @@ pub(crate) fn reconcile(
     }
 
     match assertion {
-        Assertion::Truthy => Some(reconcile_truthy(context, assertion, existing_var_type, key, negated, span)),
+        Assertion::Truthy | Assertion::NonEmpty => {
+            Some(reconcile_truthy_or_non_empty(context, assertion, existing_var_type, key, negated, span))
+        }
         Assertion::IsEqualIsset | Assertion::IsIsset => Some(reconcile_isset(
             context,
             assertion,
@@ -959,7 +959,7 @@ fn intersect_int(
     get_never()
 }
 
-fn reconcile_truthy(
+fn reconcile_truthy_or_non_empty(
     context: &mut ReconcilationContext<'_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
@@ -968,14 +968,12 @@ fn reconcile_truthy(
     span: Option<&Span>,
 ) -> TUnion {
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
-
     let mut new_var_type = existing_var_type.clone();
-    let existing_var_types = new_var_type.types.drain(..).collect::<Vec<_>>();
     let mut acceptable_types = vec![];
 
-    for atomic in existing_var_types {
-        // if any atomic in the union is either always falsy, we remove it.
-        // If not always truthy, we mark the check as not redundant.
+    let is_non_empty_assertion = matches!(assertion, Assertion::NonEmpty);
+
+    for atomic in new_var_type.types.drain(..) {
         if atomic.is_falsy() {
             did_remove_type = true;
         } else if !atomic.is_truthy() || new_var_type.possibly_undefined_from_try {
@@ -984,7 +982,7 @@ fn reconcile_truthy(
             match atomic {
                 TAtomic::GenericParameter(TGenericParameter { ref constraint, .. }) => {
                     if !constraint.is_mixed() {
-                        let atomic = atomic.replace_template_constraint(reconcile_truthy(
+                        let atomic = atomic.replace_template_constraint(reconcile_truthy_or_non_empty(
                             context, assertion, constraint, None, false, None,
                         ));
 
@@ -1037,6 +1035,7 @@ fn reconcile_truthy(
         existing_var_type,
         assertion,
         negated,
+        !is_non_empty_assertion,
         new_var_type,
     )
 }
@@ -1911,9 +1910,11 @@ pub(crate) fn get_acceptable_type(
     existing_var_type: &TUnion,
     assertion: &Assertion,
     negated: bool,
+    trigger_issue: bool,
     mut new_var_type: TUnion,
 ) -> TUnion {
-    if (acceptable_types.is_empty() || !did_remove_type)
+    if trigger_issue
+        && (acceptable_types.is_empty() || !did_remove_type)
         && let Some(key) = key
         && let Some(span) = span
     {

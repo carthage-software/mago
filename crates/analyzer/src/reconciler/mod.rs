@@ -506,6 +506,7 @@ fn add_nested_assertions(
 
     new_types.retain(|k, _| !keys_to_remove.contains(k));
 }
+
 pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
     if path.is_empty() {
         return vec!["".to_string()];
@@ -1128,6 +1129,10 @@ fn report_redundant_issue(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
     use super::*;
 
     #[test]
@@ -1136,5 +1141,70 @@ mod tests {
         let expected: Vec<&str> = vec!["$service_name", "->", "prop", "[", "0", "]", "->", "foo", "::$", "prop"];
         let result = break_up_path_into_parts(path);
         assert_eq!(result, expected);
+    }
+
+    test_analysis! {
+        name = reconcile_non_empty_string,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @assert-if-true !empty $string
+             */
+            function is_non_empty(string $string): bool {
+                return $string !== '';
+            }
+
+            /**
+             * @param non-empty-string $str
+             */
+            function i_take_non_empty(string $str): void {
+                echo $str;
+            }
+
+            function i_take_any(string $str): void {
+                if (is_non_empty($str)) {
+                    i_take_non_empty($str);
+                } else {
+                    i_take_non_empty('default value');
+                }
+            }
+        "#}
+    }
+
+    test_analysis! {
+        name = reconcile_empty_string,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @assert-if-true empty $string
+             */
+            function is_empty_str(string $string): bool {
+                return $string === '';
+            }
+
+            /**
+             * @param '' $str
+             */
+            function i_take_empty_str(string $str): void {
+                echo 'Here comes nothing: ' . $str;
+            }
+
+            /**
+             * @param non-empty-string $str
+             */
+            function i_take_non_empty(string $str): void {
+                echo 'Here comes something: ' . $str;
+            }
+
+            function i_take_any(string $str): void {
+                if (is_empty_str($str)) {
+                    i_take_empty_str($str);
+                } else {
+                    i_take_non_empty($str);
+                }
+            }
+        "#}
     }
 }

@@ -12,6 +12,7 @@ pub struct TMixed {
     is_isset_from_loop: bool,
     is_any: bool,
     is_non_null: bool,
+    is_empty: bool,
     truthiness: TMixedTruthiness,
 }
 
@@ -25,6 +26,7 @@ impl TMixed {
             is_isset_from_loop: false,
             is_any: false,
             is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Undetermined,
         }
     }
@@ -34,8 +36,9 @@ impl TMixed {
     pub const fn any() -> Self {
         Self {
             is_isset_from_loop: false,
-            is_any: true, // Mark as 'any'
+            is_any: true,
             is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Undetermined,
         }
     }
@@ -43,7 +46,13 @@ impl TMixed {
     /// Creates a `Mixed` type constrained to be non-null.
     #[inline]
     pub const fn non_null() -> Self {
-        Self { is_isset_from_loop: false, is_any: false, is_non_null: true, truthiness: TMixedTruthiness::Undetermined }
+        Self {
+            is_isset_from_loop: false,
+            is_any: false,
+            is_non_null: true,
+            is_empty: false,
+            truthiness: TMixedTruthiness::Undetermined,
+        }
     }
 
     /// Creates a `Mixed` type marked as originating from `isset()` in a loop.
@@ -53,6 +62,7 @@ impl TMixed {
             is_isset_from_loop: true, // Mark origin
             is_any: false,
             is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Undetermined,
         }
     }
@@ -64,6 +74,7 @@ impl TMixed {
             is_isset_from_loop: from_loop,
             is_any: false,
             is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Undetermined,
         }
     }
@@ -74,7 +85,8 @@ impl TMixed {
         Self {
             is_isset_from_loop: false,
             is_any: false,
-            is_non_null: true, // Truthy implies non-null
+            is_non_null: true,
+            is_empty: false,
             truthiness: TMixedTruthiness::Truthy,
         }
     }
@@ -85,7 +97,8 @@ impl TMixed {
         Self {
             is_isset_from_loop: false,
             is_any: false,
-            is_non_null: false, // Falsy *can* be null
+            is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Falsy,
         }
     }
@@ -105,7 +118,7 @@ impl TMixed {
     /// Checks if this `mixed` type is a vanilla `mixed` type.
     #[inline]
     pub const fn is_vanilla(&self) -> bool {
-        !self.is_any && !self.is_non_null && matches!(self.truthiness, TMixedTruthiness::Undetermined)
+        !self.is_any && !self.is_non_null && !self.is_empty && matches!(self.truthiness, TMixedTruthiness::Undetermined)
     }
 
     /// Checks if this represents the most general "any" mixed type.
@@ -173,42 +186,46 @@ impl TMixed {
         self
     }
 
+    pub const fn as_empty(mut self) -> Self {
+        self.is_empty = true;
+        self.ensure_consistency();
+
+        self
+    }
+
     /// Ensures consistency between `is_non_null` and `truthiness`.
     #[inline]
     const fn ensure_consistency(&mut self) {
         if self.is_truthy() {
-            self.is_non_null = true; // Truthy always implies non-null
+            self.is_non_null = true;
+        }
+
+        if self.is_empty {
+            self.is_non_null = false;
+            self.truthiness = TMixedTruthiness::Falsy;
         }
     }
 }
 
 impl TType for TMixed {
     fn get_id(&self, _interner: Option<&mago_interner::ThreadedInterner>) -> String {
-        if self.is_any {
+        let id = if self.is_any {
             match self.truthiness {
-                TMixedTruthiness::Truthy => "truthy-from-any".to_string(),
-                TMixedTruthiness::Falsy => "falsy-from-any".to_string(),
-                TMixedTruthiness::Undetermined => {
-                    if self.is_non_null {
-                        "nonnull-from-any".to_string()
-                    } else {
-                        "any".to_string()
-                    }
-                }
+                TMixedTruthiness::Truthy => "truthy-from-any",
+                TMixedTruthiness::Falsy => "falsy-from-any",
+                TMixedTruthiness::Undetermined if self.is_non_null => "nonnull-from-any",
+                TMixedTruthiness::Undetermined => "any",
             }
         } else {
             match self.truthiness {
-                TMixedTruthiness::Truthy => "truthy-mixed".to_string(),
-                TMixedTruthiness::Falsy => "falsy-mixed".to_string(),
-                TMixedTruthiness::Undetermined => {
-                    if self.is_non_null {
-                        "nonnull".to_string()
-                    } else {
-                        "mixed".to_string()
-                    }
-                }
+                TMixedTruthiness::Truthy => "truthy-mixed",
+                TMixedTruthiness::Falsy => "falsy-mixed",
+                TMixedTruthiness::Undetermined if self.is_non_null => "nonnull",
+                TMixedTruthiness::Undetermined => "mixed",
             }
-        }
+        };
+
+        if self.is_empty { format!("empty-{id}") } else { id.to_string() }
     }
 }
 
@@ -218,6 +235,7 @@ impl Default for TMixed {
             is_isset_from_loop: false,
             is_any: false,
             is_non_null: false,
+            is_empty: false,
             truthiness: TMixedTruthiness::Undetermined,
         }
     }

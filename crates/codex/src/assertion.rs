@@ -128,7 +128,6 @@ impl Assertion {
                 | Assertion::HasAtLeastCount(_)
                 | Assertion::EmptyCountable
                 | Assertion::Empty
-                | Assertion::NonEmpty
                 | Assertion::NotCountable(_)
         )
     }
