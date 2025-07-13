@@ -65,3 +65,83 @@ impl Analyzable for StaticMethodCall {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = calling_non_static_method_statically_is_ok,
+        code = indoc! {r#"
+            <?php
+
+            class Example {
+                private string $value = '';
+
+                function doWork(): void {
+                    $something = self::getSomething(); // Ok
+                    $something .= $this->getSomething(); // Ok
+                    $something .= Example::getSomething(); // Ok
+                    $something .= static::getSomething(); // Ok
+
+                    echo 'Doing work with: ' . $something;
+                }
+
+                function getSomething(): string {
+                    return $this->value;
+                }
+            }
+
+            class SubExample extends Example {
+                function doWork(): void {
+                    $something = self::getSomething(); // Ok
+                    $something .= $this->getSomething(); // Ok
+                    $something .= Example::getSomething(); // Ok
+                    $something .= SubExample::getSomething(); // Ok
+                    $something .= static::getSomething(); // Ok
+                    $something .= parent::getSomething(); // Ok
+
+                    echo 'Doing work with: ' . $something;
+                }
+            }
+
+            trait TraitExample {
+                function doWork(): void {
+                    $something = self::getSomething(); // Ok
+                    $something .= $this->getSomething(); // Ok
+                    $something .= static::getSomething(); // Ok
+
+                    echo 'Doing work with: ' . $something;
+                }
+
+                function getSomething(): string {
+                    return 'Trait value';
+                }
+            }
+
+            class TraitUser {
+                use TraitExample;
+
+                function doWorkToo(): void {
+                    $something = self::getSomething(); // Ok
+                    $something .= $this->getSomething(); // Ok
+                    $something .= TraitUser::getSomething(); // Ok
+                    $something .= static::getSomething(); // Ok
+
+                    echo 'Doing work with: ' . $something;
+                }
+            }
+
+            $e = new Example();
+            $s = new SubExample();
+            $t = new TraitUser();
+
+            $e->doWork();
+            $s->doWork();
+            $t->doWork();
+            $t->doWorkToo();
+        "#}
+    }
+}

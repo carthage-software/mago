@@ -88,40 +88,46 @@ impl ResolvedClassname {
     /// This is true for vague types like a generic `string`, `mixed`, or `any`, where the
     /// actual value is not guaranteed to be a valid class name. It is also true if the
     /// resolution is known to be `Invalid`.
-    pub fn is_possibly_invalid(&self) -> bool {
+    pub const fn is_possibly_invalid(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Mixed | ResolutionOrigin::Any | ResolutionOrigin::Invalid)
     }
 
     /// Checks if the class name is resolved from the `static` keyword.
-    pub fn is_static(&self) -> bool {
+    pub const fn is_static(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Static { .. })
     }
 
     /// Checks if the class name is resolved from the `static` keyword and the class is not final,
-    pub fn can_extend_static(&self) -> bool {
+    pub const fn can_extend_static(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Static { can_extend: true })
     }
 
     /// Checks if the resolution is from a generic `class-string` type,
     /// which means it could be any class name that is a valid `class-string`.
-    pub fn is_from_class_string(&self) -> bool {
+    pub const fn is_from_class_string(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::GenericClassString | ResolutionOrigin::LiteralClassString)
     }
 
     /// Checks if the resolution is from a generic `object` type,
     /// which means it could be any object type.
-    pub fn is_from_generic_object(&self) -> bool {
+    pub const fn is_from_generic_object(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::GenericObject)
     }
 
     /// Checks if the resolution is a class instance (e.g., from an object or `static`).
-    pub fn is_object_instance(&self) -> bool {
+    pub const fn is_object_instance(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Object { .. } | ResolutionOrigin::Static { .. })
     }
 
-    /// Checks if the resolution is from a `parent` keyword.
-    pub fn is_from_parent(&self) -> bool {
-        matches!(self.origin, ResolutionOrigin::Named { is_parent: true, .. })
+    /// Checks if the resolution is from a `self`, `static`, or `parent` keyword.
+    #[inline]
+    pub const fn is_relative(&self) -> bool {
+        matches!(
+            self.origin,
+            ResolutionOrigin::Named { is_self: true, .. }
+                | ResolutionOrigin::Named { is_parent: true, .. }
+                | ResolutionOrigin::Static { .. }
+        )
     }
 }
 

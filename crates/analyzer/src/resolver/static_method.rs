@@ -78,16 +78,10 @@ pub fn resolve_static_method_targets<'a>(
             continue;
         };
 
-        if !class_res.is_object_instance() {
-            if metadata.is_interface() {
-                report_static_access_on_interface(context, &metadata.name, class_expr.span());
-                result.has_invalid_target = true;
-                continue;
-            }
-
-            if metadata.is_trait() && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait) {
-                report_deprecated_static_access_on_trait(context, &metadata.name, class_expr.span());
-            }
+        if !class_res.is_object_instance() && metadata.is_interface() {
+            report_static_access_on_interface(context, &metadata.original_name, class_expr.span());
+            result.has_invalid_target = true;
+            continue;
         }
 
         for method_name in &method_names {
@@ -99,7 +93,7 @@ pub fn resolve_static_method_targets<'a>(
                 &fq_class_id,
                 class_expr.span(),
                 method_selector.span(),
-                class_res.is_from_parent(),
+                class_res.is_relative(),
             ) {
                 Some(resolved_method) => {
                     result.resolved_methods.push(resolved_method);
@@ -123,7 +117,7 @@ fn find_static_method_in_class<'a>(
     fq_class_id: &StringIdentifier,
     class_span: Span,
     method_span: Span,
-    for_parent: bool,
+    is_relative: bool,
 ) -> Option<ResolvedMethod> {
     let method_id = get_method_id(&defining_class_metadata.original_name, &method_name);
     let declaring_method_id = get_declaring_method_id(context.codebase, context.interner, &method_id);
@@ -134,13 +128,26 @@ fn find_static_method_in_class<'a>(
         return None;
     };
 
-    if !for_parent && function_like_metadata.get_method_metadata().is_none_or(|m| !m.is_static()) {
+    let is_method_static = function_like_metadata.get_method_metadata().is_some_and(|m| m.is_static());
+
+    if !is_method_static
+        && !is_relative
+        && !current_class_metadata.is_some_and(|current_class_metadata| {
+            current_class_metadata.name == defining_class_metadata.name
+                || current_class_metadata.has_parent(&defining_class_metadata.name)
+        })
+    {
         report_non_static_access(context, &declaring_method_id, method_span);
         return None;
+    } else if is_method_static
+        && defining_class_metadata.is_trait()
+        && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
+    {
+        report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
     }
 
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata
-        && for_parent
+        && is_relative
     {
         let mut type_parameters = vec![];
         for (template_name, _) in &defining_class_metadata.template_types {
