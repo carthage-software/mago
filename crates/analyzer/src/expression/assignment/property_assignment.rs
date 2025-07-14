@@ -253,7 +253,7 @@ fn add_instance_property_dataflow(
     assigned_value_type: &TUnion,
 ) {
     if let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, class_name) {
-        if class_like_metadata.is_specialized_instance() {
+        if class_like_metadata.specialized_instance {
             if let Some(object_variable_id) = object_variable_id.to_owned() {
                 add_instance_property_assignment_dataflow(
                     context,

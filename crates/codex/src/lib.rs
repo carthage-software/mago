@@ -20,6 +20,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::union::TUnion;
 
 pub mod assertion;
+pub mod consts;
 pub mod context;
 pub mod data_flow;
 pub mod diff;
@@ -445,7 +446,7 @@ pub fn get_declaring_method_id(
         return MethodIdentifier::new(declaring_class_metadata.original_name, *method_id.get_method_name());
     };
 
-    if class_like_metadata.is_abstract() {
+    if class_like_metadata.is_abstract {
         let overridden_method_ids = class_like_metadata.get_overridden_method_ids();
         if let Some(overridden_classes) = overridden_method_ids.get(&lowered_method_id)
             && let Some(first_class) = overridden_classes.iter().next()
@@ -711,7 +712,7 @@ pub fn get_class_constant_type<'a>(
 ) -> Option<Cow<'a, TUnion>> {
     let class_metadata = get_class_like(codebase, interner, fq_class_name)?;
 
-    if class_metadata.is_enum() && class_metadata.get_enum_cases().contains_key(constant_name) {
+    if class_metadata.kind.is_enum() && class_metadata.enum_cases.contains_key(constant_name) {
         return Some(Cow::Owned(TUnion::new(vec![TAtomic::Object(TObject::new_enum_case(
             class_metadata.original_name,
             *constant_name,
@@ -719,10 +720,10 @@ pub fn get_class_constant_type<'a>(
     }
 
     // It's a regular class constant
-    let constant_metadata = class_metadata.get_constant(constant_name)?;
+    let constant_metadata = class_metadata.constants.get(constant_name)?;
 
     // Prefer the type signature if available
-    if let Some(type_metadata) = constant_metadata.get_type_metadata() {
+    if let Some(type_metadata) = constant_metadata.type_metadata.as_ref() {
         // Return borrowed signature type directly
         // (Original logic about boring scalars/is_this seemed complex and possibly specific
         //  to a particular analysis stage; simplifying here to return declared type if present)
@@ -730,7 +731,7 @@ pub fn get_class_constant_type<'a>(
     }
 
     // Fall back to inferred type if no signature
-    constant_metadata.get_inferred_type().map(|atomic_type| {
+    constant_metadata.inferred_type.as_ref().map(|atomic_type| {
         // Wrap the atomic type in a TUnion if returning inferred type
         Cow::Owned(TUnion::new(vec![atomic_type.clone()]))
     })

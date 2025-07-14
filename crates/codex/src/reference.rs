@@ -122,7 +122,7 @@ impl SymbolReferences {
     ) {
         if referencing_symbol == symbol {
             return;
-        } // Skip self-references
+        }
 
         // Represent top-level symbols with an empty member identifier
         let referencing_key = (referencing_symbol, StringIdentifier::empty());
@@ -159,7 +159,7 @@ impl SymbolReferences {
     ) {
         if referencing_class_member == class_member {
             return;
-        } // Skip self-references
+        }
 
         // Add implicit references between the classes/symbols involved
         self.add_symbol_reference_to_symbol(referencing_class_member.0, class_member.0, false);
@@ -196,7 +196,7 @@ impl SymbolReferences {
     ) {
         if referencing_class_member.0 == symbol {
             return;
-        } // Skip references to own class
+        }
 
         // Add implicit reference from the class to the symbol
         self.add_symbol_reference_to_symbol(referencing_class_member.0, symbol, false);
@@ -222,7 +222,6 @@ impl SymbolReferences {
 
     /// Convenience method to add a reference *from* the current function context *to* a class member.
     /// Delegates to appropriate `add_*` methods based on the function context.
-    /// Handles panics if context is inconsistent (e.g., closure ID not expected).
     #[inline]
     pub fn add_reference_to_class_member(
         &mut self,
@@ -269,14 +268,16 @@ impl SymbolReferences {
 
     /// Convenience method to add a reference *from* the current function context *to* an overridden class member (e.g., `parent::foo`).
     /// Delegates based on the function context.
-    /// Handles panics if context is inconsistent.
     #[inline]
     pub fn add_reference_to_overridden_class_member(&mut self, scope: &ScopeContext, class_member: SymbolIdentifier) {
         let referencing_key = if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
                 FunctionLikeIdentifier::Function(function_name) => (StringIdentifier::empty(), function_name),
                 FunctionLikeIdentifier::Method(class_name, function_name) => (class_name, function_name),
-                _ => unreachable!("unexpected referencing function-like kind for overridden member reference"),
+                _ => {
+                    // A reference from a closure can be ignored for now.
+                    return;
+                }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
             (*calling_class, StringIdentifier::empty())
@@ -289,7 +290,6 @@ impl SymbolReferences {
 
     /// Convenience method to add a reference *from* the current function context *to* a top-level symbol.
     /// Delegates to appropriate `add_*` methods based on the function context.
-    /// Handles panics if context is inconsistent.
     #[inline]
     pub fn add_reference_to_symbol(&mut self, scope: &ScopeContext, symbol: StringIdentifier, in_signature: bool) {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
@@ -318,7 +318,7 @@ impl SymbolReferences {
     ) {
         if referencing_functionlike == referenced_functionlike {
             return;
-        } // Skip self-references
+        }
 
         self.functionlike_references_to_functionlike_returns
             .entry(referencing_functionlike)

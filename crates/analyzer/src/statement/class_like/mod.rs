@@ -229,7 +229,7 @@ pub(crate) fn analyze_class_like<'a>(
         return Ok(());
     }
 
-    if !class_like_metadata.kind.is_trait() && !class_like_metadata.is_abstract() {
+    if !class_like_metadata.kind.is_trait() && !class_like_metadata.is_abstract {
         for (method_name, fqcn) in &class_like_metadata.declaring_method_ids {
             if class_like_metadata.kind.is_enum() {
                 let method_name_str = context.interner.lookup(method_name);
@@ -358,8 +358,8 @@ fn check_class_like_extends(
     class_like_metadata: &ClassLikeMetadata,
     extends_ast: Option<&Extends>,
 ) -> Result<(), AnalysisError> {
-    let extending_class = class_like_metadata.is_class();
-    let extending_interface = class_like_metadata.is_interface();
+    let extending_class = class_like_metadata.kind.is_class();
+    let extending_interface = class_like_metadata.kind.is_interface();
 
     if !extending_class && !extending_interface {
         return Ok(());
@@ -389,13 +389,18 @@ fn check_class_like_extends(
             let extending_class_span =
                 class_like_metadata.get_name_span().unwrap_or_else(|| class_like_metadata.get_span());
             let extended_name_str = context.interner.lookup(&extended_class_metadata.original_name);
-            let extended_kind_str = extended_class_metadata.get_kind().as_str();
-            let extended_kind_prefix = if extended_class_metadata.is_class_or_trait() { "a" } else { "an" };
+            let extended_kind_str = extended_class_metadata.kind.as_str();
+            let extended_kind_prefix =
+                if extended_class_metadata.kind.is_class() || extended_class_metadata.kind.is_trait() {
+                    "a"
+                } else {
+                    "an"
+                };
             let extended_class_span =
                 extended_class_metadata.get_name_span().unwrap_or_else(|| extended_class_metadata.get_span());
 
             if extending_interface {
-                if !extended_class_metadata.is_interface() {
+                if !extended_class_metadata.kind.is_interface() {
                     context.buffer.report(
                         TypingIssueKind::InvalidExtend,
                         Issue::error(format!("Interface `{extending_name_str}` cannot extend {extended_kind_prefix} {extended_kind_str}."))
@@ -434,7 +439,7 @@ fn check_class_like_extends(
             }
 
             if extending_class {
-                if !extended_class_metadata.is_class() {
+                if !extended_class_metadata.kind.is_class() {
                     context.buffer.report(
                         TypingIssueKind::InvalidExtend,
                         Issue::error(format!("Class `{extending_name_str}` cannot extend {extended_kind_prefix} {extended_kind_str}."))
@@ -449,7 +454,7 @@ fn check_class_like_extends(
                     continue;
                 }
 
-                if extended_class_metadata.is_final() {
+                if extended_class_metadata.is_final {
                     context.buffer.report(
                         TypingIssueKind::InvalidExtend,
                         Issue::error(format!("Class `{extending_name_str}` cannot extend final class `{extended_name_str}`."))
@@ -544,7 +549,7 @@ fn check_class_like_extends(
                     }
                 }
 
-                if !class_like_metadata.is_abstract()
+                if !class_like_metadata.is_abstract
                     && let Some(permitted_inheritors) = &extended_class_metadata.permitted_inheritors
                     && !permitted_inheritors.contains(&class_like_metadata.name)
                     && !class_like_metadata
@@ -598,7 +603,7 @@ fn check_class_like_implements(
     class_like_metadata: &ClassLikeMetadata,
     implements_ast: Option<&Implements>,
 ) -> Result<(), AnalysisError> {
-    if !class_like_metadata.is_class() && !class_like_metadata.is_enum() {
+    if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
         // Interfaces and traits cannot implement interfaces
         // This will be caught by the semantic analyzer
         return Ok(());
@@ -615,11 +620,16 @@ fn check_class_like_implements(
 
         match implemented_interface_metadata {
             Some(implemented_metadata) => {
-                if !implemented_metadata.is_interface() {
+                if !implemented_metadata.kind.is_interface() {
                     let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
                     let implemented_name_str = context.interner.lookup(&implemented_metadata.original_name);
-                    let implemented_kind_str = implemented_metadata.get_kind().as_str();
-                    let implemented_kind_prefix = if implemented_metadata.is_class_or_trait() { "a" } else { "an" };
+                    let implemented_kind_str = implemented_metadata.kind.as_str();
+                    let implemented_kind_prefix =
+                        if implemented_metadata.kind.is_class() || implemented_metadata.kind.is_trait() {
+                            "a"
+                        } else {
+                            "an"
+                        };
 
                     context.buffer.report(
                         TypingIssueKind::InvalidImplement,
@@ -656,7 +666,7 @@ fn check_class_like_implements(
                     );
                 }
 
-                if !class_like_metadata.is_abstract()
+                if !class_like_metadata.is_abstract
                     && let Some(permitted_inheritors) = &implemented_metadata.permitted_inheritors
                     && !permitted_inheritors.contains(&class_like_metadata.name)
                     && !class_like_metadata
@@ -745,7 +755,7 @@ fn check_template_parameters(
     let expected_parameters_count = parent_metadata.get_template_types().len();
 
     let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
-    let class_kind_str = class_like_metadata.get_kind().as_str();
+    let class_kind_str = class_like_metadata.kind.as_str();
     let parent_name_str = context.interner.lookup(&parent_metadata.original_name);
     let class_name_span = class_like_metadata.get_name_span().unwrap_or_else(|| class_like_metadata.get_span());
     let parent_definition_span = parent_metadata.get_name_span().unwrap_or_else(|| parent_metadata.get_span());
@@ -797,7 +807,7 @@ fn check_template_parameters(
     }
 
     let own_template_parameters_len = class_like_metadata.get_template_types().len();
-    if parent_metadata.has_consistent_templates() && own_template_parameters_len != expected_parameters_count {
+    if parent_metadata.has_consistent_templates && own_template_parameters_len != expected_parameters_count {
         context.buffer.report(
             TypingIssueKind::InconsistentTemplate,
             Issue::error(format!(
@@ -862,7 +872,7 @@ fn check_template_parameters(
                 }
             }
 
-            if parent_metadata.has_consistent_templates() {
+            if parent_metadata.has_consistent_templates {
                 for extended_type_atomic in &extended_type.types {
                     let extended_as_template = extended_type_atomic.get_generic_parameter_name();
                     if extended_as_template.is_none() {

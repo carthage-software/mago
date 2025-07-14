@@ -151,7 +151,7 @@ pub fn populate_codebase(
             }
         }
 
-        for (constant_name, constant) in metadata.get_constants_mut() {
+        for (constant_name, constant) in &mut metadata.constants {
             let constant_reference_source = ReferenceSource::ClassLikeMember(true, *name, *constant_name);
 
             for attribute_metadata in constant.get_attributes() {
@@ -185,7 +185,7 @@ pub fn populate_codebase(
             }
         }
 
-        for (enum_case_name, enum_case) in metadata.get_enum_cases_mut() {
+        for (enum_case_name, enum_case) in &mut metadata.enum_cases {
             let enum_case_reference_source = ReferenceSource::ClassLikeMember(true, *name, *enum_case_name);
 
             for attribute_metadata in enum_case.get_attributes() {
@@ -559,7 +559,7 @@ fn populate_class_like_metadata(
     }
 
     // Apply immutability to properties if the class is immutable
-    if metadata.is_immutable() {
+    if metadata.is_immutable {
         for property_metadata in metadata.get_properties_mut().values_mut() {
             if !property_metadata.is_static() {
                 property_metadata.set_is_readonly(true);
@@ -591,8 +591,8 @@ fn populate_interface_metadata_from_parent_interface(
         return;
     };
 
-    for (interface_constant_name, interface_constant_metadata) in parent_interface_metadata.get_constants() {
-        if !metadata.has_constant(interface_constant_name) {
+    for (interface_constant_name, interface_constant_metadata) in &parent_interface_metadata.constants {
+        if !metadata.constants.contains_key(interface_constant_name) {
             metadata.add_constant(*interface_constant_name, interface_constant_metadata.clone());
         }
     }
@@ -646,18 +646,14 @@ fn populate_metadata_from_parent_class_like(
     inherit_methods_from_parent(metadata, parent_metadata, codebase, interner);
     inherit_properties_from_parent(metadata, parent_metadata);
 
-    for (parent_constant_name, parent_constant_metadata) in parent_metadata.get_constants() {
-        if !metadata.has_constant(parent_constant_name) {
+    for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
+        if !metadata.constants.contains_key(parent_constant_name) {
             metadata.add_constant(*parent_constant_name, parent_constant_metadata.clone());
         }
     }
 
-    if parent_metadata.has_consistent_constructor() {
-        metadata.set_has_consistent_constructor(true);
-    }
-
-    if parent_metadata.has_consistent_templates() {
-        metadata.set_has_consistent_templates(true);
+    if parent_metadata.has_consistent_templates {
+        metadata.has_consistent_templates = true;
     }
 }
 
@@ -680,8 +676,8 @@ fn populate_metadata_from_trait(
     };
 
     // Inherit constants (if not already defined)
-    for (trait_constant_name, trait_constant_metadata) in trait_metadata.get_constants() {
-        if !metadata.has_constant(trait_constant_name) {
+    for (trait_constant_name, trait_constant_metadata) in &trait_metadata.constants {
+        if !metadata.constants.contains_key(trait_constant_name) {
             metadata.add_constant(*trait_constant_name, trait_constant_metadata.clone());
         }
     }
@@ -708,7 +704,7 @@ fn inherit_methods_from_parent(
     interner: &ThreadedInterner,
 ) {
     let class_like_name = metadata.name;
-    let is_trait = metadata.is_trait();
+    let is_trait = metadata.kind.is_trait();
 
     for (method_name, appearing_class_like) in parent_metadata.get_appearing_method_ids() {
         if metadata.has_appearing_method(method_name) {
@@ -733,8 +729,9 @@ fn inherit_methods_from_parent(
 
     let constructor_id = interner.intern("__construct");
     for (method_name, declaring_class) in parent_metadata.get_inheritable_method_ids() {
-        if !method_name.eq(&constructor_id) || parent_metadata.has_consistent_constructor() {
-            if !parent_metadata.is_trait() || is_method_abstract(codebase, interner, declaring_class, method_name) {
+        if !method_name.eq(&constructor_id) || parent_metadata.has_consistent_constructor {
+            if !parent_metadata.kind.is_trait() || is_method_abstract(codebase, interner, declaring_class, method_name)
+            {
                 metadata.add_overridden_method_parent(*method_name, *declaring_class);
             }
 
@@ -746,7 +743,7 @@ fn inherit_methods_from_parent(
         }
 
         let mut aliased_method_names = vec![*method_name];
-        if parent_metadata.is_trait() {
+        if parent_metadata.kind.is_trait() {
             aliased_method_names
                 .extend(metadata.get_trait_alias_map().iter().filter(|(_, v)| *v == method_name).map(|(k, _)| *k));
         }
@@ -769,8 +766,8 @@ fn inherit_methods_from_parent(
 /// Updates declaring_property_ids, appearing_property_ids, etc.
 fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_metadata: &ClassLikeMetadata) {
     let classlike_name = metadata.name;
-    let is_trait = metadata.is_trait();
-    let parent_is_trait = parent_metadata.is_trait();
+    let is_trait = metadata.kind.is_trait();
+    let parent_is_trait = parent_metadata.kind.is_trait();
 
     for (property_name, appearing_classlike) in parent_metadata.get_appearing_property_ids() {
         if metadata.has_appearing_property(property_name) {

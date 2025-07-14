@@ -479,9 +479,9 @@ fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> HashSet<StringI
             continue;
         };
 
-        if class_like_metadata.is_enum() || class_like_metadata.is_trait() {
+        if class_like_metadata.kind.is_enum() || class_like_metadata.kind.is_trait() {
             let caught_type_str = context.interner.lookup(&caught_type);
-            let kind_str = if class_like_metadata.is_enum() { "an enum" } else { "a trait" };
+            let kind_str = if class_like_metadata.kind.is_enum() { "an enum" } else { "a trait" };
 
             context.buffer.report(
                 TypingIssueKind::InvalidCatchTypeNotClassOrInterface,

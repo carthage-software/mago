@@ -42,7 +42,7 @@ impl<'a> ScopeContext<'a> {
         }
 
         if let Some(class_like) = self.class_like
-            && class_like.is_mutation_free()
+            && class_like.is_mutation_free
         {
             return true;
         }
@@ -60,7 +60,7 @@ impl<'a> ScopeContext<'a> {
         }
 
         if let Some(class_like) = self.class_like
-            && (class_like.is_mutation_free() || class_like.is_external_mutation_free())
+            && (class_like.is_mutation_free || class_like.is_external_mutation_free)
         {
             return true;
         }
@@ -110,7 +110,7 @@ impl<'a> ScopeContext<'a> {
     #[inline]
     pub const fn is_class_like_final(&self) -> bool {
         match self.class_like {
-            Some(class) => class.is_final(),
+            Some(class) => class.is_final,
             None => false,
         }
     }

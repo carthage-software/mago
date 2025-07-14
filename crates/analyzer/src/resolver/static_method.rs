@@ -78,7 +78,7 @@ pub fn resolve_static_method_targets<'a>(
             continue;
         };
 
-        if !class_res.is_object_instance() && metadata.is_interface() {
+        if !class_res.is_object_instance() && metadata.kind.is_interface() {
             report_static_access_on_interface(context, &metadata.original_name, class_expr.span());
             result.has_invalid_target = true;
             continue;
@@ -140,7 +140,7 @@ fn find_static_method_in_class<'a>(
         report_non_static_access(context, &declaring_method_id, method_span);
         return None;
     } else if is_method_static
-        && defining_class_metadata.is_trait()
+        && defining_class_metadata.kind.is_trait()
         && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
     {
         report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);

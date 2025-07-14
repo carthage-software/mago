@@ -156,9 +156,11 @@ impl ScopeStack {
     /// - `None` if no class scope is present in the stack.
     pub fn get_class_metadata<'a>(&self, context: &'a LintContext) -> Option<&'a ClassLikeMetadata> {
         self.stack.iter().rev().find_map(|scope| match scope {
-            Scope::ClassLike(ClassLikeScope::Class(name)) => {
-                context.codebase.class_likes.get(&context.interner.lowered(name)).filter(|metadata| metadata.is_class())
-            }
+            Scope::ClassLike(ClassLikeScope::Class(name)) => context
+                .codebase
+                .class_likes
+                .get(&context.interner.lowered(name))
+                .filter(|metadata| metadata.kind.is_class()),
             _ => None,
         })
     }

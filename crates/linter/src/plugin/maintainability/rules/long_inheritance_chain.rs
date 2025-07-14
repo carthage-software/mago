@@ -111,7 +111,7 @@ impl Rule for LongInheritanceChainRule {
             let issue = Issue::new(context.level(), "Inheritance chain is too long.".to_string())
                 .with_annotation(Annotation::primary(metadata.get_span()).with_message(format!(
                     "{} `{}` has {} parents, which exceeds the threshold of {}.",
-                    match metadata.get_kind() {
+                    match metadata.kind {
                         SymbolKind::Class => "Class",
                         SymbolKind::Enum => "Enum",
                         SymbolKind::Trait => "Trait",

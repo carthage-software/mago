@@ -82,9 +82,9 @@ pub struct AnalyzeCommand {
     #[clap(flatten)]
     pub reporting: ReportingArgs,
 
-    /// Enable debug logging for the analysis process.
-    #[arg(long, help = "Enable debugging, providing detailed logs of the analysis process", default_value_t = false)]
-    pub debug: bool,
+    /// Run the analysis sequentially instead of concurrently.
+    #[arg(long, help = "Run the analysis sequentially instead of concurrently, which can be useful for debugging.")]
+    pub sequential: bool,
 }
 
 /// Executes the analyze command.
@@ -136,7 +136,7 @@ pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> R
         symbol_references,
         &codebase,
         &interner,
-        command.debug,
+        command.sequential,
     )
     .await?;
 
@@ -156,7 +156,7 @@ async fn analyze_user_sources(
     symbol_references: SymbolReferences,
     codebase: &CodebaseMetadata,
     interner: &ThreadedInterner,
-    debug: bool,
+    sequential: bool,
 ) -> Result<AnalysisResult, Error> {
     let codebase = Arc::new(codebase.clone());
 
@@ -175,6 +175,14 @@ async fn analyze_user_sources(
     let mut analysis_tasks: Vec<JoinHandle<Result<AnalysisResult, Error>>> = Vec::with_capacity(total_files);
 
     for source_id in source_ids {
+        if sequential {
+            let source_file = manager.load(&source_id)?;
+            let result = perform_single_source_analysis(source_file, settings, &codebase, interner)?;
+            aggregated_analysis_result.extend(result);
+            progress_bar.inc(1);
+            continue;
+        }
+
         let interner_clone = interner.clone();
         let manager_clone = manager.clone();
         let codebase_clone = codebase.clone();
@@ -182,32 +190,35 @@ async fn analyze_user_sources(
 
         analysis_tasks.push(tokio::spawn(async move {
             let source_file = manager_clone.load(&source_id)?;
+            let result = perform_single_source_analysis(source_file, settings, &codebase_clone, &interner_clone);
             progress_bar_clone.inc(1);
-            perform_single_source_analysis(source_file, settings, &codebase_clone, &interner_clone)
+            result
         }));
     }
 
-    for task_handle in analysis_tasks {
-        match task_handle.await {
-            Ok(Ok(source_analysis_result)) => {
-                aggregated_analysis_result.extend(source_analysis_result);
-            }
-            Ok(Err(e)) => {
-                tracing::error!("Error during analysis: {}", e);
-
-                if debug {
-                    continue;
-                } else {
-                    return Err(e);
+    if !sequential {
+        for task_handle in analysis_tasks {
+            match task_handle.await {
+                Ok(Ok(source_analysis_result)) => {
+                    aggregated_analysis_result.extend(source_analysis_result);
                 }
-            }
-            Err(e) => {
-                tracing::error!("Task failed: {}", e);
+                Ok(Err(e)) => {
+                    tracing::error!("Error during analysis: {}", e);
 
-                if debug {
-                    continue;
-                } else {
-                    return Err(Error::from(e));
+                    if sequential {
+                        continue;
+                    } else {
+                        return Err(e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Task failed: {}", e);
+
+                    if sequential {
+                        continue;
+                    } else {
+                        return Err(Error::from(e));
+                    }
                 }
             }
         }

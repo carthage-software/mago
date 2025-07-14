@@ -184,7 +184,7 @@ fn analyze_class_instantiation<'a>(
 
     let class_name_str = context.interner.lookup(&metadata.original_name);
 
-    if metadata.is_interface() {
+    if metadata.kind.is_interface() {
         context.buffer.report(
              TypingIssueKind::InterfaceInstantiation,
              Issue::error(format!("Interface `{class_name_str}` cannot be instantiated with `new`."))
@@ -199,9 +199,7 @@ fn analyze_class_instantiation<'a>(
         argument_list.analyze(context, block_context, artifacts)?;
 
         return Ok(get_never());
-    }
-
-    if metadata.is_trait() {
+    } else if metadata.kind.is_trait() {
         context.buffer.report(
             TypingIssueKind::TraitInstantiation,
             Issue::error(format!("Trait `{class_name_str}` cannot be instantiated with `new`."))
@@ -217,9 +215,7 @@ fn analyze_class_instantiation<'a>(
         argument_list.analyze(context, block_context, artifacts)?;
 
         return Ok(get_never());
-    }
-
-    if metadata.is_enum() {
+    } else if metadata.kind.is_enum() {
         context.buffer.report(
             TypingIssueKind::EnumInstantiation,
             Issue::error(format!("Enum `{class_name_str}` cannot be instantiated with `new`."))
@@ -239,7 +235,7 @@ fn analyze_class_instantiation<'a>(
     }
 
     let mut is_impossible = false;
-    if metadata.is_abstract() && !classname.can_extend_static() {
+    if metadata.is_abstract && !classname.can_extend_static() {
         context.buffer.report(
             TypingIssueKind::AbstractInstantiation,
             Issue::error(format!("Cannot instantiate abstract class `{class_name_str}`."))
@@ -257,7 +253,7 @@ fn analyze_class_instantiation<'a>(
         is_impossible = true;
     }
 
-    if metadata.is_deprecated() {
+    if metadata.is_deprecated {
         let is_self_instantiation =
             block_context.scope.get_class_like_name().is_some_and(|self_id| *self_id == metadata.original_name);
 
@@ -283,7 +279,7 @@ fn analyze_class_instantiation<'a>(
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
 
-    let mut has_inconsistent_constructor = !metadata.is_final() && !metadata.has_consistent_constructor();
+    let mut has_inconsistent_constructor = !metadata.is_final && !metadata.has_consistent_constructor;
     let mut constructor_span = None;
 
     let mut template_result = TemplateResult::new(

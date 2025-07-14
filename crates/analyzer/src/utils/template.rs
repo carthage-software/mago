@@ -148,7 +148,7 @@ pub fn get_template_types_for_class_member(
                         StaticClassType::None
                     },
                     parent_class: declaring_class_meta.and_then(|m| m.get_direct_parent_class_ref()),
-                    function_is_final: calling_class_meta.is_some_and(|m| m.is_final()),
+                    function_is_final: calling_class_meta.is_some_and(|m| m.is_final),
                     file_path: Some(&context.source.identifier),
                     expand_templates: true,
                     ..Default::default()

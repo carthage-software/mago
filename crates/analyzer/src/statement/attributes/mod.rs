@@ -101,7 +101,7 @@ pub fn analyze_attributes(
             continue;
         }
 
-        if metadata.is_abstract() {
+        if metadata.is_abstract {
             context.buffer.report(
                 TypingIssueKind::AbstractClassUsedAsAttribute,
                 Issue::error(format!("The abstract class `{attribute_name_str}` cannot be used as an attribute.",))

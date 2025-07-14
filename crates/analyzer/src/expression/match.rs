@@ -1,6 +1,7 @@
 use ahash::HashSet;
 
 use mago_codex::assertion::Assertion;
+use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use mago_codex::get_class_like;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -398,30 +399,52 @@ impl Analyzable for Match {
                 }
             }
         } else if possible_results.is_empty() || (!remaining_subject_type.is_never() && definite_match.is_none()) {
-            context.buffer.report(
-                TypingIssueKind::MatchNotExhaustive,
-                Issue::error(format!(
-                    "Non-exhaustive `match` expression: subject of type `{}` is not fully handled.",
-                    subject_type.get_id(Some(context.interner))
-                ))
-                .with_annotation(
-                    Annotation::primary(self.expression.span())
-                        .with_message(format!(
-                            "Unhandled portion of subject: `{}`",
-                            remaining_subject_type.get_id(Some(context.interner))
-                        ))
-                )
-                .with_annotation(
-                    Annotation::secondary(self.r#match.span()).with_message("This `match` expression does not cover all cases and lacks a `default` arm.")
-                )
-                .with_note(
-                    "If the subject expression evaluates to one of the unhandled types at runtime, PHP will throw an `UnhandledMatchError`."
-                )
-                .with_help(format!(
-                    "Add conditional arms to cover type(s) `{}` or include a `default` arm to handle all other possibilities.",
-                    remaining_subject_type.get_id(Some(context.interner))
-                )),
-            );
+            let mut skip_check = false;
+
+            // Check if the subject type consists only of enums.
+            let subject_is_all_enums =
+                subject_type.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(_))));
+
+            if subject_is_all_enums {
+                // If so, check if any of those enums are larger than the threshold.
+                for atomic_subject in &subject_type.types {
+                    if let TAtomic::Object(TObject::Enum(enum_object)) = atomic_subject
+                        && let Some(enum_metadata) =
+                            get_class_like(context.codebase, context.interner, &enum_object.name)
+                        && enum_metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS
+                    {
+                        skip_check = true;
+                        break;
+                    }
+                }
+            }
+
+            if !skip_check {
+                context.buffer.report(
+                    TypingIssueKind::MatchNotExhaustive,
+                    Issue::error(format!(
+                        "Non-exhaustive `match` expression: subject of type `{}` is not fully handled.",
+                        subject_type.get_id(Some(context.interner))
+                    ))
+                    .with_annotation(
+                        Annotation::primary(self.expression.span())
+                            .with_message(format!(
+                                "Unhandled portion of subject: `{}`",
+                                remaining_subject_type.get_id(Some(context.interner))
+                            ))
+                    )
+                    .with_annotation(
+                        Annotation::secondary(self.r#match.span()).with_message("This `match` expression does not cover all cases and lacks a `default` arm.")
+                    )
+                    .with_note(
+                        "If the subject expression evaluates to one of the unhandled types at runtime, PHP will throw an `UnhandledMatchError`."
+                    )
+                    .with_help(format!(
+                        "Add conditional arms to cover type(s) `{}` or include a `default` arm to handle all other possibilities.",
+                        remaining_subject_type.get_id(Some(context.interner))
+                    )),
+                );
+            }
         }
 
         let resulting_type = if possible_results.is_empty() {
@@ -548,7 +571,15 @@ fn subtract_handled_enum_cases(
             if let Some(case_name) = enum_object.case {
                 subject_possible_cases.insert((enum_object.name, case_name));
             } else if let Some(enum_metadata) = get_class_like(context.codebase, context.interner, &enum_object.name) {
-                for (case_name, _) in enum_metadata.get_enum_cases() {
+                // If the enum has too many cases, don't expand it.
+                // Instead, add the original full enum type back and continue.
+                // This prevents creating a massive union of thousands of cases.
+                if enum_metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS {
+                    final_atomic_types.push(TAtomic::Object(TObject::Enum(enum_object)));
+                    continue;
+                }
+
+                for (case_name, _) in &enum_metadata.enum_cases {
                     subject_possible_cases.insert((enum_object.name, *case_name));
                 }
             }

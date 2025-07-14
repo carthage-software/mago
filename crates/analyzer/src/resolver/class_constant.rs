@@ -187,7 +187,7 @@ fn find_constant_in_class(
     const_span: Span,
 ) -> Option<ResolvedConstant> {
     // Check for a defined constant
-    if let Some(constant_metadata) = metadata.get_constant(&const_name) {
+    if let Some(constant_metadata) = metadata.constants.get(&const_name) {
         let const_type = constant_metadata
             .get_inferred_type()
             .map(|t| wrap_atomic(t.clone()))
@@ -198,7 +198,7 @@ fn find_constant_in_class(
     }
 
     // Check for an enum case
-    if metadata.is_enum() && metadata.has_enum_case(&const_name) {
+    if metadata.kind.is_enum() && metadata.enum_cases.contains_key(&const_name) {
         let const_type =
             TUnion::new(vec![TAtomic::Object(TObject::Enum(TEnum::new_case(metadata.original_name, const_name)))]);
 
@@ -234,20 +234,20 @@ fn report_undefined_constant(
     class_span: Span,
     const_span: Span,
 ) {
-    let class_kind_str = metadata.get_kind().as_str();
+    let class_kind_str = metadata.kind.as_str();
     let class_str = context.interner.lookup(&metadata.name);
     let constant_name_str = context.interner.lookup(&const_name);
 
-    let main_message = if metadata.is_enum() {
-        format!("Undefined enum constant or case: `{class_str}::{constant_name_str}`.")
+    let (main_message, primary_annotation_message) = if metadata.kind.is_enum() {
+        (
+            format!("Undefined enum constant or case: `{class_str}::{constant_name_str}`."),
+            format!("Constant or case `{constant_name_str}` not found in `{class_str}`"),
+        )
     } else {
-        format!("Undefined {class_kind_str} constant: `{class_str}::{constant_name_str}`.")
-    };
-
-    let primary_annotation_message = if metadata.is_enum() {
-        format!("Constant or case `{constant_name_str}` not found in `{class_str}`")
-    } else {
-        format!("Constant `{constant_name_str}` not found in `{class_str}`")
+        (
+            format!("Undefined {class_kind_str} constant: `{class_str}::{constant_name_str}`."),
+            format!("Constant `{constant_name_str}` not found in `{class_str}`"),
+        )
     };
 
     context.buffer.report(

@@ -175,7 +175,7 @@ pub fn resolve_classnames_from_expression<'a>(
         }
         Expression::Static(static_keyword) => {
             if let Some(self_class) = block_context.scope.get_class_like() {
-                let origin = ResolutionOrigin::Static { can_extend: !self_class.is_final() };
+                let origin = ResolutionOrigin::Static { can_extend: !self_class.is_final };
                 possible_types.push(ResolvedClassname::new(Some(self_class.name), origin));
             } else {
                 possible_types.push(ResolvedClassname::invalid());

@@ -55,7 +55,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(case_metadata) = metadata.get_enum_case(&case_name) else {
+                    let Some(case_metadata) = metadata.enum_cases.get(&case_name) else {
                         continue;
                     };
 

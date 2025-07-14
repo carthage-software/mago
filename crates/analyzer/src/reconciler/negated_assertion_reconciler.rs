@@ -1,5 +1,6 @@
 use ahash::HashSet;
 
+use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use mago_codex::get_class_like;
 use mago_codex::get_enum;
 use mago_codex::interface_exists;
@@ -210,13 +211,18 @@ fn subtract_complex_type(
             ) if is_instance_of(context.codebase, context.interner, assertion_enum_name, existing_enum_name) => {
                 *can_be_disjunct = true;
 
-                let Some(existing_enum_metadata) = get_enum(context.codebase, context.interner, existing_enum_name)
-                else {
+                let Some(enum_metadata) = get_enum(context.codebase, context.interner, existing_enum_name) else {
                     acceptable_types.push(existing_atomic);
                     continue;
                 };
 
-                for (enum_case, _) in existing_enum_metadata.get_enum_cases() {
+                // Enum is too large, do not subtract anything
+                if enum_metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS {
+                    acceptable_types.push(existing_atomic);
+                    continue;
+                }
+
+                for (enum_case, _) in &enum_metadata.enum_cases {
                     if enum_case == assertion_case {
                         continue;
                     }

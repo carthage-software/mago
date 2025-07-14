@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
 
+use crate::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -264,11 +265,10 @@ fn scan_class_like(
 
     match kind {
         SymbolKind::Class => {
-            class_like_metadata = class_like_metadata
-                .with_kind(kind)
-                .with_is_final(modifiers.is_some_and(|m| m.contains_final()))
-                .with_is_abstract(modifiers.is_some_and(|m| m.contains_abstract()))
-                .with_is_readonly(modifiers.is_some_and(|m| m.contains_readonly()));
+            class_like_metadata = class_like_metadata.with_kind(kind);
+            class_like_metadata.is_final = modifiers.is_some_and(|m| m.contains_final());
+            class_like_metadata.is_abstract = modifiers.is_some_and(|m| m.contains_abstract());
+            class_like_metadata.is_readonly = modifiers.is_some_and(|m| m.contains_readonly());
 
             codebase.symbols.add_class_name(name);
 
@@ -280,7 +280,8 @@ fn scan_class_like(
             }
         }
         SymbolKind::Enum => {
-            class_like_metadata = class_like_metadata.with_kind(kind).with_is_final(true);
+            class_like_metadata = class_like_metadata.with_kind(kind);
+            class_like_metadata.is_final = true;
 
             if enum_type.is_some() {
                 let backed_enum_interface = context.interner.intern("backedenum");
@@ -306,7 +307,7 @@ fn scan_class_like(
             codebase.symbols.add_trait_name(name);
         }
         SymbolKind::Interface => {
-            class_like_metadata = class_like_metadata.with_is_abstract(true).with_kind(kind);
+            class_like_metadata.is_abstract = true;
 
             codebase.symbols.add_interface_name(name);
 
@@ -321,7 +322,7 @@ fn scan_class_like(
         }
     };
 
-    if (class_like_metadata.is_class() || class_like_metadata.is_enum())
+    if (class_like_metadata.kind.is_class() || class_like_metadata.kind.is_enum())
         && let Some(implemented_interfaces) = implements
     {
         for interface_name in implemented_interfaces.types.iter() {
@@ -353,7 +354,7 @@ fn scan_class_like(
             .with_has_sealed_methods(docblock.has_sealed_methods)
             .with_has_sealed_properties(docblock.has_sealed_properties);
 
-        class_like_metadata.is_enum_interface = class_like_metadata.is_interface() && docblock.is_enum_interface;
+        class_like_metadata.is_enum_interface = class_like_metadata.kind.is_interface() && docblock.is_enum_interface;
         class_like_metadata.is_final |= docblock.is_final;
         class_like_metadata.is_deprecated |= docblock.is_deprecated;
         class_like_metadata.is_immutable |= docblock.is_immutable;
@@ -478,7 +479,7 @@ fn scan_class_like(
             let parent_name_str = context.interner.lookup(&parent_name);
             let parent_name = context.interner.lowered(&parent_name);
 
-            let has_parent = if class_like_metadata.is_interface() {
+            let has_parent = if class_like_metadata.kind.is_interface() {
                 class_like_metadata.has_parent_interface(&parent_name)
             } else {
                 class_like_metadata.has_parent_class(&parent_name)
@@ -805,7 +806,7 @@ fn scan_class_like(
             ClassLikeMember::Constant(constant) => {
                 for constant_metadata in scan_class_like_constants(&mut class_like_metadata, constant, context) {
                     let constant_name = constant_metadata.get_name();
-                    if class_like_metadata.has_constant(constant_name) {
+                    if class_like_metadata.constants.contains_key(constant_name) {
                         continue;
                     }
 
@@ -815,7 +816,7 @@ fn scan_class_like(
             ClassLikeMember::EnumCase(enum_case) => {
                 let case_metadata = scan_enum_case(enum_case, context);
                 let case_name = case_metadata.get_name();
-                if class_like_metadata.has_enum_case(case_name) {
+                if class_like_metadata.constants.contains_key(case_name) {
                     continue;
                 }
 
@@ -827,46 +828,60 @@ fn scan_class_like(
         }
     }
 
-    if class_like_metadata.is_enum() {
+    if class_like_metadata.kind.is_enum() {
         let enum_name_span = class_like_metadata.get_name_span().expect("Enum name span should be present");
         let mut name_types = vec![];
         let mut value_types = vec![];
         let backing_type = class_like_metadata.enum_type.as_ref().cloned();
 
-        for (case_name, case_info) in class_like_metadata.get_enum_cases() {
-            name_types.push(TAtomic::Scalar(TScalar::literal_string(context.interner.lookup(case_name).to_string())));
+        if class_like_metadata.enum_cases.len() <= MAX_ENUM_CASES_FOR_ANALYSIS {
+            for (case_name, case_info) in &class_like_metadata.enum_cases {
+                name_types
+                    .push(TAtomic::Scalar(TScalar::literal_string(context.interner.lookup(case_name).to_string())));
 
-            if let Some(enum_backing_type) = &backing_type {
-                if let Some(t) = case_info.get_value_type() {
-                    value_types.push(t.clone());
-                } else {
-                    value_types.push(enum_backing_type.clone());
+                if let Some(enum_backing_type) = &backing_type {
+                    if let Some(t) = case_info.get_value_type() {
+                        value_types.push(t.clone());
+                    } else {
+                        value_types.push(enum_backing_type.clone());
+                    }
                 }
             }
         }
 
-        if !name_types.is_empty() {
-            let name = context.interner.intern("$name");
-            let mut property_metadata = PropertyMetadata::new(VariableIdentifier(name));
-            property_metadata.is_readonly = true;
-            property_metadata.has_default = true;
-            property_metadata.type_declaration_metadata = Some(TypeMetadata::new(get_string(), enum_name_span));
-            property_metadata.type_metadata = Some(TypeMetadata::new(TUnion::new(name_types), enum_name_span));
-
-            class_like_metadata.add_property_metadata(property_metadata);
+        if name_types.is_empty() {
+            name_types.push(TAtomic::Scalar(TScalar::string()));
         }
 
-        if let Some(enum_backing_type) = backing_type
-            && !value_types.is_empty()
+        if value_types.is_empty()
+            && let Some(enum_backing_type) = &backing_type
         {
+            value_types.push(enum_backing_type.clone());
+        }
+
+        let name = context.interner.intern("$name");
+        let mut property_metadata = PropertyMetadata::new(VariableIdentifier(name));
+        property_metadata.is_readonly = true;
+        property_metadata.has_default = true;
+        property_metadata.type_declaration_metadata = Some(TypeMetadata::new(get_string(), enum_name_span));
+        property_metadata.type_metadata = Some(TypeMetadata::new(TUnion::new(name_types), enum_name_span));
+
+        class_like_metadata.add_property_metadata(property_metadata);
+
+        if let Some(enum_backing_type) = backing_type {
             let value = context.interner.intern("$value");
 
             let mut property_metadata = PropertyMetadata::new(VariableIdentifier(value));
             property_metadata.is_readonly = true;
             property_metadata.has_default = true;
-            property_metadata.type_declaration_metadata =
-                Some(TypeMetadata::new(TUnion::new(vec![enum_backing_type]), enum_name_span));
-            property_metadata.type_metadata = Some(TypeMetadata::new(TUnion::new(value_types), enum_name_span));
+            property_metadata.set_type_declaration_metadata(Some(TypeMetadata::new(
+                TUnion::new(vec![enum_backing_type]),
+                enum_name_span,
+            )));
+
+            if !value_types.is_empty() {
+                property_metadata.set_type_metadata(Some(TypeMetadata::new(TUnion::new(value_types), enum_name_span)));
+            }
 
             class_like_metadata.add_property_metadata(property_metadata);
         }
@@ -976,13 +991,13 @@ fn scan_class_like(
                 if !method_metadata.get_visibility().is_private()
                     || is_constructor
                     || is_clone
-                    || class_like_metadata.is_trait()
+                    || class_like_metadata.kind.is_trait()
                 {
                     class_like_metadata.add_inheritable_method_id(name, class_like_metadata.name);
                 }
 
                 if method_metadata.is_final() && is_constructor {
-                    class_like_metadata.set_has_consistent_constructor(true);
+                    class_like_metadata.has_consistent_constructor = true;
                 }
 
                 codebase.function_likes.insert(method_id, function_like_metadata);
@@ -993,14 +1008,14 @@ fn scan_class_like(
         }
     }
 
-    if !class_like_metadata.is_trait() {
+    if !class_like_metadata.kind.is_trait() {
         let to_string_method = context.interner.intern("__tostring");
         if class_like_metadata.methods.contains(&to_string_method) {
             class_like_metadata.add_direct_parent_interface(context.interner.intern("stringable"));
         }
     }
 
-    if class_like_metadata.has_consistent_constructor() && !has_constructor {
+    if class_like_metadata.has_consistent_constructor && !has_constructor {
         let constructor_name = context.interner.intern("__construct");
 
         let mut function_like_metadata =

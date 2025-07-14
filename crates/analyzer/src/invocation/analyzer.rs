@@ -1632,7 +1632,7 @@ fn get_parameter_type(
                 None => StaticClassType::None,
             },
             parent_class: base_class_metadata.and_then(|meta| meta.get_direct_parent_class_ref()),
-            function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.is_final()),
+            function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.is_final),
             file_path: Some(&context.source.identifier),
             ..Default::default()
         },

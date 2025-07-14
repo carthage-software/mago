@@ -82,7 +82,7 @@ impl CodebaseMetadata {
         match self.symbols.get_kind(fq_class_name) {
             Some(SymbolKind::Class) => {
                 // Check if the class metadata exists and if it's NOT final
-                self.class_likes.get(fq_class_name).is_some_and(|meta| !meta.is_final())
+                self.class_likes.get(fq_class_name).is_some_and(|meta| !meta.is_final)
             }
             Some(SymbolKind::Enum) => {
                 // Enums are final and cannot be part of intersections
@@ -139,7 +139,7 @@ impl CodebaseMetadata {
     ) -> Option<&TAtomic> {
         self.class_likes
             .get(fq_class_name)
-            .and_then(|class_metadata| class_metadata.get_constants().get(const_name))
+            .and_then(|class_metadata| class_metadata.constants.get(const_name))
             .and_then(|constant_metadata| constant_metadata.get_inferred_type())
     }
 

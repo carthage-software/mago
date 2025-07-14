@@ -1346,7 +1346,7 @@ pub fn cast_type_to_string<'a>(
                     return Ok(get_string());
                 };
 
-                if class_metadata.is_enum() {
+                if class_metadata.kind.is_enum() {
                     context.buffer.report(
                         TypingIssueKind::InvalidTypeCast,
                         Issue::error(format!(

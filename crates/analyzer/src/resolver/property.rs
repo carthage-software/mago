@@ -219,9 +219,9 @@ fn find_property_in_class<'a>(
     let Some(property_metadata) = declaring_class_metadata.get_property(prop_name) else {
         result.has_invalid_path = true;
 
-        if !declaring_class_metadata.is_final()
-            || declaring_class_metadata.is_interface()
-            || declaring_class_metadata.is_trait()
+        if !declaring_class_metadata.is_final
+            || declaring_class_metadata.kind.is_interface()
+            || declaring_class_metadata.kind.is_trait()
         {
             result.has_possibly_defined_property = true;
         }
@@ -633,7 +633,7 @@ fn report_non_existent_property(
     let class_name_str = context.interner.lookup(classname);
     let property_name_str = context.interner.lookup(prop_name).replace('$', "");
     let class_kind_str =
-        get_class_like(context.codebase, context.interner, classname).map_or("class", |m| m.get_kind().as_str());
+        get_class_like(context.codebase, context.interner, classname).map_or("class", |m| m.kind.as_str());
 
     context.buffer.report(
         TypingIssueKind::NonExistentProperty,
