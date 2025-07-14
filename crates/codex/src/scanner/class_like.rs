@@ -251,21 +251,22 @@ fn scan_class_like(
         return None;
     }
 
-    let mut class_like_metadata = ClassLikeMetadata::new(name, original_name, span, name_span)
-        .with_attributes(scan_attribute_lists(attribute_lists, context))
-        .with_enum_type(match enum_type {
-            Some(EnumBackingTypeHint { hint: Hint::String(_), .. }) => Some(TAtomic::Scalar(TScalar::string())),
-            Some(EnumBackingTypeHint { hint: Hint::Integer(_), .. }) => Some(TAtomic::Scalar(TScalar::int())),
-            _ => None,
-        });
+    let mut class_like_metadata = ClassLikeMetadata::new(name, original_name, span, name_span);
+    class_like_metadata.attributes = scan_attribute_lists(attribute_lists, context);
+    class_like_metadata.enum_type = match enum_type {
+        Some(EnumBackingTypeHint { hint: Hint::String(_), .. }) => Some(TAtomic::Scalar(TScalar::string())),
+        Some(EnumBackingTypeHint { hint: Hint::Integer(_), .. }) => Some(TAtomic::Scalar(TScalar::int())),
+        _ => None,
+    };
 
     if kind.is_class() {
         class_like_metadata.set_attribute_flags(get_attribute_flags(name, attribute_lists, context));
     }
 
+    class_like_metadata.kind = kind;
+
     match kind {
         SymbolKind::Class => {
-            class_like_metadata = class_like_metadata.with_kind(kind);
             class_like_metadata.is_final = modifiers.is_some_and(|m| m.contains_final());
             class_like_metadata.is_abstract = modifiers.is_some_and(|m| m.contains_abstract());
             class_like_metadata.is_readonly = modifiers.is_some_and(|m| m.contains_readonly());
@@ -280,7 +281,6 @@ fn scan_class_like(
             }
         }
         SymbolKind::Enum => {
-            class_like_metadata = class_like_metadata.with_kind(kind);
             class_like_metadata.is_final = true;
 
             if enum_type.is_some() {
@@ -302,8 +302,6 @@ fn scan_class_like(
             codebase.symbols.add_enum_name(name);
         }
         SymbolKind::Trait => {
-            class_like_metadata = class_like_metadata.with_kind(kind);
-
             codebase.symbols.add_trait_name(name);
         }
         SymbolKind::Interface => {
@@ -350,11 +348,9 @@ fn scan_class_like(
     };
 
     if let Some(docblock) = docblock {
-        class_like_metadata = class_like_metadata
-            .with_has_sealed_methods(docblock.has_sealed_methods)
-            .with_has_sealed_properties(docblock.has_sealed_properties);
-
         class_like_metadata.is_enum_interface = class_like_metadata.kind.is_interface() && docblock.is_enum_interface;
+        class_like_metadata.has_sealed_methods = docblock.has_sealed_methods;
+        class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
         class_like_metadata.is_final |= docblock.is_final;
         class_like_metadata.is_deprecated |= docblock.is_deprecated;
         class_like_metadata.is_immutable |= docblock.is_immutable;
@@ -810,7 +806,7 @@ fn scan_class_like(
                         continue;
                     }
 
-                    class_like_metadata.add_constant(*constant_name, constant_metadata);
+                    class_like_metadata.constants.insert(*constant_name, constant_metadata);
                 }
             }
             ClassLikeMember::EnumCase(enum_case) => {
@@ -820,7 +816,7 @@ fn scan_class_like(
                     continue;
                 }
 
-                class_like_metadata.add_enum_case(*case_name, case_metadata);
+                class_like_metadata.enum_cases.insert(*case_name, case_metadata);
             }
             _ => {
                 continue;

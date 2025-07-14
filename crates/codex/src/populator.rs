@@ -587,18 +587,18 @@ fn populate_interface_metadata_from_parent_interface(
     let parent_interface_metadata = if let Some(parent_meta) = codebase.class_likes.get(&parent_interface) {
         parent_meta
     } else {
-        metadata.add_invalid_dependency(parent_interface);
+        metadata.invalid_dependencies.push(parent_interface);
         return;
     };
 
     for (interface_constant_name, interface_constant_metadata) in &parent_interface_metadata.constants {
         if !metadata.constants.contains_key(interface_constant_name) {
-            metadata.add_constant(*interface_constant_name, interface_constant_metadata.clone());
+            metadata.constants.insert(*interface_constant_name, interface_constant_metadata.clone());
         }
     }
 
     metadata.add_all_parent_interfaces(parent_interface_metadata.get_all_parent_interfaces().iter().copied());
-    metadata.add_invalid_dependencies(parent_interface_metadata.get_invalid_dependencies().iter().copied());
+    metadata.invalid_dependencies.extend(parent_interface_metadata.get_invalid_dependencies().iter().copied());
 
     if let Some(inheritors) = &parent_interface_metadata.permitted_inheritors {
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
@@ -628,14 +628,14 @@ fn populate_metadata_from_parent_class_like(
     let parent_metadata = if let Some(parent_meta) = codebase.class_likes.get(&parent_class) {
         parent_meta
     } else {
-        metadata.add_invalid_dependency(parent_class);
+        metadata.invalid_dependencies.push(parent_class);
         return;
     };
 
     metadata.add_all_parent_classes(parent_metadata.get_all_parent_classes().iter().copied());
     metadata.add_all_parent_interfaces(parent_metadata.get_all_parent_interfaces().iter().copied());
     metadata.add_used_traits(parent_metadata.get_used_traits().iter().copied());
-    metadata.add_invalid_dependencies(parent_metadata.get_invalid_dependencies().iter().copied());
+    metadata.invalid_dependencies.extend(parent_metadata.get_invalid_dependencies().iter().copied());
 
     if let Some(inheritors) = &parent_metadata.permitted_inheritors {
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
@@ -648,7 +648,7 @@ fn populate_metadata_from_parent_class_like(
 
     for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
         if !metadata.constants.contains_key(parent_constant_name) {
-            metadata.add_constant(*parent_constant_name, parent_constant_metadata.clone());
+            metadata.constants.insert(*parent_constant_name, parent_constant_metadata.clone());
         }
     }
 
@@ -671,21 +671,21 @@ fn populate_metadata_from_trait(
     symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);
 
     let Some(trait_metadata) = codebase.class_likes.get(&trait_name) else {
-        metadata.add_invalid_dependency(trait_name);
+        metadata.invalid_dependencies.push(trait_name);
         return;
     };
 
     // Inherit constants (if not already defined)
     for (trait_constant_name, trait_constant_metadata) in &trait_metadata.constants {
         if !metadata.constants.contains_key(trait_constant_name) {
-            metadata.add_constant(*trait_constant_name, trait_constant_metadata.clone());
+            metadata.constants.insert(*trait_constant_name, trait_constant_metadata.clone());
         }
     }
 
     // Inherit the trait's parent interfaces (direct parents of the trait become parents of the user)
     metadata.add_all_parent_interfaces(trait_metadata.get_direct_parent_interfaces().iter().copied());
     // Also inherit invalid dependencies from the trait
-    metadata.add_invalid_dependencies(trait_metadata.get_invalid_dependencies().iter().copied());
+    metadata.invalid_dependencies.extend(trait_metadata.get_invalid_dependencies().iter().copied());
 
     // Extend template parameters based on the trait's templates
     extend_template_parameters(metadata, trait_metadata);
@@ -810,12 +810,12 @@ fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_metad
             }
 
             if is_overridable {
-                metadata.add_overridden_property_parent(*property_name, *inheritable_classlike);
+                metadata.overridden_property_ids.entry(*property_name).or_default().push(*inheritable_classlike);
             }
         }
 
         if is_overridable {
-            metadata.add_inheritable_property_id(*property_name, *inheritable_classlike);
+            metadata.inheritable_property_ids.insert(*property_name, *inheritable_classlike);
         }
     }
 }

@@ -731,23 +731,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all direct parent interfaces.
-    #[inline]
-    pub fn unset_direct_parent_interfaces(&mut self) {
-        for interface in &self.direct_parent_interfaces {
-            self.all_parent_interfaces.retain(|i| i != interface);
-        }
-
-        self.direct_parent_interfaces.clear();
-    }
-
-    /// Returns a new instance with no direct parent interfaces.
-    #[inline]
-    pub fn without_direct_parent_interfaces(mut self) -> Self {
-        self.unset_direct_parent_interfaces();
-        self
-    }
-
     /// Sets all parent interfaces (direct and indirect), replacing existing ones.
     #[inline]
     pub fn set_all_parent_interfaces(&mut self, interfaces: impl IntoIterator<Item = StringIdentifier>) {
@@ -787,19 +770,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all parent interfaces. Use with caution.
-    #[inline]
-    pub fn unset_all_parent_interfaces(&mut self) {
-        self.all_parent_interfaces.clear();
-    }
-
-    /// Returns a new instance with no parent interfaces. Use with caution.
-    #[inline]
-    pub fn without_all_parent_interfaces(mut self) -> Self {
-        self.unset_all_parent_interfaces();
-        self
-    }
-
     /// Sets the direct parent class.
     #[inline]
     pub fn set_direct_parent_class(&mut self, parent: Option<StringIdentifier>) {
@@ -813,23 +783,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_direct_parent_class(mut self, parent: Option<StringIdentifier>) -> Self {
         self.set_direct_parent_class(parent);
-        self
-    }
-
-    /// Sets the direct parent class to `None`.
-    #[inline]
-    pub fn unset_direct_parent_class(&mut self) {
-        if let Some(parent) = &self.direct_parent_class {
-            self.all_parent_classes.retain(|p| p != parent);
-        }
-
-        self.direct_parent_class = None;
-    }
-
-    /// Returns a new instance with the direct parent class set to `None`.
-    #[inline]
-    pub fn without_direct_parent_class(mut self) -> Self {
-        self.unset_direct_parent_class();
         self
     }
 
@@ -873,19 +826,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all required extend entries.
-    #[inline]
-    pub fn unset_require_extends(&mut self) {
-        self.require_extends.clear();
-    }
-
-    /// Returns a new instance with no required extend entries.
-    #[inline]
-    pub fn without_require_extends(mut self) -> Self {
-        self.unset_require_extends();
-        self
-    }
-
     /// Sets the required implemented interfaces from traits, replacing existing ones.
     #[inline]
     pub fn set_require_implements(&mut self, requires: impl IntoIterator<Item = StringIdentifier>) {
@@ -923,19 +863,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_added_require_implements(mut self, requires: impl IntoIterator<Item = StringIdentifier>) -> Self {
         self.add_require_implements(requires);
-        self
-    }
-
-    /// Clears all required implement entries.
-    #[inline]
-    pub fn unset_require_implements(&mut self) {
-        self.require_implements.clear();
-    }
-
-    /// Returns a new instance with no required implement entries.
-    #[inline]
-    pub fn without_require_implements(mut self) -> Self {
-        self.unset_require_implements();
         self
     }
 
@@ -978,19 +905,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all ancestor classes. Use with caution.
-    #[inline]
-    pub fn unset_all_parent_classes(&mut self) {
-        self.all_parent_classes.clear();
-    }
-
-    /// Returns a new instance with no ancestor classes. Use with caution.
-    #[inline]
-    pub fn without_all_parent_classes(mut self) -> Self {
-        self.unset_all_parent_classes();
-        self
-    }
-
     /// Sets the used traits, replacing existing ones.
     #[inline]
     pub fn set_used_traits(&mut self, traits: impl IntoIterator<Item = StringIdentifier>) {
@@ -1030,19 +944,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all used traits.
-    #[inline]
-    pub fn unset_used_traits(&mut self) {
-        self.used_traits.clear();
-    }
-
-    /// Returns a new instance with no used traits.
-    #[inline]
-    pub fn without_used_traits(mut self) -> Self {
-        self.unset_used_traits();
-        self
-    }
-
     /// Sets the trait alias map, replacing the existing one.
     #[inline]
     pub fn set_trait_alias_map(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
@@ -1069,19 +970,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears the trait alias map.
-    #[inline]
-    pub fn unset_trait_alias_map(&mut self) {
-        self.trait_alias_map.clear();
-    }
-
-    /// Returns a new instance with an empty trait alias map.
-    #[inline]
-    pub fn without_trait_alias_map(mut self) -> Self {
-        self.unset_trait_alias_map();
-        self
-    }
-
     /// Sets the trait visibility map, replacing the existing one.
     #[inline]
     pub fn set_trait_visibility_map(&mut self, map: HashMap<StringIdentifier, Visibility>) {
@@ -1105,19 +993,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_added_trait_visibility(mut self, method: StringIdentifier, visibility: Visibility) -> Self {
         self.add_trait_visibility(method, visibility);
-        self
-    }
-
-    /// Clears the trait visibility map.
-    #[inline]
-    pub fn unset_trait_visibility_map(&mut self) {
-        self.trait_visibility_map.clear();
-    }
-
-    /// Returns a new instance with an empty trait visibility map.
-    #[inline]
-    pub fn without_trait_visibility_map(mut self) -> Self {
-        self.unset_trait_visibility_map();
         self
     }
 
@@ -1160,19 +1035,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all final trait methods.
-    #[inline]
-    pub fn unset_trait_final_map(&mut self) {
-        self.trait_final_map.clear();
-    }
-
-    /// Returns a new instance with no final trait methods.
-    #[inline]
-    pub fn without_trait_final_map(mut self) -> Self {
-        self.unset_trait_final_map();
-        self
-    }
-
     /// Sets the set of child classlikes.
     #[inline]
     pub fn set_child_class_likes(&mut self, children: Option<HashSet<StringIdentifier>>) {
@@ -1212,19 +1074,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Sets the child classlikes to `None`.
-    #[inline]
-    pub fn unset_child_class_likes(&mut self) {
-        self.child_class_likes = None;
-    }
-
-    /// Returns a new instance with the child classlikes set to `None`.
-    #[inline]
-    pub fn without_child_class_likes(mut self) -> Self {
-        self.unset_child_class_likes();
-        self
-    }
-
     /// Sets the span for the class-like name identifier.
     #[inline]
     pub fn set_name_span(&mut self, name_span: Option<Span>) {
@@ -1235,32 +1084,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_name_span(mut self, name_span: Option<Span>) -> Self {
         self.set_name_span(name_span);
-        self
-    }
-
-    /// Sets the name span to `None`.
-    #[inline]
-    pub fn unset_name_span(&mut self) {
-        self.name_span = None;
-    }
-
-    /// Returns a new instance with the name span set to `None`.
-    #[inline]
-    pub fn without_name_span(mut self) -> Self {
-        self.unset_name_span();
-        self
-    }
-
-    /// Sets the kind of class-like (Class, Interface, Trait, Enum). Use with caution after creation.
-    #[inline]
-    pub fn set_kind(&mut self, kind: SymbolKind) {
-        self.kind = kind;
-    }
-
-    /// Returns a new instance with the kind set. Use with caution after creation.
-    #[inline]
-    pub fn with_kind(mut self, kind: SymbolKind) -> Self {
-        self.set_kind(kind);
         self
     }
 
@@ -1303,19 +1126,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all template types.
-    #[inline]
-    pub fn unset_template_types(&mut self) {
-        self.template_types.clear();
-    }
-
-    /// Returns a new instance with no template types.
-    #[inline]
-    pub fn without_template_types(mut self) -> Self {
-        self.unset_template_types();
-        self
-    }
-
     /// Sets the readonly template parameters, replacing existing ones.
     #[inline]
     pub fn set_template_readonly(&mut self, readonly_templates: impl IntoIterator<Item = StringIdentifier>) {
@@ -1355,19 +1165,6 @@ impl ClassLikeMetadata {
         template_names: impl IntoIterator<Item = StringIdentifier>,
     ) -> Self {
         self.add_template_readonlies(template_names);
-        self
-    }
-
-    /// Clears all readonly template parameters.
-    #[inline]
-    pub fn unset_template_readonly(&mut self) {
-        self.template_readonly.clear();
-    }
-
-    /// Returns a new instance with no readonly template parameters.
-    #[inline]
-    pub fn without_template_readonly(mut self) -> Self {
-        self.unset_template_readonly();
         self
     }
 
@@ -1420,19 +1217,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_added_template_extended_offset(mut self, name: StringIdentifier, types: Vec<TUnion>) -> Self {
         self.add_template_extended_offset(name, types);
-        self
-    }
-
-    /// Clears the template extended offsets map.
-    #[inline]
-    pub fn unset_template_extended_offsets(&mut self) {
-        self.template_extended_offsets.clear();
-    }
-
-    /// Returns a new instance with an empty template extended offsets map.
-    #[inline]
-    pub fn without_template_extended_offsets(mut self) -> Self {
-        self.unset_template_extended_offsets();
         self
     }
 
@@ -1508,19 +1292,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears the template extended parameters map.
-    #[inline]
-    pub fn unset_template_extended_parameters(&mut self) {
-        self.template_extended_parameters.clear();
-    }
-
-    /// Returns a new instance with an empty template extended parameters map.
-    #[inline]
-    pub fn without_template_extended_parameters(mut self) -> Self {
-        self.unset_template_extended_parameters();
-        self
-    }
-
     /// Sets the directly defined methods, replacing existing ones.
     #[inline]
     pub fn set_methods(&mut self, methods: impl IntoIterator<Item = StringIdentifier>) {
@@ -1560,35 +1331,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears all directly defined methods.
-    #[inline]
-    pub fn unset_methods(&mut self) {
-        self.methods.clear();
-    }
-
-    /// Returns a new instance with no directly defined methods.
-    #[inline]
-    pub fn without_methods(mut self) -> Self {
-        self.unset_methods();
-        self
-    }
-
-    /// Sets the declaring method IDs map, replacing the existing one.
-    #[inline]
-    pub fn set_declaring_method_ids(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
-        self.unset_declaring_method_ids();
-        for (method, declaring_fqcn) in map {
-            self.add_declaring_method_id(method, declaring_fqcn);
-        }
-    }
-
-    /// Returns a new instance with the declaring method IDs map replaced.
-    #[inline]
-    pub fn with_declaring_method_ids(mut self, map: HashMap<StringIdentifier, StringIdentifier>) -> Self {
-        self.set_declaring_method_ids(map);
-        self
-    }
-
     /// Adds or updates the declaring class FQCN for a method name.
     #[inline]
     pub fn add_declaring_method_id(
@@ -1608,21 +1350,6 @@ impl ClassLikeMetadata {
         declaring_fqcn: StringIdentifier,
     ) -> Self {
         self.add_declaring_method_id(method, declaring_fqcn);
-        self
-    }
-
-    /// Clears the declaring method IDs map.
-    #[inline]
-    pub fn unset_declaring_method_ids(&mut self) {
-        for (metod, _) in self.declaring_method_ids.drain() {
-            self.appearing_method_ids.remove(&metod);
-        }
-    }
-
-    /// Returns a new instance with an empty declaring method IDs map.
-    #[inline]
-    pub fn without_declaring_method_ids(mut self) -> Self {
-        self.unset_declaring_method_ids();
         self
     }
 
@@ -1657,19 +1384,6 @@ impl ClassLikeMetadata {
         appearing_fqcn: StringIdentifier,
     ) -> Self {
         self.add_appearing_method_id(method, appearing_fqcn);
-        self
-    }
-
-    /// Clears the appearing method IDs map.
-    #[inline]
-    pub fn unset_appearing_method_ids(&mut self) {
-        self.appearing_method_ids.clear();
-    }
-
-    /// Returns a new instance with an empty appearing method IDs map.
-    #[inline]
-    pub fn without_appearing_method_ids(mut self) -> Self {
-        self.unset_appearing_method_ids();
         self
     }
 
@@ -1724,19 +1438,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears the overridden method IDs map.
-    #[inline]
-    pub fn unset_overridden_method_ids(&mut self) {
-        self.overridden_method_ids.clear();
-    }
-
-    /// Returns a new instance with an empty overridden method IDs map.
-    #[inline]
-    pub fn without_overridden_method_ids(mut self) -> Self {
-        self.unset_overridden_method_ids();
-        self
-    }
-
     /// Sets the inheritable method IDs map, replacing the existing one.
     #[inline]
     pub fn set_inheritable_method_ids(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
@@ -1764,19 +1465,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_added_inheritable_method_id(mut self, method: StringIdentifier, source_fqcn: StringIdentifier) -> Self {
         self.add_inheritable_method_id(method, source_fqcn);
-        self
-    }
-
-    /// Clears the inheritable method IDs map.
-    #[inline]
-    pub fn unset_inheritable_method_ids(&mut self) {
-        self.inheritable_method_ids.clear();
-    }
-
-    /// Returns a new instance with an empty inheritable method IDs map.
-    #[inline]
-    pub fn without_inheritable_method_ids(mut self) -> Self {
-        self.unset_inheritable_method_ids();
         self
     }
 
@@ -1858,19 +1546,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears the potential declaring method IDs map.
-    #[inline]
-    pub fn unset_potential_declaring_method_ids(&mut self) {
-        self.potential_declaring_method_ids.clear();
-    }
-
-    /// Returns a new instance with an empty potential declaring method IDs map.
-    #[inline]
-    pub fn without_potential_declaring_method_ids(mut self) -> Self {
-        self.unset_potential_declaring_method_ids();
-        self
-    }
-
     /// Sets the properties map, replacing the existing one.
     #[inline]
     pub fn set_properties(&mut self, map: HashMap<StringIdentifier, PropertyMetadata>) {
@@ -1898,7 +1573,7 @@ impl ClassLikeMetadata {
 
         self.add_declaring_property_id(name, class_name);
         if property_metadata.has_default() {
-            self.add_initialized_property(name);
+            self.initialized_properties.push(name);
         }
 
         if !property_metadata.is_final() {
@@ -1933,13 +1608,6 @@ impl ClassLikeMetadata {
         }
     }
 
-    /// Returns a new instance with an empty properties map.
-    #[inline]
-    pub fn without_properties(mut self) -> Self {
-        self.unset_properties();
-        self
-    }
-
     /// Sets the appearing property IDs map, replacing the existing one.
     #[inline]
     pub fn set_appearing_property_ids(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
@@ -1963,34 +1631,10 @@ impl ClassLikeMetadata {
         self.appearing_property_ids.insert(prop, appearing_fqcn)
     }
 
-    /// Returns a new instance with the appearing class FQCN for the property added or updated.
-    #[inline]
-    pub fn with_added_appearing_property_id(
-        mut self,
-        prop: StringIdentifier,
-        appearing_fqcn: StringIdentifier,
-    ) -> Self {
-        self.add_appearing_property_id(prop, appearing_fqcn);
-        self
-    }
-
-    /// Clears the appearing property IDs map.
-    #[inline]
-    pub fn unset_appearing_property_ids(&mut self) {
-        self.appearing_property_ids.clear();
-    }
-
-    /// Returns a new instance with an empty appearing property IDs map.
-    #[inline]
-    pub fn without_appearing_property_ids(mut self) -> Self {
-        self.unset_appearing_property_ids();
-        self
-    }
-
     /// Sets the declaring property IDs map, replacing the existing one.
     #[inline]
     pub fn set_declaring_property_ids(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
-        self.unset_declaring_property_ids();
+        self.declaring_property_ids = HashMap::with_hasher(RandomState::new());
         for (prop, declaring_fqcn) in map {
             self.add_declaring_property_id(prop, declaring_fqcn);
         }
@@ -2025,21 +1669,6 @@ impl ClassLikeMetadata {
         self
     }
 
-    /// Clears the declaring property IDs map.
-    #[inline]
-    pub fn unset_declaring_property_ids(&mut self) {
-        for (metod, _) in self.declaring_property_ids.drain() {
-            self.appearing_property_ids.remove(&metod);
-        }
-    }
-
-    /// Returns a new instance with an empty declaring property IDs map.
-    #[inline]
-    pub fn without_declaring_property_ids(mut self) -> Self {
-        self.unset_declaring_property_ids();
-        self
-    }
-
     /// Sets the inheritable property IDs map, replacing the existing one.
     #[inline]
     pub fn set_inheritable_property_ids(&mut self, map: HashMap<StringIdentifier, StringIdentifier>) {
@@ -2050,419 +1679,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_inheritable_property_ids(mut self, map: HashMap<StringIdentifier, StringIdentifier>) -> Self {
         self.set_inheritable_property_ids(map);
-        self
-    }
-
-    /// Adds or updates the inheriting source FQCN for a property name.
-    #[inline]
-    pub fn add_inheritable_property_id(
-        &mut self,
-        prop: StringIdentifier,
-        source_fqcn: StringIdentifier,
-    ) -> Option<StringIdentifier> {
-        self.inheritable_property_ids.insert(prop, source_fqcn)
-    }
-
-    /// Returns a new instance with the inheriting source FQCN for the property added or updated.
-    #[inline]
-    pub fn with_added_inheritable_property_id(mut self, prop: StringIdentifier, source_fqcn: StringIdentifier) -> Self {
-        self.add_inheritable_property_id(prop, source_fqcn);
-        self
-    }
-
-    /// Clears the inheritable property IDs map.
-    #[inline]
-    pub fn unset_inheritable_property_ids(&mut self) {
-        self.inheritable_property_ids.clear();
-    }
-
-    /// Returns a new instance with an empty inheritable property IDs map.
-    #[inline]
-    pub fn without_inheritable_property_ids(mut self) -> Self {
-        self.unset_inheritable_property_ids();
-        self
-    }
-
-    /// Sets the overridden property IDs map, replacing the existing one.
-    #[inline]
-    pub fn set_overridden_property_ids(&mut self, map: HashMap<StringIdentifier, Vec<StringIdentifier>>) {
-        self.overridden_property_ids = map;
-    }
-
-    /// Returns a new instance with the overridden property IDs map replaced.
-    #[inline]
-    pub fn with_overridden_property_ids(mut self, map: HashMap<StringIdentifier, Vec<StringIdentifier>>) -> Self {
-        self.set_overridden_property_ids(map);
-        self
-    }
-
-    /// Adds a parent FQCN to the list for an overridden property. Initializes list if needed.
-    #[inline]
-    pub fn add_overridden_property_parent(&mut self, prop: StringIdentifier, parent_fqcn: StringIdentifier) {
-        self.overridden_property_ids.entry(prop).or_default().push(parent_fqcn)
-    }
-
-    /// Returns a new instance with the parent FQCN added for the overridden property.
-    #[inline]
-    pub fn with_added_overridden_property_parent(
-        mut self,
-        prop: StringIdentifier,
-        parent_fqcn: StringIdentifier,
-    ) -> Self {
-        self.add_overridden_property_parent(prop, parent_fqcn);
-        self
-    }
-
-    /// Adds multiple parent FQCNs for an overridden property.
-    #[inline]
-    pub fn add_overridden_property_parents(
-        &mut self,
-        prop: StringIdentifier,
-        parents: impl IntoIterator<Item = StringIdentifier>,
-    ) {
-        self.overridden_property_ids.entry(prop).or_default().extend(parents);
-    }
-
-    /// Returns a new instance with multiple parent FQCNs added for the overridden property.
-    #[inline]
-    pub fn with_added_overridden_property_parents(
-        mut self,
-        prop: StringIdentifier,
-        parents: impl IntoIterator<Item = StringIdentifier>,
-    ) -> Self {
-        self.add_overridden_property_parents(prop, parents);
-        self
-    }
-
-    /// Clears the overridden property IDs map.
-    #[inline]
-    pub fn unset_overridden_property_ids(&mut self) {
-        self.overridden_property_ids.clear();
-    }
-
-    /// Returns a new instance with an empty overridden property IDs map.
-    #[inline]
-    pub fn without_overridden_property_ids(mut self) -> Self {
-        self.unset_overridden_property_ids();
-        self
-    }
-
-    /// Sets the list of properties initialized with a default value, replacing existing ones.
-    #[inline]
-    pub fn set_initialized_properties(&mut self, props: impl IntoIterator<Item = StringIdentifier>) {
-        self.initialized_properties = props.into_iter().collect();
-    }
-
-    /// Returns a new instance with the initialized properties replaced.
-    #[inline]
-    pub fn with_initialized_properties(mut self, props: impl IntoIterator<Item = StringIdentifier>) -> Self {
-        self.set_initialized_properties(props);
-        self
-    }
-
-    /// Adds a single initialized property.
-    #[inline]
-    pub fn add_initialized_property(&mut self, prop: StringIdentifier) {
-        self.initialized_properties.push(prop);
-    }
-
-    /// Returns a new instance with the initialized property added.
-    #[inline]
-    pub fn with_added_initialized_property(mut self, prop: StringIdentifier) -> Self {
-        self.add_initialized_property(prop);
-        self
-    }
-
-    /// Adds multiple initialized properties.
-    #[inline]
-    pub fn add_initialized_properties(&mut self, props: impl IntoIterator<Item = StringIdentifier>) {
-        self.initialized_properties.extend(props);
-    }
-
-    /// Returns a new instance with the initialized properties added.
-    #[inline]
-    pub fn with_added_initialized_properties(mut self, props: impl IntoIterator<Item = StringIdentifier>) -> Self {
-        self.add_initialized_properties(props);
-        self
-    }
-
-    /// Clears all initialized properties.
-    #[inline]
-    pub fn unset_initialized_properties(&mut self) {
-        self.initialized_properties.clear();
-    }
-
-    /// Returns a new instance with no initialized properties.
-    #[inline]
-    pub fn without_initialized_properties(mut self) -> Self {
-        self.unset_initialized_properties();
-        self
-    }
-
-    /// Sets the class constants, replacing existing ones.
-    #[inline]
-    pub fn set_constants(&mut self, constants: IndexMap<StringIdentifier, ClassLikeConstantMetadata, RandomState>) {
-        self.constants = constants;
-    }
-
-    /// Returns a new instance with the class constants replaced.
-    #[inline]
-    pub fn with_constants(
-        mut self,
-        constants: IndexMap<StringIdentifier, ClassLikeConstantMetadata, RandomState>,
-    ) -> Self {
-        self.set_constants(constants);
-        self
-    }
-
-    /// Adds or updates a single class constant. Returns the previous metadata if the constant existed.
-    #[inline]
-    pub fn add_constant(
-        &mut self,
-        name: StringIdentifier,
-        constant: ClassLikeConstantMetadata,
-    ) -> Option<ClassLikeConstantMetadata> {
-        self.constants.insert(name, constant)
-    }
-
-    /// Returns a new instance with the class constant added or updated.
-    #[inline]
-    pub fn with_added_constant(mut self, name: StringIdentifier, constant: ClassLikeConstantMetadata) -> Self {
-        self.add_constant(name, constant);
-        self
-    }
-
-    /// Clears all class constants.
-    #[inline]
-    pub fn unset_constants(&mut self) {
-        self.constants.clear();
-    }
-
-    /// Returns a new instance with no class constants.
-    #[inline]
-    pub fn without_constants(mut self) -> Self {
-        self.unset_constants();
-        self
-    }
-
-    /// Sets the enum cases, replacing existing ones.
-    #[inline]
-    pub fn set_enum_cases(&mut self, cases: IndexMap<StringIdentifier, EnumCaseMetadata, RandomState>) {
-        self.enum_cases = cases;
-    }
-
-    /// Returns a new instance with the enum cases replaced.
-    #[inline]
-    pub fn with_enum_cases(mut self, cases: IndexMap<StringIdentifier, EnumCaseMetadata, RandomState>) -> Self {
-        self.set_enum_cases(cases);
-        self
-    }
-
-    /// Adds or updates a single enum case. Returns the previous metadata if the case existed.
-    #[inline]
-    pub fn add_enum_case(&mut self, name: StringIdentifier, case_meta: EnumCaseMetadata) -> Option<EnumCaseMetadata> {
-        self.enum_cases.insert(name, case_meta)
-    }
-
-    /// Returns a new instance with the enum case added or updated.
-    #[inline]
-    pub fn with_added_enum_case(mut self, name: StringIdentifier, case_meta: EnumCaseMetadata) -> Self {
-        self.add_enum_case(name, case_meta);
-        self
-    }
-
-    /// Clears all enum cases.
-    #[inline]
-    pub fn unset_enum_cases(&mut self) {
-        self.enum_cases.clear();
-    }
-
-    /// Returns a new instance with no enum cases.
-    #[inline]
-    pub fn without_enum_cases(mut self) -> Self {
-        self.unset_enum_cases();
-        self
-    }
-
-    /// Sets the list of invalid dependencies, replacing existing ones.
-    #[inline]
-    pub fn set_invalid_dependencies(&mut self, deps: impl IntoIterator<Item = StringIdentifier>) {
-        self.invalid_dependencies = deps.into_iter().collect();
-    }
-
-    /// Returns a new instance with the invalid dependencies replaced.
-    #[inline]
-    pub fn with_invalid_dependencies(mut self, deps: impl IntoIterator<Item = StringIdentifier>) -> Self {
-        self.set_invalid_dependencies(deps);
-        self
-    }
-
-    /// Adds a single invalid dependency.
-    #[inline]
-    pub fn add_invalid_dependency(&mut self, dep: StringIdentifier) {
-        self.invalid_dependencies.push(dep);
-    }
-
-    /// Returns a new instance with the invalid dependency added.
-    #[inline]
-    pub fn with_added_invalid_dependency(mut self, dep: StringIdentifier) -> Self {
-        self.add_invalid_dependency(dep);
-        self
-    }
-
-    /// Adds multiple invalid dependencies.
-    #[inline]
-    pub fn add_invalid_dependencies(&mut self, deps: impl IntoIterator<Item = StringIdentifier>) {
-        self.invalid_dependencies.extend(deps);
-    }
-
-    /// Returns a new instance with the invalid dependencies added.
-    #[inline]
-    pub fn with_added_invalid_dependencies(mut self, deps: impl IntoIterator<Item = StringIdentifier>) -> Self {
-        self.add_invalid_dependencies(deps);
-        self
-    }
-
-    /// Clears all invalid dependencies.
-    #[inline]
-    pub fn unset_invalid_dependencies(&mut self) {
-        self.invalid_dependencies.clear();
-    }
-
-    /// Returns a new instance with no invalid dependencies.
-    #[inline]
-    pub fn without_invalid_dependencies(mut self) -> Self {
-        self.unset_invalid_dependencies();
-        self
-    }
-
-    /// Sets the attributes, replacing existing ones.
-    #[inline]
-    pub fn set_attributes(&mut self, attributes: impl IntoIterator<Item = AttributeMetadata>) {
-        self.attributes = attributes.into_iter().collect();
-    }
-
-    /// Returns a new instance with the attributes replaced.
-    #[inline]
-    pub fn with_attributes(mut self, attributes: impl IntoIterator<Item = AttributeMetadata>) -> Self {
-        self.set_attributes(attributes);
-        self
-    }
-
-    /// Adds a single attribute.
-    #[inline]
-    pub fn add_attribute(&mut self, attribute: AttributeMetadata) {
-        self.attributes.push(attribute);
-    }
-
-    /// Returns a new instance with the attribute added.
-    #[inline]
-    pub fn with_added_attribute(mut self, attribute: AttributeMetadata) -> Self {
-        self.add_attribute(attribute);
-        self
-    }
-
-    /// Adds multiple attributes.
-    #[inline]
-    pub fn add_attributes(&mut self, attributes: impl IntoIterator<Item = AttributeMetadata>) {
-        self.attributes.extend(attributes);
-    }
-
-    /// Returns a new instance with the attributes added.
-    #[inline]
-    pub fn with_added_attributes(mut self, attributes: impl IntoIterator<Item = AttributeMetadata>) -> Self {
-        self.add_attributes(attributes);
-        self
-    }
-
-    /// Clears all attributes.
-    #[inline]
-    pub fn unset_attributes(&mut self) {
-        self.attributes.clear();
-    }
-
-    /// Returns a new instance with no attributes.
-    #[inline]
-    pub fn without_attributes(mut self) -> Self {
-        self.unset_attributes();
-        self
-    }
-
-    /// Sets the backing type for an enum.
-    #[inline]
-    pub fn set_enum_type(&mut self, enum_type: Option<TAtomic>) {
-        self.enum_type = enum_type;
-    }
-
-    /// Returns a new instance with the enum backing type set.
-    #[inline]
-    pub fn with_enum_type(mut self, enum_type: Option<TAtomic>) -> Self {
-        self.set_enum_type(enum_type);
-        self
-    }
-
-    /// Sets the enum backing type to `None`.
-    #[inline]
-    pub fn unset_enum_type(&mut self) {
-        self.enum_type = None;
-    }
-
-    /// Returns a new instance with the enum backing type set to `None`.
-    #[inline]
-    pub fn without_enum_type(mut self) -> Self {
-        self.unset_enum_type();
-        self
-    }
-
-    /// Sets the `@sealed-methods` status.
-    #[inline]
-    pub fn set_has_sealed_methods(&mut self, sealed: Option<bool>) {
-        self.has_sealed_methods = sealed;
-    }
-
-    /// Returns a new instance with the `@sealed-methods` status set.
-    #[inline]
-    pub fn with_has_sealed_methods(mut self, sealed: Option<bool>) -> Self {
-        self.set_has_sealed_methods(sealed);
-        self
-    }
-
-    /// Sets the `@sealed-methods` status to `None`.
-    #[inline]
-    pub fn unset_has_sealed_methods(&mut self) {
-        self.has_sealed_methods = None;
-    }
-
-    /// Returns a new instance with the `@sealed-methods` status set to `None`.
-    #[inline]
-    pub fn without_has_sealed_methods(mut self) -> Self {
-        self.unset_has_sealed_methods();
-        self
-    }
-
-    /// Sets the `@sealed-properties` status.
-    #[inline]
-    pub fn set_has_sealed_properties(&mut self, sealed: Option<bool>) {
-        self.has_sealed_properties = sealed;
-    }
-
-    /// Returns a new instance with the `@sealed-properties` status set.
-    #[inline]
-    pub fn with_has_sealed_properties(mut self, sealed: Option<bool>) -> Self {
-        self.set_has_sealed_properties(sealed);
-        self
-    }
-
-    /// Sets the `@sealed-properties` status to `None`.
-    #[inline]
-    pub fn unset_has_sealed_properties(&mut self) {
-        self.has_sealed_properties = None;
-    }
-
-    /// Returns a new instance with the `@sealed-properties` status set to `None`.
-    #[inline]
-    pub fn without_has_sealed_properties(mut self) -> Self {
-        self.unset_has_sealed_properties();
         self
     }
 
@@ -2502,19 +1718,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn with_added_issues(mut self, issues: impl IntoIterator<Item = Issue>) -> Self {
         self.add_issues(issues);
-        self
-    }
-
-    /// Clears all typing issues.
-    #[inline]
-    pub fn unset_issues(&mut self) {
-        self.issues.clear();
-    }
-
-    /// Returns a new instance with no typing issues.
-    #[inline]
-    pub fn without_issues(mut self) -> Self {
-        self.unset_issues();
         self
     }
 
