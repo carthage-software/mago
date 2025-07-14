@@ -41,9 +41,11 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::OpenResource => Type::OpenResource(Keyword::from(stream.consume()?)),
         TypeTokenKind::True => Type::True(Keyword::from(stream.consume()?)),
         TypeTokenKind::False => Type::False(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Bool => Type::Bool(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Float => Type::Float(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Int => {
+        TypeTokenKind::Bool | TypeTokenKind::Boolean => Type::Bool(Keyword::from(stream.consume()?)),
+        TypeTokenKind::Float | TypeTokenKind::Real | TypeTokenKind::Double => {
+            Type::Float(Keyword::from(stream.consume()?))
+        }
+        TypeTokenKind::Int | TypeTokenKind::Integer => {
             let keyword = Keyword::from(stream.consume()?);
 
             if stream.is_at(TypeTokenKind::LessThan)? {

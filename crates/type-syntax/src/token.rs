@@ -8,9 +8,13 @@ use mago_span::Span;
 #[repr(C)]
 pub enum TypeTokenKind {
     Int,
+    Integer,
     String,
     Float,
+    Real,
+    Double,
     Bool,
+    Boolean,
     False,
     True,
     Object,
@@ -124,9 +128,13 @@ impl TypeTokenKind {
         matches!(
             self,
             Self::Int
+                | Self::Integer
+                | Self::Double
                 | Self::String
                 | Self::Float
+                | Self::Real
                 | Self::Bool
+                | Self::Boolean
                 | Self::False
                 | Self::True
                 | Self::Object

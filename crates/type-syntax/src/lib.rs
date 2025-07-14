@@ -870,4 +870,62 @@ mod tests {
             res => panic!("Expected Ok(Type::Union), got {res:?}"),
         }
     }
+
+    #[test]
+    fn test_parse_float_alias() {
+        match do_parse("double") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "double");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+
+        match do_parse("real") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "real");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+
+        match do_parse("float") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "float");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_alias() {
+        match do_parse("boolean") {
+            Ok(Type::Bool(b)) => {
+                assert_eq!(b.value, "boolean");
+            }
+            res => panic!("Expected Ok(Type::Bool), got {res:?}"),
+        }
+
+        match do_parse("bool") {
+            Ok(Type::Bool(b)) => {
+                assert_eq!(b.value, "bool");
+            }
+            res => panic!("Expected Ok(Type::Bool), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_integer_alias() {
+        match do_parse("integer") {
+            Ok(Type::Int(i)) => {
+                assert_eq!(i.value, "integer");
+            }
+            res => panic!("Expected Ok(Type::Int), got {res:?}"),
+        }
+
+        match do_parse("int") {
+            Ok(Type::Int(i)) => {
+                assert_eq!(i.value, "int");
+            }
+            res => panic!("Expected Ok(Type::Int), got {res:?}"),
+        }
+    }
 }

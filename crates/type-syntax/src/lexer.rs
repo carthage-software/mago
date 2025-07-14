@@ -444,12 +444,16 @@ impl<'input> TypeLexer<'input> {
     }
 
     fn read_identifier(&self) -> (TypeTokenKind, usize) {
-        const KEYWORD_TYPES: [(&[u8], TypeTokenKind); 24] = [
+        const KEYWORD_TYPES: [(&[u8], TypeTokenKind); 28] = [
             (b"list", TypeTokenKind::List),
             (b"int", TypeTokenKind::Int),
+            (b"integer", TypeTokenKind::Integer),
             (b"string", TypeTokenKind::String),
             (b"float", TypeTokenKind::Float),
+            (b"double", TypeTokenKind::Double),
+            (b"real", TypeTokenKind::Real),
             (b"bool", TypeTokenKind::Bool),
+            (b"boolean", TypeTokenKind::Boolean),
             (b"false", TypeTokenKind::False),
             (b"true", TypeTokenKind::True),
             (b"object", TypeTokenKind::Object),
