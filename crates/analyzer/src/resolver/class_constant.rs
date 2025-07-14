@@ -189,9 +189,10 @@ fn find_constant_in_class(
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
         let const_type = constant_metadata
-            .get_inferred_type()
-            .map(|t| wrap_atomic(t.clone()))
-            .or_else(|| constant_metadata.type_metadata.as_ref().map(|s| s.type_union.clone()))
+            .inferred_type
+            .clone()
+            .map(wrap_atomic)
+            .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
             .unwrap_or_else(get_mixed);
 
         return Some(ResolvedConstant { fq_class_id: metadata.name, const_name, const_type });

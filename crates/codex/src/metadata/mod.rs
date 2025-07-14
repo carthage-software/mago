@@ -140,7 +140,7 @@ impl CodebaseMetadata {
         self.class_likes
             .get(fq_class_name)
             .and_then(|class_metadata| class_metadata.constants.get(const_name))
-            .and_then(|constant_metadata| constant_metadata.get_inferred_type())
+            .and_then(|constant_metadata| constant_metadata.inferred_type.as_ref())
     }
 
     /// Checks if a property with the given name exists (is declared or inherited) within the class-like structure.

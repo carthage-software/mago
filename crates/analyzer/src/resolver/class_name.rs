@@ -191,7 +191,7 @@ pub fn resolve_classnames_from_expression<'a>(
         }
         Expression::Parent(parent_keyword) => {
             if let Some(self_meta) = block_context.scope.get_class_like() {
-                if let Some(parent_id_ref) = self_meta.get_direct_parent_class_ref() {
+                if let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref() {
                     possible_types.push(ResolvedClassname::new(
                         Some(*parent_id_ref),
                         ResolutionOrigin::Named { is_parent: true, is_self: false },

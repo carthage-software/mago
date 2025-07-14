@@ -1124,7 +1124,7 @@ fn analyze_iterator<'a>(
                         let enum_name = context.interner.lookup(&enum_instance.get_name());
                         let enum_backing_type =
                             get_enum(context.codebase, context.interner, enum_instance.get_name_ref())
-                                .and_then(|class_like| class_like.get_enum_type());
+                                .and_then(|class_like| class_like.enum_type.as_ref());
 
                         context.buffer.report(
                             TypingIssueKind::EnumIteration,

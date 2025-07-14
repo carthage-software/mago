@@ -59,7 +59,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    if let Some(case_value_type) = case_metadata.get_value_type() {
+                    if let Some(case_value_type) = case_metadata.value_type.as_ref() {
                         value_types.push(case_value_type.clone());
                     }
                 }
@@ -73,7 +73,7 @@ impl TValueOf {
                     };
 
                     for (_, case_metadata) in metadata.enum_cases.iter() {
-                        if let Some(case_value_type) = case_metadata.get_value_type() {
+                        if let Some(case_value_type) = case_metadata.value_type.as_ref() {
                             value_types.push(case_value_type.clone());
                         }
                     }

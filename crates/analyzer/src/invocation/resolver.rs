@@ -111,7 +111,7 @@ fn resolve_union(
 
     if let Some(method_context) = invocation.target.get_method_context() {
         static_class_type = method_context.class_type.clone();
-        parent_class = method_context.class_like_metadata.get_direct_parent_class_ref();
+        parent_class = method_context.class_like_metadata.direct_parent_class.as_ref();
         self_class = Some(&method_context.class_like_metadata.name);
         function_is_final = invocation
             .target

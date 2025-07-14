@@ -12,22 +12,25 @@ pub fn scan_enum_case(case: &EnumCase, context: &mut Context<'_>) -> EnumCaseMet
     let attributes = scan_attribute_lists(&case.attribute_lists, context);
 
     match &case.item {
-        EnumCaseItem::Unit(enum_case_unit_item) => {
-            EnumCaseMetadata::new(enum_case_unit_item.name.value, enum_case_unit_item.name.span, span)
-                .with_attributes(attributes)
-                .with_value_type(None)
-                .with_is_backed(false)
-                .with_is_deprecated(false)
+        EnumCaseItem::Unit(item) => {
+            let mut meta = EnumCaseMetadata::new(item.name.value, item.name.span, span);
+
+            meta.attributes = attributes;
+            meta.value_type = None;
+            meta.is_backed = false;
+            meta.is_deprecated = false;
+            meta
         }
-        EnumCaseItem::Backed(enum_case_backed_item) => {
-            EnumCaseMetadata::new(enum_case_backed_item.name.value, enum_case_backed_item.name.span, span)
-                .with_attributes(attributes)
-                .with_is_backed(true)
-                .with_is_deprecated(false)
-                .with_value_type(
-                    infer(context.interner, context.resolved_names, &enum_case_backed_item.value)
-                        .map(|u| u.get_single_owned()),
-                )
+        EnumCaseItem::Backed(item) => {
+            let mut meta = EnumCaseMetadata::new(item.name.value, item.name.span, span);
+
+            meta.attributes = attributes;
+            meta.is_backed = true;
+            meta.is_deprecated = false;
+            meta.value_type =
+                infer(context.interner, context.resolved_names, &item.value).map(|u| u.get_single_owned());
+
+            meta
         }
     }
 }

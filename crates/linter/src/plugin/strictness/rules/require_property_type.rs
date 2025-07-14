@@ -78,7 +78,8 @@ impl Rule for RequirePropertyTypeRule {
 
             for variable in property.variables() {
                 if metadata
-                    .get_appearing_property_id(&variable.name)
+                    .appearing_property_ids
+                    .get(&variable.name)
                     .is_none_or(|appearing_class_id| appearing_class_id != &metadata.name)
                 {
                     continue;

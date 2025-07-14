@@ -154,7 +154,7 @@ pub fn populate_codebase(
         for (constant_name, constant) in &mut metadata.constants {
             let constant_reference_source = ReferenceSource::ClassLikeMember(true, *name, *constant_name);
 
-            for attribute_metadata in constant.get_attributes() {
+            for attribute_metadata in &constant.attributes {
                 symbol_references.add_class_member_reference_to_symbol(
                     (*name, *constant_name),
                     attribute_metadata.get_name(),
@@ -162,7 +162,7 @@ pub fn populate_codebase(
                 );
             }
 
-            if let Some(signature) = constant.get_type_signature_mut() {
+            if let Some(signature) = &mut constant.type_metadata {
                 populate_union_type(
                     &mut signature.type_union,
                     &codebase.symbols,
@@ -173,7 +173,7 @@ pub fn populate_codebase(
                 );
             }
 
-            if let Some(inferred) = constant.get_inferred_type_mut() {
+            if let Some(inferred) = &mut constant.inferred_type {
                 populate_atomic_type(
                     inferred,
                     &codebase.symbols,
@@ -188,7 +188,7 @@ pub fn populate_codebase(
         for (enum_case_name, enum_case) in &mut metadata.enum_cases {
             let enum_case_reference_source = ReferenceSource::ClassLikeMember(true, *name, *enum_case_name);
 
-            for attribute_metadata in enum_case.get_attributes() {
+            for attribute_metadata in &enum_case.attributes {
                 symbol_references.add_class_member_reference_to_symbol(
                     (*name, *enum_case_name),
                     attribute_metadata.get_name(),
@@ -196,7 +196,7 @@ pub fn populate_codebase(
                 );
             }
 
-            if let Some(value_type) = enum_case.get_value_type_mut() {
+            if let Some(value_type) = &mut enum_case.value_type {
                 populate_atomic_type(
                     value_type,
                     &codebase.symbols,
@@ -208,7 +208,7 @@ pub fn populate_codebase(
             }
         }
 
-        if let Some(enum_type) = metadata.get_enum_type_mut() {
+        if let Some(enum_type) = &mut metadata.enum_type {
             populate_atomic_type(
                 enum_type,
                 &codebase.symbols,
@@ -220,7 +220,7 @@ pub fn populate_codebase(
         }
     }
 
-    for (name, constant) in codebase.constants.iter_mut() {
+    for (name, constant) in &mut codebase.constants {
         for attribute_metadata in &constant.attributes {
             symbol_references.add_symbol_reference_to_symbol(*name, attribute_metadata.get_name(), true);
         }

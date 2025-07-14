@@ -801,22 +801,20 @@ fn scan_class_like(
         match member {
             ClassLikeMember::Constant(constant) => {
                 for constant_metadata in scan_class_like_constants(&mut class_like_metadata, constant, context) {
-                    let constant_name = constant_metadata.get_name();
-                    if class_like_metadata.constants.contains_key(constant_name) {
+                    if class_like_metadata.constants.contains_key(&constant_metadata.name) {
                         continue;
                     }
 
-                    class_like_metadata.constants.insert(*constant_name, constant_metadata);
+                    class_like_metadata.constants.insert(constant_metadata.name, constant_metadata);
                 }
             }
             ClassLikeMember::EnumCase(enum_case) => {
                 let case_metadata = scan_enum_case(enum_case, context);
-                let case_name = case_metadata.get_name();
-                if class_like_metadata.constants.contains_key(case_name) {
+                if class_like_metadata.constants.contains_key(&case_metadata.name) {
                     continue;
                 }
 
-                class_like_metadata.enum_cases.insert(*case_name, case_metadata);
+                class_like_metadata.enum_cases.insert(case_metadata.name, case_metadata);
             }
             _ => {
                 continue;
@@ -836,7 +834,7 @@ fn scan_class_like(
                     .push(TAtomic::Scalar(TScalar::literal_string(context.interner.lookup(case_name).to_string())));
 
                 if let Some(enum_backing_type) = &backing_type {
-                    if let Some(t) = case_info.get_value_type() {
+                    if let Some(t) = case_info.value_type.as_ref() {
                         value_types.push(t.clone());
                     } else {
                         value_types.push(enum_backing_type.clone());

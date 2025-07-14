@@ -117,7 +117,7 @@ pub(crate) fn analyze<'a>(
                     &TypeExpansionOptions {
                         self_class: Some(&declaring_class_metadata.name),
                         static_class_type: StaticClassType::Name(declaring_class_metadata.name),
-                        parent_class: declaring_class_metadata.get_direct_parent_class_ref(),
+                        parent_class: declaring_class_metadata.direct_parent_class.as_ref(),
                         file_path: Some(&context.source.identifier),
                         ..Default::default()
                     },

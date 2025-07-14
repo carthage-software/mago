@@ -463,8 +463,8 @@ pub(crate) fn can_be_identical<'a>(
 }
 
 pub fn expand_constant_value(v: &ClassLikeConstantMetadata) -> TAtomic {
-    v.get_inferred_type().cloned().unwrap_or(
-        v.get_type_metadata().map(|t| t.type_union.get_single()).cloned().unwrap_or(TAtomic::Mixed(TMixed::any())),
+    v.inferred_type.clone().unwrap_or(
+        v.type_metadata.as_ref().map(|t| t.type_union.get_single()).cloned().unwrap_or(TAtomic::Mixed(TMixed::any())),
     )
 }
 

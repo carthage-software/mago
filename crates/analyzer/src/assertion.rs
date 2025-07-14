@@ -754,7 +754,7 @@ fn scrape_instanceof_assertions(
             Expression::Parent(_) => {
                 if let Some(self_class) = context.this_class_name
                     && let Some(self_meta) = get_class_like(context.codebase, context.interner, self_class)
-                    && let Some(parent_id_ref) = self_meta.get_direct_parent_class_ref()
+                    && let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref()
                 {
                     if_types.insert(
                         counter_variable_id,
