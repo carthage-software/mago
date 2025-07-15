@@ -4,6 +4,7 @@ use mago_codex::get_method_by_id;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::inherits_class;
 use mago_codex::method_id_exists;
+use mago_codex::uses_trait;
 use mago_codex::visibility::Visibility;
 use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
@@ -225,6 +226,8 @@ fn is_visible_from_scope(
                 context.interner.lowered(current_class_id) == context.interner.lowered(declaring_class_id)
                     || inherits_class(context.codebase, context.interner, current_class_id, declaring_class_id)
                     || inherits_class(context.codebase, context.interner, declaring_class_id, current_class_id)
+                    || uses_trait(context.codebase, context.interner, current_class_id, declaring_class_id)
+                    || uses_trait(context.codebase, context.interner, declaring_class_id, current_class_id)
             } else {
                 false
             }
@@ -232,6 +235,8 @@ fn is_visible_from_scope(
         Visibility::Private => {
             if let Some(current_class_id) = current_class_id_opt {
                 context.interner.lowered(current_class_id) == context.interner.lowered(declaring_class_id)
+                    || uses_trait(context.codebase, context.interner, current_class_id, declaring_class_id)
+                    || uses_trait(context.codebase, context.interner, declaring_class_id, current_class_id)
             } else {
                 false
             }

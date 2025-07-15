@@ -575,4 +575,27 @@ mod tests {
             TypingIssueKind::UnusedStatement,
         ]
     }
+
+    test_analysis! {
+        name = trait_property_access,
+        code = indoc! {r#"
+            <?php
+
+            trait A {
+                private string $x = "hello 1";
+                protected string $y = "hello 2";
+            }
+
+            class B {
+                use A;
+
+                public function c(): void {
+                    echo $this->x; // private property access
+                    echo $this->y; // protected property access
+                }
+            }
+
+            new B()->c();
+        "#},
+    }
 }

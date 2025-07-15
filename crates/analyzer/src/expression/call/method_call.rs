@@ -506,4 +506,32 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = trait_method_access,
+        code = indoc! {r#"
+            <?php
+
+            trait A {
+                private function x(): void {
+                    echo "hello 1";
+                }
+
+                protected function y(): void {
+                    echo "hello 2";
+                }
+            }
+
+            class B {
+                use A;
+
+                public function c(): void {
+                    $this->x();
+                    $this->y();
+                }
+            }
+
+            new B()->c();
+        "#},
+    }
 }
