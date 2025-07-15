@@ -166,24 +166,40 @@ impl TAtomic {
     }
 
     pub fn get_generator_parameters(&self, interner: &ThreadedInterner) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
-        let TAtomic::Object(TObject::Named(named_object)) = self else {
-            return None;
+        let generator_parameters = 'parameters: {
+            let TAtomic::Object(TObject::Named(named_object)) = self else {
+                break 'parameters None;
+            };
+
+            let name_str = interner.lookup(named_object.get_name_ref());
+            if !name_str.eq_ignore_ascii_case("Generator") {
+                break 'parameters None;
+            }
+
+            let parameters = named_object.get_type_parameters().unwrap_or_default();
+            match parameters.len() {
+                0 => Some((get_mixed(), get_mixed(), get_mixed(), get_mixed())),
+                1 => Some((get_mixed(), parameters[0].clone(), get_mixed(), get_mixed())),
+                2 => Some((parameters[0].clone(), parameters[1].clone(), get_mixed(), get_mixed())),
+                3 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), get_mixed())),
+                4 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), parameters[3].clone())),
+                _ => None,
+            }
         };
 
-        let name_str = interner.lookup(named_object.get_name_ref());
-        if !name_str.eq_ignore_ascii_case("Generator") {
-            return None;
+        if let Some(parameters) = generator_parameters {
+            return Some(parameters);
         }
 
-        let parameters = named_object.get_type_parameters().unwrap_or_default();
-        match parameters.len() {
-            0 => Some((get_mixed(), get_mixed(), get_mixed(), get_mixed())),
-            1 => Some((get_mixed(), parameters[0].clone(), get_mixed(), get_mixed())),
-            2 => Some((parameters[0].clone(), parameters[1].clone(), get_mixed(), get_mixed())),
-            3 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), get_mixed())),
-            4 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), parameters[3].clone())),
-            _ => None,
+        if let Some(intersection_types) = self.get_intersection_types() {
+            for intersection_type in intersection_types {
+                if let Some(parameters) = intersection_type.get_generator_parameters(interner) {
+                    return Some(parameters);
+                }
+            }
         }
+
+        None
     }
 
     pub fn is_templated_as_object(&self) -> bool {
@@ -308,16 +324,19 @@ impl TAtomic {
     }
 
     #[inline]
+    pub fn is_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
+        self.extends_or_implements(codebase, interner, interner.intern("Traversable"))
+            || self.extends_or_implements(codebase, interner, interner.intern("Iterator"))
+            || self.extends_or_implements(codebase, interner, interner.intern("IteratorAggregate"))
+            || self.extends_or_implements(codebase, interner, interner.intern("Generator"))
+    }
+
+    #[inline]
     pub fn is_array_or_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
         match self {
             TAtomic::Iterable(_) => true,
             TAtomic::Array(_) => true,
-            _ => {
-                self.extends_or_implements(codebase, interner, interner.intern("Traversable"))
-                    || self.extends_or_implements(codebase, interner, interner.intern("Iterator"))
-                    || self.extends_or_implements(codebase, interner, interner.intern("IteratorAggregate"))
-                    || self.extends_or_implements(codebase, interner, interner.intern("Generator"))
-            }
+            _ => self.is_traversable(codebase, interner),
         }
     }
 

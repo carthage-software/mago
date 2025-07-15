@@ -7,7 +7,7 @@ use crate::ttype::comparator::generic_comparator::update_failed_result_from_nest
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_iterable_parameters;
 
-pub(crate) fn is_contained_by(
+pub fn is_contained_by(
     codebase: &CodebaseMetadata,
     interner: &ThreadedInterner,
     input_type_part: &TAtomic,
@@ -15,11 +15,11 @@ pub(crate) fn is_contained_by(
     inside_assertion: bool,
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
-    let TAtomic::Iterable(iterable) = container_type_part else {
+    let Some((container_k, container_v)) = get_iterable_parameters(container_type_part, codebase, interner) else {
         return false;
     };
 
-    let Some(input_parameters) = get_iterable_parameters(input_type_part, codebase, interner) else {
+    let Some((input_k, input_v)) = get_iterable_parameters(input_type_part, codebase, interner) else {
         return false;
     };
 
@@ -29,10 +29,10 @@ pub(crate) fn is_contained_by(
     if !union_comparator::is_contained_by(
         codebase,
         interner,
-        &input_parameters.0,
-        iterable.get_key_type(),
+        &input_k,
+        &container_k,
         false,
-        input_parameters.0.ignore_falsable_issues,
+        input_k.ignore_falsable_issues,
         inside_assertion,
         &mut nested_comparison_result,
     ) {
@@ -46,10 +46,10 @@ pub(crate) fn is_contained_by(
     if !union_comparator::is_contained_by(
         codebase,
         interner,
-        &input_parameters.1,
-        iterable.get_value_type(),
+        &input_v,
+        &container_v,
         false,
-        input_parameters.1.ignore_falsable_issues,
+        input_v.ignore_falsable_issues,
         inside_assertion,
         &mut nested_comparison_result,
     ) {

@@ -5,16 +5,18 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::union::TUnion;
 
-pub mod array_comparator;
+mod array_comparator;
+mod callable_comparator;
+mod class_string_comparator;
+mod generic_comparator;
+mod integer_comparator;
+mod iterable_comparator;
+mod resource_comparator;
+mod scalar_comparator;
+
+pub(super) mod object_comparator;
+
 pub mod atomic_comparator;
-pub mod callable_comparator;
-pub mod class_string_comparator;
-pub mod generic_comparator;
-pub mod integer_comparator;
-pub mod iterable_comparator;
-pub mod object_comparator;
-pub mod resource_comparator;
-pub mod scalar_comparator;
 pub mod union_comparator;
 
 #[derive(Debug)]

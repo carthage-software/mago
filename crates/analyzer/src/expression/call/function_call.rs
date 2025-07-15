@@ -461,8 +461,6 @@ mod tests {
                 needs_non_empty_list($arg_list);
             }
 
-            // Passing an array that *could* be empty at runtime, if type is just list<int>
-            // Your analyzer might flag this as a potential issue if it can't prove $arg_list is non-empty.
             main_list_can_be_empty([]); // Definitely empty
         "#},
         issues = [TypingIssueKind::PossiblyInvalidArgument]
@@ -831,6 +829,43 @@ mod tests {
             foo('update');           // OK (starts with 'U')
             foo(ChangeKind::RENAME); // OK (ends with 'ME')
             foo('rename');           // OK (ends with 'ME')
+        "#},
+    }
+
+    test_analysis! {
+        name = iterable_for_traversable_or_array,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template K
+             * @template-covariant V
+             */
+            interface Traversable {}
+
+            /**
+             * @template K as array-key
+             * @template V
+             *
+             * @param array<K, V>|Traversable<K, V> $_input
+             *
+             * @return array<K, V>
+             */
+            function as_array(array|Traversable $_input): array {
+                return [];
+            }
+
+            /**
+             * @template K as array-key
+             * @template V
+             *
+             * @param iterable<K, V> $input
+             *
+             * @return array<K, V>
+             */
+            function iter_as_array(iterable $input): array {
+                return as_array($input);
+            }
         "#},
     }
 

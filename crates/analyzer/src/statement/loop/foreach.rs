@@ -327,4 +327,63 @@ mod tests {
             }
         "#}
     }
+
+    test_analysis! {
+        name = iterating_over_intersection,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template K
+             * @template-covariant V
+             */
+            interface Traversable
+            {
+            }
+
+            /**
+             * @template K
+             * @template-covariant V
+             *
+             * @extends Traversable<K, V>
+             */
+            interface IteratorAggregate extends Traversable
+            {
+                /**
+                 * @return Traversable<K, V>
+                 */
+                public function getIterator(): Traversable;
+            }
+
+            class X
+            {
+            }
+
+            /**
+             * @implements IteratorAggregate<int, string>
+             */
+            class Y extends X implements IteratorAggregate
+            {
+                /**
+                 * @return Traversable<int, string>
+                 */
+                public function getIterator(): Traversable
+                {
+                    return $this->getIterator();
+                }
+            }
+
+            /**
+             * @return X&Traversable<int, string>
+             */
+            function y(): X
+            {
+                return new Y();
+            }
+
+            foreach (y() as $item) {
+                echo $item . "\n";
+            }
+        "#}
+    }
 }

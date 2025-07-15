@@ -601,42 +601,58 @@ pub fn get_iterable_parameters(
         return Some((generator_parameters.0, generator_parameters.1));
     }
 
-    match atomic {
-        TAtomic::Iterable(iterable) => Some((iterable.get_key_type().clone(), iterable.get_value_type().clone())),
-        TAtomic::Array(array_type) => Some(get_array_parameters(array_type, codebase, interner)),
-        TAtomic::Object(object) => {
-            let name = object.get_name()?;
-            let traversable = interner.intern("traversable");
+    let parameters = 'parameters: {
+        match atomic {
+            TAtomic::Iterable(iterable) => Some((iterable.get_key_type().clone(), iterable.get_value_type().clone())),
+            TAtomic::Array(array_type) => Some(get_array_parameters(array_type, codebase, interner)),
+            TAtomic::Object(object) => {
+                let name = object.get_name()?;
+                let traversable = interner.intern("traversable");
 
-            let class_metadata = get_class_like(codebase, interner, name)?;
-            if !is_instance_of(codebase, interner, &class_metadata.name, &traversable) {
-                return None;
+                let class_metadata = get_class_like(codebase, interner, name)?;
+                if !is_instance_of(codebase, interner, &class_metadata.name, &traversable) {
+                    break 'parameters None;
+                }
+
+                let key_type = get_specialized_template_type(
+                    codebase,
+                    interner,
+                    "K",
+                    &traversable,
+                    class_metadata,
+                    object.get_type_parameters(),
+                )
+                .unwrap_or_else(get_mixed);
+
+                let value_type = get_specialized_template_type(
+                    codebase,
+                    interner,
+                    "V",
+                    &traversable,
+                    class_metadata,
+                    object.get_type_parameters(),
+                )
+                .unwrap_or_else(get_mixed);
+
+                Some((key_type, value_type))
             }
-
-            let key_type = get_specialized_template_type(
-                codebase,
-                interner,
-                "K",
-                &traversable,
-                class_metadata,
-                object.get_type_parameters(),
-            )
-            .unwrap_or_else(get_mixed);
-
-            let value_type = get_specialized_template_type(
-                codebase,
-                interner,
-                "V",
-                &traversable,
-                class_metadata,
-                object.get_type_parameters(),
-            )
-            .unwrap_or_else(get_mixed);
-
-            Some((key_type, value_type))
+            _ => None,
         }
-        _ => None,
+    };
+
+    if let Some((key_type, value_type)) = parameters {
+        return Some((key_type, value_type));
     }
+
+    if let Some(intersection_types) = atomic.get_intersection_types() {
+        for intersection_type in intersection_types {
+            if let Some((key_type, value_type)) = get_iterable_parameters(intersection_type, codebase, interner) {
+                return Some((key_type, value_type));
+            }
+        }
+    }
+
+    None
 }
 
 pub fn get_array_parameters(
@@ -705,7 +721,7 @@ pub fn get_iterable_value_parameter(
         return Some(generator_parameters.1);
     }
 
-    match atomic {
+    let parameter = match atomic {
         TAtomic::Iterable(iterable) => Some(iterable.get_value_type().clone()),
         TAtomic::Array(array_type) => Some(get_array_value_parameter(array_type, codebase, interner)),
         TAtomic::Object(object) => {
@@ -727,7 +743,21 @@ pub fn get_iterable_value_parameter(
             )
         }
         _ => None,
+    };
+
+    if let Some(value_param) = parameter {
+        return Some(value_param);
     }
+
+    if let Some(intersection_types) = atomic.get_intersection_types() {
+        for intersection_type in intersection_types {
+            if let Some(value_param) = get_iterable_value_parameter(intersection_type, codebase, interner) {
+                return Some(value_param);
+            }
+        }
+    }
+
+    None
 }
 
 pub fn get_array_value_parameter(

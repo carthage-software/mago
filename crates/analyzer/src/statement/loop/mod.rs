@@ -7,9 +7,7 @@ use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
-use mago_codex::get_class_like;
 use mago_codex::get_enum;
-use mago_codex::is_instance_of;
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -984,7 +982,7 @@ fn analyze_iterator<'a>(
         return Ok((false, get_arraykey(), get_never()));
     }
 
-    if iterator_type.is_nullable() {
+    if iterator_type.is_nullable() && !iterator_type.ignore_nullable_issues {
         context.buffer.report(
             TypingIssueKind::PossiblyNullIterator,
             Issue::warning(format!("Expression being iterated (type `{}`) might be `null` at runtime.", iterator_type.get_id(Some(context.interner))))
@@ -1041,7 +1039,7 @@ fn analyze_iterator<'a>(
                 collected_value_atomics.extend(iterable.value_type.types.clone());
             }
             TAtomic::Object(object) => {
-                let (obj_key_type, obj_value_type, obj_non_empty) = match object {
+                let (obj_key_type, obj_value_type) = match object {
                     TObject::Any => {
                         context.buffer.report(
                             TypingIssueKind::GenericObjectIteration,
@@ -1051,65 +1049,24 @@ fn analyze_iterator<'a>(
                                 .with_help("For predictable and type-safe iteration, ensure the object is an instance of a class implementing `Iterator` or `IteratorAggregate`.")
                         );
 
-                        (get_string(), get_mixed_any(), false)
+                        (get_string(), get_mixed_any())
                     }
-                    TObject::Named(named_object) => {
-                        let class_name = context.interner.lookup(named_object.get_name_ref());
-                        let traversable = context.interner.intern("traversable");
-
-                        if class_name.eq_ignore_ascii_case("generator") {
-                            let key = named_object
-                                .get_type_parameters()
-                                .and_then(|parameters| parameters.first())
-                                .cloned()
-                                .unwrap_or_else(get_mixed);
-
-                            let value = named_object
-                                .get_type_parameters()
-                                .and_then(|parameters| parameters.get(1))
-                                .cloned()
-                                .unwrap_or_else(get_mixed_any);
-
-                            (key, value, false)
-                        } else if is_instance_of(
-                            context.codebase,
-                            context.interner,
-                            named_object.get_name_ref(),
-                            &traversable,
-                        ) {
-                            let class_metadata =
-                                get_class_like(context.codebase, context.interner, named_object.get_name_ref())
-                                    .expect("Class metadata should exist for named object");
-
-                            let key_type = get_specialized_template_type(
-                                context.codebase,
-                                context.interner,
-                                "K",
-                                &traversable,
-                                class_metadata,
-                                object.get_type_parameters(),
-                            )
-                            .unwrap_or_else(get_mixed);
-
-                            let value_type = get_specialized_template_type(
-                                context.codebase,
-                                context.interner,
-                                "V",
-                                &traversable,
-                                class_metadata,
-                                object.get_type_parameters(),
-                            )
-                            .unwrap_or_else(get_mixed_any);
-
-                            (key_type, value_type, false)
+                    TObject::Named(atomic_object) => {
+                        if let Some((k, v)) =
+                            get_iterable_parameters(iterator_atomic, context.codebase, context.interner)
+                        {
+                            (k, v)
                         } else {
+                            let class_name = context.interner.lookup(&atomic_object.name);
+                            let iterator_atomic_str = iterator_atomic.get_id(Some(context.interner));
+
                             context.buffer.report(
                                 TypingIssueKind::NonIterableObjectIteration,
                                 Issue::warning(format!(
                                     "Iterating over object of type `{class_name}` which does not implement `Iterator` or `IteratorAggregate`.",
                                 ))
                                     .with_annotation(
-                                        Annotation::primary(iterator.span()).with_message(format!("Iterating non-traversable object `{class_name}`")),
+                                        Annotation::primary(iterator.span()).with_message(format!("Iterating non-traversable object `{class_name}` of type `{iterator_atomic_str}`")),
                                     )
                                     .with_note(format!("PHP will iterate over the public properties of `{class_name}`."))
                                     .with_help("The keys will be property names (strings) and values will be their types (often `mixed` from a static analysis perspective).")
@@ -1117,10 +1074,12 @@ fn analyze_iterator<'a>(
                                     .with_help(format!("For controlled and type-safe iteration, implement the `Iterator` or `IteratorAggregate` interface on class `{class_name}`."))
                             );
 
-                            (get_string(), get_mixed_any(), false)
+                            (get_string(), get_mixed_any())
                         }
                     }
                     TObject::Enum(enum_instance) => {
+                        has_at_least_one_entry = true;
+
                         let enum_name = context.interner.lookup(&enum_instance.get_name());
                         let enum_backing_type =
                             get_enum(context.codebase, context.interner, enum_instance.get_name_ref())
@@ -1151,17 +1110,13 @@ fn analyze_iterator<'a>(
                                     TAtomic::Scalar(TScalar::literal_string("value".to_owned())),
                                 ]),
                                 TUnion::new(vec![TAtomic::Scalar(TScalar::non_empty_string()), backing_type.clone()]),
-                                true,
                             ),
-                            None => (get_literal_string("name".to_owned()), get_non_empty_string(), true),
+                            None => (get_literal_string("name".to_owned()), get_non_empty_string()),
                         }
                     }
                 };
 
                 has_valid_iterable_type = true;
-                if obj_non_empty {
-                    has_at_least_one_entry = true;
-                }
 
                 collected_key_atomics.extend(obj_key_type.types);
                 collected_value_atomics.extend(obj_value_type.types);

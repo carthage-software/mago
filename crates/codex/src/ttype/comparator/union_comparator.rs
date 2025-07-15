@@ -7,6 +7,7 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
+use crate::ttype::comparator::iterable_comparator;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
@@ -92,6 +93,32 @@ pub fn is_contained_by(
                 {
                     continue 'outer;
                 }
+            }
+        }
+
+        if let TAtomic::Iterable(_) = input_type_part
+            && !container_type.has_iterable()
+            && container_type.has_array()
+            && container_type.has_traversable(codebase, interner)
+        {
+            let mut matched_all = true;
+            for container_atomic_type in &container_atomic_types {
+                if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase, interner) {
+                    continue;
+                }
+
+                matched_all &= iterable_comparator::is_contained_by(
+                    codebase,
+                    interner,
+                    input_type_part,
+                    container_atomic_type,
+                    inside_assertion,
+                    union_comparison_result,
+                );
+            }
+
+            if matched_all {
+                continue;
             }
         }
 

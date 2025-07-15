@@ -11,6 +11,7 @@ use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 
 use crate::data_flow::node::DataFlowNode;
+use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
 use crate::reference::SymbolReferences;
 use crate::symbol::Symbols;
@@ -557,6 +558,18 @@ impl TUnion {
 
     pub fn has_array_key(&self) -> bool {
         self.types.iter().any(|atomic| atomic.is_array_key())
+    }
+
+    pub fn has_iterable(&self) -> bool {
+        self.types.iter().any(|atomic| atomic.is_iterable()) && !self.types.is_empty()
+    }
+
+    pub fn has_array(&self) -> bool {
+        self.types.iter().any(|atomic| atomic.is_array()) && !self.types.is_empty()
+    }
+
+    pub fn has_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
+        self.types.iter().any(|atomic| atomic.is_traversable(codebase, interner)) && !self.types.is_empty()
     }
 
     pub fn has_array_key_like(&self) -> bool {
