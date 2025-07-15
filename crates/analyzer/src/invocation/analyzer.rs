@@ -639,36 +639,26 @@ pub fn populate_template_result_from_invocation(invocation: &Invocation<'_>, tem
         if let Some(method_metadata) = &metadata.method_metadata
             && !method_metadata.is_static()
             && let Some(method_context) = method_context
+            && let StaticClassType::Object(object_type) = &method_context.class_type
+            && let TObject::Named(named_object) = object_type
+            && let Some(type_parameters) = &named_object.type_parameters
         {
-            for (template_name, template_defaults) in method_context.class_like_metadata.template_types.iter() {
-                template_result
+            for (template_index, template_type) in type_parameters.iter().enumerate() {
+                let Some(template_name) = method_context
+                    .class_like_metadata
                     .template_types
-                    .entry(*template_name)
-                    .or_default()
-                    .extend(template_defaults.iter().cloned());
-            }
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
+                else {
+                    break;
+                };
 
-            if let StaticClassType::Object(object_type) = &method_context.class_type
-                && let TObject::Named(named_object) = object_type
-                && let Some(type_parameters) = &named_object.type_parameters
-            {
-                for (template_index, template_type) in type_parameters.iter().enumerate() {
-                    let Some(template_name) = method_context
-                        .class_like_metadata
-                        .template_types
-                        .iter()
-                        .enumerate()
-                        .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
-                    else {
-                        break;
-                    };
-
-                    template_result.add_lower_bound(
-                        template_name,
-                        GenericParent::ClassLike(method_context.class_like_metadata.name),
-                        template_type.clone(),
-                    );
-                }
+                template_result.add_lower_bound(
+                    template_name,
+                    GenericParent::ClassLike(method_context.class_like_metadata.name),
+                    template_type.clone(),
+                );
             }
         }
     }

@@ -62,10 +62,7 @@ pub fn replace(
 
                 if let Some(template_type) = template_type {
                     keys_to_unset.insert(*key);
-
-                    for template_type_part in template_type.types {
-                        new_types.push(replace_atomic(template_type_part, template_result, codebase, interner));
-                    }
+                    new_types.extend(template_type.types);
                 } else {
                     new_types.push(atomic_type);
                 }

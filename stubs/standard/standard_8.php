@@ -747,36 +747,16 @@ function array_splice(array &$array, int $offset, null|int $length, mixed $repla
 }
 
 /**
- * Extract a slice of the array
- * @link https://php.net/manual/en/function.array-slice.php
- * @param array $array <p>
- * The input array.
- * </p>
- * @param int $offset <p>
- * If offset is non-negative, the sequence will
- * start at that offset in the array. If
- * offset is negative, the sequence will
- * start that far from the end of the array.
- * </p>
- * @param int|null $length [optional] <p>
- * If length is given and is positive, then
- * the sequence will have that many elements in it. If
- * length is given and is negative then the
- * sequence will stop that many elements from the end of the
- * array. If it is omitted, then the sequence will have everything
- * from offset up until the end of the
- * array.
- * </p>
- * @param bool $preserve_keys [optional] <p>
- * Note that array_slice will reorder and reset the
- * array indices by default. You can change this behaviour by setting
- * preserve_keys to true.
- * </p>
- * @return array the slice.
- * @meta
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($preserve_keys is true ? array<K, V> : list<V>) $array
+ *
+ * @pure
  */
-#[Pure]
-function array_slice(array $array, int $offset, null|int $length, bool $preserve_keys = false): array
+function array_slice(array $array, int $offset, null|int $length = null, bool $preserve_keys = false): array
 {
 }
 

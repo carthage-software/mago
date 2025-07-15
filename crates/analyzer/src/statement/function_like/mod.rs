@@ -108,12 +108,12 @@ pub fn analyze_function_like<'a, 'ast>(
                             .template_types
                             .iter()
                             .map(|(parameter_name, template_map)| {
-                                let first_map_entry = template_map.iter().next().unwrap();
+                                let (defining_entry, constraint) = template_map.iter().next().unwrap();
 
                                 wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
                                     parameter_name: *parameter_name,
-                                    constraint: Box::new(first_map_entry.1.clone()),
-                                    defining_entity: first_map_entry.0,
+                                    constraint: Box::new(constraint.clone()),
+                                    defining_entity: *defining_entry,
                                     intersection_types: None,
                                 }))
                             })
