@@ -4,7 +4,6 @@ use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_source::SourceIdentifier;
 
-use crate::enum_exists;
 use crate::get_class_like;
 use crate::get_closure;
 use crate::get_declaring_method;
@@ -148,37 +147,14 @@ fn expand_atomic(
             }
         },
         TAtomic::Object(TObject::Named(named_object)) => {
-            if named_object.is_this() {
-                match &options.static_class_type {
-                    StaticClassType::Object(obj) => {
-                        if let TObject::Named(new_this) = obj
-                            && is_instance_of(codebase, interner, new_this.get_name_ref(), named_object.get_name_ref())
-                        {
-                            *skip_key = true;
-                            new_return_type_parts.push(TAtomic::Object(obj.clone()));
-
-                            return;
-                        }
-                    }
-                    StaticClassType::Name(static_class_name) => {
-                        if is_instance_of(codebase, interner, static_class_name, named_object.get_name_ref()) {
-                            *skip_key = true;
-
-                            let object = if enum_exists(codebase, interner, static_class_name) {
-                                TObject::new_enum(*static_class_name)
-                            } else {
-                                TObject::new_named(*static_class_name)
-                            };
-
-                            new_return_type_parts.push(TAtomic::Object(object));
-
-                            return;
-                        }
-                    }
-                    StaticClassType::None => {
-                        // Can't expand type coming from a non-class context
-                    }
-                }
+            if named_object.is_this()
+                && let StaticClassType::Object(obj) = &options.static_class_type
+                && let TObject::Named(new_this_object) = &obj
+                && is_instance_of(codebase, interner, &new_this_object.name, &named_object.name)
+            {
+                *skip_key = true;
+                new_return_type_parts.push(TAtomic::Object(obj.clone()));
+                return;
             }
 
             if let Some(type_parameters) = named_object.get_type_parameters_mut() {

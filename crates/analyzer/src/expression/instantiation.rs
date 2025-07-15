@@ -457,7 +457,7 @@ fn analyze_class_instantiation<'a>(
     let result_type = wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters,
-        is_this: classname.is_static(),
+        is_this: classname.is_static() || (classname.is_self() && metadata.is_final),
         intersection_types: None,
         remapped_parameters: false,
     })));
@@ -880,5 +880,37 @@ mod tests {
             // TODO(azjezz): we want to trigger an issue here in the future about
             // the type parameter not being used at all in the class `Example`
         ]
+    }
+
+    test_analysis! {
+        name = self_is_static_in_final_class,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template Tk of array-key
+             * @template Tv
+             */
+            final class Map {
+                /**
+                 * @var array<Tk, Tv> $elements
+                 */
+                private array $elements;
+
+                /**
+                 * @param array<Tk, Tv> $elements
+                 */
+                public function __construct(array $elements = []) {
+                    $this->elements = $elements;
+                }
+
+                /**
+                 * @return static
+                 */
+                public static function getStatic(): static {
+                    return new self(); // `self` is same as `static` since the class is final
+                }
+            }
+        "#},
     }
 }

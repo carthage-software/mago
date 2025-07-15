@@ -97,6 +97,11 @@ impl ResolvedClassname {
         matches!(self.origin, ResolutionOrigin::Static { .. })
     }
 
+    /// Checks if the class name is resolved from the `self` keyword.
+    pub const fn is_self(&self) -> bool {
+        matches!(self.origin, ResolutionOrigin::Named { is_self: true, .. })
+    }
+
     /// Checks if the class name is resolved from the `static` keyword and the class is not final,
     pub const fn can_extend_static(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Static { can_extend: true })

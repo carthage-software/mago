@@ -879,6 +879,38 @@ mod tests {
     }
 
     test_analysis! {
+        name = expanding_this,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template Tk of array-key
+             * @template Tv
+             */
+            final class Map {
+                /**
+                 * @var array<Tk, Tv> $elements
+                 */
+                private array $elements;
+
+                /**
+                 * @param array<Tk, Tv> $elements
+                 */
+                public function __construct(array $elements = []) {
+                    $this->elements = $elements;
+                }
+
+                /**
+                 * @return Map<Tk, Tv>
+                 */
+                public function toStatic(): static {
+                    return $this;
+                }
+            }
+        "#},
+    }
+
+    test_analysis! {
         name = complex_type_return,
         code = indoc! {r#"
             <?php
