@@ -493,7 +493,7 @@ fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> HashSet<StringI
                         .with_message(format!("Cannot catch `{caught_type_str}` because it is {kind_str}")),
                 )
                 .with_annotation(
-                    Annotation::secondary(class_like_metadata.get_name_span().unwrap_or(class_like_metadata.get_span()))
+                    Annotation::secondary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
                         .with_message(format!("`{caught_type_str}` is defined as {kind_str} here")),
                 )
                 .with_note("PHP `catch` blocks require a class or interface type. Enums and traits are not valid types for catching exceptions as they cannot be thrown or extend `Throwable`.")
@@ -516,7 +516,7 @@ fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> HashSet<StringI
                         .with_message(format!("`{caught_type_str}` is not an instance of `Throwable`")),
                 )
                 .with_annotation(
-                    Annotation::secondary(class_like_metadata.get_name_span().unwrap_or(class_like_metadata.get_span()))
+                    Annotation::secondary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
                         .with_message(format!("`{caught_type_str}` defined here does not implement `Throwable`")),
                 )
                 .with_note("In PHP, only objects that implement the `Throwable` interface (this includes `Exception` and `Error` classes and their children) can be caught in a `catch` block.")

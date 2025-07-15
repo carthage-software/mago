@@ -585,7 +585,7 @@ pub fn inherits_class(
         return false;
     };
 
-    child_meta.has_parent_class(&lowered_parent)
+    child_meta.all_parent_classes.contains(&lowered_parent)
 }
 
 pub fn directly_inherits_class(
@@ -601,7 +601,7 @@ pub fn directly_inherits_class(
         return false;
     };
 
-    child_meta.has_direct_parent_class(&lowered_parent)
+    child_meta.direct_parent_class.as_ref().is_some_and(|parent_class| parent_class == &lowered_parent)
 }
 
 pub fn inherits_interface(
@@ -617,7 +617,7 @@ pub fn inherits_interface(
         return false;
     };
 
-    child_meta.has_parent_interface(&lowered_parent)
+    child_meta.all_parent_interfaces.contains(&lowered_parent)
 }
 
 pub fn directly_inherits_interface(
@@ -633,7 +633,7 @@ pub fn directly_inherits_interface(
         return false;
     };
 
-    child_meta.has_direct_parent_interface(&lowered_parent)
+    child_meta.direct_parent_interfaces.contains(&lowered_parent)
 }
 
 pub fn uses_trait(
@@ -649,7 +649,7 @@ pub fn uses_trait(
         return false;
     };
 
-    child_meta.has_used_trait(&lowered_trait_name)
+    child_meta.used_traits.contains(&lowered_trait_name)
 }
 
 /// Recursively collects all descendant class/interface/enum FQCNs for a given class-like structure.

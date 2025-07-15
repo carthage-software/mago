@@ -259,7 +259,7 @@ pub(crate) fn analyze_class_like<'a>(
             if method_metadata.is_abstract() {
                 let method_name_str = context.interner.lookup(method_name);
                 let fqcn_str = context.interner.lookup(&declaring_class_like_metadata.original_name);
-                let method_span = function_like.get_name_span().unwrap_or_else(|| function_like.get_span());
+                let method_span = function_like.name_span.unwrap_or(function_like.span);
 
                 context.buffer.report(
                     TypingIssueKind::UnimplementedAbstractMethod,
@@ -295,8 +295,7 @@ pub(crate) fn analyze_class_like<'a>(
                 get_class_like(context.codebase, context.interner, &resolved_template_name_id)
             {
                 let conflicting_class_name = context.interner.lookup(&conflicting_class.name);
-                let conflicting_class_span =
-                    conflicting_class.get_name_span().unwrap_or_else(|| conflicting_class.get_span());
+                let conflicting_class_span = conflicting_class.name_span.unwrap_or(conflicting_class.span);
 
                 context.buffer.report(
                     TypingIssueKind::NameAlreadyInUse,
@@ -386,8 +385,7 @@ fn check_class_like_extends(
             };
 
             let extending_name_str = context.interner.lookup(&class_like_metadata.original_name);
-            let extending_class_span =
-                class_like_metadata.get_name_span().unwrap_or_else(|| class_like_metadata.get_span());
+            let extending_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
             let extended_name_str = context.interner.lookup(&extended_class_metadata.original_name);
             let extended_kind_str = extended_class_metadata.kind.as_str();
             let extended_kind_prefix =
@@ -396,8 +394,7 @@ fn check_class_like_extends(
                 } else {
                     "an"
                 };
-            let extended_class_span =
-                extended_class_metadata.get_name_span().unwrap_or_else(|| extended_class_metadata.get_span());
+            let extended_class_span = extended_class_metadata.name_span.unwrap_or(extended_class_metadata.span);
 
             if extending_interface {
                 if !extended_class_metadata.kind.is_interface() {
@@ -520,7 +517,7 @@ fn check_class_like_extends(
 
                 if !class_like_metadata.is_abstract {
                     for required_interface in &extended_class_metadata.require_implements {
-                        if !class_like_metadata.has_parent_interface(required_interface) {
+                        if !class_like_metadata.all_parent_interfaces.contains(required_interface) {
                             let required_iface_str = context.interner.lookup(required_interface);
 
                             context.buffer.report(
@@ -656,10 +653,8 @@ fn check_class_like_implements(
                                 .with_message("This interface is an enum interface"),
                         )
                         .with_annotation(
-                            Annotation::secondary(
-                                implemented_metadata.get_name_span().unwrap_or(implemented_metadata.get_span()),
-                            )
-                            .with_message("This interface is marked with `@enum-interface`"),
+                            Annotation::secondary(implemented_metadata.name_span.unwrap_or(implemented_metadata.span))
+                                .with_message("This interface is marked with `@enum-interface`"),
                         )
                         .with_note("An enum interface can only be implemented by an enums.")
                         .with_help("Change this class to be an enum, or remove the `implements` clause."),
@@ -752,13 +747,13 @@ fn check_template_parameters(
     actual_parameters_count: usize,
     inheritance: InheritanceKind,
 ) -> Result<(), AnalysisError> {
-    let expected_parameters_count = parent_metadata.get_template_types().len();
+    let expected_parameters_count = parent_metadata.template_types.len();
 
     let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
     let class_kind_str = class_like_metadata.kind.as_str();
     let parent_name_str = context.interner.lookup(&parent_metadata.original_name);
-    let class_name_span = class_like_metadata.get_name_span().unwrap_or_else(|| class_like_metadata.get_span());
-    let parent_definition_span = parent_metadata.get_name_span().unwrap_or_else(|| parent_metadata.get_span());
+    let class_name_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
+    let parent_definition_span = parent_metadata.name_span.unwrap_or(parent_metadata.span);
     let primary_annotation_span = inheritance.span();
     let (inheritance_keyword, inheritance_tag) = match inheritance {
         InheritanceKind::Extends(_) => ("extends", "@extends"),
@@ -806,7 +801,7 @@ fn check_template_parameters(
         context.buffer.report(TypingIssueKind::ExcessTemplateParameter, issue);
     }
 
-    let own_template_parameters_len = class_like_metadata.get_template_types().len();
+    let own_template_parameters_len = class_like_metadata.template_types.len();
     if parent_metadata.has_consistent_templates && own_template_parameters_len != expected_parameters_count {
         context.buffer.report(
             TypingIssueKind::InconsistentTemplate,
@@ -826,7 +821,7 @@ fn check_template_parameters(
         let mut previous_extended_types: IndexMap<StringIdentifier, Vec<(GenericParent, TUnion)>, RandomState> =
             IndexMap::default();
 
-        for (template_name, template_type_map) in parent_metadata.get_template_types() {
+        for (template_name, template_type_map) in &parent_metadata.template_types {
             let Some(extended_type) = extended_parameters.get(template_name) else {
                 i += 1;
                 continue;
@@ -840,14 +835,14 @@ fn check_template_parameters(
             let template_name_str = context.interner.lookup(template_name);
             let extended_type_str = extended_type.get_id(Some(context.interner));
 
-            if parent_metadata.get_template_variance_for_index(i).is_some_and(|variance| variance.is_invariant()) {
+            if parent_metadata.template_variance.get(&i).is_some_and(|variance| variance.is_invariant()) {
                 for extended_type_atomic in &extended_type.types {
                     let TAtomic::GenericParameter(generic_parameter) = extended_type_atomic else {
                         continue;
                     };
 
                     let Some(local_offset) = class_like_metadata
-                        .get_template_types()
+                        .template_types
                         .iter()
                         .position(|(name, _)| *name == generic_parameter.parameter_name)
                     else {
@@ -855,7 +850,8 @@ fn check_template_parameters(
                     };
 
                     if class_like_metadata
-                        .get_template_variance_for_index(local_offset)
+                        .template_variance
+                        .get(&local_offset)
                         .is_some_and(|variance| variance.is_covariant())
                     {
                         let child_template_name_str = context.interner.lookup(&generic_parameter.parameter_name);

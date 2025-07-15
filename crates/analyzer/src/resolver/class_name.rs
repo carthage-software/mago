@@ -205,11 +205,10 @@ pub fn resolve_classnames_from_expression<'a>(
                         ))
                         .with_annotation(Annotation::primary(parent_keyword.span()).with_message("`parent` used here"))
                         .with_annotation(
-                            Annotation::secondary(self_meta.get_name_span().unwrap_or_else(|| self_meta.get_span()))
-                                .with_message(format!(
-                                    "Class `{}` has no parent",
-                                    context.interner.lookup(&self_meta.original_name)
-                                )),
+                            Annotation::secondary(self_meta.name_span.unwrap_or(self_meta.span)).with_message(format!(
+                                "Class `{}` has no parent",
+                                context.interner.lookup(&self_meta.original_name)
+                            )),
                         ),
                     );
 

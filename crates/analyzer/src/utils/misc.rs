@@ -206,7 +206,7 @@ pub fn get_name_from_expression(
 
             let class_like_metadata = get_class_like(codebase, interner, self_name)?;
 
-            class_like_metadata.get_direct_parent_class()?
+            class_like_metadata.direct_parent_class?
         }
         Expression::Identifier(identifier) => *resolved_names.get(&identifier),
         _ => {

@@ -91,6 +91,29 @@ impl TemplateResult {
     pub fn add_upper_bound_unintersectable_type(&mut self, bound: TUnion) {
         self.upper_bounds_unintersectable_types.push(bound);
     }
+
+    pub fn has_lower_bound(&self, parameter_name: &StringIdentifier, generic_parent: &GenericParent) -> bool {
+        self.lower_bounds
+            .get(parameter_name)
+            .and_then(|bounds| bounds.get(generic_parent))
+            .is_some_and(|bounds| !bounds.is_empty())
+    }
+
+    pub fn has_lower_bound_for_class_like(
+        &self,
+        parameter_name: &StringIdentifier,
+        classlike_name: &StringIdentifier,
+    ) -> bool {
+        self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
+    }
+
+    pub fn get_lower_bounds_for_class_like(
+        &self,
+        parameter_name: &StringIdentifier,
+        classlike_name: &StringIdentifier,
+    ) -> Option<&Vec<TemplateBound>> {
+        self.lower_bounds.get(parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(*classlike_name)))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

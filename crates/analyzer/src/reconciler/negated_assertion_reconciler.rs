@@ -174,7 +174,7 @@ fn subtract_complex_type(
                     get_class_like(context.codebase, context.interner, existing_classlike_name)
                 {
                     // handle __Sealed classes, negating where possible
-                    if let Some(child_classlikes) = class_like_metadata.get_child_class_likes()
+                    if let Some(child_classlikes) = class_like_metadata.child_class_likes.as_ref()
                         && child_classlikes.contains(assertion_classlike_name)
                     {
                         handle_negated_class(
@@ -265,7 +265,7 @@ fn handle_negated_class(
                 TAtomic::Object(TObject::Named(TNamedObject::new(*child_classlike).with_type_parameters(
                     if let Some(child_metadata) = get_class_like(context.codebase, context.interner, child_classlike) {
                         let placeholder_params =
-                            child_metadata.get_template_types().iter().map(|_| get_placeholder()).collect::<Vec<_>>();
+                            child_metadata.template_types.iter().map(|_| get_placeholder()).collect::<Vec<_>>();
 
                         if placeholder_params.is_empty() { None } else { Some(placeholder_params) }
                     } else {

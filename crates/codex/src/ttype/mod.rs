@@ -780,8 +780,20 @@ pub fn get_specialized_template_type(
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
     let template_name_id = interner.get(template_name_to_find)?;
-
     let defining_class_metadata = get_class_like(codebase, interner, template_defining_class_id)?;
+
+    if defining_class_metadata.name == instantiated_class_metadata.name {
+        let index = instantiated_class_metadata.get_template_index_for_name(&template_name_id)?;
+
+        let Some(instantiated_type_parameters) = instantiated_type_parameters else {
+            let type_map = instantiated_class_metadata.get_template_type(&template_name_id)?;
+
+            return type_map.first().map(|(_, constraint)| constraint).cloned();
+        };
+
+        return instantiated_type_parameters.get(index).cloned();
+    }
+
     let defining_template_type = defining_class_metadata.get_template_type(&template_name_id)?;
     let template_union = TUnion::new(
         defining_template_type

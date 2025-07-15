@@ -213,7 +213,7 @@ impl Rule for OverrideAttributeRule {
             }
 
             let lowercase_name = context.interner.lowered(&method.name.value);
-            let Some(parent_class_names) = metadata.get_overridden_method_id(&lowercase_name) else {
+            let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
                 if let Some(attribute) = override_attribute {
                     let issue = Issue::new(
                         context.level(),

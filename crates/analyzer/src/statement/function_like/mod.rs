@@ -390,18 +390,18 @@ fn add_properties_to_context<'a>(
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
 ) -> Result<(), AnalysisError> {
-    for (property_name, declaring_class) in class_like_metadata.get_declaring_property_ids() {
+    for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
         let Some(property_class_metadata) = get_class_like(context.codebase, context.interner, declaring_class) else {
             return Err(AnalysisError::InternalError(
                 format!("Could not load property class metadata for `{}`.", context.interner.lookup(declaring_class)),
-                class_like_metadata.get_span(),
+                class_like_metadata.span,
             ));
         };
 
-        let Some(property_metadata) = property_class_metadata.get_property(property_name) else {
+        let Some(property_metadata) = property_class_metadata.properties.get(property_name) else {
             return Err(AnalysisError::InternalError(
                 format!("Could not load property metadata for `{}`.", context.interner.lookup(property_name)),
-                class_like_metadata.get_span(),
+                class_like_metadata.span,
             ));
         };
 

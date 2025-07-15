@@ -12,7 +12,6 @@ use mago_codex::get_method_id;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -21,11 +20,8 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
-use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
-use mago_codex::ttype::template::standin_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
-use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -48,6 +44,7 @@ use crate::issue::TypingIssueKind;
 use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::utils::template::get_generic_parameter_for_offset;
+use crate::visibility::check_method_visibility;
 
 impl Analyzable for Instantiation {
     fn analyze<'a>(
@@ -253,22 +250,19 @@ fn analyze_class_instantiation<'a>(
         is_impossible = true;
     }
 
-    if metadata.is_deprecated {
-        let is_self_instantiation =
-            block_context.scope.get_class_like_name().is_some_and(|self_id| *self_id == metadata.original_name);
-
-        if !is_self_instantiation {
-            context.buffer.report(
-                TypingIssueKind::DeprecatedClass,
-                Issue::warning(format!("Class `{class_name_str}` is deprecated and should no longer be used."))
-                    .with_annotation(
-                        Annotation::primary(class_expression_span).with_message("Instantiation of deprecated class"),
-                    )
-                    .with_help(
-                        "Consult the documentation for this class to find its replacement or an alternative approach.",
-                    ),
-            );
-        }
+    if metadata.is_deprecated
+        && block_context.scope.get_class_like_name().is_none_or(|self_id| *self_id != metadata.original_name)
+    {
+        context.buffer.report(
+            TypingIssueKind::DeprecatedClass,
+            Issue::warning(format!("Class `{class_name_str}` is deprecated and should no longer be used."))
+                .with_annotation(
+                    Annotation::primary(class_expression_span).with_message("Instantiation of deprecated class"),
+                )
+                .with_help(
+                    "Consult the documentation for this class to find its replacement or an alternative approach.",
+                ),
+        );
     }
 
     let mut type_parameters = None;
@@ -287,38 +281,33 @@ fn analyze_class_instantiation<'a>(
         IndexMap::with_hasher(RandomState::default()),
     );
 
-    if let Some(constructor_metadata) = get_method_by_id(context.codebase, context.interner, &constructor_declraing_id)
-    {
-        has_inconsistent_constructor = has_inconsistent_constructor
-            && !constructor_metadata.get_method_metadata().is_some_and(|meta| meta.is_final());
-        constructor_span =
-            Some(constructor_metadata.get_name_span().unwrap_or_else(|| constructor_metadata.get_span()));
+    if let Some(constructor) = get_method_by_id(context.codebase, context.interner, &constructor_declraing_id) {
+        has_inconsistent_constructor =
+            has_inconsistent_constructor && !constructor.get_method_metadata().is_some_and(|meta| meta.is_final());
+        constructor_span = Some(constructor.get_name_span().unwrap_or_else(|| constructor.get_span()));
 
         artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_declraing_id);
 
-        let method_target_context = MethodTargetContext {
-            declaring_method_id: Some(constructor_declraing_id),
-            class_like_metadata: metadata,
-            class_type: StaticClassType::None,
-        };
-
-        let constructor_invocation_target = InvocationTarget::FunctionLike {
-            identifier: FunctionLikeIdentifier::Method(
-                *constructor_declraing_id.get_class_name(),
-                *constructor_declraing_id.get_method_name(),
-            ),
-            metadata: constructor_metadata,
-            method_context: Some(method_target_context),
+        let constructor_invocation = Invocation {
+            target: InvocationTarget::FunctionLike {
+                identifier: FunctionLikeIdentifier::Method(
+                    *constructor_declraing_id.get_class_name(),
+                    *constructor_declraing_id.get_method_name(),
+                ),
+                metadata: constructor,
+                method_context: Some(MethodTargetContext {
+                    declaring_method_id: Some(constructor_declraing_id),
+                    class_like_metadata: metadata,
+                    class_type: StaticClassType::None,
+                }),
+                span: instantiation_span,
+            },
+            arguments_source: match argument_list.as_ref() {
+                Some(arg_list) => InvocationArgumentsSource::ArgumentList(arg_list),
+                None => InvocationArgumentsSource::None(instantiation_span),
+            },
             span: instantiation_span,
         };
-
-        let arguments_source = match argument_list.as_ref() {
-            Some(arg_list) => InvocationArgumentsSource::ArgumentList(arg_list),
-            None => InvocationArgumentsSource::None(instantiation_span),
-        };
-
-        let constructor_invocation =
-            Invocation { target: constructor_invocation_target, arguments_source, span: instantiation_span };
 
         analyze_invocation(
             context,
@@ -329,101 +318,41 @@ fn analyze_class_instantiation<'a>(
             &mut template_result,
             &mut HashMap::default(),
         )?;
-    } else if let Some(argument_list) = &argument_list
-        && !argument_list.arguments.is_empty()
-    {
-        context.buffer.report(
-                TypingIssueKind::TooManyArguments,
-                Issue::error(format!(
-                    "Class `{class_name_str}` has no `__construct` method, but arguments were provided to `new`."
-                ))
-                .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
-                .with_annotation(
-                    Annotation::secondary(class_expression_span)
-                        .with_message(format!("For class `{class_name_str}` which has no constructor")),
-                )
-                .with_help("Remove the arguments, or define a `__construct` method in the class if arguments are needed for initialization."),
-            );
 
-        argument_list.analyze(context, block_context, artifacts)?;
-    }
+        if !check_method_visibility(
+            context,
+            block_context,
+            constructor_declraing_id.get_class_name(),
+            constructor_declraing_id.get_method_name(),
+            instantiation_span,
+            None,
+        ) {
+            is_impossible = true;
+        }
 
-    if metadata.has_template_types() {
-        let mut v = vec![];
-
-        for (i, (template_name, base_type_map)) in metadata.get_template_types().iter().enumerate() {
-            if !metadata.has_readonly_template(template_name)
-                && let Some((template_name, map)) = template_result.template_types.get_index(i)
+        let mut resolved_template_types = vec![];
+        for (template_name, base_type) in metadata.template_types.iter() {
+            let template_type = if let Some(lower_bounds) =
+                template_result.get_lower_bounds_for_class_like(template_name, &metadata.name)
             {
-                let placeholder_name = format!("`_{}", artifacts.type_variable_bounds.len());
-
-                let upper_bound = map.iter().next().unwrap().1.clone();
-
-                let mut placeholder_lower_bounds = vec![];
-
-                if let Some(bounds) = template_result.lower_bounds.get(template_name)
-                    && let Some(bounds) = bounds.get(&GenericParent::ClassLike(metadata.name))
-                {
-                    for bound in bounds {
-                        placeholder_lower_bounds.push(bound.clone());
-                    }
-                }
-
-                artifacts.type_variable_bounds.insert(
-                    placeholder_name.clone(),
-                    (
-                        placeholder_lower_bounds,
-                        vec![TemplateBound {
-                            bound_type: upper_bound,
-                            appearance_depth: 0,
-                            argument_offset: None,
-                            equality_bound_classlike: None,
-                            span: Some(instantiation_span),
-                        }],
-                    ),
-                );
-
-                template_result.lower_bounds.insert(
-                    *template_name,
-                    map.iter()
-                        .map(|(entity, _)| {
-                            (
-                                *entity,
-                                vec![TemplateBound::new(
-                                    wrap_atomic(TAtomic::Variable(context.interner.intern(&placeholder_name))),
-                                    0,
-                                    None,
-                                    None,
-                                )],
-                            )
-                        })
-                        .collect::<HashMap<_, _>>(),
-                );
-            }
-
-            let mut generic_param_type = if let Some(template_bounds) = template_result
-                .lower_bounds
-                .get(template_name)
-                .and_then(|result_map| result_map.get(&GenericParent::ClassLike(metadata.name)))
-            {
-                standin_type_replacer::get_most_specific_type_from_bounds(
-                    template_bounds,
-                    context.codebase,
-                    context.interner,
-                )
+                get_most_specific_type_from_bounds(lower_bounds, context.codebase, context.interner)
             } else if !metadata.template_extended_parameters.is_empty() && !template_result.lower_bounds.is_empty() {
                 let found_generic_parameters = template_result
                     .lower_bounds
                     .iter()
-                    .map(|(key, type_map)| {
+                    .map(|(template_name, lower_bounds_map)| {
                         (
-                            *key,
-                            type_map
+                            *template_name,
+                            lower_bounds_map
                                 .iter()
-                                .map(|(map_key, bounds)| {
+                                .map(|(generic_parent, lower_bounds)| {
                                     (
-                                        *map_key,
-                                        get_most_specific_type_from_bounds(bounds, context.codebase, context.interner),
+                                        *generic_parent,
+                                        get_most_specific_type_from_bounds(
+                                            lower_bounds,
+                                            context.codebase,
+                                            context.interner,
+                                        ),
                                     )
                                 })
                                 .collect::<Vec<_>>(),
@@ -437,18 +366,43 @@ fn analyze_class_instantiation<'a>(
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )
-            } else if let Some(Variance::Contravariant) = metadata.get_template_variance_for_index(i) {
+            } else if metadata.name == context.interner.intern("splobjectstorage") {
                 get_never()
             } else {
-                (base_type_map.iter().next().unwrap().1).clone()
+                base_type.first().map(|(_, constraint)| constraint).cloned().unwrap_or_else(get_never)
             };
 
-            generic_param_type.had_template = true;
-
-            v.push(generic_param_type);
+            resolved_template_types.push(template_type);
         }
 
-        type_parameters = Some(v);
+        if !resolved_template_types.is_empty() {
+            type_parameters = Some(resolved_template_types);
+        }
+    } else if let Some(argument_list) = &argument_list
+        && !argument_list.arguments.is_empty()
+    {
+        context.buffer.report(
+            TypingIssueKind::TooManyArguments,
+            Issue::error(format!(
+                "Class `{class_name_str}` has no `__construct` method, but arguments were provided to `new`."
+            ))
+            .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+            .with_annotation(
+                Annotation::secondary(class_expression_span)
+                    .with_message(format!("For class `{class_name_str}` which has no constructor")),
+            )
+            .with_help("Remove the arguments, or define a `__construct` method in the class if arguments are needed for initialization."),
+        );
+
+        argument_list.analyze(context, block_context, artifacts)?;
+    } else if !metadata.template_types.is_empty() {
+        type_parameters = Some(
+            metadata
+                .template_types
+                .iter()
+                .map(|(_, map)| map.iter().next().map(|(_, i)| i).cloned().unwrap_or_else(get_never))
+                .collect(),
+        );
     }
 
     if has_inconsistent_constructor
@@ -872,5 +826,59 @@ mod tests {
 
             $a = new Child(1);
         "#}
+    }
+
+    test_analysis! {
+        name = resolve_nested_type_parameters,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template-covariant T
+             */
+            final readonly class Box
+            {
+                /**
+                 * @param T $value
+                 */
+                public function __construct(
+                    private mixed $value,
+                ) {}
+
+                /**
+                 * @return T
+                 */
+                public function get(): mixed {
+                    return $this->value;
+                }
+            }
+
+            /**
+             * @return Box<Box<Box<42>>>
+             */
+            function get_box_of_box_of_box(): Box {
+                return new Box(new Box(new Box(42)));
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = handles_recursive_type,
+        code = indoc! {r#"
+            <?php
+
+            /** @template T */
+            final readonly class Example {
+                /** @return Example<Example<T>> */
+                public function return_something(): Example {
+                    /** @var Example<Example<T>> */
+                    return new Example();
+                }
+            }
+        "#},
+        issues = [
+            // TODO(azjezz): we want to trigger an issue here in the future about
+            // the type parameter not being used at all in the class `Example`
+        ]
     }
 }

@@ -216,7 +216,7 @@ fn find_property_in_class<'a>(
         return Ok(None);
     };
 
-    let Some(property_metadata) = declaring_class_metadata.get_property(prop_name) else {
+    let Some(property_metadata) = declaring_class_metadata.properties.get(prop_name) else {
         result.has_invalid_path = true;
 
         if !declaring_class_metadata.is_final
@@ -244,13 +244,13 @@ fn find_property_in_class<'a>(
         &TypeExpansionOptions {
             self_class: Some(&declaring_class_id),
             static_class_type: StaticClassType::Object(object.clone()),
-            parent_class: declaring_class_metadata.get_direct_parent_class().as_ref(),
+            parent_class: declaring_class_metadata.direct_parent_class.as_ref(),
             file_path: Some(&context.source.identifier),
             ..Default::default()
         },
     );
 
-    if declaring_class_metadata.has_template_types()
+    if !declaring_class_metadata.template_types.is_empty()
         && let TObject::Named(named_object) = object
     {
         property_type = localize_property_type(
@@ -387,7 +387,7 @@ fn localize_property_type(
         Some(property_declaring_class_metadata),
         Some(&property_declaring_class_metadata.name),
         Some(property_class_metadata),
-        property_class_metadata.get_template_types(),
+        &property_class_metadata.template_types,
         &IndexMap::default(),
     );
 
@@ -413,11 +413,11 @@ fn update_template_types(
     lhs_type_params: &[TUnion],
     property_declaring_class_metadata: &ClassLikeMetadata,
 ) {
-    if !template_types.is_empty() && !property_class_metadata.get_template_types().is_empty() {
+    if !template_types.is_empty() && !property_class_metadata.template_types.is_empty() {
         for (param_offset, lhs_param_type) in lhs_type_params.iter().enumerate() {
             let mut i = -1;
 
-            for (calling_param_name, _) in property_class_metadata.get_template_types() {
+            for (calling_param_name, _) in &property_class_metadata.template_types {
                 i += 1;
 
                 if i == (param_offset as i32) {
@@ -456,7 +456,7 @@ fn update_template_types(
             for mapped_type_atomic in &mapped_type.types {
                 if let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = &mapped_type_atomic {
                     let position = property_class_metadata
-                        .get_template_types()
+                        .template_types
                         .iter()
                         .enumerate()
                         .filter(|(_, (k, _))| k == parameter_name)

@@ -982,7 +982,7 @@ fn get_combiner_key(
     interner: &ThreadedInterner,
 ) -> String {
     let covariants = if let Some(class_like_metadata) = get_class_like(codebase, interner, name) {
-        class_like_metadata.get_template_variance()
+        &class_like_metadata.template_variance
     } else {
         return name.to_string();
     };

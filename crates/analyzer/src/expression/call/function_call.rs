@@ -672,15 +672,15 @@ mod tests {
             <?php
 
             /**
-             * @template Integer as int
+             * @template Input as int
              *
-             * @param Integer $a
+             * @param Input $a
              *
-             * @return (Integer is 1 ? 2 : (
-             *    Integer is 2 ? 3 : (
-             *      Integer is 3 ? 4 : (
-             *        Integer is not 4 ? (
-             *            Integer is 5 ? 6 : int
+             * @return (Input is 1 ? 2 : (
+             *    Input is 2 ? 3 : (
+             *      Input is 3 ? 4 : (
+             *        Input is not 4 ? (
+             *            Input is 5 ? 6 : int
              *        ) : 5
              *      )
              *    )

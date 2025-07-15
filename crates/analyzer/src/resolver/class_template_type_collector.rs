@@ -23,7 +23,7 @@ pub(crate) fn collect(
     static_class_metadata: &ClassLikeMetadata,
     object_type: Option<&TObject>,
 ) -> Option<IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState>> {
-    if !class_metadata.has_template_types() {
+    if class_metadata.template_types.is_empty() {
         return None;
     }
 
@@ -31,8 +31,8 @@ pub(crate) fn collect(
         IndexMap::default();
 
     if let Some(TObject::Named(TNamedObject { type_parameters: Some(parameters), .. })) = &object_type {
-        if class_metadata.name == static_class_metadata.name && static_class_metadata.has_template_types() {
-            for (i, (template_type_name, _)) in class_metadata.get_template_types().iter().enumerate() {
+        if class_metadata.name == static_class_metadata.name && !static_class_metadata.template_types.is_empty() {
+            for (i, (template_type_name, _)) in class_metadata.template_types.iter().enumerate() {
                 if let Some(type_parameter) = parameters.get(i) {
                     class_template_parameters
                         .entry(*template_type_name)
@@ -42,7 +42,7 @@ pub(crate) fn collect(
             }
         }
 
-        for (template_name, _) in class_metadata.get_template_types() {
+        for (template_name, _) in &class_metadata.template_types {
             if class_template_parameters.contains_key(template_name) {
                 continue;
             }
@@ -75,7 +75,7 @@ pub(crate) fn collect(
         }
     }
 
-    for (template_name, type_map) in class_metadata.get_template_types() {
+    for (template_name, type_map) in &class_metadata.template_types {
         for (template_classname, type_) in type_map {
             if class_metadata.name != static_class_metadata.name
                 && let Some(extended_type) = static_class_metadata
@@ -91,7 +91,7 @@ pub(crate) fn collect(
                         extended_type,
                         &static_class_metadata.template_extended_parameters,
                         &static_class_metadata.name,
-                        static_class_metadata.get_template_types(),
+                        &static_class_metadata.template_types,
                     )));
             }
 
@@ -132,7 +132,7 @@ pub(crate) fn resolve_template_parameter(
         }) = &type_extends_atomic
         {
             if let Some(entry) =
-                static_class_storage.get_template_types().iter().enumerate().find(|(_, (k, _))| k == parameter_name)
+                static_class_storage.template_types.iter().enumerate().find(|(_, (k, _))| k == parameter_name)
             {
                 let mapped_offset = entry.0;
 

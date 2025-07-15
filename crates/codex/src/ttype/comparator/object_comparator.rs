@@ -4,7 +4,6 @@ use crate::get_class_like;
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
-use crate::trait_exists;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::generic::TGenericParameter;
@@ -170,11 +169,8 @@ pub(super) fn is_intersection_shallowly_contained_by(
         return false;
     }
 
-    if is_instance_of(codebase, interner, &input_name, &container_name) {
-        return true;
-    }
-
-    if trait_exists(codebase, interner, &container_name) && uses_trait(codebase, interner, &input_name, &container_name)
+    if is_instance_of(codebase, interner, &input_name, &container_name)
+        || uses_trait(codebase, interner, &input_name, &container_name)
     {
         return true;
     }

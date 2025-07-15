@@ -228,72 +228,6 @@ impl ClassLikeMetadata {
         &self.trait_alias_map
     }
 
-    /// Returns a reference to the map of trait visibility overrides.
-    #[inline]
-    pub fn get_trait_visibility_map(&self) -> &HashMap<StringIdentifier, Visibility> {
-        &self.trait_visibility_map
-    }
-
-    /// Returns a reference to the set of trait methods marked final.
-    #[inline]
-    pub fn get_trait_final_map(&self) -> &HashSet<StringIdentifier> {
-        &self.trait_final_map
-    }
-
-    /// Returns a reference to the list of required interfaces/classes.
-    #[inline]
-    pub fn get_require_extends(&self) -> &[StringIdentifier] {
-        &self.require_extends
-    }
-
-    /// Returns a reference to the list of required interfaces.
-    #[inline]
-    pub fn get_require_implements(&self) -> &[StringIdentifier] {
-        &self.require_implements
-    }
-
-    /// Checks if this class-like requires extending a specific interface/class.
-    #[inline]
-    pub fn has_require_extends(&self, name: &StringIdentifier) -> bool {
-        self.require_extends.contains(name)
-    }
-
-    /// Checks if this class-like requires implementing a specific interface.
-    #[inline]
-    pub fn has_require_implements(&self, name: &StringIdentifier) -> bool {
-        self.require_implements.contains(name)
-    }
-
-    /// Checks if this class-like requires implementing or extending a specific interface/class.
-    #[inline]
-    pub fn has_require(&self, name: &StringIdentifier) -> bool {
-        self.require_extends.contains(name) || self.require_implements.contains(name)
-    }
-
-    /// Returns a reference to the set of direct child classlikes, if tracked.
-    #[inline]
-    pub fn get_child_class_likes(&self) -> Option<&HashSet<StringIdentifier>> {
-        self.child_class_likes.as_ref()
-    }
-
-    /// Checks if this class-like has template types.
-    #[inline]
-    pub fn has_template_types(&self) -> bool {
-        !self.template_types.is_empty()
-    }
-
-    /// Returns a slice of the generic type parameters (`@template T`).
-    #[inline]
-    pub fn get_template_types(&self) -> &[(StringIdentifier, Vec<(GenericParent, TUnion)>)] {
-        &self.template_types
-    }
-
-    /// Returns a mutable reference to the generic type parameters (`@template T`).
-    #[inline]
-    pub fn get_template_types_mut(&mut self) -> &mut Vec<(StringIdentifier, Vec<(GenericParent, TUnion)>)> {
-        &mut self.template_types
-    }
-
     /// Returns a vector of the generic type parameter names.
     #[inline]
     pub fn get_template_type_names(&self) -> Vec<StringIdentifier> {
@@ -326,64 +260,14 @@ impl ClassLikeMetadata {
         self.template_types.get(index).map(|(name, _)| *name)
     }
 
-    /// Returns a reference to the set of `@readonly` template parameters.
-    #[inline]
-    pub fn get_template_readonly(&self) -> &HashSet<StringIdentifier> {
-        &self.template_readonly
-    }
-
-    /// Returns a mutable reference to the set of `@readonly` template parameters.
-    #[inline]
-    pub fn has_readonly_template(&self, name: &StringIdentifier) -> bool {
-        self.template_readonly.contains(name)
-    }
-
-    /// Returns a reference to the map of template parameter variances.
-    #[inline]
-    pub fn get_template_variance(&self) -> &HashMap<usize, Variance> {
-        &self.template_variance
-    }
-
-    /// Returns the variance for a specific template parameter index.
-    #[inline]
-    pub fn get_template_variance_for_index(&self, index: usize) -> Option<&Variance> {
-        self.template_variance.get(&index)
-    }
-
-    /// Checks if a specific parent is a parent interface.
-    #[inline]
-    pub fn has_parent_interface(&self, parent: &StringIdentifier) -> bool {
-        self.all_parent_interfaces.contains(parent)
-    }
-
-    /// Checks if a specific parent is a direct parent interface.
-    #[inline]
-    pub fn has_direct_parent_interface(&self, parent: &StringIdentifier) -> bool {
-        self.direct_parent_interfaces.contains(parent)
-    }
-
-    /// Checks if a specific parent is a parent class.
-    #[inline]
-    pub fn has_parent_class(&self, parent: &StringIdentifier) -> bool {
-        self.all_parent_classes.contains(parent)
-    }
-
-    /// Checks if a specific parent is a direct parent class.
-    #[inline]
-    pub fn has_direct_parent_class(&self, parent: &StringIdentifier) -> bool {
-        self.direct_parent_class.as_ref() == Some(parent)
+    pub fn get_template_index_for_name(&self, name: &StringIdentifier) -> Option<usize> {
+        self.template_types.iter().position(|(param_name, _)| param_name == name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
     #[inline]
     pub fn has_parent(&self, parent: &StringIdentifier) -> bool {
         self.all_parent_classes.contains(parent) || self.all_parent_interfaces.contains(parent)
-    }
-
-    /// Checks if a specific trait is used.
-    #[inline]
-    pub fn has_used_trait(&self, trait_name: &StringIdentifier) -> bool {
-        self.used_traits.contains(trait_name)
     }
 
     /// Checks if a specific parent has template extended parameters.
@@ -766,16 +650,6 @@ impl ClassLikeMetadata {
     ) -> Option<StringIdentifier> {
         self.add_appearing_property_id(prop, declaring_fqcn);
         self.declaring_property_ids.insert(prop, declaring_fqcn)
-    }
-
-    /// Get the attribute flags for this class, if it is an attribute.
-    pub fn get_attribute_flags(&self) -> Option<AttributeFlags> {
-        self.attribute_flags.as_ref().copied()
-    }
-
-    /// Set the attribute flags for this class, if it is an attribute.
-    pub fn set_attribute_flags(&mut self, flags: Option<AttributeFlags>) {
-        self.attribute_flags = flags;
     }
 
     #[inline]

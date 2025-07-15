@@ -136,7 +136,7 @@ pub fn populate_codebase(
             }
         }
 
-        for (_, map) in metadata.get_template_types_mut() {
+        for (_, map) in &mut metadata.template_types {
             for (_, v) in map {
                 if v.needs_population() || userland_force_repopulation {
                     populate_union_type(
@@ -825,7 +825,7 @@ fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_metad
 fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metadata: &ClassLikeMetadata) {
     let parent_name = parent_metadata.name;
 
-    if parent_metadata.has_template_types() {
+    if !parent_metadata.template_types.is_empty() {
         metadata.template_extended_parameters.entry(parent_name).or_default();
 
         if let Some(parent_offsets) = metadata.template_extended_offsets.get(&parent_name).cloned() {
@@ -846,9 +846,9 @@ fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metadata:
                 }
             }
         } else {
-            for (parameter_name, parameter_type_map) in parent_metadata.get_template_types() {
-                for (_, parameter_type_arc) in parameter_type_map {
-                    metadata.add_template_extended_parameter(parent_name, *parameter_name, parameter_type_arc.clone());
+            for (parameter_name, parameter_type_map) in &parent_metadata.template_types {
+                for (_, parameter_type) in parameter_type_map {
+                    metadata.add_template_extended_parameter(parent_name, *parameter_name, parameter_type.clone());
                 }
             }
 

@@ -73,7 +73,7 @@ pub fn register_anonymous_class(
     )?;
 
     let template_resolution_context = class_like_metadata
-        .get_template_types()
+        .template_types
         .iter()
         .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
         .collect::<TemplateConstraintList>();
@@ -107,7 +107,7 @@ pub fn register_class(
     )?;
 
     let template_resolution_context = class_like_metadata
-        .get_template_types()
+        .template_types
         .iter()
         .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
         .collect::<TemplateConstraintList>();
@@ -143,7 +143,7 @@ pub fn register_interface(
     )?;
 
     let template_resolution_context = class_like_metadata
-        .get_template_types()
+        .template_types
         .iter()
         .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
         .collect::<TemplateConstraintList>();
@@ -179,7 +179,7 @@ pub fn register_trait(
     )?;
 
     let template_resolution_context = class_like_metadata
-        .get_template_types()
+        .template_types
         .iter()
         .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
         .collect::<TemplateConstraintList>();
@@ -215,7 +215,7 @@ pub fn register_enum(
     )?;
 
     let template_resolution_context = class_like_metadata
-        .get_template_types()
+        .template_types
         .iter()
         .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
         .collect::<TemplateConstraintList>();
@@ -260,7 +260,7 @@ fn scan_class_like(
     };
 
     if kind.is_class() {
-        class_like_metadata.set_attribute_flags(get_attribute_flags(name, attribute_lists, context));
+        class_like_metadata.attribute_flags = get_attribute_flags(name, attribute_lists, context);
     }
 
     class_like_metadata.kind = kind;
@@ -476,9 +476,9 @@ fn scan_class_like(
             let parent_name = context.interner.lowered(&parent_name);
 
             let has_parent = if class_like_metadata.kind.is_interface() {
-                class_like_metadata.has_parent_interface(&parent_name)
+                class_like_metadata.all_parent_interfaces.contains(&parent_name)
             } else {
-                class_like_metadata.has_parent_class(&parent_name)
+                class_like_metadata.all_parent_classes.contains(&parent_name)
             };
 
             if !has_parent {
@@ -565,7 +565,7 @@ fn scan_class_like(
             let parent_name_str = context.interner.lookup(&parent_name);
             let parent_name = context.interner.lowered(&parent_name);
 
-            if !class_like_metadata.has_parent_interface(&context.interner.lowered(&parent_name)) {
+            if !class_like_metadata.all_parent_interfaces.contains(&context.interner.lowered(&parent_name)) {
                 class_like_metadata.issues.push(
                     Issue::error("The `@implements` tag must refer to a direct parent interface.")
                         .with_code(ScanningIssueKind::InvalidImplementsTag)

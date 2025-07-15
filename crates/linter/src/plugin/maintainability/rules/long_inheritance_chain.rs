@@ -103,13 +103,13 @@ impl Rule for LongInheritanceChainRule {
             return LintDirective::default();
         };
 
-        let parents = metadata.get_all_parent_classes().len() + metadata.get_all_parent_interfaces().len();
+        let parents = metadata.all_parent_classes.len() + metadata.all_parent_interfaces.len();
 
         let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
 
         if parents > threshold {
             let issue = Issue::new(context.level(), "Inheritance chain is too long.".to_string())
-                .with_annotation(Annotation::primary(metadata.get_span()).with_message(format!(
+                .with_annotation(Annotation::primary(metadata.span).with_message(format!(
                     "{} `{}` has {} parents, which exceeds the threshold of {}.",
                     match metadata.kind {
                         SymbolKind::Class => "Class",

@@ -87,7 +87,7 @@ pub fn analyze_attributes(
                         )),
                 )
                 .with_annotation(
-                    Annotation::secondary(metadata.get_name_span().unwrap_or_else(|| metadata.get_span()))
+                    Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
                         .with_message(format!(
                             "`{attribute_name_str}` defined as a{} {class_like_kind_str} here",
                             if metadata.kind.is_interface() || metadata.kind.is_enum() { "n" } else { "" }
@@ -109,7 +109,7 @@ pub fn analyze_attributes(
                         "`{attribute_name_str}` is an abstract class and cannot be instantiated as an attribute"
                     )))
                     .with_annotation(
-                        Annotation::secondary(metadata.get_name_span().unwrap_or_else(|| metadata.get_span()))
+                        Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
                             .with_message(format!("`{attribute_name_str}` defined here as an abstract class")),
                     )
                     .with_note("Attributes must be concrete classes that can be instantiated.")
@@ -119,7 +119,7 @@ pub fn analyze_attributes(
             continue;
         }
 
-        let Some(attribute_flags) = metadata.get_attribute_flags() else {
+        let Some(attribute_flags) = &metadata.attribute_flags else {
             context.buffer.report(
                 TypingIssueKind::ClassNotMarkedAsAttribute,
                 Issue::error(format!(
@@ -129,7 +129,7 @@ pub fn analyze_attributes(
                     Annotation::primary(attribute.span()).with_message(format!("`{attribute_name_str}` used as an attribute here")),
                 )
                 .with_annotation(
-                    Annotation::secondary(metadata.get_name_span().unwrap_or_else(|| metadata.get_span()))
+                    Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
                         .with_message(format!("Class `{attribute_name_str}` defined here needs an `#[Attribute]` declaration")),
                 )
                 .with_note("To be used as a PHP attribute, a class must itself be decorated with the `#[\\Attribute]` system attribute.")
@@ -203,7 +203,7 @@ fn report_invalid_target(
         Issue::error(format!("Attribute `{attribute_name_str}` cannot be used on {}.", target.as_str()))
             .with_annotation(Annotation::primary(attribute.span()).with_message("This attribute is not allowed here"))
             .with_annotation(
-                Annotation::secondary(metadata.get_name_span().unwrap_or_else(|| metadata.get_span()))
+                Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
                     .with_message(format!("`{attribute_name_str}` defined here")),
             )
             .with_note(format!(

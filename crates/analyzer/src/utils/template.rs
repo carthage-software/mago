@@ -115,8 +115,8 @@ pub fn get_template_types_for_class_member(
                     }
                 }
             }
-        } else if !declaring_class_meta.get_template_types().is_empty() {
-            for (template_name, type_map) in declaring_class_meta.get_template_types() {
+        } else if !declaring_class_meta.template_types.is_empty() {
+            for (template_name, type_map) in &declaring_class_meta.template_types {
                 for (defining_parent, default_type) in type_map {
                     let concrete_type = class_template_parameters.get(template_name).and_then(|parameters| {
                         parameters.iter().find(|(p, _)| p == defining_parent).map(|(_, t)| t.clone())

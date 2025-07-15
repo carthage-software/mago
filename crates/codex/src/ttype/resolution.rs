@@ -88,9 +88,11 @@ impl TypeResolutionContext {
     /// Looks up the constraints for a specific template parameter defined in this context.
     ///
     /// # Arguments
+    ///
     /// * `name`: The name of the template parameter (e.g., `"T"`) to look up.
     ///
     /// # Returns
+    ///
     /// `Some` containing a reference to the vector of constraints if the template is defined, `None` otherwise.
     pub fn get_template_definition(&self, name: &str) -> Option<&Vec<(GenericParent, TUnion)>> {
         self.template_definitions.iter().find(|(n, _)| n == name).map(|(_, constraints)| constraints)
@@ -99,9 +101,11 @@ impl TypeResolutionContext {
     /// Checks if a specific template parameter is defined in this context.
     ///
     /// # Arguments
+    ///
     /// * `name`: The name of the template parameter (e.g., `"T"`) to check.
     ///
     /// # Returns
+    ///
     /// `true` if the template parameter is defined, `false` otherwise.
     pub fn has_template_definition(&self, name: &str) -> bool {
         self.template_definitions.iter().any(|(n, _)| n == name)
@@ -110,9 +114,11 @@ impl TypeResolutionContext {
     /// Looks up the concrete type that a specific template parameter resolves to in this context.
     ///
     /// # Arguments
+    ///
     /// * `name`: The name of the template parameter (e.g., `"T"`) to look up.
     ///
     /// # Returns
+    ///
     /// `Some` containing a reference to the resolved `TUnion` type if found, `None` otherwise.
     /// Note: If multiple entries exist for the same name (due to shadowing or errors),
     /// this currently returns the first match found.

@@ -428,13 +428,12 @@ fn replace_atomic(
                         _ => None,
                     };
 
-                    let is_covariant = if let Some(class_like_metadata) =
-                        get_class_like(codebase, interner, &object_name)
-                    {
-                        matches!(class_like_metadata.get_template_variance_for_index(offset), Some(Variance::Covariant))
-                    } else {
-                        false
-                    };
+                    let is_covariant =
+                        if let Some(class_like_metadata) = get_class_like(codebase, interner, &object_name) {
+                            matches!(class_like_metadata.template_variance.get(&offset), Some(Variance::Covariant))
+                        } else {
+                            false
+                        };
 
                     *type_param = self::replace(
                         type_param,
@@ -1212,7 +1211,7 @@ pub fn get_mapped_generic_type_parameters(
         return input_type_parameters;
     }
 
-    let input_template_types = input_class_metadata.get_template_types();
+    let input_template_types = &input_class_metadata.template_types;
 
     let mut i = 0;
     let mut replacement_templates = IndexMap::with_hasher(RandomState::new());
