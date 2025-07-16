@@ -34,6 +34,8 @@ use crate::utils::progress::remove_progress_bar;
 #[derive(Parser, Debug)]
 #[command(
     name = "analyze",
+    // Alias for the British
+    alias = "analyse",
     about = "Find typing issues in the project source code using configurable type checker settings.",
     long_about = "The `analyze` command is a fast type checker for PHP. It scans your codebase, \
                   builds a model of its symbols and types, and then analyzes it to find \
