@@ -1277,9 +1277,12 @@ fn analyze_null_coalesce_operation<'a>(
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let was_inside_isset = block_context.inside_isset;
+    let was_inside_coalescing = block_context.inside_coalescing;
     block_context.inside_isset = true;
+    block_context.inside_coalescing = true;
     binary.lhs.analyze(context, block_context, artifacts)?;
     block_context.inside_isset = was_inside_isset;
+    block_context.inside_coalescing = was_inside_coalescing;
 
     let lhs_type_option = artifacts.get_rc_expression_type(&binary.lhs);
 

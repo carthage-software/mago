@@ -101,8 +101,14 @@ pub fn resolve_instance_properties<'a>(
     let is_all_void = object_type.is_void();
     let is_all_null = object_type.is_null() || is_all_void;
 
-    if is_null_safe && !is_nullable {
-        report_redundant_nullsafe(context, operator_span, object_expression, &object_type);
+    if is_null_safe {
+        if !is_nullable {
+            report_redundant_nullsafe(context, operator_span, object_expression, &object_type, false, false);
+        } else if block_context.inside_coalescing {
+            report_redundant_nullsafe(context, operator_span, object_expression, &object_type, true, false);
+        } else if block_context.inside_isset {
+            report_redundant_nullsafe(context, operator_span, object_expression, &object_type, true, true);
+        }
     }
 
     let mut property_names = Vec::new();
@@ -525,66 +531,80 @@ fn report_access_on_null(
             );
         }
         (false, false) => {
-            if block_context.inside_assignment {
-                context.buffer.report(
-                    TypingIssueKind::PossiblyNullPropertyAccess,
-                    Issue::error("Attempting to access a property on a possibly `null` value.")
-                        .with_annotation(
-                            Annotation::primary(object_span)
-                                .with_message("This expression can be `null` here"),
-                        )
-                        .with_note("If this expression is `null` at runtime, PHP will raise a warning and the property access will result in `null`.")
-                        .with_help("Add a check to ensure the value is not `null` (e.g., `if ($obj !== null)`).")
-                );
-            } else {
-                context.buffer.report(
-                    TypingIssueKind::PossiblyNullPropertyAccess,
-                    Issue::error("Attempting to access a property on a possibly `null` value.")
-                        .with_annotation(
-                            Annotation::primary(object_span)
-                                .with_message("This expression can be `null` here"),
-                        )
-                        .with_note("If this expression is `null` at runtime, PHP will raise a warning and the property access will result in `null`.")
-                        .with_help("Use the nullsafe operator (`?->`) to safely access the property, or add a check to ensure the value is not `null` (e.g., `if ($obj !== null)`).")
-                        .with_suggestion(operator_span.start.source, {
-                            let mut plan = FixPlan::new();
-                            plan.replace(operator_span.to_range(), "?->", SafetyClassification::Safe);
+            if !block_context.inside_isset {
+                if block_context.inside_assignment {
+                    context.buffer.report(
+                        TypingIssueKind::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting to access a property on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(object_span)
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_note("If this expression is `null` at runtime, PHP will raise a warning and the property access will result in `null`.")
+                            .with_help("Add a check to ensure the value is not `null` (e.g., `if ($obj !== null)`).")
+                    );
+                } else {
+                    context.buffer.report(
+                        TypingIssueKind::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting to access a property on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(object_span)
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_note("If this expression is `null` at runtime, PHP will raise a warning and the property access will result in `null`.")
+                            .with_help("Use the nullsafe operator (`?->`) to safely access the property, or add a check to ensure the value is not `null` (e.g., `if ($obj !== null)`).")
+                            .with_suggestion(operator_span.start.source, {
+                                let mut plan = FixPlan::new();
+                                plan.replace(operator_span.to_range(), "?->", SafetyClassification::Safe);
 
-                            plan
-                        }),
-                );
+                                plan
+                            }),
+                    );
+                }
             }
         }
     }
 }
 
-fn report_redundant_nullsafe(
-    context: &mut Context,
+fn report_redundant_nullsafe<'a>(
+    context: &mut Context<'a>,
     operator_span: Span,
     object_expr: &Expression,
     object_type: &TUnion,
+    in_coalescing: bool,
+    in_isset: bool,
 ) {
     let object_type_str = object_type.get_id(Some(context.interner));
 
+    let (note, help) = if in_isset {
+        (
+            "When used inside `isset()`, the standard property access (`->`) is already null-safe. `isset()` correctly returns `false` for null objects without causing an error.",
+            "You can safely change `?->` to `->` inside an `isset()` check for better clarity.",
+        )
+    } else if in_coalescing {
+        (
+            "The null coalescing operator (`??`) already provides a fallback for `null` values, making the nullsafe operator (`?->`) redundant in this context.",
+            "Consider changing `?->` to `->` and letting the `??` operator handle the null case.",
+        )
+    } else {
+        (
+            "The nullsafe operator (`?->`) short-circuits the access if the object is `null`. Since this expression is guaranteed not to be `null`, this check is unnecessary.",
+            "Consider using the direct property access operator (`->`) for clarity.",
+        )
+    };
+
     context.buffer.report(
         TypingIssueKind::RedundantNullsafeOperator,
-        Issue::help(
-            "Redundant nullsafe operator (`?->`) used on an expression that is never `null`.",
-        )
-        .with_annotation(
-            Annotation::primary(operator_span)
-                .with_message("Nullsafe operator `?->` is unnecessary here"),
-        )
-        .with_annotation(
-            Annotation::secondary(object_expr.span())
-                .with_message(format!("This expression (type `{object_type_str}`) is never `null`")),
-        )
-        .with_note(
-            "The nullsafe operator (`?->`) short-circuits the property access if the object is `null`. Since this object is guaranteed not to be `null`, the nullsafe check provides no additional safety here."
-        )
-        .with_help(
-            "Consider using the direct property access operator (`->`) for clarity and conciseness.",
-        ),
+        Issue::help("Redundant nullsafe operator (`?->`) used on an expression that is never `null`.")
+            .with_annotation(
+                Annotation::primary(operator_span).with_message("Nullsafe operator `?->` is unnecessary here"),
+            )
+            .with_annotation(
+                Annotation::secondary(object_expr.span())
+                    .with_message(format!("This expression (type `{object_type_str}`) is never `null`")),
+            )
+            .with_note(note)
+            .with_help(help),
     );
 }
 
