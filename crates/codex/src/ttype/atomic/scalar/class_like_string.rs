@@ -4,12 +4,14 @@ use serde::Serialize;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 
+use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::union::TUnion;
 
@@ -242,7 +244,7 @@ impl TClassLikeString {
 
     /// Returns the atomic type representation of the object type this string refers to.
     #[inline]
-    pub fn get_object_type(&self) -> TAtomic {
+    pub fn get_object_type(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> TAtomic {
         match self {
             TClassLikeString::Any { .. } => TAtomic::Object(TObject::Any),
             TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
@@ -252,7 +254,15 @@ impl TClassLikeString {
                     *defining_entity,
                 ))
             }
-            TClassLikeString::Literal { value } => TAtomic::Object(TObject::Named(TNamedObject::new(*value))),
+            TClassLikeString::Literal { value } => {
+                let lowered_value = interner.lowered(value);
+
+                if codebase.symbols.contains_enum(&lowered_value) {
+                    TAtomic::Object(TObject::Enum(TEnum::new(*value)))
+                } else {
+                    TAtomic::Object(TObject::Named(TNamedObject::new(*value)))
+                }
+            }
             TClassLikeString::OfType { constraint, .. } => constraint.as_ref().clone(),
         }
     }

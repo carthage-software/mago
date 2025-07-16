@@ -1174,7 +1174,7 @@ fn infer_templates_from_argument_and_parameter_types(
                         continue;
                     };
 
-                    argument_object_atomics.push(class_string.get_object_type());
+                    argument_object_atomics.push(class_string.get_object_type(context.codebase, context.interner));
                 }
 
                 let mut lower_bound_type = TUnion::new(argument_object_atomics);

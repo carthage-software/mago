@@ -801,17 +801,25 @@ fn get_class_string_type_from_ast(
 
             let mut class_strings = vec![];
             for constraint in constraint_union.types {
-                class_strings.push(match constraint {
-                    generic @ TAtomic::GenericParameter(TGenericParameter {
-                        parameter_name, defining_entity, ..
-                    }) => TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
-                        kind,
+                match constraint {
+                    TAtomic::Object(TObject::Named(_))
+                    | TAtomic::Object(TObject::Enum(_))
+                    | TAtomic::Reference(TReference::Symbol { .. }) => class_strings
+                        .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
+                    TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
                         defining_entity,
-                        generic,
-                    ))),
-                    TAtomic::Object(TObject::Named(_)) | TAtomic::Reference(TReference::Symbol { .. }) => {
-                        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))
+                        constraint,
+                        ..
+                    }) => {
+                        for constraint_atomic in constraint.types {
+                            class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
+                                kind,
+                                parameter_name,
+                                defining_entity,
+                                constraint_atomic,
+                            ))));
+                        }
                     }
                     _ => {
                         return Err(TypeError::InvalidType(
@@ -822,7 +830,7 @@ fn get_class_string_type_from_ast(
                             span,
                         ));
                     }
-                });
+                }
             }
 
             TUnion::new(class_strings)

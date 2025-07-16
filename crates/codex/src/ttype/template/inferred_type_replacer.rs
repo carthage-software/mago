@@ -113,7 +113,11 @@ pub fn replace(
                     if let Some(class_template_type) = class_template_type {
                         keys_to_unset.insert(*parameter_name);
                         new_types.push(class_template_type);
+                    } else {
+                        new_types.push(atomic_type);
                     }
+                } else {
+                    new_types.push(atomic_type);
                 }
             }
             _ => {
