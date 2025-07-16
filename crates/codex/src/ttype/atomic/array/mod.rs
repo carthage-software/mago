@@ -89,6 +89,17 @@ impl TArray {
         }
     }
 
+    pub fn is_sealed(&self) -> bool {
+        if !self.has_known_items() {
+            return false;
+        }
+
+        match &self {
+            Self::Keyed(keyed_array) => keyed_array.parameters.is_none(),
+            Self::List(list) => list.element_type.is_never(),
+        }
+    }
+
     /// Checks if the array is known to be non-empty.
     #[inline]
     pub const fn is_non_empty(&self) -> bool {

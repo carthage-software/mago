@@ -23,6 +23,7 @@ use mago_span::Span;
 use mago_syntax::ast::*;
 
 mod resolver;
+mod special_function_like_handler;
 
 pub mod analyzer;
 pub mod post_process;

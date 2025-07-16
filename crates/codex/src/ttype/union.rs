@@ -23,8 +23,10 @@ use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::atomic::scalar::bool::TBool;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
@@ -653,6 +655,39 @@ impl TUnion {
     #[inline]
     pub fn is_single(&self) -> bool {
         self.types.len() == 1
+    }
+
+    #[inline]
+    pub fn get_single_array(&self) -> Option<&TArray> {
+        if self.is_single()
+            && let TAtomic::Array(array) = &self.types[0]
+        {
+            Some(array)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn get_single_bool(&self) -> Option<&TBool> {
+        if self.is_single()
+            && let TAtomic::Scalar(TScalar::Bool(bool)) = &self.types[0]
+        {
+            Some(bool)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn get_single_named_object(&self) -> Option<&TNamedObject> {
+        if self.is_single()
+            && let TAtomic::Object(TObject::Named(named_object)) = &self.types[0]
+        {
+            Some(named_object)
+        } else {
+            None
+        }
     }
 
     #[inline]

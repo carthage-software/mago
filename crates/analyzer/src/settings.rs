@@ -10,6 +10,7 @@ pub struct Settings {
     pub allow_include: bool,
     pub analyze_effects: bool,
     pub memoize_properties: bool,
+    pub trigger_error_exists: bool,
     pub graph_kind: GraphKind,
     pub diff: bool,
 }
@@ -29,6 +30,7 @@ impl Settings {
             analyze_dead_code: false,
             allow_include: true,
             memoize_properties: true,
+            trigger_error_exists: false,
             analyze_effects: true,
             graph_kind: GraphKind::FunctionBody,
             diff: false,
