@@ -78,7 +78,7 @@ fn handle_special_functions(
                     None
                 }
             }
-            InvocationArgumentsSource::LanguageConstructExpressions(_) => None,
+            InvocationArgumentsSource::Slice(_) => None,
             InvocationArgumentsSource::None(_) => None,
         }
     }

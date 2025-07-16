@@ -111,6 +111,7 @@ pub fn analyze_implicit_method_call<'a>(
     method_identifier: MethodIdentifier,
     class_like_metadata: &ClassLikeMetadata,
     method_metadata: &FunctionLikeMetadata,
+    arguments_source: Option<InvocationArgumentsSource<'a>>,
     span: Span,
 ) -> Result<TUnion, AnalysisError> {
     if !check_method_visibility(
@@ -142,7 +143,7 @@ pub fn analyze_implicit_method_call<'a>(
             method_context: Some(method_target_context),
             span,
         },
-        InvocationArgumentsSource::None(span),
+        arguments_source.unwrap_or(InvocationArgumentsSource::None(span)),
         span,
     );
 

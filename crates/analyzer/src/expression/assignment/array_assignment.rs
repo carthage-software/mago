@@ -14,7 +14,6 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
-use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
@@ -197,7 +196,6 @@ fn update_atomic_given_key(
     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &atomic_type
         && constraint.types.len() == 1
     {
-        // destructure generic after update
         return update_atomic_given_key(
             context,
             constraint.types[0].clone(),
@@ -210,53 +208,52 @@ fn update_atomic_given_key(
 
     if !key_values.is_empty() {
         for key_value in key_values {
-            let TAtomic::Array(array) = &mut atomic_type else {
-                continue;
-            };
+            if let TAtomic::Array(array) = &mut atomic_type {
+                let array_key = if let Some(str) = key_value.get_literal_string_value() {
+                    ArrayKey::String(str.to_owned())
+                } else if let Some(int) = key_value.get_literal_int_value() {
+                    ArrayKey::Integer(int)
+                } else {
+                    continue;
+                };
 
-            let array_key = if let Some(str) = key_value.get_literal_string_value() {
-                ArrayKey::String(str.to_owned())
-            } else if let Some(int) = key_value.get_literal_int_value() {
-                ArrayKey::Integer(int)
-            } else {
-                continue;
-            };
+                match array {
+                    TArray::List(list) => {
+                        if let ArrayKey::Integer(key_value) = array_key {
+                            *has_matching_item = true;
 
-            match array {
-                TArray::List(list) => {
-                    if let ArrayKey::Integer(key_value) = array_key {
+                            if let Some(known_elements) = list.known_elements.as_mut() {
+                                if let Some((pu, entry)) = known_elements.get_mut(&(key_value as usize)) {
+                                    *entry = current_type.clone();
+                                    *pu = false;
+                                } else {
+                                    known_elements.insert(key_value as usize, (false, current_type.clone()));
+                                }
+                            } else {
+                                list.known_elements =
+                                    Some(BTreeMap::from([(key_value as usize, (false, current_type.clone()))]));
+                            }
+
+                            list.non_empty = true;
+                        }
+                    }
+                    TArray::Keyed(keyed_array) => {
                         *has_matching_item = true;
 
-                        if let Some(known_elements) = list.known_elements.as_mut() {
-                            if let Some((pu, entry)) = known_elements.get_mut(&(key_value as usize)) {
+                        if let Some(known_items) = keyed_array.known_items.as_mut() {
+                            if let Some((pu, entry)) = known_items.get_mut(&array_key) {
                                 *entry = current_type.clone();
                                 *pu = false;
                             } else {
-                                known_elements.insert(key_value as usize, (false, current_type.clone()));
+                                known_items.insert(array_key, (false, current_type.clone()));
                             }
                         } else {
-                            list.known_elements =
-                                Some(BTreeMap::from([(key_value as usize, (false, current_type.clone()))]));
+                            keyed_array.known_items =
+                                Some(BTreeMap::from([(array_key, (false, current_type.clone()))]));
                         }
 
-                        list.non_empty = true;
+                        keyed_array.non_empty = true;
                     }
-                }
-                TArray::Keyed(keyed_array) => {
-                    *has_matching_item = true;
-
-                    if let Some(known_items) = keyed_array.known_items.as_mut() {
-                        if let Some((pu, entry)) = known_items.get_mut(&array_key) {
-                            *entry = current_type.clone();
-                            *pu = false;
-                        } else {
-                            known_items.insert(array_key, (false, current_type.clone()));
-                        }
-                    } else {
-                        keyed_array.known_items = Some(BTreeMap::from([(array_key, (false, current_type.clone()))]));
-                    }
-
-                    keyed_array.non_empty = true;
                 }
             }
         }
@@ -395,8 +392,8 @@ fn update_array_assignment_child_type(
         let key_type = if key_type.is_mixed() { Rc::new(get_arraykey()) } else { key_type.clone() };
 
         for original_type in &root_type.types {
-            match original_type {
-                TAtomic::Array(array_type) => match array_type {
+            if let TAtomic::Array(array_type) = original_type {
+                match array_type {
                     TArray::List(list) => {
                         collection_types.push(TAtomic::Array(TArray::List(TList {
                             element_type: Box::new(value_type.clone()),
@@ -417,14 +414,13 @@ fn update_array_assignment_child_type(
                             non_empty: true,
                         })));
                     }
-                },
-                _ => collection_types.push(TAtomic::Mixed(TMixed::any())),
+                }
             }
         }
     } else {
         for original_type in &root_type.types {
-            match original_type {
-                TAtomic::Array(array) => match array {
+            if let TAtomic::Array(array) = original_type {
+                match array {
                     TArray::List(list) => {
                         if !block_context.inside_loop && list.element_type.is_never() {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
@@ -488,8 +484,7 @@ fn update_array_assignment_child_type(
                             })));
                         }
                     }
-                },
-                _ => collection_types.push(TAtomic::Mixed(TMixed::any())),
+                }
             }
         }
     }
@@ -555,9 +550,8 @@ pub(crate) fn analyze_nested_array_assignment<'a, 's>(
             full_var_id = false;
         }
 
-        let mut array_expression_type = if let Some(t) = artifacts.get_rc_expression_type(array_target.get_array()) {
-            t.clone()
-        } else {
+        let Some(mut array_expression_type) = artifacts.get_rc_expression_type(array_target.get_array()).cloned()
+        else {
             return Ok(array_target.get_index());
         };
 

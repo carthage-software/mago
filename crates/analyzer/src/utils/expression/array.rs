@@ -2,6 +2,9 @@ use std::borrow::Cow;
 
 use mago_codex::data_flow::node::DataFlowNode;
 use mago_codex::data_flow::path::PathKind;
+use mago_codex::get_class_like;
+use mago_codex::is_instance_of;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
@@ -23,6 +26,7 @@ use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_null;
+use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -83,14 +87,14 @@ impl<'a> From<&'a ArrayAppend> for ArrayTarget<'a> {
     }
 }
 
-pub(crate) fn get_array_target_type_given_index(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+pub(crate) fn get_array_target_type_given_index<'a>(
+    context: &mut Context<'a>,
+    block_context: &mut BlockContext<'a>,
     artifacts: &mut AnalysisArtifacts,
     access_span: Span,
     access_array_span: Span,
     access_index_span: Option<Span>,
-    array_type: &TUnion,
+    array_like_type: &TUnion,
     mut index_type: &TUnion,
     in_assignment: bool,
     extended_var_id: &Option<String>,
@@ -108,7 +112,7 @@ pub(crate) fn get_array_target_type_given_index(
         None => access_span,
     };
 
-    if array_type.is_never() || index_type.is_never() {
+    if array_like_type.is_never() || index_type.is_never() {
         return get_never();
     }
 
@@ -130,26 +134,27 @@ pub(crate) fn get_array_target_type_given_index(
         );
     }
 
-    if index_type.is_nullable() {
+    if index_type.is_nullable() && !block_context.inside_isset && !index_type.ignore_nullable_issues {
         context.buffer.report(
-            TypingIssueKind::PossiblyNullArrayIndex,
-            Issue::warning(format!(
-                "Possibly using `null` as an array index to access element{}.",
-                match extended_var_id {
-                    Some(var) => "of variable ".to_string() + var,
-                    None => "".to_string(),
-                }
-            ))
-            .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `null` here."))
-            .with_note("Using `null` as an array key is equivalent to using an empty string `''`.")
-            .with_note("The analysis indicates this index could be `null` at runtime.")
-            .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
-        );
+                TypingIssueKind::PossiblyNullArrayIndex,
+                Issue::warning(format!(
+                    "Possibly using `null` as an array index to access element{}.",
+                    match extended_var_id {
+                        Some(var) => "of variable ".to_string() + var,
+                        None => "".to_string(),
+                    }
+                ))
+                .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `null` here."))
+                .with_note("Using `null` as an array key is equivalent to using an empty string `''`.")
+                .with_note("The analysis indicates this index could be `null` at runtime.")
+                .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
+            );
     }
 
-    let mut array_atomic_types = array_type.types.iter().collect::<Vec<_>>();
+    let mut array_atomic_types = array_like_type.types.iter().collect::<Vec<_>>();
 
     let mut value_type = None;
+    let mut expected_index_types = vec![];
     while let Some(atomic_var_type) = array_atomic_types.pop() {
         if let TAtomic::GenericParameter(parameter) = atomic_var_type {
             array_atomic_types.extend(&parameter.constraint.types);
@@ -162,11 +167,12 @@ pub(crate) fn get_array_target_type_given_index(
                 let new_type = handle_array_access_on_list(
                     context,
                     block_context,
-                    access_span,
+                    Some(access_span),
                     atomic_var_type,
                     index_type,
                     in_assignment,
                     &mut has_valid_expected_index,
+                    &mut expected_index_types,
                 );
 
                 if let Some(existing_type) = value_type {
@@ -189,6 +195,7 @@ pub(crate) fn get_array_target_type_given_index(
                     block_context.inside_isset || block_context.inside_unset,
                     &mut possibly_undefined,
                     &mut false,
+                    &mut expected_index_types,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
@@ -205,8 +212,8 @@ pub(crate) fn get_array_target_type_given_index(
                     context,
                     atomic_var_type.clone(),
                     index_type.clone(),
-                    &mut Vec::new(),
                     &mut has_valid_expected_index,
+                    &mut expected_index_types,
                 );
 
                 if let Some(existing_type) = value_type {
@@ -223,7 +230,7 @@ pub(crate) fn get_array_target_type_given_index(
                     artifacts,
                     access_span,
                     atomic_var_type,
-                    array_type,
+                    array_like_type,
                     value_type.clone(),
                 );
 
@@ -243,7 +250,7 @@ pub(crate) fn get_array_target_type_given_index(
                     artifacts,
                     access_span,
                     atomic_var_type,
-                    array_type,
+                    array_like_type,
                     value_type.clone(),
                 );
 
@@ -257,6 +264,10 @@ pub(crate) fn get_array_target_type_given_index(
                 has_valid_expected_index = true;
             }
             TAtomic::Null => {
+                if array_like_type.ignore_nullable_issues {
+                    continue;
+                }
+
                 if !in_assignment {
                     if !block_context.inside_isset {
                         context.buffer.report(
@@ -278,8 +289,18 @@ pub(crate) fn get_array_target_type_given_index(
 
                 has_valid_expected_index = true;
             }
-            TAtomic::Object(TObject::Named(_named_object)) => {
-                // TODO(azjezz): handle ArrayAccess on objects
+            TAtomic::Object(TObject::Named(_)) => {
+                let new_type = handle_array_access_on_named_object(
+                    context,
+                    access_span,
+                    atomic_var_type,
+                    index_type,
+                    &mut has_valid_expected_index,
+                    &mut expected_index_types,
+                );
+
+                value_type =
+                    Some(add_optional_union_type(new_type, value_type.as_ref(), context.codebase, context.interner));
             }
             _ => {
                 has_valid_expected_index = true;
@@ -289,7 +310,22 @@ pub(crate) fn get_array_target_type_given_index(
 
     if !has_valid_expected_index {
         let index_type_str = index_type.get_id(Some(context.interner));
-        let array_type_str = array_type.get_id(Some(context.interner));
+        let array_like_type_str = array_like_type.get_id(Some(context.interner));
+        let expected_index_types_str = expected_index_types
+            .into_iter()
+            .flat_map(|union| union.types)
+            .map(|t| t.get_id(Some(context.interner)))
+            .collect::<Vec<_>>();
+
+        let expected_types_list = match expected_index_types_str.len() {
+            0 => "an expected type".to_string(),
+            1 => format!("`{}`", expected_index_types_str[0]),
+            _ => {
+                let last = expected_index_types_str.last().unwrap();
+                let rest = &expected_index_types_str[..expected_index_types_str.len() - 1];
+                format!("`{}` or `{}`", rest.join("`, `"), last)
+            }
+        };
 
         let mut mixed_with_any = false;
         if index_type.is_mixed_with_any(&mut mixed_with_any) {
@@ -297,23 +333,30 @@ pub(crate) fn get_array_target_type_given_index(
                 artifacts.data_flow_graph.add_mixed_data(origin, access_span);
             }
 
+            let note_text = if expected_index_types_str.len() == 1 {
+                format!("The index for this type must be `{expected_types_list}`.")
+            } else {
+                format!("The index for this type must be one of: {expected_types_list}.")
+            };
+
+            let help_text = if expected_index_types_str.len() == 1 {
+                format!("Ensure the index expression evaluates to `{expected_types_list}`.")
+            } else {
+                format!("Ensure the index expression evaluates to one of the expected types: {expected_types_list}.")
+            };
+
             context.buffer.report(
                 if mixed_with_any { TypingIssueKind::MixedAnyArrayIndex } else { TypingIssueKind::MixedArrayIndex },
                 Issue::error(format!(
-                    "Invalid array index type `{index_type_str}` used for array access on `{array_type_str}`."
+                    "Invalid index type `{index_type_str}` used for array access on `{array_like_type_str}`."
                 ))
-                .with_annotation(
-                    Annotation::primary(access_index_span)
-                        .with_message(format!("Index type `{index_type_str}` is not guaranteed to be `int` or `string`."))
-                )
-                .with_note(
-                    "Array indices must be `integer`s or `string`s."
-                )
-                .with_help(
-                    "Ensure the index expression evaluates to an `integer` or `string`, potentially using type checks or assertions."
-                ),
+                .with_annotation(Annotation::primary(access_index_span).with_message(format!(
+                    "This index has type `{index_type_str}` which is not guaranteed to be a valid key."
+                )))
+                .with_note(note_text)
+                .with_help(help_text),
             );
-        } else if index_type.has_array_key_like() && array_type.is_array() {
+        } else if index_type.has_array_key_like() && array_like_type.is_array() {
             context.buffer.report(
                 TypingIssueKind::MismatchedArrayIndex,
                 Issue::error(format!(
@@ -325,7 +368,7 @@ pub(crate) fn get_array_target_type_given_index(
                 )
                 .with_annotation(
                     Annotation::secondary(access_array_span)
-                        .with_message(format!("...but this array (type `{array_type_str}` ) has a more specific key type."))
+                        .with_message(format!("...but this array (type `{array_like_type_str}` ) has a more specific key type."))
                 )
                 .with_note(
                     "While the provided key is a valid array key type in general (an `int` or `string`), it is not compatible with the specific key type expected by this array."
@@ -335,46 +378,54 @@ pub(crate) fn get_array_target_type_given_index(
                 ),
             );
         } else {
+            let note_text = if expected_index_types_str.len() == 1 {
+                format!("The only valid index type for `{array_like_type_str}` is {expected_types_list}.")
+            } else {
+                format!("Valid index types for `{array_like_type_str}` are: {expected_types_list}.")
+            };
+
+            let help_text = if expected_index_types_str.len() == 1 {
+                format!("Ensure the index expression evaluates to {expected_types_list}.")
+            } else {
+                format!("Ensure the index expression evaluates to one of the expected types: {expected_types_list}.")
+            };
+
             context.buffer.report(
                 TypingIssueKind::InvalidArrayIndex,
                 Issue::error(format!(
-                    "Invalid array index type `{index_type_str}` used for array access on `{array_type_str}`."
+                    "Invalid index type `{index_type_str}` used for array access on `{array_like_type_str}`."
                 ))
                 .with_annotation(
                     Annotation::primary(access_index_span)
-                        .with_message(format!("Type `{index_type_str}` cannot be used as an array index.")),
+                        .with_message(format!("Type `{index_type_str}` cannot be used as an index here.")),
                 )
-                .with_note("Array indices must be `integer`s or `string`s.")
-                .with_help("Ensure the index expression evaluates to an `integer` or `string`."),
+                .with_note(note_text)
+                .with_help(help_text),
             );
         }
     }
 
-    let array_access_type = value_type;
-    if let Some(array_access_type) = array_access_type {
-        array_access_type
-    } else {
-        // shouldn’t happen, but don’t crash
-        get_mixed_any()
-    }
+    value_type.unwrap_or_else(get_mixed_any)
 }
 
-// Handle array access on vec-list collections
 pub(crate) fn handle_array_access_on_list(
     context: &mut Context<'_>,
     block_context: &mut BlockContext,
-    span: Span,
+    span: Option<Span>,
     list: &TAtomic,
     dim_type: &TUnion,
     in_assignment: bool,
     has_valid_expected_index: &mut bool,
+    expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
+    let expected_key_type = TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::unspecified()))]);
+
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
         context.interner,
         dim_type,
-        &get_int(),
+        &expected_key_type,
         false,
         false,
         false,
@@ -383,6 +434,8 @@ pub(crate) fn handle_array_access_on_list(
 
     if index_type_contained_by_expected {
         *has_valid_expected_index = true;
+    } else {
+        expected_index_types.push(expected_key_type);
     }
 
     if let TAtomic::Array(TArray::List(TList { known_elements: Some(known_elements), element_type, .. })) = list {
@@ -397,7 +450,11 @@ pub(crate) fn handle_array_access_on_list(
                 if *actual_possibly_undefined {
                     resulting_type.set_possibly_undefined(true, None);
 
-                    if !block_context.inside_isset && !block_context.inside_unset && !in_assignment {
+                    if !block_context.inside_isset
+                        && !block_context.inside_unset
+                        && !in_assignment
+                        && let Some(span) = span
+                    {
                         // oh no!
                         context.buffer.report(
                         TypingIssueKind::PossiblyUndefinedIntArrayIndex,
@@ -426,7 +483,9 @@ pub(crate) fn handle_array_access_on_list(
             }
 
             if !in_assignment {
-                if type_param.is_never() {
+                if type_param.is_never()
+                    && let Some(span) = span
+                {
                     context.buffer.report(
                         TypingIssueKind::UndefinedIntArrayIndex,
                         Issue::error(format!(
@@ -471,7 +530,11 @@ pub(crate) fn handle_array_access_on_list(
         return if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
     } else if let TAtomic::Array(TArray::List(TList { element_type, .. })) = list {
         return if element_type.is_never() {
-            if !in_assignment && !block_context.inside_isset && !block_context.inside_unset {
+            if !in_assignment
+                && !block_context.inside_isset
+                && !block_context.inside_unset
+                && let Some(span) = span
+            {
                 context.buffer.report(
                     TypingIssueKind::ImpossibleArrayAccess,
                     Issue::error(format!(
@@ -498,7 +561,6 @@ pub(crate) fn handle_array_access_on_list(
     get_mixed()
 }
 
-// Handle array access on dict-like collections
 pub(crate) fn handle_array_access_on_keyed_array(
     context: &mut Context<'_>,
     block_context: &mut BlockContext,
@@ -510,6 +572,7 @@ pub(crate) fn handle_array_access_on_keyed_array(
     allow_possibly_undefined: bool,
     has_possibly_undefined: &mut bool,
     has_matching_dict_key: &mut bool,
+    expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
@@ -546,6 +609,8 @@ pub(crate) fn handle_array_access_on_keyed_array(
 
     if index_type_contained_by_expected {
         *has_valid_expected_index = true;
+    } else {
+        expected_index_types.push(key_parameter.clone().into_owned());
     }
 
     if let Some(known_items) = keyed_array.get_known_items() {
@@ -723,13 +788,145 @@ pub(crate) fn handle_array_access_on_keyed_array(
     }
 }
 
-// Handle array access on strings
+pub(crate) fn handle_array_access_on_named_object<'a>(
+    context: &mut Context<'a>,
+    span: Span,
+    named_object: &TAtomic,
+    index_type: &TUnion,
+    has_valid_expected_index: &mut bool,
+    expected_index_types: &mut Vec<TUnion>,
+) -> TUnion {
+    fn get_array_access_classes<'a>(
+        context: &mut Context<'a>,
+        atomic: &TAtomic,
+    ) -> Option<(Vec<&'a ClassLikeMetadata>, TUnion, TUnion)> {
+        let mut parameters = vec![];
+        let metadata = 'metadata: {
+            let TAtomic::Object(TObject::Named(named_object)) = atomic else {
+                break 'metadata None;
+            };
+
+            let array_access = context.interner.intern("ArrayAccess");
+            if !is_instance_of(context.codebase, context.interner, &named_object.name, &array_access) {
+                break 'metadata None;
+            }
+
+            let Some(metadata) = get_class_like(context.codebase, context.interner, &named_object.name) else {
+                break 'metadata None;
+            };
+
+            let key_type = get_specialized_template_type(
+                context.codebase,
+                context.interner,
+                "K",
+                &array_access,
+                metadata,
+                named_object.get_type_parameters(),
+            )
+            .unwrap_or_else(get_mixed);
+
+            let value_type = get_specialized_template_type(
+                context.codebase,
+                context.interner,
+                "V",
+                &array_access,
+                metadata,
+                named_object.get_type_parameters(),
+            )
+            .unwrap_or_else(get_mixed);
+
+            parameters.push((key_type, value_type));
+
+            Some(metadata)
+        };
+
+        let mut class_likes = vec![];
+
+        if let Some(metadata) = metadata {
+            class_likes.push(metadata);
+        }
+
+        if let Some(intersection_types) = atomic.get_intersection_types() {
+            for intersection_type in intersection_types {
+                if let Some(intersections) = get_array_access_classes(context, intersection_type) {
+                    class_likes.extend(intersections.0);
+
+                    parameters.push((intersections.1, intersections.2));
+                }
+            }
+        }
+
+        let mut key_type = None;
+        let mut value_type = None;
+
+        for (key_parameter_type, value_parameter_type) in parameters {
+            key_type = Some(add_optional_union_type(
+                key_parameter_type,
+                key_type.as_ref(),
+                context.codebase,
+                context.interner,
+            ));
+
+            value_type = Some(add_optional_union_type(
+                value_parameter_type,
+                value_type.as_ref(),
+                context.codebase,
+                context.interner,
+            ));
+        }
+
+        if class_likes.is_empty() {
+            return None;
+        }
+
+        Some((class_likes, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+    }
+
+    // TODO: we should analyze calls to `offsetSet` and `offsetGet` here.
+    let Some((_array_access_classes, expected_key_type, resulting_value_type)) =
+        get_array_access_classes(context, named_object)
+    else {
+        context.buffer.report(
+            TypingIssueKind::InvalidArrayAccess,
+            Issue::error(format!(
+                "Cannot access array index on object `{}` that does not implement `ArrayAccess`.",
+                named_object.get_id(Some(context.interner))
+            ))
+            .with_annotation(Annotation::primary(span).with_message("Object does not implement `ArrayAccess`."))
+            .with_note("Only objects implementing `ArrayAccess` can be accessed like arrays.")
+            .with_help("Ensure the object implements `ArrayAccess` before attempting to access it as an array."),
+        );
+
+        return get_never();
+    };
+
+    let mut union_comparison_result = ComparisonResult::new();
+    let index_type_contained_by_expected = is_contained_by(
+        context.codebase,
+        context.interner,
+        index_type,
+        &expected_key_type,
+        false,
+        false,
+        false,
+        &mut union_comparison_result,
+    );
+
+    if index_type_contained_by_expected {
+        *has_valid_expected_index = true;
+    } else {
+        expected_index_types.push(expected_key_type);
+    }
+
+    resulting_value_type
+}
+
 pub(crate) fn handle_array_access_on_string(
     context: &mut Context<'_>,
     string: TAtomic,
     index_type: TUnion,
-    expected_index_types: &mut Vec<String>,
     has_valid_expected_index: &mut bool,
+    expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
     let mut non_empty = false;
 
@@ -759,7 +956,7 @@ pub(crate) fn handle_array_access_on_string(
         false,
         &mut ComparisonResult::new(),
     ) {
-        expected_index_types.push(valid_index_type.get_id(Some(context.interner)));
+        expected_index_types.push(valid_index_type);
     } else {
         *has_valid_expected_index = true;
     }

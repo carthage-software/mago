@@ -40,6 +40,7 @@ pub(crate) enum TypingIssueKind {
     InvalidArrayElement,
     MismatchedArrayIndex,
     InvalidArrayIndex,
+    InvalidArrayAccess,
     InvalidContainsCheck,
     InvalidMethodAccess,
     InvalidPropertyAssignmentValue,

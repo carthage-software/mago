@@ -23,7 +23,7 @@ impl Analyzable for Echo {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let target = InvocationTarget::for_language_construct(LanguageConstructKind::Echo, self.echo.span);
-        let arguments = InvocationArgumentsSource::LanguageConstructExpressions(self.values.as_slice());
+        let arguments = InvocationArgumentsSource::Slice(self.values.as_slice());
         let invocation = Invocation::new(target, arguments, self.span());
 
         let mut template_result = TemplateResult::default();

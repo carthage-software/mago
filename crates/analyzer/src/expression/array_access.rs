@@ -83,8 +83,6 @@ impl Analyzable for ArrayAccess {
         let container_type = artifacts.get_rc_expression_type(&self.array).cloned();
 
         if let Some(container_type) = container_type {
-            // maybe todo handle access on null
-
             let mut access_type = get_array_target_type_given_index(
                 context,
                 block_context,

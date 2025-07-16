@@ -192,7 +192,7 @@ impl Analyzable for PrintConstruct {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let target = InvocationTarget::for_language_construct(LanguageConstructKind::Print, self.print.span);
-        let arguments = InvocationArgumentsSource::LanguageConstructExpressions(std::slice::from_ref(&self.value));
+        let arguments = InvocationArgumentsSource::Slice(std::slice::from_ref(&self.value));
         let invocation = Invocation::new(target, arguments, self.span());
 
         let mut template_result = TemplateResult::default();

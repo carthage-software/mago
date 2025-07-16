@@ -548,7 +548,7 @@ pub fn analyze_invocation<'a>(
                 .with_annotation(
                     Annotation::secondary(pipe.input.span()).with_message("This value is passed as the first argument"),
                 ),
-            InvocationArgumentsSource::LanguageConstructExpressions(_) => issue.with_annotation(
+            InvocationArgumentsSource::Slice(_) => issue.with_annotation(
                 Annotation::secondary(invocation.target.span()).with_message("For this language construct"),
             ),
             InvocationArgumentsSource::None(constructor_or_attribute_span) => issue.with_annotation(
@@ -591,7 +591,7 @@ pub fn analyze_invocation<'a>(
                 .with_annotation(
                     Annotation::secondary(pipe.operator).with_message("Pipe operator provides this as an argument"),
                 );
-        } else if let InvocationArgumentsSource::LanguageConstructExpressions { .. } = invocation.arguments_source {
+        } else if let InvocationArgumentsSource::Slice { .. } = invocation.arguments_source {
             issue = issue.with_annotation(
                 Annotation::secondary(invocation.target.span())
                     .with_message(format!("For this {target_name_str} construct")),

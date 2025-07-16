@@ -175,9 +175,32 @@ impl Analyzable for UnaryPrefix {
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
                     Some(t) => {
-                        if t.is_int() {
-                            report_redundant_type_cast(&self.operator, self, &t, context);
-                        }
+                        // we intentionally do not report redundant casts here, as
+                        // what we think is an integer, might be a float at runtime.
+                        //
+                        // Example:
+                        //
+                        // ```
+                        // function factorial(int $number): int {
+                        //     if ($number <= 1) {
+                        //         return 1;
+                        //     }
+                        //
+                        //     return $number * factorial($number - 1);
+                        // }
+                        // ```
+                        //
+                        // While this function looks like it always returns an integer,
+                        // it could result in a float ( via overflow ) at runtime.
+                        //
+                        // While currently we do not report overflows, we should allow the
+                        // user to explicitly cast the result to an integer.
+                        //
+                        // ---
+                        //
+                        // if t.is_int() {
+                        //     report_redundant_type_cast(&self.operator, self, &t, context);
+                        // }
 
                         cast_type_to_int(&t, context)
                     }
@@ -1413,6 +1436,7 @@ pub fn cast_type_to_string<'a>(
                     declaring_method_id,
                     class_metadata,
                     to_string_metadata,
+                    None,
                     expression_span,
                 );
             }

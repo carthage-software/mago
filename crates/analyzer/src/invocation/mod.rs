@@ -183,14 +183,15 @@ pub enum InvocationTargetParameter<'a> {
 /// arguments provided via the pipe operator `$input |> func`.
 #[derive(Debug, Clone, Copy)]
 pub enum InvocationArgumentsSource<'a> {
-    /// No arguments are present, e.g., `new Foo`.
+    /// No arguments are present, e.g., calling `__construct` via `new Foo`,
+    /// or `__toString` via `(string) $foo`.
     None(Span),
     /// Arguments are provided in a standard list, like `foo($a, $b)`.
     ArgumentList(&'a ArgumentList),
     /// The single argument is the input from a pipe operator, like `$input` in `$input |> foo(...)`.
     PipeInput(&'a Pipe),
-    /// The arguments are a list of expressions, used for constructs like `echo`.
-    LanguageConstructExpressions(&'a [Expression]),
+    /// A slice of expressions, used for constructs like `echo` or `print`.
+    Slice(&'a [Expression]),
 }
 
 /// Represents a single argument passed during an invocation, abstracting whether
@@ -485,7 +486,7 @@ impl<'a> InvocationArgumentsSource<'a> {
             InvocationArgumentsSource::PipeInput(pipe) => {
                 vec![InvocationArgument::PipedValue(pipe.input.as_ref())]
             }
-            InvocationArgumentsSource::LanguageConstructExpressions(expr_list) => {
+            InvocationArgumentsSource::Slice(expr_list) => {
                 expr_list.iter().map(InvocationArgument::Expression).collect()
             }
             InvocationArgumentsSource::None(_) => {
@@ -561,7 +562,7 @@ impl HasSpan for InvocationArgumentsSource<'_> {
         match self {
             InvocationArgumentsSource::ArgumentList(arg_list) => arg_list.span(),
             InvocationArgumentsSource::PipeInput(pipe) => pipe.span(),
-            InvocationArgumentsSource::LanguageConstructExpressions(expr_list) => {
+            InvocationArgumentsSource::Slice(expr_list) => {
                 let first = expr_list.first();
                 let last = expr_list.last();
 

@@ -560,21 +560,18 @@ function compact($var_name, ...$var_names): array
 }
 
 /**
- * Fill an array with values
- * @link https://php.net/manual/en/function.array-fill.php
- * @param int $start_index <p>
- * The first index of the returned array.
- * Supports non-negative indexes only.
- * </p>
- * @param int $count <p>
- * Number of elements to insert
- * </p>
- * @param mixed $value <p>
- * Value to use for filling
- * </p>
- * @return array the filled array
+ * @template T
+ *
+ * @param T $value
+ *
+ * @return (
+ *   $start_index is 0 ?
+ *   ($count is int<1, max> ? non-empty-list<T> : list<T>) :
+ *   ($count is int<1, max> ? non-empty-array<int, T> : array<int, T>)
+ * )
+ *
+ * @pure
  */
-#[Pure]
 function array_fill(int $start_index, int $count, mixed $value): array
 {
 }
