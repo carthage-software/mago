@@ -1,12 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\ArrayShape;
-use JetBrains\PhpStorm\Deprecated;
-use JetBrains\PhpStorm\ExpectedValues;
-use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-use JetBrains\PhpStorm\Pure;
-
 function syslog(int $priority, string $message): true
 {
 }
@@ -438,61 +431,29 @@ function max(mixed $value, mixed ...$values): mixed
 }
 
 /**
- * Checks if a value exists in an array
- * @link https://php.net/manual/en/function.in-array.php
- * @param mixed $needle <p>
- * The searched value.
- * </p>
- * <p>
- * If needle is a string, the comparison is done
- * in a case-sensitive manner.
- * </p>
- * @param array $haystack <p>
- * The array.
- * </p>
- * @param bool $strict [optional] <p>
- * If the third parameter strict is set to true
- * then the in_array function will also check the
- * types of the
- * needle in the haystack.
- * </p>
- * @return bool true if needle is found in the array,
- * false otherwise.
+ * @template K of array-key
+ * @template V
+ *
+ * @param K $needle
+ * @param array<K, V> $haystack
+ *
+ * @pure
  */
-#[Pure]
 function in_array(mixed $needle, array $haystack, bool $strict = false): bool
 {
 }
 
 /**
- * Searches the array for a given value and returns the first corresponding key if successful
- * @link https://php.net/manual/en/function.array-search.php
- * @param mixed $needle <p>
- * The searched value.
- * </p>
- * <p>
- * If needle is a string, the comparison is done
- * in a case-sensitive manner.
- * </p>
- * @param array $haystack <p>
- * The array.
- * </p>
- * @param bool $strict [optional] <p>
- * If the third parameter strict is set to true
- * then the array_search function will also check the
- * types of the
- * needle in the haystack.
- * </p>
- * @return int|string|false the key for needle if it is found in the
- * array, false otherwise.
- * </p>
- * <p>
- * If needle is found in haystack
- * more than once, the first matching key is returned. To return the keys for
- * all matching values, use array_keys with the optional
- * search_value parameter instead.
+ * @template K of array-key
+ * @template V
+ *
+ * @param K $needle
+ * @param array<K, V> $haystack
+ *
+ * @return K|false
+ *
+ * @pure
  */
-#[Pure]
 function array_search(mixed $needle, array $haystack, bool $strict = false): string|int|false
 {
 }
@@ -523,21 +484,8 @@ function array_search(mixed $needle, array $haystack, bool $strict = false): str
  * @return int the number of variables successfully imported into the symbol
  * table.
  */
-function extract(
-    array &$array,
-    #[ExpectedValues(flags: [
-        EXTR_OVERWRITE,
-        EXTR_SKIP,
-        EXTR_PREFIX_SAME,
-        EXTR_PREFIX_ALL,
-        EXTR_PREFIX_INVALID,
-        EXTR_IF_EXISTS,
-        EXTR_PREFIX_IF_EXISTS,
-        EXTR_REFS,
-    ])]
-    int $flags = EXTR_OVERWRITE,
-    string $prefix = '',
-): int {
+function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int
+{
 }
 
 /**
@@ -577,18 +525,16 @@ function array_fill(int $start_index, int $count, mixed $value): array
 }
 
 /**
- * Fill an array with values, specifying keys
- * @link https://php.net/manual/en/function.array-fill-keys.php
- * @param array $keys <p>
- * Array of values that will be used as keys. Illegal values
- * for key will be converted to string.
- * </p>
- * @param mixed $value <p>
- * Value to use for filling
- * </p>
- * @return array the filled array
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K> $keys
+ * @param V $value
+ *
+ * @return ($keys is non-empty-array<K> ? non-empty-array<K, V> : array<K, V>)
+ *
+ * @pure
  */
-#[Pure]
 function array_fill_keys(array $keys, mixed $value): array
 {
 }
@@ -634,17 +580,17 @@ function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REG
 }
 
 /**
- * Push elements onto the end of array
- * Since 7.3.0 this function can be called with only one parameter.
- * For earlier versions at least two parameters are required.
- * @link https://php.net/manual/en/function.array-push.php
- * @param array &$array <p>
- * The input array.
- * </p>
- * @param mixed ...$values <p>
- * The pushed variables.
- * </p>
- * @return int the number of elements in the array.
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param V ...$values
+ *
+ * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K, V>) $array
+ *
+ * @return int<1, max>
+ *
+ * @pure
  */
 function array_push(array &$array, mixed ...$values): int
 {
@@ -655,7 +601,8 @@ function array_push(array &$array, mixed ...$values): int
  * @template V
  *
  * @param array<K, V> $array
- * @param-out ($array is list ? list<V> : array<K, V>) $array
+ *
+ * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
  *
  * @return V|null
  */
@@ -668,7 +615,7 @@ function array_pop(array &$array): mixed
  * @template V
  *
  * @param array<K, V> $array
- * @param-out ($array is list ? list<V> : array<K, V>) $array
+ * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
  *
  * @return V|null
  *
