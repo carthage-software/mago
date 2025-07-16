@@ -23,6 +23,11 @@ pub fn parse_callable_type_specifications<'input>(
                         } else {
                             None
                         },
+                        variable: if stream.is_at(TypeTokenKind::Variable)? {
+                            Some(VariableType::from(stream.consume()?))
+                        } else {
+                            None
+                        },
                         comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
                     };
 

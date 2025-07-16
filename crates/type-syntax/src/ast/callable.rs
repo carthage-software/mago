@@ -5,6 +5,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Type;
+use crate::ast::VariableType;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -45,6 +46,7 @@ pub struct CallableTypeParameter<'input> {
     pub parameter_type: Box<Type<'input>>,
     pub equals: Option<Span>,
     pub ellipsis: Option<Span>,
+    pub variable: Option<VariableType<'input>>,
     pub comma: Option<Span>,
 }
 

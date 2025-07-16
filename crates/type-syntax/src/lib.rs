@@ -928,4 +928,27 @@ mod tests {
             res => panic!("Expected Ok(Type::Int), got {res:?}"),
         }
     }
+
+    #[test]
+    fn test_parse_callable_with_variables() {
+        match do_parse("callable(string ...$names)") {
+            Ok(Type::Callable(callable)) => {
+                assert_eq!(callable.keyword.value, "callable");
+                assert!(callable.specification.is_some());
+
+                let specification = callable.specification.unwrap();
+
+                assert!(specification.return_type.is_none());
+                assert_eq!(specification.parameters.entries.len(), 1);
+
+                let first_parameter = specification.parameters.entries.first().unwrap();
+                assert!(first_parameter.variable.is_some());
+                assert!(first_parameter.ellipsis.is_some());
+
+                let variable = first_parameter.variable.unwrap();
+                assert_eq!(variable.value, "$names");
+            }
+            res => panic!("Expected Ok(Type::Callable), got {res:?}"),
+        }
+    }
 }
