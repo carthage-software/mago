@@ -137,7 +137,7 @@ pub fn analyze_invocation<'a>(
     let mut analyzed_argument_types: HashMap<usize, (TUnion, Span)> = HashMap::default();
 
     let mut non_callable_arguments: Vec<(usize, InvocationArgument<'_>)> = Vec::new();
-    let mut closure_arguments: Vec<(usize, InvocationArgument<'_>)> = Vec::new();
+    let mut callable_arguments: Vec<(usize, InvocationArgument<'_>)> = Vec::new();
     let mut unpacked_arguments: Vec<InvocationArgument<'_>> = Vec::new();
     for (offset, argument) in invocation.arguments_source.get_arguments().into_iter().enumerate() {
         if argument.is_unpacked() {
@@ -146,7 +146,7 @@ pub fn analyze_invocation<'a>(
             argument.value(),
             Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::ClosureCreation(_)
         ) {
-            closure_arguments.push((offset, argument));
+            callable_arguments.push((offset, argument));
         } else {
             non_callable_arguments.push((offset, argument));
         }
@@ -197,7 +197,7 @@ pub fn analyze_invocation<'a>(
         }
     }
 
-    for (argument_offset, argument) in &closure_arguments {
+    for (argument_offset, argument) in &callable_arguments {
         let argument_expression = argument.value();
         let parameter = get_parameter_of_argument(context, &parameter_refs, argument, *argument_offset);
 
@@ -264,7 +264,7 @@ pub fn analyze_invocation<'a>(
     let mut has_too_many_arguments = false;
     let mut last_argument_offset: isize = -1;
     for (argument_offset, argument) in
-        non_callable_arguments.iter().chain(closure_arguments.iter()).sorted_by(|(a, _), (b, _)| a.cmp(b))
+        non_callable_arguments.iter().chain(callable_arguments.iter()).sorted_by(|(a, _), (b, _)| a.cmp(b))
     {
         let argument_expression = argument.value();
         let (argument_value_type, _) = analyzed_argument_types
@@ -428,6 +428,10 @@ pub fn analyze_invocation<'a>(
         }
     }
 
+    let max_params = parameter_refs.len();
+    let number_of_required_parameters = parameter_refs.iter().filter(|p| !p.has_default() && !p.is_variadic()).count();
+    let mut number_of_provided_parameters = non_callable_arguments.len() + callable_arguments.len();
+
     if !unpacked_arguments.is_empty() {
         if let Some(last_parameter_ref) = parameter_refs.last().copied() {
             if last_parameter_ref.is_variadic() {
@@ -462,6 +466,19 @@ pub fn analyze_invocation<'a>(
 
                     let argument_value_type =
                         artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed_any); // Get type of the iterable
+
+                    let mut sizes = vec![];
+                    for argument_atomic in &argument_value_type.types {
+                        let TAtomic::Array(array) = argument_atomic else {
+                            sizes.push(0);
+
+                            continue;
+                        };
+
+                        sizes.push(array.get_minimum_size());
+                    }
+
+                    number_of_provided_parameters += sizes.into_iter().min().unwrap_or(0);
 
                     let unpacked_element_type = get_unpacked_argument_type(
                         context,
@@ -516,10 +533,6 @@ pub fn analyze_invocation<'a>(
         }
     }
 
-    let max_params = parameter_refs.len();
-    let number_of_required_parameters =
-        parameter_refs.iter().filter(|parameter| !parameter.has_default() && !parameter.is_variadic()).count();
-    let number_of_provided_parameters = non_callable_arguments.len() + closure_arguments.len();
     if number_of_provided_parameters < number_of_required_parameters {
         let primary_annotation_span = invocation.arguments_source.span();
 
@@ -1786,17 +1799,14 @@ fn get_unpacked_argument_type(
         }
     }
 
-    let mut result_type = if potential_element_types.is_empty() {
-        get_never()
-    } else if potential_element_types.len() == 1 {
-        potential_element_types.pop().unwrap()
-    } else {
-        let mut combined_type = potential_element_types.pop().unwrap();
+    let mut result_type = if let Some(mut combined_type) = potential_element_types.pop() {
         for element_type in potential_element_types {
             combined_type = add_union_type(combined_type, &element_type, context.codebase, context.interner, false);
         }
 
         combined_type
+    } else {
+        get_never()
     };
 
     add_array_access_dataflow(expression_types, data_flow_graph, span, None, &mut result_type, &mut get_arraykey());

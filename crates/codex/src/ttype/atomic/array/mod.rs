@@ -109,6 +109,40 @@ impl TArray {
         }
     }
 
+    /// Returns the minimum size of the array based on known items or elements.
+    pub fn get_minimum_size(&self) -> usize {
+        let mut size = 0;
+
+        match &self {
+            Self::Keyed(keyed_array) => {
+                if let Some(known_items) = keyed_array.known_items.as_ref() {
+                    for (optional, _) in known_items.values() {
+                        if !optional {
+                            size += 1;
+                        }
+                    }
+                } else if keyed_array.non_empty {
+                    size = 1;
+                }
+            }
+            Self::List(list) => {
+                if let Some(count) = list.known_count {
+                    size = count;
+                } else if let Some(known_elements) = list.known_elements.as_ref() {
+                    for (optional, _) in known_elements.values() {
+                        if !optional {
+                            size += 1;
+                        }
+                    }
+                } else if list.non_empty {
+                    size = 1;
+                }
+            }
+        }
+
+        size
+    }
+
     /// Returns the key type of the array, if applicable.
     pub fn get_key_type(&self) -> Option<TUnion> {
         match self {
