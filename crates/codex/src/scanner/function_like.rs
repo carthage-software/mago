@@ -286,10 +286,12 @@ fn scan_function_like_docblock(
             continue;
         };
 
+        let mut variadic_mismatch_issue = None;
         if is_variadic && !parameter_metadata.is_variadic() {
             let parameter_span = parameter_metadata.get_span();
+            parameter_metadata.is_variadic = true;
 
-            metadata.issues.push(
+            variadic_mismatch_issue = Some(
                 Issue::error("@param tag has a variadic mismatch.")
                     .with_code(ScanningIssueKind::InvalidParamTag)
                     .with_annotation(Annotation::primary(parameter_tag.span).with_message(
@@ -302,8 +304,6 @@ fn scan_function_like_docblock(
                     .with_note("The use of `...` in the `@param` tag must match the function's parameter declaration.")
                     .with_help("Either add `...` to the parameter in the function signature or remove it from the `@param` tag."),
             );
-
-            continue;
         }
 
         match get_type_metadata_from_type_string(param_type_string, classname, &type_context, context, scope) {
@@ -331,6 +331,10 @@ fn scan_function_like_docblock(
                         .with_help(typing_error.help()),
                 );
             }
+        }
+
+        if let Some(variadic_mismatch_issue) = variadic_mismatch_issue {
+            metadata.issues.push(variadic_mismatch_issue);
         }
     }
 
