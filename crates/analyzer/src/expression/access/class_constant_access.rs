@@ -327,4 +327,83 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = const_var_type,
+        code = indoc! {r#"
+            <?php
+
+            class NumberFormatter
+            {
+                public const int CURRENCY = 1;
+                public const int DECIMAL = 2;
+
+                private string $locale;
+                private int $style;
+
+                public function __construct(string $locale, int $style)
+                {
+                    $this->locale = $locale;
+                    $this->style = $style;
+                }
+
+                public function formatCurrency(float $_value, string $_currency): string|false
+                {
+                    return false;
+                }
+            }
+
+            enum PremiumBasisCode: string
+            {
+                case ADMISSIONS = 'admissions';
+                case AREA = 'area';
+                case COST = 'cost';
+                case EACH = 'each';
+                case FLAT = 'flat';
+                case OTHER = 'other';
+                case PAYROLL = 'payroll';
+                case RECEIPTS = 'receipts';
+                case SALES = 'sales';
+                case UNITS = 'units';
+            }
+
+            class ExposureFormatter
+            {
+                /**
+                 * @var array<string, int>
+                 */
+                private const array PREFIXES = [
+                    PremiumBasisCode::ADMISSIONS->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::AREA->value => NumberFormatter::DECIMAL,
+                    PremiumBasisCode::COST->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::EACH->value => NumberFormatter::DECIMAL,
+                    PremiumBasisCode::FLAT->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::OTHER->value => NumberFormatter::DECIMAL,
+                    PremiumBasisCode::PAYROLL->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::RECEIPTS->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::SALES->value => NumberFormatter::CURRENCY,
+                    PremiumBasisCode::UNITS->value => NumberFormatter::DECIMAL,
+                ];
+
+                private string $locale;
+
+                public function __construct(string $locale = 'en_US')
+                {
+                    $this->locale = $locale;
+                }
+
+                public function format(PremiumBasisCode $basisCode, float $value): null|string
+                {
+                    $formatter = new NumberFormatter($this->locale, self::PREFIXES[$basisCode->value]);
+                    $result = $formatter->formatCurrency($value, 'USD');
+
+                    if (false === $result) {
+                        return null;
+                    } else {
+                        return $result;
+                    }
+                }
+            }
+        "#},
+    }
 }

@@ -15,6 +15,7 @@ pub struct ClassLikeConstantMetadata {
     pub name: StringIdentifier,
     pub span: Span,
     pub visibility: Visibility,
+    pub type_declaration: Option<TypeMetadata>,
     pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TAtomic>,
     pub is_final: bool,
@@ -29,11 +30,20 @@ impl ClassLikeConstantMetadata {
             name,
             span,
             visibility,
+            type_declaration: None,
             type_metadata: None,
             inferred_type: None,
             is_final: false,
             is_deprecated: false,
             is_internal: false,
         }
+    }
+
+    pub fn set_type_declaration(&mut self, type_declaration: TypeMetadata) {
+        if self.type_metadata.is_none() {
+            self.type_metadata = Some(type_declaration.clone());
+        }
+
+        self.type_declaration = Some(type_declaration);
     }
 }

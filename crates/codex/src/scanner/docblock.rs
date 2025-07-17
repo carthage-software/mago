@@ -73,6 +73,7 @@ pub struct PropertyDocblockComment {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ConstantDocblockComment {
     pub span: Span,
+    pub type_string: Option<TypeString>,
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_final: bool,
@@ -550,6 +551,7 @@ impl ConstantDocblockComment {
         let mut is_deprecated = false;
         let mut is_internal = false;
         let mut is_final = false;
+        let mut type_string: Option<TypeString> = None;
 
         let parsed_docblock = parse_trivia(context.interner, docblock)?;
 
@@ -568,10 +570,25 @@ impl ConstantDocblockComment {
                 TagKind::Final => {
                     is_final = true;
                 }
+
+                TagKind::PsalmVar | TagKind::PhpstanVar => {
+                    if let Some(type_string_tag) =
+                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
+                    {
+                        type_string = Some(type_string_tag.0);
+                    }
+                }
+                TagKind::Var if type_string.is_none() => {
+                    if let Some(type_string_tag) =
+                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
+                    {
+                        type_string = Some(type_string_tag.0);
+                    }
+                }
                 _ => {}
             }
         }
 
-        Ok(Some(ConstantDocblockComment { span: docblock.span, is_deprecated, is_internal, is_final }))
+        Ok(Some(ConstantDocblockComment { span: docblock.span, is_deprecated, is_internal, is_final, type_string }))
     }
 }

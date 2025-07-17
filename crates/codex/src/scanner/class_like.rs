@@ -800,7 +800,14 @@ fn scan_class_like(
     for member in members.iter() {
         match member {
             ClassLikeMember::Constant(constant) => {
-                for constant_metadata in scan_class_like_constants(&mut class_like_metadata, constant, context) {
+                for constant_metadata in scan_class_like_constants(
+                    &mut class_like_metadata,
+                    constant,
+                    Some(&name),
+                    &type_context,
+                    context,
+                    scope,
+                ) {
                     if class_like_metadata.constants.contains_key(&constant_metadata.name) {
                         continue;
                     }

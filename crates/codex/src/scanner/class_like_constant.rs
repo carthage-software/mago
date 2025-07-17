@@ -1,3 +1,5 @@
+use mago_interner::StringIdentifier;
+use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -11,19 +13,24 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::ConstantDocblockComment;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
+use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
 pub fn scan_class_like_constants(
     class_like_metadata: &mut ClassLikeMetadata,
     constant: &ClassLikeConstant,
+    classname: Option<&StringIdentifier>,
+    type_context: &TypeResolutionContext,
     context: &mut Context<'_>,
+    scope: &NamespaceScope,
 ) -> Vec<ClassLikeConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let visibility =
         constant.modifiers.get_first_visibility().and_then(|m| Visibility::try_from(m).ok()).unwrap_or_default();
     let is_final = constant.modifiers.contains_final();
-    let type_metadata =
+    let type_declaration =
         constant.hint.as_ref().map(|h| get_type_metadata_from_hint(h, Some(&class_like_metadata.name), context));
 
     let docblock = match ConstantDocblockComment::create(context, constant) {
@@ -46,8 +53,11 @@ pub fn scan_class_like_constants(
         .iter()
         .map(|item| {
             let mut meta = ClassLikeConstantMetadata::new(item.name.value, item.span(), visibility);
+            if let Some(type_declaration) = type_declaration.as_ref().cloned() {
+                meta.set_type_declaration(type_declaration);
+            }
+
             meta.attributes = attributes.clone();
-            meta.type_metadata = type_metadata.clone();
             meta.is_final = is_final;
             meta.inferred_type =
                 infer(context.interner, context.resolved_names, &item.value).map(|u| u.get_single_owned());
@@ -56,6 +66,23 @@ pub fn scan_class_like_constants(
                 meta.is_deprecated = docblock.is_deprecated;
                 meta.is_internal = docblock.is_internal;
                 meta.is_final = docblock.is_final;
+
+                if let Some(type_string) = &docblock.type_string {
+                    match get_type_metadata_from_type_string(type_string, classname, type_context, context, scope) {
+                        Ok(type_metadata) => {
+                            meta.type_metadata = Some(type_metadata);
+                        }
+                        Err(typing_error) => class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the type for the @var tag.")
+                                .with_code(ScanningIssueKind::InvalidVarTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        ),
+                    }
+                }
             }
 
             meta
