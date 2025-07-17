@@ -13,7 +13,7 @@ use crate::token::TypeTokenKind;
 /// capabilities and automatically skipping trivia tokens (whitespace, comments).
 #[derive(Debug)]
 pub struct TypeTokenStream<'input> {
-    lexer: TypeLexer<'input>,
+    pub(crate) lexer: TypeLexer<'input>,
     buffer: VecDeque<TypeToken<'input>>,
     position: Position,
 }

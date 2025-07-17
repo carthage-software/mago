@@ -105,6 +105,53 @@ impl<'a> Input<'a> {
         self.offset >= self.length
     }
 
+    /// Returns a byte slice within a specified absolute range.
+    ///
+    /// The `from` and `to` arguments are absolute byte offsets from the beginning
+    /// of the original source file. The method calculates the correct slice
+    /// relative to the `starting_position` of this `Input`.
+    ///
+    /// This is useful for retrieving the raw text of a `Span` or `Token` whose
+    /// positions are absolute, even when the `Input` only contains a subsection
+    /// of the source file.
+    ///
+    /// The returned slice is defensively clamped to the bounds of the current
+    /// `Input`'s byte slice to prevent panics.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The absolute starting byte offset.
+    /// * `to` - The absolute ending byte offset (exclusive).
+    ///
+    /// # Returns
+    ///
+    /// A byte slice `&[u8]` corresponding to the requested range.
+    #[inline]
+    pub fn slice_in_range(&self, from: usize, to: usize) -> &'a [u8] {
+        let base_offset = self.starting_position.offset;
+
+        // Calculate the start and end positions relative to the local `bytes` slice.
+        // `saturating_sub` prevents underflow if `from`/`to` are smaller than `base_offset`.
+        let local_from = from.saturating_sub(base_offset);
+        let local_to = to.saturating_sub(base_offset);
+
+        // Clamp the local indices to the actual length of the `bytes` slice to prevent panics.
+        let start = local_from.min(self.length);
+        let end = local_to.min(self.length);
+
+        // Ensure the start index is not greater than the end index.
+        if start >= end {
+            return &[];
+        }
+
+        // If the start index is beyond the length of the input, return an empty slice.
+        if start >= self.length {
+            return &[];
+        }
+
+        &self.bytes[start..end]
+    }
+
     /// Advances the current position by one character, updating line and column numbers.
     ///
     /// Handles different line endings (`\n`, `\r`, `\r\n`) and updates line and column counters accordingly.

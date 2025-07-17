@@ -308,6 +308,62 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_shape_with_keys_containing_special_chars() {
+        match do_parse("array{key-with-dash: int, key-with---multiple-dashes?: int}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 2);
+
+                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "key-with-dash");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "key-with---multiple-dashes");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_shape_with_keys_after_types() {
+        match do_parse("array{list: list<int>, int?: int, string: string, bool: bool}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 4);
+
+                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "list");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "int");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[2].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "string");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[3].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "bool");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_unsealed_shape_with_fallback() {
         match do_parse(
             "array{

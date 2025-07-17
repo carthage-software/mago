@@ -36,6 +36,23 @@ impl<'input> TypeLexer<'input> {
         self.input.current_position()
     }
 
+    /// Returns a string slice within a specified absolute range.
+    ///
+    /// This method exposes the underlying `Input::slice_in_range` functionality but
+    /// returns a `&str` instead of a `&[u8]`. It assumes the source is valid UTF-8.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The absolute starting byte offset.
+    /// * `to` - The absolute ending byte offset (exclusive).
+    #[inline]
+    pub fn slice_in_range(&self, from: usize, to: usize) -> &'input str {
+        let bytes_slice = self.input.slice_in_range(from, to);
+
+        // Reuse the same safe UTF-8 conversion logic as the `token` method.
+        bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
+    }
+
     #[inline]
     pub fn advance(&mut self) -> Option<Result<TypeToken<'input>, SyntaxError>> {
         if self.input.has_reached_eof() {
