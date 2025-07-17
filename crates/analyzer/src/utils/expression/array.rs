@@ -815,10 +815,22 @@ pub(crate) fn handle_array_access_on_named_object<'a>(
                 break 'metadata None;
             };
 
+            let Some(array_access_metadata) = get_class_like(context.codebase, context.interner, &array_access) else {
+                break 'metadata None;
+            };
+
+            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| name) else {
+                break 'metadata None;
+            };
+
+            let Some(value_template_name) = array_access_metadata.template_types.get(1).map(|(name, _)| name) else {
+                break 'metadata None;
+            };
+
             let key_type = get_specialized_template_type(
                 context.codebase,
                 context.interner,
-                "K",
+                key_template_name,
                 &array_access,
                 metadata,
                 named_object.get_type_parameters(),
@@ -828,7 +840,7 @@ pub(crate) fn handle_array_access_on_named_object<'a>(
             let value_type = get_specialized_template_type(
                 context.codebase,
                 context.interner,
-                "V",
+                value_template_name,
                 &array_access,
                 metadata,
                 named_object.get_type_parameters(),

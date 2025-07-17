@@ -614,10 +614,14 @@ pub fn get_iterable_parameters(
                     break 'parameters None;
                 }
 
+                let traversable_metadata = get_class_like(codebase, interner, &traversable)?;
+                let key_template = traversable_metadata.template_types.first().map(|(name, _)| name)?;
+                let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+
                 let key_type = get_specialized_template_type(
                     codebase,
                     interner,
-                    "K",
+                    key_template,
                     &traversable,
                     class_metadata,
                     object.get_type_parameters(),
@@ -627,7 +631,7 @@ pub fn get_iterable_parameters(
                 let value_type = get_specialized_template_type(
                     codebase,
                     interner,
-                    "V",
+                    value_template,
                     &traversable,
                     class_metadata,
                     object.get_type_parameters(),
@@ -733,10 +737,13 @@ pub fn get_iterable_value_parameter(
                 return None;
             }
 
+            let traversable_metadata = get_class_like(codebase, interner, &traversable)?;
+            let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+
             get_specialized_template_type(
                 codebase,
                 interner,
-                "V",
+                value_template,
                 &traversable,
                 class_metadata,
                 object.get_type_parameters(),
@@ -804,19 +811,18 @@ pub fn get_array_value_parameter(
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
     interner: &ThreadedInterner,
-    template_name_to_find: &str,
+    template_name: &StringIdentifier,
     template_defining_class_id: &StringIdentifier,
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let template_name_id = interner.get(template_name_to_find)?;
     let defining_class_metadata = get_class_like(codebase, interner, template_defining_class_id)?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
-        let index = instantiated_class_metadata.get_template_index_for_name(&template_name_id)?;
+        let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
 
         let Some(instantiated_type_parameters) = instantiated_type_parameters else {
-            let type_map = instantiated_class_metadata.get_template_type(&template_name_id)?;
+            let type_map = instantiated_class_metadata.get_template_type(template_name)?;
 
             return type_map.first().map(|(_, constraint)| constraint).cloned();
         };
@@ -824,13 +830,13 @@ pub fn get_specialized_template_type(
         return instantiated_type_parameters.get(index).cloned();
     }
 
-    let defining_template_type = defining_class_metadata.get_template_type(&template_name_id)?;
+    let defining_template_type = defining_class_metadata.get_template_type(template_name)?;
     let template_union = TUnion::new(
         defining_template_type
             .iter()
             .map(|(defining_entity, constraint)| {
                 TAtomic::GenericParameter(TGenericParameter {
-                    parameter_name: template_name_id,
+                    parameter_name: *template_name,
                     defining_entity: *defining_entity,
                     constraint: Box::new(constraint.clone()),
                     intersection_types: None,

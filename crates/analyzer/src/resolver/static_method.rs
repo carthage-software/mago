@@ -151,17 +151,16 @@ fn find_static_method_in_class<'a>(
     {
         let mut type_parameters = vec![];
         for (template_name, _) in &defining_class_metadata.template_types {
-            let template_name_str = context.interner.lookup(template_name);
-
             let Some(parameter) = get_specialized_template_type(
                 context.codebase,
                 context.interner,
-                template_name_str,
+                template_name,
                 &defining_class_metadata.name,
                 current_class_metadata,
                 None,
             ) else {
                 let defining_class_str = context.interner.lookup(&defining_class_metadata.original_name);
+                let template_name_str = context.interner.lookup(template_name);
 
                 panic!("Failed to get specialized template type for {template_name_str} in {defining_class_str}");
             };

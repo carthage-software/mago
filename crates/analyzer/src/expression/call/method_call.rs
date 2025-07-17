@@ -147,7 +147,7 @@ pub fn analyze_implicit_method_call<'a>(
         span,
     );
 
-    populate_template_result_from_invocation(&invocation, &mut template_result);
+    populate_template_result_from_invocation(context, &invocation, &mut template_result);
 
     let result = fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &Default::default());
 
@@ -533,6 +533,63 @@ mod tests {
             }
 
             new B()->c();
+        "#},
+    }
+
+    test_analysis! {
+        name = calling_method_on_parent_class,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template TKey of array-key
+             * @template-covariant T
+             */
+            interface ReadableCollection
+            {
+                /**
+                 * @return list<T>
+                 */
+                public function getValues(): array;
+            }
+
+            /**
+             * @template TKey of array-key
+             * @template T
+             *
+             * @template-extends ReadableCollection<TKey, T>
+             */
+            interface Collection extends ReadableCollection
+            {
+            }
+
+            class Filing
+            {
+            }
+
+            class Storage
+            {
+                /**
+                 * @var Collection<string, Filing>
+                 */
+                private $filings;
+
+                /**
+                 * @param Collection<string, Filing> $filings
+                 */
+                public function __construct(Collection $filings)
+                {
+                    $this->filings = $filings;
+                }
+
+                /**
+                 * @return list<Filing>
+                 */
+                public function getFilings(): array
+                {
+                    return $this->filings->getValues();
+                }
+            }
         "#},
     }
 }

@@ -50,7 +50,7 @@ pub(crate) fn is_contained_by(
         let Some(specialized_template_type) = get_specialized_template_type(
             codebase,
             interner,
-            interner.lookup(template_name),
+            template_name,
             &container_metadata.name,
             input_metadata,
             Some(input_type_parameters),

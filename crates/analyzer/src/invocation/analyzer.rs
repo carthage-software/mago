@@ -131,7 +131,7 @@ pub fn analyze_invocation<'a>(
         parameters.get(argument_offset).copied().map(|parameter| (argument_offset, parameter))
     }
 
-    populate_template_result_from_invocation(invocation, template_result);
+    populate_template_result_from_invocation(context, invocation, template_result);
 
     let parameter_refs = invocation.target.get_parameters();
     let mut analyzed_argument_types: HashMap<usize, (TUnion, Span)> = HashMap::default();
@@ -643,34 +643,75 @@ pub fn analyze_invocation<'a>(
 ///
 /// This function assumes that the `TemplateResult` is initially empty and will be populated with
 /// template types and bounds derived from the invocation's target metadata.
-pub fn populate_template_result_from_invocation(invocation: &Invocation<'_>, template_result: &mut TemplateResult) {
-    if let InvocationTarget::FunctionLike { metadata, method_context, .. } = &invocation.target {
-        for (template_name, template_details) in metadata.template_types.iter() {
-            template_result.template_types.insert(*template_name, template_details.clone());
+pub fn populate_template_result_from_invocation(
+    context: &mut Context<'_>,
+    invocation: &Invocation<'_>,
+    template_result: &mut TemplateResult,
+) {
+    let InvocationTarget::FunctionLike { metadata, method_context, .. } = &invocation.target else {
+        return;
+    };
+
+    for (template_name, template_details) in metadata.template_types.iter() {
+        template_result.template_types.insert(*template_name, template_details.clone());
+    }
+
+    let Some(method_metadata) = &metadata.method_metadata else {
+        return;
+    };
+
+    if method_metadata.is_static() {
+        return;
+    }
+
+    let Some(method_context) = method_context else {
+        return;
+    };
+
+    let StaticClassType::Object(TObject::Named(named_object)) = &method_context.class_type else {
+        return;
+    };
+
+    if let Some(type_parameters) = &named_object.type_parameters {
+        for (template_index, template_type) in type_parameters.iter().enumerate() {
+            let Some(template_name) = method_context
+                .class_like_metadata
+                .template_types
+                .iter()
+                .enumerate()
+                .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
+            else {
+                break;
+            };
+
+            template_result.add_lower_bound(
+                template_name,
+                GenericParent::ClassLike(method_context.class_like_metadata.name),
+                template_type.clone(),
+            );
         }
+    }
 
-        if let Some(method_metadata) = &metadata.method_metadata
-            && !method_metadata.is_static()
-            && let Some(method_context) = method_context
-            && let StaticClassType::Object(object_type) = &method_context.class_type
-            && let TObject::Named(named_object) = object_type
-            && let Some(type_parameters) = &named_object.type_parameters
-        {
-            for (template_index, template_type) in type_parameters.iter().enumerate() {
-                let Some(template_name) = method_context
-                    .class_like_metadata
-                    .template_types
-                    .iter()
-                    .enumerate()
-                    .find_map(|(index, (name, _))| if index == template_index { Some(*name) } else { None })
-                else {
-                    break;
-                };
+    if let Some(declaring_method_id) = method_context.declaring_method_id
+        && let Some(declaring_class_like_metadata) =
+            get_class_like(context.codebase, context.interner, declaring_method_id.get_class_name())
+        && declaring_class_like_metadata.name != method_context.class_like_metadata.name
+    {
+        for (template_name, _) in &declaring_class_like_metadata.template_types {
+            let template_type = get_specialized_template_type(
+                context.codebase,
+                context.interner,
+                template_name,
+                &declaring_class_like_metadata.name,
+                method_context.class_like_metadata,
+                named_object.type_parameters.as_deref(),
+            );
 
+            if let Some(template_type) = template_type {
                 template_result.add_lower_bound(
-                    template_name,
-                    GenericParent::ClassLike(method_context.class_like_metadata.name),
-                    template_type.clone(),
+                    *template_name,
+                    GenericParent::ClassLike(declaring_class_like_metadata.name),
+                    template_type,
                 );
             }
         }
@@ -1114,7 +1155,7 @@ fn infer_templates_from_argument_and_parameter_types(
                             if let Some(inferred_bound) = get_specialized_template_type(
                                 context.codebase,
                                 context.interner,
-                                context.interner.lookup(template_name),
+                                template_name,
                                 &parameter_class_metadata.name,
                                 argument_class_metadata,
                                 argument_object.get_type_parameters(),
