@@ -134,7 +134,7 @@ impl std::fmt::Display for CallableTypeReturnType<'_> {
 impl std::fmt::Display for CallableTypeParameter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(parameter_type) = &self.parameter_type {
-            write!(f, "{}", parameter_type)?;
+            write!(f, "{parameter_type}")?;
         }
 
         if self.equals.is_some() {
@@ -144,7 +144,7 @@ impl std::fmt::Display for CallableTypeParameter<'_> {
         }
 
         if let Some(variable) = &self.variable {
-            write!(f, " {}", variable)?;
+            write!(f, " {variable}")?;
         }
 
         Ok(())
