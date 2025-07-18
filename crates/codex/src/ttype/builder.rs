@@ -668,8 +668,11 @@ fn get_callable_from_ast(
 
     if let Some(specification) = &callable.specification {
         for parameter_ast in specification.parameters.entries.iter() {
-            let parameter_type =
-                get_union_from_type_ast(&parameter_ast.parameter_type, scope, type_context, classname, interner)?;
+            let parameter_type = if let Some(parameter_type) = &parameter_ast.parameter_type {
+                get_union_from_type_ast(parameter_type, scope, type_context, classname, interner)?
+            } else {
+                get_mixed()
+            };
 
             parameters.push(TCallableParameter::new(
                 Some(Box::new(parameter_type)),

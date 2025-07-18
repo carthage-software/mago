@@ -534,8 +534,8 @@ mod tests {
                 let spec = c.specification.expect("Expected callable specification");
                 assert!(spec.return_type.is_none());
                 assert_eq!(spec.parameters.entries.len(), 2);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::Int(_)));
-                assert!(matches!(*spec.parameters.entries[1].parameter_type, Type::Nullable(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::Int(_))));
+                assert!(matches!(spec.parameters.entries[1].parameter_type, Some(Type::Nullable(_))));
                 assert!(spec.parameters.entries[0].ellipsis.is_none());
                 assert!(spec.parameters.entries[0].equals.is_none());
             }
@@ -563,7 +563,7 @@ mod tests {
                 assert_eq!(c.kind, CallableTypeKind::PureCallable);
                 let spec = c.specification.expect("Expected callable specification");
                 assert_eq!(spec.parameters.entries.len(), 1);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::Bool(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::Bool(_))));
                 assert!(spec.return_type.is_some());
                 assert!(matches!(*spec.return_type.unwrap().return_type, Type::Int(_)));
             }
@@ -579,7 +579,7 @@ mod tests {
                 assert_eq!(c.keyword.value, "Closure");
                 let spec = c.specification.expect("Expected callable specification");
                 assert_eq!(spec.parameters.entries.len(), 1);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::String(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::String(_))));
                 assert!(spec.return_type.is_some());
                 assert!(matches!(*spec.return_type.unwrap().return_type, Type::Bool(_)));
             }
@@ -597,17 +597,17 @@ mod tests {
                 assert!(spec.return_type.is_some());
 
                 let first_param = &spec.parameters.entries[0];
-                assert!(matches!(*first_param.parameter_type, Type::List(_)));
+                assert!(matches!(first_param.parameter_type, Some(Type::List(_))));
                 assert!(first_param.ellipsis.is_none());
                 assert!(first_param.equals.is_none());
 
                 let second_param = &spec.parameters.entries[1];
-                assert!(matches!(*second_param.parameter_type, Type::Nullable(_)));
+                assert!(matches!(second_param.parameter_type, Some(Type::Nullable(_))));
                 assert!(second_param.ellipsis.is_none());
                 assert!(second_param.equals.is_some());
 
                 let third_param = &spec.parameters.entries[2];
-                assert!(matches!(*third_param.parameter_type, Type::Int(_)));
+                assert!(matches!(third_param.parameter_type, Some(Type::Int(_))));
                 assert!(third_param.ellipsis.is_some());
                 assert!(third_param.equals.is_none());
 
