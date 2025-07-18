@@ -4,6 +4,8 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 
 use ahash::HashSet;
+use mago_codex::get_declaring_class_for_property;
+use mago_codex::get_property;
 use regex::Regex;
 
 use mago_codex::assertion::Assertion;
@@ -824,7 +826,6 @@ fn get_value_for_key(
             base_key = new_base_key;
         } else if divider == "->" || divider == "::$" {
             let property_name = key_parts.pop().unwrap();
-
             let new_base_key = base_key.clone() + "->" + property_name.as_str();
 
             if !block_context.locals.contains_key(&new_base_key) {
@@ -855,18 +856,8 @@ fn get_value_for_key(
                             || !class_or_interface_exists(context.codebase, context.interner, fq_class_name)
                         {
                             class_property_type = get_mixed_any();
-                        } else if property_name.ends_with("()") {
-                            // MAYBE TODO deal with memoisable method call memoisation
-                            panic!();
                         } else {
-                            let maybe_class_property_type =
-                                get_property_type(context, fq_class_name, &context.interner.get(&property_name)?);
-
-                            if let Some(maybe_class_property_type) = maybe_class_property_type {
-                                class_property_type = maybe_class_property_type;
-                            } else {
-                                return None;
-                            }
+                            class_property_type = get_property_type(context, fq_class_name, &property_name)?;
                         }
                     } else {
                         class_property_type = get_mixed_any();
@@ -900,35 +891,35 @@ fn get_value_for_key(
 fn get_property_type(
     context: &ReconcilationContext<'_>,
     classlike_name: &StringIdentifier,
-    property_name: &StringIdentifier,
+    property_name_str: &str,
 ) -> Option<TUnion> {
-    if !context.codebase.property_exists(classlike_name, property_name) {
-        return None;
-    }
+    // Add `$` prefix
+    let prefixed_property_name = "$".to_owned() + property_name_str;
+    let property_name = context.interner.intern(&prefixed_property_name);
 
-    let declaring_property_class = context.codebase.get_declaring_class_for_property(classlike_name, property_name);
+    let declaring_property_class =
+        get_declaring_class_for_property(context.codebase, context.interner, classlike_name, &property_name)?;
+    let property_metadata = get_property(context.codebase, context.interner, classlike_name, &property_name)?;
+    let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
 
-    let declaring_property_class = declaring_property_class?;
-
-    let class_property_type = context.codebase.get_property_type(classlike_name, property_name);
-
-    if let Some(class_property_type) = class_property_type {
-        let mut class_property_type = class_property_type.clone();
-
+    let property_type = if let Some(mut property_type) = property_type {
         expander::expand_union(
             context.codebase,
             context.interner,
-            &mut class_property_type,
+            &mut property_type,
             &TypeExpansionOptions {
-                self_class: Some(declaring_property_class),
-                static_class_type: StaticClassType::Name(*declaring_property_class),
+                self_class: Some(&declaring_property_class),
+                static_class_type: StaticClassType::Name(declaring_property_class),
                 ..Default::default()
             },
         );
-        return Some(class_property_type);
-    }
 
-    Some(get_mixed_any())
+        property_type
+    } else {
+        get_mixed_any()
+    };
+
+    Some(property_type)
 }
 
 pub(crate) fn trigger_issue_for_impossible(
@@ -1176,6 +1167,105 @@ mod tests {
                     i_take_non_empty($str);
                 } else {
                     i_take_non_empty('default value');
+                }
+            }
+        "#}
+    }
+
+    test_analysis! {
+        name = property_lookup,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template Tk
+             * @template Tv
+             * @api
+             */
+            final class AwaitableIteratorQueue
+            {
+                /**
+                 * @var list<array{0: Tk, 1: Awaitable<Tv>}>
+                 */
+                public array $items = [];
+
+                /**
+                 * @var array<string, State<Tv>>
+                 */
+                public array $pending = [];
+            }
+
+            /**
+             * @template Tk
+             * @template Tv
+             * @api
+             */
+            final class AwaitableIterator
+            {
+                /**
+                 * @var AwaitableIteratorQueue<Tk, Tv>
+                 */
+                public readonly AwaitableIteratorQueue $queue;
+
+                public function __construct()
+                {
+                    $this->queue = new AwaitableIteratorQueue();
+                }
+
+                /**
+                 * @return null|array{0: Tk, 1: Awaitable<Tv>}
+                 */
+                public function consume(): null|array
+                {
+                    if ([] === $this->queue->items) {
+                        echo 'No items in the queue.';
+
+                        return null;
+                    }
+
+                    return $this->queue->items[0];
+                }
+            }
+
+            /**
+             * @template T
+             * @api
+             */
+            final class State
+            {
+                public static string $nextId = 'a';
+
+                public bool $complete = false;
+
+                public bool $handled = false;
+
+                /**
+                 * @var array<string, (Closure(?Throwable, ?T, string): void)>
+                 */
+                public array $callbacks = [];
+
+                /**
+                 * @var T|null
+                 */
+                public mixed $result = null;
+
+                public null|Throwable $throwable = null;
+            }
+
+            /**
+             * @template T
+             * @api
+             */
+            final readonly class Awaitable
+            {
+                public State $state;
+
+                /**
+                 * @param State<T> $state
+                 */
+                public function __construct(State $state)
+                {
+                    $this->state = $state;
                 }
             }
         "#}
