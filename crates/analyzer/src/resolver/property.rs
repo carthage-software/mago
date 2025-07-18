@@ -381,7 +381,7 @@ pub fn get_nodes_for_property_access(
     (object_variable_node, property_node)
 }
 
-fn localize_property_type(
+pub fn localize_property_type(
     context: &Context<'_>,
     class_property_type: &TUnion,
     object_type_parameters: &[TUnion],
@@ -404,6 +404,7 @@ fn localize_property_type(
         object_type_parameters,
         property_declaring_class_metadata,
     );
+
     inferred_type_replacer::replace(
         class_property_type,
         &TemplateResult::new(IndexMap::default(), template_types),

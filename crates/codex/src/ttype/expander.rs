@@ -9,7 +9,6 @@ use crate::get_closure;
 use crate::get_declaring_method;
 use crate::get_function;
 use crate::identifier::function_like::FunctionLikeIdentifier;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::ttype::atomic::TAtomic;
@@ -22,12 +21,14 @@ use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
 use crate::ttype::extend_dataflow_uniquely;
+use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -147,21 +148,7 @@ fn expand_atomic(
             }
         },
         TAtomic::Object(TObject::Named(named_object)) => {
-            if named_object.is_this()
-                && let StaticClassType::Object(obj) = &options.static_class_type
-                && let TObject::Named(new_this_object) = &obj
-                && is_instance_of(codebase, interner, &new_this_object.name, &named_object.name)
-            {
-                *skip_key = true;
-                new_return_type_parts.push(TAtomic::Object(obj.clone()));
-                return;
-            }
-
-            if let Some(type_parameters) = named_object.get_type_parameters_mut() {
-                for parameter in type_parameters {
-                    expand_union(codebase, interner, parameter, options);
-                }
-            }
+            expand_named_object(named_object, codebase, interner, options);
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
@@ -409,6 +396,81 @@ fn expand_atomic(
             TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
         },
         _ => {}
+    }
+}
+
+fn expand_named_object(
+    named_object: &mut TNamedObject,
+    codebase: &CodebaseMetadata,
+    interner: &ThreadedInterner,
+    options: &TypeExpansionOptions,
+) {
+    let name_str_lc = interner.lookup(&named_object.name).to_lowercase();
+
+    if named_object.is_this() || name_str_lc == "static" {
+        match &options.static_class_type {
+            StaticClassType::Object(TObject::Named(static_object)) => {
+                let mut new_object = static_object.clone();
+
+                if let Some(original_intersections) = &named_object.intersection_types {
+                    let new_intersections = new_object.intersection_types.get_or_insert_with(Vec::new);
+                    new_intersections.extend(original_intersections.iter().cloned());
+                }
+
+                if new_object.type_parameters.is_none() {
+                    new_object.type_parameters = named_object.type_parameters.clone();
+                }
+
+                *named_object = new_object;
+                named_object.is_this = false;
+            }
+            StaticClassType::Name(static_class_name) => {
+                named_object.name = *static_class_name;
+                named_object.is_this = options.function_is_final;
+            }
+            _ => {}
+        }
+    } else if name_str_lc == "self" {
+        if let Some(self_class_name) = options.self_class {
+            named_object.name = *self_class_name;
+        }
+    } else if name_str_lc == "parent"
+        && let Some(self_class_name) = options.self_class
+        && let Some(class_metadata) = get_class_like(codebase, interner, self_class_name)
+        && let Some(parent_name) = class_metadata.direct_parent_class
+    {
+        named_object.name = parent_name;
+    }
+
+    if named_object.type_parameters.is_none()
+        && let Some(class_like_metadata) = get_class_like(codebase, interner, &named_object.name)
+        && !class_like_metadata.template_types.is_empty()
+    {
+        let default_params: Vec<TUnion> = class_like_metadata
+            .template_types
+            .iter()
+            .map(|(_, template_map)| template_map.iter().map(|(_, t)| t).next().cloned().unwrap_or_else(get_mixed))
+            .collect();
+
+        if !default_params.is_empty() {
+            named_object.type_parameters = Some(default_params);
+        }
+    }
+
+    if let Some(type_parameters) = &mut named_object.type_parameters {
+        for parameter in type_parameters {
+            expand_union(codebase, interner, parameter, options);
+        }
+    }
+
+    if let Some(intersection_types) = &mut named_object.intersection_types {
+        for atomic_intersection in intersection_types {
+            let mut union = TUnion::new(vec![atomic_intersection.clone()]);
+            expand_union(codebase, interner, &mut union, options);
+            if let Some(expanded_atomic) = union.types.into_iter().next() {
+                *atomic_intersection = expanded_atomic;
+            }
+        }
     }
 }
 

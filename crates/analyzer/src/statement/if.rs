@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 use ahash::HashSet;
-
 use itertools::Itertools;
+
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::find_satisfying_assignments;
