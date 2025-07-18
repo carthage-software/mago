@@ -69,7 +69,8 @@ pub fn analyze<'a>(
     )?;
     block_context.inside_assignment = was_inside_assignment;
 
-    let mut resulting_expression_type = None;
+    let mut resolved_property_type = None;
+    let mut matched_all_properties = true;
     for resolved_property in resolution_result.properties {
         if let GraphKind::WholeProgram = artifacts.data_flow_graph.kind {
             add_instance_property_dataflow(
@@ -199,36 +200,36 @@ pub fn analyze<'a>(
             }
         }
 
-        resulting_expression_type = Some(add_optional_union_type(
+        resolved_property_type = Some(add_optional_union_type(
             resolved_property.property_type,
-            resulting_expression_type.as_ref(),
+            resolved_property_type.as_ref(),
             context.codebase,
             context.interner,
         ));
+
+        matched_all_properties &= type_match_found;
     }
+
+    let mut resulting_type = if matched_all_properties && context.settings.memoize_properties {
+        Some(assigned_value_type.clone())
+    } else {
+        resolved_property_type
+    };
 
     if resolution_result.has_ambiguous_path
         || resolution_result.encountered_mixed
         || resolution_result.has_possibly_defined_property
     {
-        resulting_expression_type = Some(add_optional_union_type(
-            get_mixed_any(),
-            resulting_expression_type.as_ref(),
-            context.codebase,
-            context.interner,
-        ));
+        resulting_type =
+            Some(add_optional_union_type(get_mixed_any(), resulting_type.as_ref(), context.codebase, context.interner));
     }
 
     if resolution_result.has_error_path || resolution_result.has_invalid_path || resolution_result.encountered_null {
-        resulting_expression_type = Some(add_optional_union_type(
-            get_never(),
-            resulting_expression_type.as_ref(),
-            context.codebase,
-            context.interner,
-        ));
+        resulting_type =
+            Some(add_optional_union_type(get_never(), resulting_type.as_ref(), context.codebase, context.interner));
     }
 
-    let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
+    let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
     if context.settings.memoize_properties
         && let Some(property_access_id) = property_access_id
@@ -357,5 +358,37 @@ pub(crate) fn add_unspecialized_property_assignment_dataflow(
         );
 
         artifacts.data_flow_graph.add_node(declaring_property_node);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = memoized_property_assignment,
+        code = indoc! {r#"
+            <?php
+
+            class A {
+                /** @var int<0, max> */
+                private int $a = 0;
+
+                public function work(): void {
+                    $this->a++;
+                    $this->a--;
+                    $this->a += 5;
+                    $this->a -= 2;
+                    $this->a *= 2;
+                    $this->a %= 2;
+                    $this->a = 1;
+                    $this->a = 0;
+                    ++$this->a;
+                    --$this->a;
+                }
+            }
+        "#}
     }
 }
