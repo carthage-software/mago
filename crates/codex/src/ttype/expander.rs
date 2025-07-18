@@ -78,7 +78,6 @@ pub fn expand_union(
     return_type.types = combiner::combine(previous_types, codebase, interner, false);
 
     let mut new_return_type_parts = vec![];
-
     let mut skipped_keys = vec![];
 
     for (i, return_type_part) in return_type.types.iter_mut().enumerate() {
@@ -454,22 +453,6 @@ fn expand_named_object(
 
         if !default_params.is_empty() {
             named_object.type_parameters = Some(default_params);
-        }
-    }
-
-    if let Some(type_parameters) = &mut named_object.type_parameters {
-        for parameter in type_parameters {
-            expand_union(codebase, interner, parameter, options);
-        }
-    }
-
-    if let Some(intersection_types) = &mut named_object.intersection_types {
-        for atomic_intersection in intersection_types {
-            let mut union = TUnion::new(vec![atomic_intersection.clone()]);
-            expand_union(codebase, interner, &mut union, options);
-            if let Some(expanded_atomic) = union.types.into_iter().next() {
-                *atomic_intersection = expanded_atomic;
-            }
         }
     }
 }
