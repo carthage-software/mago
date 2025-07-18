@@ -166,7 +166,6 @@ impl MutWalker<Context<'_>> for Scanner {
         });
 
         self.codebase.function_likes.insert(identifier, metadata);
-        self.codebase.closure_files.entry(span.start.source).or_default().insert(closure_ref);
     }
 
     #[inline]
@@ -200,7 +199,6 @@ impl MutWalker<Context<'_>> for Scanner {
             constraints
         });
         self.codebase.function_likes.insert(identifer, metadata);
-        self.codebase.closure_files.entry(span.start.source).or_default().insert(closure_ref);
     }
 
     #[inline]

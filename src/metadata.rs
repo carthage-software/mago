@@ -40,15 +40,17 @@ pub async fn compile_codebase_for_sources(
 
         compilation_tasks.push(tokio::spawn(async move {
             let source_file = manager_clone.load(&source_id)?;
+            let source_metadata = extract_metadata_from_source(&source_file, &interner_clone);
             progress_bar_clone.inc(1);
-            Ok(extract_metadata_from_source(&source_file, &interner_clone))
+
+            Ok(source_metadata)
         }));
     }
 
     for task_handle in compilation_tasks {
-        let source_codebase_metadata = task_handle.await??;
+        let source_metadata = task_handle.await??;
 
-        compiled_codebase.extend(source_codebase_metadata);
+        compiled_codebase.extend(source_metadata);
     }
 
     remove_progress_bar(progress_bar);

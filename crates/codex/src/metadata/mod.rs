@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use ahash::HashMap;
 use ahash::HashSet;
 use serde::Deserialize;
@@ -6,7 +8,6 @@ use serde::Serialize;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_reporting::IssueCollection;
-use mago_source::SourceIdentifier;
 
 use crate::get_closure;
 use crate::get_function;
@@ -54,10 +55,6 @@ pub struct CodebaseMetadata {
     pub symbols: Symbols,
     /// Map from global constant FQN (`StringIdentifier`) to its metadata (`ConstantMetadata`).
     pub constants: HashMap<StringIdentifier, ConstantMetadata>,
-    /// Map from source file identifier to the set of closure names/identifiers defined within that file.
-    pub closure_files: HashMap<SourceIdentifier, HashSet<StringIdentifier>>,
-    /// Map from source file identifier to the set of global constant names defined within that file.
-    pub constant_files: HashMap<SourceIdentifier, HashSet<StringIdentifier>>,
     /// Map from class/interface FQCN to the set of all its descendants (recursive).
     pub all_class_like_descendants: HashMap<StringIdentifier, HashSet<StringIdentifier>>,
     /// Map from class/interface FQCN to the set of its direct descendants (children).
@@ -257,27 +254,80 @@ impl CodebaseMetadata {
             self.aliases.entry(k).or_insert(v);
         }
 
+        // Merge class-likes with priority
         for (k, v) in other.class_likes {
-            self.class_likes.entry(k).or_insert(v);
+            let metadata_to_keep = match self.class_likes.entry(k) {
+                Entry::Occupied(entry) => {
+                    let existing_metadata = entry.remove();
+                    let existing_category = existing_metadata.span.start.source.category();
+                    let new_category = v.span.start.source.category();
+
+                    if new_category.is_user_defined() {
+                        v
+                    } else if existing_category.is_user_defined() {
+                        existing_metadata
+                    } else if new_category.is_built_in() {
+                        v
+                    } else if existing_category.is_built_in() {
+                        existing_metadata
+                    } else {
+                        v
+                    }
+                }
+                Entry::Vacant(_) => v,
+            };
+            self.class_likes.insert(k, metadata_to_keep);
         }
 
         for (k, v) in other.function_likes {
-            self.function_likes.entry(k).or_insert(v);
+            let metadata_to_keep = match self.function_likes.entry(k) {
+                Entry::Occupied(entry) => {
+                    let existing_metadata = entry.remove();
+                    let existing_category = existing_metadata.span.start.source.category();
+                    let new_category = v.span.start.source.category();
+
+                    if new_category.is_user_defined() {
+                        v
+                    } else if existing_category.is_user_defined() {
+                        existing_metadata
+                    } else if new_category.is_built_in() {
+                        v
+                    } else if existing_category.is_built_in() {
+                        existing_metadata
+                    } else {
+                        v
+                    }
+                }
+                Entry::Vacant(_) => v,
+            };
+            self.function_likes.insert(k, metadata_to_keep);
         }
 
         for (k, v) in other.constants {
-            self.constants.entry(k).or_insert(v);
+            let metadata_to_keep = match self.constants.entry(k) {
+                Entry::Occupied(entry) => {
+                    let existing_metadata = entry.remove();
+                    let existing_category = existing_metadata.span.start.source.category();
+                    let new_category = v.span.start.source.category();
+
+                    if new_category.is_user_defined() {
+                        v
+                    } else if existing_category.is_user_defined() {
+                        existing_metadata
+                    } else if new_category.is_built_in() {
+                        v
+                    } else if existing_category.is_built_in() {
+                        existing_metadata
+                    } else {
+                        v
+                    }
+                }
+                Entry::Vacant(_) => v,
+            };
+            self.constants.insert(k, metadata_to_keep);
         }
 
         self.symbols.extend(other.symbols);
-
-        for (k, v) in other.closure_files {
-            self.closure_files.entry(k).or_default().extend(v);
-        }
-
-        for (k, v) in other.constant_files {
-            self.constant_files.entry(k).or_default().extend(v);
-        }
 
         for (k, v) in other.all_class_like_descendants {
             self.all_class_like_descendants.entry(k).or_default().extend(v);
@@ -334,8 +384,6 @@ impl Default for CodebaseMetadata {
             symbols: Symbols::new(),
             infer_types_from_usage: false,
             constants: HashMap::default(),
-            closure_files: HashMap::default(),
-            constant_files: HashMap::default(),
             all_class_like_descendants: HashMap::default(),
             direct_classlike_descendants: HashMap::default(),
             safe_symbols: HashSet::default(),
