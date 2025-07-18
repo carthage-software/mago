@@ -682,6 +682,11 @@ fn get_callable_from_ast(
         if let Some(ret) = specification.return_type.as_ref() {
             return_type = Some(get_union_from_type_ast(&ret.return_type, scope, type_context, classname, interner)?);
         }
+    } else {
+        // `callable` without a specification should be treated the same as
+        // `callable(mixed...): mixed`
+        parameters.push(TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false));
+        return_type = Some(get_mixed());
     }
 
     Ok(TAtomic::Callable(TCallable::Signature(
@@ -707,6 +712,15 @@ fn get_reference_from_ast<'i>(
 
         return Ok(TAtomic::Object(TObject::Named(
             TNamedObject::new(class_name).with_is_this(reference_name != "self"),
+        )));
+    }
+
+    // `Closure` -> `Closure(mixed...): mixed`
+    if reference_name.eq_ignore_ascii_case("Closure") {
+        return Ok(TAtomic::Callable(TCallable::Signature(
+            TCallableSignature::new(false, true)
+                .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false)])
+                .with_return_type(Some(Box::new(get_mixed()))),
         )));
     }
 
