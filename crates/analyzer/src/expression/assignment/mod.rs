@@ -187,25 +187,25 @@ pub fn analyze_assignment<'a>(
                 && let Some(assignment_span) = assignment_span
             {
                 context.buffer.report(
-                                        TypingIssueKind::CloneInsideLoop,
-                                        Issue::warning(format!(
-                                            "Cloning variable `{target_variable_id}` onto itself inside a loop might not have the intended effect."
-                                        ))
-                                        .with_annotation(
-                                            Annotation::primary(assignment_span).with_message("Cloning onto self within loop")
-                                        )
-                                        .with_note(
-                                            "This pattern overwrites the variable with a fresh clone on each loop iteration."
-                                        )
-                                        .with_note(
-                                            "If the intent was to modify a copy of the variable defined *outside* the loop, the clone should happen *before* the loop starts."
-                                        )
-                                        .with_help(
-                                            format!(
-                                                "Consider cloning `{target_variable_id}` before the loop if you need a copy, or revise the loop logic if cloning onto itself is not the desired behavior."
-                                            )
-                                        ),
-                                    );
+                    TypingIssueKind::CloneInsideLoop,
+                    Issue::warning(format!(
+                        "Cloning variable `{target_variable_id}` onto itself inside a loop might not have the intended effect."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(assignment_span).with_message("Cloning onto self within loop")
+                    )
+                    .with_note(
+                        "This pattern overwrites the variable with a fresh clone on each loop iteration."
+                    )
+                    .with_note(
+                        "If the intent was to modify a copy of the variable defined *outside* the loop, the clone should happen *before* the loop starts."
+                    )
+                    .with_help(
+                        format!(
+                            "Consider cloning `{target_variable_id}` before the loop if you need a copy, or revise the loop logic if cloning onto itself is not the desired behavior."
+                        )
+                    ),
+                );
             }
         }
 
@@ -381,16 +381,14 @@ pub(crate) fn assign_to_expression<'a>(
             &source_type,
             source_expression.map(|e| e.span()),
         )?,
-        Expression::Access(Access::StaticProperty(StaticPropertyAccess { class, property, .. })) => {
-            static_property_assignment::analyze(
-                context,
-                block_context,
-                artifacts,
-                (class, property),
-                &source_type,
-                &target_expression_id,
-            )?
-        }
+        Expression::Access(Access::StaticProperty(property_access)) => static_property_assignment::analyze(
+            context,
+            block_context,
+            artifacts,
+            property_access,
+            &source_type,
+            &target_expression_id,
+        )?,
         Expression::ArrayAccess(array_access) => {
             array_assignment::analyze(context, block_context, artifacts, array_access.into(), source_type)?;
         }

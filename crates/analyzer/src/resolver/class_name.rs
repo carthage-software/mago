@@ -92,6 +92,13 @@ impl ResolvedClassname {
         matches!(self.origin, ResolutionOrigin::Mixed | ResolutionOrigin::Any | ResolutionOrigin::Invalid)
     }
 
+    /// Checks if the class name is resolved from `mixed` or `any` type,
+    /// which means it could potentially be any class name.
+    #[inline]
+    pub const fn is_from_mixed(&self) -> bool {
+        matches!(self.origin, ResolutionOrigin::Mixed | ResolutionOrigin::Any)
+    }
+
     /// Checks if the class name is resolved from the `static` keyword.
     pub const fn is_static(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Static { .. })

@@ -99,6 +99,17 @@ pub fn get_expression_id(
     interner: &ThreadedInterner,
     codebase: Option<&CodebaseMetadata>,
 ) -> Option<String> {
+    get_extended_expression_id(expression, this_class_name, resolved_names, interner, codebase, false)
+}
+
+fn get_extended_expression_id(
+    expression: &Expression,
+    this_class_name: Option<&StringIdentifier>,
+    resolved_names: &ResolvedNames,
+    interner: &ThreadedInterner,
+    codebase: Option<&CodebaseMetadata>,
+    solve_identifiers: bool,
+) -> Option<String> {
     let expression = unwrap_expression(expression);
 
     if let Expression::Assignment(assignment) = expression {
@@ -129,26 +140,22 @@ pub fn get_expression_id(
                 interner,
                 codebase,
             )?,
-            Access::StaticProperty(static_property_access) => {
-                let class = get_expression_id(
-                    &static_property_access.class,
-                    this_class_name,
-                    resolved_names,
-                    interner,
-                    codebase,
-                )?;
-
-                let property = get_variable_id(&static_property_access.property, interner)?;
-
-                format!("{class}::{property}")
-            }
+            Access::StaticProperty(static_property_access) => get_static_property_access_expression_id(
+                &static_property_access.class,
+                &static_property_access.property,
+                this_class_name,
+                resolved_names,
+                interner,
+                codebase,
+            )?,
             Access::ClassConstant(class_constant_access) => {
-                let class = get_expression_id(
+                let class = get_extended_expression_id(
                     &class_constant_access.class,
                     this_class_name,
                     resolved_names,
                     interner,
                     codebase,
+                    true,
                 )?;
 
                 let constant = get_constant_selector_id(
@@ -180,6 +187,32 @@ pub fn get_expression_id(
             Literal::Null(_) => "null".to_string(),
             _ => return None,
         },
+        Expression::Self_(_) => {
+            if let Some(class_name) = this_class_name {
+                interner.lookup(class_name).to_string()
+            } else {
+                "self".to_string()
+            }
+        }
+        Expression::Parent(_) if solve_identifiers => {
+            if let Some(class_name) = this_class_name {
+                interner.lookup(class_name).to_string()
+            } else {
+                "parent".to_string()
+            }
+        }
+        Expression::Static(_) if solve_identifiers => {
+            if let Some(class_name) = this_class_name {
+                interner.lookup(class_name).to_string()
+            } else {
+                "static".to_string()
+            }
+        }
+        Expression::Identifier(identifier) if solve_identifiers => {
+            let identifier_id = resolved_names.get(&identifier);
+
+            interner.lookup(identifier_id).to_string()
+        }
         _ => return None,
     })
 }
@@ -197,6 +230,20 @@ pub fn get_property_access_expression_id(
     let property = get_member_selector_id(selector, this_class_name, resolved_names, interner, codebase)?;
 
     Some(if is_null_safe { format!("{object}?->{property}") } else { format!("{object}->{property}") })
+}
+
+pub fn get_static_property_access_expression_id(
+    class_expr: &Expression,
+    property: &Variable,
+    this_class_name: Option<&StringIdentifier>,
+    resolved_names: &ResolvedNames,
+    interner: &ThreadedInterner,
+    codebase: Option<&CodebaseMetadata>,
+) -> Option<String> {
+    let class = get_extended_expression_id(class_expr, this_class_name, resolved_names, interner, codebase, true)?;
+    let property = get_variable_id(property, interner)?;
+
+    Some(format!("{class}::{property}"))
 }
 
 #[inline]

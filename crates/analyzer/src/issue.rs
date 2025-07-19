@@ -258,6 +258,7 @@ pub(crate) enum TypingIssueKind {
     MixedPropertyAccess,
     InvalidPropertyAccess,
     AmbiguousObjectPropertyAccess,
+    InvalidStaticPropertyAccess,
     RedundantNullsafeOperator,
     AmbiguousObjectMethodAccess,
     DisallowedInclude,
