@@ -23,6 +23,7 @@ use crate::scanner::attribute::get_attribute_flags;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::class_like_constant::scan_class_like_constants;
 use crate::scanner::docblock::ClassLikeDocblockComment;
+use crate::scanner::docblock::TraitUseDocblockComment;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::function_like::scan_method;
 use crate::scanner::property::scan_promoted_property;
@@ -938,6 +939,159 @@ fn scan_class_like(
                             }
                         }
                     }
+                }
+
+                let docblock = match TraitUseDocblockComment::create(context, trait_use) {
+                    Ok(docblock) => docblock,
+                    Err(parse_error) => {
+                        class_like_metadata.issues.push(
+                            Issue::error("Failed to parse trait use docblock comment.")
+                                .with_code(ScanningIssueKind::MalformedDocblockComment)
+                                .with_annotation(
+                                    Annotation::primary(parse_error.span()).with_message(parse_error.to_string()),
+                                )
+                                .with_note(parse_error.note())
+                                .with_help(parse_error.help()),
+                        );
+
+                        continue;
+                    }
+                };
+
+                let Some(docblock) = docblock else {
+                    continue;
+                };
+
+                for template_use in docblock.template_use {
+                    let template_use_type = match builder::get_type_from_string(
+                        &template_use.value,
+                        template_use.span,
+                        scope,
+                        &type_context,
+                        Some(&name),
+                        context.interner,
+                    ) {
+                        Ok(template_use_type) => template_use_type,
+                        Err(typing_error) => {
+                            class_like_metadata.issues.push(
+                                Issue::error("Could not resolve the trait type in the `@use` tag.")
+                                    .with_code(ScanningIssueKind::InvalidUseTag)
+                                    .with_annotation(
+                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                    )
+                                    .with_note(typing_error.note())
+                                    .with_help(typing_error.help()),
+                            );
+
+                            continue;
+                        }
+                    };
+
+                    if !template_use_type.is_single() {
+                        class_like_metadata.issues.push(
+                            Issue::error("The `@use` tag expects a single trait type.")
+                                .with_code(ScanningIssueKind::InvalidUseTag)
+                                .with_annotation(
+                                    Annotation::primary(template_use.span)
+                                        .with_message("Union types are not allowed here."),
+                                )
+                                .with_note("The `@use` tag provides concrete types for generics from a trait.")
+                                .with_help("Provide a single trait type, e.g., `@use MyTrait<string>`."),
+                        );
+
+                        continue;
+                    }
+
+                    let (trait_name, trait_parameters) = match template_use_type.get_single_owned() {
+                        TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types: None }) => {
+                            (name, parameters)
+                        }
+                        _ => {
+                            class_like_metadata.issues.push(
+                                Issue::error("The `@use` tag expects a single trait type.")
+                                    .with_code(ScanningIssueKind::InvalidUseTag)
+                                    .with_annotation(Annotation::primary(template_use.span).with_message(
+                                        "This must be a trait name, not a primitive or other complex type.",
+                                    ))
+                                    .with_note("The `@use` tag provides concrete types for generics from a trait.")
+                                    .with_help("Provide the single trait type, e.g., `@use MyTrait<string>`."),
+                            );
+
+                            continue;
+                        }
+                    };
+
+                    let lowered_trait_name = context.interner.lowered(&trait_name);
+                    if !class_like_metadata.used_traits.contains(&lowered_trait_name) {
+                        let trait_name_str = context.interner.lookup(&trait_name);
+
+                        class_like_metadata.issues.push(
+                            Issue::error("The `@use` tag must refer to a trait that is used.")
+                                .with_code(ScanningIssueKind::InvalidUseTag)
+                                .with_annotation(
+                                    Annotation::primary(template_use.span).with_message(format!(
+                                        "The trait `{trait_name_str}` is not used in this class.",
+                                    )),
+                                )
+                                .with_note("The `@use` tag is used to provide type information for the trait that is used in this class.")
+                                .with_help(format!(
+                                    "Ensure this class's definition includes `use {trait_name_str};`.",
+                                )),
+                        );
+
+                        continue;
+                    }
+
+                    match trait_parameters.filter(|parameters| !parameters.is_empty()) {
+                        Some(trait_parameters) => {
+                            let parameters_count = trait_parameters.len();
+
+                            class_like_metadata.template_type_uses_count.insert(lowered_trait_name, parameters_count);
+                            class_like_metadata.template_extended_offsets.insert(lowered_trait_name, trait_parameters);
+                        }
+                        // The `@use` tag is redundant if no parameters are provided.
+                        None => {
+                            class_like_metadata.issues.push(
+                                Issue::error("The `@use` tag must specify type parameters.")
+                                    .with_code(ScanningIssueKind::InvalidUseTag)
+                                    .with_annotation(
+                                        Annotation::primary(template_use.span).with_message(
+                                            "This tag must provide type parameters for the trait.",
+                                        ),
+                                    )
+                                    .with_note("The `@use` tag is used to provide type information for the trait that is used in this class.")
+                                    .with_help("Provide type parameters, e.g., `@use MyTrait<string>`."),
+                            );
+
+                            continue;
+                        }
+                    }
+                }
+
+                for template_implements in docblock.template_implements {
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@implements` tag is not allowed in trait use.")
+                            .with_code(ScanningIssueKind::InvalidUseTag)
+                            .with_annotation(
+                                Annotation::primary(template_implements.span)
+                                    .with_message("Use `@use` for traits, not `@implements`."),
+                            )
+                            .with_note("The `@implements` tag is used for interface, not traits.")
+                            .with_help("Use `@use` to provide type information for traits."),
+                    );
+                }
+
+                for template_extends in docblock.template_extends {
+                    class_like_metadata.issues.push(
+                        Issue::error("The `@extends` tag is not allowed in trait use.")
+                            .with_code(ScanningIssueKind::InvalidUseTag)
+                            .with_annotation(
+                                Annotation::primary(template_extends.span)
+                                    .with_message("Use `@use` for traits, not `@extends`."),
+                            )
+                            .with_note("The `@extends` tag is used for classes and interfaces, not traits.")
+                            .with_help("Use `@use` to provide type information for traits."),
+                    );
                 }
             }
             ClassLikeMember::Property(property) => {

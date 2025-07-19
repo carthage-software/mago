@@ -79,6 +79,13 @@ pub struct ConstantDocblockComment {
     pub is_final: bool,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct TraitUseDocblockComment {
+    pub template_extends: Vec<TypeString>,
+    pub template_implements: Vec<TypeString>,
+    pub template_use: Vec<TypeString>,
+}
+
 impl ClassLikeDocblockComment {
     pub fn create(
         context: &Context<'_>,
@@ -148,10 +155,11 @@ impl ClassLikeDocblockComment {
                     has_sealed_methods = Some(false);
                 }
                 TagKind::Inheritors | TagKind::PsalmInheritors => {
-                    if let Some(inheritors_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
-                        inheritors = Some(inheritors_tag.0);
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((inheritors_tag, _)) = split_tag_content(description_str, description_span) {
+                        inheritors = Some(inheritors_tag);
                     }
                 }
                 TagKind::PhpstanTemplate
@@ -160,12 +168,10 @@ impl ClassLikeDocblockComment {
                 | TagKind::TemplateInvariant
                 | TagKind::PhpstanTemplateInvariant
                 | TagKind::PsalmTemplateInvariant => {
-                    if let Some(template) = parse_template_tag(
-                        context.interner.lookup(&tag.description),
-                        tag.description_span,
-                        false,
-                        false,
-                    ) {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some(template) = parse_template_tag(description_str, description_span, false, false) {
                         scope.add(NameKind::Default, &template.name, None as Option<&str>);
 
                         templates.push(template);
@@ -174,34 +180,40 @@ impl ClassLikeDocblockComment {
                 TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant
                 | TagKind::TemplateContravariant => {
-                    if let Some(template) =
-                        parse_template_tag(context.interner.lookup(&tag.description), tag.description_span, false, true)
-                    {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some(template) = parse_template_tag(description_str, description_span, false, true) {
                         scope.add(NameKind::Default, &template.name, None as Option<&str>);
 
                         templates.push(template);
                     }
                 }
                 TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant | TagKind::TemplateCovariant => {
-                    if let Some(template) =
-                        parse_template_tag(context.interner.lookup(&tag.description), tag.description_span, true, false)
-                    {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some(template) = parse_template_tag(description_str, description_span, true, false) {
                         scope.add(NameKind::Default, &template.name, None as Option<&str>);
 
                         templates.push(template);
                     }
                 }
                 TagKind::TemplateExtends | TagKind::Extends => {
-                    template_extends.push(TypeString {
-                        value: context.interner.lookup(&tag.description).to_string(),
-                        span: tag.description_span,
-                    });
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
+                        template_extends.push(extended_type);
+                    }
                 }
                 TagKind::TemplateImplements | TagKind::Implements => {
-                    template_implements.push(TypeString {
-                        value: context.interner.lookup(&tag.description).to_string(),
-                        span: tag.description_span,
-                    });
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
+                        template_implements.push(implemented_type);
+                    }
                 }
                 TagKind::PhpstanImmutable | TagKind::PsalmImmutable | TagKind::Immutable => {
                     is_immutable = true;
@@ -590,5 +602,58 @@ impl ConstantDocblockComment {
         }
 
         Ok(Some(ConstantDocblockComment { span: docblock.span, is_deprecated, is_internal, is_final, type_string }))
+    }
+}
+
+impl TraitUseDocblockComment {
+    pub fn create(
+        context: &Context<'_>,
+        trait_use: impl HasSpan,
+    ) -> Result<Option<TraitUseDocblockComment>, ParseError> {
+        let Some(docblock) = context.get_docblock(trait_use) else {
+            return Ok(None);
+        };
+
+        let mut template_extends = Vec::new();
+        let mut template_implements = Vec::new();
+        let mut template_use = Vec::new();
+
+        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+
+        for element in parsed_docblock.elements {
+            let Element::Tag(tag) = element else {
+                continue;
+            };
+
+            match tag.kind {
+                TagKind::TemplateExtends | TagKind::Extends => {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
+                        template_extends.push(extended_type);
+                    }
+                }
+                TagKind::TemplateImplements | TagKind::Implements => {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
+                        template_implements.push(implemented_type);
+                    }
+                }
+                TagKind::Use | TagKind::TemplateUse => {
+                    let description_str = context.interner.lookup(&tag.description);
+                    let description_span = tag.description_span;
+
+                    if let Some((used_type, _)) = split_tag_content(description_str, description_span) {
+                        template_use.push(used_type);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Some(TraitUseDocblockComment { template_extends, template_implements, template_use }))
     }
 }
