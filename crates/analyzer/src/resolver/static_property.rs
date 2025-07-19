@@ -162,10 +162,10 @@ fn find_static_property_in_class<'a>(
 
         context.buffer.report(
             TypingIssueKind::InvalidStaticPropertyAccess,
-            Issue::error(format!("Cannot access instance property `{}::{}` statically.", class_name_str, prop_name_str))
+            Issue::error(format!("Cannot access instance property `{class_name_str}::{prop_name_str}` statically."))
                 .with_annotation(Annotation::primary(variable.span()).with_message("This is an instance property"))
                 .with_note("Static properties are declared with the `static` keyword and accessed with `::` on a class name, not an instance.")
-                .with_help(format!("To access this property, you need an instance of the class (e.g., `$instance->{}`), or declare the property as `static`.", prop_name_str)),
+                .with_help(format!("To access this property, you need an instance of the class (e.g., `$instance->{prop_name_str}`), or declare the property as `static`.")),
         );
 
         result.has_error_path = true;
