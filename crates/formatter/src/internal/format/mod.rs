@@ -96,8 +96,15 @@ impl<'a> Format<'a> for Statement {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
         wrap!(f, self, Statement, {
             match self {
-                Statement::OpeningTag(t) => t.format(f),
-                Statement::ClosingTag(t) => t.format(f),
+                Statement::OpeningTag(t) => {
+                    f.in_echo_tag = matches!(t, OpeningTag::Echo(_));
+                    t.format(f)
+                }
+                Statement::ClosingTag(t) => {
+                    let tag = t.format(f);
+                    f.in_echo_tag = false;
+                    tag
+                }
                 Statement::Inline(i) => i.format(f),
                 Statement::Namespace(n) => n.format(f),
                 Statement::Use(u) => u.format(f),
@@ -171,6 +178,7 @@ impl<'a> Format<'a> for ClosingTag {
 
         wrap!(f, self, ClosingTag, {
             if f.settings.remove_trailing_close_tag
+                && !f.in_echo_tag
                 && f.skip_spaces_and_new_lines(Some(self.span.end.offset), false).is_none()
             {
                 f.scripting_mode = true;
