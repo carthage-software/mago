@@ -31,7 +31,6 @@ use crate::scanner::property::scan_properties;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
-use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::builder;
@@ -627,8 +626,8 @@ fn scan_class_like(
             }
 
             let (required_name, required_params) = match required_union.get_single_owned() {
-                TAtomic::Object(TObject::Named(named_object)) => {
-                    if named_object.is_intersection() {
+                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types }) => {
+                    if intersection_types.is_some() {
                         class_like_metadata.issues.push(
                             Issue::error("The `@require-extends` tag expects a single class name.")
                                 .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
@@ -643,7 +642,7 @@ fn scan_class_like(
                         continue;
                     }
 
-                    (named_object.name, named_object.type_parameters)
+                    (name, parameters)
                 }
                 _ => {
                     class_like_metadata.issues.push(
@@ -708,8 +707,8 @@ fn scan_class_like(
             }
 
             let (required_name, required_parameters) = match required_union.get_single_owned() {
-                TAtomic::Object(TObject::Named(named_object)) => {
-                    if named_object.is_intersection() {
+                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types }) => {
+                    if intersection_types.is_some() {
                         class_like_metadata.issues.push(
                             Issue::error("The `@require-implements` tag expects a single interface name.")
                                 .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
@@ -724,7 +723,7 @@ fn scan_class_like(
                         continue;
                     }
 
-                    (named_object.name, named_object.type_parameters)
+                    (name, parameters)
                 }
                 _ => {
                     class_like_metadata.issues.push(

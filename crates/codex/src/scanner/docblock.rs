@@ -233,13 +233,13 @@ impl ClassLikeDocblockComment {
                 TagKind::PsalmAllowPrivateMutation => {
                     allows_private_mutation = true;
                 }
-                TagKind::PhpstanRequireExtends | TagKind::PsalmRequireExtends => {
+                TagKind::RequireExtends | TagKind::PhpstanRequireExtends | TagKind::PsalmRequireExtends => {
                     require_extends.push(TypeString {
                         value: context.interner.lookup(&tag.description).to_string(),
                         span: tag.description_span,
                     });
                 }
-                TagKind::PhpstanRequireImplements | TagKind::PsalmRequireImplements => {
+                TagKind::RequireImplements | TagKind::PhpstanRequireImplements | TagKind::PsalmRequireImplements => {
                     require_implements.push(TypeString {
                         value: context.interner.lookup(&tag.description).to_string(),
                         span: tag.description_span,

@@ -8,6 +8,8 @@ use mago_syntax::ast::Identifier;
 use crate::metadata::ttype::TypeMetadata;
 use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
@@ -139,8 +141,12 @@ fn get_union_from_identifier_hint<'ast>(identifier: &'ast Identifier, context: &
 
     if name_str.eq_ignore_ascii_case("Generator") {
         return wrap_atomic(TAtomic::Object(TObject::Named(
-            TNamedObject::new(*name).with_type_parameters(Some(vec![get_arraykey(), get_mixed_any(), get_mixed_any()])),
+            TNamedObject::new(*name).with_type_parameters(Some(vec![get_mixed(), get_mixed(), get_mixed()])),
         )));
+    }
+
+    if name_str.eq_ignore_ascii_case("Closure") {
+        return wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(true))));
     }
 
     wrap_atomic(TAtomic::Reference(TReference::Symbol { name: *name, parameters: None, intersection_types: None }))

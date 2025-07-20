@@ -13,7 +13,6 @@ use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
-use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::mixed::TMixed;
@@ -429,20 +428,12 @@ pub fn get_mixed_keyed_array() -> TUnion {
 
 #[inline]
 pub fn get_mixed_callable() -> TUnion {
-    wrap_atomic(TAtomic::Callable(TCallable::Signature(
-        TCallableSignature::new(false, false)
-            .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, true)])
-            .with_return_type(Some(Box::new(get_mixed()))),
-    )))
+    wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(false))))
 }
 
 #[inline]
 pub fn get_mixed_closure() -> TUnion {
-    wrap_atomic(TAtomic::Callable(TCallable::Signature(
-        TCallableSignature::new(false, true)
-            .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, true)])
-            .with_return_type(Some(Box::new(get_mixed()))),
-    )))
+    wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(true))))
 }
 
 #[inline]

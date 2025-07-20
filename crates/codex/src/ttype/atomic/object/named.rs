@@ -154,10 +154,6 @@ impl TType for TNamedObject {
             None => self.name.to_string(),
         };
 
-        if self.is_this {
-            id += "&static";
-        }
-
         if let Some(parameters) = self.get_type_parameters() {
             id += "<";
             for (i, atomic) in parameters.iter().enumerate() {
@@ -180,6 +176,10 @@ impl TType for TNamedObject {
 
                 id += &atomic.get_id(interner);
             }
+        }
+
+        if self.is_this {
+            id += "&static";
         }
 
         id

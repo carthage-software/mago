@@ -117,6 +117,8 @@ pub enum TagKind {
     PhpstanPure,
     Pure,
     Immutable,
+    RequireExtends,
+    RequireImplements,
     InheritDoc,
     ParamOut,
     Assert,
@@ -353,6 +355,8 @@ impl TagKind {
             Self::MagoUnchecked => Some(Self::Unchecked),
             Self::PsalmType => Some(Self::Type),
             Self::PsalmImportType => Some(Self::ImportType),
+            Self::PhpstanRequireExtends | Self::PsalmRequireExtends => Some(Self::RequireExtends),
+            Self::PhpstanRequireImplements | Self::PsalmRequireImplements => Some(Self::RequireImplements),
             _ => None,
         }
     }
@@ -403,6 +407,12 @@ impl TagKind {
                 | Self::PsalmType
                 | Self::Type
                 | Self::PsalmImportType
+                | Self::RequireImplements
+                | Self::PsalmRequireImplements
+                | Self::PhpstanRequireImplements
+                | Self::RequireExtends
+                | Self::PsalmRequireExtends
+                | Self::PhpstanRequireExtends
         )
     }
 }
@@ -567,8 +577,8 @@ where
             "phpstan-assert-if-false" => TagKind::PhpstanAssertIfFalse,
             "phpstan-self-out" => TagKind::PhpstanSelfOut,
             "phpstan-this-out" => TagKind::PhpstanThisOut,
-            "phpstan-require-extends" => TagKind::PhpstanRequireExtends,
-            "phpstan-require-implements" => TagKind::PhpstanRequireImplements,
+            "phpstan-require-extends" | "phpstanrequireextends" => TagKind::PhpstanRequireExtends,
+            "phpstan-require-implements" | "phpstanrequireimplements" => TagKind::PhpstanRequireImplements,
             "template" => TagKind::Template,
             "template-invariant" | "templateinvariant" => TagKind::TemplateInvariant,
             "template-covariant" | "templatecovariant" => TagKind::TemplateCovariant,
@@ -591,6 +601,8 @@ where
             "unchecked" => TagKind::Unchecked,
             "type" => TagKind::Type,
             "import-type" | "importtype" => TagKind::ImportType,
+            "require-implements" | "requireimplements" => TagKind::RequireImplements,
+            "require-extends" | "requireextends" => TagKind::RequireExtends,
             _ => TagKind::Other,
         }
     }

@@ -83,23 +83,35 @@ pub fn is_contained_by(
     }
 
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
-        if let TAtomic::Object(TObject::Enum(enum_input)) = input_type_part {
-            if !is_instance_of(codebase, interner, enum_input.get_name_ref(), enum_container.get_name_ref()) {
-                return false;
-            }
-
-            if let Some(container_case) = enum_container.case.as_ref() {
-                if let Some(input_case) = enum_input.case.as_ref() {
-                    return container_case == input_case;
-                } else {
+        return match input_type_part {
+            TAtomic::Object(TObject::Enum(enum_input)) => {
+                if !is_instance_of(codebase, interner, enum_input.get_name_ref(), enum_container.get_name_ref()) {
                     return false;
                 }
+
+                if let Some(container_case) = enum_container.case.as_ref() {
+                    if let Some(input_case) = enum_input.case.as_ref() {
+                        return container_case == input_case;
+                    } else {
+                        return false;
+                    }
+                }
+
+                true
             }
+            TAtomic::Object(TObject::Named(named_object)) if enum_container.case.is_none() => {
+                if !is_instance_of(codebase, interner, named_object.get_name_ref(), enum_container.get_name_ref()) {
+                    return false;
+                }
 
-            return true;
-        }
+                if named_object.has_type_parameters() {
+                    atomic_comparison_result.type_coerced = Some(true);
+                }
 
-        return false;
+                true
+            }
+            _ => false,
+        };
     }
 
     if container_type_part.is_mixed() || container_type_part.is_templated_as_mixed(&mut false) {

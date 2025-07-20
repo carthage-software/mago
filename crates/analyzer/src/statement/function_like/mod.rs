@@ -11,6 +11,7 @@ use mago_codex::data_flow::node::DataFlowNodeKind;
 use mago_codex::data_flow::node::VariableSourceKind;
 use mago_codex::data_flow::path::PathKind;
 use mago_codex::get_class_like;
+use mago_codex::get_interface;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -98,7 +99,7 @@ pub fn analyze_function_like<'a, 'ast>(
     if !scope.is_static()
         && let Some(class_like_metadata) = scope.get_class_like()
     {
-        let mut this_type = wrap_atomic(TAtomic::Object(get_this_type(class_like_metadata)));
+        let mut this_type = wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata)));
 
         if function_like_metadata.kind.is_method()
             && let Some(method_name) = &function_like_metadata.name
@@ -390,7 +391,7 @@ fn add_properties_to_context<'a>(
         let expression_id = if property_metadata.is_static() {
             format!("{}::${raw_property_name}", context.interner.lookup(&class_like_metadata.name),)
         } else {
-            let this_type = get_this_type(class_like_metadata);
+            let this_type = get_this_type(context, class_like_metadata);
 
             property_type = localize_property_type(
                 context,
@@ -429,37 +430,74 @@ fn add_properties_to_context<'a>(
     Ok(())
 }
 
-fn get_this_type(class_like_metadata: &ClassLikeMetadata) -> TObject {
+fn get_this_type(context: &Context<'_>, class_like_metadata: &ClassLikeMetadata) -> TObject {
     if class_like_metadata.kind.is_enum() {
-        TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None })
-    } else {
-        TObject::Named(TNamedObject {
-            name: class_like_metadata.original_name,
-            type_parameters: if !class_like_metadata.template_types.is_empty() {
-                Some(
-                    class_like_metadata
-                        .template_types
-                        .iter()
-                        .map(|(parameter_name, template_map)| {
-                            let (defining_entry, constraint) = template_map.iter().next().unwrap();
-
-                            wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
-                                parameter_name: *parameter_name,
-                                constraint: Box::new(constraint.clone()),
-                                defining_entity: *defining_entry,
-                                intersection_types: None,
-                            }))
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            } else {
-                None
-            },
-            is_this: true,
-            intersection_types: None,
-            remapped_parameters: false,
-        })
+        return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });
     }
+
+    let mut intersections = vec![];
+    for required_interface in &class_like_metadata.require_implements {
+        let Some(interface_metadata) = get_interface(context.codebase, context.interner, required_interface) else {
+            continue;
+        };
+
+        let TObject::Named(mut interface_type) = get_this_type(context, interface_metadata) else {
+            continue;
+        };
+
+        let interface_intersactions = std::mem::take(&mut interface_type.intersection_types);
+
+        interface_type.is_this = false;
+        intersections.push(TAtomic::Object(TObject::Named(interface_type)));
+        if let Some(interface_intersactions) = interface_intersactions {
+            intersections.extend(interface_intersactions);
+        }
+    }
+
+    for required_class in &class_like_metadata.require_extends {
+        let Some(parent_class_metadata) = get_class_like(context.codebase, context.interner, required_class) else {
+            continue;
+        };
+
+        let TObject::Named(mut parent_type) = get_this_type(context, parent_class_metadata) else {
+            continue;
+        };
+
+        let parent_intersections = std::mem::take(&mut parent_type.intersection_types);
+
+        parent_type.is_this = false;
+        intersections.push(TAtomic::Object(TObject::Named(parent_type)));
+        if let Some(parent_intersections) = parent_intersections {
+            intersections.extend(parent_intersections);
+        }
+    }
+
+    TObject::Named(TNamedObject {
+        name: class_like_metadata.original_name,
+        type_parameters: if !class_like_metadata.template_types.is_empty() {
+            Some(
+                class_like_metadata
+                    .template_types
+                    .iter()
+                    .map(|(parameter_name, template_map)| {
+                        let (defining_entry, constraint) = template_map.iter().next().unwrap();
+
+                        wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
+                            parameter_name: *parameter_name,
+                            constraint: Box::new(constraint.clone()),
+                            defining_entity: *defining_entry,
+                            intersection_types: None,
+                        }))
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            None
+        },
+        is_this: true,
+        intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
+        remapped_parameters: false,
+    })
 }
 
 fn handle_reference_at_return<'a>(

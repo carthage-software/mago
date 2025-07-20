@@ -205,32 +205,16 @@ fn replace_template_parameter(
     } else {
         for (_, template_type_map) in inferred_lower_bounds {
             for map_defining_entity in template_type_map.keys() {
-                let classlike_name = match map_defining_entity {
-                    GenericParent::ClassLike(e) => e,
-                    _ => {
-                        continue;
-                    }
-                };
-
-                if let Some(metadata) = get_class_like(codebase, interner, classlike_name)
-                    && let Some(templated_extended_parameter_map) =
-                        metadata.template_extended_parameters.get(&metadata.name)
-                    && let Some(inner_parameter) = templated_extended_parameter_map.get(key)
+                if let GenericParent::ClassLike(classlike_name) = map_defining_entity
+                    && let Some(metadata) = get_class_like(codebase, interner, classlike_name)
+                    && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
+                    && let Some(param) = extended_parameter_map.get(key)
+                    && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
+                    && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
+                    && let Some(bounds) = bounds_map.get(map_defining_entity)
                 {
-                    let template_name = if let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) =
-                        inner_parameter.get_single()
-                    {
-                        parameter_name
-                    } else {
-                        panic!()
-                    };
-
-                    if let Some(bounds_map) = inferred_lower_bounds.get(template_name)
-                        && let Some(bounds) = bounds_map.get(map_defining_entity)
-                    {
-                        template_type =
-                            Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase, interner));
-                    }
+                    template_type =
+                        Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase, interner));
                 }
             }
         }

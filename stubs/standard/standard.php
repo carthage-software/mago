@@ -1543,9 +1543,6 @@ function strcoll(string $string1, string $string2): int
 }
 
 /**
- * @param string $string
- * @param null|int<0, max> $length
- *
  * @pure
  */
 function substr(string $string, int $offset, null|int $length = null): string
@@ -3089,6 +3086,8 @@ function fseek($stream, int $offset, int $whence = SEEK_SET): int
 
 /**
  * @param resource $stream
+ *
+ * @return int<0, max>|false
  */
 function ftell($stream): int|false
 {
@@ -3120,7 +3119,7 @@ function fdatasync($stream): bool
  *
  * @return int<0, max>|false
  */
-function fwrite($stream, string $data, null|int $length): int|false
+function fwrite($stream, string $data, null|int $length = null): int|false
 {
 }
 
@@ -3129,7 +3128,7 @@ function fwrite($stream, string $data, null|int $length): int|false
  *
  * @return int<0, max>|false
  */
-function fputs($stream, string $data, null|int $length): int|false
+function fputs($stream, string $data, null|int $length = null): int|false
 {
 }
 
@@ -3849,7 +3848,7 @@ function fputcsv(
  *
  * @return bool
  */
-function flock($stream, int $operation, &$would_block): bool
+function flock($stream, int $operation, &$would_block = null): bool
 {
 }
 
