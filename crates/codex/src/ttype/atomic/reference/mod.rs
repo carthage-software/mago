@@ -167,8 +167,6 @@ impl TType for TReference {
 
         match self {
             TReference::Symbol { name, .. } => {
-                let mut str = String::new();
-                str += "unknown-ref(";
                 if let Some(interner) = interner {
                     str += interner.lookup(name);
                 } else {

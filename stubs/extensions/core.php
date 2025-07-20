@@ -8,7 +8,7 @@ class stdClass
  * @template K
  * @template-covariant V
  *
- * @inheritors IteratorAggregate|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
+ * @inheritors IteratorAggregate|Generator|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
  */
 interface Traversable
 {

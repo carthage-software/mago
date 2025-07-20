@@ -10,9 +10,6 @@ use crate::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
-use crate::metadata::function_like::FunctionLikeKind;
-use crate::metadata::function_like::FunctionLikeMetadata;
-use crate::metadata::function_like::MethodMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
@@ -25,8 +22,6 @@ use crate::scanner::class_like_constant::scan_class_like_constants;
 use crate::scanner::docblock::ClassLikeDocblockComment;
 use crate::scanner::docblock::TraitUseDocblockComment;
 use crate::scanner::enum_case::scan_enum_case;
-use crate::scanner::function_like::scan_method;
-use crate::scanner::property::scan_promoted_property;
 use crate::scanner::property::scan_properties;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
@@ -888,9 +883,6 @@ fn scan_class_like(
         }
     }
 
-    let clone_name_id = context.interner.intern("__clone");
-    let mut has_constructor = false;
-
     for member in members.iter() {
         match member {
             ClassLikeMember::TraitUse(trait_use) => {
@@ -1101,61 +1093,6 @@ fn scan_class_like(
                     class_like_metadata.add_property_metadata(property_metadata);
                 }
             }
-            ClassLikeMember::Method(method) => {
-                let name = context.interner.lowered(&method.name.value);
-                if class_like_metadata.has_method(&name) {
-                    continue;
-                }
-
-                let method_id = (class_like_metadata.name, name);
-                let type_resolution = if method.is_static() { None } else { Some(type_context.clone()) };
-
-                let function_like_metadata =
-                    scan_method(method_id, method, &class_like_metadata, context, scope, type_resolution);
-                let Some(method_metadata) = &function_like_metadata.get_method_metadata() else {
-                    unreachable!("Method info should be present for method.",);
-                };
-
-                let mut is_constructor = false;
-                let mut is_clone = false;
-                if method_metadata.is_constructor() {
-                    is_constructor = true;
-                    has_constructor = true;
-
-                    for (index, param) in method.parameter_list.parameters.iter().enumerate() {
-                        if !param.is_promoted_property() {
-                            continue;
-                        }
-
-                        let Some(parameter_info) = function_like_metadata.get_parameters().get(index) else {
-                            continue;
-                        };
-
-                        let property_metadata =
-                            scan_promoted_property(param, parameter_info, &class_like_metadata, context);
-
-                        class_like_metadata.add_property_metadata(property_metadata);
-                    }
-                } else {
-                    is_clone = name == clone_name_id;
-                }
-
-                class_like_metadata.add_method(name);
-                class_like_metadata.add_declaring_method_id(name, class_like_metadata.name);
-                if !method_metadata.get_visibility().is_private()
-                    || is_constructor
-                    || is_clone
-                    || class_like_metadata.kind.is_trait()
-                {
-                    class_like_metadata.add_inheritable_method_id(name, class_like_metadata.name);
-                }
-
-                if method_metadata.is_final() && is_constructor {
-                    class_like_metadata.has_consistent_constructor = true;
-                }
-
-                codebase.function_likes.insert(method_id, function_like_metadata);
-            }
             _ => {
                 continue;
             }
@@ -1167,23 +1104,6 @@ fn scan_class_like(
         if class_like_metadata.methods.contains(&to_string_method) {
             class_like_metadata.add_direct_parent_interface(context.interner.intern("stringable"));
         }
-    }
-
-    if class_like_metadata.has_consistent_constructor && !has_constructor {
-        let constructor_name = context.interner.intern("__construct");
-
-        let mut function_like_metadata =
-            FunctionLikeMetadata::new(FunctionLikeKind::Method, class_like_metadata.get_span());
-
-        function_like_metadata.method_metadata = Some(MethodMetadata::new(Visibility::Public));
-        function_like_metadata.is_mutation_free = true;
-        function_like_metadata.is_external_mutation_free = true;
-
-        class_like_metadata.add_method(constructor_name);
-        class_like_metadata.add_declaring_method_id(constructor_name, class_like_metadata.name);
-        class_like_metadata.add_inheritable_method_id(constructor_name, class_like_metadata.name);
-
-        codebase.function_likes.insert((class_like_metadata.name, constructor_name), function_like_metadata);
     }
 
     Some(class_like_metadata)

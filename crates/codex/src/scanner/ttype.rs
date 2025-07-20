@@ -141,7 +141,12 @@ fn get_union_from_identifier_hint<'ast>(identifier: &'ast Identifier, context: &
 
     if name_str.eq_ignore_ascii_case("Generator") {
         return wrap_atomic(TAtomic::Object(TObject::Named(
-            TNamedObject::new(*name).with_type_parameters(Some(vec![get_mixed(), get_mixed(), get_mixed()])),
+            TNamedObject::new(*name).with_type_parameters(Some(vec![
+                get_mixed(),
+                get_mixed(),
+                get_mixed(),
+                get_mixed(),
+            ])),
         )));
     }
 

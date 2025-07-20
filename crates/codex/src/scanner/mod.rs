@@ -14,12 +14,17 @@ use mago_syntax::walker::walk_interface_mut;
 use mago_syntax::walker::walk_trait_mut;
 
 use crate::metadata::CodebaseMetadata;
+use crate::metadata::function_like::FunctionLikeKind;
+use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::function_like::MethodMetadata;
 use crate::misc::GenericParent;
 use crate::scanner::class_like::*;
 use crate::scanner::constant::*;
 use crate::scanner::function_like::*;
+use crate::scanner::property::scan_promoted_property;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::union::TUnion;
+use crate::visibility::Visibility;
 
 mod argument;
 mod attribute;
@@ -80,6 +85,7 @@ struct Scanner {
     stack: Vec<StringIdentifier>,
     template_constraints: Vec<TemplateConstraintList>,
     scope: NamespaceScope,
+    has_constructor: bool,
 }
 
 impl Scanner {
@@ -236,9 +242,9 @@ impl MutWalker<Context<'_>> for Scanner {
 
     #[inline]
     fn walk_class(&mut self, class: &Class, context: &mut Context<'_>) {
-        if let Some((id, template_definition)) = register_class(&mut self.codebase, class, context, &mut self.scope) {
+        if let Some((id, templates)) = register_class(&mut self.codebase, class, context, &mut self.scope) {
             self.stack.push(id);
-            self.template_constraints.push(template_definition);
+            self.template_constraints.push(templates);
 
             walk_class_mut(self, class, context);
         } else {
@@ -248,9 +254,9 @@ impl MutWalker<Context<'_>> for Scanner {
 
     #[inline]
     fn walk_trait(&mut self, r#trait: &Trait, context: &mut Context<'_>) {
-        if let Some((id, template_definition)) = register_trait(&mut self.codebase, r#trait, context, &mut self.scope) {
+        if let Some((id, templates)) = register_trait(&mut self.codebase, r#trait, context, &mut self.scope) {
             self.stack.push(id);
-            self.template_constraints.push(template_definition);
+            self.template_constraints.push(templates);
 
             walk_trait_mut(self, r#trait, context);
         } else {
@@ -260,9 +266,9 @@ impl MutWalker<Context<'_>> for Scanner {
 
     #[inline]
     fn walk_enum(&mut self, r#enum: &Enum, context: &mut Context<'_>) {
-        if let Some((id, template_definition)) = register_enum(&mut self.codebase, r#enum, context, &mut self.scope) {
+        if let Some((id, templates)) = register_enum(&mut self.codebase, r#enum, context, &mut self.scope) {
             self.stack.push(id);
-            self.template_constraints.push(template_definition);
+            self.template_constraints.push(templates);
 
             walk_enum_mut(self, r#enum, context);
         } else {
@@ -272,14 +278,90 @@ impl MutWalker<Context<'_>> for Scanner {
 
     #[inline]
     fn walk_interface(&mut self, interface: &Interface, context: &mut Context<'_>) {
-        if let Some((id, template_definition)) =
-            register_interface(&mut self.codebase, interface, context, &mut self.scope)
-        {
+        if let Some((id, templates)) = register_interface(&mut self.codebase, interface, context, &mut self.scope) {
             self.stack.push(id);
-            self.template_constraints.push(template_definition);
+            self.template_constraints.push(templates);
 
             walk_interface_mut(self, interface, context);
         }
+    }
+
+    #[inline]
+    fn walk_in_method(&mut self, method: &Method, context: &mut Context<'_>) {
+        let current_class = self.stack.last().expect("Expected class-like stack to be non-empty");
+        let mut class_like_metadata =
+            self.codebase.class_likes.remove(current_class).expect("Expected class-like metadata to be present");
+
+        let name = context.interner.lowered(&method.name.value);
+        if class_like_metadata.has_method(&name) {
+            self.codebase.class_likes.insert(*current_class, class_like_metadata);
+            self.template_constraints.push(vec![]);
+
+            return;
+        }
+
+        let method_id = (class_like_metadata.name, name);
+        let type_resolution = if method.is_static() { None } else { Some(self.get_current_type_resolution_context()) };
+
+        let function_like_metadata =
+            scan_method(method_id, method, &class_like_metadata, context, &mut self.scope, type_resolution);
+        let Some(method_metadata) = &function_like_metadata.get_method_metadata() else {
+            unreachable!("Method info should be present for method.",);
+        };
+
+        let mut is_constructor = false;
+        let mut is_clone = false;
+        if method_metadata.is_constructor() {
+            is_constructor = true;
+            self.has_constructor = true;
+
+            for (index, param) in method.parameter_list.parameters.iter().enumerate() {
+                if !param.is_promoted_property() {
+                    continue;
+                }
+
+                let Some(parameter_info) = function_like_metadata.get_parameters().get(index) else {
+                    continue;
+                };
+
+                let property_metadata = scan_promoted_property(param, parameter_info, &class_like_metadata, context);
+
+                class_like_metadata.add_property_metadata(property_metadata);
+            }
+        } else {
+            is_clone = name == context.interner.intern("__clone");
+        }
+
+        class_like_metadata.add_method(name);
+        class_like_metadata.add_declaring_method_id(name, class_like_metadata.name);
+        if !method_metadata.get_visibility().is_private()
+            || is_constructor
+            || is_clone
+            || class_like_metadata.kind.is_trait()
+        {
+            class_like_metadata.add_inheritable_method_id(name, class_like_metadata.name);
+        }
+
+        if method_metadata.is_final() && is_constructor {
+            class_like_metadata.has_consistent_constructor = true;
+        }
+
+        self.template_constraints.push({
+            let mut constraints: TemplateConstraintList = vec![];
+            for (template_name, template_constraints) in function_like_metadata.get_template_types() {
+                constraints.push((context.interner.lookup(template_name).to_string(), template_constraints.to_vec()));
+            }
+
+            constraints
+        });
+
+        self.codebase.class_likes.insert(*current_class, class_like_metadata);
+        self.codebase.function_likes.insert(method_id, function_like_metadata);
+    }
+
+    #[inline]
+    fn walk_out_method(&mut self, _method: &Method, _context: &mut Context<'_>) {
+        self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
     #[inline]
@@ -289,26 +371,57 @@ impl MutWalker<Context<'_>> for Scanner {
     }
 
     #[inline]
-    fn walk_out_class(&mut self, _class: &Class, _context: &mut Context<'_>) {
-        self.stack.pop().expect("Expected class stack to be non-empty");
-        self.template_constraints.pop().expect("Expected template stack to be non-empty");
+    fn walk_out_class(&mut self, _class: &Class, context: &mut Context<'_>) {
+        finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_trait(&mut self, _trait: &Trait, _context: &mut Context<'_>) {
-        self.stack.pop().expect("Expected class stack to be non-empty");
-        self.template_constraints.pop().expect("Expected template stack to be non-empty");
+    fn walk_out_trait(&mut self, _trait: &Trait, context: &mut Context<'_>) {
+        finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_enum(&mut self, _enum: &Enum, _context: &mut Context<'_>) {
-        self.stack.pop().expect("Expected class stack to be non-empty");
-        self.template_constraints.pop().expect("Expected template stack to be non-empty");
+    fn walk_out_enum(&mut self, _enum: &Enum, context: &mut Context<'_>) {
+        finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_interface(&mut self, _interface: &Interface, _context: &mut Context<'_>) {
-        self.stack.pop().expect("Expected class stack to be non-empty");
-        self.template_constraints.pop().expect("Expected template stack to be non-empty");
+    fn walk_out_interface(&mut self, _interface: &Interface, context: &mut Context<'_>) {
+        finalize_class_like(self, context);
     }
+}
+
+fn finalize_class_like(scanner: &mut Scanner, context: &mut Context<'_>) {
+    let has_constructor = scanner.has_constructor;
+    scanner.has_constructor = false;
+
+    let class_like_id = scanner.stack.pop().expect("Expected class stack to be non-empty");
+    scanner.template_constraints.pop().expect("Expected template stack to be non-empty");
+
+    if has_constructor {
+        return;
+    }
+
+    let Some(mut class_like_metadata) = scanner.codebase.class_likes.remove(&class_like_id) else {
+        return;
+    };
+
+    if class_like_metadata.has_consistent_constructor {
+        let constructor_name = context.interner.intern("__construct");
+
+        let mut function_like_metadata =
+            FunctionLikeMetadata::new(FunctionLikeKind::Method, class_like_metadata.get_span());
+
+        function_like_metadata.method_metadata = Some(MethodMetadata::new(Visibility::Public));
+        function_like_metadata.is_mutation_free = true;
+        function_like_metadata.is_external_mutation_free = true;
+
+        class_like_metadata.add_method(constructor_name);
+        class_like_metadata.add_declaring_method_id(constructor_name, class_like_metadata.name);
+        class_like_metadata.add_inheritable_method_id(constructor_name, class_like_metadata.name);
+
+        scanner.codebase.function_likes.insert((class_like_metadata.name, constructor_name), function_like_metadata);
+    }
+
+    scanner.codebase.class_likes.insert(class_like_id, class_like_metadata);
 }
