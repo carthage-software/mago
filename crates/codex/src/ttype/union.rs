@@ -709,6 +709,15 @@ impl TUnion {
         self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(_))))
     }
 
+    pub fn is_enum_case(&self) -> bool {
+        self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()))
+    }
+
+    pub fn is_single_enum_case(&self) -> bool {
+        self.is_single()
+            && self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()))
+    }
+
     #[inline]
     pub fn has_named_object(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Named(_))))

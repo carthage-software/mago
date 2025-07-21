@@ -1894,4 +1894,89 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = remove_enum_case_in_else,
+        code = indoc! {r#"
+            <?php
+
+            enum Color
+            {
+                case Transparent;
+                case Black;
+                case White;
+                case Red;
+                case Green;
+                case Blue;
+            }
+
+            function get_rgba_1(Color $color): string
+            {
+                if ($color === Color::Transparent) {
+                    return 'rgba(0, 0, 0, 0)';
+                }
+
+                [$r, $g, $b] = match ($color) {
+                    Color::Black => ['0', '0', '0'],
+                    Color::White => ['255', '255', '255'],
+                    Color::Red => ['255', '0', '0'],
+                    Color::Green => ['0', '255', '0'],
+                    Color::Blue => ['0', '0', '255'],
+                };
+
+                return "rgba($r, $g, $b, 1)";
+            }
+
+            function get_rgba_2(Color $color): string
+            {
+                if (Color::Transparent === $color) {
+                    return 'rgba(0, 0, 0, 0)';
+                }
+
+                [$r, $g, $b] = match ($color) {
+                    Color::Black => ['0', '0', '0'],
+                    Color::White => ['255', '255', '255'],
+                    Color::Red => ['255', '0', '0'],
+                    Color::Green => ['0', '255', '0'],
+                    Color::Blue => ['0', '0', '255'],
+                };
+
+                return "rgba($r, $g, $b, 1)";
+            }
+
+            function get_rgba_3(Color $color): string
+            {
+                if (Color::Transparent !== $color) {
+                    [$r, $g, $b] = match ($color) {
+                        Color::Black => ['0', '0', '0'],
+                        Color::White => ['255', '255', '255'],
+                        Color::Red => ['255', '0', '0'],
+                        Color::Green => ['0', '255', '0'],
+                        Color::Blue => ['0', '0', '255'],
+                    };
+
+                    return "rgba($r, $g, $b, 1)";
+                }
+
+                return 'rgba(0, 0, 0, 0)';
+            }
+
+            function get_rgba_4(Color $color): string
+            {
+                if ($color !== Color::Transparent) {
+                    [$r, $g, $b] = match ($color) {
+                        Color::Black => ['0', '0', '0'],
+                        Color::White => ['255', '255', '255'],
+                        Color::Red => ['255', '0', '0'],
+                        Color::Green => ['0', '255', '0'],
+                        Color::Blue => ['0', '0', '255'],
+                    };
+
+                    return "rgba($r, $g, $b, 1)";
+                }
+
+                return 'rgba(0, 0, 0, 0)';
+            }
+        "#},
+    }
 }

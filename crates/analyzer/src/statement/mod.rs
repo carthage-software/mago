@@ -356,3 +356,45 @@ fn has_unused_must_use<'a>(
         FunctionLikeIdentifier::Closure(_) => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = docblock_type_narrowing,
+        code = indoc! {r#"
+            <?php
+
+            interface Throwable {}
+            class Exception implements Throwable {}
+
+            class A {}
+
+            class B {
+                public function __construct(
+                    public A $a,
+                ) {}
+            }
+
+            /**
+             * @param list{true, A}|list{false, Exception} $data
+             *
+             * @return iterable<int, A>
+             */
+            function foo(array $data): iterable {
+                [$success, $object_or_exception] = $data;
+
+                if ($success) {
+                    /** @var A $object_or_exception */
+                    yield $object_or_exception;
+                } else {
+                    /** @var Exception $object_or_exception */
+                    throw $object_or_exception;
+                }
+            }
+        "#},
+    }
+}

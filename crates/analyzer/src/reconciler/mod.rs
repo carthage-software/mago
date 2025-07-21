@@ -4,8 +4,6 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 
 use ahash::HashSet;
-use mago_codex::get_declaring_class_for_property;
-use mago_codex::get_property;
 use regex::Regex;
 
 use mago_codex::assertion::Assertion;
@@ -14,6 +12,8 @@ use mago_codex::data_flow::graph::GraphKind;
 use mago_codex::data_flow::node::DataFlowNode;
 use mago_codex::data_flow::path::PathKind;
 use mago_codex::get_class_constant_type;
+use mago_codex::get_declaring_class_for_property;
+use mago_codex::get_property;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::add_union_type;

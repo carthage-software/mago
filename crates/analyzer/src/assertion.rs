@@ -257,6 +257,10 @@ fn scrape_equality_assertions(
         return get_empty_array_equality_assertions(left, operator, right, assertion_context, empty_array_position);
     }
 
+    if let Some(enum_case_position) = has_enum_case_comparison(left, right, artifacts) {
+        return get_enum_case_equality_assertions(left, right, assertion_context, artifacts, enum_case_position);
+    }
+
     if let Some(typed_value_position) = has_typed_value_comparison(left, right, artifacts, assertion_context) {
         return get_typed_value_equality_assertions(
             left,
@@ -330,6 +334,10 @@ fn scrape_inequality_assertions(
 
     if let Some(empty_array_position) = has_empty_array_variable(left, right) {
         return get_empty_array_inequality_assertions(left, operator, right, assertion_context, empty_array_position);
+    }
+
+    if let Some(enum_case_position) = has_enum_case_comparison(left, right, artifacts) {
+        return get_enum_case_inequality_assertions(left, right, assertion_context, artifacts, enum_case_position);
     }
 
     if let Some(typed_value_position) = has_typed_value_comparison(left, right, artifacts, assertion_context) {
@@ -417,6 +425,68 @@ fn get_empty_array_inequality_assertions(
     }
 
     if if_types.is_empty() { vec![] } else { vec![if_types] }
+}
+
+fn get_enum_case_equality_assertions(
+    left: &Expression,
+    right: &Expression,
+    assertion_context: AssertionContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    enum_case_position: OtherValuePosition,
+) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
+    let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
+        OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
+        OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
+    }) else {
+        return vec![];
+    };
+
+    let mut if_types = HashMap::default();
+
+    let var_name = get_expression_id(
+        variable_expression,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        assertion_context.interner,
+        Some(assertion_context.codebase),
+    );
+
+    if let Some(var_name) = var_name {
+        if_types.insert(var_name, vec![vec![Assertion::IsType(enum_case_type.clone().get_single_owned())]]);
+    }
+
+    vec![if_types]
+}
+
+fn get_enum_case_inequality_assertions(
+    left: &Expression,
+    right: &Expression,
+    assertion_context: AssertionContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    enum_case_position: OtherValuePosition,
+) -> Vec<HashMap<String, Vec<Vec<Assertion>>>> {
+    let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
+        OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
+        OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
+    }) else {
+        return vec![];
+    };
+
+    let mut if_types = HashMap::default();
+
+    let var_name = get_expression_id(
+        variable_expression,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        assertion_context.interner,
+        Some(assertion_context.codebase),
+    );
+
+    if let Some(var_name) = var_name {
+        if_types.insert(var_name, vec![vec![Assertion::IsNotType(enum_case_type.clone().get_single_owned())]]);
+    }
+
+    vec![if_types]
 }
 
 fn get_null_equality_assertions(
@@ -1051,9 +1121,7 @@ fn get_typed_value_equality_assertions(
     if other_value_type.is_single() {
         let other_value_atomic = other_value_type.get_single().clone();
 
-        let orred_types = if other_value_atomic.is_enum_case() {
-            vec![Assertion::IsType(other_value_atomic)]
-        } else if operator.is_identity() {
+        let orred_types = if operator.is_identity() {
             vec![Assertion::IsIdentical(other_value_atomic)]
         } else {
             vec![Assertion::IsEqual(other_value_atomic)]
@@ -1186,6 +1254,31 @@ fn get_first_argument_expression_id(
         assertion_context.interner,
         Some(assertion_context.codebase),
     )
+}
+
+#[inline]
+pub fn has_enum_case_comparison(
+    left: &Expression,
+    right: &Expression,
+    artifacts: &AnalysisArtifacts,
+) -> Option<OtherValuePosition> {
+    if let Expression::Access(Access::ClassConstant(class_constant_access)) = unwrap_expression(right)
+        && artifacts
+            .get_expression_type(class_constant_access)
+            .is_some_and(|expression_type| expression_type.is_single_enum_case())
+    {
+        return Some(OtherValuePosition::Right);
+    }
+
+    if let Expression::Access(Access::ClassConstant(class_constant_access)) = unwrap_expression(left)
+        && artifacts
+            .get_expression_type(class_constant_access)
+            .is_some_and(|expression_type| expression_type.is_single_enum_case())
+    {
+        return Some(OtherValuePosition::Left);
+    }
+
+    None
 }
 
 #[inline]
