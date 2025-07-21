@@ -30,9 +30,9 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::control_action::ControlAction;
 use crate::error::AnalysisError;
-use crate::expression::assignment::check_docblock_type_incompatibility;
-use crate::expression::assignment::get_type_from_var_docblock;
 use crate::issue::TypingIssueKind;
+use crate::utils::docblock::check_docblock_type_incompatibility;
+use crate::utils::docblock::get_type_from_var_docblock;
 
 impl Analyzable for Return {
     fn analyze<'a>(
@@ -71,10 +71,7 @@ impl Analyzable for Return {
                 );
             }
 
-            match (
-                inferred_return_type,
-                get_type_from_var_docblock(context, block_context, artifacts, None, return_value.span(), true),
-            ) {
+            match (inferred_return_type, get_type_from_var_docblock(context, block_context, artifacts, None, true)) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
                     check_docblock_type_incompatibility(
                         context,

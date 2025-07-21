@@ -59,7 +59,7 @@ function hash_init(string $algo, int $flags = 0, string $key = '', array $option
 {
 }
 
-function hash_update(HashContext $context, string $data): true
+function hash_update(HashContext $context, string $data): bool
 {
 }
 

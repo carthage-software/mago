@@ -11,6 +11,7 @@ pub struct Settings {
     pub analyze_effects: bool,
     pub memoize_properties: bool,
     pub trigger_error_exists: bool,
+    pub allow_possibly_undefined_array_keys: bool,
     pub graph_kind: GraphKind,
     pub diff: bool,
 }
@@ -31,6 +32,7 @@ impl Settings {
             allow_include: true,
             memoize_properties: true,
             trigger_error_exists: false,
+            allow_possibly_undefined_array_keys: true,
             analyze_effects: true,
             graph_kind: GraphKind::FunctionBody,
             diff: false,

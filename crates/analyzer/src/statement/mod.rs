@@ -17,6 +17,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::issue::TypingIssueKind;
+use crate::utils::docblock::populate_docblock_variables;
 use crate::utils::expression::get_function_like_id_from_call;
 
 pub mod attributes;
@@ -41,6 +42,19 @@ impl Analyzable for Statement {
     ) -> Result<(), AnalysisError> {
         let last_statement_span = context.statement_span;
         context.statement_span = self.span();
+
+        let should_populate_docblock_variables =
+            if let Statement::Expression(ExpressionStatement { expression, .. }) = self
+                && matches!(expression.as_ref(), Expression::Assignment(_))
+            {
+                false
+            } else {
+                !self.is_control_flow() && !matches!(self, Statement::Static(_) | Statement::Global(_))
+            };
+
+        if should_populate_docblock_variables {
+            populate_docblock_variables(context, block_context, artifacts);
+        }
 
         let result = match self {
             Statement::Inline(_)

@@ -893,14 +893,14 @@ impl TType for TAtomic {
 }
 
 pub fn populate_atomic_type(
-    t_atomic: &mut TAtomic,
+    unpopulated_atomic: &mut TAtomic,
     codebase_symbols: &Symbols,
     interner: &ThreadedInterner,
     reference_source: Option<&ReferenceSource>,
     symbol_references: &mut SymbolReferences,
     force: bool,
 ) {
-    match t_atomic {
+    match unpopulated_atomic {
         TAtomic::Array(array) => match array {
             TArray::List(list) => {
                 populate_union_type(
@@ -992,7 +992,7 @@ pub fn populate_atomic_type(
                 && !named_object.has_type_parameters()
                 && codebase_symbols.contains_enum(&name)
             {
-                *t_atomic = TAtomic::Object(TObject::new_enum(name));
+                *unpopulated_atomic = TAtomic::Object(TObject::new_enum(name));
             } else {
                 if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                     for parameter in type_parameters {
@@ -1095,7 +1095,7 @@ pub fn populate_atomic_type(
                 if let Some(symbol_kind) = codebase_symbols.get_kind(&lower_name) {
                     match symbol_kind {
                         SymbolKind::Enum => {
-                            *t_atomic = TAtomic::Object(TObject::new_enum(*name));
+                            *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                         }
                         _ => {
                             let intersection_types = intersection_types.take().map(|intersection_types| {
@@ -1123,7 +1123,7 @@ pub fn populate_atomic_type(
                                 }
                             }
 
-                            *t_atomic = TAtomic::Object(TObject::Named(named_object));
+                            *unpopulated_atomic = TAtomic::Object(TObject::Named(named_object));
                         }
                     }
                 }
@@ -1145,9 +1145,9 @@ pub fn populate_atomic_type(
                 }
             }
         },
-        TAtomic::GenericParameter(parameter) => {
+        TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {
             populate_union_type(
-                &mut parameter.constraint,
+                constraint.as_mut(),
                 codebase_symbols,
                 interner,
                 reference_source,
@@ -1155,7 +1155,7 @@ pub fn populate_atomic_type(
                 force,
             );
 
-            if let Some(intersection_types) = parameter.intersection_types.as_mut() {
+            if let Some(intersection_types) = intersection_types.as_mut() {
                 for intersection_type in intersection_types {
                     populate_atomic_type(
                         intersection_type,

@@ -12,16 +12,10 @@ use mago_codex::data_flow::node::DataFlowNodeId;
 use mago_codex::data_flow::node::DataFlowNodeKind;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::TType;
-use mago_codex::ttype::builder::get_type_from_string;
-use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_mixed_any;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
-use mago_codex::ttype::union::populate_union_type;
-use mago_docblock::document::Element;
-use mago_docblock::document::TagKind;
-use mago_docblock::tag::parse_var_tag;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -37,6 +31,8 @@ use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
 use crate::issue::TypingIssueKind;
+use crate::utils::docblock::check_docblock_type_incompatibility;
+use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_has_logic;
 use crate::utils::expression::get_expression_id;
@@ -496,7 +492,7 @@ pub fn analyze_assignment_to_variable<'a>(
 
     let mut from_docblock = false;
     if let Some((variable_type, variable_type_span)) =
-        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), variable_span, !destructuring)
+        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), !destructuring)
     {
         check_docblock_type_incompatibility(
             context,
@@ -892,192 +888,12 @@ fn handle_assignment_with_boolean_logic(
     );
 }
 
-/// Finds the last applicable `@var` tag for a given variable and parses its type string.
-///
-/// This function retrieves the docblock associated with the current statement from the
-/// context. It then iterates through all `@var`, `@psalm-var`, and `@phpstan-var` tags
-/// to find the last one that applies to the specified `variable_id`. If a matching
-/// tag is found, it attempts to parse the type string into a `TUnion`.
-///
-/// If parsing fails, a detailed error is reported to the user.
-///
-/// # Arguments
-///
-/// * `context`: The main analysis context, providing access to the docblock parser and error buffer.
-/// * `variable_id`: The name of the variable (e.g., "$foo") for which to find a type hint.
-/// * `variable_span`: The span of the variable's usage, used for error reporting context.
-///
-/// # Returns
-///
-/// An `Option<TUnion>` containing the parsed type if a valid, matching `@var` tag
-/// was found and successfully parsed. Returns `None` otherwise.
-pub(crate) fn get_type_from_var_docblock<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
-    artifacts: &mut AnalysisArtifacts,
-    value_expression_variable_id: Option<&str>,
-    value_expression_span: Span,
-    mut allow_unnamed: bool,
-) -> Option<(TUnion, Span)> {
-    allow_unnamed = allow_unnamed && !block_context.inside_return && !block_context.inside_loop_expressions;
-
-    context
-        // Get the parsed docblock of the current statement
-        .get_parsed_docblock()
-        // Extract the elements from the docblock
-        .map(|document| document.elements)
-        // If no docblock is present, use an empty vector
-        .unwrap_or_default()
-        // Iterate over the elements
-        .into_iter()
-        // Filter out non-tag elements
-        .filter_map(|element| match element {
-            Element::Tag(tag) => Some(tag),
-            _ => None,
-        })
-        // Parse `@var` tags
-        .filter_map(|tag| {
-            if !matches!(tag.kind, TagKind::Var | TagKind::PsalmVar | TagKind::PhpstanVar) {
-                return None;
-            }
-
-            let tag_content = context.interner.lookup(&tag.description);
-
-            parse_var_tag(tag_content, tag.description_span)
-        })
-        // Filter out tags that do not match the variable name
-        .filter_map(|var_tag| match var_tag.variable_name {
-            None if allow_unnamed => Some(var_tag.type_string),
-            Some(name_in_tag) if Some(name_in_tag.as_str()) == value_expression_variable_id => {
-                Some(var_tag.type_string)
-            }
-            _ => None,
-        })
-        // Get the last matching type string, as it's the most specific/recent declaration.
-        .next_back()
-        // Convert the type string to a TUnion
-        .and_then(|type_string| {
-            get_type_from_string(
-                &type_string.value,
-                type_string.span,
-                &context.scope,
-                &context.type_resolution_context,
-                block_context.scope.get_class_like_name(),
-                context.interner,
-            )
-            .map(|variable_type| (variable_type, type_string.span))
-            .map_err(|type_error| {
-                let error_span = type_error.span();
-
-                if let Some(value_expression_variable_id) = value_expression_variable_id {
-                    context.buffer.report(
-                        TypingIssueKind::InvalidDocblock,
-                        Issue::error(format!(
-                            "Invalid type in `@var` tag for variable `{value_expression_variable_id}`."
-                        ))
-                        .with_annotation(Annotation::primary(error_span).with_message(type_error.to_string()))
-                        .with_annotation(
-                            Annotation::secondary(value_expression_span)
-                                .with_message("This variable's type is defined by the docblock"),
-                        )
-                        .with_note(type_error.note())
-                        .with_help(type_error.help()),
-                    )
-                } else {
-                    context.buffer.report(
-                        TypingIssueKind::InvalidDocblock,
-                        Issue::error("Invalid type in `@var` tag for expression.".to_string())
-                            .with_annotation(Annotation::primary(error_span).with_message(type_error.to_string()))
-                            .with_annotation(
-                                Annotation::secondary(value_expression_span)
-                                    .with_message("This expression's type is defined by the docblock"),
-                            )
-                            .with_note(type_error.note())
-                            .with_help(type_error.help()),
-                    )
-                }
-            })
-            .ok()
-        })
-        .map(|(mut variable_type, variable_type_span)| {
-            populate_union_type(
-                &mut variable_type,
-                &context.codebase.symbols,
-                context.interner,
-                block_context.scope.get_reference_source(&context.source.identifier).as_ref(),
-                &mut artifacts.symbol_references,
-                true,
-            );
-
-            (variable_type, variable_type_span)
-        })
-}
-
-pub(crate) fn check_docblock_type_incompatibility<'a>(
-    context: &mut Context<'a>,
-    value_expression_variable_id: Option<&str>,
-    value_expression_span: Span,
-    inferred_type: &TUnion,
-    docblock_type: &TUnion,
-    dockblock_type_span: Span,
-    source_expression: Option<&Expression>,
-) {
-    if !can_expression_types_be_identical(context.codebase, context.interner, inferred_type, docblock_type, false) {
-        // Get clean string representations of the types for the error message.
-        let docblock_type_str = docblock_type.get_id(Some(context.interner));
-        let inferred_type_str = inferred_type.get_id(Some(context.interner));
-
-        let mut issue = if let Some(value_expression_variable_id) = value_expression_variable_id {
-            Issue::error(format!("Docblock type mismatch for variable `{value_expression_variable_id}`."))
-                .with_annotation(
-                    Annotation::primary(dockblock_type_span)
-                        .with_message(format!("This docblock asserts the type should be `{docblock_type_str}`...")),
-                )
-        } else {
-            Issue::error("Docblock type mismatch for expression.".to_string()).with_annotation(
-                Annotation::primary(dockblock_type_span)
-                    .with_message(format!("This docblock asserts the type should be `{docblock_type_str}`...")),
-            )
-        };
-
-        if let Some(value_expression_variable_id) = value_expression_variable_id {
-            if let Some(source_expression) = source_expression {
-                issue = issue.with_annotation(Annotation::secondary(source_expression.span()).with_message(format!(
-                    "...but this expression provides an incompatible type `{inferred_type_str}`."
-                )));
-            }
-
-            issue = issue.with_annotation(
-                Annotation::secondary(value_expression_span)
-                    .with_message(format!("The assignment to `{value_expression_variable_id}` here is invalid.")),
-            ) .with_note(
-                "The type of the assigned value and the `@var` docblock type have no overlap, making this assignment impossible."
-            )
-            .with_help(format!(
-                "Change the assigned value to match `{docblock_type_str}`, or update the `@var` tag to a compatible type."
-            ));
-        } else {
-            issue = issue.with_annotation(
-                Annotation::secondary(value_expression_span)
-                    .with_message(format!("...but this expression provides an incompatible type `{inferred_type_str}`.")),
-            )
-            .with_note(
-                "The type resolved from the docblock and the type of the expression have no overlap, making the docblock type invalid.",
-            )
-            .with_help(format!(
-                "Change the expression to match `{docblock_type_str}`, or update the `@var` tag to a compatible type."
-            ));
-        }
-
-        context.buffer.report(TypingIssueKind::DocblockTypeMismatch, issue);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
 
     use crate::issue::TypingIssueKind;
+    use crate::settings::Settings;
     use crate::test_analysis;
 
     test_analysis! {
@@ -1493,8 +1309,13 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_from_typed_array,
+        settings = Settings {
+            allow_possibly_undefined_array_keys: false,
+            ..Default::default()
+        },
         code = indoc! {r#"
             <?php
+
             /** @param array<int, float> $source */
             function test_typed_source(array $source): void {
                 [$a, $b] = $source;
@@ -1508,5 +1329,25 @@ mod tests {
             TypingIssueKind::PossiblyUndefinedArrayIndex,
             TypingIssueKind::PossiblyUndefinedArrayIndex,
         ]
+    }
+
+    test_analysis! {
+        name = destructuring_list_from_typed_array_with_undefined_keys,
+        settings = Settings {
+            allow_possibly_undefined_array_keys: true,
+            ..Default::default()
+        },
+        code = indoc! {r#"
+            <?php
+
+            /** @param array<int, float> $source */
+            function test_typed_source(array $source): void {
+                [$a, $b] = $source;
+                /** @param float $_f */
+                function i_take_float(float $_f): void {}
+                i_take_float($a);
+                i_take_float($b);
+            }
+        "#},
     }
 }

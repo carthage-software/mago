@@ -192,7 +192,9 @@ pub(crate) fn get_array_target_type_given_index<'a>(
                     index_type,
                     in_assignment,
                     &mut has_valid_expected_index,
-                    block_context.inside_isset || block_context.inside_unset,
+                    context.settings.allow_possibly_undefined_array_keys
+                        || block_context.inside_isset
+                        || block_context.inside_unset,
                     &mut possibly_undefined,
                     &mut false,
                     &mut expected_index_types,
@@ -450,32 +452,33 @@ pub(crate) fn handle_array_access_on_list(
                 if *actual_possibly_undefined {
                     resulting_type.set_possibly_undefined(true, None);
 
-                    if !block_context.inside_isset
+                    if !context.settings.allow_possibly_undefined_array_keys
+                        && !block_context.inside_isset
                         && !block_context.inside_unset
                         && !in_assignment
                         && let Some(span) = span
                     {
                         // oh no!
                         context.buffer.report(
-                        TypingIssueKind::PossiblyUndefinedIntArrayIndex,
-                        Issue::warning(format!(
-                            "Possibly undefined array key `{}` accessed on `{}`.",
-                            val,
-                            list.get_id(Some(context.interner))
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("Key `{val}` might not exist."))
-                        )
-                        .with_note(
-                            "The analysis indicates this specific integer key might not be set when this access occurs."
-                        )
-                        .with_help(
-                            format!(
-                                "Ensure the key `{val}` is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                            TypingIssueKind::PossiblyUndefinedIntArrayIndex,
+                            Issue::warning(format!(
+                                "Possibly undefined array key `{}` accessed on `{}`.",
+                                val,
+                                list.get_id(Some(context.interner))
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("Key `{val}` might not exist."))
                             )
-                        ),
-                    );
+                            .with_note(
+                                "The analysis indicates this specific integer key might not be set when this access occurs."
+                            )
+                            .with_help(
+                                format!(
+                                    "Ensure the key `{val}` is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                                )
+                            ),
+                        );
                     }
                 }
 

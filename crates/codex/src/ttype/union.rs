@@ -887,27 +887,26 @@ impl PartialEq for TUnion {
 }
 
 pub fn populate_union_type(
-    t_union: &mut TUnion,
+    unpopulated_union: &mut TUnion,
     codebase_symbols: &Symbols,
     interner: &ThreadedInterner,
     reference_source: Option<&ReferenceSource>,
     symbol_references: &mut SymbolReferences,
     force: bool,
 ) {
-    if t_union.populated && !force {
+    if unpopulated_union.populated && !force {
         return;
     }
 
-    t_union.populated = true;
+    unpopulated_union.populated = true;
 
-    let types = &mut t_union.types;
-
-    for atomic in types.iter_mut() {
-        match atomic {
+    for unpopulated_atomic in &mut unpopulated_union.types {
+        match unpopulated_atomic {
             TAtomic::Scalar(TScalar::ClassLikeString(
                 TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. },
             )) => {
                 let mut new_constraint = (**constraint).clone();
+
                 populate_atomic_type(
                     &mut new_constraint,
                     codebase_symbols,
@@ -916,10 +915,18 @@ pub fn populate_union_type(
                     symbol_references,
                     force,
                 );
+
                 *constraint = Box::new(new_constraint);
             }
             _ => {
-                populate_atomic_type(atomic, codebase_symbols, interner, reference_source, symbol_references, force);
+                populate_atomic_type(
+                    unpopulated_atomic,
+                    codebase_symbols,
+                    interner,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
             }
         }
     }

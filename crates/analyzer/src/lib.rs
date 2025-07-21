@@ -125,6 +125,11 @@ mod tests {
             Self { name, content, settings: Settings::default(), expected_issues: vec![] }
         }
 
+        pub fn settings(mut self, settings: Settings) -> Self {
+            self.settings = settings;
+            self
+        }
+
         pub fn expect_success(mut self) -> Self {
             self.expected_issues = vec![];
             self
