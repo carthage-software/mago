@@ -4656,7 +4656,7 @@ function array_diff_assoc(array $array, array ...$arrays): array
 }
 
 /**
- * @param array<num> $array
+ * @param array<int|float> $array
  *
  * @pure
  */
