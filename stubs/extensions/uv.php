@@ -414,301 +414,125 @@ function uv_timer_again(UVTimer $timer): void
 {
 }
 
-/**
- * Set repeat count.
- *
- * @param UVTimer $timer uv_timer.
- * @param int $repeat repeat count.
- *
- * @return void
- */
-function uv_timer_set_repeat($timer, int $repeat)
+function uv_timer_set_repeat(UVTimer $timer, int $repeat): void
+{
+}
+
+function uv_timer_get_repeat(UVTimer $timer): int
+{
+}
+
+function uv_idle_init(null|UVLoop $loop = null): UVIdle
+{
+}
+
+function uv_idle_start(UVIdle $idle, callable $callback): void
 {
 }
 
 /**
- * Returns repeat interval.
- *
- * @param UVTimer $timer uv_timer.
- *
- * @return int
+ * @param UVIdle $idle
  */
-function uv_timer_get_repeat($timer): int
-{
-}
-
-/**
- * Initialize uv idle handle.
- *
- * @param UVLoop $loop uv_loop handle.
- *
- * @return UVIdle initialized idle handle.
- */
-function uv_idle_init($loop = null)
-{
-}
-
-/**
- * start idle callback.
- *
- * @param UVIdle $idle uv_idle.
- * @param callable $callback idle callback.
- *
- * @return void
- */
-function uv_idle_start($idle, callable $callback)
-{
-}
-
-/**
- * Stop idle callback.
- *
- * @param UVIdle $idle uv_idle.
- *
- * @return void
- */
-function uv_idle_stop($idle)
+function uv_idle_stop($idle): void
 {
 }
 
 /**
  * @param UVLoop $loop
- *
- * @return void
  */
-function uv_getaddrinfo(UVLoop $loop, callable $callback, string $node, string $service, array $hints)
+function uv_getaddrinfo(UVLoop $loop, callable $callback, string $node, string $service, array $hints): void
 {
 }
 
 /**
- * Create a tcp socket.
+ * @param UVLoop|null $loop
  *
- * @param UVLoop|null $loop loop or null. if not specified loop then use uv_default_loop.
- *
- * @return UVTcp uv handle which initialized for tcp.
+ * @return UVTcp
  */
 function uv_tcp_init($loop = null)
 {
 }
 
-/**
- * Return default loop handle.
- *
- * @return UVLoop
- */
-function uv_default_loop()
+function uv_default_loop(): UVLoop
 {
 }
 
-/**
- * Create a new loop handle.
- *
- * @return UVLoop
- */
-function uv_loop_new()
+function uv_loop_new(): UVLoop
 {
 }
 
-/**
- * Create a udp socket.
- *
- * @param UVLoop|null $loop loop or null. if not specified loop then use uv_default_loop.
- *
- * @return UVUdp uv handle which initialized for udp.
- */
-function uv_udp_init($loop = null)
+function uv_udp_init(UVLoop|null $loop = null): UVUdp
 {
 }
 
-/**
- * Listens for a connection on a uv udp handle.
- *
- * @param UVUdp $resource uv udp handle.
- * @param UVSockAddr $address uv sockaddr(ipv4).
- * @param int $flags unused.
- *
- * @return void
- */
-function uv_udp_bind($resource, $address, int $flags)
+function uv_udp_bind(UVUdp $resource, UVSockAddr $address, int $flags): void
 {
 }
 
-/**
- * Listens for a connection on a uv udp handle.
- *
- * @param UVUdp $resource uv udp handle.
- * @param UVSockAddr $address uv sockaddr(ipv6).
- * @param int $flags Should be 0 or UV::UDP_IPV6ONLY.
- *
- * @return void
- */
-function uv_udp_bind6($resource, $address, int $flags)
+function uv_udp_bind6(UVUdp $resource, UVSockAddr $address, int $flags): void
 {
 }
 
-/**
- * Start receive callback.
- *
- * @param UVUdp $handle uv udp handle.
- * @param callable $callback this callback parameter expects (UVUdp $stream, long $nread, string $buffer)..
- *
- * @return void
- */
-function uv_udp_recv_start($handle, callable $callback)
+function uv_udp_recv_start(UVUdp $handle, callable $callback): void
 {
 }
 
-/**
- * Stop receive callback.
- *
- * @param UVUdp $handle
- *
- * @return void
- */
-function uv_udp_recv_stop($handle)
+function uv_udp_recv_stop(UVUdp $handle): void
 {
 }
 
-/**
- * Join or leave udp muticast group.
- *
- * @param UVUdp $handle uv udp handle.
- * @param string $multicast_addr multicast address.
- * @param string $interface_addr interface address.
- * @param int $membership UV::JOIN_GROUP or UV::LEAVE_GROUP
- *
- * @return int
- */
-function uv_udp_set_membership($handle, string $multicast_addr, string $interface_addr, int $membership): int
+function uv_udp_set_membership(UVUdp $handle, string $multicast_addr, string $interface_addr, int $membership): int
 {
 }
 
-/**
- * Set multicast loop.
- *
- * @param UVUdp $handle uv udp handle.
- * @param int $enabled
- *
- * @return void
- */
-function uv_udp_set_multicast_loop($handle, int $enabled)
+function uv_udp_set_multicast_loop(UVUdp $handle, int $enabled): void
 {
 }
 
-/**
- * Set multicast ttl.
- *
- * @param UVUdp $handle uv udp handle.
- * @param int $ttl multicast ttl.
- *
- * @return void
- */
-function uv_udp_set_multicast_ttl($handle, int $ttl)
+function uv_udp_set_multicast_ttl(UVUdp $handle, int $ttl): void
 {
 }
 
-/**
- * Set udp broadcast.
- *
- * @param UVUdp $handle uv udp handle.
- * @param bool $enabled
- *
- * @return void
- */
-function uv_udp_set_broadcast($handle, bool $enabled)
+function uv_udp_set_broadcast(UVUdp $handle, bool $enabled): void
 {
 }
 
-/**
- * Send buffer to specified address.
- *
- * @param UVUdp $handle uv udp handle.
- * @param string $data data.
- * @param UVSockAddr $uv_addr uv_ip4_addr.
- * @param callable $callback this callback parameter expects (UVUdp $stream, long $status).
- *
- * @return void
- */
-function uv_udp_send($handle, string $data, $uv_addr, callable $callback)
+function uv_udp_send(UVUdp $handle, string $data, UVSockAddr $uv_addr, callable $callback): void
 {
 }
 
-/**
- * Send buffer to specified address.
- *
- * @param UVUdp $handle uv udp handle.
- * @param string $data data.
- * @param UVSockAddrIPv6 $uv_addr6 uv_ip6_addr.
- * @param callable $callback this callback parameter expects (UVUdp $stream, long $status).
- *
- * @return void
- */
-function uv_udp_send6($handle, string $data, $uv_addr6, callable $callback)
+function uv_udp_send6(UVUdp $handle, string $data, UVSockAddrIPv6 $uv_addr6, callable $callback): void
 {
 }
 
-/**
- * @param UV $handle
- *
- * @return bool
- */
-function uv_is_active($handle): bool
+function uv_is_active(UV $handle): bool
 {
 }
 
-/**
- * @param UV $handle
- *
- * @return bool
- */
-function uv_is_closing($handle): bool
+function uv_is_closing(UV $handle): bool
 {
 }
 
-/**
- * @param UVStream $handle
- *
- * @return bool
- */
-function uv_is_readable($handle): bool
+function uv_is_readable(UVStream $handle): bool
 {
 }
 
-/**
- * @param UVStream $handle
- *
- * @return bool
- */
-function uv_is_writable($handle): bool
+function uv_is_writable(UVStream $handle): bool
 {
 }
 
-/**
- * @param UVLoop $loop
- * @param callable $closure
- * @param array|null $opaque
- *
- * @return bool
- */
 function uv_walk(UVLoop $loop, callable $closure, array $opaque = null): bool
 {
 }
 
 /**
  * @param resource $uv
- *
- * @return int
  */
 function uv_guess_handle($uv): int
 {
 }
 
-/**
- * @param UVLoop $loop
- *
- * @return UVPipe
- */
-function uv_pipe_init(UVLoop $loop, int $ipc)
+function uv_pipe_init(UVLoop $loop, int $ipc): UVPipe
 {
 }
 
@@ -796,243 +620,95 @@ function uv_rwlock_init(): UVLock
 {
 }
 
-/**
- * Set read lock.
- *
- * @param UVLock $handle uv lock handle.
- */
-function uv_rwlock_rdlock($handle)
+function uv_rwlock_rdlock(UVLock $handle)
+{
+}
+
+function uv_rwlock_tryrdlock(UVLock $handle): bool
+{
+}
+
+function uv_rwlock_rdunlock(UVLock $handle): void
+{
+}
+
+function uv_rwlock_wrlock(UVLock $handle): void
+{
+}
+
+function uv_rwlock_trywrlock(UVLock $handle)
+{
+}
+
+function uv_rwlock_wrunlock(UVLock $handle)
+{
+}
+
+function uv_mutex_init(): UVLock
+{
+}
+
+function uv_mutex_lock(UVLock $lock): void
+{
+}
+
+function uv_mutex_trylock(UVLock $lock): bool
+{
+}
+
+function uv_sem_init(int $value): UVLock
+{
+}
+
+function uv_sem_post(UVLock $sem): void
+{
+}
+
+function uv_sem_wait(UVLock $sem): void
+{
+}
+
+function uv_sem_trywait(UVLock $sem): void
+{
+}
+
+function uv_prepare_init(UVLoop $loop): UVPrepare
+{
+}
+
+function uv_prepare_start(UVPrepare $handle, callable $callback): void
+{
+}
+
+function uv_prepare_stop(UVPrepare $handle): void
+{
+}
+
+function uv_check_init(UVLoop $loop): UVCheck
+{
+}
+
+function uv_check_start(UVCheck $handle, callable $callback): void
+{
+}
+
+function uv_check_stop(UVCheck $handle): void
+{
+}
+
+function uv_async_init(UVLoop $loop, callable $callback): UVAsync
+{
+}
+
+function uv_async_send(UVAsync $handle): void
+{
+}
+
+function uv_queue_work(UVLoop $loop, callable $callback, callable $after_callback): void
 {
 }
 
 /**
- * @param UVLock $handle
- *
- * @return bool
- */
-function uv_rwlock_tryrdlock($handle): bool
-{
-}
-
-/**
- * Unlock read lock.
- *
- * @param UVLock $handle uv lock handle.
- *
- * @return void
- */
-function uv_rwlock_rdunlock($handle)
-{
-}
-
-/**
- * Set write lock.
- *
- * @param UVLock $handle uv lock handle.
- *
- * @return void
- */
-function uv_rwlock_wrlock($handle)
-{
-}
-
-/**
- * @param UVLock $handle uv lock handle.
- */
-function uv_rwlock_trywrlock($handle)
-{
-}
-
-/**
- * Unlock write lock.
- *
- * @param UVLock $handle uv lock handle.
- */
-function uv_rwlock_wrunlock($handle)
-{
-}
-
-/**
- * Initialize mutex.
- *
- * @return UVLock uv mutex
- */
-function uv_mutex_init()
-{
-}
-
-/**
- * Lock mutex.
- *
- * @param UVLock $lock uv lock handle.
- *
- * @return void
- */
-function uv_mutex_lock($lock)
-{
-}
-
-/**
- * @param UVLock $lock
- *
- * @return bool
- */
-function uv_mutex_trylock($lock): bool
-{
-}
-
-/**
- * Initialize semaphore.
- *
- * @param int $value
- * @return UVLock
- */
-function uv_sem_init(int $value)
-{
-}
-
-/**
- * Post semaphore.
- *
- * @param UVLock $sem uv lock handle.
- *
- * @return void
- */
-function uv_sem_post($sem)
-{
-}
-
-/**
- * @param UVLock $sem
- *
- * @return void
- */
-function uv_sem_wait($sem)
-{
-}
-
-/**
- * @param UVLock $sem
- *
- * @return void
- */
-function uv_sem_trywait($sem)
-{
-}
-
-/**
- * Initialize prepare.
- *
- * @param UVLoop $loop uv loop handle.
- *
- * @return UVPrepare
- */
-function uv_prepare_init($loop)
-{
-}
-
-/**
- * Setup prepare loop callback. (pre loop callback)
- *
- * @param UVPrepare $handle uv prepare handle.
- * @param callable $callback this callback parameter expects (UVPrepare $prepare, long $status).
- *
- * @return void
- */
-function uv_prepare_start($handle, callable $callback)
-{
-}
-
-/**
- * Stop prepare callback.
- *
- * @param UVPrepare $handle uv prepare handle.
- *
- * @return void
- */
-function uv_prepare_stop($handle)
-{
-}
-
-/**
- * Setup check.
- *
- * @param UVLoop $loop uv loop handle
- *
- * @return UVCheck
- */
-function uv_check_init($loop)
-{
-}
-
-/**
- * Stats check loop callback. (after loop callback)
- *
- * @param UVCheck $handle uv check handle.
- * @param callable $callback this callback parameter expects (UVCheck $check, long $status).
- *
- * @return void
- */
-function uv_check_start($handle, callable $callback)
-{
-}
-
-/**
- * Stop check callback.
- *
- * @param UVCheck $handle uv check handle.
- *
- * @return void
- */
-function uv_check_stop($handle)
-{
-}
-
-/**
- * Setup async callback.
- *
- * @param UVLoop $loop uv loop
- * @param callable $callback
- *
- * @return UVAsync uv async handle.
- */
-function uv_async_init(UVLoop $loop, callable $callback)
-{
-}
-
-/**
- * Send async callback immediately.
- *
- * @param UVAsync $handle uv async handle.
- *
- * @return void
- */
-function uv_async_send($handle)
-{
-}
-
-/**
- * Execute callbacks in another thread (requires Thread Safe enabled PHP).
- *
- * @param UVLoop $loop
- * @param callable $callback
- * @param callable $after_callback
- *
- * @return void
- */
-function uv_queue_work(UVLoop $loop, callable $callback, callable $after_callback)
-{
-}
-
-/**
- * Open specified file.
- *
- * @param UVLoop $loop uv_loop handle.
- * @param string $path file path
- * @param int $flag file flag. this should be UV::O_RDONLY and some constants flag.
- * @param int $mode mode flag. this should be UV::S_IRWXU and some mode flag.
- * @param callable $callback this callback parameter expects (resource $stream).
- *
  * @return resource
  */
 function uv_fs_open(UVLoop $loop, string $path, int $flag, int $mode, callable $callback)
@@ -1119,120 +795,44 @@ function uv_fs_fchmod(UVLoop $loop, $fd, int $mode, callable $callback): void
 {
 }
 
-/**
- * Async chown.
- *
- * @param UVLoop $loop uv loop handle.
- * @param string $path
- * @param int $uid
- * @param int $gid
- * @param callable $callback
- *
- * @return void
- */
 function uv_fs_chown(UVLoop $loop, string $path, int $uid, int $gid, callable $callback): void
 {
 }
 
 /**
- * Async fchown.
- *
- * @param UVLoop $loop uv loop handle.
  * @param resource $fd
- * @param int $uid
- * @param int $gid
- * @param callable $callback
- *
- * @return void
  */
 function uv_fs_fchown(UVLoop $loop, $fd, int $uid, int $gid, callable $callback): void
 {
 }
 
-/**
- * Async link.
- *
- * @param UVLoop $loop uv loop handle.
- * @param string $from
- * @param string $to
- * @param callable $callback
- *
- * @return void
- */
 function uv_fs_link(UVLoop $loop, string $from, string $to, callable $callback): void
 {
 }
 
-/**
- * Async symlink.
- *
- * @param UVLoop $loop uv loop handle.
- * @param string $from
- * @param string $to
- * @param int $flags
- * @param callable $callback
- *
- * @return void
- */
 function uv_fs_symlink(UVLoop $loop, string $from, string $to, int $flags, callable $callback): void
 {
 }
 
-/**
- * Async readlink.
- *
- * @param UVLoop $loop uv loop handle
- * @param string $path
- * @param callable $callback
- *
- * @return void
- */
 function uv_fs_readlink(UVLoop $loop, string $path, callable $callback): void
 {
 }
 
-/**
- * Async stat.
- *
- * @param UVLoop $loop uv loop handle
- * @param string $path
- * @param callable $callback this callback parameter expects (resource $stream, array $stat)
- *
- * @return void
- */
 function uv_fs_stat(UVLoop $loop, string $path, callable $callback): void
 {
 }
 
-/**
- * Async lstat.
- *
- * @param UVLoop $loop uv loop handle
- * @param string $path
- * @param callable $callback
- *
- * @return void
- */
 function uv_fs_lstat(UVLoop $loop, string $path, callable $callback): void
 {
 }
 
 /**
- * Async fstat.
- *
- * @param UVLoop $loop uv loop handle.
  * @param resource $fd
- * @param callable $callback
- *
- * @return void
  */
 function uv_fs_fstat(UVLoop $loop, $fd, callable $callback): void
 {
 }
 
-/**
- * @param UVLoop $loop
- */
 function uv_fs_readdir(UVLoop $loop, string $path, int $flags, callable $callback): void
 {
 }

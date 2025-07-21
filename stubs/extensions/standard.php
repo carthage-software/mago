@@ -4353,3 +4353,1226 @@ function mail(
 function openlog(string $prefix, int $flags, int $facility): bool
 {
 }
+
+const ARRAY_FILTER_USE_BOTH = 1;
+
+const ARRAY_FILTER_USE_KEY = 2;
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> ...$arrays
+ *
+ * @return array<K, V>
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_merge_recursive(array ...$arrays)
+{
+}
+
+/**
+ * @param array<array-key, mixed> $array
+ * @param array<array-key, mixed> ...$replacements
+ *
+ * @return array<array-key, mixed>
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_replace(array $array, array ...$replacements): array
+{
+}
+
+/**
+ * @param array<array-key, mixed> $array
+ * @param array<array-key, mixed> ...$replacements
+ *
+ * @return array<array-key, mixed>
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_replace_recursive(array $array, array ...$replacements): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param V $filter_value
+ * @param bool $strict
+ *
+ * @return ($array is non-empty-array ? non-empty-list<K> : list<K>)
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($array is non-empty-array ? non-empty-list<V> : list<V>)
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_values(array $array): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V as array-key
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<V, int>
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_count_values(array $array): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<array-key, array<K, V>> $array
+ * @param K|null $column_key
+ * @param K|null $index_key
+ *
+ * @return array<array-key, V>
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_column(array $array, string|int|null $column_key, string|int|null $index_key = null): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param bool $preserve_keys
+ *
+ * @return ($preserve_keys ? array<K, V> : list<V>)
+ *
+ * @no-named-arguments
+ * @pure
+ */
+function array_reverse(array $array, bool $preserve_keys = false): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ * @template I
+ *
+ * @param array<K, V> $array
+ * @param (callable(null|I, V): I) $callback
+ * @param null|I $initial
+ *
+ * @return I
+ */
+function array_reduce(array $array, callable $callback, mixed $initial = null): mixed
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ * @template T
+ *
+ * @param array<K, V> $array
+ * @param T $value
+ *
+ * @return ($length is int<1, max> ? non-empty-array<K, V|T> : array<K, V|T>)
+ *
+ * @pure
+ */
+function array_pad(array $array, int $length, mixed $value): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V as array-key
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($array is non-empty-array ? non-empty-array<V, K> : array<V, K>)
+ *
+ * @pure
+ */
+function array_flip(array $array): array
+{
+}
+
+/**
+ *
+ * @template V
+ *
+ * @param array<string, V> $array
+ * @param int $case
+ *
+ * @return ($array is non-empty-array ? non-empty-array<string, V> : array<string, V>)
+ *
+ * @pure
+ */
+function array_change_key_case(array $array, int $case = CASE_LOWER): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V as array-key
+ *
+ * @param array<K, V> $array
+ * @param int<0, max> $num
+ *
+ * @return ($num is 1 ? K : array<K>)
+ *
+ * @pure
+ */
+function array_rand(array $array, int $num = 1): array|string|int
+{
+}
+
+/**
+ * @template K
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param int<0, 5> $flags
+ *
+ * @return array<K, V>
+ *
+ * @pure
+ */
+function array_unique(array $array, int $flags = SORT_STRING): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_intersect(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ *
+ * @pure
+ */
+function array_intersect_key(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_intersect_assoc(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_diff(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_diff_key(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ *
+ * @pure
+ */
+function array_diff_assoc(array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @param array<num> $array
+ *
+ * @pure
+ */
+function array_sum(array $array): int|float
+{
+}
+
+/**
+ * @param array<num> $array
+ *
+ * @pure
+ */
+function array_product(array $array): int|float
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param null|(callable(V, K): bool)|(callable(V): bool)|(callable(K): bool) $callback
+ *
+ * @return array<K, V>
+ */
+function array_filter(array $array, null|callable $callback, int $mode = 0): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ * @template S
+ * @template U
+ *
+ * @param (callable(V, S): U)|null $callback
+ * @param array<K, V> $array
+ * @param array<S> ...$arrays
+ *
+ * @return array<K, U>
+ */
+function array_map(null|callable $callback, array $array, array ...$arrays): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($preserve_keys is true ? list<array<K, V>> : list<list<V>>)
+ *
+ * @pure
+ */
+function array_chunk(array $array, int $length, bool $preserve_keys = false): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K> $keys
+ * @param array<V> $values
+ *
+ * @return ($keys is non-empty-array ? non-empty-array<K, V> : array<K, V>)
+ *
+ * @pure
+ */
+function array_combine(array $keys, array $values): array
+{
+}
+
+/**
+ * @pure
+ */
+function array_key_exists(string|int|float|bool|null $key, array $array): bool
+{
+}
+
+/**
+ * @template K as array-key
+ *
+ * @param array<K, mixed> $array
+ *
+ * @return K|null
+ *
+ * @pure
+ */
+function array_key_first(array $array): string|int|null
+{
+}
+
+/**
+ * @template K as array-key
+ *
+ * @param array<K, mixed> $array
+ *
+ * @return K|null
+ *
+ * @pure
+ */
+function array_key_last(array $array): string|int|null
+{
+}
+
+/**
+ * @pure
+ */
+function pos(object|array $array): mixed
+{
+}
+
+/**
+ * @return int<0, max>
+ *
+ * @pure
+ */
+function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param K $key
+ * @param array<K, V> $array
+ */
+function key_exists($key, array $array): bool
+{
+}
+
+/**
+ * @assert truthy $assertion
+ */
+function assert(mixed $assertion, Throwable|string|null $description = null): bool
+{
+}
+
+class AssertionError extends Error
+{
+}
+
+/**
+ * @deprecated
+ */
+function assert_options(int $option, mixed $value): mixed
+{
+}
+
+/**
+ * @param null|'<'|'lt'|'<='|'le'|'>'|'gt'|'>='|'ge'|'=='|'='|'eq'|'!='|'<>'|'ne' $operator
+ *
+ * @return int<-1, 1>|bool
+ *
+ * @pure
+ */
+function version_compare(string $version1, string $version2, null|string $operator): int|bool
+{
+}
+
+function ftok(string $filename, string $project_id): int
+{
+}
+
+/**
+ * @pure
+ */
+function str_rot13(string $string): string
+{
+}
+
+/**
+ * @return list<string>
+ */
+function stream_get_filters(): array
+{
+}
+
+/**
+ * @param resource $stream
+ */
+function stream_isatty($stream): bool
+{
+}
+
+/**
+ * @param class-string $class
+ */
+function stream_filter_register(string $filter_name, string $class): bool
+{
+}
+
+/**
+ * @param resource $brigade
+ */
+function stream_bucket_make_writeable($brigade): StreamBucket|null
+{
+}
+
+/**
+ * @param resource $brigade
+ */
+function stream_bucket_prepend($brigade, StreamBucket $bucket): void
+{
+}
+
+/**
+ * @param resource $brigade
+ */
+function stream_bucket_append($brigade, StreamBucket $bucket): void
+{
+}
+
+/**
+ * @param resource $stream
+ */
+function stream_bucket_new($stream, string $buffer): StreamBucket
+{
+}
+
+function output_add_rewrite_var(string $name, string $value): bool
+{
+}
+
+function output_reset_rewrite_vars(): bool
+{
+}
+
+/**
+ * @return non-empty-string
+ */
+function sys_get_temp_dir(): string
+{
+}
+
+function realpath_cache_get(): array
+{
+}
+
+function realpath_cache_size(): int
+{
+}
+
+function get_mangled_object_vars(object $object): array
+{
+}
+
+/**
+ * @return non-empty-string
+ *
+ * @pure
+ */
+function get_debug_type(mixed $value): string
+{
+}
+
+/**
+ * @param resource $resource
+ *
+ * @pure
+ */
+function get_resource_id($resource): int
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_diff_ukey(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_udiff(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_udiff_assoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_diff_uassoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_udiff_uassoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_uintersect_assoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_intersect_uassoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_uintersect_uassoc(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_intersect_ukey(array $array, ...$rest): array
+{
+}
+
+/**
+ * @no-named-arguments
+ */
+function array_uintersect(array $array, ...$rest): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function ksort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function krsort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function natsort(array &$array): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function natcasesort(array &$array): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function asort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out array<K, V> $array
+ */
+function arsort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T> $array
+ *
+ * @param-out list<T> $array
+ */
+function sort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T> $array
+ *
+ * @param-out list<T> $array
+ */
+function rsort(array &$array, int $flags = SORT_REGULAR): true
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T> $array
+ * @param (callable(T, T): int) $callback
+ *
+ * @param-out list<T> $array
+ */
+function usort(array &$array, callable $callback): true
+{
+}
+
+/**
+ * @template K
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param (callable(V, V): int) $callback
+ *
+ * @param-out array<K, V> $array
+ */
+function uasort(array &$array, callable $callback): true
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param (callable(K, K): int) $callback
+ *
+ * @param-out array<K, V> $array
+ */
+function uksort(array &$array, callable $callback): true
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T> $array
+ *
+ * @param-out list<T> $array
+ */
+function shuffle(array &$array): true
+{
+}
+
+/**
+ * @return int<0, max>
+ *
+ * @pure
+ */
+function count(Countable|array $value, int $mode = COUNT_NORMAL): int
+{
+}
+
+/**
+ * @template T
+ *
+ * @param object|array<T> $array
+ *
+ * @return T|false
+ */
+function end(object|array &$array): mixed
+{
+}
+
+/**
+ * @template T
+ *
+ * @param object|array<T> $array
+ *
+ * @return T|false
+ */
+function prev(object|array &$array): mixed
+{
+}
+
+/**
+ * @template T
+ *
+ * @param object|array<T> $array
+ *
+ * @return T|false
+ */
+function next(object|array &$array): mixed
+{
+}
+
+/**
+ * @template T
+ *
+ * @param object|array<T> $array
+ *
+ * @return T|false
+ */
+function reset(object|array &$array): mixed
+{
+}
+
+/**
+ * @template T
+ *
+ * @param object|array<T> $array
+ *
+ * @return T|null
+ *
+ * @pure
+ */
+function current(object|array $array): mixed
+{
+}
+
+/**
+ * @template K of array-key
+ *
+ * @param object|array<K, mixed> $array
+ *
+ * @return K|null
+ *
+ * @pure
+ */
+function key(object|array $array): string|int|null
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T>|T $value
+ * @param T ...$values
+ *
+ * @return T
+ *
+ * @pure
+ */
+function min(mixed $value, mixed ...$values): mixed
+{
+}
+
+/**
+ * @template T
+ *
+ * @param array<T>|T $value
+ * @param T ...$values
+ *
+ * @return T
+ *
+ * @pure
+ */
+function max(mixed $value, mixed ...$values): mixed
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param K $needle
+ * @param array<K, V> $haystack
+ *
+ * @pure
+ */
+function in_array(mixed $needle, array $haystack, bool $strict = false): bool
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param K $needle
+ * @param array<K, V> $haystack
+ *
+ * @return K|false
+ *
+ * @pure
+ */
+function array_search(mixed $needle, array $haystack, bool $strict = false): string|int|false
+{
+}
+
+/**
+ * @template T
+ *
+ * @param T $value
+ *
+ * @return (
+ *   $start_index is 0 ?
+ *   ($count is int<1, max> ? non-empty-list<T> : list<T>) :
+ *   ($count is int<1, max> ? non-empty-array<int, T> : array<int, T>)
+ * )
+ *
+ * @pure
+ */
+function array_fill(int $start_index, int $count, mixed $value): array
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K> $keys
+ * @param V $value
+ *
+ * @return ($keys is non-empty-array<K> ? non-empty-array<K, V> : array<K, V>)
+ *
+ * @pure
+ */
+function array_fill_keys(array $keys, mixed $value): array
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param V ...$values
+ *
+ * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K, V>) $array
+ *
+ * @return int<1, max>
+ *
+ * @pure
+ */
+function array_push(array &$array, mixed ...$values): int
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
+ *
+ * @return V|null
+ */
+function array_pop(array &$array): mixed
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
+ *
+ * @return V|null
+ *
+ * @pure
+ */
+function array_shift(array &$array): mixed
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return ($preserve_keys is true ? array<K, V> : list<V>) $array
+ *
+ * @pure
+ */
+function array_slice(array $array, int $offset, null|int $length = null, bool $preserve_keys = false): array
+{
+}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> ...$arrays
+ *
+ * @return array<K, V>
+ *
+ * @pure
+ */
+function array_merge(array ...$arrays): array
+{
+}
+
+/**
+ * @param (callable(string, null|int): string)|null $callback
+ */
+function ob_start(callable|null $callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT_HANDLER_STDFLAGS): bool
+{
+}
+
+function ob_flush(): bool
+{
+}
+
+function ob_clean(): bool
+{
+}
+
+function ob_end_flush(): bool
+{
+}
+
+function ob_end_clean(): bool
+{
+}
+
+function ob_get_flush(): string|false
+{
+}
+
+function ob_get_clean(): string|false
+{
+}
+
+function ob_get_length(): int|false
+{
+}
+
+function ob_get_level(): int
+{
+}
+
+/**
+ * @return array{
+ *   level: int,
+ *   type: int,
+ *   flags: int,
+ *   name: string,
+ *   del: int,
+ *   chunk_size: int,
+ *   buffer_size: int,
+ *   buffer_used: int
+ * }
+ */
+function ob_get_status(bool $full_status = false): array
+{
+}
+
+function ob_get_contents(): string|false
+{
+}
+
+function ob_implicit_flush(bool $enable = true): void
+{
+}
+
+/**
+ * @return list<non-empty-string>
+ */
+function ob_list_handlers(): array
+{
+}
+
+function syslog(int $priority, string $message): true
+{
+}
+
+function closelog(): true
+{
+}
+
+/**
+ * @param (callable(): void) $callback
+ */
+function header_register_callback(callable $callback): bool
+{
+}
+
+/**
+ * @return false|array{
+ *  0: int,
+ *  1: int,
+ *  2: int,
+ *  3: string,
+ *  bits: int,
+ *  channels: int,
+ *  mime: string
+ * }
+ */
+function getimagesizefromstring(string $string, &$image_info): array|false
+{
+}
+
+/**
+ * @param resource $stream
+ */
+function stream_set_chunk_size($stream, int $size): int
+{
+}
+
+/**
+ * @pure
+ */
+function metaphone(string $string, int $max_phonemes = 0): string
+{
+}
+
+function array_walk(object|array &$array, callable $callback, mixed $arg = null): true
+{
+}
+
+function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true
+{
+}
+
+/**
+ * @param array<string, mixed> $array
+ *
+ * @return int<0, max>
+ */
+function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int
+{
+}
+
+/**
+ * @param string|array<string> $var_name
+ * @param string|array<string> ...$var_names
+ *
+ * @return array<string, mixed>
+ *
+ * @pure
+ */
+function compact($var_name, ...$var_names): array
+{
+}
+
+/**
+ * @param positive-int|float $step
+ *
+ * @return (
+ *   $start is string
+ *   ? (
+ *     $end is string
+ *     ? ($step is int ? list<string> : list{float})
+ *     : ($end is float ? list<float> : ($step is float ? list<float> : list<int>))
+ *   )
+ *   : (
+ *     $start is float
+ *     ? list<float>
+ *     : ($end is float ? list<float> : ($step is float ? list<float> : list<int>))
+ *   )
+ * )
+ *
+ * @pure
+ */
+function range(string|int|float $start, string|int|float $end, int|float $step = 1): array
+{
+}
+
+/**
+ * @pure
+ */
+function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REGULAR, &...$rest): bool
+{
+}
+
+/**
+ * @template K of array-key
+ * @template V
+ * @template T
+ *
+ * @param array<K, V> $array
+ * @param T ...$values
+ *
+ * @param-out array<K, V|T> $array
+ *
+ * @return int<0, max>
+ *
+ * @pure
+ */
+function array_unshift(array &$array, mixed ...$values): int
+{
+}
+
+/**
+ * @pure
+ */
+function array_splice(array &$array, int $offset, null|int $length = null, mixed $replacement = []): array
+{
+}

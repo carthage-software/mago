@@ -92,7 +92,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
     /**
      * @param string|int $offset
      *
-     * @return bool true on success or false on failure.
+     * @return bool
      */
     public function offsetExists($offset)
     {

@@ -99,200 +99,187 @@ class Zookeeper
     }
 
     /**
-     * Delete a node in zookeeper synchronously.
      * @param string $path
      * @param int $version
+     *
      * @return bool
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperNoNodeException when path does not exist
-     * @link https://www.php.net/manual/en/zookeeper.delete.php
+     * @throws ZookeeperNoNodeException
      */
     public function delete($path, $version = -1)
     {
     }
 
     /**
-     * Sets the data associated with a node.
      * @param string $path
      * @param string $data
      * @param int $version
-     * @param array  &$stat
+     *
+     * @param-out array $stat
+     *
      * @return bool
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperNoNodeException when path does not exist
-     * @link https://www.php.net/manual/en/zookeeper.set.php
+     * @throws ZookeeperNoNodeException
      */
     public function set($path, $data, $version = -1, &$stat = null)
     {
     }
 
     /**
-     * Gets the data associated with a node synchronously.
      * @param string $path
      * @param callable $watcher_cb
-     * @param array    &$stat
      * @param int $max_size
+     *
+     * @param-out array $stat
+     *
      * @return string
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperNoNodeException when path does not exist
-     * @link https://www.php.net/manual/en/zookeeper.get.php
+     * @throws ZookeeperNoNodeException
      */
     public function get($path, $watcher_cb = null, &$stat = null, $max_size = 0)
     {
     }
 
     /**
-     * Get children data of a path.
      * @param string $path
      * @param callable $watcher_cb
+     *
      * @return array|false
-     * @throws ZookeeperException       when connection not in connected status
-     * @throws ZookeeperNoNodeException when path does not exist
-     * @link https://www.php.net/manual/en/zookeeper.getchildren.php
+     *
+     * @throws ZookeeperException
+     * @throws ZookeeperNoNodeException
      */
-    #[Pure]
     public function getChildren($path, $watcher_cb = null)
     {
     }
 
     /**
-     * Checks the existence of a node in zookeeper synchronously.
      * @param string $path
      * @param callable $watcher_cb
+     *
      * @return bool
+     *
      * @throws ZookeeperException
-     * @link https://www.php.net/manual/en/zookeeper.exists.php
      */
     public function exists($path, $watcher_cb = null)
     {
     }
 
     /**
-     * Gets the acl associated with a node synchronously.
      * @param string $path
+     *
      * @return array
-     * @throws ZookeeperException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.getacl.php
+     *
+     * @throws ZookeeperException
      */
-    #[Pure]
     public function getAcl($path)
     {
     }
 
     /**
-     * Sets the acl associated with a node synchronously.
      * @param string $path
      * @param int $version
      * @param array $acls
+     *
      * @return bool
-     * @throws ZookeeperException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.setacl.php
+     *
+     * @throws ZookeeperException
      */
     public function setAcl($path, $version, $acls)
     {
     }
 
     /**
-     * return the client session id, only valid if the connections is currently connected
-     * (ie. last watcher state is ZOO_CONNECTED_STATE).
      * @return int
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.getclientid.php
+     * @throws ZookeeperConnectionException
      */
-    #[Pure]
     public function getClientId()
     {
     }
 
     /**
-     * Set a watcher function.
      * @param callable $watcher_cb
+     *
      * @return bool
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.setwatcher.php
+     * @throws ZookeeperConnectionException
      */
     public function setWatcher($watcher_cb)
     {
     }
 
     /**
-     * Get the state of the zookeeper connection.
      * @return int
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.getstate.php
+     * @throws ZookeeperConnectionException
      */
-    #[Pure]
     public function getState()
     {
     }
 
     /**
-     * Return the timeout for this session, only valid if the connections is currently connected
-     * (ie. last watcher state is ZOO_CONNECTED_STATE). This value may change after a server reconnect.
      * @return int
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.getrecvtimeout.php
+     * @throws ZookeeperConnectionException
      */
-    #[Pure]
     public function getRecvTimeout()
     {
     }
 
     /**
-     * Specify application credentials.
      * @param string $scheme
      * @param string $cert
      * @param callable $completion_cb
+     *
      * @return bool
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.addauth.php
+     * @throws ZookeeperConnectionException
      */
     public function addAuth($scheme, $cert, $completion_cb = null)
     {
     }
 
     /**
-     * Checks if the current zookeeper connection state can be recovered.
      * @return bool
+     *
      * @throws ZookeeperException
-     * @throws ZookeeperConnectionException when connection not in connected status
-     * @link https://www.php.net/manual/en/zookeeper.isrecoverable.php
+     * @throws ZookeeperConnectionException
      */
     public function isRecoverable()
     {
     }
 
     /**
-     * Sets the stream to be used by the library for logging.
-     * TODO: might be able to set a stream like php://stderr or something
      * @param resource $file
+     *
      * @return bool
-     * @link https://www.php.net/manual/en/zookeeper.setlogstream.php
      */
     public function setLogStream($file)
     {
     }
 
     /**
-     * Sets the debugging level for the library.
      * @param int $level
+     *
      * @return bool
-     * @link https://www.php.net/manual/en/zookeeper.setdebuglevel.php
      */
     public static function setDebugLevel($level)
     {
     }
 
     /**
-     * Enable/disable quorum endpoint order randomization.
      * @param bool $trueOrFalse
+     *
      * @return bool
-     * @link https://www.php.net/manual/en/zookeeper.setdeterministicconnorder.php
      */
     public static function setDeterministicConnOrder($trueOrFalse)
     {
