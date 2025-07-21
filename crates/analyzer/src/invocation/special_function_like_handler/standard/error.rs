@@ -4,6 +4,7 @@ use mago_codex::ttype::union::TUnion;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
+use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::special_function_like_handler::SpecialFunctionLikeHandlerTrait;
 
@@ -14,6 +15,7 @@ impl SpecialFunctionLikeHandlerTrait for ErrorFunctionsHandler {
     fn get_return_type<'a>(
         &self,
         context: &mut Context<'a>,
+        _block_context: &BlockContext<'a>,
         _artifacts: &AnalysisArtifacts,
         function_like_name: &str,
         _invocation: &Invocation,

@@ -10,19 +10,21 @@ use mago_span::Span;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
+use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationTarget;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::special_function_like_handler::handle_special_functions;
 
-pub fn fetch_invocation_return_type(
-    context: &mut Context<'_>,
+pub fn fetch_invocation_return_type<'a>(
+    context: &mut Context<'a>,
+    block_context: &BlockContext<'a>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'_>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
 ) -> TUnion {
-    if let Some(return_type) = handle_special_functions(context, artifacts, invocation) {
+    if let Some(return_type) = handle_special_functions(context, block_context, artifacts, invocation) {
         return add_dataflow(artifacts, invocation.span, &invocation.target, return_type);
     }
 

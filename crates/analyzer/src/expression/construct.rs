@@ -208,8 +208,14 @@ impl Analyzable for PrintConstruct {
             &mut argument_types,
         )?;
 
-        let return_type =
-            fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &argument_types);
+        let return_type = fetch_invocation_return_type(
+            context,
+            block_context,
+            artifacts,
+            &invocation,
+            &template_result,
+            &argument_types,
+        );
 
         artifacts.set_expression_type(self, return_type);
 

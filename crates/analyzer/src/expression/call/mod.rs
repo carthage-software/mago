@@ -110,7 +110,14 @@ fn analyze_invocation_targets<'a>(
         )?;
 
         resulting_type = Some(add_optional_union_type(
-            fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &argument_types),
+            fetch_invocation_return_type(
+                context,
+                block_context,
+                artifacts,
+                &invocation,
+                &template_result,
+                &argument_types,
+            ),
             resulting_type.as_ref(),
             context.codebase,
             context.interner,

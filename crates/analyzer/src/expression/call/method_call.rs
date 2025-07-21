@@ -149,7 +149,14 @@ pub fn analyze_implicit_method_call<'a>(
 
     populate_template_result_from_invocation(context, &invocation, &mut template_result);
 
-    let result = fetch_invocation_return_type(context, artifacts, &invocation, &template_result, &Default::default());
+    let result = fetch_invocation_return_type(
+        context,
+        block_context,
+        artifacts,
+        &invocation,
+        &template_result,
+        &Default::default(),
+    );
 
     post_invocation_process(
         context,

@@ -407,7 +407,17 @@ final class Closure
     {
     }
 
+    /**
+     * @pure
+     */
     public static function fromCallable(callable $callback): Closure
+    {
+    }
+
+    /**
+     * @pure
+     */
+    public static function getCurrent(): Closure
     {
     }
 }

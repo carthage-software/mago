@@ -330,4 +330,132 @@ mod tests {
             TypingIssueKind::InvalidArgument,
         ]
     }
+
+    test_analysis! {
+        name = get_current_closure,
+        code = indoc! {r#"
+            <?php
+
+            class Closure {
+                /**
+                 * @pure
+                 */
+                public static function getCurrent(): Closure
+                {
+                    exit(0);
+                }
+            }
+
+            $fibaonacci =
+                /**
+                 * @pure
+                 */
+                function (int $n): int {
+                    if ($n <= 1) {
+                        return $n;
+                    }
+
+                    $fibaonacci = Closure::getCurrent();
+
+                    return $fibaonacci($n - 1) + $fibaonacci($n - 2);
+                };
+
+            echo $fibaonacci(10);
+        "#}
+    }
+
+    test_analysis! {
+        name = get_current_closure_inside_function,
+        code = indoc! {r#"
+            <?php
+
+            class Closure {
+                /**
+                 * @pure
+                 */
+                public static function getCurrent(): Closure
+                {
+                    exit(0);
+                }
+            }
+
+            function fibaonacci(int $n): int {
+                if ($n <= 1) {
+                    return $n;
+                }
+
+                $fibaonacci = Closure::getCurrent();
+
+                return $fibaonacci($n - 1) + $fibaonacci($n - 2);
+            }
+
+            echo fibaonacci(10);
+        "#},
+        issues = [
+            TypingIssueKind::InvalidStaticMethodCall,
+            TypingIssueKind::ImpossibleAssignment,
+            TypingIssueKind::UnevaluatedCode,
+            TypingIssueKind::UnusedAssignment,
+        ]
+    }
+
+    test_analysis! {
+        name = get_current_closure_inside_method,
+        code = indoc! {r#"
+            <?php
+
+            class Closure {
+                /**
+                 * @pure
+                 */
+                public static function getCurrent(): Closure
+                {
+                    exit(0);
+                }
+            }
+
+            class Foo {
+                public function fibaonacci(int $n): int {
+                    if ($n <= 1) {
+                        return $n;
+                    }
+
+                    $fibaonacci = Closure::getCurrent();
+
+                    return $fibaonacci($n - 1) + $fibaonacci($n - 2);
+                }
+            }
+
+            echo (new Foo())->fibaonacci(10);
+        "#},
+        issues = [
+            TypingIssueKind::InvalidStaticMethodCall,
+            TypingIssueKind::ImpossibleAssignment,
+            TypingIssueKind::UnevaluatedCode,
+            TypingIssueKind::UnusedAssignment,
+        ]
+    }
+
+    test_analysis! {
+    name = get_current_closure_in_global_scope,
+    code = indoc! {r#"
+            <?php
+
+            class Closure {
+                /**
+                 * @pure
+                 */
+                public static function getCurrent(): Closure
+                {
+                    exit(0);
+                }
+            }
+
+            $_fn = Closure::getCurrent();
+        "#},
+        issues = [
+            TypingIssueKind::InvalidStaticMethodCall,
+            TypingIssueKind::ImpossibleAssignment,
+        ]
+    }
 }
