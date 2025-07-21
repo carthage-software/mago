@@ -172,16 +172,20 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 }
 
 pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
-    let (is_next_literal_int, is_next_colon) = if let Some(next) = stream.lookahead(1)? {
-        (next.kind == TypeTokenKind::LiteralInteger, next.kind == TypeTokenKind::Colon)
+    let (is_next_literal_int, is_next_colon, is_next_question_mark) = if let Some(next) = stream.lookahead(1)? {
+        (
+            next.kind == TypeTokenKind::LiteralInteger,
+            next.kind == TypeTokenKind::Colon,
+            next.kind == TypeTokenKind::Question,
+        )
     } else {
-        (false, false)
+        (false, false, false)
     };
 
     let is_negated_or_posited = stream.is_at(TypeTokenKind::Plus)? || stream.is_at(TypeTokenKind::Minus)?;
 
-    let is_literal_string = stream.is_at(TypeTokenKind::LiteralString)? && is_next_colon;
-    let is_literal_integer = stream.is_at(TypeTokenKind::LiteralInteger)? && is_next_colon;
+    let is_literal_string = stream.is_at(TypeTokenKind::LiteralString)? && (is_next_colon || is_next_question_mark);
+    let is_literal_integer = stream.is_at(TypeTokenKind::LiteralInteger)? && (is_next_colon || is_next_question_mark);
     let is_negated_or_posited_integer = is_negated_or_posited && is_next_literal_int;
 
     if is_literal_integer || is_literal_string || is_negated_or_posited_integer {

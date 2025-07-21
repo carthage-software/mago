@@ -1007,4 +1007,31 @@ mod tests {
             res => panic!("Expected Ok(Type::Callable), got {res:?}"),
         }
     }
+
+    #[test]
+    fn test_parse_optional_literal_string_shape_field() {
+        match do_parse("array{'salt'?: int, 'cost'?: int, ...}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 2);
+                assert!(shape.additional_fields.is_some());
+
+                let first_field = &shape.fields[0];
+                assert!(first_field.is_optional());
+                assert!(matches!(
+                    first_field.key.as_ref().map(|k| k.name.as_ref()),
+                    Some(Type::LiteralString(LiteralStringType { raw: "'salt'", value: "salt", .. }))
+                ));
+                assert!(matches!(first_field.value.as_ref(), Type::Int(_)));
+
+                let second_field = &shape.fields[1];
+                assert!(second_field.is_optional());
+                assert!(matches!(
+                    second_field.key.as_ref().map(|k| k.name.as_ref()),
+                    Some(Type::LiteralString(LiteralStringType { raw: "'cost'", value: "cost", .. }))
+                ));
+                assert!(matches!(second_field.value.as_ref(), Type::Int(_)));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
 }
