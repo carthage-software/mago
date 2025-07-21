@@ -72,7 +72,7 @@ function preg_replace(
     array|string $replacement,
     array|string $subject,
     int $limit = -1,
-    &$count,
+    &$count = null,
 ): array|string|null {
 }
 
@@ -90,7 +90,7 @@ function preg_replace_callback(
     callable $callback,
     array|string $subject,
     int $limit = -1,
-    &$count,
+    &$count = null,
     int $flags = 0,
 ): array|string|null {
 }
@@ -107,7 +107,7 @@ function preg_replace_callback_array(
     array $pattern,
     array|string $subject,
     int $limit = -1,
-    &$count,
+    &$count = null,
     int $flags = 0,
 ): array|string|null {
 }
@@ -126,7 +126,7 @@ function preg_filter(
     array|string $replacement,
     array|string $subject,
     int $limit = -1,
-    &$count,
+    &$count = null,
 ): array|string|null {
 }
 

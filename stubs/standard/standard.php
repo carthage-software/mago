@@ -1311,21 +1311,21 @@ function strnatcasecmp(string $string1, string $string2): int
  *
  * @pure
  */
-function substr_count(string $haystack, string $needle, int $offset = 0, null|int $length): int
+function substr_count(string $haystack, string $needle, int $offset = 0, null|int $length = null): int
 {
 }
 
 /**
  * @pure
  */
-function strspn(string $string, string $characters, int $offset = 0, null|int $length): int
+function strspn(string $string, string $characters, int $offset = 0, null|int $length = null): int
 {
 }
 
 /**
  * @pure
  */
-function strcspn(string $string, string $characters, int $offset = 0, null|int $length): int
+function strcspn(string $string, string $characters, int $offset = 0, null|int $length = null): int
 {
 }
 
@@ -1501,7 +1501,7 @@ function str_shuffle(string $string): string
  *
  * @pure
  */
-function str_word_count(string $string, int $format = 0, null|string $characters): array|int
+function str_word_count(string $string, int $format = 0, null|string $characters = null): array|int
 {
 }
 
@@ -1530,7 +1530,7 @@ function substr_compare(
     string $haystack,
     string $needle,
     int $offset,
-    null|int $length,
+    null|int $length = null,
     bool $case_insensitive = false,
 ): int {
 }
@@ -1717,7 +1717,7 @@ function strip_tags(string $string, string|array|null $allowed_tags = null): str
 /**
  * @pure
  */
-function similar_text(string $string1, string $string2, &$percent): int
+function similar_text(string $string1, string $string2, &$percent = null): int
 {
 }
 
