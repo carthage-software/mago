@@ -394,13 +394,13 @@ pub fn get_union_from_type_ast<'i>(
                 IntOrKeyword::Keyword(_) => None,
             };
 
-            if let (Some(min_value), Some(max_value)) = (min, max) {
-                if min_value > max_value {
-                    return Err(TypeError::InvalidType(
-                        "Minimum value of an int range cannot be greater than maximum value".to_string(),
-                        ttype.span(),
-                    ));
-                }
+            if let (Some(min_value), Some(max_value)) = (min, max)
+                && min_value > max_value
+            {
+                return Err(TypeError::InvalidType(
+                    "Minimum value of an int range cannot be greater than maximum value".to_string(),
+                    ttype.span(),
+                ));
             }
 
             TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))])
