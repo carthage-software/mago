@@ -367,6 +367,215 @@ impl TInteger {
         false
     }
 
+    /// Computes the set difference of two integer types, returning the parts
+    /// of `self` that are not present in `other`.
+    ///
+    /// This method treats the integer variants as sets of numbers and
+    /// calculates the logical difference `self` - `other`.
+    ///
+    /// The `conservative_subtraction` flag controls the precision of this
+    /// operation. When `false`, a precise set difference is always computed.
+    ///
+    /// When `true`, the operation is bypassed for any non-literal `other` type
+    /// (`Unspecified`, `Range`, `From`, `To`), and the method simply returns
+    /// a vector containing a copy of `self`. This provides a trade-off
+    /// between precision and performance.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: The type to subtract from `self`.
+    /// - `conservative_subtraction`: If `true`, the subtraction is bypassed
+    ///   for non-literal types, returning `vec![self]` instead.
+    pub fn difference(&self, other: Self, conservative_subtraction: bool) -> Vec<Self> {
+        let mut res = Vec::with_capacity(2);
+        match other {
+            TInteger::Unspecified if !conservative_subtraction => {
+                // Subtracting the entire set leaves nothing.
+            }
+            TInteger::Literal(b) => match *self {
+                TInteger::Unspecified => {
+                    if b > i64::MIN {
+                        res.push(TInteger::To(b - 1));
+                    }
+
+                    if b < i64::MAX {
+                        res.push(TInteger::From(b + 1));
+                    }
+                }
+                TInteger::Literal(a) => {
+                    if a != b {
+                        res.push(TInteger::Literal(a));
+                    }
+                }
+                TInteger::Range(a1, a2) => {
+                    if b < a1 || b > a2 {
+                        res.push(TInteger::Range(a1, a2));
+                    } else {
+                        if b > a1 {
+                            res.push(TInteger::Range(a1, b - 1));
+                        }
+
+                        if b < a2 {
+                            res.push(TInteger::Range(b + 1, a2));
+                        }
+                    }
+                }
+                TInteger::From(a) => {
+                    if b < a {
+                        res.push(TInteger::From(a));
+                    } else {
+                        if b > a {
+                            res.push(TInteger::Range(a, b - 1));
+                        }
+
+                        if b < i64::MAX {
+                            res.push(TInteger::From(b + 1));
+                        }
+                    }
+                }
+                TInteger::To(a) => {
+                    if b > a {
+                        res.push(TInteger::To(a));
+                    } else {
+                        if b > i64::MIN {
+                            res.push(TInteger::To(b - 1));
+                        }
+
+                        if b < a {
+                            res.push(TInteger::Range(b + 1, a));
+                        }
+                    }
+                }
+            },
+            TInteger::Range(b1, b2) if !conservative_subtraction => match *self {
+                TInteger::Unspecified => {
+                    if b1 > i64::MIN {
+                        res.push(TInteger::To(b1 - 1));
+                    }
+                    if b2 < i64::MAX {
+                        res.push(TInteger::From(b2 + 1));
+                    }
+                }
+                TInteger::Literal(a) => {
+                    if a >= b1 && a <= b2 {
+                        // Fully contained.
+                    } else {
+                        res.push(TInteger::Literal(a));
+                    }
+                }
+                TInteger::Range(a1, a2) => {
+                    if a2 < b1 || a1 > b2 {
+                        res.push(TInteger::Range(a1, a2));
+                    } else {
+                        if a1 < b1 {
+                            res.push(TInteger::Range(a1, b1 - 1));
+                        }
+                        if a2 > b2 {
+                            res.push(TInteger::Range(b2 + 1, a2));
+                        }
+                    }
+                }
+                TInteger::From(a) => {
+                    // [a, MAX] - [b1, b2]
+                    if b2 < a {
+                        res.push(TInteger::From(a));
+                    } else {
+                        if a < b1 {
+                            res.push(TInteger::Range(a, b1 - 1));
+                        }
+                        if b2 < i64::MAX {
+                            res.push(TInteger::From(b2 + 1));
+                        }
+                    }
+                }
+                TInteger::To(a) => {
+                    // [MIN, a] - [b1, b2]
+                    if b1 > a {
+                        res.push(TInteger::To(a));
+                    } else {
+                        if b1 > i64::MIN {
+                            res.push(TInteger::To(b1 - 1));
+                        }
+                        if a > b2 {
+                            res.push(TInteger::Range(b2 + 1, a));
+                        }
+                    }
+                }
+            },
+            // Subtracting an unbounded range [b, MAX].
+            TInteger::From(b) if !conservative_subtraction => match *self {
+                TInteger::Unspecified => {
+                    if b > i64::MIN {
+                        res.push(TInteger::To(b - 1));
+                    }
+                }
+                TInteger::Literal(a) => {
+                    if a < b {
+                        res.push(TInteger::Literal(a));
+                    }
+                }
+                TInteger::Range(a1, a2) => {
+                    if a2 < b {
+                        res.push(TInteger::Range(a1, a2));
+                    } else if a1 < b {
+                        res.push(TInteger::Range(a1, b - 1));
+                    }
+                }
+                TInteger::From(a) => {
+                    if a < b {
+                        res.push(TInteger::Range(a, b - 1));
+                    }
+                }
+                TInteger::To(a) => {
+                    if a < b {
+                        res.push(TInteger::To(a));
+                    } else if b > i64::MIN {
+                        res.push(TInteger::To(b - 1));
+                    }
+                }
+            },
+            // Subtracting an unbounded range [MIN, b].
+            TInteger::To(b) if !conservative_subtraction => match *self {
+                TInteger::Unspecified => {
+                    if b < i64::MAX {
+                        res.push(TInteger::From(b + 1));
+                    }
+                }
+                TInteger::Literal(a) => {
+                    if a > b {
+                        res.push(TInteger::Literal(a));
+                    }
+                }
+                TInteger::Range(a1, a2) => {
+                    if a1 > b {
+                        res.push(TInteger::Range(a1, a2));
+                    } else if a2 <= b {
+                        // Fully contained.
+                    } else {
+                        res.push(TInteger::Range(b + 1, a2));
+                    }
+                }
+                TInteger::From(a) => {
+                    if a > b {
+                        res.push(TInteger::From(a));
+                    } else if b < i64::MAX {
+                        res.push(TInteger::From(b + 1));
+                    }
+                }
+                TInteger::To(a) => {
+                    if a > b {
+                        res.push(TInteger::Range(b + 1, a));
+                    }
+                }
+            },
+            _ => {
+                res.push(*self);
+            }
+        };
+
+        res
+    }
+
     /// Returns a new `TInteger` that represents the negation of the current type.
     pub fn negated(&self) -> Self {
         match *self {

@@ -165,7 +165,7 @@ impl Assertion {
         )
     }
 
-    pub fn has_literal_string_or_int(&self) -> bool {
+    pub fn has_literal_value(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
             | Assertion::IsNotIdentical(atomic)
@@ -175,6 +175,57 @@ impl Assertion {
             | Assertion::IsNotEqual(atomic) => {
                 atomic.is_literal_int() || atomic.is_literal_float() || atomic.is_known_literal_string()
             }
+
+            _ => false,
+        }
+    }
+
+    pub fn has_integer(&self) -> bool {
+        match self {
+            Assertion::IsIdentical(atomic)
+            | Assertion::IsNotIdentical(atomic)
+            | Assertion::IsType(atomic)
+            | Assertion::IsNotType(atomic)
+            | Assertion::IsEqual(atomic)
+            | Assertion::IsNotEqual(atomic) => atomic.is_int(),
+            _ => false,
+        }
+    }
+
+    pub fn has_literal_string(&self) -> bool {
+        match self {
+            Assertion::IsIdentical(atomic)
+            | Assertion::IsNotIdentical(atomic)
+            | Assertion::IsType(atomic)
+            | Assertion::IsNotType(atomic)
+            | Assertion::IsEqual(atomic)
+            | Assertion::IsNotEqual(atomic) => atomic.is_known_literal_string(),
+
+            _ => false,
+        }
+    }
+
+    pub fn has_literal_int(&self) -> bool {
+        match self {
+            Assertion::IsIdentical(atomic)
+            | Assertion::IsNotIdentical(atomic)
+            | Assertion::IsType(atomic)
+            | Assertion::IsNotType(atomic)
+            | Assertion::IsEqual(atomic)
+            | Assertion::IsNotEqual(atomic) => atomic.is_literal_int(),
+
+            _ => false,
+        }
+    }
+
+    pub fn has_literal_float(&self) -> bool {
+        match self {
+            Assertion::IsIdentical(atomic)
+            | Assertion::IsNotIdentical(atomic)
+            | Assertion::IsType(atomic)
+            | Assertion::IsNotType(atomic)
+            | Assertion::IsEqual(atomic)
+            | Assertion::IsNotEqual(atomic) => atomic.is_literal_float(),
 
             _ => false,
         }

@@ -84,7 +84,7 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) => {
+            TAtomic::Scalar(TScalar::Integer(integer_to_subtract)) => {
                 return Some(subtract_int(
                     context,
                     assertion,
@@ -93,6 +93,7 @@ pub(crate) fn reconcile(
                     negated,
                     span,
                     assertion.has_equality(),
+                    integer_to_subtract,
                 ));
             }
             TAtomic::Scalar(TScalar::String(string)) if string.is_boring() => {
@@ -527,6 +528,7 @@ fn subtract_int(
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
+    integer_to_subtract: &TInteger,
 ) -> TUnion {
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
@@ -548,6 +550,7 @@ fn subtract_int(
                     false,
                     None,
                     is_equality,
+                    integer_to_subtract,
                 ));
 
                 acceptable_types.push(new_atomic);
@@ -579,6 +582,19 @@ fn subtract_int(
 
             if !is_equality {
                 retain_types.push(TAtomic::Scalar(TScalar::float()));
+            } else {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::Integer(existing_integer)) = atomic {
+            did_remove_type = true;
+
+            if !is_equality {
+                acceptable_types.extend(
+                    existing_integer
+                        .difference(*integer_to_subtract, false)
+                        .into_iter()
+                        .map(|i| TAtomic::Scalar(TScalar::Integer(i))),
+                );
             } else {
                 acceptable_types.push(atomic);
             }

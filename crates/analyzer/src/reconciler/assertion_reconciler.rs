@@ -72,9 +72,8 @@ pub fn reconcile(
         );
     }
 
-    if let Some(assertion_type) = assertion.get_type()
-        && assertion_type.is_literal()
-        && !assertion_type.is_null()
+    if assertion.has_literal_value()
+        && let Some(assertion_type) = assertion.get_type()
     {
         return handle_literal_equality(
             context,

@@ -40,7 +40,7 @@ pub(crate) fn reconcile(
     negated: bool,
 ) -> TUnion {
     let is_equality = assertion.has_equality();
-    if is_equality && assertion.has_literal_string_or_int() {
+    if is_equality && assertion.has_literal_value() {
         if existing_var_type.is_mixed() {
             return existing_var_type.clone();
         }
@@ -330,20 +330,19 @@ fn handle_literal_negated_equality(
                 }
             }
             TAtomic::Scalar(TScalar::Integer(_)) => {
-                let existing_value = existing_atomic_type.get_literal_int_value();
-                let assertion_value = assertion_type.get_literal_int_value();
+                let existing_integer = existing_atomic_type.get_integer();
+                let assertion_integer = assertion_type.get_integer();
 
-                match (existing_value, assertion_value) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
-                    }
-                    (None, Some(_)) => {
+                match (existing_integer, assertion_integer) {
+                    (Some(existing_integer), Some(assertion_integer)) => {
                         did_remove_type = true;
-                        acceptable_types.push(existing_atomic_type);
+
+                        acceptable_types.extend(
+                            existing_integer
+                                .difference(assertion_integer, false)
+                                .into_iter()
+                                .map(|remaining_integer| TAtomic::Scalar(TScalar::Integer(remaining_integer))),
+                        )
                     }
                     _ => {
                         acceptable_types.push(existing_atomic_type);

@@ -28,6 +28,7 @@ use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::resource::TResource;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::get_mixed;
@@ -728,6 +729,13 @@ impl TAtomic {
     pub fn get_class_string_value(&self) -> Option<StringIdentifier> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_class_string_value(),
+            _ => None,
+        }
+    }
+
+    pub fn get_integer(&self) -> Option<TInteger> {
+        match self {
+            TAtomic::Scalar(TScalar::Integer(integer)) => Some(*integer),
             _ => None,
         }
     }

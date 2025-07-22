@@ -234,6 +234,7 @@ pub(crate) fn reconcile(
                     negated,
                     span,
                     assertion.has_equality(),
+                    i,
                 ));
             }
             TAtomic::Mixed(mixed) if mixed.is_vanilla() || mixed.is_isset_from_loop() => {
@@ -950,6 +951,7 @@ fn intersect_int(
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
+    integer: &TInteger,
 ) -> TUnion {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
@@ -957,17 +959,18 @@ fn intersect_int(
     for atomic in &existing_var_type.types {
         match atomic {
             TAtomic::Scalar(TScalar::Integer(_)) => {
-                acceptable_types.push(atomic.clone());
+                acceptable_types.push(TAtomic::Scalar(TScalar::Integer(*integer)));
             }
             TAtomic::Mixed(_)
             | TAtomic::Scalar(TScalar::Generic)
             | TAtomic::Scalar(TScalar::Number)
             | TAtomic::Scalar(TScalar::ArrayKey) => {
-                return get_int();
+                return TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(*integer))]);
             }
             TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
                 if constraint.is_mixed() {
-                    let atomic = atomic.replace_template_constraint(get_int());
+                    let atomic = atomic
+                        .replace_template_constraint(TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(*integer))]));
 
                     acceptable_types.push(atomic);
                 } else {
@@ -979,6 +982,7 @@ fn intersect_int(
                         false,
                         None,
                         is_equality,
+                        integer,
                     ));
                     acceptable_types.push(atomic);
                 }
@@ -989,7 +993,13 @@ fn intersect_int(
                 if let Some(span) = span {
                     let name_str = context.interner.lookup(name);
                     if let Some((lower_bounds, _)) = context.artifacts.type_variable_bounds.get_mut(name_str) {
-                        let mut bound = TemplateBound::new(get_int(), 0, None, None);
+                        let mut bound = TemplateBound::new(
+                            TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(*integer))]),
+                            0,
+                            None,
+                            None,
+                        );
+
                         bound.span = Some(*span);
                         lower_bounds.push(bound);
                     }
@@ -1003,7 +1013,7 @@ fn intersect_int(
                     context.codebase,
                     context.interner,
                     atomic,
-                    &TAtomic::Scalar(TScalar::int()),
+                    &TAtomic::Scalar(TScalar::Integer(*integer)),
                     false,
                     &mut ComparisonResult::new(),
                 ) {
