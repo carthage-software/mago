@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
+use colored::Colorize;
 use tokio::task::JoinHandle;
 
 use mago_analyzer::Analyzer;
@@ -98,6 +99,19 @@ pub struct AnalyzeCommand {
 /// 3. Analyzing the user-defined sources against the compiled codebase (with progress).
 /// 4. Reporting any found issues.
 pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> Result<ExitCode, Error> {
+    eprintln!();
+    eprintln!("{}", "╔════════════════════════════════════════════════════════════════════════════════╗");
+    eprintln!("║{}║", format!(" {:^80} ", "⚠️  EXPERIMENTAL ANALYZER ⚠️").bold().yellow());
+    eprintln!("{}", "╠════════════════════════════════════════════════════════════════════════════════╣");
+    eprintln!("║{}║", format!(" {:<78} ", "The analyzer is a work in progress. You may encounter:"));
+    eprintln!("║{}║", format!(" {:<78} ", "  - False positive errors in your code."));
+    eprintln!("║{}║", format!(" {:<78} ", "  - Unexpected panics or crashes."));
+    eprintln!("║{}║", format!(" {:<78} ", ""));
+    eprintln!("║{}║", format!(" {:<78} ", "Please report any issues to the Mago repository:"));
+    eprintln!("║{}║", format!(" {:<78} ", "  https://github.com/carthage-software/mago/issues"));
+    eprintln!("{}", "╚════════════════════════════════════════════════════════════════════════════════╝");
+    eprintln!();
+
     let interner = ThreadedInterner::new();
 
     let source_manager = if !command.path.is_empty() {
