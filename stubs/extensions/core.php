@@ -970,7 +970,7 @@ function property_exists(object|string $object_or_class, string $property): bool
 /**
  * @param string $trait
  *
- * @assert-if-true trait-string $trait
+ * @assert-if-true =trait-string $trait
  *
  * @pure
  * @no-named-arguments
@@ -982,7 +982,7 @@ function trait_exists(string $trait, bool $autoload = true): bool
 /**
  * @param string $class
  *
- * @assert-if-true class-string $class
+ * @assert-if-true =class-string $class
  *
  * @pure
  * @no-named-arguments
@@ -994,7 +994,7 @@ function class_exists(string $class, bool $autoload = true): bool
 /**
  * @param string $interface
  *
- * @assert-if-true interface-string $interface
+ * @assert-if-true =interface-string $interface
  *
  * @pure
  * @no-named-arguments
@@ -1006,7 +1006,7 @@ function interface_exists(string $interface, bool $autoload = true): bool
 /**
  * @param string $function
  *
- * @assert-if-true non-empty-string $function
+ * @assert-if-true =non-empty-string $function
  *
  * @pure
  * @no-named-arguments
@@ -1018,7 +1018,7 @@ function function_exists(string $function): bool
 /**
  * @param string $enum
  *
- * @assert-if-true enum-string $enum
+ * @assert-if-true =enum-string $enum
  *
  * @pure
  * @no-named-arguments

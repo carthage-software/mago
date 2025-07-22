@@ -1479,4 +1479,56 @@ mod tests {
             }
         "#}
     }
+
+    test_analysis! {
+        name = resource_reconciliation,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @assert-if-true open-resource $value
+             *
+             * @return ($value is open-resource ? true : false)
+             *
+             * @pure
+             */
+            function is_resource(mixed $value): bool
+            {
+                return is_resource($value);
+            }
+
+            /** @return resource */
+            function get_resource(): mixed
+            {
+                return get_resource();
+            }
+
+            /** @param open-resource $resource */
+            function take_open_resource(mixed $resource): void
+            {
+                take_open_resource($resource);
+            }
+
+            /** @param closed-resource $resource */
+            function take_closed_resource(mixed $resource): void
+            {
+                take_closed_resource($resource);
+            }
+
+            /** @param resource $resource */
+            function take_resource(mixed $resource): void
+            {
+                if (is_resource($resource)) {
+                    take_open_resource($resource);
+                } else {
+                    take_closed_resource($resource);
+                }
+            }
+
+            function main(): void
+            {
+                take_resource(get_resource());
+            }
+        "#}
+    }
 }

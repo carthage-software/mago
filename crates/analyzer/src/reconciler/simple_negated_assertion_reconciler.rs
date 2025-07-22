@@ -1,5 +1,6 @@
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::resource::TResource;
 use mago_span::Span;
 
 use mago_codex::assertion::Assertion;
@@ -142,6 +143,17 @@ pub(crate) fn reconcile(
             }
             TAtomic::Null => {
                 return Some(subtract_null(context, assertion, existing_var_type, key, negated, span));
+            }
+            TAtomic::Resource(resource_to_subtract) => {
+                return Some(subtract_resource(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    resource_to_subtract,
+                ));
             }
             TAtomic::Mixed(mixed) if mixed.is_non_null() => {
                 return Some(intersect_null(context, assertion, existing_var_type, key, negated, span));
@@ -932,6 +944,72 @@ pub(crate) fn subtract_null(
             TAtomic::Null => {
                 did_remove_type = true;
             }
+            _ => {
+                acceptable_types.push(atomic);
+            }
+        }
+    }
+
+    get_acceptable_type(
+        context,
+        acceptable_types,
+        did_remove_type,
+        key,
+        span,
+        existing_var_type,
+        assertion,
+        negated,
+        true,
+        new_var_type,
+    )
+}
+
+pub(crate) fn subtract_resource(
+    context: &mut ReconcilationContext<'_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    negated: bool,
+    span: Option<&Span>,
+    resource_to_subtract: &TResource,
+) -> TUnion {
+    let mut did_remove_type = false;
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = vec![];
+
+    for atomic in new_var_type.types.drain(..) {
+        match atomic {
+            TAtomic::GenericParameter(TGenericParameter { ref constraint, .. }) => {
+                let new_atomic = atomic.replace_template_constraint(subtract_resource(
+                    context,
+                    assertion,
+                    constraint,
+                    None,
+                    false,
+                    None,
+                    resource_to_subtract,
+                ));
+
+                acceptable_types.push(new_atomic);
+
+                did_remove_type = true;
+            }
+            TAtomic::Resource(existing_resource) => match (existing_resource.closed, resource_to_subtract.closed) {
+                (Some(true), Some(true)) | (Some(false), Some(false)) | (_, None) => {
+                    did_remove_type = true;
+                }
+                (None, Some(true)) => {
+                    acceptable_types.push(TAtomic::Resource(TResource { closed: Some(false) }));
+                    did_remove_type = true;
+                }
+                (None, Some(false)) => {
+                    acceptable_types.push(TAtomic::Resource(TResource { closed: Some(true) }));
+                    did_remove_type = true;
+                }
+                _ => {
+                    acceptable_types.push(atomic);
+                }
+            },
             _ => {
                 acceptable_types.push(atomic);
             }

@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -136,6 +137,17 @@ pub(crate) fn reconcile(
             }
             TAtomic::Null => {
                 return Some(intersect_null(context, assertion, existing_var_type, key, negated, span));
+            }
+            TAtomic::Resource(resource_to_intersect) => {
+                return Some(intersect_resource(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    resource_to_intersect,
+                ));
             }
             TAtomic::Mixed(mixed) if mixed.is_non_null() => {
                 return Some(subtract_null(context, assertion, existing_var_type, key, !negated, span));
@@ -372,6 +384,75 @@ pub(crate) fn intersect_null(
                 did_remove_type = true;
             }
             TAtomic::Object(TObject::Named(named_object)) if !named_object.has_type_parameters() => {
+                did_remove_type = true;
+            }
+            _ => {
+                did_remove_type = true;
+            }
+        }
+    }
+
+    if (acceptable_types.is_empty() || !did_remove_type)
+        && let Some(key) = key
+        && let Some(span) = span
+    {
+        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+
+        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::new(acceptable_types);
+    }
+
+    get_never()
+}
+
+pub(crate) fn intersect_resource(
+    context: &mut ReconcilationContext<'_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    negated: bool,
+    span: Option<&Span>,
+    resource_to_intersection: &TResource,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return TUnion::new(vec![TAtomic::Resource(*resource_to_intersection)]);
+    }
+
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
+
+    for atomic in &existing_var_type.types {
+        match atomic {
+            TAtomic::Resource(existing_resource) => match (existing_resource.closed, resource_to_intersection.closed) {
+                (Some(true), Some(true)) | (Some(false), Some(false)) | (None, None) | (Some(_), None) => {
+                    acceptable_types.push(TAtomic::Resource(*existing_resource));
+                }
+                (None, Some(true) | Some(false)) => {
+                    did_remove_type = true;
+
+                    acceptable_types.push(TAtomic::Resource(*resource_to_intersection));
+                }
+                (Some(true), Some(false)) | (Some(false), Some(true)) => {
+                    did_remove_type = true;
+                }
+            },
+            TAtomic::Null => {
+                acceptable_types.push(TAtomic::Null);
+            }
+            TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
+                if constraint.is_mixed() {
+                    let atomic = atomic.replace_template_constraint(get_null());
+
+                    acceptable_types.push(atomic);
+                } else {
+                    let atomic = atomic
+                        .replace_template_constraint(intersect_null(context, assertion, constraint, None, false, None));
+
+                    acceptable_types.push(atomic);
+                }
                 did_remove_type = true;
             }
             _ => {

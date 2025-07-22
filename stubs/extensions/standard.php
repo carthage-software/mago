@@ -2767,9 +2767,9 @@ function is_null(mixed $value): bool
 }
 
 /**
- * @assert-if-true resource $value
+ * @assert-if-true open-resource $value
  *
- * @return ($value is resource ? true : false)
+ * @return ($value is open-resource ? true : false)
  *
  * @pure
  */
