@@ -39,6 +39,8 @@ pub struct ResolvedMethod {
     pub method_identifier: MethodIdentifier,
     /// The type of `$this` or the static class type if it's a static method.
     pub static_class_type: StaticClassType,
+    /// True if this method is static, meaning it can be called without an instance.
+    pub is_static: bool,
 }
 
 /// Holds the results of resolving a method call, including valid targets and summary flags.
@@ -79,13 +81,11 @@ pub fn resolve_method_targets<'a>(
 ) -> Result<MethodResolutionResult, AnalysisError> {
     let mut result = MethodResolutionResult::default();
 
-    // 1. Analyze the object expression
     let was_inside_general_use = block_context.inside_general_use;
     block_context.inside_general_use = true;
     object.analyze(context, block_context, artifacts)?;
     block_context.inside_general_use = was_inside_general_use;
 
-    // 2. Resolve the method selector to get potential names
     let resolved_selectors = resolve_member_selector(context, block_context, artifacts, selector)?;
     let mut method_names = Vec::new();
 
@@ -198,10 +198,12 @@ pub fn resolve_method_from_object<'a>(
         object,
         selector,
         object_type,
+        object_type,
         method_name,
         access_span,
         result,
     );
+
     for (metadata, declaring_method_id, object, classname) in method_ids {
         let declaring_class_metadata =
             get_class_like(context.codebase, context.interner, declaring_method_id.get_class_name())
@@ -236,6 +238,7 @@ pub fn resolve_method_from_object<'a>(
             method_identifier: declaring_method_id,
             static_class_type: StaticClassType::Object(object.clone()),
             classname,
+            is_static: false,
         });
     }
 
@@ -248,6 +251,7 @@ pub fn get_method_ids_from_object<'a, 'b>(
     object: &Expression,
     selector: &ClassLikeMemberSelector,
     object_type: &'b TObject,
+    outer_object: &'b TObject,
     method_name: StringIdentifier,
     access_span: Span,
     result: &mut MethodResolutionResult,
@@ -273,7 +277,7 @@ pub fn get_method_ids_from_object<'a, 'b>(
     }
 
     if method_id_exists(context.codebase, context.interner, &method_id) {
-        ids.push((class_metadata, method_id, object_type, *name));
+        ids.push((class_metadata, method_id, outer_object, *name));
     }
 
     if !check_method_visibility(
@@ -298,6 +302,7 @@ pub fn get_method_ids_from_object<'a, 'b>(
                         object,
                         selector,
                         intersected_object,
+                        object_type,
                         method_name,
                         access_span,
                         result,
@@ -314,6 +319,7 @@ pub fn get_method_ids_from_object<'a, 'b>(
                                 object,
                                 selector,
                                 intersected_object,
+                                object_type,
                                 method_name,
                                 access_span,
                                 result,

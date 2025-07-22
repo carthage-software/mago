@@ -1,13 +1,18 @@
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_method_id;
+use mago_codex::get_interface;
 use mago_codex::get_method_by_id;
 use mago_codex::get_method_id;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_specialized_template_type;
+use mago_codex::ttype::wrap_atomic;
 use mago_interner::StringIdentifier;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
@@ -22,6 +27,8 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::issue::TypingIssueKind;
+use crate::resolver::class_name::ResolutionOrigin;
+use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
@@ -59,122 +66,130 @@ pub fn resolve_static_method_targets<'a>(
         }
     }
 
-    for class_res in &class_resolutions {
-        if class_res.is_possibly_invalid() {
+    for resolved_classname in &class_resolutions {
+        if resolved_classname.is_possibly_invalid() {
             result.has_ambiguous_target = true;
-            if class_res.origin == crate::resolver::class_name::ResolutionOrigin::Invalid {
+            if resolved_classname.origin == ResolutionOrigin::Invalid {
                 result.has_invalid_target = true;
             }
-            continue;
-        }
 
-        let Some(fq_class_id) = class_res.fq_class_id else {
-            result.has_ambiguous_target = true;
-            continue;
-        };
-
-        let Some(metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
-            result.has_invalid_target = true;
-            continue;
-        };
-
-        if !class_res.is_object_instance() && metadata.kind.is_interface() {
-            report_static_access_on_interface(context, &metadata.original_name, class_expr.span());
-            result.has_invalid_target = true;
             continue;
         }
 
         for method_name in &method_names {
-            match find_static_method_in_class(
+            let resolved_methods = resolve_method_from_classname(
                 context,
                 block_context.scope.get_class_like(),
-                metadata,
                 *method_name,
-                &fq_class_id,
                 class_expr.span(),
                 method_selector.span(),
-                class_res.is_relative(),
-            ) {
-                Some(resolved_method) => {
-                    result.resolved_methods.push(resolved_method);
-                }
-                None => {
-                    result.has_invalid_target = true;
-                }
-            }
+                resolved_classname,
+                &mut result,
+            );
+
+            result.resolved_methods.extend(resolved_methods);
         }
     }
 
     Ok(result)
 }
 
-/// Finds a single static method in a class and validates it.
-fn find_static_method_in_class<'a>(
+fn resolve_method_from_classname<'a>(
     context: &mut Context<'a>,
     current_class_metadata: Option<&'a ClassLikeMetadata>,
-    defining_class_metadata: &'a ClassLikeMetadata,
     method_name: StringIdentifier,
-    fq_class_id: &StringIdentifier,
     class_span: Span,
     method_span: Span,
-    is_relative: bool,
+    classname: &ResolvedClassname,
+    result: &mut MethodResolutionResult,
+) -> Vec<ResolvedMethod> {
+    let mut resolve_method_from_class_id = |fq_class_id, result: &mut MethodResolutionResult| {
+        let defining_class_metadata = get_class_like(context.codebase, context.interner, &fq_class_id)?;
+
+        if !classname.is_object_instance() && defining_class_metadata.kind.is_interface() {
+            report_static_access_on_interface(context, &defining_class_metadata.original_name, class_span);
+            result.has_invalid_target = true;
+            return None;
+        }
+
+        let method = resolve_method_from_metadata(
+            context,
+            current_class_metadata,
+            method_name,
+            &fq_class_id,
+            defining_class_metadata,
+            classname,
+        )?;
+
+        if !method.is_static
+            && !classname.is_relative()
+            && !current_class_metadata.is_some_and(|current_class_metadata| {
+                current_class_metadata.name == defining_class_metadata.name
+                    || current_class_metadata.has_parent(&defining_class_metadata.name)
+            })
+        {
+            report_non_static_access(context, &method.method_identifier, method_span);
+            return None;
+        }
+
+        if method.is_static
+            && defining_class_metadata.kind.is_trait()
+            && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
+        {
+            report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
+        }
+
+        Some(method)
+    };
+
+    let mut resolved_methods = vec![];
+    if let Some(fq_class_id) = classname.fq_class_id
+        && let Some(resolved_method) = resolve_method_from_class_id(fq_class_id, result)
+    {
+        resolved_methods.push(resolved_method);
+    }
+
+    for intersection in classname.intersections.iter().filter_map(|c| c.fq_class_id) {
+        if let Some(resolved_method) = resolve_method_from_class_id(intersection, result) {
+            resolved_methods.push(resolved_method);
+        }
+    }
+
+    if resolved_methods.is_empty() {
+        let fq_class_id = classname
+            .fq_class_id
+            .or_else(|| classname.intersections.iter().find_map(|c| c.fq_class_id).iter().next().copied());
+
+        if let Some(fq_class_id) = fq_class_id {
+            result.has_invalid_target = true;
+            report_non_existent_method(context, class_span, method_span, method_name, &fq_class_id);
+        } else {
+            result.has_ambiguous_target = true;
+        }
+    }
+
+    resolved_methods
+}
+
+fn resolve_method_from_metadata<'a>(
+    context: &mut Context<'a>,
+    current_class_metadata: Option<&'a ClassLikeMetadata>,
+    method_name: StringIdentifier,
+    fq_class_id: &StringIdentifier,
+    defining_class_metadata: &'a ClassLikeMetadata,
+    classname: &ResolvedClassname,
 ) -> Option<ResolvedMethod> {
     let method_id = get_method_id(&defining_class_metadata.original_name, &method_name);
     let declaring_method_id = get_declaring_method_id(context.codebase, context.interner, &method_id);
-
-    let Some(function_like_metadata) = get_method_by_id(context.codebase, context.interner, &declaring_method_id)
-    else {
-        report_non_existent_method(context, class_span, method_span, method_name, fq_class_id);
-        return None;
-    };
-
-    let is_method_static = function_like_metadata.get_method_metadata().is_some_and(|m| m.is_static());
-
-    if !is_method_static
-        && !is_relative
-        && !current_class_metadata.is_some_and(|current_class_metadata| {
-            current_class_metadata.name == defining_class_metadata.name
-                || current_class_metadata.has_parent(&defining_class_metadata.name)
-        })
-    {
-        report_non_static_access(context, &declaring_method_id, method_span);
-        return None;
-    } else if is_method_static
-        && defining_class_metadata.kind.is_trait()
-        && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
-    {
-        report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
-    }
+    let function_like = get_method_by_id(context.codebase, context.interner, &declaring_method_id)?;
 
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata
-        && is_relative
+        && classname.is_relative()
     {
-        let mut type_parameters = vec![];
-        for (template_name, _) in &defining_class_metadata.template_types {
-            let Some(parameter) = get_specialized_template_type(
-                context.codebase,
-                context.interner,
-                template_name,
-                &defining_class_metadata.name,
-                current_class_metadata,
-                None,
-            ) else {
-                let defining_class_str = context.interner.lookup(&defining_class_metadata.original_name);
-                let template_name_str = context.interner.lookup(template_name);
-
-                panic!("Failed to get specialized template type for {template_name_str} in {defining_class_str}");
-            };
-
-            type_parameters.push(parameter);
-        }
-
-        let object = if type_parameters.is_empty() {
-            TObject::Named(TNamedObject::new(defining_class_metadata.original_name))
+        let object = if classname.is_parent() {
+            get_metadata_object(context, defining_class_metadata, current_class_metadata)
         } else {
-            TObject::Named(TNamedObject::new_with_type_parameters(
-                defining_class_metadata.original_name,
-                Some(type_parameters),
-            ))
+            get_metadata_object(context, current_class_metadata, current_class_metadata)
         };
 
         StaticClassType::Object(object)
@@ -186,6 +201,96 @@ fn find_static_method_in_class<'a>(
         classname: defining_class_metadata.name,
         method_identifier: declaring_method_id,
         static_class_type,
+        is_static: function_like.get_method_metadata().is_some_and(|m| m.is_static()),
+    })
+}
+
+fn get_metadata_object<'a>(
+    context: &Context<'a>,
+    class_like_metadata: &'a ClassLikeMetadata,
+    current_class_metadata: &'a ClassLikeMetadata,
+) -> TObject {
+    if class_like_metadata.kind.is_enum() {
+        return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });
+    }
+
+    let mut intersections = vec![];
+    for required_interface in &class_like_metadata.require_implements {
+        let Some(interface_metadata) = get_interface(context.codebase, context.interner, required_interface) else {
+            continue;
+        };
+
+        let TObject::Named(mut interface_type) =
+            get_metadata_object(context, interface_metadata, current_class_metadata)
+        else {
+            continue;
+        };
+
+        let interface_intersactions = std::mem::take(&mut interface_type.intersection_types);
+
+        interface_type.is_this = false;
+        intersections.push(TAtomic::Object(TObject::Named(interface_type)));
+        if let Some(interface_intersactions) = interface_intersactions {
+            intersections.extend(interface_intersactions);
+        }
+    }
+
+    for required_class in &class_like_metadata.require_extends {
+        let Some(parent_class_metadata) = get_class_like(context.codebase, context.interner, required_class) else {
+            continue;
+        };
+
+        let TObject::Named(mut parent_type) =
+            get_metadata_object(context, parent_class_metadata, current_class_metadata)
+        else {
+            continue;
+        };
+
+        let parent_intersections = std::mem::take(&mut parent_type.intersection_types);
+
+        parent_type.is_this = false;
+        intersections.push(TAtomic::Object(TObject::Named(parent_type)));
+        if let Some(parent_intersections) = parent_intersections {
+            intersections.extend(parent_intersections);
+        }
+    }
+
+    TObject::Named(TNamedObject {
+        name: class_like_metadata.original_name,
+        type_parameters: if !class_like_metadata.template_types.is_empty() {
+            Some(
+                class_like_metadata
+                    .template_types
+                    .iter()
+                    .map(|(parameter_name, template_map)| {
+                        if let Some(parameter) = get_specialized_template_type(
+                            context.codebase,
+                            context.interner,
+                            parameter_name,
+                            &class_like_metadata.name,
+                            current_class_metadata,
+                            None,
+                        ) {
+                            parameter
+                        } else {
+                            let (defining_entry, constraint) = template_map.iter().next().unwrap();
+
+                            wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
+                                parameter_name: *parameter_name,
+                                constraint: Box::new(constraint.clone()),
+                                defining_entity: *defining_entry,
+                                intersection_types: None,
+                            }))
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            None
+        },
+        is_this: true,
+        intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
+        remapped_parameters: false,
     })
 }
 

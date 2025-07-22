@@ -1,3 +1,6 @@
+use mago_codex::get_class_like;
+use mago_codex::get_interface;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -141,6 +144,12 @@ impl ResolvedClassname {
                 | ResolutionOrigin::Static { .. }
         )
     }
+
+    /// Checks if the resolution is from the `parent` keyword.
+    #[inline]
+    pub const fn is_parent(&self) -> bool {
+        matches!(self.origin, ResolutionOrigin::Named { is_parent: true, .. })
+    }
 }
 
 /// Resolves an AST `Expression` to one or more `ResolvedClassname` instances.
@@ -171,10 +180,12 @@ pub fn resolve_classnames_from_expression<'a>(
         }
         Expression::Self_(self_keyword) => {
             if let Some(self_class) = block_context.scope.get_class_like() {
-                possible_types.push(ResolvedClassname::new(
-                    Some(self_class.name),
-                    ResolutionOrigin::Named { is_parent: false, is_self: true },
-                ));
+                let origin = ResolutionOrigin::Named { is_parent: false, is_self: true };
+                let mut class_name = ResolvedClassname::new(Some(self_class.original_name), origin);
+
+                class_name.intersections = get_intersections_from_metadata(context, self_class);
+
+                possible_types.push(class_name);
             } else {
                 possible_types.push(ResolvedClassname::invalid());
                 context.buffer.report(
@@ -188,7 +199,10 @@ pub fn resolve_classnames_from_expression<'a>(
         Expression::Static(static_keyword) => {
             if let Some(self_class) = block_context.scope.get_class_like() {
                 let origin = ResolutionOrigin::Static { can_extend: !self_class.is_final };
-                possible_types.push(ResolvedClassname::new(Some(self_class.name), origin));
+                let mut classname = ResolvedClassname::new(Some(self_class.original_name), origin);
+                classname.intersections = get_intersections_from_metadata(context, self_class);
+
+                possible_types.push(classname);
             } else {
                 possible_types.push(ResolvedClassname::invalid());
                 context.buffer.report(
@@ -203,11 +217,16 @@ pub fn resolve_classnames_from_expression<'a>(
         }
         Expression::Parent(parent_keyword) => {
             if let Some(self_meta) = block_context.scope.get_class_like() {
-                if let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref() {
-                    possible_types.push(ResolvedClassname::new(
-                        Some(*parent_id_ref),
-                        ResolutionOrigin::Named { is_parent: true, is_self: false },
-                    ));
+                if let Some(parent_metadata) = self_meta
+                    .direct_parent_class
+                    .as_ref()
+                    .and_then(|id| get_class_like(context.codebase, context.interner, id))
+                {
+                    let origin = ResolutionOrigin::Named { is_parent: true, is_self: false };
+                    let mut classname = ResolvedClassname::new(Some(parent_metadata.original_name), origin);
+                    classname.intersections = get_intersections_from_metadata(context, self_meta);
+
+                    possible_types.push(classname);
                 } else {
                     context.buffer.report(
                         TypingIssueKind::InvalidParentType,
@@ -358,6 +377,39 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
     }
 
     get_class_name_from_atomic_impl(interner, atomic, false)
+}
+
+fn get_intersections_from_metadata(context: &Context<'_>, metadata: &ClassLikeMetadata) -> Vec<ResolvedClassname> {
+    if metadata.kind.is_enum() {
+        return vec![];
+    }
+
+    let mut intersections = vec![];
+    for required_interface in &metadata.require_implements {
+        let Some(interface_metadata) = get_interface(context.codebase, context.interner, required_interface) else {
+            continue;
+        };
+
+        intersections.extend(get_intersections_from_metadata(context, interface_metadata));
+        intersections.push(ResolvedClassname::new(
+            Some(interface_metadata.original_name),
+            ResolutionOrigin::Named { is_parent: false, is_self: false },
+        ));
+    }
+
+    for required_class in &metadata.require_extends {
+        let Some(parent_class_metadata) = get_class_like(context.codebase, context.interner, required_class) else {
+            continue;
+        };
+
+        intersections.extend(get_intersections_from_metadata(context, parent_class_metadata));
+        intersections.push(ResolvedClassname::new(
+            Some(parent_class_metadata.original_name),
+            ResolutionOrigin::Named { is_parent: true, is_self: false },
+        ));
+    }
+
+    intersections
 }
 
 pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: &StringIdentifier) {
