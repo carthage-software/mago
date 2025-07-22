@@ -100,16 +100,16 @@ pub struct AnalyzeCommand {
 /// 4. Reporting any found issues.
 pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> Result<ExitCode, Error> {
     eprintln!();
-    eprintln!("{}", "╔════════════════════════════════════════════════════════════════════════════════╗");
+    eprintln!("╔════════════════════════════════════════════════════════════════════════════════╗");
     eprintln!("║{}║", format!(" {:^80} ", "⚠️  EXPERIMENTAL ANALYZER ⚠️").bold().yellow());
-    eprintln!("{}", "╠════════════════════════════════════════════════════════════════════════════════╣");
-    eprintln!("║{}║", format!(" {:<78} ", "The analyzer is a work in progress. You may encounter:"));
-    eprintln!("║{}║", format!(" {:<78} ", "  - False positive errors in your code."));
-    eprintln!("║{}║", format!(" {:<78} ", "  - Unexpected panics or crashes."));
-    eprintln!("║{}║", format!(" {:<78} ", ""));
-    eprintln!("║{}║", format!(" {:<78} ", "Please report any issues to the Mago repository:"));
-    eprintln!("║{}║", format!(" {:<78} ", "  https://github.com/carthage-software/mago/issues"));
-    eprintln!("{}", "╚════════════════════════════════════════════════════════════════════════════════╝");
+    eprintln!("╠════════════════════════════════════════════════════════════════════════════════╣");
+    eprintln!("║ {:<78} ║", "The analyzer is a work in progress. You may encounter:");
+    eprintln!("║ {:<78} ║", "  - False positive errors in your code.");
+    eprintln!("║ {:<78} ║", "  - Unexpected panics or crashes.");
+    eprintln!("║ {:<78} ║", "");
+    eprintln!("║ {:<78} ║", "Please report any issues to the Mago repository:");
+    eprintln!("║ {:<78} ║", "  https://github.com/carthage-software/mago/issues");
+    eprintln!("╚════════════════════════════════════════════════════════════════════════════════╝");
     eprintln!();
 
     let interner = ThreadedInterner::new();
