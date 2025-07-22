@@ -766,7 +766,44 @@ impl Rem for TInteger {
         use TInteger::*;
 
         match (self, rhs) {
-            (Unspecified, _) | (_, Unspecified) => Unspecified,
+            (Unspecified, other) => match other {
+                Unspecified => Unspecified,
+                Literal(n) => {
+                    if n == 0 {
+                        // Division by zero is a potential error.
+                        Unspecified
+                    } else {
+                        // Result is in the range (-|n|, |n|).
+                        Range(-(n.abs() - 1), n.abs() - 1)
+                    }
+                }
+                From(_) => {
+                    // If n <= 0, the divisor range [n, max] includes 0 (error).
+                    // If n > 0, the result is int<-(max-1), max-1> (Unspecified).
+                    // Therefore, the outcome is always Unspecified.
+                    Unspecified
+                }
+                To(_) => {
+                    // If n >= 0, the divisor range [min, n] includes 0 (error).
+                    // If n < 0, the result is int<min+1, -min-1> or int<-max, max> (Unspecified).
+                    // Therefore, the outcome is always Unspecified.
+                    Unspecified
+                }
+                Range(n1, n2) => {
+                    // If the range contains 0, we represent the potential error as Unspecified.
+                    if n1 <= 0 && n2 >= 0 {
+                        Unspecified
+                    } else if 0 < n1 {
+                        // Divisor is positive, result range is bounded by n2.
+                        Range(-(n2 - 1), n2 - 1)
+                    } else {
+                        // n2 < 0
+                        // Divisor is negative, result range is bounded by n1.
+                        Range(n1 + 1, -n1 - 1)
+                    }
+                }
+            },
+            (_, Unspecified) => Unspecified,
             (_, rhs) if rhs.can_be_zero() => Unspecified,
             (Literal(l1), Literal(l2)) => {
                 if l1 == i64::MIN && l2 == -1 {
@@ -1143,6 +1180,10 @@ mod tests {
         assert_eq!(TInteger::Literal(10) % TInteger::Range(-1, 1), TInteger::Unspecified);
         assert_eq!(TInteger::Literal(100) % TInteger::Range(2, 5), TInteger::Unspecified);
         assert_eq!(TInteger::Literal(i64::MIN) % TInteger::Literal(-1), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified % TInteger::Literal(5), TInteger::Range(-4, 4));
+        assert_eq!(TInteger::Unspecified % TInteger::Range(1, 10), TInteger::Range(-9, 9));
+        assert_eq!(TInteger::Unspecified % TInteger::From(5), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified % TInteger::To(5), TInteger::Unspecified);
     }
 
     #[test]

@@ -3229,4 +3229,68 @@ mod tests {
             TypingIssueKind::ImpossibleCondition,
         ]
     }
+
+    test_analysis! {
+        name = int_mod,
+        code = indoc! {r#"
+            <?php
+
+            const NANOSECONDS_PER_SECOND = 1_000_000_000;
+
+            const MICROSECONDS_PER_SECOND = 1_000_000;
+
+            const MILLISECONDS_PER_SECOND = 1000;
+
+            const SECONDS_PER_MINUTE = 60;
+
+            const SECONDS_PER_HOUR = 3600;
+
+            final readonly class Duration
+            {
+                /**
+                 * @param int $hours
+                 * @param int<-59, 59> $minutes
+                 * @param int<-59, 59> $seconds
+                 * @param int<-999999999, 999999999> $nanoseconds
+                 *
+                 * @pure
+                 */
+                private function __construct(
+                    private int $hours,
+                    private int $minutes,
+                    private int $seconds,
+                    private int $nanoseconds,
+                ) {}
+
+                /**
+                 * @pure
+                 */
+                public static function fromParts(int $hours, int $minutes = 0, int $seconds = 0, int $nanoseconds = 0): self
+                {
+                    $s =
+                        (SECONDS_PER_HOUR * $hours) +
+                        (SECONDS_PER_MINUTE * $minutes) +
+                        $seconds +
+                        ((int) ($nanoseconds / NANOSECONDS_PER_SECOND));
+
+                    $ns = $nanoseconds % NANOSECONDS_PER_SECOND;
+
+                    if ($s < 0 && $ns > 0) {
+                        ++$s;
+                        $ns -= NANOSECONDS_PER_SECOND;
+                    } elseif ($s > 0 && $ns < 0) {
+                        --$s;
+                        $ns += NANOSECONDS_PER_SECOND;
+                    }
+
+                    $m = (int) ($s / 60);
+                    $s %= 60;
+                    $h = (int) ($m / 60);
+                    $m %= 60;
+
+                    return new self($h, $m, $s, $ns);
+                }
+            }
+        "#},
+    }
 }
