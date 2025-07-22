@@ -146,7 +146,7 @@ impl Analyzable for UnaryPrefix {
                             }
                         },
                         TAtomic::GenericParameter(parameter) => {
-                            if parameter.constraint.is_number() {
+                            if parameter.constraint.is_int_or_float() {
                                 resulting_types.push(TAtomic::GenericParameter(parameter.clone()));
                             }
                         }

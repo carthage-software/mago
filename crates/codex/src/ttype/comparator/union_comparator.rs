@@ -82,17 +82,60 @@ pub fn is_contained_by(
         let mut some_type_coerced_from_nested_mixed = false;
         let mut some_type_coerced_from_nested_any = false;
 
-        if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
-            if container_type.has_int() && container_type.has_string() {
+        if let TAtomic::Scalar(TScalar::Number) = input_type_part {
+            if container_type.has_int_and_float() {
                 continue;
             }
 
+            let mut has_int = false;
+            let mut has_float = false;
+
             for container_atomic_type in &container_atomic_types {
-                if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type
-                    && constraint.is_array_key()
-                {
-                    continue 'outer;
+                if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type {
+                    if constraint.has_int_and_float() {
+                        continue 'outer;
+                    }
+
+                    if constraint.has_int() {
+                        has_int = true;
+                    }
+
+                    if constraint.has_float() {
+                        has_float = true;
+                    }
                 }
+            }
+
+            if has_int && has_float {
+                continue;
+            }
+        }
+
+        if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
+            if container_type.has_int_and_string() {
+                continue;
+            }
+            let mut has_int = false;
+            let mut has_string = false;
+
+            for container_atomic_type in &container_atomic_types {
+                if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type {
+                    if constraint.has_int_and_string() {
+                        continue 'outer;
+                    }
+
+                    if constraint.has_int() {
+                        has_int = true;
+                    }
+
+                    if constraint.has_string() {
+                        has_string = true;
+                    }
+                }
+            }
+
+            if has_int && has_string {
+                continue;
             }
         }
 

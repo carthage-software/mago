@@ -1610,4 +1610,24 @@ mod tests {
             });
         "#},
     }
+
+    test_analysis! {
+        name = int_or_float,
+        code = indoc! {r#"
+            <?php
+
+            function example(int|float|string $x): void {
+                echo "The value is: $x\n";
+            }
+
+            function main(int $value, int $other): void {
+                $a = $value / $other;
+
+                example($a);
+                example($value);
+                example($other);
+                example('Hello, World!');
+            }
+        "#},
+    }
 }

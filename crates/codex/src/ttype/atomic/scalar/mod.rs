@@ -268,7 +268,7 @@ impl TScalar {
 
     /// Checks if this is any kind of number type (`int`, `float`, or `num`).
     #[inline]
-    pub const fn is_number(&self) -> bool {
+    pub const fn is_int_or_float(&self) -> bool {
         matches!(self, TScalar::Integer(_) | TScalar::Float(_) | TScalar::Number)
     }
 

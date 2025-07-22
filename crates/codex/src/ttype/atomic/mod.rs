@@ -75,10 +75,10 @@ impl TAtomic {
         }
     }
 
-    pub fn is_number(&self) -> bool {
+    pub fn is_int_or_float(&self) -> bool {
         match self {
-            TAtomic::Scalar(scalar) => scalar.is_number(),
-            TAtomic::GenericParameter(parameter) => parameter.constraint.is_number(),
+            TAtomic::Scalar(scalar) => scalar.is_int_or_float(),
+            TAtomic::GenericParameter(parameter) => parameter.constraint.is_int_or_float(),
             _ => false,
         }
     }

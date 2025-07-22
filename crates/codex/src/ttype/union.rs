@@ -204,6 +204,60 @@ impl TUnion {
         true
     }
 
+    pub fn has_int_or_float(&self) -> bool {
+        for atomic in &self.types {
+            if atomic.is_int_or_float() {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn has_int_and_float(&self) -> bool {
+        let mut has_int = false;
+        let mut has_float = false;
+
+        for atomic in &self.types {
+            if atomic.is_int() {
+                has_int = true;
+            } else if atomic.is_float() {
+                has_float = true;
+            } else if atomic.is_int_or_float() {
+                has_int = true;
+                has_float = true;
+            }
+
+            if has_int && has_float {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn has_int_and_string(&self) -> bool {
+        let mut has_int = false;
+        let mut has_string = false;
+
+        for atomic in &self.types {
+            if atomic.is_int() {
+                has_int = true;
+            } else if atomic.is_string() {
+                has_string = true;
+            } else if atomic.is_array_key() {
+                has_int = true;
+                has_string = true;
+            }
+
+            if has_int && has_string {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn has_int(&self) -> bool {
         for atomic in &self.types {
             if atomic.is_int() {
@@ -295,11 +349,11 @@ impl TUnion {
     }
 
     pub fn is_numeric(&self) -> bool {
-        self.types.iter().all(|t| t.is_numeric())
+        self.types.iter().all(|t| t.is_numeric()) && !self.types.is_empty()
     }
 
-    pub fn is_number(&self) -> bool {
-        self.types.iter().all(|t| t.is_number())
+    pub fn is_int_or_float(&self) -> bool {
+        self.types.iter().all(|t| t.is_int_or_float()) && !self.types.is_empty()
     }
 
     pub fn is_mixed(&self) -> bool {
@@ -575,11 +629,8 @@ impl TUnion {
         self.types.iter().any(|atomic| atomic.is_array_key() || atomic.is_int() || atomic.is_string())
     }
 
-    pub fn has_num(&self) -> bool {
-        self.types
-            .iter()
-            .any(|atomic| atomic.is_numeric() || atomic.is_number() || atomic.is_int() || atomic.is_float())
-            && !self.types.is_empty()
+    pub fn has_numeric(&self) -> bool {
+        self.types.iter().any(|atomic| atomic.is_numeric()) && !self.types.is_empty()
     }
 
     pub fn is_always_truthy(&self) -> bool {

@@ -647,7 +647,7 @@ fn handle_literal_equality_with_int(
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
     if existing_var_type.has_scalar()
-        || existing_var_type.has_num()
+        || existing_var_type.has_numeric()
         || existing_var_type.has_array_key()
         || existing_var_type.has_mixed()
     {
@@ -813,7 +813,7 @@ fn handle_literal_equality_with_float(
     let literal_asserted_type = TAtomic::Scalar(TScalar::literal_float(assertion_float_val));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
-    if existing_var_type.has_scalar() || existing_var_type.has_num() || existing_var_type.has_mixed() {
+    if existing_var_type.has_scalar() || existing_var_type.has_numeric() || existing_var_type.has_mixed() {
         return if is_loose_equality { existing_var_type.clone() } else { TUnion::new(vec![literal_asserted_type]) };
     }
 
