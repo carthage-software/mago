@@ -540,6 +540,11 @@ pub fn add_union_type(
     overwrite_empty_array: bool,
 ) -> TUnion {
     if &base_type == other_type {
+        base_type.possibly_undefined |= other_type.possibly_undefined;
+        base_type.possibly_undefined_from_try |= other_type.possibly_undefined_from_try;
+        base_type.ignore_falsable_issues |= other_type.ignore_falsable_issues;
+        base_type.ignore_nullable_issues |= other_type.ignore_nullable_issues;
+
         return base_type;
     }
 
@@ -560,17 +565,10 @@ pub fn add_union_type(
         base_type.reference_free = false;
     }
 
-    if other_type.possibly_undefined {
-        base_type.possibly_undefined = true;
-    }
-
-    if other_type.possibly_undefined_from_try {
-        base_type.possibly_undefined_from_try = true;
-    }
-
-    if other_type.ignore_falsable_issues {
-        base_type.ignore_falsable_issues = true;
-    }
+    base_type.possibly_undefined |= other_type.possibly_undefined;
+    base_type.possibly_undefined_from_try |= other_type.possibly_undefined_from_try;
+    base_type.ignore_falsable_issues |= other_type.ignore_falsable_issues;
+    base_type.ignore_nullable_issues |= other_type.ignore_nullable_issues;
 
     if !other_type.parent_nodes.is_empty() {
         extend_dataflow_uniquely(&mut base_type.parent_nodes, other_type.parent_nodes.clone());

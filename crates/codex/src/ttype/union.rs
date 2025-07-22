@@ -78,9 +78,6 @@ impl TUnion {
 
     pub fn set_possibly_undefined(&mut self, possibly_undefined: bool, from_try: Option<bool>) {
         let from_try = from_try.unwrap_or(self.possibly_undefined_from_try);
-        if self.possibly_undefined == possibly_undefined && self.possibly_undefined_from_try == from_try {
-            return;
-        }
 
         self.possibly_undefined = possibly_undefined;
         self.possibly_undefined_from_try = from_try;

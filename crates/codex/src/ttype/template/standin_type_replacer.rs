@@ -1352,6 +1352,7 @@ pub(crate) fn get_root_template_type(
 
         if let TAtomic::GenericParameter(TGenericParameter { parameter_name, defining_entity, .. }) = first_template {
             visited_entities.insert(*defining_entity);
+
             return Some(
                 get_root_template_type(
                     lower_bounds,
@@ -1365,7 +1366,7 @@ pub(crate) fn get_root_template_type(
             );
         }
 
-        return Some(mapped_type.clone());
+        return Some(mapped_type);
     }
 
     None
