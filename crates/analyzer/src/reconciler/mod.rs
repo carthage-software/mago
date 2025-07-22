@@ -1529,6 +1529,34 @@ mod tests {
             {
                 take_resource(get_resource());
             }
+
+            class StreamHandler
+            {
+                /**
+                 * @var resource|null
+                 */
+                private mixed $stream = null;
+
+                /**
+                 * @param open-resource|closed-resource|resource|null $stream
+                 */
+                public function __construct(mixed $stream)
+                {
+                    $this->stream = $stream;
+                }
+
+                /**
+                 * @return open-resource
+                 */
+                public function getOpenResource(): mixed
+                {
+                    if (!is_resource($this->stream)) {
+                        exit('Stream is not a resource');
+                    }
+
+                    return $this->stream;
+                }
+            }
         "#}
     }
 }

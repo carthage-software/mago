@@ -43,6 +43,9 @@ pub struct TypeCombination {
     pub literal_floats: HashSet<OrderedFloat<f64>>,
     pub class_string_types: HashMap<String, TAtomic>,
     pub derived_types: HashSet<TDerived>,
+    pub resource: bool,
+    pub open_resource: bool,
+    pub closed_resource: bool,
 }
 
 impl Default for TypeCombination {
@@ -82,6 +85,9 @@ impl TypeCombination {
             class_string_types: HashMap::default(),
             enum_names: HashSet::default(),
             derived_types: HashSet::default(),
+            resource: false,
+            open_resource: false,
+            closed_resource: false,
         }
     }
 
@@ -90,6 +96,9 @@ impl TypeCombination {
         if self.value_types.len() == 1
             && !self.has_keyed_array
             && !self.has_empty_array
+            && !self.resource
+            && !self.open_resource
+            && !self.closed_resource
             && let (None, None) = (&self.keyed_array_parameters, &self.list_array_parameter)
         {
             return self.keyed_array_entries.is_empty()

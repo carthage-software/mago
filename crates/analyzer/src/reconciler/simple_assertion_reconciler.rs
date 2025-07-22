@@ -439,9 +439,6 @@ pub(crate) fn intersect_resource(
                     did_remove_type = true;
                 }
             },
-            TAtomic::Null => {
-                acceptable_types.push(TAtomic::Null);
-            }
             TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
                 if constraint.is_mixed() {
                     let atomic = atomic.replace_template_constraint(get_null());

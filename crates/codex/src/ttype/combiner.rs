@@ -22,6 +22,7 @@ use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::resource::TResource;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
@@ -105,6 +106,25 @@ pub fn combine(
     let mut new_types = Vec::new();
     for derived_type in combination.derived_types {
         new_types.push(TAtomic::Derived(derived_type));
+    }
+
+    if combination.resource {
+        new_types.push(TAtomic::Resource(TResource { closed: None }));
+    } else {
+        match (combination.open_resource, combination.closed_resource) {
+            (true, true) => {
+                new_types.push(TAtomic::Resource(TResource { closed: None }));
+            }
+            (true, false) => {
+                new_types.push(TAtomic::Resource(TResource { closed: Some(false) }));
+            }
+            (false, true) => {
+                new_types.push(TAtomic::Resource(TResource { closed: Some(true) }));
+            }
+            _ => {
+                // No resource type, do nothing
+            }
+        }
     }
 
     let mut added_array = false;
@@ -394,6 +414,24 @@ fn scrape_type_properties(
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if !bool.is_general())
         && combination.value_types.contains_key("bool")
     {
+        return;
+    }
+
+    if let TAtomic::Resource(TResource { closed }) = atomic {
+        match closed {
+            Some(closed) => match closed {
+                true => {
+                    combination.closed_resource = true;
+                }
+                false => {
+                    combination.open_resource = true;
+                }
+            },
+            None => {
+                combination.resource = true;
+            }
+        }
+
         return;
     }
 
