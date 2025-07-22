@@ -382,28 +382,28 @@ pub fn get_union_from_type_ast<'i>(
         Type::NonPositiveInt(_) => TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::non_positive()))]),
         Type::NonNegativeInt(_) => TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::non_negative()))]),
         Type::IntRange(range) => {
-            match (&range.min, &range.max) {
-                (IntOrKeyword::Int(min), IntOrKeyword::Int(max)) => {
-                    if min.value > max.value {
-                        return Err(TypeError::InvalidType(
-                            "Minimum value of an int range cannot be greater than maximum value".to_string(),
-                            ttype.span(),
-                        ));
-                    }
+            let min = match range.min {
+                IntOrKeyword::NegativeInt { int, .. } => Some(-(int.value as i64)),
+                IntOrKeyword::Int(literal_int_type) => Some(literal_int_type.value as i64),
+                IntOrKeyword::Keyword(_) => None,
+            };
 
-                    TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(
-                        Some(min.value as i64),
-                        Some(max.value as i64),
-                    )))])
+            let max = match range.max {
+                IntOrKeyword::NegativeInt { int, .. } => Some(-(int.value as i64)),
+                IntOrKeyword::Int(literal_int_type) => Some(literal_int_type.value as i64),
+                IntOrKeyword::Keyword(_) => None,
+            };
+
+            if let (Some(min_value), Some(max_value)) = (min, max) {
+                if min_value > max_value {
+                    return Err(TypeError::InvalidType(
+                        "Minimum value of an int range cannot be greater than maximum value".to_string(),
+                        ttype.span(),
+                    ));
                 }
-                (IntOrKeyword::Int(min), _) => TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(
-                    TInteger::from_bounds(Some(min.value as i64), None),
-                ))]),
-                (_, IntOrKeyword::Int(max)) => TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(
-                    TInteger::from_bounds(None, Some(max.value as i64)),
-                ))]),
-                (_, _) => get_int(),
             }
+
+            TUnion::new(vec![TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))])
         }
         Type::Conditional(conditional) => TUnion::new(vec![TAtomic::Conditional(TConditional::new(
             Box::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname, interner)?),

@@ -1571,4 +1571,37 @@ mod tests {
             }
         "#}
     }
+
+    test_analysis! {
+        name = negate_integer_ranges,
+        code = indoc! {r#"
+            <?php
+
+            final readonly class Duration
+            {
+                /**
+                 * @param int $hours
+                 * @param int<-59, 59> $minutes
+                 * @param int<-59, 59> $seconds
+                 * @param int<-999999999, 999999999> $nanoseconds
+                 *
+                 * @pure
+                 */
+                public function __construct(
+                    public int $hours,
+                    public int $minutes = 0,
+                    public int $seconds = 0,
+                    public int $nanoseconds = 0,
+                ) {}
+
+                /**
+                 * @return Duration
+                 */
+                public function invert(): Duration
+                {
+                    return new Duration(-$this->hours, -$this->minutes, -$this->seconds, -$this->nanoseconds);
+                }
+            }
+        "#}
+    }
 }
