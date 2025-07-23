@@ -857,10 +857,16 @@ fn cast_type_to_array(operand_type: &TUnion, context: &mut Context<'_>, cast_exp
 
                 resulting_array_atomics.push(TAtomic::Array(TArray::List(scalar_list)));
             }
-            TAtomic::Object(_) => {
+            TAtomic::Object(casted_object) => {
+                let is_stdclass = casted_object.get_name().is_some_and(|name| {
+                    // Check if the object is stdClass
+                    context.interner.lookup(name).eq_ignore_ascii_case("stdClass")
+                });
+
                 // Object to array: properties become key-value pairs.
                 // Keys are strings (property names), values are mixed (property values).
-                if !reported_object_warning {
+                // stdClass is a special case where we do not report a warning.
+                if !reported_object_warning && !is_stdclass {
                     context.buffer.report(
                         TypingIssueKind::InvalidTypeCast,
                         Issue::warning(format!(
@@ -1601,6 +1607,24 @@ mod tests {
                 {
                     return new Duration(-$this->hours, -$this->minutes, -$this->seconds, -$this->nanoseconds);
                 }
+            }
+        "#}
+    }
+
+    test_analysis! {
+        name = cast_stdclass_to_array,
+        code = indoc! {r#"
+            <?php
+
+            class stdClass
+            {
+                // built-in
+            }
+
+            /** @return array<string, mixed> */
+            function example(stdClass $obj): array
+            {
+                return (array) $obj;
             }
         "#}
     }
