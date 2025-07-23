@@ -318,8 +318,8 @@ pub fn handle_return_value<'a>(
                 context.interner,
                 &inferred_return_type,
                 &expected_return_type,
-                false,
-                false,
+                inferred_return_type.ignore_nullable_issues,
+                inferred_return_type.ignore_falsable_issues,
                 false,
                 &mut union_comparison_result,
             );
@@ -437,6 +437,7 @@ pub fn handle_return_value<'a>(
             }
 
             if inferred_return_type.is_nullable()
+                && !inferred_return_type.ignore_nullable_issues
                 && !expected_return_type.is_nullable()
                 && !expected_return_type.has_template()
             {
@@ -469,11 +470,10 @@ pub fn handle_return_value<'a>(
                 );
             }
 
-            // todo at some point in the future all notions of falsability can be removed
             if inferred_return_type.is_falsable()
+                && !inferred_return_type.ignore_falsable_issues
                 && !expected_return_type.is_falsable()
                 && !expected_return_type.has_template()
-                && !inferred_return_type.ignore_falsable_issues
             {
                 let function_name =
                     block_context.scope.get_function_like_identifier().unwrap().as_string(context.interner);
@@ -946,6 +946,52 @@ mod tests {
                     ['a', 'b', 'c'],
                     ['a', 'b', 'c'],
                 ];
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = ignore_falsable_return,
+        code = indoc! {r#"
+            <?php
+
+            /** @ignore-falsable-return */
+            function get_foo(): string|false
+            {
+                return 'foo';
+            }
+
+            function get_bar(): string
+            {
+                return get_foo();
+            }
+
+            function get_baz(): string
+            {
+                return get_foo() ?: 'baz';
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = ignore_nullable_return,
+        code = indoc! {r#"
+            <?php
+
+            /** @ignore-nullable-return */
+            function get_foo(): string|null
+            {
+                return 'foo';
+            }
+
+            function get_bar(): string
+            {
+                return get_foo();
+            }
+
+            function get_baz(): string
+            {
+                return get_foo() ?? 'baz';
             }
         "#},
     }

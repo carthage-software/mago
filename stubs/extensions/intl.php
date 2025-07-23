@@ -524,6 +524,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getDateType(): int|false
@@ -531,6 +533,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getTimeType(): int|false
@@ -538,6 +542,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getCalendar(): int|false
@@ -549,6 +555,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getTimeZoneId(): string|false
@@ -556,6 +564,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getCalendarObject(): IntlCalendar|false|null
@@ -563,6 +573,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getTimeZone(): IntlTimeZone|false
@@ -581,6 +593,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getPattern(): string|false
@@ -588,6 +602,8 @@ class IntlDateFormatter
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getLocale(int $type = 0): string|false
@@ -626,6 +642,8 @@ class IntlDateFormatter
      *   tm_yday?: int,
      *   tm_year?: int,
      * }|float|int|string $datetime
+     *
+     * @ignore-falsable-return
      */
     public function format(IntlCalendar|DateTimeInterface|array|string|int|float $datetime): string|false
     {
@@ -634,6 +652,8 @@ class IntlDateFormatter
     /**
      * @param IntlCalendar|DateTimeInterface $datetime
      * @param null|int|string|array<string|int> $format
+     *
+     * @ignore-falsable-return
      */
     public static function formatObject($datetime, $format = null, string|null $locale = null): string|false
     {
@@ -641,6 +661,8 @@ class IntlDateFormatter
 
     /**
      * @param-out int $offset
+     *
+     * @ignore-falsable-return
      */
     public function parse(string $string, &$offset = null): int|float|false
     {
@@ -648,6 +670,8 @@ class IntlDateFormatter
 
     /**
      * @param-out int $offset
+     *
+     * @ignore-falsable-return
      */
     public function localtime(string $string, &$offset = null): array|false
     {
@@ -667,6 +691,9 @@ class IntlDateFormatter
     {
     }
 
+    /**
+     * @ignore-falsable-return
+     */
     public function parseToCalendar(string $string, &$offset = null): int|float|false
     {
     }

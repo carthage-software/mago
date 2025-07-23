@@ -61,7 +61,7 @@ pub(crate) fn analyze<'a>(
             context.interner,
             assigned_value_type,
             &resolved_property.property_type,
-            false,
+            assigned_value_type.ignore_nullable_issues,
             assigned_value_type.ignore_falsable_issues,
             false,
             &mut union_comparison_result,
