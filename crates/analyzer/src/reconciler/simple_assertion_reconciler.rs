@@ -36,7 +36,7 @@ use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_num;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::get_scalar;
-use mago_codex::ttype::get_string;
+use mago_codex::ttype::get_string_with_props;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::template::TemplateBound;
@@ -229,7 +229,7 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Scalar(TScalar::String(str)) if str.is_boring() => {
+            TAtomic::Scalar(TScalar::String(str)) if str.is_general() => {
                 return Some(intersect_string(
                     context,
                     assertion,
@@ -238,6 +238,9 @@ pub(crate) fn reconcile(
                     negated,
                     span,
                     assertion.has_equality(),
+                    str.is_non_empty,
+                    str.is_truthy,
+                    str.is_numeric,
                 ));
             }
             TAtomic::Scalar(TScalar::Integer(i)) if !i.is_literal() => {
@@ -952,23 +955,38 @@ fn intersect_string(
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
+    is_non_empty: bool,
+    is_truthy: bool,
+    is_numeric: bool,
 ) -> TUnion {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
     for atomic in &existing_var_type.types {
         match atomic {
-            TAtomic::Scalar(TScalar::String(_)) | TAtomic::Scalar(TScalar::ClassLikeString(_)) => {
+            TAtomic::Scalar(TScalar::String(existing_string)) => {
+                acceptable_types.push(
+                    get_string_with_props(
+                        is_numeric || existing_string.is_numeric,
+                        is_truthy || existing_string.is_truthy,
+                        is_non_empty || existing_string.is_non_empty,
+                    )
+                    .get_single_owned(),
+                );
+            }
+            TAtomic::Scalar(TScalar::ClassLikeString(_)) if !is_numeric => {
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) | TAtomic::Scalar(TScalar::ArrayKey) => {
-                return get_string();
+                return get_string_with_props(is_numeric, is_truthy, is_non_empty);
             }
             TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
                 if constraint.is_mixed() {
-                    let atomic = atomic.replace_template_constraint(get_string());
-
-                    acceptable_types.push(atomic);
+                    acceptable_types.push(atomic.replace_template_constraint(get_string_with_props(
+                        is_numeric,
+                        is_truthy,
+                        is_non_empty,
+                    )));
                 } else {
                     let atomic = atomic.replace_template_constraint(intersect_string(
                         context,
@@ -978,6 +996,9 @@ fn intersect_string(
                         false,
                         None,
                         is_equality,
+                        is_non_empty,
+                        is_truthy,
+                        is_numeric,
                     ));
 
                     acceptable_types.push(atomic);
@@ -989,7 +1010,12 @@ fn intersect_string(
                 if let Some(span) = span {
                     let name_str = context.interner.lookup(name);
                     if let Some((lower_bounds, _)) = context.artifacts.type_variable_bounds.get_mut(name_str) {
-                        let mut bound = TemplateBound::new(get_string(), 0, None, None);
+                        let mut bound = TemplateBound::new(
+                            get_string_with_props(is_numeric, is_truthy, is_non_empty),
+                            0,
+                            None,
+                            None,
+                        );
                         bound.span = Some(*span);
                         lower_bounds.push(bound);
                     }
@@ -998,7 +1024,7 @@ fn intersect_string(
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
             }
-            TAtomic::Object(TObject::Named(_)) => {
+            TAtomic::Object(_) => {
                 did_remove_type = true;
             }
             _ => {
@@ -1006,15 +1032,11 @@ fn intersect_string(
                     context.codebase,
                     context.interner,
                     atomic,
-                    &TAtomic::Scalar(TScalar::string()),
+                    get_string_with_props(is_numeric, is_truthy, is_non_empty).get_single(),
                     false,
                     &mut ComparisonResult::new(),
                 ) {
                     acceptable_types.push(atomic.clone());
-
-                    if let TAtomic::Object(TObject::Enum(_)) = atomic {
-                        did_remove_type = true;
-                    }
                 } else {
                     did_remove_type = true;
                 }

@@ -193,6 +193,10 @@ pub fn get_string() -> TUnion {
     wrap_atomic(TAtomic::Scalar(TScalar::string()))
 }
 
+pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool) -> TUnion {
+    wrap_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(is_numeric, is_truthy, is_non_empty))))
+}
+
 #[inline]
 pub fn get_literal_class_string(value: StringIdentifier) -> TUnion {
     wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(value))))

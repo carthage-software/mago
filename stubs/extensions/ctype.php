@@ -22,6 +22,8 @@ function ctype_cntrl(string $text): bool
 }
 
 /**
+ * @assert-if-true numeric-string $text
+ *
  * @pure
  */
 function ctype_digit(string $text): bool

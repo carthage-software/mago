@@ -1158,6 +1158,8 @@ class IntlCalendar
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getTime(): float|false
@@ -1165,6 +1167,8 @@ class IntlCalendar
     }
 
     /**
+     * @ignore-falsable-return
+     *
      * @pure
      */
     public function getTimeZone(): IntlTimeZone|false

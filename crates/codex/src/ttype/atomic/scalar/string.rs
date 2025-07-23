@@ -218,29 +218,33 @@ impl TString {
 
 impl TType for TString {
     fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
-        match &self.literal {
-            Some(TStringLiteral::Value(s)) => {
-                format!("string('{}')", s.replace('\'', "\\'"))
-            }
+        let s = match &self.literal {
+            Some(TStringLiteral::Value(s)) => return format!("string('{}')", s.replace('\'', "\\'")),
             Some(_) => {
                 if self.is_truthy {
-                    "truthy-literal-string".to_string()
+                    if self.is_numeric { "truthy-numeric-literal-string" } else { "truthy-literal-string" }
+                } else if self.is_numeric {
+                    "numeric-literal-string"
                 } else if self.is_non_empty {
-                    "non-empty-literal-string".to_string()
+                    "non-empty-literal-string"
                 } else {
-                    "literal-string".to_string()
+                    "literal-string"
                 }
             }
             None => {
                 if self.is_truthy {
-                    "truthy-string".to_string()
+                    if self.is_numeric { "truthy-numeric-string" } else { "truthy-string" }
+                } else if self.is_numeric {
+                    "numeric-string"
                 } else if self.is_non_empty {
-                    "non-empty-string".to_string()
+                    "non-empty-string"
                 } else {
-                    "string".to_string()
+                    "string"
                 }
             }
-        }
+        };
+
+        s.to_string()
     }
 }
 

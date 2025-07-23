@@ -523,7 +523,7 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
     let mut all_literals = true;
     let mut all_unspecified_literal = true;
     let mut non_empty = false;
-    let mut truthy = false;
+    let mut truthy = true;
 
     for operand_atomic_type in &operand_type.types {
         match operand_atomic_type {
@@ -561,7 +561,7 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
 
                 if boolean.is_true() {
                     literals.push("1".to_owned());
-                    truthy = true;
+                    truthy &= true;
                     non_empty = true;
                 } else if !boolean.is_false() {
                     all_literals = false;
@@ -573,7 +573,7 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
                 if let Some(v) = tint.get_literal_value() {
                     non_empty = true;
                     literals.push(v.to_string());
-                    truthy = truthy || v != 0;
+                    truthy &= v != 0;
                 } else {
                     all_literals = false;
                 }
@@ -584,22 +584,22 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
                 if let Some(v) = tfloat.get_literal_value() {
                     non_empty = true;
                     literals.push(v.to_string());
-                    truthy = truthy || v != 0.0;
+                    truthy &= v != 0.0;
                 } else {
                     all_literals = false;
                     all_unspecified_literal = false;
                 }
             }
-            TScalar::String(tstring) => {
-                if let Some(v) = tstring.get_known_literal_value() {
+            TScalar::String(operand_string) => {
+                if let Some(v) = operand_string.get_known_literal_value() {
                     literals.push(v.to_string());
                 } else {
                     all_literals = false;
                 }
 
-                all_unspecified_literal = all_unspecified_literal && tstring.is_unspecified_literal();
-                non_empty = non_empty || tstring.is_non_empty();
-                truthy = truthy || tstring.is_truthy();
+                all_unspecified_literal = all_unspecified_literal && operand_string.is_unspecified_literal();
+                non_empty = non_empty || operand_string.is_non_empty();
+                truthy &= operand_string.is_truthy();
             }
             TScalar::ClassLikeString(tclass_like_string) => {
                 if let Some(id) = tclass_like_string.literal_value() {
@@ -609,7 +609,7 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
                 }
 
                 non_empty = true;
-                truthy = true;
+                truthy &= true;
             }
             _ => {
                 all_literals = false;
@@ -627,7 +627,7 @@ fn get_concat_operand_string(context: &mut Context<'_>, operand_type: &TUnion) -
             None
         },
         is_numeric: false,
-        is_truthy: truthy,
+        is_truthy: non_empty && truthy,
         is_non_empty: non_empty,
     }
 }
@@ -676,7 +676,7 @@ fn analyze_string_concat_operand(
         return Ok(());
     }
 
-    if operand_type.is_nullable() {
+    if operand_type.is_nullable() && !operand_type.ignore_nullable_issues {
         context.buffer.report(
             TypingIssueKind::PossiblyNullOperand,
             Issue::warning(format!(
@@ -1481,7 +1481,7 @@ fn analyze_arithmetic_operation<'a>(
         // In Psalm, null operand often leads to mixed result or halts analysis for this path.
         // Let's set result to mixed and return, similar to Psalm's behavior.
         final_result_type = Some(get_mixed_any());
-    } else if left_type.is_nullable() {
+    } else if left_type.is_nullable() && !left_type.ignore_nullable_issues {
         context.buffer.report(
             TypingIssueKind::PossiblyNullOperand,
             Issue::warning(format!(
@@ -1506,7 +1506,7 @@ fn analyze_arithmetic_operation<'a>(
         );
 
         final_result_type = Some(get_mixed_any());
-    } else if right_type.is_nullable() {
+    } else if right_type.is_nullable() && !right_type.ignore_nullable_issues {
         context.buffer.report(
             TypingIssueKind::PossiblyNullOperand,
             Issue::warning(format!(
@@ -3290,6 +3290,108 @@ mod tests {
 
                     return new self($h, $m, $s, $ns);
                 }
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = string_manipulation,
+        code = indoc! {r#"
+            <?php
+
+            const STR_PAD_RIGHT = 0;
+
+            const STR_PAD_LEFT = 1;
+
+            /**
+             * @pure
+             */
+            function abs(int|float $num): int|float
+            {
+                return abs($num);
+            }
+
+            /**
+             * @pure
+             */
+            function str_pad(string $string, int $length, string $pad_string = ' ', int $pad_type = STR_PAD_RIGHT): string
+            {
+                return str_pad($string, $length, $pad_string, $pad_type);
+            }
+
+            /**
+             * @pure
+             */
+            function substr(string $string, int $offset, null|int $length = null): string
+            {
+                return substr($string, $offset, $length);
+            }
+
+            /**
+             * @pure
+             */
+            function rtrim(string $string, string $characters = " \n\r\t\v\0"): string
+            {
+                return rtrim($string, $characters);
+            }
+
+            /**
+             * @param array<string>|string $separator
+             * @param array<string>|null $array
+             *
+             * @pure
+             */
+            function join(array|string $separator = '', null|array $array = null): string
+            {
+                return join($separator, $array);
+            }
+
+            /**
+             * @param int $hours
+             * @param int<-59, 59> $minutes
+             * @param int<-59, 59> $seconds
+             * @param int<-999999999, 999999999> $nanoseconds
+             * @param int<0, max> $max_decimals
+             *
+             * @pure
+             */
+            function format_duration(int $hours, int $minutes, int $seconds, int $nanoseconds, int $max_decimals = 3): string
+            {
+                $decimal_part = '';
+                if ($max_decimals > 0) {
+                    $decimal_part = (string) abs($nanoseconds);
+                    $decimal_part = str_pad($decimal_part, 9, '0', STR_PAD_LEFT);
+                    $decimal_part = substr($decimal_part, 0, $max_decimals);
+                    $decimal_part = rtrim($decimal_part, '0');
+                }
+
+                if ($decimal_part !== '') {
+                    $decimal_part = '.' . $decimal_part;
+                }
+
+                $sec_sign = $seconds < 0 || $nanoseconds < 0 ? '-' : '';
+                $sec = abs($seconds);
+
+                $containsHours = $hours !== 0;
+                $containsMinutes = $minutes !== 0;
+                $concatenatedSeconds = $sec_sign . ((string) $sec) . $decimal_part;
+                $containsSeconds = $concatenatedSeconds !== '0';
+
+                /** @var list<non-empty-string> $output */
+                $output = [];
+                if ($containsHours) {
+                    $output[] = ((string) $hours) . ' hour(s)';
+                }
+
+                if ($containsMinutes || $containsHours && $containsSeconds) {
+                    $output[] = ((string) $minutes) . ' minute(s)';
+                }
+
+                if ($containsSeconds) {
+                    $output[] = $concatenatedSeconds . ' second(s)';
+                }
+
+                return [] === $output ? '0 second(s)' : join(', ', $output);
             }
         "#},
     }

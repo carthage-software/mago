@@ -1038,11 +1038,11 @@ fn cast_type_to_float(operand_type: &TUnion, context: &mut Context<'_>, cast_exp
 
                             if !val.is_empty() && num_str.is_empty() && val != "0" {
                                 context.buffer.report(
-                                TypingIssueKind::InvalidTypeCast,
-                                Issue::warning(format!("String `{val}` implicitly cast to float `0.0`."))
-                                    .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("Non-numeric string cast to float"))
-                                    .with_help("Explicitly cast or ensure string is numeric if float conversion is intended."),
-                            );
+                                    TypingIssueKind::InvalidTypeCast,
+                                    Issue::warning(format!("String `{val}` implicitly cast to float `0.0`."))
+                                        .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("Non-numeric string cast to float"))
+                                        .with_help("Explicitly cast or ensure string is numeric if float conversion is intended."),
+                                );
                             }
                         } else {
                             if !s.is_numeric {
