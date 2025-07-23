@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use colored::Colorize;
+use mago_semantics::SemanticsChecker;
 use tokio::task::JoinHandle;
 
 use mago_analyzer::Analyzer;
@@ -252,6 +253,8 @@ fn perform_single_source_analysis(
     interner: &ThreadedInterner,
 ) -> Result<AnalysisResult, Error> {
     let (program, parsing_error) = parse_source(interner, &source);
+    let semantics_checker = SemanticsChecker::new(&settings.version, interner);
+
     let mut analysis_result = AnalysisResult::new(settings.graph_kind, SymbolReferences::new());
     if let Some(parsing_error) = parsing_error {
         analysis_result.emitted_issues.entry(source.identifier).or_default().push(Issue::from(&parsing_error));
@@ -259,9 +262,15 @@ fn perform_single_source_analysis(
 
     let resolver = NameResolver::new(interner);
     let resolved_names = resolver.resolve(&program);
-
     tracing::trace!("Analyzing source: {}", interner.lookup(&source.identifier.0));
-    let mut analyzer = Analyzer::new(source, &resolved_names, codebase, interner, settings);
-    analyzer.analyze(&program, &mut analysis_result)?;
+
+    analysis_result.emitted_issues.entry(source.identifier).or_default().extend(semantics_checker.check(
+        &source,
+        &program,
+        &resolved_names,
+    ));
+
+    Analyzer::new(source, &resolved_names, codebase, interner, settings).analyze(&program, &mut analysis_result)?;
+
     Ok(analysis_result)
 }
