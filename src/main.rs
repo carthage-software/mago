@@ -12,6 +12,7 @@ use crate::consts::MINIMUM_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::logger::initialize_logger;
 
+mod baseline;
 mod commands;
 mod config;
 mod consts;

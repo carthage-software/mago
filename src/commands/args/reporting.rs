@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -15,6 +16,7 @@ use mago_reporting::reporter::ReportingTarget;
 use mago_source::SourceIdentifier;
 use mago_source::SourceManager;
 
+use crate::baseline;
 use crate::config::Configuration;
 use crate::enum_variants;
 use crate::error::Error;
@@ -27,7 +29,7 @@ use crate::utils::progress::remove_progress_bar;
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
-#[derive(Parser, Debug, Clone, Copy)]
+#[derive(Parser, Debug, Clone)]
 pub struct ReportingArgs {
     /// Filter the output to only show issues that can be automatically fixed.
     #[arg(long, short = 'f', help = "Filter output to show only fixable issues", default_value_t = false)]
@@ -78,6 +80,23 @@ pub struct ReportingArgs {
     /// For example, if set to `Error`, warnings or notices will not cause a failure exit code.
     #[arg(long, short = 'm', help = "Set minimum issue level for failure (e.g., error, warning)", default_value_t = Level::Error, value_parser = enum_variants!(Level), conflicts_with = "fix")]
     pub minimum_fail_level: Level,
+
+    /// Generate a baseline file to ignore existing issues.
+    #[arg(
+        long,
+        help = "Generate a baseline file to ignore existing issues",
+        conflicts_with = "fix",
+        requires = "baseline"
+    )]
+    pub generate_baseline: bool,
+
+    /// Create a backup of the old baseline file (`.bkp`) when generating a new one.
+    #[arg(long, help = "Backup the old baseline file when generating a new one", requires = "generate_baseline")]
+    pub backup_baseline: bool,
+
+    /// Specify a baseline file to ignore issues listed within it.
+    #[arg(long, help = "Specify a baseline file to ignore issues", value_name = "PATH", conflicts_with = "fix")]
+    pub baseline: Option<PathBuf>,
 }
 
 impl ReportingArgs {
@@ -158,11 +177,49 @@ impl ReportingArgs {
         interner: ThreadedInterner,
         source_manager: SourceManager,
     ) -> Result<ExitCode, Error> {
-        let has_issues_above_threshold = issues.has_minimum_level(self.minimum_fail_level);
-
         if self.sort {
             issues = issues.sorted();
         }
+
+        if let Some(baseline_path) = &self.baseline {
+            if self.generate_baseline {
+                tracing::info!("Generating baseline file...");
+                let baseline = baseline::generate_baseline_from_issues(issues, &source_manager, &interner)?;
+                baseline::serialize_baseline(baseline_path, &baseline, self.backup_baseline)?;
+                tracing::info!("Baseline file successfully generated at `{}`.", baseline_path.display());
+
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            if !baseline_path.exists() {
+                tracing::warn!(
+                    "Baseline file `{}` does not exist. Issues will not be filtered.",
+                    baseline_path.display()
+                );
+            } else {
+                let baseline = baseline::unserialize_baseline(baseline_path)?;
+                let (filtered_issues, filtered_out_count, has_dead_issues) =
+                    baseline::filter_issues(&baseline, issues, &source_manager, &interner)?;
+
+                if has_dead_issues {
+                    tracing::warn!(
+                        "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
+                    );
+                }
+
+                if filtered_out_count > 0 {
+                    tracing::info!(
+                        "Filtered out {} issues based on the baseline file at `{}`.",
+                        filtered_out_count,
+                        baseline_path.display()
+                    );
+                }
+
+                issues = filtered_issues;
+            }
+        }
+
+        let has_issues_above_threshold = issues.has_minimum_level(self.minimum_fail_level);
 
         let reporter = Reporter::new(interner.clone(), source_manager.clone(), self.reporting_target);
 

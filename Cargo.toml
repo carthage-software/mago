@@ -131,6 +131,7 @@ tracing-subscriber = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
 dialoguer = { workspace = true }
+blake3 = { workspace = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"

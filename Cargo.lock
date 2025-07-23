@@ -1553,6 +1553,7 @@ version = "0.26.1"
 dependencies = [
  "ahash",
  "async-walkdir",
+ "blake3",
  "clap",
  "colored",
  "config",
