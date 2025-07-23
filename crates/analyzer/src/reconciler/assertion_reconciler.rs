@@ -1,19 +1,16 @@
 use std::collections::BTreeMap;
 
+use mago_codex::assertion::Assertion;
 use mago_codex::interface_exists;
 use mago_codex::is_instance_of;
 use mago_codex::ttype::TType;
-use mago_codex::ttype::atomic::object::r#enum::TEnum;
-use mago_interner::ThreadedInterner;
-use mago_span::Span;
-
-use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -31,6 +28,8 @@ use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_interner::ThreadedInterner;
+use mago_span::Span;
 
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::negated_assertion_reconciler;

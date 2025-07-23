@@ -1,9 +1,5 @@
-use mago_codex::ttype::TType;
-use mago_codex::ttype::atomic::object::named::TNamedObject;
-use mago_codex::ttype::atomic::resource::TResource;
-use mago_span::Span;
-
 use mago_codex::assertion::Assertion;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -12,6 +8,8 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -21,11 +19,12 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
+use mago_span::Span;
 
-use super::ReconcilationContext;
-use super::trigger_issue_for_impossible;
+use crate::reconciler::ReconcilationContext;
 use crate::reconciler::simple_assertion_reconciler::get_acceptable_type;
 use crate::reconciler::simple_assertion_reconciler::intersect_null;
+use crate::reconciler::trigger_issue_for_impossible;
 
 pub(crate) fn reconcile(
     context: &mut ReconcilationContext<'_>,
@@ -446,7 +445,6 @@ fn subtract_string(
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
-    let mut retain_types = vec![];
 
     for atomic in new_var_type.types.drain(..) {
         if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &atomic {
@@ -479,8 +477,9 @@ fn subtract_string(
             did_remove_type = true;
 
             if !is_equality {
-                retain_types.push(TAtomic::Scalar(TScalar::num()));
-                retain_types.push(TAtomic::Scalar(TScalar::bool()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::int()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::float()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
             } else {
                 acceptable_types.push(atomic);
             }
@@ -503,8 +502,6 @@ fn subtract_string(
             acceptable_types.push(atomic);
         }
     }
-
-    new_var_type.types = retain_types;
 
     get_acceptable_type(
         context,
@@ -537,7 +534,6 @@ fn subtract_int(
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
-    let mut retain_types = vec![];
 
     for atomic in new_var_type.types.drain(..) {
         if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &atomic {
@@ -563,7 +559,7 @@ fn subtract_int(
             did_remove_type = true;
 
             if !is_equality {
-                retain_types.push(TAtomic::Scalar(TScalar::string()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
             } else {
                 acceptable_types.push(atomic);
             }
@@ -571,9 +567,9 @@ fn subtract_int(
             did_remove_type = true;
 
             if !is_equality {
-                retain_types.push(TAtomic::Scalar(TScalar::string()));
-                retain_types.push(TAtomic::Scalar(TScalar::float()));
-                retain_types.push(TAtomic::Scalar(TScalar::bool()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::float()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
             } else {
                 acceptable_types.push(atomic);
             }
@@ -581,7 +577,7 @@ fn subtract_int(
             did_remove_type = true;
 
             if !is_equality {
-                retain_types.push(TAtomic::Scalar(TScalar::float()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::float()));
             } else {
                 acceptable_types.push(atomic);
             }
@@ -604,10 +600,10 @@ fn subtract_int(
             if is_equality {
                 acceptable_types.push(atomic);
             }
+        } else {
+            acceptable_types.push(atomic);
         }
     }
-
-    new_var_type.types = retain_types;
 
     get_acceptable_type(
         context,

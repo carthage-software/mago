@@ -44,9 +44,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
 
-use super::ReconcilationContext;
-use super::refine_array_key;
 use crate::intersect_simple;
+use crate::reconciler::ReconcilationContext;
+use crate::reconciler::refine_array_key;
 use crate::reconciler::simple_negated_assertion_reconciler::subtract_null;
 use crate::reconciler::trigger_issue_for_impossible;
 

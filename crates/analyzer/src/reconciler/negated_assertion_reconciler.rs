@@ -1,17 +1,14 @@
 use ahash::HashSet;
 
+use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use mago_codex::get_class_like;
 use mago_codex::get_enum;
 use mago_codex::interface_exists;
 use mago_codex::is_instance_of;
-use mago_codex::ttype::atomic::object::r#enum::TEnum;
-use mago_interner::StringIdentifier;
-use mago_span::Span;
-
-use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
@@ -23,11 +20,13 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_placeholder;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_interner::StringIdentifier;
+use mago_span::Span;
 
-use super::ReconcilationContext;
-use super::assertion_reconciler::intersect_atomic_with_atomic;
-use super::trigger_issue_for_impossible;
+use crate::reconciler::ReconcilationContext;
+use crate::reconciler::assertion_reconciler::intersect_atomic_with_atomic;
 use crate::reconciler::simple_negated_assertion_reconciler;
+use crate::reconciler::trigger_issue_for_impossible;
 
 pub(crate) fn reconcile(
     context: &mut ReconcilationContext<'_>,
