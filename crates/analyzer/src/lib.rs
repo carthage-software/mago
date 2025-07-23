@@ -56,7 +56,7 @@ impl<'a> Analyzer<'a> {
         Self { source, resolved_names, codebase, interner, settings }
     }
 
-    pub fn analyze(&mut self, program: &Program, analysis_result: &mut AnalysisResult) -> Result<(), AnalysisError> {
+    pub fn analyze(&self, program: &Program, analysis_result: &mut AnalysisResult) -> Result<(), AnalysisError> {
         let start_time = std::time::Instant::now();
 
         if !program.has_script() {
@@ -162,7 +162,7 @@ mod tests {
         populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
 
         let mut analysis_result = AnalysisResult::new(config.settings.graph_kind, symbol_references);
-        let mut analyzer = Analyzer::new(source, &resolved_names, &codebase, &interner, config.settings);
+        let analyzer = Analyzer::new(source, &resolved_names, &codebase, &interner, config.settings);
 
         let analysis_run_result = analyzer.analyze(&program, &mut analysis_result);
 
