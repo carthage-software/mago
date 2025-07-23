@@ -11,6 +11,9 @@ use mago_span::Span;
 use crate::ast::LiteralStringKind;
 use crate::token::TokenKind;
 
+const SYNTAX_ERROR_CODE: &'static str = "syntax";
+const PARSE_ERROR_CODE: &'static str = "parse";
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SyntaxError {
     UnexpectedToken(u8, Position),
@@ -111,12 +114,16 @@ impl std::error::Error for ParseError {
         }
     }
 }
-impl From<SyntaxError> for Issue {
-    fn from(error: SyntaxError) -> Issue {
+impl From<&SyntaxError> for Issue {
+    fn from(error: &SyntaxError) -> Issue {
         let position = error.position();
         let span = Span::new(position, Position { offset: position.offset + 1, ..position });
 
-        Issue::error(error.to_string()).with_annotation(Annotation::primary(span).with_message("Syntax error."))
+        Issue::error("Syntax error encountered during lexing")
+            .with_code(SYNTAX_ERROR_CODE)
+            .with_annotation(Annotation::primary(span).with_message(error.to_string()))
+            .with_note("This error indicates that the lexer encountered a syntax issue.")
+            .with_help("Check the syntax of your code.")
     }
 }
 
@@ -128,8 +135,14 @@ impl From<SyntaxError> for ParseError {
 
 impl From<&ParseError> for Issue {
     fn from(error: &ParseError) -> Self {
-        let span = error.span();
-
-        Issue::error(error.to_string()).with_annotation(Annotation::primary(span).with_message("Invalid syntax."))
+        if let ParseError::SyntaxError(syntax_error) = error {
+            syntax_error.into()
+        } else {
+            Issue::error("Fatal parse error encountered")
+                .with_code(PARSE_ERROR_CODE)
+                .with_annotation(Annotation::primary(error.span()).with_message(error.to_string()))
+                .with_note("This error indicates that the parser encountered a parse issue.")
+                .with_help("Check the syntax of your code.")
+        }
     }
 }
