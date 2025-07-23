@@ -292,6 +292,7 @@ pub(crate) enum TypingIssueKind {
     InvalidPropertyWrite,
     InvalidPropertyRead,
     DeprecatedConstant,
+    InvalidEnumCaseValue,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
