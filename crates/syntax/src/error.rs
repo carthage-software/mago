@@ -11,8 +11,8 @@ use mago_span::Span;
 use crate::ast::LiteralStringKind;
 use crate::token::TokenKind;
 
-const SYNTAX_ERROR_CODE: &'static str = "syntax";
-const PARSE_ERROR_CODE: &'static str = "parse";
+const SYNTAX_ERROR_CODE: &str = "syntax";
+const PARSE_ERROR_CODE: &str = "parse";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SyntaxError {
