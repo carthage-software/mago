@@ -15,7 +15,7 @@ pub fn check_for_new_without_parenthesis(object_expr: &Expression, context: &mut
         return;
     };
 
-    context.issues.push(
+    context.report(
         Issue::error(format!(
             "Direct {operation} on `new` expressions without parentheses is only available in PHP 8.4 and above."
         ))
@@ -31,7 +31,7 @@ pub fn check_unary_prefix_operator(unary_prefix_operator: &UnaryPrefixOperator, 
     if !context.version.is_supported(Feature::UnsetCast)
         && let UnaryPrefixOperator::UnsetCast(span, _) = unary_prefix_operator
     {
-        context.issues.push(
+        context.report(
             Issue::error("The `unset` cast is no longer supported in PHP 8.0 and later.")
                 .with_annotation(Annotation::primary(*span).with_message("Unset cast used here.")),
         );
@@ -40,7 +40,7 @@ pub fn check_unary_prefix_operator(unary_prefix_operator: &UnaryPrefixOperator, 
     if !context.version.is_supported(Feature::VoidCast)
         && let UnaryPrefixOperator::VoidCast(span, _) = unary_prefix_operator
     {
-        context.issues.push(
+        context.report(
             Issue::error("The `void` cast is only available in PHP 8.5 and later.")
                 .with_annotation(Annotation::primary(*span).with_message("Void cast used here.")),
         );

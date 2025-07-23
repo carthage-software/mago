@@ -30,7 +30,7 @@ pub fn check_property(
     for modifier in modifiers.iter() {
         match modifier {
             Modifier::Abstract(_) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Property `{class_like_name}::{first_variable_name}` cannot be declared abstract"
                     ))
@@ -50,7 +50,7 @@ pub fn check_property(
             }
             Modifier::Static(_) => {
                 if let Some(last_readonly) = last_readonly {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Readonly property `{class_like_name}::{first_variable_name}` cannot be static."
                         ))
@@ -73,7 +73,7 @@ pub fn check_property(
                 }
 
                 if let Some(last_static) = last_static {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Property `{class_like_name}::{first_variable_name}` has multiple `static` modifiers."
                         ))
@@ -95,7 +95,7 @@ pub fn check_property(
                 if let Some(last_visibility) = last_write_visibility
                     && !context.version.is_supported(Feature::AsymmetricVisibilityForStaticProperties)
                 {
-                    context.issues.push(
+                    context.report(
                             Issue::error(format!(
                                 "Asymmetric visibility for static property `{class_like_name}::{first_variable_name}` is not available in your current PHP version, this feature was introduced in PHP 8.5.",
                             ))
@@ -121,7 +121,7 @@ pub fn check_property(
             }
             Modifier::Readonly(modifier) => {
                 if !context.version.is_supported(Feature::ReadonlyProperties) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Readonly properties are only available in PHP 8.1 and above.").with_annotation(
                             Annotation::primary(modifier.span()).with_message("Readonly modifier used here."),
                         ),
@@ -131,7 +131,7 @@ pub fn check_property(
                 }
 
                 if let Some(last_static) = last_static {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Static property `{class_like_name}::{first_variable_name}` cannot be readonly."
                         ))
@@ -154,7 +154,7 @@ pub fn check_property(
                 }
 
                 if let Some(last_readonly) = last_readonly {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Property `{class_like_name}::{first_variable_name}` has multiple `readonly` modifiers."
                         ))
@@ -179,7 +179,7 @@ pub fn check_property(
             }
             Modifier::Final(_) => {
                 if let Some(last_final) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Property has multiple `final` modifiers.")
                             .with_annotation(
                                 Annotation::primary(modifier.span()).with_message("Duplicate `final` modifier."),
@@ -200,7 +200,7 @@ pub fn check_property(
             }
             Modifier::Private(_) | Modifier::Protected(_) | Modifier::Public(_) => {
                 if let Some(last_visibility) = last_read_visibility {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Property `{class_like_name}::{first_variable_name}` has multiple visibility modifiers."
                         ))
@@ -225,7 +225,7 @@ pub fn check_property(
             }
             Modifier::PrivateSet(_) | Modifier::ProtectedSet(_) | Modifier::PublicSet(_) => {
                 if !context.version.is_supported(Feature::AsymmetricVisibility) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Asymmetric visibility is only available in PHP 8.4 and above.").with_annotation(
                             Annotation::primary(modifier.span())
                                 .with_message("Asymmetric visibility modifier used here."),
@@ -236,7 +236,7 @@ pub fn check_property(
                 }
 
                 if let Some(last_visibility) = last_write_visibility {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Property `{class_like_name}::{first_variable_name}` has multiple write visibility modifiers."
                         ))
@@ -260,7 +260,7 @@ pub fn check_property(
                 if let Some(last_static) = last_static
                     && !context.version.is_supported(Feature::AsymmetricVisibilityForStaticProperties)
                 {
-                    context.issues.push(
+                    context.report(
                             Issue::error(format!(
                                 "Asymmetric visibility for static property `{class_like_name}::{first_variable_name}` is not available in your current PHP version, this feature was introduced in PHP 8.5.",
                             ))
@@ -293,7 +293,7 @@ pub fn check_property(
         let first = modifiers.first().unwrap();
         let last = modifiers.last().unwrap();
 
-        context.issues.push(
+        context.report(
             Issue::error(format!("Var property `{class_like_name}::{first_variable_name}` cannot have modifiers."))
                 .with_annotation(
                     Annotation::primary(first.span().join(last.span())).with_message("Modifiers used here."),
@@ -313,7 +313,7 @@ pub fn check_property(
 
     if let Some(hint) = property.hint() {
         if !context.version.is_supported(Feature::TypedProperties) {
-            context.issues.push(
+            context.report(
                 Issue::error("Typed properties are only available in PHP 7.4 and above.")
                     .with_annotation(Annotation::primary(hint.span()).with_message("Type hint used here."))
                     .with_help("Remove the type hint to make the code compatible with PHP 7.3 and earlier versions, or upgrade to PHP 7.4 or later."),
@@ -321,7 +321,7 @@ pub fn check_property(
         }
 
         if !context.version.is_supported(Feature::NativeUnionTypes) && hint.is_union() {
-            context.issues.push(
+            context.report(
                 Issue::error(
                     "Union type hints (e.g. `int|float`) are only available in PHP 8.0 and above.",
                 )
@@ -335,7 +335,7 @@ pub fn check_property(
         if hint.is_bottom() {
             let hint_name = context.get_code_snippet(hint);
             // cant be used on properties
-            context.issues.push(
+            context.report(
                 Issue::error(format!(
                     "Property `{class_like_name}::{first_variable_name}` cannot have type `{hint_name}`."
                 ))
@@ -355,7 +355,7 @@ pub fn check_property(
         }
     } else if let Some(readonly) = last_readonly {
         // readonly properties must have a type hint
-        context.issues.push(
+        context.report(
             Issue::error(format!(
                 "Readonly property `{class_like_name}::{first_variable_name}` must have a type hint."
             ))
@@ -376,7 +376,7 @@ pub fn check_property(
             if !context.version.is_supported(Feature::AsymmetricVisibility)
                 && let Some(write_visibility) = plain_property.modifiers.get_first_write_visibility()
             {
-                context.issues.push(
+                context.report(
                     Issue::error("Asymmetric visibility is only available in PHP 8.4 and above.").with_annotation(
                         Annotation::primary(write_visibility.span()).with_message("Asymmetric visibility used here."),
                     ),
@@ -389,7 +389,7 @@ pub fn check_property(
                     let item_name = context.interner.lookup(&item_name_id);
 
                     if !property_concrete_item.value.is_constant(context.version, false) {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "Property `{class_like_name}::{item_name}` value contains a non-constant expression."
                             ))
@@ -409,7 +409,7 @@ pub fn check_property(
                     }
 
                     if let Some(readonly) = last_readonly {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "Readonly property `{class_like_name}::{item_name}` cannot have a default value."
                             ))
@@ -439,14 +439,14 @@ pub fn check_property(
                     Annotation::primary(hooked_property.span()).with_message("Hooked property declaration used here."),
                 );
 
-                context.issues.push(issue);
+                context.report(issue);
             }
 
             let item_name_id = hooked_property.item.variable().name;
             let item_name = context.interner.lookup(&item_name_id);
 
             if let Some(readonly) = last_readonly {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Hooked property `{class_like_name}::{item_name}` cannot be readonly."))
                         .with_annotation(Annotation::primary(readonly).with_message(format!(
                             "Property `{class_like_name}::{item_name}` is marked as readonly here."
@@ -467,7 +467,7 @@ pub fn check_property(
             }
 
             if let Some(r#static) = last_static {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Hooked property `{class_like_name}::{item_name}` cannot be static."))
                         .with_annotation(Annotation::primary(r#static).with_message(format!(
                             "Property `{class_like_name}::{item_name}` is marked as static here."
@@ -496,7 +496,7 @@ pub fn check_property(
                     let first = hook.modifiers.first().unwrap();
                     let last = hook.modifiers.last().unwrap();
 
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Hook `{name}` for property `{class_like_name}::{item_name}` cannot have modifiers."
                         ))
@@ -516,7 +516,7 @@ pub fn check_property(
 
                 if !class_like_is_interface && let PropertyHookBody::Abstract(property_hook_abstract_body) = &hook.body
                 {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Non-abstract property hook `{name}` must have a body."))
                             .with_annotation(
                                 Annotation::primary(property_hook_abstract_body.span())
@@ -543,7 +543,7 @@ pub fn check_property(
                     match lowered_name.as_str() {
                         "set" => {
                             if parameter_list.parameters.len() != 1 {
-                                context.issues.push(
+                                context.report(
                                     Issue::error(format!(
                                         "Hook `{}` of property `{}::{}` must accept exactly one parameter, found {}.",
                                         name,
@@ -574,7 +574,7 @@ pub fn check_property(
                                 let first_parameter_name = context.interner.lookup(&first_parameter.variable.name);
 
                                 if first_parameter.hint.is_none() {
-                                    context.issues.push(
+                                    context.report(
                                         Issue::error(format!(
                                             "Parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must contain a type hint."
                                         ))
@@ -600,7 +600,7 @@ pub fn check_property(
                                 }
 
                                 if let Some(ellipsis) = first_parameter.ellipsis {
-                                    context.issues.push(
+                                    context.report(
                                         Issue::error(format!(
                                             "Parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must not be variadic."
                                         ))
@@ -629,7 +629,7 @@ pub fn check_property(
                                 }
 
                                 if let Some(ampersand) = first_parameter.ampersand {
-                                    context.issues.push(
+                                    context.report(
                                         Issue::error(format!(
                                             "Parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must not be pass-by-reference."
                                         ))
@@ -658,7 +658,7 @@ pub fn check_property(
                                 }
 
                                 if let Some(default_value) = &first_parameter.default_value {
-                                    context.issues.push(
+                                    context.report(
                                         Issue::error(format!(
                                             "Parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must not have a default value."
                                         ))
@@ -686,7 +686,7 @@ pub fn check_property(
                             }
                         }
                         "get" => {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Hook `{name}` of property `{class_like_name}::{item_name}` must not have a parameters list."
                                 ))
@@ -714,7 +714,7 @@ pub fn check_property(
                 }
 
                 if !lowered_name.as_str().eq("set") && !lowered_name.as_str().eq("get") {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Hooked property `{class_like_name}::{item_name}` contains an unknwon hook `{name}`, expected `set` or `get`."
                         ))
@@ -734,7 +734,7 @@ pub fn check_property(
                 }
 
                 if let Some((_, previous_span)) = hook_names.iter().find(|(previous, _)| previous.eq(&lowered_name)) {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Hook `{name}` has already been defined for property `{class_like_name}::{item_name}`."
                         ))

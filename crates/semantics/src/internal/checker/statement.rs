@@ -34,7 +34,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
                 let name = context.interner.lookup(&item.name.value);
 
                 if name.eq_ignore_ascii_case(STRICT_TYPES_DECLARE_DIRECTIVE) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Strict type declaration must be the first statement in the file.")
                             .with_annotation(
                                 Annotation::primary(declare.span()).with_message("Strict type declaration found here."),
@@ -73,7 +73,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
         }
 
         if let Statement::Namespace(namespace) = statement {
-            context.issues.push(
+            context.report(
                 Issue::error("Namespace must be the first statement in the file.")
                     .with_annotation(
                         Annotation::primary(namespace.span()).with_message("Namespace statement found here."),
@@ -102,7 +102,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
         match &namespace.body {
             NamespaceBody::Implicit(body) => {
                 if namespace.name.is_none() {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Unbraced namespace must be named.")
                             .with_annotation(
                                 Annotation::primary(namespace.span().join(body.terminator.span()))
@@ -117,7 +117,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
 
                 last_unbraced = Some((namespace_span, body.span()));
                 if let Some((last_namespace_span, last_body_span)) = last_braced {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Cannot mix unbraced namespace declarations with braced namespace declarations.")
                             .with_annotation(
                                 Annotation::primary(namespace_span)
@@ -139,7 +139,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
                 last_braced = Some((namespace_span, body.span()));
 
                 if let Some((last_namespace_span, last_body_span)) = last_unbraced {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Cannot mix braced namespace declarations with unbraced namespace declarations.")
                             .with_annotation(
                                 Annotation::primary(namespace_span)
@@ -166,7 +166,7 @@ pub fn check_opening_tag(opening_tag: &OpeningTag, context: &mut Context<'_>) {
     if let OpeningTag::Short(short_opening_tag) = opening_tag
         && !context.version.is_supported(Feature::ShortOpenTag)
     {
-        context.issues.push(
+        context.report(
             Issue::error("Short opening tag `<?` is no longer supported.")
                 .with_annotation(
                     Annotation::primary(short_opening_tag.span()).with_message("Short opening tag used here."),
@@ -190,7 +190,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
                 };
 
                 if !matches!(value, Some(0) | Some(1)) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("The `strict_types` directive must be set to either `0` or `1`.")
                             .with_annotation(
                                 Annotation::primary(item.value.span())
@@ -205,7 +205,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
                     // get the span of the parent, and label it.
                     let parent = context.ancestors[context.ancestors.len() - 2];
 
-                    context.issues.push(
+                    context.report(
                         Issue::error("The `strict_types` directive must be declared at the top level.")
                             .with_annotation(
                                 Annotation::primary(declare.span()).with_message("Directive declared here."),
@@ -220,7 +220,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
             }
             TICKS_DECLARE_DIRECTIVE => {
                 if !matches!(item.value, Expression::Literal(Literal::Integer(_))) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("The `ticks` directive must be set to a literal integer.")
                             .with_annotation(
                                 Annotation::primary(item.value.span())
@@ -235,7 +235,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
             }
             ENCODING_DECLARE_DIRECTIVE => {
                 if !matches!(item.value, Expression::Literal(Literal::String(_))) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("The `encoding` declare directive must be set to a literal string")
                             .with_annotation(
                                 Annotation::primary(item.value.span())
@@ -247,7 +247,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
                 }
             }
             _ => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "`{}` is not a supported `declare` directive. Supported directives are: `{}`.",
                         name,
@@ -270,7 +270,7 @@ pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_>) {
         // get the span of the parent, and label it.
         let parent = context.ancestors[context.ancestors.len() - 2];
 
-        context.issues.push(
+        context.report(
             Issue::error("Namespace declaration must be at the top level.")
                 .with_annotation(Annotation::primary(namespace.span()).with_message("Namespace declared here."))
                 .with_annotation(
@@ -325,5 +325,5 @@ pub fn check_goto(goto: &Goto, context: &mut Context<'_>) {
         ));
     }
 
-    context.issues.push(issue);
+    context.report(issue);
 }

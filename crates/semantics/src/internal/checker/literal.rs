@@ -21,7 +21,7 @@ pub fn check_literal(literal: &Literal, context: &mut Context<'_>) {
         return;
     }
 
-    context.issues.push(
+    context.report(
         Issue::error("Numeric literal separators are only available in PHP 7.4 and later.")
             .with_annotation(Annotation::primary(literal.span()).with_message("Numeric literal used here."))
             .with_help("Remove the underscore separators to make the code compatible with PHP 7.3 and earlier versions, or upgrade to PHP 7.4 or later."),

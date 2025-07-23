@@ -29,7 +29,7 @@ pub fn check_method(
         match modifier {
             Modifier::Static(_) => {
                 if let Some(last_static) = last_static {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "duplicate `static` modifier on method `{class_like_name}::{method_name}`"
                         ))
@@ -52,7 +52,7 @@ pub fn check_method(
             }
             Modifier::Final(_) => {
                 if let Some(abstract_modifier) = last_abstract {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "method `{class_like_name}::{method_name}` cannot be both `final` and `abstract`"
                         ))
@@ -70,7 +70,7 @@ pub fn check_method(
                 }
 
                 if let Some(last_final) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "duplicate `final` modifier on method `{class_like_name}::{method_name}`"
                         ))
@@ -93,7 +93,7 @@ pub fn check_method(
             }
             Modifier::Abstract(_) => {
                 if let Some(final_modifier) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "method `{class_like_name}::{method_name}` cannot be both `final` and `abstract`"
                         ))
@@ -111,7 +111,7 @@ pub fn check_method(
                 }
 
                 if let Some(last_abstract) = last_abstract {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "duplicate `abstract` modifier on method `{class_like_name}::{method_name}`"
                         ))
@@ -135,7 +135,7 @@ pub fn check_method(
                 last_abstract = Some(modifier.span());
             }
             Modifier::Readonly(_) => {
-                context.issues.push(
+                context.report(
                     Issue::error("`readonly` modifier is not allowed on methods".to_string())
                         .with_annotation(Annotation::primary(modifier.span()).with_message("`readonly` modifier"))
                         .with_annotation(
@@ -150,7 +150,7 @@ pub fn check_method(
             }
             Modifier::Private(_) | Modifier::Protected(_) | Modifier::Public(_) => {
                 if let Some(last_visibility) = last_visibility {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "duplicate visibility modifier on method `{class_like_name}::{method_name}`"
                         ))
@@ -180,7 +180,7 @@ pub fn check_method(
             Modifier::PrivateSet(k) | Modifier::ProtectedSet(k) | Modifier::PublicSet(k) => {
                 let modifier_name = context.interner.lookup(&k.value);
 
-                context.issues.push(
+                context.report(
                     Issue::error(format!("`{modifier_name}` modifier is not allowed on methods"))
                         .with_annotation(
                             Annotation::primary(modifier.span()).with_message(format!("`{modifier_name}` modifier")),
@@ -223,7 +223,7 @@ pub fn check_method(
                         )
                     };
 
-                    context.issues.push(
+                    context.report(
                         Issue::error(message)
                             .with_annotation(Annotation::primary(method.parameter_list.span()))
                             .with_annotation(
@@ -239,7 +239,7 @@ pub fn check_method(
             }
 
             if *must_be_public && !is_public {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Magic method `{class_like_name}::{method_name}` must be public."))
                         .with_annotation(
                             Annotation::primary(last_visibility.unwrap())
@@ -258,7 +258,7 @@ pub fn check_method(
 
             match last_static.as_ref() {
                 Some(span) if !*must_be_static => {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Magic method `{class_like_name}::{method_name}` cannot be static."))
                             .with_annotation(Annotation::primary(*span).with_message("`static` modifier"))
                             .with_annotation(
@@ -272,7 +272,7 @@ pub fn check_method(
                     );
                 }
                 None if *must_be_static => {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Magic method `{class_like_name}::{method_name}` must be static."))
                             .with_annotation(Annotation::primary(method.name.span()))
                             .with_annotation(
@@ -289,7 +289,7 @@ pub fn check_method(
             }
 
             if !*can_have_return_type && let Some(hint) = &method.return_type_hint {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Magic method `{class_like_name}::{method_name}` cannot have a return type hint."
                     ))
@@ -311,7 +311,7 @@ pub fn check_method(
     match &method.body {
         MethodBody::Abstract(method_abstract_body) => {
             if !class_like_is_interface && last_abstract.is_none() {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Non-Abstract method `{class_like_name}::{method_name}` must have a concrete body.",
                     ))
@@ -331,7 +331,7 @@ pub fn check_method(
             if let Some(abstract_modifier) = last_abstract {
                 is_abstract = true;
 
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Method `{class_like_name}::{method_name}` is abstract and cannot have a concrete body.",
                     ))
@@ -345,7 +345,7 @@ pub fn check_method(
                     ]),
                 );
             } else if class_like_is_interface {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Interface method `{class_like_name}::{method_name}` is implicitly abstract and cannot have a concrete body.",
                     ))
@@ -371,7 +371,7 @@ pub fn check_method(
                 Hint::Void(_) => {
                     for r#return in returns {
                         if let Some(val) = &r#return.value {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Method `{class_like_name}::{method_name}` with return type of `void` must not return a value.",
                                 ))
@@ -391,7 +391,7 @@ pub fn check_method(
                 }
                 Hint::Never(_) => {
                     for r#return in returns {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "Function `{class_like_name}::{method_name}` with return type of `never` must not return.",
                             ))
@@ -411,7 +411,7 @@ pub fn check_method(
                 _ if !returns_generator(context, body, hint) => {
                     for r#return in returns {
                         if r#return.value.is_none() {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Method `{class_like_name}::{method_name}` with return type must return a value.",
                                 ))
@@ -440,7 +440,7 @@ pub fn check_method(
     } else if is_abstract {
         for parameter in method.parameter_list.parameters.iter() {
             if parameter.is_promoted_property() {
-                context.issues.push(
+                context.report(
                     Issue::error("Promoted properties are not allowed in abstract constructors.")
                         .with_annotation(
                             Annotation::primary(parameter.span()).with_message("Promoted property used here."),

@@ -17,7 +17,7 @@ pub fn check_extends(
     context: &mut Context<'_>,
 ) {
     if extension_limit && extends.types.len() > 1 {
-        context.issues.push(
+        context.report(
             Issue::error(format!(
                 "{} `{}` can only extend one other type, found {}.",
                 class_like_kind,
@@ -37,7 +37,7 @@ pub fn check_extends(
         let extended_fqcn = context.get_name(&extended_type.span().start);
 
         if extended_fqcn.eq_ignore_ascii_case(class_like_fqcn) {
-            context.issues.push(
+            context.report(
                 Issue::error(format!("{class_like_kind} `{class_like_name}` cannot extend itself."))
                     .with_annotation(
                         Annotation::primary(extended_type.span())
@@ -60,7 +60,7 @@ pub fn check_extends(
                 .iter()
                 .any(|keyword| keyword.eq_ignore_ascii_case(extended_name))
         {
-            context.issues.push(
+            context.report(
                 Issue::error(format!(
                     "{class_like_kind} `{class_like_name}` cannot extend reserved keyword `{extended_name}`."
                 ))
@@ -94,7 +94,7 @@ pub fn check_implements(
             let implemented_fqcn = context.get_name(&implemented_type.span().start);
 
             if implemented_fqcn.eq_ignore_ascii_case(class_like_fqcn) {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("{class_like_kind} `{class_like_name}` cannot implement itself."))
                         .with_annotation(
                             Annotation::primary(implemented_type.span())
@@ -118,7 +118,7 @@ pub fn check_implements(
                 .iter()
                 .any(|keyword| keyword.eq_ignore_ascii_case(implemented_name))
         {
-            context.issues.push(
+            context.report(
                 Issue::error(format!(
                     "{class_like_kind} `{class_like_name}` cannot implement reserved keyword `{implemented_name}`."
                 ))

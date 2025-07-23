@@ -14,7 +14,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_>) {
         }
         Access::NullSafeProperty(null_safe_access) => {
             if !context.version.is_supported(Feature::NullSafeOperator) {
-                context.issues.push(
+                context.report(
                     Issue::error("Nullsafe operator is available in PHP 8.0 and above.")
                         .with_annotation(
                             Annotation::primary(null_safe_access.question_mark_arrow)
@@ -49,7 +49,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_>) {
                 return;
             }
 
-            context.issues.push(
+            context.report(
                 Issue::error("Accessing the `class` constant on an object is only available in PHP 8.0 and above.")
                     .with_annotation(
                         Annotation::primary(class_constant_access.span()).with_message("`class` constant used here."),

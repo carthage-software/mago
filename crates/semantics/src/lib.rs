@@ -52,6 +52,6 @@ impl<'a> SemanticsChecker<'a> {
 
         CheckingWalker.walk_program(program, &mut context);
 
-        context.issues
+        context.finalize()
     }
 }

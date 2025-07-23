@@ -9,7 +9,7 @@ use crate::internal::context::Context;
 pub fn check_try(r#try: &Try, context: &mut Context<'_>) {
     for catch in r#try.catch_clauses.iter() {
         if catch.variable.is_none() && !context.version.is_supported(Feature::CatchOptionalVariable) {
-            context.issues.push(
+            context.report(
                 Issue::error("Cannot use optional variable in `catch` clause.")
                     .with_annotation(Annotation::primary(catch.span()).with_message("`catch` clause without variable."))
                     .with_note("Before PHP 8.0, `catch` clauses must have a variable to store the exception.")
@@ -27,7 +27,7 @@ pub fn check_try(r#try: &Try, context: &mut Context<'_>) {
         return;
     }
 
-    context.issues.push(
+    context.report(
         Issue::error("Cannot use `try` without a `catch` or `finally` clause.")
             .with_annotation(
                 Annotation::primary(r#try.span()).with_message("`try` statement without `catch` or `finally`."),
@@ -44,7 +44,7 @@ fn check_try_catch_hint(hint: &Hint, union_supported: bool, context: &mut Contex
         Hint::Identifier(_) => {}
         Hint::Union(union) => {
             if !union_supported {
-                context.issues.push(
+                context.report(
                     Issue::error("Cannot use union type hint in `catch` clause.")
                         .with_annotation(
                             Annotation::primary(union.span()).with_message("Union type hint in `catch` clause."),
@@ -60,7 +60,7 @@ fn check_try_catch_hint(hint: &Hint, union_supported: bool, context: &mut Contex
         }
         _ => {
             if union_supported {
-                context.issues.push(
+                context.report(
                     Issue::error("Invalid type hint in `catch` clause.")
                         .with_annotation(
                             Annotation::primary(hint.span()).with_message("Invalid type hint in `catch` clause."),
@@ -70,7 +70,7 @@ fn check_try_catch_hint(hint: &Hint, union_supported: bool, context: &mut Contex
                         .with_link("https://www.php.net/manual/en/language.exceptions.php"),
                 );
             } else {
-                context.issues.push(
+                context.report(
                     Issue::error("Invalid type hint in `catch` clause.")
                         .with_annotation(
                             Annotation::primary(hint.span()).with_message("Invalid type hint in `catch` clause."),

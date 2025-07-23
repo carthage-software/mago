@@ -10,7 +10,7 @@ pub fn check_list(list: &List, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::TrailingCommaInListSyntax)
         && let Some(token) = list.elements.get_trailing_token()
     {
-        context.issues.push(
+        context.report(
             Issue::error("Trailing comma in list syntax is only available in PHP 7.2 and above.")
                 .with_annotation(Annotation::primary(token.span).with_message("Trailing comma used here."))
                 .with_help("Upgrade to PHP 7.2 or later to use trailing commas in list syntax."),
@@ -29,7 +29,7 @@ pub fn check_list(list: &List, context: &mut Context<'_>) {
                 operator: UnaryPrefixOperator::Reference(reference), ..
             }) = value
             {
-                context.issues.push(
+                context.report(
                     Issue::error("Reference assignment in list syntax is only available in PHP 7.3 and above.")
                         .with_annotation(
                             Annotation::primary(reference.span()).with_message("Reference assignment used here."),

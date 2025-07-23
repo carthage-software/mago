@@ -11,7 +11,7 @@ pub fn check_closure_creation(closure_creation: &ClosureCreation, context: &mut 
         return;
     }
 
-    context.issues.push(
+    context.report(
         Issue::error("The closure creation syntax is only available in PHP 8.1 and above.").with_annotation(
             Annotation::primary(closure_creation.span()).with_message("Closure creation syntax used here."),
         ),

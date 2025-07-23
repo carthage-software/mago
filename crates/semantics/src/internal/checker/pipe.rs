@@ -11,7 +11,7 @@ pub fn check_pipe(pipe: &Pipe, context: &mut Context<'_>) {
         return;
     }
 
-    context.issues.push(
+    context.report(
         Issue::error(format!(
             "The pipe operator (`|>`) is not available in your configured PHP version ({}).",
             context.version

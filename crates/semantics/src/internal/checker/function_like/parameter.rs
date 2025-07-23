@@ -11,7 +11,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
     let mut parameters_seen = vec![];
     for parameter in function_like_parameter_list.parameters.iter() {
         if parameter.is_promoted_property() && !context.version.is_supported(Feature::PromotedProperties) {
-            context.issues.push(
+            context.report(
                 Issue::error("Promoted properties are only available in PHP 8.0 and above.").with_annotation(
                     Annotation::primary(parameter.span()).with_message("Promoted property used here."),
                 ),
@@ -22,7 +22,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
         if let Some(prev_span) =
             parameters_seen.iter().find_map(|(n, s)| if parameter.variable.name.eq(n) { Some(s) } else { None })
         {
-            context.issues.push(
+            context.report(
                 Issue::error(format!("Parameter `{name}` is already defined."))
                     .with_annotation(
                         Annotation::primary(parameter.variable.span())
@@ -43,7 +43,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
         for modifier in parameter.modifiers.iter() {
             match &modifier {
                 Modifier::Static(keyword) | Modifier::Final(keyword) | Modifier::Abstract(keyword) => {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Parameter `{}` cannot have the `{}` modifier.",
                             name,
@@ -62,7 +62,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
                 }
                 Modifier::Readonly(_) => {
                     if let Some(s) = last_readonly {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!("Parameter `{name}` cannot have multiple `readonly` modifiers."))
                                 .with_annotation(
                                     Annotation::primary(modifier.span())
@@ -79,7 +79,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
                 }
                 Modifier::Public(_) | Modifier::Protected(_) | Modifier::Private(_) => {
                     if let Some(s) = last_read_visibility {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!("Parameter `{name}` cannot have multiple visibility modifiers."))
                                 .with_annotation(
                                     Annotation::primary(modifier.span())
@@ -96,7 +96,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
                 }
                 Modifier::PrivateSet(_) | Modifier::ProtectedSet(_) | Modifier::PublicSet(_) => {
                     if let Some(s) = last_write_visibility {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "Parameter `{name}` cannot have multiple write visibility modifiers."
                             ))
@@ -117,7 +117,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
         }
 
         if let Some((n, s)) = last_variadic {
-            context.issues.push(
+            context.report(
                 Issue::error(format!(
                     "Invalid parameter order: parameter `{}` is defined after variadic parameter `{}`.",
                     name,
@@ -137,7 +137,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
 
         if let Some(ellipsis) = parameter.ellipsis {
             if let Some(default) = &parameter.default_value {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Invalid parameter definition: variadic parameter `{name}` cannot have a default value."
                     ))
@@ -161,7 +161,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
             if hint.is_bottom() {
                 let hint_name = context.get_code_snippet(hint);
 
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Invalid parameter type: bottom type `{hint_name}` cannot be used as a parameter type."
                     ))
@@ -176,7 +176,7 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
                     .with_help("Use a valid parameter type to ensure compatibility with PHP's type system."),
                 );
             } else if hint.is_union() && !context.version.is_supported(Feature::NativeUnionTypes) {
-                context.issues.push(
+                context.report(
                     Issue::error(
                         "Union type hints (e.g. `int|float`) are only available in PHP 8.0 and above.",
                     )

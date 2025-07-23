@@ -8,7 +8,7 @@ use crate::internal::context::Context;
 #[inline]
 pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::Attributes) {
-        context.issues.push(
+        context.report(
             Issue::error("Attributes are only available in PHP 8.0 and above.")
                 .with_annotation(Annotation::primary(attribute_list.span()).with_message("Attribute list used here."))
                 .with_help("Upgrade to PHP 8.0 or above to use attributes."),
@@ -27,7 +27,7 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
                 };
 
                 if let Some(ellipsis) = ellipsis {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Cannot use argument unpacking in attribute arguments.")
                             .with_annotation(
                                 Annotation::primary(ellipsis.span()).with_message("Argument unpacking used here."),
@@ -41,7 +41,7 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
                 }
 
                 if !value.is_constant(context.version, true) {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Attribute `{name}` argument contains a non-constant expression."))
                             .with_annotations([
                                 Annotation::primary(value.span()).with_message("Non-constant expression used here."),

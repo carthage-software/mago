@@ -20,7 +20,7 @@ pub fn check_switch(switch: &Switch, context: &mut Context<'_>) {
             continue;
         };
 
-        context.issues.push(
+        context.report(
             Issue::error("A switch statement can only have one default case.")
                 .with_annotation(
                     Annotation::primary(default_case.span()).with_message("This is a duplicate default case."),
@@ -42,7 +42,7 @@ pub fn check_switch(switch: &Switch, context: &mut Context<'_>) {
 #[inline]
 pub fn check_match(r#match: &Match, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::MatchExpression) {
-        context.issues.push(
+        context.report(
             Issue::error("Match expressions are only available in PHP 8.0 and above.")
                 .with_annotation(Annotation::primary(r#match.span()).with_message("Match expression defined here."))
                 .with_help("Upgrade to PHP 8.0 or above to use match expressions."),
@@ -61,7 +61,7 @@ pub fn check_match(r#match: &Match, context: &mut Context<'_>) {
             continue;
         };
 
-        context.issues.push(
+        context.report(
             Issue::error("A match expression can only have one default arm.")
                 .with_annotation(
                     Annotation::primary(default_arm.span()).with_message("This is a duplicate default arm."),

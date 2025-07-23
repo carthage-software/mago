@@ -27,7 +27,7 @@ pub fn check_class_like_constant(
             | Modifier::PrivateSet(k)
             | Modifier::ProtectedSet(k)
             | Modifier::PublicSet(k) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "`{}` modifier is not allowed on constants",
                         context.interner.lookup(&k.value),
@@ -44,7 +44,7 @@ pub fn check_class_like_constant(
             }
             Modifier::Final(_) => {
                 if !context.version.is_supported(Feature::FinalConstants) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Final class constants are only available in PHP 8.1 and above.").with_annotation(
                             Annotation::primary(modifier.span()).with_message("Final modifier used here."),
                         ),
@@ -52,7 +52,7 @@ pub fn check_class_like_constant(
                 }
 
                 if let Some(last_final) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error("duplicate `final` modifier on constant")
                             .with_annotation(Annotation::primary(modifier.span()))
                             .with_annotations([
@@ -71,7 +71,7 @@ pub fn check_class_like_constant(
             }
             Modifier::Private(_) | Modifier::Protected(_) | Modifier::Public(_) => {
                 if !context.version.is_supported(Feature::ClassLikeConstantVisibilityModifiers) {
-                    context.issues.push(
+                    context.report(
                         Issue::error(
                             "Visibility modifiers for class constants are only available in PHP 7.1 and above.",
                         )
@@ -82,7 +82,7 @@ pub fn check_class_like_constant(
                 }
 
                 if let Some(last_visibility) = last_visibility {
-                    context.issues.push(
+                    context.report(
                         Issue::error("duplicate visibility modifier on constant")
                             .with_annotation(Annotation::primary(modifier.span()))
                             .with_annotations([
@@ -105,7 +105,7 @@ pub fn check_class_like_constant(
     if let Some(type_hint) = &class_like_constant.hint
         && !context.version.is_supported(Feature::TypedClassLikeConstants)
     {
-        context.issues.push(
+        context.report(
             Issue::error("Typed class constants are only available in PHP 8.3 and above.")
                 .with_annotation(Annotation::primary(type_hint.span()).with_message("Type hint used here.")),
         );
@@ -115,7 +115,7 @@ pub fn check_class_like_constant(
         let item_name = context.interner.lookup(&item.name.value);
 
         if !item.value.is_constant(context.version, false) {
-            context.issues.push(
+            context.report(
                 Issue::error(format!(
                     "Constant `{class_like_name}::{item_name}` value contains a non-constant expression."
                 ))

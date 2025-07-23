@@ -25,7 +25,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
         Hint::Void(_) => {
             for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
                 if let Some(val) = &r#return.value {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Function `{name}` with return type `void` must not return a value."))
                             .with_annotation(Annotation::primary(val.span()).with_message("Return value found here."))
                             .with_annotation(
@@ -39,7 +39,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
         }
         Hint::Never(_) => {
             for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Function `{name}` with return type `never` must not return."))
                         .with_annotation(
                             Annotation::primary(r#return.span()).with_message("Return statement found here."),
@@ -55,7 +55,7 @@ pub fn check_function(function: &Function, context: &mut Context<'_>) {
         _ if !returns_generator(context, &function.body, &return_hint.hint) => {
             for r#return in mago_syntax::utils::find_returns_in_block(&function.body) {
                 if r#return.value.is_none() {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Function `{name}` with a return type must return a value."))
                             .with_annotation(
                                 Annotation::primary(r#return.span()).with_message("Empty return statement found here."),
@@ -82,7 +82,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
                 Annotation::primary(arrow_function.span()).with_message("Arrow function uses `fn` keyword."),
             );
 
-        context.issues.push(issue);
+        context.report(issue);
     }
 
     check_for_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
@@ -95,7 +95,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
         // see: https://3v4l.org/VgoiO
         match &return_hint.hint {
             Hint::Void(_) => {
-                context.issues.push(
+                context.report(
                     Issue::error("Arrow function cannot have a return type of `void`.")
                         .with_annotation(
                             Annotation::primary(return_hint.hint.span())
@@ -109,7 +109,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
                 );
             }
             Hint::Never(_) if !context.version.is_supported(Feature::NeverReturnTypeInArrowFunction) => {
-                context.issues.push(
+                context.report(
                     Issue::error("The `never` return type in arrow functions is only available in PHP 8.2 and later.")
                         .with_annotation(
                             Annotation::primary(return_hint.hint.span())
@@ -133,7 +133,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::TrailingCommaInClosureUseList)
         && let Some(trailing_comma) = &closure.use_clause.as_ref().and_then(|u| u.variables.get_trailing_token())
     {
-        context.issues.push(
+        context.report(
                 Issue::error("Trailing comma in closure use list is only available in PHP 8.0 and later.")
                 .with_annotation(
                     Annotation::primary(trailing_comma.span).with_message("Trailing comma found here."),
@@ -156,7 +156,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
         Hint::Void(_) => {
             for r#return in returns {
                 if let Some(val) = &r#return.value {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Closure with a return type of `void` must not return a value.")
                             .with_annotation(
                                 Annotation::primary(val.span())
@@ -174,7 +174,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
         }
         Hint::Never(_) => {
             for r#return in returns {
-                context.issues.push(
+                context.report(
                     Issue::error("Closure with a return type of `never` must not include a return statement.")
                         .with_annotation(
                             Annotation::primary(r#return.span())
@@ -188,7 +188,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
         _ if !returns_generator(context, &closure.body, hint) => {
             for r#return in returns {
                 if r#return.value.is_none() {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Closure with a return type must return a value.")
                             .with_annotation(Annotation::primary(r#return.span()).with_message("Missing return value."))
                             .with_annotation(
@@ -208,7 +208,7 @@ pub fn check_closure(closure: &Closure, context: &mut Context<'_>) {
 pub fn check_return_type_hint(function_like_return_type_hint: &FunctionLikeReturnTypeHint, context: &mut Context<'_>) {
     match &function_like_return_type_hint.hint {
         Hint::Union(union_hint) if !context.version.is_supported(Feature::NativeUnionTypes) => {
-            context.issues.push(
+            context.report(
                 Issue::error(
                     "Union type hints (e.g. `int|float`) are only available in PHP 8.0 and above."
                 )
@@ -220,7 +220,7 @@ pub fn check_return_type_hint(function_like_return_type_hint: &FunctionLikeRetur
                         );
         }
         Hint::Static(r#static) if !context.version.is_supported(Feature::StaticReturnTypeHint) => {
-            context.issues.push(
+            context.report(
                 Issue::error("Static return type hints are only available in PHP 8.0 and above.").with_annotation(
                     Annotation::primary(r#static.span()).with_message("Static return type hint used here."),
                 )
@@ -238,7 +238,7 @@ pub fn check_for_promoted_properties_outside_constructor(
 ) {
     for parameter in parameter_list.parameters.iter() {
         if parameter.is_promoted_property() {
-            context.issues.push(
+            context.report(
                 Issue::error("Promoted properties are not allowed outside of constructors.")
                     .with_annotation(
                         Annotation::primary(parameter.span()).with_message("Promoted property found here."),

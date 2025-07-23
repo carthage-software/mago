@@ -15,7 +15,7 @@ pub fn check_assignment(assignment: &Assignment, context: &mut Context<'_>) {
         return;
     };
 
-    context.issues.push(
+    context.report(
         Issue::error("The `??=` (null coalesce assignment) operator is only available in PHP 7.4 and later.")
             .with_annotation(
                 Annotation::primary(operator.span()).with_message("Null coalesce assignment operator `??=` used here."),

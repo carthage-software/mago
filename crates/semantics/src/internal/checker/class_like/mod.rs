@@ -25,7 +25,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
     {
-        context.issues.push(
+        context.report(
             Issue::error(format!("Class `{class_name}` name cannot be a reserved keyword."))
                 .with_annotation(
                     Annotation::primary(class.name.span())
@@ -45,7 +45,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
     for modifier in class.modifiers.iter() {
         match &modifier {
             Modifier::Static(_) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Class `{class_name}` cannot have the `static` modifier."))
                         .with_annotation(
                             Annotation::primary(modifier.span()).with_message("`static` modifier applied here."),
@@ -65,7 +65,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
             | Modifier::PrivateSet(keyword) => {
                 let visibility_name = context.interner.lookup(&keyword.value);
 
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Class `{class_name}` cannot have the `{visibility_name}` visibility modifier."
                     ))
@@ -82,7 +82,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
             }
             Modifier::Final(keyword) => {
                 if let Some(span) = last_abstract {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Abstract class `{class_name}` cannot have the `final` modifier."))
                             .with_annotation(
                                 Annotation::primary(keyword.span()).with_message("`final` modifier applied here."),
@@ -97,7 +97,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
                 }
 
                 if let Some(span) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Class `{class_name}` cannot have multiple `final` modifiers."))
                             .with_annotation(
                                 Annotation::primary(keyword.span())
@@ -116,7 +116,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
             }
             Modifier::Abstract(keyword) => {
                 if let Some(span) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Final class `{class_name}` cannot have the `abstract` modifier."))
                             .with_annotation(
                                 Annotation::primary(keyword.span()).with_message("`abstract` modifier applied here."),
@@ -131,7 +131,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
                 }
 
                 if let Some(span) = last_abstract {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Class `{class_name}` cannot have multiple `abstract` modifiers."))
                             .with_annotation(
                                 Annotation::primary(keyword.span())
@@ -150,7 +150,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
             }
             Modifier::Readonly(keyword) => {
                 if let Some(span) = last_readonly {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Class `{class_name}` cannot have multiple `readonly` modifiers."))
                             .with_annotation(
                                 Annotation::primary(keyword.span())
@@ -176,7 +176,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
         let issue = Issue::error("Readonly classes are only available in PHP 8.2 and above.")
             .with_annotation(Annotation::primary(modifier.span()).with_message("Readonly modifier used here."));
 
-        context.issues.push(issue);
+        context.report(issue);
     }
 
     if let Some(extends) = &class.extends {
@@ -192,7 +192,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
     for memeber in class.members.iter() {
         match &memeber {
             ClassLikeMember::EnumCase(case) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Class `{class_name}` cannot contain enum cases."))
                         .with_annotation(Annotation::primary(case.span()).with_message("Enum case found in class."))
                         .with_annotation(
@@ -206,7 +206,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
                 let method_name = context.interner.lookup(&method.name.value);
 
                 if !class.modifiers.contains_abstract() && method.modifiers.contains_abstract() {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Class `{class_name}` contains an abstract method `{method_name}`, so the class must be declared abstract."
                         ))
@@ -246,7 +246,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
             .iter()
             .any(|keyword| keyword.eq_ignore_ascii_case(interface_name))
     {
-        context.issues.push(
+        context.report(
             Issue::error(format!("Interface `{interface_name}` name cannot be a reserved keyword."))
                 .with_annotation(
                     Annotation::primary(interface.name.span())
@@ -269,7 +269,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
     for memeber in interface.members.iter() {
         match &memeber {
             ClassLikeMember::TraitUse(trait_use) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Interface `{interface_name}` cannot use traits."))
                         .with_annotation(Annotation::primary(trait_use.span()).with_message("Trait use statement."))
                         .with_annotation(
@@ -280,7 +280,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 );
             }
             ClassLikeMember::EnumCase(case) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Interface `{interface_name}` cannot contain enum cases."))
                         .with_annotation(Annotation::primary(case.span()).with_message("Enum case declared here."))
                         .with_annotation(
@@ -306,7 +306,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 for visibility in visibilities {
                     let visibility_name = visibility.as_str(context.interner);
 
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Interface method `{interface_name}::{method_name}` cannot have `{visibility_name}` modifier."
                         ))
@@ -326,7 +326,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 }
 
                 if let MethodBody::Concrete(body) = &method.body {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Interface method `{interface_name}::{method_name}` cannot have a body."))
                             .with_annotations([
                                 Annotation::primary(body.span()).with_message("Method body declared here."),
@@ -340,7 +340,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 }
 
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Interface method `{interface_name}::{method_name}` must not be abstract."
                         ))
@@ -375,7 +375,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
             ClassLikeMember::Property(property) => {
                 match &property {
                     Property::Plain(plain_property) => {
-                        context.issues.push(
+                        context.report(
                                     Issue::error(format!(
                                         "Interface `{interface_name}` cannot have non-hooked properties."
                                     ))
@@ -415,7 +415,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         for visibility in write_visibilities {
                             let visibility_name = visibility.as_str(context.interner);
 
-                            context.issues.push(
+                            context.report(
                                         Issue::error(format!(
                                             "Interface virtual property `{interface_name}::{property_name}` must not specify asymmetric visibility.",
                                         ))
@@ -436,7 +436,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         for visibility in non_public_read_visibilities {
                             let visibility_name = visibility.as_str(context.interner);
 
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Interface virtual property `{interface_name}::{property_name}` cannot have `{visibility_name}` modifier.",
                                 ))
@@ -456,7 +456,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         }
 
                         if !found_public {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Interface virtual property `{interface_name}::{property_name}` must be declared public."
                                 ))
@@ -472,7 +472,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         }
 
                         if let Some(abstract_modifier) = hooked_property.modifiers.get_abstract() {
-                            context.issues.push(
+                            context.report(
                                             Issue::error(format!(
                                                 "Interface virtual property `{interface_name}::{property_name}` cannot be abstract."
                                             ))
@@ -493,7 +493,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         }
 
                         if let PropertyItem::Concrete(item) = &hooked_property.item {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Interface virtual property `{interface_name}::{property_name}` cannot have a default value."
                                 ))
@@ -517,7 +517,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
 
                         for hook in hooked_property.hook_list.hooks.iter() {
                             if let PropertyHookBody::Concrete(property_hook_concrete_body) = &hook.body {
-                                context.issues.push(
+                                context.report(
                                     Issue::error(format!(
                                         "Interface virtual property `{interface_name}::{property_name}` must be abstract."
                                     ))
@@ -553,7 +553,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 for visibility in non_public_read_visibility.iter() {
                     let visibility_name = visibility.as_str(context.interner);
 
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Interface constant cannot have `{visibility_name}` visibility modifier.",
                         ))
@@ -593,7 +593,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
             .iter()
             .any(|keyword| keyword.eq_ignore_ascii_case(class_like_name))
     {
-        context.issues.push(
+        context.report(
             Issue::error(format!("Trait `{class_like_name}` name cannot be a reserved keyword."))
                 .with_annotation(
                     Annotation::primary(r#trait.name.span())
@@ -612,7 +612,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
     for member in r#trait.members.iter() {
         match &member {
             ClassLikeMember::EnumCase(case) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Trait `{class_like_name}` cannot contain enum cases."))
                         .with_annotation(Annotation::primary(case.span()).with_message("Enum case defined here."))
                         .with_annotation(
@@ -641,7 +641,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 if !context.version.is_supported(Feature::ConstantsInTraits) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Constants in traits are only available in PHP 8.2 and above.")
                             .with_annotation(
                                 Annotation::primary(class_like_constant.span())
@@ -671,7 +671,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
 #[inline]
 pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::Enums) {
-        context.issues.push(
+        context.report(
             Issue::error("Enums are only available in PHP 8.1 and above.")
                 .with_annotation(Annotation::primary(r#enum.span()).with_message("Enum defined here.")),
         );
@@ -686,7 +686,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name))
     {
-        context.issues.push(
+        context.report(
             Issue::error(format!("Enum `{enum_name}` name cannot be a reserved keyword."))
                 .with_annotation(
                     Annotation::primary(r#enum.name.span())
@@ -704,7 +704,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
     {
         let key = context.get_code_snippet(hint);
 
-        context.issues.push(
+        context.report(
             Issue::error(format!(
                 "Enum `{enum_name}` backing type must be either `string` or `int`, but found `{key}`."
             ))
@@ -733,7 +733,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                 match &case.item {
                     EnumCaseItem::Unit(_) => {
                         if enum_is_backed {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Case `{item_name}` of backed enum `{enum_name}` must have a value."
                                 ))
@@ -753,7 +753,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                     }
                     EnumCaseItem::Backed(item) => {
                         if !enum_is_backed {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "Case `{item_name}` of unbacked enum `{enum_name}` must not have a value."
                                 ))
@@ -782,7 +782,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                 if let Some(magic_method) =
                     MAGIC_METHODS.iter().find(|magic_method| magic_method.eq_ignore_ascii_case(method_name))
                 {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Enum `{enum_name}` cannot contain magic method `{magic_method}`."))
                             .with_annotation(
                                 Annotation::primary(method.name.span)
@@ -797,7 +797,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                 }
 
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!("Enum method `{enum_name}::{method_name}` must not be abstract."))
                             .with_annotation(
                                 Annotation::primary(abstract_modifier.span())
@@ -818,7 +818,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                 check_method(method, method_name, r#enum.span(), enum_name, enum_fqcn, "enum", false, context);
             }
             ClassLikeMember::Property(property) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Enum `{enum_name}` cannot have properties."))
                         .with_annotation(Annotation::primary(property.span()).with_message("Property defined here."))
                         .with_annotation(
@@ -855,7 +855,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
             | Modifier::Private(_) => {
                 let modifier_name = modifier.as_str(context.interner);
 
-                context.issues.push(
+                context.report(
                     Issue::error(format!(
                         "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have the `{modifier_name}` modifier."
                     ))
@@ -872,7 +872,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
             }
             Modifier::Final(keyword) => {
                 if let Some(span) = last_final {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have multiple `final` modifiers."
                         ))
@@ -895,7 +895,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
             }
             Modifier::Readonly(keyword) => {
                 if let Some(span) = last_readonly {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have multiple `readonly` modifiers."
                         ))
@@ -913,7 +913,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
                 last_readonly = Some(keyword.span);
 
                 if !context.version.is_supported(Feature::ReadonlyAnonymousClasses) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Readonly anonymous classes are only available in PHP 8.3 and above.")
                             .with_annotation(
                                 Annotation::primary(keyword.span).with_message("Readonly modifier used here."),
@@ -964,7 +964,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
     for member in anonymous_class.members.iter() {
         match &member {
             ClassLikeMember::EnumCase(case) => {
-                context.issues.push(
+                context.report(
                     Issue::error(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot contain enum cases."))
                         .with_annotations([
                             Annotation::primary(case.span()).with_message("Enum case defined here."),
@@ -978,7 +978,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
                 let method_name = context.interner.lookup(&method.name.value);
 
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "Method `{method_name}` in anonymous class `{ANONYMOUS_CLASS_NAME}` must not be abstract."
                         ))
@@ -1063,7 +1063,7 @@ pub fn check_members(
                                 format!("property `{class_like_name}::{item_name}` has already been defined")
                             };
 
-                            context.issues.push(
+                            context.report(
                                 Issue::error(message)
                                     .with_annotation(Annotation::primary(item.variable().span()))
                                     .with_annotations([
@@ -1097,7 +1097,7 @@ pub fn check_members(
                             format!("property `{class_like_name}::{item_name}` has already been defined")
                         };
 
-                        context.issues.push(
+                        context.report(
                             Issue::error(message)
                                 .with_annotation(Annotation::primary(item_variable.span()))
                                 .with_annotations([
@@ -1122,7 +1122,7 @@ pub fn check_members(
                 if let Some((previous, _)) =
                     method_names.iter().find(|(_, previous_name)| method_name_lowered_id.eq(previous_name))
                 {
-                    context.issues.push(
+                    context.report(
                         Issue::error(format!(
                             "{class_like_kind} method `{class_like_name}::{method_name}` has already been defined"
                         ))
@@ -1156,7 +1156,7 @@ pub fn check_members(
                                     )
                                 };
 
-                                context.issues.push(
+                                context.report(
                                     Issue::error(message)
                                         .with_annotation(Annotation::primary(parameter.variable.span()))
                                         .with_annotations([
@@ -1182,7 +1182,7 @@ pub fn check_members(
 
                     if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&item_name)) {
                         if *is_constant {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "{class_like_kind} constant `{class_like_name}::{name}` has already been defined",
                                 ))
@@ -1196,7 +1196,7 @@ pub fn check_members(
                                 ]),
                             );
                         } else {
-                            context.issues.push(
+                            context.report(
                                 Issue::error(format!(
                                     "{class_like_kind} case `{class_like_name}::{name}` and constant `{class_like_name}::{name}` cannot have the same name"
                                 ))
@@ -1220,7 +1220,7 @@ pub fn check_members(
 
                 if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&case_name)) {
                     if *is_constant {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "{class_like_kind} case `{class_like_name}::{name}` and constant `{class_like_name}::{name}` cannot have the same name"
                             ))
@@ -1233,7 +1233,7 @@ pub fn check_members(
                             ]),
                         );
                     } else {
-                        context.issues.push(
+                        context.report(
                             Issue::error(format!(
                                 "{class_like_kind} case `{class_like_name}::{name}` has already been defined",
                             ))

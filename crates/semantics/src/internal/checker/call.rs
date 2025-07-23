@@ -13,7 +13,7 @@ pub fn check_call(call: &Call, context: &mut Context<'_>) {
         }
         Call::NullSafeMethod(null_safe_method_call) => {
             if !context.version.is_supported(Feature::NullSafeOperator) {
-                context.issues.push(
+                context.report(
                     Issue::error("Nullsafe operator is available in PHP 8.0 and above.")
                         .with_annotation(
                             Annotation::primary(null_safe_method_call.question_mark_arrow)

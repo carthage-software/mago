@@ -15,7 +15,7 @@ pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'
             Argument::Positional(positional_argument) => {
                 if let Some(ellipsis) = positional_argument.ellipsis {
                     if let Some(last_named_argument) = last_named_argument {
-                        context.issues.push(
+                        context.report(
                             Issue::error("Cannot use argument unpacking after a named argument.")
                                 .with_annotation(
                                     Annotation::primary(ellipsis.span()).with_message("Unpacking argument here."),
@@ -30,7 +30,7 @@ pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'
                     last_unpacking = Some(ellipsis.span());
                 } else {
                     if let Some(named_argument) = last_named_argument {
-                        context.issues.push(
+                        context.report(
                             Issue::error("Cannot use positional argument after a named argument.")
                                 .with_annotation(
                                     Annotation::primary(positional_argument.span())
@@ -44,7 +44,7 @@ pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'
                     }
 
                     if let Some(unpacking) = last_unpacking {
-                        context.issues.push(
+                        context.report(
                             Issue::error("Cannot use positional argument after argument unpacking.")
                                 .with_annotation(
                                     Annotation::primary(positional_argument.span())
@@ -60,7 +60,7 @@ pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'
             }
             Argument::Named(named_argument) => {
                 if !context.version.is_supported(Feature::NamedArguments) {
-                    context.issues.push(
+                    context.report(
                         Issue::error("Named arguments are only available in PHP 8.0 and above.").with_annotation(
                             Annotation::primary(named_argument.span()).with_message("Named argument used here."),
                         ),
@@ -75,7 +75,7 @@ pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'
     if !context.version.is_supported(Feature::TrailingCommaInFunctionCalls)
         && let Some(last_comma) = argument_list.arguments.get_trailing_token()
     {
-        context.issues.push(
+        context.report(
                 Issue::error("Trailing comma in function calls is only available in PHP 7.3 and later.")
                     .with_annotation(
                         Annotation::primary(last_comma.span).with_message("Trailing comma found here."),
