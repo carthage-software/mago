@@ -8,6 +8,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::iterable::TIterable;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use mago_codex::ttype::atomic::object::TObject;
@@ -26,6 +27,7 @@ use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_any;
+use mago_codex::ttype::get_mixed_iterable;
 use mago_codex::ttype::get_mixed_keyed_array;
 use mago_codex::ttype::get_mixed_list;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
@@ -162,6 +164,19 @@ pub(crate) fn reconcile(
                     span,
                     assertion.has_equality(),
                 ));
+            }
+            TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None }) => {
+                if (key_type.is_mixed() || key_type.is_array_key()) && value_type.is_mixed() {
+                    return Some(intersect_iterable(
+                        context,
+                        assertion,
+                        existing_var_type,
+                        key,
+                        negated,
+                        span,
+                        assertion.has_equality(),
+                    ));
+                }
             }
             TAtomic::Array(TArray::List(TList { known_elements: None, element_type, non_empty, .. })) => {
                 if element_type.is_mixed() {
@@ -530,6 +545,92 @@ fn intersect_object(
 
     if !object_types.is_empty() {
         return TUnion::new(object_types);
+    }
+
+    get_never()
+}
+
+fn intersect_iterable(
+    context: &mut ReconcilationContext<'_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    negated: bool,
+    span: Option<&Span>,
+    is_equality: bool,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return get_mixed_iterable();
+    }
+
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
+
+    for atomic in &existing_var_type.types {
+        if atomic.is_array_or_traversable(context.codebase, context.interner) {
+            acceptable_types.push(atomic.clone());
+
+            continue;
+        }
+
+        match atomic {
+            TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
+                if constraint.is_mixed() {
+                    let atomic = atomic.replace_template_constraint(get_mixed_iterable());
+
+                    acceptable_types.push(atomic);
+                } else {
+                    let atomic = atomic.replace_template_constraint(intersect_iterable(
+                        context,
+                        assertion,
+                        constraint,
+                        None,
+                        false,
+                        span,
+                        is_equality,
+                    ));
+
+                    acceptable_types.push(atomic);
+                }
+
+                did_remove_type = true;
+            }
+            TAtomic::Variable(name) => {
+                if let Some(span) = span {
+                    let name_str = context.interner.lookup(name);
+                    if let Some((lower_bounds, _)) = context.artifacts.type_variable_bounds.get_mut(name_str) {
+                        let mut bound = TemplateBound::new(get_mixed_iterable(), 0, None, None);
+                        bound.span = Some(*span);
+                        lower_bounds.push(bound);
+                    }
+                }
+
+                acceptable_types.push(atomic.clone());
+                did_remove_type = true;
+            }
+            _ => {
+                did_remove_type = true;
+            }
+        }
+    }
+
+    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
+        && let Some(key) = key
+        && let Some(span) = span
+    {
+        trigger_issue_for_impossible(
+            context,
+            &existing_var_type.get_id(Some(context.interner)),
+            key,
+            assertion,
+            !did_remove_type,
+            negated,
+            span,
+        );
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::new(acceptable_types);
     }
 
     get_never()

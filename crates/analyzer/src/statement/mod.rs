@@ -49,7 +49,17 @@ impl Analyzable for Statement {
             {
                 false
             } else {
-                !self.is_control_flow() && !matches!(self, Statement::Static(_) | Statement::Global(_))
+                matches!(
+                    self,
+                    Statement::Block(_)
+                        | Statement::Expression(_)
+                        | Statement::Try(_)
+                        | Statement::Continue(_)
+                        | Statement::Break(_)
+                        | Statement::Return(_)
+                        | Statement::Echo(_)
+                        | Statement::Unset(_)
+                )
             };
 
         if should_populate_docblock_variables {

@@ -2900,7 +2900,7 @@ function array_is_list(array $array): bool
 }
 
 /**
- * @assert-if-true iterable $values
+ * @assert-if-true iterable $value
  *
  * @return ($values is iterable ? true : false)
  *
