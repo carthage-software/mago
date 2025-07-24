@@ -139,6 +139,13 @@ pub fn is_contained_by(
             }
         }
 
+        if let TAtomic::Scalar(TScalar::Generic) = input_type_part
+            && !container_type.has_scalar()
+            && container_type.has_scalar_combination()
+        {
+            continue;
+        }
+
         if let TAtomic::Iterable(_) = input_type_part
             && !container_type.has_iterable()
             && container_type.has_array()

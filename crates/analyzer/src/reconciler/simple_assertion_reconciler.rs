@@ -62,6 +62,11 @@ pub(crate) fn reconcile(
     inside_loop: bool,
 ) -> Option<TUnion> {
     if let Some(assertion_type) = assertion.get_type() {
+        // `mixed is T` -> `T`, always
+        if existing_var_type.is_mixed() {
+            return Some(wrap_atomic(assertion_type.clone()));
+        }
+
         match assertion_type {
             TAtomic::Scalar(TScalar::Generic) => {
                 return intersect_simple!(

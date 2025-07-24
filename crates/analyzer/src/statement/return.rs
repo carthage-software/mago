@@ -995,4 +995,150 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = resolve_nested_generics_through_inheritance,
+        code = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+            #[Attribute(Attribute::TARGET_CLASS)]
+            class Attribute
+            {
+            }
+
+            #[Attribute(Attribute::TARGET_METHOD)]
+            class Override
+            {
+            }
+
+            /**
+             * @template T
+             */
+            interface TypeInterface
+            {
+                /**
+                 * @assert-if-true T $value
+                 */
+                public function matches(mixed $value): bool;
+            }
+
+            /**
+             * @template R
+             * @template L
+             *
+             * @implements TypeInterface<L|R>
+             */
+            readonly class UnionType implements TypeInterface
+            {
+                /**
+                 * @param TypeInterface<L> $left
+                 * @param TypeInterface<R> $right
+                 *
+                 * @mutation-free
+                 */
+                public function __construct(
+                    private TypeInterface $left,
+                    private TypeInterface $right,
+                ) {}
+
+                /**
+                 * @assert-if-true R|L $value
+                 */
+                #[Override]
+                public function matches(mixed $value): bool
+                {
+                    return $this->left->matches($value) || $this->right->matches($value);
+                }
+            }
+
+            /**
+             * @implements TypeInterface<string>
+             */
+            final readonly class StringType implements TypeInterface
+            {
+                /**
+                 * @assert-if-true string $value
+                 */
+                #[Override]
+                public function matches(mixed $value): bool
+                {
+                    return $this->matches($value);
+                }
+            }
+
+            /**
+             * @implements TypeInterface<bool>
+             */
+            final readonly class BoolType implements TypeInterface
+            {
+                /**
+                 * @assert-if-true bool $value
+                 */
+                #[Override]
+                public function matches(mixed $value): bool
+                {
+                    return $this->matches($value);
+                }
+            }
+
+            /**
+             * @implements TypeInterface<int>
+             */
+            final readonly class IntType implements TypeInterface
+            {
+                /**
+                 * @assert-if-true int $value
+                 */
+                #[Override]
+                public function matches(mixed $value): bool
+                {
+                    return $this->matches($value);
+                }
+            }
+
+            /**
+             * @implements TypeInterface<float>
+             */
+            final readonly class FloatType implements TypeInterface
+            {
+                /**
+                 * @assert-if-true float $value
+                 */
+                #[Override]
+                public function matches(mixed $value): bool
+                {
+                    return $this->matches($value);
+                }
+            }
+
+            /**
+             * @extends UnionType<string|bool, int|float>
+             *
+             * @internal
+             */
+            final readonly class ScalarType extends UnionType
+            {
+                /**
+                 * @mutation-free
+                 */
+                public function __construct()
+                {
+                    parent::__construct(
+                        new UnionType(new IntType(), new FloatType()),
+                        new UnionType(new StringType(), new BoolType()),
+                    );
+                }
+            }
+
+            /**
+             * @return TypeInterface<string|bool|int|float>
+             */
+            function scalar_type(): TypeInterface
+            {
+                return new ScalarType();
+            }
+        "#},
+    }
 }

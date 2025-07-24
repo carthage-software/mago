@@ -605,10 +605,54 @@ impl TUnion {
         self.types.iter().any(|t| t.is_bool() || t.is_generic_scalar()) && !self.types.is_empty()
     }
 
+    /// Checks if the union explicitly contains the generic `scalar` type.
+    ///
+    /// This is a specific check for the `scalar` type itself, not for a
+    /// combination of types that would form a scalar (e.g., `int|string|bool|float`).
+    /// For that, see `has_scalar_combination`.
     pub fn has_scalar(&self) -> bool {
         self.types.iter().any(|atomic| atomic.is_generic_scalar())
     }
 
+    /// Checks if the union contains a combination of types that is equivalent
+    /// to the generic `scalar` type (i.e., contains `int`, `float`, `bool`, and `string`).
+    pub fn has_scalar_combination(&self) -> bool {
+        const HAS_INT: u8 = 1 << 0;
+        const HAS_FLOAT: u8 = 1 << 1;
+        const HAS_BOOL: u8 = 1 << 2;
+        const HAS_STRING: u8 = 1 << 3;
+        const ALL_SCALARS: u8 = HAS_INT | HAS_FLOAT | HAS_BOOL | HAS_STRING;
+
+        let mut flags = 0u8;
+
+        for atomic in &self.types {
+            if atomic.is_int() {
+                flags |= HAS_INT;
+            } else if atomic.is_float() {
+                flags |= HAS_FLOAT;
+            } else if atomic.is_bool() {
+                flags |= HAS_BOOL;
+            } else if atomic.is_string() {
+                flags |= HAS_STRING;
+            } else if atomic.is_array_key() {
+                flags |= HAS_INT | HAS_STRING;
+            } else if atomic.is_num() {
+                flags |= HAS_INT | HAS_FLOAT;
+            } else if atomic.is_numeric() {
+                // We don't add `string` as `numeric-string` does not contain `string` type
+                flags |= HAS_INT | HAS_FLOAT;
+            } else if atomic.is_generic_scalar() {
+                return true;
+            }
+
+            // Early exit if we've already found all scalar types
+            if flags == ALL_SCALARS {
+                return true;
+            }
+        }
+
+        flags == ALL_SCALARS
+    }
     pub fn has_array_key(&self) -> bool {
         self.types.iter().any(|atomic| atomic.is_array_key())
     }

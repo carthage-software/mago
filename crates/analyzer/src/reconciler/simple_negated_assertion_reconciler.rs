@@ -38,6 +38,11 @@ pub(crate) fn reconcile(
     let assertion_type = assertion.get_type();
 
     if let Some(assertion_type) = assertion_type {
+        // `mixed is not T` -> `mixed`, always
+        if existing_var_type.is_mixed() {
+            return Some(existing_var_type.clone());
+        }
+
         match assertion_type {
             TAtomic::Object(TObject::Any) => {
                 return Some(subtract_object(
