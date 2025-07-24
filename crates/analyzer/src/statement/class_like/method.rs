@@ -3,7 +3,6 @@ use ahash::HashMap;
 use mago_codex::context::ScopeContext;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::method::MethodIdentifier;
-use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -34,15 +33,17 @@ impl Analyzable for Method {
         let MethodBody::Concrete(concrete_body) = &self.body else { return Ok(()) };
 
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-            return Err(AnalysisError::InternalError(
-                "Method analysis requires class-like context.".to_string(),
-                self.span(),
-            ));
+            tracing::error!(
+                "Attempted to analyze method `{}` without class-like context.",
+                context.interner.lookup(&self.name.value),
+            );
+
+            return Ok(());
         };
 
-        let method_name = context.interner.lowered(&self.name.value);
+        let lc_method_name = context.interner.lowered(&self.name.value);
         if context.settings.diff
-            && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, method_name))
+            && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, lc_method_name))
         {
             return Ok(());
         }
@@ -50,12 +51,15 @@ impl Analyzable for Method {
         let Some(method_metadata) = get_method_by_id(
             context.codebase,
             context.interner,
-            &MethodIdentifier::new(class_like_metadata.name, method_name),
+            &MethodIdentifier::new(class_like_metadata.name, lc_method_name),
         ) else {
-            return Err(AnalysisError::InternalError(
-                format!("Method metadata for `{method_name}` not found."),
-                self.span(),
-            ));
+            tracing::error!(
+                "Failed to find method metadata for `{}` in class `{}`.",
+                context.interner.lookup(&self.name.value),
+                context.interner.lookup(&class_like_metadata.original_name)
+            );
+
+            return Ok(());
         };
 
         let mut scope = ScopeContext::new();
