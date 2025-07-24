@@ -263,6 +263,13 @@ fn add_parameter_types_to_context<'a>(
                             Issue::error(format!(
                                 "Class or interface or enum `{}` not found",
                                 context.interner.lookup(name)
+                            ))
+                            .with_annotation(Annotation::primary(type_signature.span).with_message(
+                                "This type contains a reference to a class or interface or enum that does not exist.",
+                            ))
+                            .with_note("Ensure that the class or interface or enum is defined and imported correctly.")
+                            .with_help(format!(
+                                "If this is a class or interface or enum that is defined in another file, ensure that the file is included or autoloaded correctly."
                             )),
                         );
                     }
