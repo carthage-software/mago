@@ -68,7 +68,8 @@ impl Configuration {
     /// 1. Environment variables with the prefix `MAGO_`.
     /// 2. A TOML file specified by the `file` argument.
     /// 3. A TOML file named `mago.toml` in the current directory.
-    /// 4. A TOML file named `mago.toml` in the `$HOME` directory.
+    /// 4. A TOML file named `mago.toml` in the `$XDG_CONFIG_HOME` directory.
+    /// 5. A TOML file named `mago.toml` in the `$HOME` directory.
     ///
     /// When the `file` argument is set, 3 and 4 are not used at all.
     ///
@@ -98,9 +99,14 @@ impl Configuration {
         if let Some(file) = file {
             builder = builder.add_source(File::from(file).required(true).format(FileFormat::Toml));
         } else {
-            if let Some(home_dir) = home_dir() {
-                builder = builder
-                    .add_source(File::from(home_dir.join(CONFIGURATION_FILE)).required(false).format(FileFormat::Toml));
+            for global_config_root in [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()] {
+                if let Some(global_config_root) = global_config_root {
+                    builder = builder.add_source(
+                        File::from(global_config_root.join(CONFIGURATION_FILE))
+                            .required(false)
+                            .format(FileFormat::Toml),
+                    );
+                }
             }
 
             builder = builder
@@ -318,17 +324,21 @@ mod tests {
     #[test]
     fn test_merge_workspace_override_global() {
         let home_path = temp_dir().join("home-3");
+        let xdg_config_home_path = temp_dir().join("xdg-config-home-3");
         let workspace_path = temp_dir().join("workspace-3");
 
         std::fs::create_dir_all(&home_path).unwrap();
+        std::fs::create_dir_all(&xdg_config_home_path).unwrap();
         std::fs::create_dir_all(&workspace_path).unwrap();
 
         create_tmp_file("threads = 3\nphp_version = \"7.4.0\"", &home_path);
         create_tmp_file("threads = 2", &workspace_path);
+        create_tmp_file("source.excludes = [\"yes\"]", &xdg_config_home_path);
 
         let config = temp_env::with_vars(
             [
                 ("HOME", Some(home_path)),
+                ("XDG_CONFIG_HOME", Some(xdg_config_home_path)),
                 ("MAGO_THREADS", None),
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
@@ -338,6 +348,7 @@ mod tests {
 
         assert_eq!(config.threads, 2);
         assert_eq!(config.php_version.to_string(), "7.4.0".to_string());
+        assert_eq!(config.source.excludes, vec!["yes".to_string()]);
     }
 
     fn create_tmp_file(config_content: &str, folder: &PathBuf) -> PathBuf {
