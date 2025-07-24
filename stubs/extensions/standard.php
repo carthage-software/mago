@@ -5330,7 +5330,7 @@ function array_push(array &$array, mixed ...$values): int
  *
  * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
  *
- * @return V|null
+ * @return ($array is non-empty-array ? V : V|null)
  */
 function array_pop(array &$array): mixed
 {
@@ -5343,7 +5343,7 @@ function array_pop(array &$array): mixed
  * @param array<K, V> $array
  * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
  *
- * @return V|null
+ * @return ($array is non-empty-array ? V : V|null)
  *
  * @pure
  */
