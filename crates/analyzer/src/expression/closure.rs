@@ -245,7 +245,6 @@ mod tests {
     use indoc::indoc;
 
     use crate::issue::TypingIssueKind;
-    use crate::settings::Settings;
     use crate::test_analysis;
 
     test_analysis! {
