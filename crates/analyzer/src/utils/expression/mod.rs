@@ -172,21 +172,6 @@ fn get_extended_expression_id(
         Expression::ArrayAccess(array_access) => {
             get_array_access_id(array_access, this_class_name, resolved_names, interner, codebase)?
         }
-        Expression::Literal(literal) => match literal {
-            Literal::String(literal_string) => {
-                let value = interner.lookup(&literal_string.raw).to_string();
-                let value = value[1..value.len() - 1].to_string();
-                if value.is_empty() {
-                    return None;
-                }
-
-                value
-            }
-            Literal::True(_) => "true".to_string(),
-            Literal::False(_) => "false".to_string(),
-            Literal::Null(_) => "null".to_string(),
-            _ => return None,
-        },
         Expression::Self_(_) => {
             if let Some(class_name) = this_class_name {
                 interner.lookup(class_name).to_string()

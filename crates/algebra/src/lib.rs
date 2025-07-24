@@ -202,7 +202,8 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
 
         // Consensus rule: remove redundant consensus clauses.
         // (A | X) & (!A | Y) implies (X | Y). If (X | Y) already exists, it is redundant.
-        if simplified_clauses.len() > 2 {
+        let simplified_clauses_len = simplified_clauses.len();
+        if simplified_clauses_len > 2 && simplified_clauses_len < 256 {
             let mut compared_clauses = HashSet::default();
             let mut removed_clauses_by_consensus = HashSet::default();
 
@@ -379,7 +380,7 @@ pub fn disjoin_clauses(
     right_clauses: Vec<Clause>,
     conditional_object_id: Span,
 ) -> Vec<Clause> {
-    const COMPLEXITY_THRESHOLD: usize = 50_000;
+    const COMPLEXITY_THRESHOLD: usize = 60_000;
 
     let left_clauses_len = left_clauses.len();
     let right_clauses_len = right_clauses.len();
@@ -551,7 +552,7 @@ pub fn negate_formula(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
 
 #[inline]
 fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
-    const MAX_COMPLEXITY: usize = 50_000;
+    const MAX_COMPLEXITY: usize = 20_000;
 
     let mut seed_clauses = Vec::new();
     let mut complexity = 1usize;

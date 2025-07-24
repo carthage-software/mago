@@ -1128,9 +1128,7 @@ fn get_typed_value_equality_assertions(
         };
 
         if_types.insert(var_name, vec![orred_types]);
-    }
-
-    if let Some(other_value_var_name) = other_value_var_name
+    } else if let Some(other_value_var_name) = other_value_var_name
         && let Some(var_type) = var_type
         && !var_type.is_mixed()
         && var_type.is_single()

@@ -34,6 +34,8 @@ use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
 use crate::utils::misc::check_for_paradox;
 
+const CLAUSES_THRESHOLD: usize = 1000;
+
 impl Analyzable for If {
     fn analyze<'a>(
         &self,
@@ -78,6 +80,10 @@ impl Analyzable for If {
             context.get_assertion_context_from_block(block_context),
             artifacts,
         );
+
+        if if_clauses.len() > CLAUSES_THRESHOLD {
+            if_clauses = vec![];
+        }
 
         for clause in &mut if_clauses {
             let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
@@ -1783,6 +1789,40 @@ mod tests {
         issues = [
             TypingIssueKind::RedundantCondition, // `if ($val)` is always executed because $val is truthy
         ]
+    }
+
+    test_analysis! {
+        name = formula_generated,
+        code = indoc! {r#"
+            <?php
+
+            final class Tokenizer
+            {
+                public static function isSpecial(string $char): bool
+                {
+                    if (
+                        $char === '<' ||
+                            $char === '>' ||
+                            $char === '|' ||
+                            $char === '?' ||
+                            $char === ',' ||
+                            $char === '{' ||
+                            $char === '}' ||
+                            $char === '[' ||
+                            $char === ']' ||
+                            $char === '(' ||
+                            $char === ')' ||
+                            $char === ' ' ||
+                            $char === '&' ||
+                            $char === '='
+                    ) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        "#},
     }
 
     test_analysis! {
