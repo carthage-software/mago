@@ -201,6 +201,9 @@ impl<'a> FormatterState<'a> {
                 // ```
                 return access.left_bracket.start.offset > node.span().start.offset;
             }
+            Some(Node::Clone(_)) => {
+                return true;
+            }
             parent => {
                 if let Some(Node::Assignment(_)) = parent
                     && operator.is_low_precedence()
