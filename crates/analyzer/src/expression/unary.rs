@@ -1275,16 +1275,17 @@ pub fn cast_type_to_string<'a>(
                     if let Some(value) = integer.get_literal_value() {
                         TAtomic::Scalar(TScalar::literal_string(format!("{value}")))
                     } else {
-                        TAtomic::Scalar(TScalar::non_empty_string())
+                        TAtomic::Scalar(TScalar::numeric_string())
                     }
                 }
                 TScalar::Float(float) => {
                     if let Some(value) = float.get_literal_value() {
                         TAtomic::Scalar(TScalar::literal_string(format!("{value}")))
                     } else {
-                        TAtomic::Scalar(TScalar::non_empty_string())
+                        TAtomic::Scalar(TScalar::numeric_string())
                     }
                 }
+                TScalar::Number | TScalar::Numeric => TAtomic::Scalar(TScalar::numeric_string()),
                 TScalar::String(string) => TAtomic::Scalar(TScalar::String(string.clone())),
                 TScalar::ClassLikeString(class_string) => {
                     if let Some(value) = class_string.literal_value() {

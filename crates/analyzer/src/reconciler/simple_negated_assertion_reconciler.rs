@@ -354,6 +354,9 @@ fn subtract_list_array(
             if is_equality {
                 acceptable_types.push(atomic);
             }
+        } else if let TAtomic::Array(TArray::Keyed(_)) = atomic {
+            did_remove_type = true;
+            acceptable_types.push(atomic);
         } else {
             acceptable_types.push(atomic);
         }

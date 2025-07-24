@@ -22,7 +22,7 @@ pub enum PathKind {
     UnknownPropertyAccess,
     UnknownPropertyAssignment,
     Serialize,
-    RemoveDictKey(String),
+    RemoveArrayKey(String),
     RefineSymbol(StringIdentifier),
     ScalarTypeGuard,
     Aggregate,
@@ -78,7 +78,7 @@ impl PathKind {
             PathKind::PropertyAssignment(a, b) => {
                 format!("property-assignment({a},{b})")
             }
-            PathKind::RemoveDictKey(_) => "remove-dict-key".to_string(),
+            PathKind::RemoveArrayKey(_) => "remove-array-key".to_string(),
             PathKind::RefineSymbol(_) => "refine-symbol".to_string(),
             PathKind::ScalarTypeGuard => "scalar-type-guard".to_string(),
             PathKind::Serialize => "serialize".to_string(),
@@ -103,7 +103,7 @@ impl std::fmt::Display for PathKind {
             PathKind::PropertyAssignment(_, _) | PathKind::UnknownPropertyAssignment => {
                 write!(f, "property-assignment")
             }
-            PathKind::RemoveDictKey(_) => write!(f, "remove-dict-key"),
+            PathKind::RemoveArrayKey(_) => write!(f, "remove-array-key"),
             PathKind::RefineSymbol(_) => write!(f, "refine-symbol"),
             PathKind::ScalarTypeGuard => write!(f, "scalar-type-guard"),
             PathKind::Serialize => write!(f, "serialize"),

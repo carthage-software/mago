@@ -260,7 +260,7 @@ impl TUnion {
 
     pub fn has_int(&self) -> bool {
         for atomic in &self.types {
-            if atomic.is_int() {
+            if atomic.is_int() || atomic.is_array_key() || atomic.is_numeric() || atomic.is_num() {
                 return true;
             }
         }

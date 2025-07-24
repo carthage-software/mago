@@ -53,7 +53,7 @@ pub fn should_ignore_array_access(
         return true;
     }
 
-    if let PathKind::RemoveDictKey(key_name) = path_type
+    if let PathKind::RemoveArrayKey(key_name) = path_type
         && match_kind == &ArrayDataKind::ArrayValue
         && let Some(PathKind::ArrayAssignment(ArrayDataKind::ArrayValue, assigned_name)) =
             previous_path_types.iter().rev().find(|t| !matches!(t, PathKind::Default))

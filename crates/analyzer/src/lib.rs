@@ -122,7 +122,12 @@ mod tests {
 
     impl<'a> TestCase<'a> {
         pub fn new(name: &'a str, content: &'a str) -> Self {
-            Self { name, content, settings: Settings::default(), expected_issues: vec![] }
+            Self {
+                name,
+                content,
+                settings: Settings { find_unused_variables: true, find_unused_expressions: true, ..Default::default() },
+                expected_issues: vec![],
+            }
         }
 
         pub fn settings(mut self, settings: Settings) -> Self {

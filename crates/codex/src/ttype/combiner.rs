@@ -1105,13 +1105,12 @@ fn combine_string_scalars(s1: &TString, s2: TString) -> TString {
                     Some(TStringLiteral::Unspecified)
                 }
             }
-            (Some(TStringLiteral::Value(_)), Some(TStringLiteral::Unspecified))
-            | (Some(TStringLiteral::Unspecified), Some(TStringLiteral::Value(_))) => Some(TStringLiteral::Unspecified),
-            (Some(TStringLiteral::Unspecified), Some(TStringLiteral::Unspecified)) => Some(TStringLiteral::Unspecified),
-            (Some(_), None) | (None, Some(_)) => None,
-            (None, None) => None,
+            (Some(TStringLiteral::Unspecified), Some(_)) | (Some(_), Some(TStringLiteral::Unspecified)) => {
+                Some(TStringLiteral::Unspecified)
+            }
+            _ => None,
         },
-        is_numeric: false, // we can't garantee this
+        is_numeric: s1.is_numeric && s2.is_numeric,
         is_truthy: s1.is_truthy && s2.is_truthy,
         is_non_empty: s1.is_non_empty && s2.is_non_empty,
     }

@@ -64,6 +64,11 @@ pub struct AnalyzeCommand {
     #[arg(long, help = "Find unused definitions (functions, classes, constants, etc.)")]
     pub find_unused_definitions: Option<bool>,
 
+    /// Enable or disable finding unused variables.
+    /// Overrides the corresponding setting in `mago.toml` if provided.
+    #[arg(long, help = "Find unused variables (e.g., variables that are declared but never used)")]
+    pub find_unused_variables: Option<bool>,
+
     /// Enable or disable analysis of code known to be unreachable (dead code).
     /// Overrides the corresponding setting in `mago.toml` if provided.
     #[arg(long, help = "Analyze dead code for errors (code known to be unreachable)")]
@@ -137,6 +142,7 @@ pub async fn execute(command: AnalyzeCommand, configuration: Configuration) -> R
         find_unused_expressions: command
             .find_unused_expressions
             .unwrap_or(configuration.analyze.find_unused_expressions),
+        find_unused_variables: command.find_unused_variables.unwrap_or(configuration.analyze.find_unused_variables),
         analyze_effects: command.analyze_effects.unwrap_or(configuration.analyze.analyze_effects),
         memoize_properties: command.memoize_properties.unwrap_or(configuration.analyze.memoize_properties),
         allow_include: command.allow_include.unwrap_or(configuration.analyze.allow_include),
@@ -240,6 +246,8 @@ async fn analyze_user_sources(
             }
         }
     }
+
+    tracing::debug!("Analysis completed for {} sources.", total_files);
 
     remove_progress_bar(progress_bar);
     Ok(aggregated_analysis_result)

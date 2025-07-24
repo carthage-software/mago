@@ -198,7 +198,7 @@ pub fn analyze_function_like<'a, 'ast>(
         }
 
         if context.settings.find_unused_expressions {
-            report_unused_expressions(context, &block_context, &mut artifacts, function_like_metadata);
+            report_unused_variables(context, &block_context, &mut artifacts, function_like_metadata);
         }
     }
 
@@ -583,12 +583,16 @@ fn add_symbol_references(
     }
 }
 
-fn report_unused_expressions<'a>(
+fn report_unused_variables<'a>(
     context: &mut Context<'a>,
     block_context: &BlockContext<'a>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &FunctionLikeMetadata,
 ) {
+    if !context.settings.find_unused_variables {
+        return;
+    }
+
     let unused_source_nodes = check_variables_used(&artifacts.data_flow_graph);
 
     for node in &unused_source_nodes.0 {

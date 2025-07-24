@@ -14,6 +14,7 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator;
 use crate::ttype::comparator::callable_comparator;
@@ -404,19 +405,20 @@ pub(crate) fn can_be_identical<'a>(
     second_part: &'a TAtomic,
     inside_assertion: bool,
 ) -> bool {
-    if let TAtomic::Variable { .. } = first_part {
+    if matches!(
+        (first_part, second_part),
+        // If either part is a variable, they can be identical
+        (TAtomic::Variable(_), _) | (_, TAtomic::Variable(_)) |
+        // If either part is `mixed`, they can be identical
+        (TAtomic::Mixed(_), _) | (_, TAtomic::Mixed(_))
+        // If one is `iterable` and other is `array`, `object`, or `iterable`, they can be identical
+        | (TAtomic::Iterable(_),TAtomic::Iterable(_) | TAtomic::Array(_) | TAtomic::Object(_))
+        | (TAtomic::Array(_) | TAtomic::Object(_), TAtomic::Iterable(_))
+        // If one is `numeric` and other is `string`, they can be identical
+        | (TAtomic::Scalar(TScalar::Numeric), TAtomic::Scalar(TScalar::String(_)))
+        | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::Numeric))
+    ) {
         return true;
-    }
-
-    if let TAtomic::Variable { .. } = second_part {
-        return true;
-    }
-
-    if let TAtomic::Iterable(_) = first_part {
-        return matches!(
-            second_part,
-            TAtomic::Mixed(_) | TAtomic::Iterable(_) | TAtomic::Array(_) | TAtomic::Object(_)
-        );
     }
 
     if let (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) =
@@ -453,7 +455,7 @@ pub(crate) fn can_be_identical<'a>(
             && second_comparison_result.type_coerced.unwrap_or(false))
     {
         return true;
-    };
+    }
 
     if let TAtomic::GenericParameter(first_generic) = first_part {
         for first_constraint_part in first_generic.constraint.types.iter() {

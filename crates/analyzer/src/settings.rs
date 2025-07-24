@@ -4,6 +4,7 @@ use mago_php_version::PHPVersion;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Settings {
     pub version: PHPVersion,
+    pub find_unused_variables: bool,
     pub find_unused_expressions: bool,
     pub find_unused_definitions: bool,
     pub analyze_dead_code: bool,
@@ -26,8 +27,9 @@ impl Settings {
     pub fn new(version: PHPVersion) -> Self {
         Self {
             version,
-            find_unused_expressions: true,
-            find_unused_definitions: true,
+            find_unused_expressions: false,
+            find_unused_definitions: false,
+            find_unused_variables: false,
             analyze_dead_code: false,
             allow_include: true,
             memoize_properties: true,

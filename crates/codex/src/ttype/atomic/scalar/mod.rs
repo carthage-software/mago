@@ -123,6 +123,12 @@ impl TScalar {
         TScalar::Float(TFloat::literal(value))
     }
 
+    /// Creates the `numeric-string` type.
+    #[inline]
+    pub const fn numeric_string() -> Self {
+        TScalar::String(TString::general_with_props(true, false, false))
+    }
+
     /// Creates the general `string` type.
     #[inline]
     pub const fn string() -> Self {

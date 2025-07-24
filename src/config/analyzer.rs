@@ -19,13 +19,18 @@ pub struct AnalyzeConfiguration {
 
     /// Whether to find unused expressions.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     pub find_unused_expressions: bool,
 
     /// Whether to find unused definitions.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     pub find_unused_definitions: bool,
+
+    /// Whether to find unused variables.
+    ///
+    /// Defaults to `false`.
+    pub find_unused_variables: bool,
 
     /// Whether to analyze dead code.
     ///
@@ -34,7 +39,7 @@ pub struct AnalyzeConfiguration {
 
     /// Whether to analyze effects.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     pub analyze_effects: bool,
 
     /// Whether to memoize properties.
@@ -52,10 +57,11 @@ impl ConfigurationEntry for AnalyzeConfiguration {
     fn configure<St: BuilderState>(self, builder: ConfigBuilder<St>) -> Result<ConfigBuilder<St>, Error> {
         builder
             .set_default("analyze.excludes", Value::new(None, ValueKind::Array(vec![])))?
-            .set_default("analyze.find_unused_definitions", Value::new(None, ValueKind::Boolean(true)))?
-            .set_default("analyze.find_unused_expressions", Value::new(None, ValueKind::Boolean(true)))?
+            .set_default("analyze.find_unused_definitions", Value::new(None, ValueKind::Boolean(false)))?
+            .set_default("analyze.find_unused_expressions", Value::new(None, ValueKind::Boolean(false)))?
+            .set_default("analyze.find_unused_variables", Value::new(None, ValueKind::Boolean(false)))?
             .set_default("analyze.analyze_dead_code", Value::new(None, ValueKind::Boolean(false)))?
-            .set_default("analyze.analyze_effects", Value::new(None, ValueKind::Boolean(true)))?
+            .set_default("analyze.analyze_effects", Value::new(None, ValueKind::Boolean(false)))?
             .set_default("analyze.memoize_properties", Value::new(None, ValueKind::Boolean(true)))?
             .set_default("analyze.allow_include", Value::new(None, ValueKind::Boolean(true)))
             .map_err(Error::from)
@@ -66,10 +72,11 @@ impl Default for AnalyzeConfiguration {
     fn default() -> Self {
         Self {
             excludes: vec![],
-            find_unused_expressions: true,
-            find_unused_definitions: true,
+            find_unused_expressions: false,
+            find_unused_definitions: false,
+            find_unused_variables: false,
             analyze_dead_code: false,
-            analyze_effects: true,
+            analyze_effects: false,
             memoize_properties: true,
             allow_include: true,
         }

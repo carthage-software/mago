@@ -1845,4 +1845,98 @@ mod tests {
             }
         "#},
     }
+
+    test_analysis! {
+        name = numeric_reconciliation,
+        code = indoc! {r#"
+            <?php
+
+            interface Stringable
+            {
+                public function __toString(): string;
+            }
+
+            /**
+             * @assert-if-true numeric $value
+             */
+            function is_numeric(mixed $value): bool
+            {
+                return is_numeric($value);
+            }
+
+            /**
+             * @assert-if-true string $value
+             */
+            function is_string(mixed $value): bool
+            {
+                return is_string($value);
+            }
+
+            /**
+             * @return null|numeric-string
+             */
+            function to_numeric_string(mixed $value): null|string
+            {
+                if (is_string($value) && is_numeric($value)) {
+                    return $value;
+                }
+
+                if (is_numeric($value)) {
+                    return (string) $value;
+                }
+
+                if ($value instanceof Stringable) {
+                    $str = (string) $value;
+                    if (is_numeric($str)) {
+                        return $str;
+                    }
+                }
+
+                return null;
+            }
+        "#},
+    }
+
+    test_analysis! {
+        name = array_list_reconciliation,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @assert-if-true array<array-key, mixed> $value
+             *
+             * @return ($value is array ? true : false)
+             *
+             * @pure
+             */
+            function is_array(mixed $value): bool
+            {
+                return is_array($value);
+            }
+
+            /**
+             * @assert-if-true list<mixed> $array
+             *
+             * @return ($array is list ? true : false)
+             *
+             * @pure
+             */
+            function array_is_list(array $array): bool
+            {
+                return array_is_list($array);
+            }
+
+            /**
+             * @return null|list<mixed>
+             */
+            function to_list(mixed $value): null|array
+            {
+                if (!is_array($value) || !array_is_list($value)) {
+                    return null;
+                } else {
+                    return $value;
+                }
+            }
+        "#},
+    }
 }

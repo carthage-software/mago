@@ -471,25 +471,6 @@ pub fn analyze_assignment_to_variable<'a>(
         );
     }
 
-    if assigned_type.is_mixed() && !variable_id.starts_with("$_") {
-        let mut issue = Issue::warning("Assigning `mixed` type to a variable may lead to unexpected behavior.");
-
-        if let Some(source_expression) = source_expression
-            && let Expression::Binary(_) = source_expression
-        {
-            issue = issue.with_annotation(
-                Annotation::secondary(source_expression.span()).with_message("This expression has type `mixed`."),
-            );
-        }
-
-        context.buffer.report(
-            TypingIssueKind::MixedAssignment,
-            issue.with_annotation(Annotation::primary(variable_span).with_message("Assigning `mixed` type here."))
-                .with_note("Using `mixed` can lead to runtime errors if the variable is used in a way that assumes a specific type.")
-                .with_help("Consider using a more specific type to avoid potential issues."),
-        );
-    }
-
     let mut from_docblock = false;
     if let Some((variable_type, variable_type_span)) =
         get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), !destructuring)
@@ -506,6 +487,25 @@ pub fn analyze_assignment_to_variable<'a>(
 
         assigned_type = variable_type;
         from_docblock = true;
+    }
+
+    if !from_docblock && assigned_type.is_mixed() && !variable_id.starts_with("$_") {
+        let mut issue = Issue::warning("Assigning `mixed` type to a variable may lead to unexpected behavior.");
+
+        if let Some(source_expression) = source_expression
+            && let Expression::Binary(_) = source_expression
+        {
+            issue = issue.with_annotation(
+                Annotation::secondary(source_expression.span()).with_message("This expression has type `mixed`."),
+            );
+        }
+
+        context.buffer.report(
+            TypingIssueKind::MixedAssignment,
+            issue.with_annotation(Annotation::primary(variable_span).with_message("Assigning `mixed` type here."))
+                .with_note("Using `mixed` can lead to runtime errors if the variable is used in a way that assumes a specific type.")
+                .with_help("Consider using a more specific type to avoid potential issues."),
+        );
     }
 
     let has_parent_nodes = !assigned_type.parent_nodes.is_empty();

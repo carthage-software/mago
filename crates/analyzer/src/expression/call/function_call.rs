@@ -295,6 +295,7 @@ mod tests {
 
     test_analysis! {
         name = call_unknown_named_argument,
+
         code = indoc!{r#"
             <?php
 

@@ -34,6 +34,7 @@ use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_num;
+use mago_codex::ttype::get_numeric;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::get_scalar;
 use mago_codex::ttype::get_string_with_props;
@@ -225,6 +226,17 @@ pub(crate) fn reconcile(
             }
             TAtomic::Scalar(TScalar::Number) => {
                 return Some(intersect_num(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
+            }
+            TAtomic::Scalar(TScalar::Numeric) => {
+                return Some(intersect_numeric(
                     context,
                     assertion,
                     existing_var_type,
@@ -665,8 +677,36 @@ fn intersect_array_list(
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
-    for atomic in &existing_var_type.types {
+    'outer: for atomic in &existing_var_type.types {
         match atomic {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
+                if let Some(known_items) = known_items {
+                    for (k, _) in known_items.iter() {
+                        if !k.is_integer() {
+                            did_remove_type = true;
+                            continue 'outer;
+                        }
+                    }
+                }
+
+                let element_type = if let Some((key_parameter, value_parameter)) = parameters {
+                    if !key_parameter.has_int() {
+                        did_remove_type = true;
+                        continue 'outer;
+                    }
+
+                    value_parameter.clone()
+                } else {
+                    Box::new(get_mixed())
+                };
+
+                did_remove_type = true;
+                acceptable_types.push(if is_non_empty || *non_empty {
+                    TAtomic::Array(TArray::List(TList::new_non_empty(element_type)))
+                } else {
+                    TAtomic::Array(TArray::List(TList::new(element_type)))
+                });
+            }
             TAtomic::Array(TArray::List(_)) => {
                 acceptable_types.push(atomic.clone());
             }
@@ -927,6 +967,106 @@ fn intersect_num(
             return get_int();
         } else {
             did_remove_type = true;
+        }
+    }
+
+    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
+        && let Some(key) = key
+        && let Some(span) = span
+    {
+        trigger_issue_for_impossible(
+            context,
+            &existing_var_type.get_id(Some(context.interner)),
+            key,
+            assertion,
+            !did_remove_type,
+            negated,
+            span,
+        );
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::new(acceptable_types);
+    }
+
+    get_never()
+}
+
+fn intersect_numeric(
+    context: &mut ReconcilationContext<'_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    negated: bool,
+    span: Option<&Span>,
+    is_equality: bool,
+) -> TUnion {
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
+
+    for atomic in &existing_var_type.types {
+        match atomic {
+            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) => {
+                return get_numeric();
+            }
+            TAtomic::Scalar(TScalar::Number) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::num()));
+            }
+            TAtomic::Scalar(TScalar::Float(float)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::Float(*float)));
+            }
+            TAtomic::Scalar(TScalar::Integer(integer)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::Integer(*integer)));
+            }
+            TAtomic::Scalar(TScalar::String(existing_string)) if existing_string.is_numeric => {
+                acceptable_types.push(atomic.clone());
+            }
+            TAtomic::Scalar(TScalar::ArrayKey) => {
+                did_remove_type = true; // we remove the `non-numeric` string part
+
+                acceptable_types.push(TAtomic::Scalar(TScalar::int()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::numeric_string()));
+            }
+            TAtomic::Scalar(TScalar::String(existing_string)) => {
+                did_remove_type = true; // we remove the `non-numeric` string part
+
+                acceptable_types.push(TAtomic::Scalar(TScalar::String(existing_string.as_numeric(false))));
+            }
+            TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
+                if constraint.is_mixed() {
+                    acceptable_types.push(atomic.replace_template_constraint(get_numeric()));
+                } else {
+                    let atomic = atomic.replace_template_constraint(intersect_numeric(
+                        context,
+                        assertion,
+                        constraint,
+                        None,
+                        false,
+                        None,
+                        is_equality,
+                    ));
+
+                    acceptable_types.push(atomic);
+                }
+
+                did_remove_type = true;
+            }
+            TAtomic::Variable(name) => {
+                if let Some(span) = span {
+                    let name_str = context.interner.lookup(name);
+                    if let Some((lower_bounds, _)) = context.artifacts.type_variable_bounds.get_mut(name_str) {
+                        let mut bound = TemplateBound::new(get_numeric(), 0, None, None);
+                        bound.span = Some(*span);
+                        lower_bounds.push(bound);
+                    }
+                }
+
+                acceptable_types.push(atomic.clone());
+                did_remove_type = true;
+            }
+            _ => {
+                did_remove_type = true;
+            }
         }
     }
 

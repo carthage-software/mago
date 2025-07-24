@@ -85,7 +85,9 @@ impl TString {
 
     /// Creates a general string instance with explicitly set guaranteed properties (from analysis).
     #[inline]
-    pub const fn general_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool) -> Self {
+    pub const fn general_with_props(is_numeric: bool, is_truthy: bool, mut is_non_empty: bool) -> Self {
+        is_non_empty |= is_numeric || is_truthy;
+
         Self { literal: None, is_numeric, is_truthy, is_non_empty }
     }
 
@@ -106,11 +108,9 @@ impl TString {
     /// Properties (`is_numeric`, `is_truthy`, `is_non_empty`) are derived from the value.
     #[inline]
     pub fn known_literal(value: String) -> Self {
-        let is_non_empty = !value.is_empty();
-        // PHP truthiness: non-empty and not "0"
-        let is_truthy = is_non_empty && value != "0";
-        // Check numeric nature
         let is_numeric = str_is_numeric(&value);
+        let is_non_empty = is_numeric || !value.is_empty();
+        let is_truthy = is_non_empty && value != "0";
 
         Self { literal: Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty }
     }
@@ -212,6 +212,15 @@ impl TString {
             is_numeric: self.is_numeric,
             is_truthy: self.is_truthy,
             is_non_empty: self.is_non_empty,
+        }
+    }
+
+    pub fn as_numeric(&self, retain_literal: bool) -> Self {
+        Self {
+            literal: if retain_literal { self.literal.clone() } else { None },
+            is_numeric: true,
+            is_truthy: self.is_truthy,
+            is_non_empty: true,
         }
     }
 }
