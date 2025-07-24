@@ -99,14 +99,13 @@ impl Configuration {
         if let Some(file) = file {
             builder = builder.add_source(File::from(file).required(true).format(FileFormat::Toml));
         } else {
-            for global_config_root in [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()] {
-                if let Some(global_config_root) = global_config_root {
-                    builder = builder.add_source(
-                        File::from(global_config_root.join(CONFIGURATION_FILE))
-                            .required(false)
-                            .format(FileFormat::Toml),
-                    );
-                }
+            let global_config_roots =
+                [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()].into_iter().flatten();
+
+            for global_config_root in global_config_roots {
+                builder = builder.add_source(
+                    File::from(global_config_root.join(CONFIGURATION_FILE)).required(false).format(FileFormat::Toml),
+                );
             }
 
             builder = builder
