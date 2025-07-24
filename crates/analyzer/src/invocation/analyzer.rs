@@ -339,12 +339,16 @@ pub fn analyze_invocation<'a>(
                 calling_class_like.and_then(|(_, atomic)| atomic),
             );
 
-            let final_parameter_type = inferred_type_replacer::replace(
-                &base_parameter_type,
-                template_result,
-                context.codebase,
-                context.interner,
-            );
+            let final_parameter_type = if template_result.has_template_types() {
+                inferred_type_replacer::replace(
+                    &base_parameter_type,
+                    template_result,
+                    context.codebase,
+                    context.interner,
+                )
+            } else {
+                base_parameter_type
+            };
 
             verify_argument_type(
                 context,

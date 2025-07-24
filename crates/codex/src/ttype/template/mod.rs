@@ -47,6 +47,10 @@ impl TemplateResult {
         }
     }
 
+    pub fn has_template_types(&self) -> bool {
+        !self.template_types.is_empty()
+    }
+
     pub fn add_lower_bounds(
         &mut self,
         lower_bounds: IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState>,
