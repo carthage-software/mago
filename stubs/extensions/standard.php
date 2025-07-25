@@ -4682,7 +4682,7 @@ function array_product(array $array): int|float
  *
  * @return array<K, V>
  */
-function array_filter(array $array, null|callable $callback, int $mode = 0): array
+function array_filter(array $array, null|callable $callback = null, int $mode = 0): array
 {
 }
 
