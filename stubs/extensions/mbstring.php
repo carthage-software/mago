@@ -21,21 +21,21 @@ const MB_ONIGURUMA_VERSION = '6.9.9';
 /**
  * @pure
  */
-function mb_convert_case(string $string, int $mode, null|string $encoding): string
+function mb_convert_case(string $string, int $mode, null|string $encoding = null): string
 {
 }
 
 /**
  * @pure
  */
-function mb_strtoupper(string $string, null|string $encoding): string
+function mb_strtoupper(string $string, null|string $encoding = null): string
 {
 }
 
 /**
  * @pure
  */
-function mb_strtolower(string $string, null|string $encoding): string
+function mb_strtolower(string $string, null|string $encoding = null): string
 {
 }
 
@@ -43,7 +43,7 @@ function mb_language(null|string $language): string|bool
 {
 }
 
-function mb_internal_encoding(null|string $encoding): string|bool
+function mb_internal_encoding(null|string $encoding = null): string|bool
 {
 }
 
@@ -56,7 +56,7 @@ function mb_http_input(null|string $type): array|string|false
 {
 }
 
-function mb_http_output(null|string $encoding): string|bool
+function mb_http_output(null|string $encoding = null): string|bool
 {
 }
 
@@ -103,7 +103,7 @@ function mb_strlen(string $string, null|string $encoding = null): int
  *
  * @pure
  */
-function mb_strpos(string $haystack, string $needle, int $offset = 0, null|string $encoding): int|false
+function mb_strpos(string $haystack, string $needle, int $offset = 0, null|string $encoding = null): int|false
 {
 }
 
@@ -112,7 +112,7 @@ function mb_strpos(string $haystack, string $needle, int $offset = 0, null|strin
  *
  * @pure
  */
-function mb_strrpos(string $haystack, string $needle, int $offset = 0, null|string $encoding): int|false
+function mb_strrpos(string $haystack, string $needle, int $offset = 0, null|string $encoding = null): int|false
 {
 }
 
@@ -121,7 +121,7 @@ function mb_strrpos(string $haystack, string $needle, int $offset = 0, null|stri
  *
  * @pure
  */
-function mb_stripos(string $haystack, string $needle, int $offset = 0, null|string $encoding): int|false
+function mb_stripos(string $haystack, string $needle, int $offset = 0, null|string $encoding = null): int|false
 {
 }
 
@@ -130,71 +130,92 @@ function mb_stripos(string $haystack, string $needle, int $offset = 0, null|stri
  *
  * @pure
  */
-function mb_strripos(string $haystack, string $needle, int $offset = 0, null|string $encoding): int|false
+function mb_strripos(string $haystack, string $needle, int $offset = 0, null|string $encoding = null): int|false
 {
 }
 
 /**
  * @pure
  */
-function mb_strstr(string $haystack, string $needle, bool $before_needle = false, null|string $encoding): string|false
+function mb_strstr(
+    string $haystack,
+    string $needle,
+    bool $before_needle = false,
+    null|string $encoding = null,
+): string|false {
+}
+
+/**
+ * @pure
+ */
+function mb_strrchr(
+    string $haystack,
+    string $needle,
+    bool $before_needle = false,
+    null|string $encoding = null,
+): string|false {
+}
+
+/**
+ * @pure
+ */
+function mb_stristr(
+    string $haystack,
+    string $needle,
+    bool $before_needle = false,
+    null|string $encoding = null,
+): string|false {
+}
+
+/**
+ * @pure
+ */
+function mb_strrichr(
+    string $haystack,
+    string $needle,
+    bool $before_needle = false,
+    null|string $encoding = null,
+): string|false {
+}
+
+/**
+ * @pure
+ */
+function mb_substr_count(string $haystack, string $needle, null|string $encoding = null): int
 {
 }
 
 /**
  * @pure
  */
-function mb_strrchr(string $haystack, string $needle, bool $before_needle = false, null|string $encoding): string|false
+function mb_substr(string $string, int $start, null|int $length = null, null|string $encoding = null): string
 {
 }
 
 /**
  * @pure
  */
-function mb_stristr(string $haystack, string $needle, bool $before_needle = false, null|string $encoding): string|false
+function mb_strcut(string $string, int $start, null|int $length = null, null|string $encoding = null): string
 {
 }
 
 /**
  * @pure
  */
-function mb_strrichr(string $haystack, string $needle, bool $before_needle = false, null|string $encoding): string|false
+function mb_strwidth(string $string, null|string $encoding = null): int
 {
 }
 
 /**
  * @pure
  */
-function mb_substr_count(string $haystack, string $needle, null|string $encoding): int
-{
-}
-
-/**
- * @pure
- */
-function mb_substr(string $string, int $start, null|int $length, null|string $encoding): string
-{
-}
-
-/**
- * @pure
- */
-function mb_strcut(string $string, int $start, null|int $length, null|string $encoding): string
-{
-}
-
-/**
- * @pure
- */
-function mb_strwidth(string $string, null|string $encoding): int
-{
-}
-
-/**
- * @pure
- */
-function mb_strimwidth(string $string, int $start, int $width, string $trim_marker = '', null|string $encoding): string
-{
+function mb_strimwidth(
+    string $string,
+    int $start,
+    int $width,
+    string $trim_marker = '',
+    null|string $encoding = null,
+): string {
 }
 
 /**
@@ -242,7 +263,7 @@ function mb_encoding_aliases(string $encoding): array
 /**
  * @pure
  */
-function mb_convert_kana(string $string, string $mode = 'KV', null|string $encoding): string
+function mb_convert_kana(string $string, string $mode = 'KV', null|string $encoding = null): string
 {
 }
 
@@ -331,11 +352,11 @@ function mb_get_info(string $type = 'all'): array|string|int|false|null
  *
  * @pure
  */
-function mb_check_encoding(array|string|null $value = null, null|string $encoding): bool
+function mb_check_encoding(array|string|null $value = null, null|string $encoding = null): bool
 {
 }
 
-function mb_regex_encoding(null|string $encoding): string|bool
+function mb_regex_encoding(null|string $encoding = null): string|bool
 {
 }
 
@@ -457,7 +478,7 @@ function mb_ereg_search_setpos(int $offset): bool
 /**
  * @pure
  */
-function mb_chr(int $codepoint, null|string $encoding): string|false
+function mb_chr(int $codepoint, null|string $encoding = null): string|false
 {
 }
 
@@ -466,7 +487,7 @@ function mb_chr(int $codepoint, null|string $encoding): string|false
  *
  * @pure
  */
-function mb_ord(string $string, null|string $encoding): int|false
+function mb_ord(string $string, null|string $encoding = null): int|false
 {
 }
 
@@ -474,7 +495,7 @@ function mb_ord(string $string, null|string $encoding): int|false
  * @pure
  * @deprecated
  */
-function mb_scrub(string $string, null|string $encoding): string
+function mb_scrub(string $string, null|string $encoding = null): string
 {
 }
 
@@ -491,7 +512,7 @@ function mbereg_search_setpos($position)
  *
  * @pure
  */
-function mb_str_split(string $string, int $length = 1, null|string $encoding): array
+function mb_str_split(string $string, int $length = 1, null|string $encoding = null): array
 {
 }
 
