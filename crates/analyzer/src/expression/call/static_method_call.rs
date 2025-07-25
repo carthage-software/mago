@@ -274,6 +274,7 @@ mod tests {
         issues = [
             TypingIssueKind::StaticAccessOnInterface,
             TypingIssueKind::StaticAccessOnInterface,
+            TypingIssueKind::MixedAnyArgument,
         ]
     }
 }
