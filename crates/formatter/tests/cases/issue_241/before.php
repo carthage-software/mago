@@ -1,5 +1,6 @@
 <?php
 
-clone $foo;
+clone ($foo);
 clone ($foo?->bar);
-clone ($foo?->bar ?? $foo?->baz);
+clone ($foo ?? $bar);
+clone $objectWithOperatorOverloading + 10;
