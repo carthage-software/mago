@@ -6,11 +6,13 @@ use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::special_function_like_handler::core::closure::GetCurrentClosureMethodHandler;
 use crate::invocation::special_function_like_handler::psl::type_component::TypeComponentFunctionsHandler;
+use crate::invocation::special_function_like_handler::random::RandomFunctionsHandler;
 use crate::invocation::special_function_like_handler::standard::error::ErrorFunctionsHandler;
 use crate::invocation::special_function_like_handler::standard::string::StringFunctionsHandler;
 
 mod core;
 mod psl;
+mod random;
 mod standard;
 mod utils;
 
@@ -37,6 +39,8 @@ pub fn handle_special_functions<'a>(
         // Standard PHP function handlers
         &StringFunctionsHandler,
         &ErrorFunctionsHandler,
+        // Random extension function handlers
+        &RandomFunctionsHandler,
         // PSL specific function handlers
         &TypeComponentFunctionsHandler,
     ];

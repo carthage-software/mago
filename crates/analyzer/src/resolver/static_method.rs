@@ -103,66 +103,112 @@ fn resolve_method_from_classname<'a>(
     classname: &ResolvedClassname,
     result: &mut MethodResolutionResult,
 ) -> Vec<ResolvedMethod> {
-    let mut resolve_method_from_class_id = |fq_class_id, result: &mut MethodResolutionResult| {
-        let defining_class_metadata = get_class_like(context.codebase, context.interner, &fq_class_id)?;
+    let mut resolve_method_from_class_id =
+        |fq_class_id,
+         is_relative: bool,
+         from_instance: bool,
+         from_class_string: bool,
+         result: &mut MethodResolutionResult| {
+            let Some(defining_class_metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
+                return (false, None);
+            };
 
-        if !classname.is_object_instance() && defining_class_metadata.kind.is_interface() {
-            report_static_access_on_interface(context, &defining_class_metadata.original_name, class_span);
-            result.has_invalid_target = true;
-            return None;
-        }
+            if !from_instance && !is_relative && defining_class_metadata.kind.is_interface() {
+                report_static_call_on_interface(
+                    context,
+                    &defining_class_metadata.original_name,
+                    class_span,
+                    from_class_string,
+                );
 
-        let method = resolve_method_from_metadata(
-            context,
-            current_class_metadata,
-            method_name,
-            &fq_class_id,
-            defining_class_metadata,
-            classname,
-        )?;
+                if !from_class_string {
+                    result.has_invalid_target = true;
+                    return (true, None);
+                }
+            }
 
-        if !method.is_static
-            && !classname.is_relative()
-            && !current_class_metadata.is_some_and(|current_class_metadata| {
-                current_class_metadata.name == defining_class_metadata.name
-                    || current_class_metadata.has_parent(&defining_class_metadata.name)
-            })
-        {
-            report_non_static_access(context, &method.method_identifier, method_span);
-            return None;
-        }
+            let Some(method) = resolve_method_from_metadata(
+                context,
+                current_class_metadata,
+                method_name,
+                &fq_class_id,
+                defining_class_metadata,
+                classname,
+            ) else {
+                return (false, None);
+            };
 
-        if method.is_static
-            && defining_class_metadata.kind.is_trait()
-            && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
-        {
-            report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
-        }
+            if !method.is_static
+                && !is_relative
+                && !current_class_metadata.is_some_and(|current_class_metadata| {
+                    current_class_metadata.name == defining_class_metadata.name
+                        || current_class_metadata.has_parent(&defining_class_metadata.name)
+                })
+            {
+                report_non_static_access(context, &method.method_identifier, method_span);
+                return (true, None);
+            }
 
-        Some(method)
-    };
+            if method.is_static
+                && defining_class_metadata.kind.is_trait()
+                && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
+            {
+                report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
+            }
+
+            (true, Some(method))
+        };
 
     let mut resolved_methods = vec![];
-    if let Some(fq_class_id) = classname.fq_class_id
-        && let Some(resolved_method) = resolve_method_from_class_id(fq_class_id, result)
-    {
-        resolved_methods.push(resolved_method);
+    let mut could_method_ever_exist = false;
+    let mut first_class_id = None;
+    if let Some(fq_class_id) = classname.fq_class_id {
+        let (could_method_exist, resolved_method) = resolve_method_from_class_id(
+            fq_class_id,
+            classname.is_relative(),
+            classname.is_object_instance(),
+            classname.is_from_class_string(),
+            result,
+        );
+
+        if let Some(resolved_method) = resolved_method {
+            resolved_methods.push(resolved_method);
+        }
+
+        could_method_ever_exist |= could_method_exist;
+        first_class_id = Some(fq_class_id);
     }
 
-    for intersection in classname.intersections.iter().filter_map(|c| c.fq_class_id) {
-        if let Some(resolved_method) = resolve_method_from_class_id(intersection, result) {
+    for intersection in &classname.intersections {
+        let Some(fq_class_id) = intersection.fq_class_id else {
+            continue;
+        };
+
+        let (could_method_exist, resolved_method) = resolve_method_from_class_id(
+            fq_class_id,
+            intersection.is_relative() || classname.is_relative(),
+            intersection.is_object_instance() || classname.is_object_instance(),
+            intersection.is_from_class_string(),
+            result,
+        );
+
+        if let Some(resolved_method) = resolved_method {
             resolved_methods.push(resolved_method);
+        }
+
+        could_method_ever_exist |= could_method_exist;
+        if first_class_id.is_none() {
+            first_class_id = Some(fq_class_id);
         }
     }
 
     if resolved_methods.is_empty() {
-        let fq_class_id = classname
-            .fq_class_id
-            .or_else(|| classname.intersections.iter().find_map(|c| c.fq_class_id).iter().next().copied());
-
-        if let Some(fq_class_id) = fq_class_id {
+        if let Some(fq_class_id) = first_class_id {
             result.has_invalid_target = true;
-            report_non_existent_method(context, class_span, method_span, method_name, &fq_class_id);
+
+            if !could_method_ever_exist {
+                report_non_existent_method(context, class_span, method_span, method_name, &fq_class_id);
+            }
         } else {
             result.has_ambiguous_target = true;
         }
@@ -305,16 +351,38 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
     );
 }
 
-fn report_static_access_on_interface(context: &mut Context, name: &StringIdentifier, span: Span) {
+fn report_static_call_on_interface(
+    context: &mut Context,
+    name: &StringIdentifier,
+    span: Span,
+    from_class_string: bool,
+) {
     let name_str = context.interner.lookup(name);
-    context.buffer.report(
-        TypingIssueKind::StaticAccessOnInterface,
-        Issue::error(format!("Cannot make a static access on an interface (`{name_str}`)."))
-            .with_annotation(Annotation::primary(span).with_message("This is an interface"))
-            .with_note(
-                "Static methods belong to classes that implement behavior, not interfaces that define contracts.",
-            ),
-    );
+
+    if from_class_string {
+        context.buffer.report(
+            TypingIssueKind::PossiblyStaticAccessOnInterface,
+            Issue::warning(format!("Potential static method call on interface `{name_str}` via `class-string`."))
+                .with_annotation(
+                    Annotation::primary(span)
+                        .with_message("This `class-string` could resolve to an interface name at runtime"),
+                )
+                .with_note(
+                    format!("While a `class-string<{name_str}>` can hold a concrete class name (which is valid), it can also hold the interface name itself, which would cause a fatal error.")
+                )
+                .with_help("Ensure the variable or expression always holds the name of a concrete class, not an interface."),
+        );
+    } else {
+        context.buffer.report(
+            TypingIssueKind::StaticAccessOnInterface,
+            Issue::error(format!("Cannot call a static method directly on an interface (`{name_str}`)."))
+                .with_annotation(Annotation::primary(span).with_message("This is a direct static call on an interface"))
+                .with_note(
+                    "Static methods belong to classes that implement behavior, not interfaces that only define contracts.",
+                )
+                .with_help("Call this method on a concrete class that implements this interface instead."),
+        );
+    }
 }
 
 fn report_deprecated_static_access_on_trait(context: &mut Context, name: &StringIdentifier, span: Span) {

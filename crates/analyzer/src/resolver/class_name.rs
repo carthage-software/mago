@@ -129,9 +129,9 @@ impl ResolvedClassname {
         matches!(self.origin, ResolutionOrigin::GenericObject)
     }
 
-    /// Checks if the resolution is a class instance (e.g., from an object or `static`).
+    /// Checks if the resolution is a class instance (e.g., from an object).
     pub const fn is_object_instance(&self) -> bool {
-        matches!(self.origin, ResolutionOrigin::Object { .. } | ResolutionOrigin::Static { .. })
+        matches!(self.origin, ResolutionOrigin::Object { .. })
     }
 
     /// Checks if the resolution is from a `self`, `static`, or `parent` keyword.

@@ -28,6 +28,7 @@ use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::bool::TBool;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::get_arraykey;
@@ -840,6 +841,10 @@ impl TUnion {
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn get_single_int(&self) -> Option<TInteger> {
+        if self.is_single() { self.get_single().get_integer() } else { None }
     }
 
     pub fn get_single_literal_int_value(&self) -> Option<i64> {

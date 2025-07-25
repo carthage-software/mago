@@ -272,6 +272,7 @@ pub(crate) enum TypingIssueKind {
     MixedKeyedAndSkippedArrayDestructuring,
     InvalidVariadicInDestructuring,
     InvalidStaticMethodAccess,
+    PossiblyStaticAccessOnInterface,
     StaticAccessOnInterface,
     UnsupportedFeature,
     ListUsedInReadContext,

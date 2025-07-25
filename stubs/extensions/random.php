@@ -16,15 +16,17 @@ namespace {
     {
     }
 
-    function rand(int $min, int $max): int
+    function rand(int $min = 0, int $max = 1): int
     {
     }
 
-    function mt_rand(int $min, int $max): int
+    function mt_rand(int $min = 0, int $max = 1): int
     {
     }
 
     /**
+     * @return int<2147483647, max>
+     *
      * @pure
      */
     function mt_getrandmax(): int
@@ -32,7 +34,7 @@ namespace {
     }
 
     /**
-     * @return int
+     * @return int<2147483647, max>
      *
      * @pure
      */

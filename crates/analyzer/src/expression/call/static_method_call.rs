@@ -70,6 +70,7 @@ impl Analyzable for StaticMethodCall {
 mod tests {
     use indoc::indoc;
 
+    use crate::issue::TypingIssueKind;
     use crate::test_analysis;
 
     test_analysis! {
@@ -219,5 +220,60 @@ mod tests {
                 }
             }
         "#}
+    }
+
+    test_analysis! {
+        name = calling_static_method_on_interface_string,
+        code = indoc! {r#"
+            <?php
+
+            interface Example {
+                public static function doTheThing(): void;
+
+                public static function getSomeValue(): int;
+            }
+
+            /**
+             * @param array<class-string<Example>> $examples
+             *
+             * @return array<string, int>
+             */
+            function process(array $examples): array {
+                $result = [];
+                foreach ($examples as $example) {
+                    $example::doTheThing();
+                    $value = $example::getSomeValue();
+
+                    $result[$example] = $value;
+                }
+
+                return $result;
+            }
+        "#},
+        issues = [
+            TypingIssueKind::PossiblyStaticAccessOnInterface,
+            TypingIssueKind::PossiblyStaticAccessOnInterface,
+        ]
+    }
+
+    test_analysis! {
+        name = calling_static_method_on_interface_name,
+        code = indoc! {r#"
+            <?php
+
+            interface Example {
+                public static function doTheThing(): void;
+
+                public static function getSomeValue(): int;
+            }
+
+            Example::doTheThing();
+
+            echo Example::getSomeValue();
+        "#},
+        issues = [
+            TypingIssueKind::StaticAccessOnInterface,
+            TypingIssueKind::StaticAccessOnInterface,
+        ]
     }
 }
