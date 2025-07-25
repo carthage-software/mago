@@ -5,6 +5,7 @@ on:
   push:
     tags:
       - "*"
+  pull_request:
 
 env:
   CICD_INTERMEDIATES_DIR: "_cd-intermediates"
@@ -200,13 +201,12 @@ jobs:
           strings "${{ steps.bin.outputs.BIN_PATH }}" | grep GLIBC_ || echo "No GLIBC version strings found."
 
       - name: run tests
-        if: matrix.job.test
+        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/')
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
-      # Build the WASM artifacts only for x86_64-unknown-linux-gnu
       - name: Install wasm-pack and build WASM
-        if: matrix.job.wasm
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
         run: |
           cargo install wasm-pack --version 0.13.1 --locked
           cd crates/wasm
@@ -255,7 +255,7 @@ jobs:
 
       - name: create WASM tarball
         id: wasm_package
-        if: matrix.job.wasm
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
@@ -273,7 +273,7 @@ jobs:
       - name: create Debian package
         id: debian-package
         shell: bash
-        if: matrix.job.debian-package
+        if: matrix.job.debian-package && !startsWith(github.ref, 'refs/pull/')
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           TARGET="${{ matrix.job.target }}"
@@ -328,7 +328,7 @@ jobs:
           path: ${{ steps.package.outputs.PKG_PATH }}
 
       - name: "Artifact upload: WASM"
-        if: matrix.job.wasm
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.wasm_package.outputs.WASM_PKG_NAME }}
