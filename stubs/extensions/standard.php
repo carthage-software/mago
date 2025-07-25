@@ -2702,8 +2702,8 @@ function get_magic_quotes_runtime(): int
 function error_log(
     string $message,
     int $message_type = 0,
-    null|string $destination,
-    null|string $additional_headers,
+    null|string $destination = null,
+    null|string $additional_headers = null,
 ): bool {
 }
 
@@ -3020,7 +3020,7 @@ function fgetc($stream): string|false
 /**
  * @param resource $stream
  */
-function fgets($stream, null|int $length): string|false
+function fgets($stream, null|int $length = null): string|false
 {
 }
 
@@ -3181,7 +3181,7 @@ function file_get_contents(
     bool $use_include_path = false,
     $context = null,
     int $offset = 0,
-    null|int $length,
+    null|int $length = null,
 ): string|false {
 }
 
@@ -4812,11 +4812,11 @@ function assert_options(int $option, mixed $value): mixed
 /**
  * @param null|'<'|'lt'|'<='|'le'|'>'|'gt'|'>='|'ge'|'=='|'='|'eq'|'!='|'<>'|'ne' $operator
  *
- * @return int<-1, 1>|bool
+ * @return ($operator is null ? int : bool)
  *
  * @pure
  */
-function version_compare(string $version1, string $version2, null|string $operator): int|bool
+function version_compare(string $version1, string $version2, null|string $operator = null): int|bool
 {
 }
 

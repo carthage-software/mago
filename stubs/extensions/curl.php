@@ -99,7 +99,7 @@ function curl_exec(CurlHandle $handle): string|bool
 {
 }
 
-function curl_getinfo(CurlHandle $handle, null|int $option): mixed
+function curl_getinfo(CurlHandle $handle, null|int $option = null): mixed
 {
 }
 

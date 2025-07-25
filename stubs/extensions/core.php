@@ -904,7 +904,7 @@ function str_increment(string $string): string
 /**
  * @no-named-arguments
  */
-function error_reporting(null|int $error_level): int
+function error_reporting(null|int $error_level = null): int
 {
 }
 
