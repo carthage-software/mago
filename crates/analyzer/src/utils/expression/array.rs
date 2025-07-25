@@ -95,17 +95,11 @@ pub(crate) fn get_array_target_type_given_index<'a>(
     access_array_span: Span,
     access_index_span: Option<Span>,
     array_like_type: &TUnion,
-    mut index_type: &TUnion,
+    index_type: &TUnion,
     in_assignment: bool,
     extended_var_id: &Option<String>,
 ) -> TUnion {
     let mut has_valid_expected_index = false;
-
-    index_type = if let Some(as_type) = index_type.get_generic_parameter_constraint() {
-        if as_type.is_mixed() { index_type } else { as_type }
-    } else {
-        index_type
-    };
 
     let access_index_span = match access_index_span {
         Some(index) => index,

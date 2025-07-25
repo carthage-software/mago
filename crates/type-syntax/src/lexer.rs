@@ -178,7 +178,7 @@ impl<'input> TypeLexer<'input> {
             }
             [b'l' | b'L', b'o' | b'O', b'w' | b'W'] => {
                 if self.input.is_at(b"lowercase-string", true) {
-                    (TypeTokenKind::LowercaseString, 15)
+                    (TypeTokenKind::LowercaseString, 16)
                 } else {
                     self.read_identifier()
                 }

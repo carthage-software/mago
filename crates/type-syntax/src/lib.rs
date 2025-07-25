@@ -1009,6 +1009,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_string_or_lowercase_string_union() {
+        match do_parse("string|lowercase-string") {
+            Ok(Type::Union(u)) => {
+                assert!(matches!(*u.left, Type::String(_)));
+                assert!(matches!(*u.right, Type::LowercaseString(_)));
+            }
+            res => panic!("Expected Ok(Type::Union), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_optional_literal_string_shape_field() {
         match do_parse("array{'salt'?: int, 'cost'?: int, ...}") {
             Ok(Type::Shape(shape)) => {

@@ -212,3 +212,34 @@ pub(crate) fn add_array_access_dataflow(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = using_generic_parameter_as_index,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @template T as string|lowercase-string
+             *
+             * @param array<T, bool> $old
+             * @param array<T, bool> $new
+             * @return array<T, bool>
+             */
+            function mergeThreadData(array $old, array $new): array {
+                foreach ($new as $name => $value) {
+                    if (!isset($old[$name]) || !$old[$name] && $value) {
+                        $old[$name] = $value;
+                    }
+                }
+
+                return $old;
+            }
+        "#},
+    }
+}

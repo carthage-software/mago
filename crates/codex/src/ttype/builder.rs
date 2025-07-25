@@ -328,6 +328,7 @@ pub fn get_union_from_type_ast<'i>(
         Type::TruthyString(_) => get_truthy_string(),
         Type::UnspecifiedLiteralString(_) => get_unspecified_literal_string(),
         Type::NonEmptyUnspecifiedLiteralString(_) => get_non_empty_unspecified_literal_string(),
+        Type::LowercaseString(_) => get_string(), // TODO(azjezz): add `lowercase-string` type
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
         Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
         Type::LiteralString(lit) => get_literal_string(lit.value.to_owned()),
