@@ -31,7 +31,7 @@ pub fn main() -> io::Result<()> {
     let map_content = stubs_map
         .into_iter()
         .map(|(simplified_path, include_path)| {
-            format!(r##"    (r#"@{simplified_path}"#, include_str!("{include_path}"))"##)
+            format!(r##"    (r#"@{simplified_path}"#, include_str!(r"{include_path}"))"##)
         })
         .collect::<Vec<_>>();
     let count = map_content.len();
