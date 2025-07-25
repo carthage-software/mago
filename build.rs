@@ -7,10 +7,12 @@ use std::path::Path;
 pub fn main() -> io::Result<()> {
     println!("cargo:rustc-env=TARGET={}", std::env::var("TARGET").unwrap());
     println!("cargo:rerun-if-changed=stubs");
+    println!("cargo:rerun-if-changed=build.rs");
 
     // Determine the stubs directory and output path
     let stubs_dir = Path::new("stubs");
 
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR environment variable not set");
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
     let output_file = Path::new(&out_dir).join("stubs_map.rs");
 
@@ -21,7 +23,7 @@ pub fn main() -> io::Result<()> {
 
     // Collect all PHP stub files
     let mut stubs_map = Vec::new();
-    stubs_map.push(("mago-internal".to_string(), "./../../../../../composer/functions.php".to_string()));
+    stubs_map.push(("mago-internal".to_string(), format!("{manifest_dir}/composer/functions.php")));
 
     collect_files(stubs_dir, stubs_dir, &mut stubs_map)?;
 
