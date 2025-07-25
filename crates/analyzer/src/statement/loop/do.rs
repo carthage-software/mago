@@ -6,6 +6,8 @@ use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -18,6 +20,7 @@ use crate::context::scope::loop_scope::LoopScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::remove_clauses_with_mixed_variables;
+use crate::issue::TypingIssueKind;
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop;
@@ -48,7 +51,32 @@ impl Analyzable for DoWhile {
             &self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
-        );
+        )
+        .unwrap_or_else(|| {
+            context.buffer.report(
+                TypingIssueKind::ConditionIsTooComplex,
+                Issue::warning("Loop condition is too complex for precise type analysis.")
+                    .with_annotation(
+                        Annotation::primary(self.condition.span())
+                            .with_message("This `do-while` loop condition is too complex for the analyzer to fully understand"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(self.statement.span())
+                            .with_message("Type inference within the loop statement(s) may be inaccurate as a result"),
+                    )
+                    .with_note(
+                        "To prevent performance issues, the analyzer limits the number of logical paths it explores for a single condition."
+                    )
+                    .with_note(
+                        "Because this limit was exceeded, type assertions from the condition will not be applied, which can affect variable types on subsequent loop iterations."
+                    )
+                    .with_help(
+                        "Consider refactoring this condition into a simpler expression or breaking it down into intermediate boolean variables before the loop.",
+                    ),
+            );
+
+            vec![]
+        });
 
         while_clauses = remove_clauses_with_mixed_variables(while_clauses, mixed_variable_ids, self.condition.span());
         if while_clauses.is_empty() {

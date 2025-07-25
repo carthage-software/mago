@@ -414,26 +414,32 @@ fn resolve_invocation_assertion<'a>(
                         ),
                         Assertion::IsNotType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) })))
                         | Assertion::IsType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })))
-                        | Assertion::Falsy => negate_or_synthesize(
-                            get_formula(
-                                assertion_expression.span(),
-                                assertion_expression.span(),
-                                assertion_expression,
-                                context.get_assertion_context_from_block(block_context),
-                                artifacts,
-                            ),
+                        | Assertion::Falsy => get_formula(
+                            assertion_expression.span(),
+                            assertion_expression.span(),
                             assertion_expression,
                             context.get_assertion_context_from_block(block_context),
                             artifacts,
-                        ),
+                        )
+                        .map(|clauses| {
+                            negate_or_synthesize(
+                                clauses,
+                                assertion_expression,
+                                context.get_assertion_context_from_block(block_context),
+                                artifacts,
+                            )
+                        }),
+
                         _ => {
                             continue; // Unsupported assertion kind for expression
                         }
                     };
 
-                    let clauses = saturate_clauses(block_context.clauses.iter().map(Rc::as_ref).chain(clauses.iter()));
-                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut Default::default());
+                    let clauses = saturate_clauses(
+                        block_context.clauses.iter().map(Rc::as_ref).chain(clauses.unwrap_or_default().iter()),
+                    );
 
+                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut Default::default());
                     for (variable, assertions) in truths {
                         type_assertions.entry(variable).or_default().extend(assertions);
                     }

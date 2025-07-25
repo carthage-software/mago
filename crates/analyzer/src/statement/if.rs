@@ -13,6 +13,8 @@ use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::union::TUnion;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -27,14 +29,13 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula;
 use crate::formula::negate_or_synthesize;
+use crate::issue::TypingIssueKind;
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::analyze_statements;
 use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
 use crate::utils::misc::check_for_paradox;
-
-const CLAUSES_THRESHOLD: usize = 1000;
 
 impl Analyzable for If {
     fn analyze<'a>(
@@ -79,11 +80,31 @@ impl Analyzable for If {
             &self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
-        );
+        ).unwrap_or_else(|| {
+            context.buffer.report(
+                TypingIssueKind::ConditionIsTooComplex,
+                Issue::warning("Condition is too complex for precise type analysis.")
+                    .with_annotation(
+                        Annotation::primary(self.condition.span())
+                            .with_message("This `if` condition is too complex for the analyzer to fully understand"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(self.body.span())
+                            .with_message("Type inference within this branch may be inaccurate as a result"),
+                    )
+                    .with_note(
+                        "The analyzer limits the number of logical paths it explores for a single condition to prevent performance issues."
+                    )
+                    .with_note(
+                        "Because this limit was exceeded, type assertions from the condition will not be applied inside the `if` block, which may lead to incorrect type information."
+                    )
+                    .with_help(
+                        "Consider refactoring this complex condition into smaller, intermediate boolean variables or nested `if` statements.",
+                    ),
+            );
 
-        if if_clauses.len() > CLAUSES_THRESHOLD {
-            if_clauses = vec![];
-        }
+            vec![]
+        });
 
         for clause in &mut if_clauses {
             let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
@@ -560,7 +581,38 @@ fn analyze_else_if_clause<'a>(
         else_if_clause.0,
         context.get_assertion_context_from_block(&else_if_block_context),
         artifacts,
-    );
+    ).unwrap_or_else(|| {
+        let clauses_statements_span = match (else_if_clause.1.first(), else_if_clause.1.last()) {
+            (Some(first_statement), Some(last_statement)) => Some(first_statement.span().join(last_statement.span())),
+            _ => None,
+        };
+
+        if let Some(clauses_statements_span) = clauses_statements_span {
+            context.buffer.report(
+                TypingIssueKind::ConditionIsTooComplex,
+                Issue::warning("Condition is too complex for precise type analysis.")
+                    .with_annotation(
+                        Annotation::primary(else_if_clause.0.span())
+                            .with_message("This `elseif` condition is too complex for the analyzer to fully understand"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(clauses_statements_span)
+                            .with_message("Type inference within this branch may be inaccurate as a result"),
+                    )
+                    .with_note(
+                        "The analyzer limits the number of logical paths it explores for a single condition to prevent performance issues."
+                    )
+                    .with_note(
+                        "Because this limit was exceeded, type assertions from the condition will not be applied to the following code, which may lead to incorrect type information."
+                    )
+                    .with_help(
+                        "Consider refactoring this complex condition into smaller, intermediate boolean variables or nested `if` statements.",
+                    ),
+            );
+        }
+
+        vec![]
+    });
 
     for clause in &mut else_if_clauses {
         let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
@@ -2018,5 +2070,77 @@ mod tests {
                 return 'rgba(0, 0, 0, 0)';
             }
         "#},
+    }
+
+    test_analysis! {
+        name = if_condition_is_too_complex,
+        code = indoc! {r#"
+            <?php
+
+            function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
+                if (
+                    ($id > 1000 && $count < 5 || $score >= 99.5 && $threshold < $score || $name === 'azjezz' && $role !== 'guest') &&
+                    ($is_active && !$is_admin || $permission === 'write' && ($category === 'critical' || $category === 'urgent')) ||
+                    !($count === 0 || $id < 0) && (
+                        $role === 'admin' && $is_admin ||
+                        $name !== 'guest' && $permission !== 'none' ||
+                        ($score - $threshold) > 5.0 && $count > 1
+                    ) && (
+                        $category === 'general' || $category === 'special' ||
+                        ($is_active && $is_admin && $id % 2 === 0) ||
+                        ($name !== 'system' && $role !== 'user' && $score < 50.0)
+                    ) || (
+                        $id < 0 && $count > 100 ||
+                        ($score < 10.0 && $threshold > 20.0) ||
+                        ($is_active && $is_admin && $name === 'root') ||
+                        ($role === 'guest' && $permission === 'read' && $category === 'public')
+                    )
+                ) {
+                    return true;
+                }
+
+                return false;
+            }
+        "#},
+        issues = [
+            TypingIssueKind::ConditionIsTooComplex,
+        ]
+    }
+
+    test_analysis! {
+        name = elseif_condition_is_too_complex,
+        code = indoc! {r#"
+            <?php
+
+            function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
+                if ($id === 0 && $name === 'admin' && $role === 'system') {
+                    return true;
+                } elseif (
+                    ($id > 1000 && $count < 5 || $score >= 99.5 && $threshold < $score || $name === 'azjezz' && $role !== 'guest') &&
+                    ($is_active && !$is_admin || $permission === 'write' && ($category === 'critical' || $category === 'urgent')) ||
+                    !($count === 0 || $id < 0) && (
+                        $role === 'admin' && $is_admin ||
+                        $name !== 'guest' && $permission !== 'none' ||
+                        ($score - $threshold) > 5.0 && $count > 1
+                    ) && (
+                        $category === 'general' || $category === 'special' ||
+                        ($is_active && $is_admin && $id % 2 === 0) ||
+                        ($name !== 'system' && $role !== 'user' && $score < 50.0)
+                    ) || (
+                        $id < 0 && $count > 100 ||
+                        ($score < 10.0 && $threshold > 20.0) ||
+                        ($is_active && $is_admin && $name === 'root') ||
+                        ($role === 'guest' && $permission === 'read' && $category === 'public')
+                    )
+                ) {
+                    return true;
+                }
+
+                return false;
+            }
+        "#},
+        issues = [
+            TypingIssueKind::ConditionIsTooComplex,
+        ]
     }
 }

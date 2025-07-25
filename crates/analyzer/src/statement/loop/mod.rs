@@ -194,14 +194,48 @@ fn analyze<'a, 'b>(
     if !pre_conditions.is_empty() {
         let assertion_context = context.get_assertion_context_from_block(loop_context);
 
+        let mut complex_conditions = vec![];
         for pre_condition in &pre_conditions {
-            pre_condition_clauses.push(get_formula(
-                pre_condition.span(),
-                pre_condition.span(),
-                pre_condition,
-                assertion_context,
-                artifacts,
-            ))
+            let condition_span = pre_condition.span();
+            let clauses = get_formula(condition_span, condition_span, pre_condition, assertion_context, artifacts)
+                .unwrap_or_else(|| {
+                    complex_conditions.push(condition_span);
+
+                    vec![]
+                });
+
+            pre_condition_clauses.push(clauses)
+        }
+
+        let statements_span = match (statements.first(), statements.last()) {
+            (Some(first), Some(last)) => Some(first.span().join(last.span())),
+            _ => None,
+        };
+
+        if let Some(statements_span) = statements_span {
+            for complex_condition in complex_conditions {
+                context.buffer.report(
+                    TypingIssueKind::ConditionIsTooComplex,
+                    Issue::warning("Loop condition is too complex for precise type analysis.")
+                        .with_annotation(
+                            Annotation::primary(complex_condition)
+                                .with_message("This loop condition is too complex for the analyzer to fully understand"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(statements_span)
+                                .with_message("Type inference within the loop statement(s) may be inaccurate as a result"),
+                        )
+                        .with_note(
+                            "The analyzer limits the number of logical paths it explores for a single condition to prevent performance issues."
+                        )
+                        .with_note(
+                            "Because this limit was exceeded, type assertions from the condition may not be applied correctly, which can affect variable types on subsequent loop iterations."
+                        )
+                        .with_help(
+                            "Consider refactoring this complex condition into a simpler expression or breaking it down into intermediate boolean variables before the loop.",
+                        ),
+                );
+            }
         }
     } else {
         always_assigned_before_loop_body_variables =

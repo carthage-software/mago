@@ -10,6 +10,8 @@ use mago_codex::assertion::Assertion;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -21,6 +23,7 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
+use crate::issue::TypingIssueKind;
 use crate::reconciler::ReconcilationContext;
 use crate::reconciler::assertion_reconciler;
 use crate::reconciler::reconcile_keyed_types;
@@ -46,8 +49,31 @@ impl Analyzable for Conditional {
         let assigned_in_conditional_variable_ids = if_conditional_scope.assigned_in_conditional_variable_ids;
 
         let assertion_context = context.get_assertion_context_from_block(block_context);
-        let mut if_clauses =
-            get_formula(self.condition.span(), self.condition.span(), &self.condition, assertion_context, artifacts);
+        let mut if_clauses = get_formula(self.condition.span(), self.condition.span(), &self.condition, assertion_context, artifacts).unwrap_or_else(|| {
+            context.buffer.report(
+                TypingIssueKind::ConditionIsTooComplex,
+                Issue::warning("Condition is too complex for precise type analysis.")
+                    .with_annotation(
+                        Annotation::primary(self.condition.span())
+                            .with_message("This conditional expression is too complex for the analyzer to fully understand"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(self.span())
+                            .with_message("As a result, type inference for this conditional expression may be inaccurate"),
+                    )
+                    .with_note(
+                        "The analyzer limits the number of logical paths it explores for a single condition to prevent performance issues with exponentially complex expressions."
+                    )
+                    .with_note(
+                        "Because this limit was exceeded, type assertions from the condition will not be applied, which may lead to incorrect type information for variables used in the `then` or `else` branches."
+                    )
+                    .with_help(
+                        "Consider refactoring this complex condition into a simpler `if/else` block or breaking it down into smaller, intermediate boolean variables.",
+                    ),
+            );
+
+            vec![]
+        });
 
         let mut mixed_variables = HashSet::default();
         for (variable_id, variable_type) in block_context.locals.iter() {
@@ -368,6 +394,7 @@ impl Analyzable for Conditional {
 mod tests {
     use indoc::indoc;
 
+    use crate::issue::TypingIssueKind;
     use crate::test_analysis;
 
     test_analysis! {
@@ -390,6 +417,37 @@ mod tests {
                 i_take_one_or_two($result);
             }
         "#}
+    }
+
+    test_analysis! {
+        name = condition_is_too_complex,
+        code = indoc! {r#"
+            <?php
+
+            function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
+                return (
+                    ($id > 1000 && $count < 5 || $score >= 99.5 && $threshold < $score || $name === 'azjezz' && $role !== 'guest') &&
+                    ($is_active && !$is_admin || $permission === 'write' && ($category === 'critical' || $category === 'urgent')) ||
+                    !($count === 0 || $id < 0) && (
+                        $role === 'admin' && $is_admin ||
+                        $name !== 'guest' && $permission !== 'none' ||
+                        ($score - $threshold) > 5.0 && $count > 1
+                    ) && (
+                        $category === 'general' || $category === 'special' ||
+                        ($is_active && $is_admin && $id % 2 === 0) ||
+                        ($name !== 'system' && $role !== 'user' && $score < 50.0)
+                    ) || (
+                        $id < 0 && $count > 100 ||
+                        ($score < 10.0 && $threshold > 20.0) ||
+                        ($is_active && $is_admin && $name === 'root') ||
+                        ($role === 'guest' && $permission === 'read' && $category === 'public')
+                    )
+                ) ? true : false;
+            }
+        "#},
+        issues = [
+            TypingIssueKind::ConditionIsTooComplex,
+        ]
     }
 
     test_analysis! {

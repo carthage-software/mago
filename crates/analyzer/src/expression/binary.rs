@@ -1966,7 +1966,8 @@ fn analyze_logical_and_operation<'a>(
         &binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
-    );
+    )
+    .unwrap_or_default();
 
     for (var_id, var_type) in &left_block_context.locals {
         if left_block_context.assigned_variable_ids.contains_key(var_id) {
@@ -2222,7 +2223,8 @@ fn analyze_logical_or_operation<'a>(
         &binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
-    );
+    )
+    .unwrap_or_default();
 
     let mut negated_left_clauses = negate_or_synthesize(
         left_clauses,
@@ -2366,7 +2368,8 @@ fn analyze_logical_or_operation<'a>(
             &binary.rhs,
             context.get_assertion_context_from_block(block_context),
             artifacts,
-        );
+        )
+        .unwrap_or_default();
 
         let mut clauses_for_right_analysis = BlockContext::remove_reconciled_clauses(
             &clauses_for_right_analysis,

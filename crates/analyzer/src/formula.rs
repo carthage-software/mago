@@ -8,6 +8,7 @@ use mago_algebra::negate_formula;
 use mago_codex::assertion::Assertion;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::*;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -16,38 +17,86 @@ use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
 use crate::utils::misc::unwrap_expression;
 
+const FORMULA_SIZE_THRESHOLD: usize = 1000;
+
 pub fn get_formula(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
     assertion_context: AssertionContext<'_>,
     artifacts: &mut AnalysisArtifacts,
-) -> Vec<Clause> {
+) -> Option<Vec<Clause>> {
     let expression = unwrap_expression(conditional);
 
-    if let Expression::Binary(binary) = expression
-        && let Some(clauses) = handle_binary_operation(
-            conditional_object_id,
-            &binary.operator,
-            &binary.lhs,
-            &binary.rhs,
-            assertion_context,
-            artifacts,
-        )
-    {
-        return clauses;
+    if let Expression::Binary(binary) = expression {
+        if let BinaryOperator::And(_) = binary.operator {
+            return handle_binary_and_operation(
+                conditional_object_id,
+                &binary.lhs,
+                &binary.rhs,
+                assertion_context,
+                artifacts,
+            );
+        }
+
+        if let BinaryOperator::Or(_) = binary.operator {
+            return handle_binary_or_operation(
+                conditional_object_id,
+                &binary.lhs,
+                &binary.rhs,
+                assertion_context,
+                artifacts,
+            );
+        }
     }
 
     if let Expression::UnaryPrefix(unary_prefix) = expression
-        && let Some(clauses) = handle_unary_prefix(
+        && unary_prefix.operator.is_not()
+    {
+        if let Expression::Binary(binary_expression) = unwrap_expression(&unary_prefix.operand) {
+            if let BinaryOperator::Or(_) = binary_expression.operator {
+                return handle_binary_and_operation(
+                    conditional_object_id,
+                    &Expression::UnaryPrefix(UnaryPrefix {
+                        operator: unary_prefix.operator.clone(),
+                        operand: binary_expression.lhs.clone(),
+                    }),
+                    &Expression::UnaryPrefix(UnaryPrefix {
+                        operator: unary_prefix.operator.clone(),
+                        operand: binary_expression.rhs.clone(),
+                    }),
+                    assertion_context,
+                    artifacts,
+                );
+            }
+
+            if let BinaryOperator::And(_) = binary_expression.operator {
+                return handle_binary_or_operation(
+                    conditional_object_id,
+                    &Expression::UnaryPrefix(UnaryPrefix {
+                        operator: unary_prefix.operator.clone(),
+                        operand: binary_expression.lhs.clone(),
+                    }),
+                    &Expression::UnaryPrefix(UnaryPrefix {
+                        operator: unary_prefix.operator.clone(),
+                        operand: binary_expression.rhs.clone(),
+                    }),
+                    assertion_context,
+                    artifacts,
+                );
+            }
+        }
+
+        let unary_oprand_span = unary_prefix.operand.span();
+        let negated = negate_formula(get_formula(
             conditional_object_id,
-            &unary_prefix.operator,
+            unary_oprand_span,
             &unary_prefix.operand,
             assertion_context,
             artifacts,
-        )
-    {
-        return clauses;
+        )?)?;
+
+        return if negated.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(negated) };
     }
 
     let anded_assertions = scrape_assertions(expression, artifacts, assertion_context);
@@ -81,7 +130,7 @@ pub fn get_formula(
     }
 
     if !clauses.is_empty() {
-        return clauses;
+        return if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) };
     }
 
     let mut conditional_ref = String::new();
@@ -90,7 +139,7 @@ pub fn get_formula(
     conditional_ref += "-";
     conditional_ref += conditional.span().end.offset.to_string().as_str();
 
-    vec![Clause::new(
+    Some(vec![Clause::new(
         {
             let mut map = BTreeMap::new();
             map.insert(conditional_ref, IndexMap::from([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
@@ -101,7 +150,7 @@ pub fn get_formula(
         None,
         None,
         None,
-    )]
+    )])
 }
 
 pub fn negate_or_synthesize(
@@ -112,7 +161,7 @@ pub fn negate_or_synthesize(
 ) -> Vec<Clause> {
     match negate_formula(clauses) {
         Some(negated_clauses) => negated_clauses,
-        None => get_formula(
+        None => match get_formula(
             conditional.span(),
             conditional.span(),
             &Expression::UnaryPrefix(UnaryPrefix {
@@ -121,35 +170,15 @@ pub fn negate_or_synthesize(
             }),
             assertion_context,
             artifacts,
-        ),
+        ) {
+            Some(synthesized_clauses) => synthesized_clauses,
+            None => {
+                // If we cannot negate the formula, we return an empty vector
+                // This is a fallback, and it should not happen in normal cases
+                vec![Clause::new(BTreeMap::new(), conditional.span(), conditional.span(), Some(true), None, None)]
+            }
+        },
     }
-}
-
-#[inline]
-fn handle_binary_operation(
-    conditional_object_id: Span,
-    bop: &BinaryOperator,
-    left: &Expression,
-    right: &Expression,
-    assertion_context: AssertionContext<'_>,
-    artifacts: &mut AnalysisArtifacts,
-) -> Option<Vec<Clause>> {
-    if let BinaryOperator::And(_) = bop {
-        return Some(handle_binary_and_operation(conditional_object_id, left, right, assertion_context, artifacts));
-    }
-
-    if let BinaryOperator::Or(_) = bop {
-        return Some(handle_binary_or_operation(conditional_object_id, left, right, assertion_context, artifacts));
-    }
-
-    // TODO: shortcuts for
-    // if (($a || $b) === false) {}
-    // if (($a || $b) !== false) {}
-    // if (!$a === true) {}
-    // if (!$a === false) {}
-    // OR we just remove that pattern with a lint (because it's redundant)
-
-    None
 }
 
 #[inline]
@@ -159,14 +188,12 @@ fn handle_binary_or_operation(
     right: &Expression,
     assertion_context: AssertionContext<'_>,
     artifacts: &mut AnalysisArtifacts,
-) -> Vec<Clause> {
-    let left_span = left.span();
-    let left_clauses = get_formula(conditional_object_id, left_span, left, assertion_context, artifacts);
+) -> Option<Vec<Clause>> {
+    let left_clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
+    let right_clauses = get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?;
+    let clauses = disjoin_clauses(left_clauses, right_clauses, conditional_object_id);
 
-    let right_span = right.span();
-    let right_clauses = get_formula(conditional_object_id, right_span, right, assertion_context, artifacts);
-
-    disjoin_clauses(left_clauses, right_clauses, conditional_object_id)
+    if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) }
 }
 
 #[inline]
@@ -176,69 +203,11 @@ fn handle_binary_and_operation(
     right: &Expression,
     assertion_context: AssertionContext<'_>,
     artifacts: &mut AnalysisArtifacts,
-) -> Vec<Clause> {
-    let left_span = left.span();
-    let mut left_clauses = get_formula(conditional_object_id, left_span, left, assertion_context, artifacts);
-
-    let right_span = right.span();
-    let right_clauses = get_formula(conditional_object_id, right_span, right, assertion_context, artifacts);
-
-    left_clauses.extend(right_clauses);
-
-    left_clauses
-}
-
-#[inline]
-fn handle_unary_prefix(
-    conditional_object_id: Span,
-    unary_operator: &UnaryPrefixOperator,
-    unary_oprand: &Expression,
-    assertion_context: AssertionContext<'_>,
-    artifacts: &mut AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
-    if let UnaryPrefixOperator::Not(_) = unary_operator {
-        if let Expression::Binary(binary_expression) = unwrap_expression(unary_oprand) {
-            if let BinaryOperator::Or(_) = binary_expression.operator {
-                return Some(self::handle_binary_and_operation(
-                    conditional_object_id,
-                    &Expression::UnaryPrefix(mago_syntax::ast::UnaryPrefix {
-                        operator: unary_operator.clone(),
-                        operand: binary_expression.lhs.clone(),
-                    }),
-                    &Expression::UnaryPrefix(mago_syntax::ast::UnaryPrefix {
-                        operator: unary_operator.clone(),
-                        operand: binary_expression.rhs.clone(),
-                    }),
-                    assertion_context,
-                    artifacts,
-                ));
-            }
+    let mut clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
+    clauses.extend(get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?);
 
-            if let BinaryOperator::And(_) = binary_expression.operator {
-                return Some(self::handle_binary_or_operation(
-                    conditional_object_id,
-                    &Expression::UnaryPrefix(mago_syntax::ast::UnaryPrefix {
-                        operator: unary_operator.clone(),
-                        operand: binary_expression.lhs.clone(),
-                    }),
-                    &Expression::UnaryPrefix(mago_syntax::ast::UnaryPrefix {
-                        operator: unary_operator.clone(),
-                        operand: binary_expression.rhs.clone(),
-                    }),
-                    assertion_context,
-                    artifacts,
-                ));
-            }
-        }
-
-        let unary_oprand_span = unary_oprand.span();
-        let original_clauses =
-            self::get_formula(conditional_object_id, unary_oprand_span, unary_oprand, assertion_context, artifacts);
-
-        return negate_formula(original_clauses);
-    }
-
-    None
+    if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) }
 }
 
 pub fn remove_clauses_with_mixed_variables(

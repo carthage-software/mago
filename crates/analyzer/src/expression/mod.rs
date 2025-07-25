@@ -225,13 +225,33 @@ pub fn find_expression_logic_issues<'a>(
     let mut if_block_context = block_context.clone();
     let mut cond_referenced_var_ids = if_block_context.conditionally_referenced_variable_ids.clone();
 
-    let mut expression_clauses = get_formula(
+    let Some(mut expression_clauses) = get_formula(
         expression.span(),
         expression.span(),
         expression,
         context.get_assertion_context_from_block(block_context),
         artifacts,
-    );
+    ) else {
+        context.buffer.report(
+           TypingIssueKind::ExpressionIsTooComplex,
+           Issue::warning("Expression is too complex for complete logical analysis.")
+               .with_annotation(
+                   Annotation::primary(expression.span())
+                       .with_message("This expression is too complex for the analyzer to fully understand its logical implications"),
+               )
+               .with_note(
+                   "To prevent performance issues, the analyzer limits how many logical paths it explores for a single expression."
+               )
+               .with_note(
+                   "As a result, some logical paradoxes or redundant checks within this expression may not be detected."
+               )
+               .with_help(
+                   "Consider refactoring this expression into smaller, intermediate variables to improve analysis and readability.",
+               ),
+        );
+
+        return;
+    };
 
     let mut mixed_var_ids = Vec::new();
     for (var_id, var_type) in &block_context.locals {
