@@ -201,7 +201,6 @@ impl Analyzable for UnaryPrefix {
                         // if t.is_int() {
                         //     report_redundant_type_cast(&self.operator, self, &t, context);
                         // }
-
                         cast_type_to_int(&t, context)
                     }
                     None => get_int(),
@@ -594,10 +593,9 @@ fn decrement_operand<'a>(
                         }
                     }
                     TScalar::Float(float_scalar) => {
-                        if block_context.inside_loop {
-                            // Do not set literal value in loop context.
-                            possibilities.push(TAtomic::Scalar(TScalar::float()));
-                        } else if let Some(value) = float_scalar.value {
+                        if let Some(value) = float_scalar.value
+                            && !block_context.inside_loop
+                        {
                             possibilities.push(TAtomic::Scalar(TScalar::literal_float(value.0 - 1.0)));
                         } else {
                             possibilities.push(TAtomic::Scalar(TScalar::float()));

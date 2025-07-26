@@ -1,6 +1,7 @@
 use ahash::HashMap;
 
 use mago_codex::get_class_like;
+use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -640,46 +641,113 @@ fn scrape_lesser_than_assertions(
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
-                } else {
-                    // A minimum_count of 0 or less (e.g. from `0 <= count($arr)`) is a tautology
-                    // and provides no new information, so we do nothing.
                 }
             }
 
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         _ => {
-            // Continue to check for other conditions
+            // Not a count comparison, so we proceed to the main logic.
         }
     }
 
-    let (count, variable, is_left) = match get_comparison_literal_operand(artifacts, left, right) {
-        (Some(count), None) => (count, right, true),
-        (None, Some(count)) => (count, left, false),
-        _ => return Vec::new(),
-    };
+    let (left_integer, right_integer) = get_comparison_literal_operand(artifacts, left, right);
+
+    if left_integer.is_none() && right_integer.is_none() {
+        return Vec::new();
+    }
 
     let mut if_types = HashMap::default();
 
-    let variable_id = get_expression_id(
-        variable,
+    let left_id = get_expression_id(
+        left,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
         assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
-    if let Some(counter_variable_id) = variable_id {
-        if is_left {
-            if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
-                if_types.insert(counter_variable_id, vec![vec![Assertion::IsGreaterThanOrEqual(count)]]);
-            } else {
-                if_types.insert(counter_variable_id, vec![vec![Assertion::IsGreaterThan(count)]]);
+    let right_id = get_expression_id(
+        right,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        assertion_context.interner,
+        Some(assertion_context.codebase),
+    );
+
+    // Generate assertions for the left variable based on the right variable's type.
+    // For an expression `$a < $b`, this asserts `$a` is less than the upper bound of `$b`.
+    if let (Some(left_var_id), Some(right_int)) = (left_id, &right_integer) {
+        let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
+            match *right_int {
+                TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
+                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                _ => None,
             }
-        } else if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
-            if_types.insert(counter_variable_id, vec![vec![Assertion::IsLessThanOrEqual(count)]]);
         } else {
-            if_types.insert(counter_variable_id, vec![vec![Assertion::IsLessThan(count)]]);
+            match *right_int {
+                TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
+                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                _ => None,
+            }
+        };
+
+        if let Some((assertion, bound)) = assertion_result {
+            let mut is_redundant = false;
+            if !right_int.is_literal()
+                && let Some(left_int) = &left_integer
+                && let Some(max_val) = left_int.get_maximum_value()
+            {
+                is_redundant = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
+                    max_val <= bound
+                } else {
+                    max_val < bound
+                };
+            }
+
+            if !is_redundant {
+                if_types.insert(left_var_id, vec![vec![assertion]]);
+            }
+        }
+    }
+
+    // Generate assertions for the right variable based on the left variable's type.
+    // For an expression `$a < $b`, this asserts `$b` is greater than the lower bound of `$a`.
+    if let (Some(right_var_id), Some(left_int)) = (right_id, &left_integer) {
+        let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
+            match *left_int {
+                TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
+                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                _ => None,
+            }
+        } else {
+            match *left_int {
+                TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
+                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                _ => None,
+            }
+        };
+
+        if let Some((assertion, bound)) = assertion_result {
+            let mut is_redundant = false;
+            if !left_int.is_literal()
+                && let Some(right_int) = &right_integer
+                && let Some(min_val) = right_int.get_minimum_value()
+            {
+                is_redundant = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
+                    min_val >= bound
+                } else {
+                    min_val > bound
+                };
+            }
+
+            if !is_redundant {
+                if_types.insert(right_var_id, vec![vec![assertion]]);
+            }
         }
     }
 
@@ -708,9 +776,6 @@ fn scrape_greater_than_assertions(
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
-                } else {
-                    // A minimum_count of 0 or less (e.g. from `count($arr) >= 0`) is a tautology
-                    // and provides no new information, so we do nothing.
                 }
             }
 
@@ -738,37 +803,107 @@ fn scrape_greater_than_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         _ => {
-            // Continue to check for other conditions
+            // Not a count comparison, so we proceed to the main logic.
         }
     }
 
-    let (count, variable, is_left) = match get_comparison_literal_operand(artifacts, left, right) {
-        (Some(count), None) => (count, right, true),
-        (None, Some(count)) => (count, left, false),
-        _ => return Vec::new(),
-    };
+    let (left_integer, right_integer) = get_comparison_literal_operand(artifacts, left, right);
+
+    if left_integer.is_none() && right_integer.is_none() {
+        return Vec::new();
+    }
 
     let mut if_types = HashMap::default();
 
-    let variable_id = get_expression_id(
-        variable,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        assertion_context.interner,
-        Some(assertion_context.codebase),
-    );
-
-    if let Some(counter_variable_id) = variable_id {
-        if is_left {
-            if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
-                if_types.insert(counter_variable_id, vec![vec![Assertion::IsLessThanOrEqual(count)]]);
-            } else {
-                if_types.insert(counter_variable_id, vec![vec![Assertion::IsLessThan(count)]]);
+    // Generate assertions for the left variable based on the right variable's type.
+    // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
+    if let Some(right_int) = &right_integer
+        && let Some(left_var_id) = get_expression_id(
+            left,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            assertion_context.interner,
+            Some(assertion_context.codebase),
+        )
+    {
+        let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
+            match *right_int {
+                TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
+                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                _ => None,
             }
-        } else if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
-            if_types.insert(counter_variable_id, vec![vec![Assertion::IsGreaterThanOrEqual(count)]]);
         } else {
-            if_types.insert(counter_variable_id, vec![vec![Assertion::IsGreaterThan(count)]]);
+            match *right_int {
+                TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
+                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                _ => None,
+            }
+        };
+
+        if let Some((assertion, bound)) = assertion_result {
+            let mut is_redundant = false;
+            if !right_int.is_literal()
+                && let Some(left_int) = &left_integer
+                && let Some(min_val) = left_int.get_minimum_value()
+            {
+                is_redundant = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
+                    min_val >= bound
+                } else {
+                    min_val > bound
+                };
+            }
+
+            if !is_redundant {
+                if_types.insert(left_var_id, vec![vec![assertion]]);
+            }
+        }
+    }
+
+    // Generate assertions for the right variable based on the left variable's type.
+    // For an expression `$a > $b`, this asserts `$b` is less than the upper bound of `$a`.
+    if let Some(left_int) = &left_integer
+        && let Some(right_var_id) = get_expression_id(
+            right,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            assertion_context.interner,
+            Some(assertion_context.codebase),
+        )
+    {
+        let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
+            match *left_int {
+                TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
+                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                _ => None,
+            }
+        } else {
+            match *left_int {
+                TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
+                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                _ => None,
+            }
+        };
+
+        if let Some((assertion, bound)) = assertion_result {
+            let mut is_redundant = false;
+            if !left_int.is_literal()
+                && let Some(right_int) = &right_integer
+                && let Some(max_val) = right_int.get_maximum_value()
+            {
+                is_redundant = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
+                    max_val <= bound
+                } else {
+                    max_val < bound
+                };
+            }
+
+            if !is_redundant {
+                if_types.insert(right_var_id, vec![vec![assertion]]);
+            }
         }
     }
 
@@ -879,9 +1014,9 @@ fn resolve_count_comparison(
     assertion_context: AssertionContext<'_>,
 ) -> (Option<i64>, Option<i64>) {
     if is_count_or_size_of_call(assertion_context, left) {
-        (None, get_expression_integer_value(artifacts, right))
+        (None, get_expression_integer_value(artifacts, right).and_then(|integer| integer.get_literal_value()))
     } else if is_count_or_size_of_call(assertion_context, right) {
-        (get_expression_integer_value(artifacts, left), None)
+        (get_expression_integer_value(artifacts, left).and_then(|integer| integer.get_literal_value()), None)
     } else {
         (None, None)
     }
@@ -891,40 +1026,15 @@ fn get_comparison_literal_operand(
     artifacts: &AnalysisArtifacts,
     left: &Expression,
     right: &Expression,
-) -> (Option<i64>, Option<i64>) {
-    if let Some(value) = get_expression_integer_value(artifacts, left) {
-        return (Some(value), None);
-    }
-
-    if let Some(value) = get_expression_integer_value(artifacts, right) {
-        return (None, Some(value));
-    }
-
-    (None, None)
+) -> (Option<TInteger>, Option<TInteger>) {
+    (get_expression_integer_value(artifacts, left), get_expression_integer_value(artifacts, right))
 }
 
-fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<i64> {
-    if let Some(value) = artifacts.get_expression_type(expression).and_then(|t| t.get_single_literal_int_value()) {
-        return Some(value);
-    }
-
-    if let Expression::Literal(Literal::Integer(integer)) = expression {
-        return Some(integer.value as i64);
-    }
-
-    if let Expression::UnaryPrefix(UnaryPrefix { operator, operand }) = expression
-        && let Expression::Literal(Literal::Integer(integer)) = operand.as_ref()
-    {
-        let value = integer.value as i64;
-
-        match operator {
-            UnaryPrefixOperator::Plus(_) => return Some(value),
-            UnaryPrefixOperator::Negation(_) => return Some(-value),
-            _ => {}
-        }
-    }
-
-    None
+fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<TInteger> {
+    artifacts
+        .get_expression_type(expression)
+        .and_then(|t| t.get_single_int())
+        .filter(|integer| !integer.is_unspecified())
 }
 
 fn is_count_or_size_of_call(assertion_context: AssertionContext<'_>, expression: &Expression) -> bool {

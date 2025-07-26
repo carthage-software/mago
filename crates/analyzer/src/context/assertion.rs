@@ -19,4 +19,5 @@ pub struct AssertionContext<'a> {
     pub type_resolution_context: &'a TypeResolutionContext,
     pub settings: &'a Settings,
     pub reference_source: Option<ReferenceSource>,
+    pub in_loop: bool,
 }

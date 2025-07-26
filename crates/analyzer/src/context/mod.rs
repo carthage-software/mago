@@ -122,6 +122,7 @@ impl<'a> Context<'a> {
             type_resolution_context: &self.type_resolution_context,
             reference_source,
             settings: self.settings,
+            in_loop: self.loop_scope.is_some(),
         }
     }
 
