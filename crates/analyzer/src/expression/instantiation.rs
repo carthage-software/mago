@@ -156,18 +156,14 @@ fn analyze_class_instantiation<'a>(
     };
 
     let Some(metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
+        let class_name_str = context.interner.lookup(&fq_class_id);
+
         context.buffer.report(
             TypingIssueKind::NonExistentClass,
-            Issue::error(format!(
-                "Class `{}` not found.",
-                context.interner.lookup(&fq_class_id)
-            ))
+            Issue::error(format!("Class `{class_name_str}` not found."))
             .with_annotation(
                 Annotation::primary(class_expression_span)
-                    .with_message(format!(
-                        "`{}` is not defined or cannot be autoloaded",
-                        context.interner.lookup(&fq_class_id)
-                    )),
+                    .with_message(format!("`{class_name_str}` is not defined or cannot be autoloaded")),
             )
             .with_help(
                 "Ensure the name is correct, including its namespace, and that it's properly defined and autoloadable.",
@@ -281,6 +277,7 @@ fn analyze_class_instantiation<'a>(
         IndexMap::with_hasher(RandomState::default()),
     );
 
+    let is_spl_object_storage = class_name_str.eq_ignore_ascii_case("splobjectstorage");
     if let Some(constructor) = get_method_by_id(context.codebase, context.interner, &constructor_declraing_id) {
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.get_method_metadata().is_some_and(|meta| meta.is_final());
@@ -366,7 +363,7 @@ fn analyze_class_instantiation<'a>(
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )
-            } else if metadata.name == context.interner.intern("splobjectstorage") {
+            } else if is_spl_object_storage {
                 get_never()
             } else {
                 base_type.first().map(|(_, constraint)| constraint).cloned().unwrap_or_else(get_never)
@@ -400,7 +397,13 @@ fn analyze_class_instantiation<'a>(
             metadata
                 .template_types
                 .iter()
-                .map(|(_, map)| map.iter().next().map(|(_, i)| i).cloned().unwrap_or_else(get_never))
+                .map(|(_, map)| {
+                    if is_spl_object_storage {
+                        get_never()
+                    } else {
+                        map.iter().next().map(|(_, i)| i).cloned().unwrap_or_else(get_never)
+                    }
+                })
                 .collect(),
         );
     }
