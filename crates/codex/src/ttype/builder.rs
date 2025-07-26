@@ -325,7 +325,7 @@ pub fn get_union_from_type_ast<'i>(
         Type::Scalar(_) => get_scalar(),
         Type::NumericString(_) => get_numeric_string(),
         Type::NonEmptyString(_) => get_non_empty_string(),
-        Type::TruthyString(_) => get_truthy_string(),
+        Type::TruthyString(_) | Type::NonFalsyString(_) => get_truthy_string(),
         Type::UnspecifiedLiteralString(_) => get_unspecified_literal_string(),
         Type::NonEmptyUnspecifiedLiteralString(_) => get_non_empty_unspecified_literal_string(),
         Type::LowercaseString(_) => get_string(), // TODO(azjezz): add `lowercase-string` type

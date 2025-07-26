@@ -22,6 +22,7 @@ pub enum TypeTokenKind {
     Array,
     NonEmptyArray,
     NonEmptyString,
+    NonFalsyString,
     LowercaseString,
     TruthyString,
     Iterable,
@@ -144,6 +145,7 @@ impl TypeTokenKind {
                 | Self::NonEmptyString
                 | Self::LowercaseString
                 | Self::TruthyString
+                | Self::NonFalsyString
                 | Self::Iterable
                 | Self::Null
                 | Self::Mixed

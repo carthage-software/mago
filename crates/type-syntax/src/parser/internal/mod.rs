@@ -110,6 +110,7 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::NonEmptyString => Type::NonEmptyString(Keyword::from(stream.consume()?)),
         TypeTokenKind::LowercaseString => Type::LowercaseString(Keyword::from(stream.consume()?)),
         TypeTokenKind::TruthyString => Type::TruthyString(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonFalsyString => Type::NonFalsyString(Keyword::from(stream.consume()?)),
         TypeTokenKind::Object => Type::Object(Keyword::from(stream.consume()?)),
         TypeTokenKind::NoReturn | TypeTokenKind::NeverReturn | TypeTokenKind::NeverReturns | TypeTokenKind::Nothing => {
             Type::Never(Keyword::from(stream.consume()?))

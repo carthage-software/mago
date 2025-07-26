@@ -82,6 +82,8 @@ impl<'input> TypeLexer<'input> {
                     (TypeTokenKind::NonEmptyArray, 15)
                 } else if self.input.is_at(b"non-empty-list", true) {
                     (TypeTokenKind::NonEmptyList, 14)
+                } else if self.input.is_at(b"non-falsy-string", true) {
+                    (TypeTokenKind::NonFalsyString, 16)
                 } else {
                     self.read_identifier()
                 }
