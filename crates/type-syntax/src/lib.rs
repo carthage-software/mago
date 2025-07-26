@@ -308,6 +308,62 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_shape_with_keys_containing_special_chars() {
+        match do_parse("array{key-with-dash: int, key-with---multiple-dashes?: int}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 2);
+
+                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "key-with-dash");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "key-with---multiple-dashes");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_shape_with_keys_after_types() {
+        match do_parse("array{list: list<int>, int?: int, string: string, bool: bool}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 4);
+
+                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "list");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "int");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[2].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "string");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+
+                if let Some(Type::Reference(r)) = shape.fields[3].key.as_ref().map(|k| k.name.as_ref()) {
+                    assert_eq!(r.identifier.value, "bool");
+                } else {
+                    panic!("Expected key to be a Type::Reference");
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_unsealed_shape_with_fallback() {
         match do_parse(
             "array{
@@ -387,7 +443,7 @@ mod tests {
         match do_parse("MyClass::MY_CONST") {
             Ok(Type::MemberReference(m)) => {
                 assert_eq!(m.class.value, "MyClass");
-                assert_eq!(m.member.value, "MY_CONST");
+                assert_eq!(m.member.to_string(), "MY_CONST");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
         }
@@ -395,7 +451,7 @@ mod tests {
         match do_parse("\\Fully\\Qualified::class") {
             Ok(Type::MemberReference(m)) => {
                 assert_eq!(m.class.value, "\\Fully\\Qualified"); // Check if lexer keeps leading \
-                assert_eq!(m.member.value, "class");
+                assert_eq!(m.member.to_string(), "class");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
         }
@@ -478,8 +534,8 @@ mod tests {
                 let spec = c.specification.expect("Expected callable specification");
                 assert!(spec.return_type.is_none());
                 assert_eq!(spec.parameters.entries.len(), 2);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::Int(_)));
-                assert!(matches!(*spec.parameters.entries[1].parameter_type, Type::Nullable(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::Int(_))));
+                assert!(matches!(spec.parameters.entries[1].parameter_type, Some(Type::Nullable(_))));
                 assert!(spec.parameters.entries[0].ellipsis.is_none());
                 assert!(spec.parameters.entries[0].equals.is_none());
             }
@@ -507,7 +563,7 @@ mod tests {
                 assert_eq!(c.kind, CallableTypeKind::PureCallable);
                 let spec = c.specification.expect("Expected callable specification");
                 assert_eq!(spec.parameters.entries.len(), 1);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::Bool(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::Bool(_))));
                 assert!(spec.return_type.is_some());
                 assert!(matches!(*spec.return_type.unwrap().return_type, Type::Int(_)));
             }
@@ -523,7 +579,7 @@ mod tests {
                 assert_eq!(c.keyword.value, "Closure");
                 let spec = c.specification.expect("Expected callable specification");
                 assert_eq!(spec.parameters.entries.len(), 1);
-                assert!(matches!(*spec.parameters.entries[0].parameter_type, Type::String(_)));
+                assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::String(_))));
                 assert!(spec.return_type.is_some());
                 assert!(matches!(*spec.return_type.unwrap().return_type, Type::Bool(_)));
             }
@@ -541,17 +597,17 @@ mod tests {
                 assert!(spec.return_type.is_some());
 
                 let first_param = &spec.parameters.entries[0];
-                assert!(matches!(*first_param.parameter_type, Type::List(_)));
+                assert!(matches!(first_param.parameter_type, Some(Type::List(_))));
                 assert!(first_param.ellipsis.is_none());
                 assert!(first_param.equals.is_none());
 
                 let second_param = &spec.parameters.entries[1];
-                assert!(matches!(*second_param.parameter_type, Type::Nullable(_)));
+                assert!(matches!(second_param.parameter_type, Some(Type::Nullable(_))));
                 assert!(second_param.ellipsis.is_none());
                 assert!(second_param.equals.is_some());
 
                 let third_param = &spec.parameters.entries[2];
-                assert!(matches!(*third_param.parameter_type, Type::Int(_)));
+                assert!(matches!(third_param.parameter_type, Some(Type::Int(_))));
                 assert!(third_param.ellipsis.is_some());
                 assert!(third_param.equals.is_none());
 
@@ -668,6 +724,26 @@ mod tests {
         match do_parse("string[]") {
             Ok(Type::Slice(s)) => {
                 assert!(matches!(*s.inner, Type::String(_)));
+            }
+            res => panic!("Expected Ok(Type::Slice), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_slice_of_slice_of_slice_type() {
+        match do_parse("string[][][]") {
+            Ok(Type::Slice(s)) => {
+                assert!(matches!(*s.inner, Type::Slice(_)));
+                if let Type::Slice(inner_slice) = *s.inner {
+                    assert!(matches!(*inner_slice.inner, Type::Slice(_)));
+                    if let Type::Slice(inner_inner_slice) = *inner_slice.inner {
+                        assert!(matches!(*inner_inner_slice.inner, Type::String(_)));
+                    } else {
+                        panic!("Expected inner slice to be a Slice");
+                    }
+                } else {
+                    panic!("Expected outer slice to be a Slice");
+                }
             }
             res => panic!("Expected Ok(Type::Slice), got {res:?}"),
         }
@@ -848,6 +924,125 @@ mod tests {
                 assert!(matches!(*u.right, Type::NegativeInt(_)));
             }
             res => panic!("Expected Ok(Type::Union), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_float_alias() {
+        match do_parse("double") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "double");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+
+        match do_parse("real") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "real");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+
+        match do_parse("float") {
+            Ok(Type::Float(f)) => {
+                assert_eq!(f.value, "float");
+            }
+            res => panic!("Expected Ok(Type::Float), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_alias() {
+        match do_parse("boolean") {
+            Ok(Type::Bool(b)) => {
+                assert_eq!(b.value, "boolean");
+            }
+            res => panic!("Expected Ok(Type::Bool), got {res:?}"),
+        }
+
+        match do_parse("bool") {
+            Ok(Type::Bool(b)) => {
+                assert_eq!(b.value, "bool");
+            }
+            res => panic!("Expected Ok(Type::Bool), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_integer_alias() {
+        match do_parse("integer") {
+            Ok(Type::Int(i)) => {
+                assert_eq!(i.value, "integer");
+            }
+            res => panic!("Expected Ok(Type::Int), got {res:?}"),
+        }
+
+        match do_parse("int") {
+            Ok(Type::Int(i)) => {
+                assert_eq!(i.value, "int");
+            }
+            res => panic!("Expected Ok(Type::Int), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_callable_with_variables() {
+        match do_parse("callable(string ...$names)") {
+            Ok(Type::Callable(callable)) => {
+                assert_eq!(callable.keyword.value, "callable");
+                assert!(callable.specification.is_some());
+
+                let specification = callable.specification.unwrap();
+
+                assert!(specification.return_type.is_none());
+                assert_eq!(specification.parameters.entries.len(), 1);
+
+                let first_parameter = specification.parameters.entries.first().unwrap();
+                assert!(first_parameter.variable.is_some());
+                assert!(first_parameter.ellipsis.is_some());
+
+                let variable = first_parameter.variable.unwrap();
+                assert_eq!(variable.value, "$names");
+            }
+            res => panic!("Expected Ok(Type::Callable), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_string_or_lowercase_string_union() {
+        match do_parse("string|lowercase-string") {
+            Ok(Type::Union(u)) => {
+                assert!(matches!(*u.left, Type::String(_)));
+                assert!(matches!(*u.right, Type::LowercaseString(_)));
+            }
+            res => panic!("Expected Ok(Type::Union), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_optional_literal_string_shape_field() {
+        match do_parse("array{'salt'?: int, 'cost'?: int, ...}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 2);
+                assert!(shape.additional_fields.is_some());
+
+                let first_field = &shape.fields[0];
+                assert!(first_field.is_optional());
+                assert!(matches!(
+                    first_field.key.as_ref().map(|k| k.name.as_ref()),
+                    Some(Type::LiteralString(LiteralStringType { raw: "'salt'", value: "salt", .. }))
+                ));
+                assert!(matches!(first_field.value.as_ref(), Type::Int(_)));
+
+                let second_field = &shape.fields[1];
+                assert!(second_field.is_optional());
+                assert!(matches!(
+                    second_field.key.as_ref().map(|k| k.name.as_ref()),
+                    Some(Type::LiteralString(LiteralStringType { raw: "'cost'", value: "cost", .. }))
+                ));
+                assert!(matches!(second_field.value.as_ref(), Type::Int(_)));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
         }
     }
 }

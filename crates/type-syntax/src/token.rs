@@ -8,9 +8,13 @@ use mago_span::Span;
 #[repr(C)]
 pub enum TypeTokenKind {
     Int,
+    Integer,
     String,
     Float,
+    Real,
+    Double,
     Bool,
+    Boolean,
     False,
     True,
     Object,
@@ -18,6 +22,7 @@ pub enum TypeTokenKind {
     Array,
     NonEmptyArray,
     NonEmptyString,
+    NonFalsyString,
     LowercaseString,
     TruthyString,
     Iterable,
@@ -59,6 +64,8 @@ pub enum TypeTokenKind {
     ProtectedPropertiesOf,
     PositiveInt,
     NegativeInt,
+    NonPositiveInt,
+    NonNegativeInt,
     As,
     Is,
     Not,
@@ -90,6 +97,7 @@ pub enum TypeTokenKind {
     Variable,
     Whitespace,
     SingleLineComment,
+    Asterisk,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -121,9 +129,13 @@ impl TypeTokenKind {
         matches!(
             self,
             Self::Int
+                | Self::Integer
+                | Self::Double
                 | Self::String
                 | Self::Float
+                | Self::Real
                 | Self::Bool
+                | Self::Boolean
                 | Self::False
                 | Self::True
                 | Self::Object
@@ -133,6 +145,7 @@ impl TypeTokenKind {
                 | Self::NonEmptyString
                 | Self::LowercaseString
                 | Self::TruthyString
+                | Self::NonFalsyString
                 | Self::Iterable
                 | Self::Null
                 | Self::Mixed
@@ -175,6 +188,8 @@ impl TypeTokenKind {
                 | Self::ProtectedPropertiesOf
                 | Self::PositiveInt
                 | Self::NegativeInt
+                | Self::NonPositiveInt
+                | Self::NonNegativeInt
         )
     }
 

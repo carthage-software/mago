@@ -22,7 +22,7 @@ pub mod stream;
 #[inline]
 pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
     let next = stream.peek()?;
-    let inner = match next.kind {
+    let mut inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from(stream.consume()?)),
         TypeTokenKind::Question => {
             Type::Nullable(NullableType { question_mark: stream.consume()?.span, inner: Box::new(parse_type(stream)?) })
@@ -41,9 +41,11 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::OpenResource => Type::OpenResource(Keyword::from(stream.consume()?)),
         TypeTokenKind::True => Type::True(Keyword::from(stream.consume()?)),
         TypeTokenKind::False => Type::False(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Bool => Type::Bool(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Float => Type::Float(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Int => {
+        TypeTokenKind::Bool | TypeTokenKind::Boolean => Type::Bool(Keyword::from(stream.consume()?)),
+        TypeTokenKind::Float | TypeTokenKind::Real | TypeTokenKind::Double => {
+            Type::Float(Keyword::from(stream.consume()?))
+        }
+        TypeTokenKind::Int | TypeTokenKind::Integer => {
             let keyword = Keyword::from(stream.consume()?);
 
             if stream.is_at(TypeTokenKind::LessThan)? {
@@ -101,10 +103,14 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         }
         TypeTokenKind::PositiveInt => Type::PositiveInt(Keyword::from(stream.consume()?)),
         TypeTokenKind::NegativeInt => Type::NegativeInt(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(Keyword::from(stream.consume()?)),
         TypeTokenKind::String => Type::String(Keyword::from(stream.consume()?)),
         TypeTokenKind::NumericString => Type::NumericString(Keyword::from(stream.consume()?)),
         TypeTokenKind::NonEmptyString => Type::NonEmptyString(Keyword::from(stream.consume()?)),
+        TypeTokenKind::LowercaseString => Type::LowercaseString(Keyword::from(stream.consume()?)),
         TypeTokenKind::TruthyString => Type::TruthyString(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonFalsyString => Type::NonFalsyString(Keyword::from(stream.consume()?)),
         TypeTokenKind::Object => Type::Object(Keyword::from(stream.consume()?)),
         TypeTokenKind::NoReturn | TypeTokenKind::NeverReturn | TypeTokenKind::NeverReturns | TypeTokenKind::Nothing => {
             Type::Never(Keyword::from(stream.consume()?))
@@ -217,11 +223,36 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::QualifiedIdentifier => {
             let identifier = Identifier::from(stream.consume()?);
             if stream.is_at(TypeTokenKind::ColonColon)? {
-                Type::MemberReference(MemberReferenceType {
-                    class: identifier,
-                    double_colon: stream.consume()?.span,
-                    member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
-                })
+                let double_colon = stream.consume()?.span;
+
+                if stream.is_at(TypeTokenKind::Asterisk)? {
+                    let asterisk = stream.consume()?.span;
+
+                    Type::MemberReference(MemberReferenceType {
+                        class: identifier,
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Identifier)? {
+                            MemberReferenceSelector::EndsWith(
+                                asterisk,
+                                Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                            )
+                        } else {
+                            MemberReferenceSelector::Wildcard(asterisk)
+                        },
+                    })
+                } else {
+                    let identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                    Type::MemberReference(MemberReferenceType {
+                        class: identifier,
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                            MemberReferenceSelector::StartsWith(identifier, stream.consume()?.span)
+                        } else {
+                            MemberReferenceSelector::Identifier(identifier)
+                        },
+                    })
+                }
             } else {
                 Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
             }
@@ -238,11 +269,36 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
             } else {
                 let identifier = Identifier::from(stream.consume()?);
                 if stream.is_at(TypeTokenKind::ColonColon)? {
-                    Type::MemberReference(MemberReferenceType {
-                        class: identifier,
-                        double_colon: stream.consume()?.span,
-                        member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
-                    })
+                    let double_colon = stream.consume()?.span;
+
+                    if stream.is_at(TypeTokenKind::Asterisk)? {
+                        let asterisk = stream.consume()?.span;
+
+                        Type::MemberReference(MemberReferenceType {
+                            class: identifier,
+                            double_colon,
+                            member: if stream.is_at(TypeTokenKind::Identifier)? {
+                                MemberReferenceSelector::EndsWith(
+                                    asterisk,
+                                    Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                                )
+                            } else {
+                                MemberReferenceSelector::Wildcard(asterisk)
+                            },
+                        })
+                    } else {
+                        let member_identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                        Type::MemberReference(MemberReferenceType {
+                            class: identifier,
+                            double_colon,
+                            member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                                MemberReferenceSelector::StartsWith(member_identifier, stream.consume()?.span)
+                            } else {
+                                MemberReferenceSelector::Identifier(member_identifier)
+                            },
+                        })
+                    }
                 } else {
                     Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
                 }
@@ -261,10 +317,31 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
                 let identifier = Identifier::from(stream.consume()?);
 
                 if stream.is_at(TypeTokenKind::ColonColon)? {
+                    let double_colon = stream.consume()?.span;
+
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
-                        double_colon: stream.consume()?.span,
-                        member: Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                        double_colon,
+                        member: if stream.is_at(TypeTokenKind::Asterisk)? {
+                            let asterisk = stream.consume()?.span;
+
+                            if stream.is_at(TypeTokenKind::Identifier)? {
+                                MemberReferenceSelector::EndsWith(
+                                    asterisk,
+                                    Identifier::from(stream.eat(TypeTokenKind::Identifier)?),
+                                )
+                            } else {
+                                MemberReferenceSelector::Wildcard(asterisk)
+                            }
+                        } else {
+                            let identifier = Identifier::from(stream.eat(TypeTokenKind::Identifier)?);
+
+                            if stream.is_at(TypeTokenKind::Asterisk)? {
+                                MemberReferenceSelector::StartsWith(identifier, stream.consume()?.span)
+                            } else {
+                                MemberReferenceSelector::Identifier(identifier)
+                            }
+                        },
                     })
                 } else {
                     Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
@@ -282,46 +359,51 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         }
     };
 
-    // Nullable types can't be used in unions or intersections
-    if let Type::Nullable(_) = inner {
-        return Ok(inner);
-    }
+    loop {
+        let is_inner_nullable = matches!(inner, Type::Nullable(_));
 
-    Ok(match stream.lookahead(0)?.map(|t| t.kind) {
-        Some(TypeTokenKind::Pipe) => Type::Union(UnionType {
-            left: Box::new(inner),
-            pipe: stream.consume()?.span,
-            right: Box::new(parse_type(stream)?),
-        }),
-        Some(TypeTokenKind::Ampersand) => Type::Intersection(IntersectionType {
-            left: Box::new(inner),
-            ampersand: stream.consume()?.span,
-            right: Box::new(parse_type(stream)?),
-        }),
-        Some(TypeTokenKind::LeftBracket) => {
-            let left_bracket = stream.consume()?.span;
+        inner = match stream.lookahead(0)?.map(|t| t.kind) {
+            Some(TypeTokenKind::Pipe) if !is_inner_nullable => Type::Union(UnionType {
+                left: Box::new(inner),
+                pipe: stream.consume()?.span,
+                right: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::Ampersand) if !is_inner_nullable => Type::Intersection(IntersectionType {
+                left: Box::new(inner),
+                ampersand: stream.consume()?.span,
+                right: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::Is) if !is_inner_nullable => Type::Conditional(ConditionalType {
+                subject: Box::new(inner),
+                is: Keyword::from(stream.consume()?),
+                not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
+                target: Box::new(parse_type(stream)?),
+                question_mark: stream.eat(TypeTokenKind::Question)?.span,
+                then: Box::new(parse_type(stream)?),
+                colon: stream.eat(TypeTokenKind::Colon)?.span,
+                otherwise: Box::new(parse_type(stream)?),
+            }),
+            Some(TypeTokenKind::LeftBracket) => {
+                let left_bracket = stream.consume()?.span;
 
-            if stream.is_at(TypeTokenKind::RightBracket)? {
-                Type::Slice(SliceType { inner: Box::new(inner), left_bracket, right_bracket: stream.consume()?.span })
-            } else {
-                Type::IndexAccess(IndexAccessType {
-                    target: Box::new(inner),
-                    left_bracket,
-                    index: Box::new(parse_type(stream)?),
-                    right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
-                })
+                if stream.is_at(TypeTokenKind::RightBracket)? {
+                    Type::Slice(SliceType {
+                        inner: Box::new(inner),
+                        left_bracket,
+                        right_bracket: stream.consume()?.span,
+                    })
+                } else {
+                    Type::IndexAccess(IndexAccessType {
+                        target: Box::new(inner),
+                        left_bracket,
+                        index: Box::new(parse_type(stream)?),
+                        right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
+                    })
+                }
             }
-        }
-        Some(TypeTokenKind::Is) => Type::Conditional(ConditionalType {
-            subject: Box::new(inner),
-            is: Keyword::from(stream.consume()?),
-            not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
-            target: Box::new(parse_type(stream)?),
-            question_mark: stream.eat(TypeTokenKind::Question)?.span,
-            then: Box::new(parse_type(stream)?),
-            colon: stream.eat(TypeTokenKind::Colon)?.span,
-            otherwise: Box::new(parse_type(stream)?),
-        }),
-        _ => inner,
-    })
+            _ => {
+                return Ok(inner);
+            }
+        };
+    }
 }

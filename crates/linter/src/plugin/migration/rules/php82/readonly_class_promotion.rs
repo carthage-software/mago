@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_codex::get_class;
 use mago_php_version::PHPVersion;
 use toml::Value;
 
@@ -86,17 +87,20 @@ impl Rule for ReadonlyClassPromotionRule {
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Class(class) = node else { return LintDirective::default() };
 
-        let name = context.module.names.get(&class.name);
-        let Some(reflection) = context.codebase.get_class(context.interner, name) else {
+        let name = context.resolved_names.get(&class.name);
+        let Some(metadata) = get_class(context.codebase, context.interner, name) else {
             return LintDirective::default();
         };
 
         // If the class is readonly, extends another class or has children, we can't promote it.
-        if reflection.is_readonly || reflection.inheritance.extends_classes() || reflection.inheritance.has_children() {
+        if metadata.is_readonly
+            || !metadata.all_parent_classes.is_empty()
+            || metadata.child_class_likes.as_ref().is_some_and(|children| !children.is_empty())
+        {
             return LintDirective::default();
         }
 
-        if !reflection.is_final && context.option(FINAL_ONLY).and_then(|c| c.as_bool()).unwrap_or(FINAL_ONLY_DEFAULT) {
+        if !metadata.is_final && context.option(FINAL_ONLY).and_then(|c| c.as_bool()).unwrap_or(FINAL_ONLY_DEFAULT) {
             return LintDirective::default();
         }
 

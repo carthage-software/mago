@@ -15,11 +15,6 @@ pub enum ParseError {
     UnclosedAnnotationArguments(Span),
     MalformedCodeBlock(Span),
     InvalidComment(Span),
-    InconsistentIndentation(Span, usize, usize),
-    MissingAsterisk(Span),
-    MissingWhitespaceAfterAsterisk(Span),
-    MissingWhitespaceAfterOpeningAsterisk(Span),
-    MissingWhitespaceBeforeClosingAsterisk(Span),
     ExpectedLine(Span),
 }
 
@@ -35,11 +30,6 @@ impl HasSpan for ParseError {
             | ParseError::UnclosedAnnotationArguments(span)
             | ParseError::MalformedCodeBlock(span)
             | ParseError::InvalidComment(span)
-            | ParseError::InconsistentIndentation(span, _, _)
-            | ParseError::MissingAsterisk(span)
-            | ParseError::MissingWhitespaceAfterAsterisk(span)
-            | ParseError::MissingWhitespaceAfterOpeningAsterisk(span)
-            | ParseError::MissingWhitespaceBeforeClosingAsterisk(span)
             | ParseError::ExpectedLine(span) => *span,
         }
     }
@@ -60,17 +50,6 @@ impl std::fmt::Display for ParseError {
             ParseError::InvalidAnnotationName(_) => write!(f, "Invalid annotation name"),
             ParseError::UnclosedAnnotationArguments(_) => write!(f, "Unclosed annotation arguments"),
             ParseError::MalformedCodeBlock(_) => write!(f, "Malformed code block"),
-            ParseError::InconsistentIndentation(_, expected, actual) => {
-                write!(f, "Inconsistent indentation: expected {expected}, found {actual}")
-            }
-            ParseError::MissingAsterisk(_) => write!(f, "Missing leading asterisk on docblock line"),
-            ParseError::MissingWhitespaceAfterAsterisk(_) => {
-                write!(f, "Missing space after leading asterisk")
-            }
-            ParseError::MissingWhitespaceAfterOpeningAsterisk(_)
-            | ParseError::MissingWhitespaceBeforeClosingAsterisk(_) => {
-                write!(f, "Improperly formatted single-line docblock")
-            }
             ParseError::ExpectedLine(_) => write!(f, "Unexpected end of docblock"),
         }
     }
@@ -92,7 +71,7 @@ impl ParseError {
                 "Multi-line code blocks must be terminated with a closing ```.".to_string()
             }
             ParseError::InvalidTagName(_) => {
-                "Docblock tags like `@param` must contain only letters, numbers, and hyphens.".to_string()
+                "Docblock tags like `@param` must contain only letters, numbers, hyphens, and colons.".to_string()
             }
             ParseError::InvalidAnnotationName(_) => {
                 "Annotations must start with an uppercase letter, `_`, or `\\`.".to_string()
@@ -102,21 +81,6 @@ impl ParseError {
             }
             ParseError::MalformedCodeBlock(_) => {
                 "A code block must start with ``` optionally followed by a language identifier.".to_string()
-            }
-            ParseError::InconsistentIndentation(_, expected, actual) => {
-                format!(
-                    "This line has an indentation of {actual}, but {expected} was expected based on the first line."
-                )
-            }
-            ParseError::MissingAsterisk(_) => {
-                "Each line in a multi-line docblock should start with an aligned asterisk `*`.".to_string()
-            }
-            ParseError::MissingWhitespaceAfterAsterisk(_) => {
-                "A space is required after the leading `*` to separate it from the content.".to_string()
-            }
-            ParseError::MissingWhitespaceAfterOpeningAsterisk(_)
-            | ParseError::MissingWhitespaceBeforeClosingAsterisk(_) => {
-                "Single-line docblocks should have spaces padding the content, like `/** content */`.".to_string()
             }
             ParseError::ExpectedLine(_) => {
                 "A tag or description was expected here, but the docblock ended prematurely.".to_string()
@@ -139,13 +103,6 @@ impl ParseError {
             }
             ParseError::UnclosedAnnotationArguments(_) => {
                 "Add a closing `)` to complete the annotation's argument list.".to_string()
-            }
-            ParseError::InconsistentIndentation(_, _, _) => {
-                "Adjust the indentation to be consistent across all lines in the docblock.".to_string()
-            }
-            ParseError::MissingAsterisk(_) => "Add a leading `*` to the beginning of this line.".to_string(),
-            ParseError::MissingWhitespaceAfterAsterisk(_) => {
-                "Insert a space after the `*` at the beginning of the line.".to_string()
             }
             _ => "Review the docblock syntax to ensure it is correctly formatted.".to_string(),
         }

@@ -42,14 +42,15 @@ pub fn parse_literal(stream: &mut TokenStream<'_, '_>) -> Result<Literal, ParseE
         T![LiteralString] => {
             let value = stream.interner().lookup(&token.value);
 
-            let kind =
-                if value.starts_with('"') { LiteralStringKind::DoubleQuoted } else { LiteralStringKind::SingleQuoted };
-
             Literal::String(LiteralString {
-                kind,
+                kind: Some(if value.starts_with('"') {
+                    LiteralStringKind::DoubleQuoted
+                } else {
+                    LiteralStringKind::SingleQuoted
+                }),
                 span: token.span,
                 raw: token.value,
-                value: parse_literal_string(value),
+                value: parse_literal_string(value, None, true),
             })
         }
         T![PartialLiteralString] => {

@@ -1,8 +1,9 @@
 use indoc::indoc;
 use toml::Value;
 
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::*;
 use mago_php_version::PHPVersion;
-use mago_reflection::class_like::ClassLikeReflection;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -160,36 +161,36 @@ impl Rule for RequireParameterTypeRule {
                 }
             }
             Node::Interface(interface) => {
-                let name = context.module.names.get(&interface.name);
-                let Some(reflection) = context.codebase.get_interface(context.interner, name) else {
+                let name = context.resolved_names.get(&interface.name);
+                let Some(metadata) = get_interface(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                check_class_like_members(reflection, interface.members.as_slice(), context);
+                check_class_like_members(metadata, interface.members.as_slice(), context);
             }
             Node::Class(class) => {
-                let name = context.module.names.get(&class.name);
-                let Some(reflection) = context.codebase.get_class(context.interner, name) else {
+                let name = context.resolved_names.get(&class.name);
+                let Some(metadata) = get_class(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                check_class_like_members(reflection, class.members.as_slice(), context);
+                check_class_like_members(metadata, class.members.as_slice(), context);
             }
             Node::Enum(r#enum) => {
-                let name = context.module.names.get(&r#enum.name);
-                let Some(reflection) = context.codebase.get_enum(context.interner, name) else {
+                let name = context.resolved_names.get(&r#enum.name);
+                let Some(metadata) = get_enum(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                check_class_like_members(reflection, r#enum.members.as_slice(), context);
+                check_class_like_members(metadata, r#enum.members.as_slice(), context);
             }
             Node::Trait(r#trait) => {
-                let name = context.module.names.get(&r#trait.name);
-                let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
+                let name = context.resolved_names.get(&r#trait.name);
+                let Some(metadata) = get_trait(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                check_class_like_members(reflection, r#trait.members.as_slice(), context);
+                check_class_like_members(metadata, r#trait.members.as_slice(), context);
             }
             _ => (),
         }
@@ -218,22 +219,13 @@ fn check_function_like_parameter(function_like_parameter: &FunctionLikeParameter
 }
 
 #[inline]
-fn check_class_like_members(
-    reflection: &ClassLikeReflection,
-    members: &[ClassLikeMember],
-    context: &mut LintContext<'_>,
-) {
+fn check_class_like_members(metadata: &ClassLikeMetadata, members: &[ClassLikeMember], context: &mut LintContext<'_>) {
     for member in members {
         let ClassLikeMember::Method(method) = member else {
             continue;
         };
 
-        let Some(method_reflection) = reflection.methods.members.get(&method.name.value) else {
-            continue;
-        };
-
-        if method_reflection.is_overriding {
-            // This method is overriding a method from a parent class.
+        if is_method_overriding(context.codebase, context.interner, &metadata.name, &method.name.value) {
             continue;
         }
 

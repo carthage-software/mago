@@ -253,7 +253,7 @@ impl<'a> Format<'a> for Literal {
 
 impl<'a> Format<'a> for LiteralString {
     fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, LiteralString, { Document::String(print_string(f, &self.kind, &self.raw)) })
+        wrap!(f, self, LiteralString, { Document::String(print_string(f, self.kind, &self.raw)) })
     }
 }
 

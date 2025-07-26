@@ -1,5 +1,6 @@
 use indoc::indoc;
 
+use mago_codex::*;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
 use mago_span::HasSpan;
@@ -62,7 +63,7 @@ impl Rule for NoUnusedParameterRule {
     }
 
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
-        let (reflection, members) = match node {
+        let (metadata, members) = match node {
             Node::Function(function) => {
                 if potentially_contains_function_call(&function.body, FUNC_GET_ARGS, context) {
                     // `func_get_args` is potentially used, so we can't determine if the parameters are unused
@@ -116,28 +117,28 @@ impl Rule for NoUnusedParameterRule {
                 return LintDirective::default();
             }
             Node::Class(class) => {
-                let name = context.module.names.get(&class.name);
-                let Some(reflection) = context.codebase.get_class(context.interner, name) else {
+                let name = context.resolved_names.get(&class.name);
+                let Some(metadata) = get_class(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                (reflection, class.members.iter())
+                (metadata, class.members.iter())
             }
             Node::Enum(r#enum) => {
-                let name = context.module.names.get(&r#enum.name);
-                let Some(reflection) = context.codebase.get_enum(context.interner, name) else {
+                let name = context.resolved_names.get(&r#enum.name);
+                let Some(metadata) = get_enum(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                (reflection, r#enum.members.iter())
+                (metadata, r#enum.members.iter())
             }
             Node::Trait(r#trait) => {
-                let name = context.module.names.get(&r#trait.name);
-                let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
+                let name = context.resolved_names.get(&r#trait.name);
+                let Some(metadata) = get_trait(context.codebase, context.interner, name) else {
                     return LintDirective::default();
                 };
 
-                (reflection, r#trait.members.iter())
+                (metadata, r#trait.members.iter())
             }
             _ => return LintDirective::default(),
         };
@@ -151,12 +152,7 @@ impl Rule for NoUnusedParameterRule {
                 continue;
             };
 
-            let Some(method_reflection) = reflection.methods.members.get(&method.name.value) else {
-                continue;
-            };
-
-            if method_reflection.is_overriding {
-                // This method is overriding a method from a parent class.
+            if is_method_overriding(context.codebase, context.interner, &metadata.name, &method.name.value) {
                 continue;
             }
 

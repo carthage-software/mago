@@ -8,6 +8,7 @@ use clap::builder::styling::Effects;
 
 use mago_php_version::PHPVersion;
 
+use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::ast::AstCommand;
 use crate::commands::find::FindCommand;
 use crate::commands::format::FormatCommand;
@@ -16,6 +17,9 @@ use crate::commands::lint::LintCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 use crate::error::Error;
 
+mod args;
+
+pub mod analyze;
 pub mod ast;
 pub mod find;
 pub mod format;
@@ -45,6 +49,9 @@ pub enum MagoCommand {
     /// Lint PHP code using Mago's linter.
     #[command(name = "lint")]
     Lint(LintCommand),
+    /// Analyze PHP code using Mago's type checker.
+    #[command(name = "analyze")]
+    Analyze(AnalyzeCommand),
     /// Format PHP code using Mago's formatter.
     #[command(name = "format")]
     Format(FormatCommand),

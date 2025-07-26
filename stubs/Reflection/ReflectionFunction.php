@@ -42,7 +42,6 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      *
      * @link https://php.net/manual/en/reflectionfunction.tostring.php
      */
-    #[TentativeType]
     public function __toString(): string
     {
     }
@@ -55,7 +54,6 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      */
     #[Deprecated(since: '8.0')]
     #[Pure]
-    #[TentativeType]
     public function isDisabled(): bool
     {
     }
@@ -69,8 +67,7 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      * like {@see call_user_func} is.
      * @return mixed Returns the result of the invoked function call.
      */
-    #[TentativeType]
-    public function invoke(#[LanguageLevelTypeAware(['8.0' => 'mixed'], default: '')]  ...$args): mixed
+    public function invoke(mixed ...$args): mixed
     {
     }
 
@@ -82,7 +79,6 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      * like {@see call_user_func_array} works.
      * @return mixed the result of the invoked function
      */
-    #[TentativeType]
     public function invokeArgs(array $args): mixed
     {
     }
@@ -94,7 +90,6 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      * @return Closure|null Returns {@see Closure} or {@see null} in case of an error.
      */
     #[Pure]
-    #[TentativeType]
     public function getClosure(): Closure
     {
     }

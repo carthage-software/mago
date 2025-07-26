@@ -18,8 +18,7 @@ class Reflection
      * @param int $modifiers Bitfield of the modifiers to get.
      * @return string[] An array of modifier names.
      */
-    #[TentativeType]
-    public static function getModifierNames(#[LanguageLevelTypeAware(['8.0' => 'int'], default: '')]  $modifiers): array
+    public static function getModifierNames(int  $modifiers): array
     {
     }
 }

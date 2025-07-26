@@ -84,7 +84,7 @@ impl Rule for TooManyMethodsRule {
                     methods += 1;
                 }
                 ClassLikeMember::Property(Property::Hooked(hooked_property)) if count_hooks => {
-                    methods += hooked_property.hooks.hooks.len();
+                    methods += hooked_property.hook_list.hooks.len();
                 }
                 _ => (),
             }

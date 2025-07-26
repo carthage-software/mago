@@ -89,37 +89,46 @@ pub struct SourceManager {
 
 /// Methods for SourceCategory.
 impl SourceCategory {
-    #[inline(always)]
+    #[inline]
     pub const fn is_built_in(&self) -> bool {
         matches!(self, Self::BuiltIn)
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn is_external(&self) -> bool {
         matches!(self, Self::External)
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn is_user_defined(&self) -> bool {
         matches!(self, Self::UserDefined)
+    }
+
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::BuiltIn => "built-in",
+            Self::External => "external",
+            Self::UserDefined => "user defined",
+        }
     }
 }
 
 /// Methods for SourceIdentifier.
 impl SourceIdentifier {
-    #[inline(always)]
+    #[inline]
     pub fn dummy() -> Self {
         Self(StringIdentifier::empty(), SourceCategory::UserDefined)
     }
 
     /// Returns the interned string identifier.
-    #[inline(always)]
+    #[inline]
     pub const fn value(&self) -> StringIdentifier {
         self.0
     }
 
     /// Returns the source category.
-    #[inline(always)]
+    #[inline]
     pub const fn category(&self) -> SourceCategory {
         self.1
     }
@@ -139,7 +148,7 @@ impl Source {
     /// * `name` - A logical identifier for this source, such as `"inline"`
     ///   or `"my_script.php"`.
     /// * `content` - The actual PHP (or other) code string.
-    #[inline(always)]
+    #[inline]
     pub fn standalone(interner: &ThreadedInterner, name: &str, content: &str) -> Self {
         let lines: Vec<_> = line_starts(content).collect();
         let size = content.len();
@@ -163,7 +172,7 @@ impl Source {
     /// # Returns
     ///
     /// The line number for the given byte offset (0-based index).
-    #[inline(always)]
+    #[inline]
     pub fn line_number(&self, offset: usize) -> usize {
         self.lines.binary_search(&offset).unwrap_or_else(|next_line| next_line - 1)
     }
@@ -207,7 +216,7 @@ impl Source {
     /// # Returns
     ///
     /// The column number for the given byte offset (0-based index).
-    #[inline(always)]
+    #[inline]
     pub fn column_number(&self, offset: usize) -> usize {
         let line_start = self.lines.binary_search(&offset).unwrap_or_else(|next_line| self.lines[next_line - 1]);
 
@@ -217,7 +226,7 @@ impl Source {
 
 impl SourceManager {
     /// Creates a new source manager.
-    #[inline(always)]
+    #[inline]
     pub fn new(interner: ThreadedInterner) -> Self {
         Self {
             interner,
@@ -229,7 +238,7 @@ impl SourceManager {
     }
 
     /// Inserts a source with the given name and file path.
-    #[inline(always)]
+    #[inline]
     pub fn insert_path(&self, name: impl AsRef<str>, path: PathBuf, category: SourceCategory) -> SourceIdentifier {
         let name_str = name.as_ref();
         let name_id = self.interner.intern(name_str);
@@ -253,7 +262,7 @@ impl SourceManager {
     }
 
     /// Inserts a source with the given name and content.
-    #[inline(always)]
+    #[inline]
     pub fn insert_content(
         &self,
         name: impl AsRef<str>,
@@ -286,28 +295,28 @@ impl SourceManager {
     }
 
     /// Returns whether the manager contains a source with the given identifier.
-    #[inline(always)]
+    #[inline]
     pub fn contains(&self, source_id: &SourceIdentifier) -> bool {
         let inner = self.inner.read();
         inner.sources.contains_key(source_id)
     }
 
     /// Returns all source identifiers.
-    #[inline(always)]
+    #[inline]
     pub fn source_ids(&self) -> Vec<SourceIdentifier> {
         let inner = self.inner.read();
         inner.sources.keys().cloned().collect()
     }
 
     /// Returns source identifiers for the given category.
-    #[inline(always)]
+    #[inline]
     pub fn source_ids_for_category(&self, category: SourceCategory) -> Vec<SourceIdentifier> {
         let inner = self.inner.read();
         inner.sources.keys().filter(|id| id.category() == category).cloned().collect()
     }
 
     /// Returns source identifiers for categories other than the given one.
-    #[inline(always)]
+    #[inline]
     pub fn source_ids_except_category(&self, category: SourceCategory) -> Vec<SourceIdentifier> {
         let inner = self.inner.read();
         inner.sources.keys().filter(|id| id.category() != category).cloned().collect()
@@ -317,7 +326,7 @@ impl SourceManager {
     ///
     /// If the source content is already loaded, it is returned immediately.
     /// Otherwise the file is read from disk, processed, and cached.
-    #[inline(always)]
+    #[inline]
     pub fn load(&self, source_id: &SourceIdentifier) -> Result<Source, SourceError> {
         let path = {
             let inner = self.inner.read();
@@ -380,7 +389,7 @@ impl SourceManager {
     }
 
     /// Writes updated content for the source with the given identifier.
-    #[inline(always)]
+    #[inline]
     pub fn write(&self, source_id: SourceIdentifier, new_content: impl AsRef<str>) -> Result<(), SourceError> {
         let new_content_str = new_content.as_ref();
         let new_content_id = self.interner.intern(new_content_str);
@@ -408,14 +417,14 @@ impl SourceManager {
     }
 
     /// Returns the number of sources.
-    #[inline(always)]
+    #[inline]
     pub fn len(&self) -> usize {
         let inner = self.inner.read();
         inner.sources.len()
     }
 
     /// Returns true if there are no sources.
-    #[inline(always)]
+    #[inline]
     pub fn is_empty(&self) -> bool {
         let inner = self.inner.read();
         inner.sources.is_empty()
@@ -423,14 +432,14 @@ impl SourceManager {
 }
 
 impl<T: HasSource> HasSource for Box<T> {
-    #[inline(always)]
+    #[inline]
     fn source(&self) -> SourceIdentifier {
         self.as_ref().source()
     }
 }
 
 /// Returns an iterator over the starting byte offsets of each line in `source`.
-#[inline(always)]
+#[inline]
 fn line_starts(source: &str) -> impl Iterator<Item = usize> + '_ {
     let bytes = source.as_bytes();
 

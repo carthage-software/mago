@@ -821,7 +821,7 @@ impl<'a> Format<'a> for HookedProperty {
 
             contents.push(self.item.format(f));
             contents.push(Document::space());
-            contents.push(self.hooks.format(f));
+            contents.push(self.hook_list.format(f));
 
             Document::Group(Group::new(contents))
         })

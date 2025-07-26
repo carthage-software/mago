@@ -140,6 +140,35 @@ impl Statement {
     }
 
     #[inline]
+    pub const fn is_control_flow(&self) -> bool {
+        matches!(
+            self,
+            Statement::If(_)
+                | Statement::Switch(_)
+                | Statement::Try(_)
+                | Statement::Continue(_)
+                | Statement::Break(_)
+                | Statement::Goto(_)
+        )
+    }
+
+    #[inline]
+    pub const fn is_declaration(&self) -> bool {
+        matches!(
+            self,
+            Statement::Declare(_)
+                | Statement::Use(_)
+                | Statement::Namespace(_)
+                | Statement::Class(_)
+                | Statement::Interface(_)
+                | Statement::Trait(_)
+                | Statement::Enum(_)
+                | Statement::Constant(_)
+                | Statement::Function(_)
+        )
+    }
+
+    #[inline]
     pub const fn is_noop(&self) -> bool {
         matches!(self, Statement::Noop(_))
     }

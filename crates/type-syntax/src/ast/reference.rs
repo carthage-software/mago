@@ -15,10 +15,19 @@ pub struct ReferenceType<'input> {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[repr(C)]
+pub enum MemberReferenceSelector<'input> {
+    Wildcard(Span),
+    Identifier(Identifier<'input>),
+    StartsWith(Identifier<'input>, Span),
+    EndsWith(Span, Identifier<'input>),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[repr(C)]
 pub struct MemberReferenceType<'input> {
     pub class: Identifier<'input>,
     pub double_colon: Span,
-    pub member: Identifier<'input>,
+    pub member: MemberReferenceSelector<'input>,
 }
 
 impl HasSpan for ReferenceType<'_> {
@@ -30,9 +39,20 @@ impl HasSpan for ReferenceType<'_> {
     }
 }
 
+impl HasSpan for MemberReferenceSelector<'_> {
+    fn span(&self) -> Span {
+        match self {
+            MemberReferenceSelector::Wildcard(span) => *span,
+            MemberReferenceSelector::Identifier(identifier) => identifier.span,
+            MemberReferenceSelector::StartsWith(identifier, span) => identifier.span.join(*span),
+            MemberReferenceSelector::EndsWith(span, identifier) => span.join(identifier.span),
+        }
+    }
+}
+
 impl HasSpan for MemberReferenceType<'_> {
     fn span(&self) -> Span {
-        self.class.span.join(self.member.span)
+        self.class.span.join(self.member.span())
     }
 }
 
@@ -42,6 +62,17 @@ impl std::fmt::Display for ReferenceType<'_> {
             write!(f, "{}{}", self.identifier, parameters)
         } else {
             write!(f, "{}", self.identifier)
+        }
+    }
+}
+
+impl std::fmt::Display for MemberReferenceSelector<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MemberReferenceSelector::Wildcard(_) => write!(f, "*"),
+            MemberReferenceSelector::Identifier(identifier) => write!(f, "{identifier}"),
+            MemberReferenceSelector::StartsWith(identifier, _) => write!(f, "{identifier}*"),
+            MemberReferenceSelector::EndsWith(_, identifier) => write!(f, "*{identifier}"),
         }
     }
 }

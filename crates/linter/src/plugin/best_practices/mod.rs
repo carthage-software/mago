@@ -16,6 +16,7 @@ use crate::plugin::best_practices::rules::no_hash_emoji::NoHashEmojiRule;
 use crate::plugin::best_practices::rules::no_multi_assignments::NoMultiAssignmentsRule;
 use crate::plugin::best_practices::rules::no_sprintf_concatenation::NoSprintfConcatenationRule;
 use crate::plugin::best_practices::rules::no_unused_parameter::NoUnusedParameterRule;
+use crate::plugin::best_practices::rules::override_attribute::OverrideAttributeRule;
 use crate::plugin::best_practices::rules::use_while_instead_of_for::UseWhileInsteadOfForRule;
 
 use crate::plugin::Plugin;
@@ -54,6 +55,7 @@ impl Plugin for BestPracticesPlugin {
             Box::new(NoEmptyCatchClauseRule),
             Box::new(NoMultiAssignmentsRule),
             Box::new(NoEmptyLoopRule),
+            Box::new(OverrideAttributeRule),
             Box::new(UseWhileInsteadOfForRule),
         ]
     }

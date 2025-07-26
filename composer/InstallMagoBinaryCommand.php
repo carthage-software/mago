@@ -125,7 +125,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
     }
 
     /**
-     * @return array{tag: string, downloads: array<string, {file: string, url: string}>}
+     * @return array{tag: string, downloads: array<string, array{file: string, url: string}>}
      */
     private function buildAssetsMapForRelease(HttpDownloader $httpDownloader, string $releaseId): array
     {
@@ -228,7 +228,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
             case 'linux':
                 if ($process_executor->execute('command -v ldd') === 0) {
                     $process_executor->execute('ldd --version 2>&1', $ldd_version);
-                    if (strpos($ldd_version, 'musl') !== false) {
+                    if (str_contains($ldd_version, 'musl')) {
                         switch ($arch) {
                             case 'x86_64':
                             case 'aarch64':
@@ -237,7 +237,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
                                 break;
                             case 'arm':
                             case 'armv7':
-                                if (strpos(file_get_contents('/proc/cpuinfo'), 'hard') !== false) {
+                                if (str_contains(file_get_contents('/proc/cpuinfo'), 'hard')) {
                                     $os_suffix = 'musleabihf';
                                 } else {
                                     $os_suffix = 'musleabi';
@@ -259,7 +259,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
                                 break;
                             case 'arm':
                             case 'armv7':
-                                if (strpos(file_get_contents('/proc/cpuinfo'), 'hard') !== false) {
+                                if (str_contains(file_get_contents('/proc/cpuinfo'), 'hard')) {
                                     $os_suffix = 'gnueabihf';
                                 } else {
                                     $os_suffix = 'gnueabi';

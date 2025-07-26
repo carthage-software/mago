@@ -83,7 +83,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getDeclaringClass(): ReflectionClass
     {
     }
@@ -96,7 +95,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getDocComment(): string|false
     {
     }
@@ -110,7 +108,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getModifiers(): int
     {
     }
@@ -123,7 +120,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getName(): string
     {
     }
@@ -136,7 +132,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function getValue(): mixed
     {
     }
@@ -149,7 +144,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function isPrivate(): bool
     {
     }
@@ -162,7 +156,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function isProtected(): bool
     {
     }
@@ -175,7 +168,6 @@ class ReflectionClassConstant implements Reflector
      * @since 7.1
      */
     #[Pure]
-    #[TentativeType]
     public function isPublic(): bool
     {
     }

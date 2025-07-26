@@ -1,6 +1,8 @@
 use indoc::indoc;
 use toml::Value;
 
+use mago_codex::symbol::SymbolKind;
+use mago_codex::*;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -70,61 +72,52 @@ impl Rule for LongInheritanceChainRule {
     }
 
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
-        let reflection = match node {
+        let metadata = match node {
             Node::Class(class) => {
-                let name = context.module.names.get(&class.name);
-                let Some(reflection) = context.codebase.get_class(context.interner, name) else {
-                    return LintDirective::default();
-                };
+                let name = context.resolved_names.get(&class.name);
 
-                reflection
+                get_class(context.codebase, context.interner, name)
             }
             Node::Enum(r#enum) => {
-                let name = context.module.names.get(&r#enum.name);
-                let Some(reflection) = context.codebase.get_enum(context.interner, name) else {
-                    return LintDirective::default();
-                };
+                let name = context.resolved_names.get(&r#enum.name);
 
-                reflection
+                get_enum(context.codebase, context.interner, name)
             }
             Node::Interface(r#interface) => {
-                let name = context.module.names.get(&r#interface.name);
-                let Some(reflection) = context.codebase.get_interface(context.interner, name) else {
-                    return LintDirective::default();
-                };
+                let name = context.resolved_names.get(&r#interface.name);
 
-                reflection
+                get_interface(context.codebase, context.interner, name)
             }
             Node::Trait(r#trait) => {
-                let name = context.module.names.get(&r#trait.name);
-                let Some(reflection) = context.codebase.get_trait(context.interner, name) else {
-                    return LintDirective::default();
-                };
+                let name = context.resolved_names.get(&r#trait.name);
 
-                reflection
+                get_trait(context.codebase, context.interner, name)
             }
             Node::AnonymousClass(anonymous_class) => {
-                let Some(reflection) = context.codebase.get_anonymous_class(&anonymous_class) else {
-                    return LintDirective::default();
-                };
-
-                reflection
+                get_anonymous_class(context.codebase, context.interner, anonymous_class.span())
             }
             _ => return LintDirective::default(),
         };
 
-        let parents = reflection.inheritance.all_extended_classes.len()
-            + reflection.inheritance.all_extended_interfaces.len()
-            + reflection.inheritance.all_implemented_interfaces.len();
+        let Some(metadata) = metadata else {
+            return LintDirective::default();
+        };
+
+        let parents = metadata.all_parent_classes.len() + metadata.all_parent_interfaces.len();
 
         let threshold = context.option(THRESHOLD).and_then(|o| o.as_integer()).unwrap_or(THRESHOLD_DEFAULT) as usize;
 
         if parents > threshold {
             let issue = Issue::new(context.level(), "Inheritance chain is too long.".to_string())
-                .with_annotation(Annotation::primary(reflection.span()).with_message(format!(
+                .with_annotation(Annotation::primary(metadata.span).with_message(format!(
                     "{} `{}` has {} parents, which exceeds the threshold of {}.",
-                    reflection.name.get_kind(),
-                    reflection.name.get_key(context.interner),
+                    match metadata.kind {
+                        SymbolKind::Class => "Class",
+                        SymbolKind::Enum => "Enum",
+                        SymbolKind::Trait => "Trait",
+                        SymbolKind::Interface => "Interface",
+                    },
+                    context.interner.lookup(&metadata.original_name),
                     parents,
                     threshold
                 )))

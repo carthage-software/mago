@@ -2,15 +2,19 @@ use crate::input::Input;
 use crate::number_separator;
 
 #[inline]
-pub fn parse_literal_string(s: &str) -> Option<String> {
+pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) -> Option<String> {
     if s.is_empty() {
         return Some(String::new());
     }
 
-    let (quote_char, content) = if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-        ('"', &s[1..s.len() - 1])
+    let (quote_char, content) = if let Some(quote_char) = quote_char {
+        (Some(quote_char), s)
+    } else if !has_quote {
+        (None, s)
+    } else if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        (Some('"'), &s[1..s.len() - 1])
     } else if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-        ('\'', &s[1..s.len() - 1])
+        (Some('\''), &s[1..s.len() - 1])
     } else {
         return None;
     };
@@ -36,44 +40,44 @@ pub fn parse_literal_string(s: &str) -> Option<String> {
                 result.push('\\');
                 chars.next();
             }
-            '\'' if quote_char == '\'' => {
+            '\'' if quote_char == Some('\'') => {
                 result.push('\'');
                 chars.next();
             }
-            '"' if quote_char == '"' => {
+            '"' if quote_char == Some('"') => {
                 result.push('"');
                 chars.next();
             }
-            'n' if quote_char == '"' => {
+            'n' if quote_char == Some('"') => {
                 result.push('\n');
                 chars.next();
             }
-            't' if quote_char == '"' => {
+            't' if quote_char == Some('"') => {
                 result.push('\t');
                 chars.next();
             }
-            'r' if quote_char == '"' => {
+            'r' if quote_char == Some('"') => {
                 result.push('\r');
                 chars.next();
             }
-            'v' if quote_char == '"' => {
+            'v' if quote_char == Some('"') => {
                 result.push('\x0B');
                 chars.next();
             }
-            'e' if quote_char == '"' => {
+            'e' if quote_char == Some('"') => {
                 result.push('\x1B');
                 chars.next();
             }
-            'f' if quote_char == '"' => {
+            'f' if quote_char == Some('"') => {
                 result.push('\x0C');
                 chars.next();
             }
-            '0' if quote_char == '"' => {
+            '0' if quote_char == Some('"') => {
                 result.push('\0');
                 chars.next();
             }
 
-            'x' if quote_char == '"' => {
+            'x' if quote_char == Some('"') => {
                 chars.next();
 
                 let mut hex_chars = String::new();
@@ -98,7 +102,7 @@ pub fn parse_literal_string(s: &str) -> Option<String> {
                     return None;
                 }
             }
-            c if quote_char == '"' && c.is_ascii_digit() => {
+            c if quote_char == Some('"') && c.is_ascii_digit() => {
                 let mut octal = String::new();
                 octal.push(chars.next().unwrap());
 
@@ -114,12 +118,12 @@ pub fn parse_literal_string(s: &str) -> Option<String> {
 
                 result.push(u8::from_str_radix(&octal, 8).ok()? as char);
             }
-            '$' if quote_char == '"' => {
+            '$' if quote_char == Some('"') => {
                 result.push('$');
                 chars.next();
             }
             _ => {
-                if quote_char == '\'' {
+                if quote_char == Some('\'') {
                     result.push(c);
                     result.push(next_char);
                     chars.next();

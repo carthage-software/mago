@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
-use mago_project::module::Module;
+use mago_names::ResolvedNames;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Program;
@@ -55,7 +55,7 @@ pub struct Reference {
 }
 
 /// Provides functionality for discovering references (imports, usages, definitions, etc.)
-/// of a symbol within a module.
+/// of a symbol within a PHP program.
 ///
 /// The [`ReferenceFinder`] can locate references by walking through the AST
 /// (via a [`Walker`]) and collecting relevant `Reference` items.
@@ -72,19 +72,19 @@ impl<'a> ReferenceFinder<'a> {
         Self { interner }
     }
 
-    /// Finds all references that match the given [`Query`] within the provided [`Module`].
+    /// Finds all references that match the given [`Query`] within the provided [`Program`].
     ///
     /// This method:
     ///
-    /// 1. Creates a [`Context`] that holds the interner, the query, and the current module.
+    /// 1. Creates a [`Context`] that holds the interner, the query, and the resolved names.
     /// 2. Uses a specialized [`Walker`] (`ReferenceFindingWalker`) to traverse the AST of the program.
     /// 3. Gathers references (e.g., [`ReferenceKind::Usage`], [`ReferenceKind::Definition`]) in the context.
     /// 4. Returns all discovered references as a `Vec<Reference>`.
     ///
     /// A list of [`Reference`] objects describing where and how the symbol is referenced
     /// in the code.
-    pub fn find(&self, module: &Module, program: &Program, query: Query) -> Vec<Reference> {
-        let mut context = Context::new(self.interner, &query, module);
+    pub fn find(&self, program: &Program, resolved_names: &ResolvedNames, query: Query) -> Vec<Reference> {
+        let mut context = Context::new(self.interner, &query, resolved_names);
 
         ReferenceFindingWalker.walk_program(program, &mut context);
 

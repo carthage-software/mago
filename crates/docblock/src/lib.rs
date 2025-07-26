@@ -91,13 +91,12 @@ mod tests {
 
         assert_eq!(text.segments.len(), 3);
 
-        let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+        let TextSegment::Paragraph { content, .. } = &text.segments[0] else {
             panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
         };
 
         let content = interner.lookup(content);
         assert_eq!(content, "This text contains an inline code ");
-        assert_eq!(&phpdoc[span.start.offset..span.end.offset], "This text contains an inline code ");
 
         let TextSegment::InlineCode(code) = &text.segments[1] else {
             panic!("Expected TextSegment::InlineCode, got {:?}", text.segments[1]);
@@ -107,13 +106,12 @@ mod tests {
         assert_eq!(content, "echo \"Hello, World!\";");
         assert_eq!(&phpdoc[code.span.start.offset..code.span.end.offset], "`echo \"Hello, World!\";`");
 
-        let TextSegment::Paragraph { span, content } = &text.segments[2] else {
+        let TextSegment::Paragraph { content, .. } = &text.segments[2] else {
             panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[2]);
         };
 
         let content = interner.lookup(content);
         assert_eq!(content, ".");
-        assert_eq!(&phpdoc[span.start.offset..span.end.offset], ".");
 
         let Element::Line(_) = &document.elements[3] else {
             panic!("Expected Element::Line, got {:?}", document.elements[3]);
@@ -125,13 +123,12 @@ mod tests {
 
         assert_eq!(text.segments.len(), 3);
 
-        let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+        let TextSegment::Paragraph { content, .. } = &text.segments[0] else {
             panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
         };
 
         let content = interner.lookup(content);
         assert_eq!(content, "This text contains an inline tag ");
-        assert_eq!(&phpdoc[span.start.offset..span.end.offset], "This text contains an inline tag ");
 
         let TextSegment::InlineTag(tag) = &text.segments[1] else {
             panic!("Expected TextSegment::InlineTag, got {:?}", text.segments[1]);
@@ -144,13 +141,12 @@ mod tests {
         assert_eq!(tag.kind, TagKind::See);
         assert_eq!(&phpdoc[tag.span.start.offset..tag.span.end.offset], "{@see \\Some\\Class}");
 
-        let TextSegment::Paragraph { span, content } = &text.segments[2] else {
+        let TextSegment::Paragraph { content, .. } = &text.segments[2] else {
             panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[2]);
         };
 
         let content = interner.lookup(content);
         assert_eq!(content, ".");
-        assert_eq!(&phpdoc[span.start.offset..span.end.offset], ".");
 
         let Element::Line(_) = &document.elements[5] else {
             panic!("Expected Element::Line, got {:?}", document.elements[5]);
@@ -369,16 +365,23 @@ mod tests {
         let result = parse_phpdoc_with_span(&interner, phpdoc, span);
 
         match result {
-            Err(ParseError::InconsistentIndentation(error_span, expected, found)) => {
-                // The expected and found indentation lengths
-                assert_eq!(expected, 4); // Assuming 4 spaces
-                assert_eq!(found, 6); // Assuming 6 spaces
-                // The error_span should point to the line with inconsistent indentation
-                let inconsistent_line = "      * With inconsistent indentation";
-                let line_start = phpdoc.find(inconsistent_line).unwrap();
-                let indent_length = inconsistent_line.chars().take_while(|c| c.is_whitespace()).count();
-                let expected_span = span.subspan(line_start, line_start + indent_length);
-                assert_eq!(error_span, expected_span);
+            Ok(document) => {
+                assert_eq!(document.elements.len(), 1);
+                let Element::Text(text) = &document.elements[0] else {
+                    panic!("Expected Element::Text, got {:?}", document.elements[0]);
+                };
+
+                assert_eq!(text.segments.len(), 1);
+                let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+                    panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+                };
+
+                let content_str = interner.lookup(content);
+                assert_eq!(content_str, "This is a doc block\nWith inconsistent indentation");
+                assert_eq!(
+                    &phpdoc[span.start.offset..span.end.offset],
+                    "This is a doc block\n      * With inconsistent indentation"
+                );
             }
             _ => {
                 panic!("Expected ParseError::InconsistentIndentation");
@@ -388,7 +391,6 @@ mod tests {
 
     #[test]
     fn test_missing_asterisk() {
-        // Test case for ParseError::MissingAsterisk
         let interner = ThreadedInterner::new();
         let phpdoc = r#"/**
      This line is missing an asterisk
@@ -399,13 +401,24 @@ mod tests {
         let result = parse_phpdoc_with_span(&interner, phpdoc, span);
 
         match result {
-            Err(ParseError::MissingAsterisk(error_span)) => {
-                // The error_span should point to where the asterisk is missing
-                let problematic_line = "     This line is missing an asterisk";
-                let line_start = phpdoc.find(problematic_line).unwrap();
-                let indent_length = problematic_line.chars().take_while(|c| c.is_whitespace()).count();
-                let expected_span = span.subspan(line_start + indent_length, line_start + indent_length + 1);
-                assert_eq!(error_span, expected_span);
+            Ok(document) => {
+                assert_eq!(document.elements.len(), 1);
+                let Element::Text(text) = &document.elements[0] else {
+                    panic!("Expected Element::Text, got {:?}", document.elements[0]);
+                };
+
+                assert_eq!(text.segments.len(), 1);
+
+                let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+                    panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+                };
+
+                let content_str = interner.lookup(content);
+                assert_eq!(content_str, "This line is missing an asterisk\nThis line is fine");
+                assert_eq!(
+                    &phpdoc[span.start.offset..span.end.offset],
+                    "This line is missing an asterisk\n     * This line is fine"
+                );
             }
             _ => {
                 panic!("Expected ParseError::MissingAsterisk");
@@ -415,7 +428,6 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_after_asterisk() {
-        // Test case for ParseError::MissingWhitespaceAfterAsterisk
         let interner = ThreadedInterner::new();
         let phpdoc = r#"/**
      *This line is missing a space after asterisk
@@ -425,13 +437,20 @@ mod tests {
         let result = parse_phpdoc_with_span(&interner, phpdoc, span);
 
         match result {
-            Err(ParseError::MissingWhitespaceAfterAsterisk(error_span)) => {
-                // The error_span should point to the character after the asterisk
-                let problematic_line = "*This line is missing a space after asterisk";
-                let line_start = phpdoc.find(problematic_line).unwrap();
-                let asterisk_pos = line_start;
-                let expected_span = span.subspan(asterisk_pos + 1, asterisk_pos + 2);
-                assert_eq!(error_span, expected_span);
+            Ok(document) => {
+                assert_eq!(document.elements.len(), 1);
+                let Element::Text(text) = &document.elements[0] else {
+                    panic!("Expected Element::Text, got {:?}", document.elements[0]);
+                };
+
+                assert_eq!(text.segments.len(), 1);
+                let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+                    panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+                };
+
+                let content_str = interner.lookup(content);
+                assert_eq!(content_str, "This line is missing a space after asterisk");
+                assert_eq!(&phpdoc[span.start.offset..span.end.offset], "This line is missing a space after asterisk");
             }
             _ => {
                 panic!("Expected ParseError::MissingWhitespaceAfterAsterisk");
@@ -441,7 +460,6 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_after_opening_asterisk() {
-        // Test case for ParseError::MissingWhitespaceAfterOpeningAsterisk
         let interner = ThreadedInterner::new();
         let phpdoc = "/**This is a doc block without space after /** */";
         let span = Span::new(Position::dummy(0), Position::dummy(phpdoc.len()));
@@ -449,10 +467,20 @@ mod tests {
         let result = parse_phpdoc_with_span(&interner, phpdoc, span);
 
         match result {
-            Err(ParseError::MissingWhitespaceAfterOpeningAsterisk(error_span)) => {
-                // The error_span should point to the position after '/**'
-                let expected_span = span.subspan(3, 4);
-                assert_eq!(error_span, expected_span);
+            Ok(document) => {
+                assert_eq!(document.elements.len(), 1);
+                let Element::Text(text) = &document.elements[0] else {
+                    panic!("Expected Element::Text, got {:?}", document.elements[0]);
+                };
+
+                assert_eq!(text.segments.len(), 1);
+                let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+                    panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+                };
+
+                let content_str = interner.lookup(content);
+                assert_eq!(content_str, "This is a doc block without space after /**");
+                assert_eq!(&phpdoc[span.start.offset..span.end.offset], "This is a doc block without space after /**");
             }
             _ => {
                 panic!("Expected ParseError::MissingWhitespaceAfterOpeningAsterisk");
@@ -462,7 +490,6 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_before_closing_asterisk() {
-        // Test case for ParseError::MissingWhitespaceBeforeClosingAsterisk
         let interner = ThreadedInterner::new();
         let phpdoc = "/** This is a doc block without space before */*/";
         let span = Span::new(Position::dummy(0), Position::dummy(phpdoc.len()));
@@ -470,10 +497,20 @@ mod tests {
         let result = parse_phpdoc_with_span(&interner, phpdoc, span);
 
         match result {
-            Err(ParseError::MissingWhitespaceBeforeClosingAsterisk(error_span)) => {
-                // The error_span should point to the position before '*/'
-                let expected_span = span.subspan(phpdoc.len() - 3, phpdoc.len() - 2);
-                assert_eq!(error_span, expected_span);
+            Ok(document) => {
+                assert_eq!(document.elements.len(), 1);
+                let Element::Text(text) = &document.elements[0] else {
+                    panic!("Expected Element::Text, got {:?}", document.elements[0]);
+                };
+
+                assert_eq!(text.segments.len(), 1);
+                let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+                    panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+                };
+
+                let content_str = interner.lookup(content);
+                assert_eq!(content_str, "This is a doc block without space before */");
+                assert_eq!(&phpdoc[span.start.offset..span.end.offset], "This is a doc block without space before */");
             }
             _ => {
                 panic!("Expected ParseError::MissingWhitespaceBeforeClosingAsterisk");
@@ -527,7 +564,7 @@ mod tests {
 
         assert_eq!(
             &phpdoc[span.start.offset..span.end.offset],
-            "هذا نص باللغة العربية.\n    * 这是一段中文。\n    * Here are some mathematical symbols: ∑, ",
+            "هذا نص باللغة العربية.\n    * 这是一段中文。\n    * Here are some mathematical symbols: ∑, ∆, π, θ."
         );
 
         // Empty line
@@ -627,5 +664,33 @@ mod tests {
         let name = interner.lookup(&annotation.name);
         assert_eq!(name, "SimpleAnnotation");
         assert!(annotation.arguments.is_none());
+    }
+
+    #[test]
+    fn test_long_description_with_missing_asterisk() {
+        let interner = ThreadedInterner::new();
+        let phpdoc = r#"/** @var string[] this is a really long description
+            that spans multiple lines, and demonstrates how the parser handles
+            docblocks with multiple descriptions, and missing astricks*/"#;
+        let span = Span::new(Position::dummy(0), Position::dummy(phpdoc.len()));
+        let document = parse_phpdoc_with_span(&interner, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        assert_eq!(document.elements.len(), 1);
+        let Element::Tag(tag) = &document.elements[0] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[0]);
+        };
+
+        let name = interner.lookup(&tag.name);
+        let description = interner.lookup(&tag.description);
+        assert_eq!(name, "var");
+        assert_eq!(tag.kind, TagKind::Var);
+        assert_eq!(
+            description,
+            "string[] this is a really long description\nthat spans multiple lines, and demonstrates how the parser handles\ndocblocks with multiple descriptions, and missing astricks"
+        );
+        assert_eq!(
+            &phpdoc[tag.span.start.offset..tag.span.end.offset],
+            "@var string[] this is a really long description\n            that spans multiple lines, and demonstrates how the parser handles\n            docblocks with multiple descriptions, and missing astricks"
+        );
     }
 }

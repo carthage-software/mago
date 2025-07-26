@@ -12,14 +12,19 @@ use crate::consts::MINIMUM_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::logger::initialize_logger;
 
+mod baseline;
 mod commands;
 mod config;
 mod consts;
 mod error;
 mod macros;
-mod reflection;
+mod metadata;
 mod source;
 mod utils;
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_env = "musl"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub fn main() -> ExitCode {
     initialize_logger(if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO }, "MAGO_LOG");
@@ -71,7 +76,8 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::Lint(cmd) => runtime.block_on(commands::lint::execute(cmd, configuration)),
         MagoCommand::Format(cmd) => runtime.block_on(commands::format::execute(cmd, configuration)),
         MagoCommand::Ast(cmd) => runtime.block_on(commands::ast::execute(cmd)),
-        MagoCommand::Find(find) => runtime.block_on(commands::find::execute(find, configuration)),
+        MagoCommand::Analyze(cmd) => runtime.block_on(commands::analyze::execute(cmd, configuration)),
+        MagoCommand::Find(cmd) => runtime.block_on(commands::find::execute(cmd, configuration)),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

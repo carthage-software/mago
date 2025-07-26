@@ -948,7 +948,7 @@ impl<'a> Node<'a> {
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.extend(node.hint.iter().map(Node::Hint));
                 children.push(Node::PropertyItem(&node.item));
-                children.push(Node::PropertyHookList(&node.hooks));
+                children.push(Node::PropertyHookList(&node.hook_list));
 
                 children
             }

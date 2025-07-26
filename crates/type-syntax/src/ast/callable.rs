@@ -5,6 +5,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Type;
+use crate::ast::VariableType;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -42,9 +43,10 @@ pub struct CallableTypeParameters<'input> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[repr(C)]
 pub struct CallableTypeParameter<'input> {
-    pub parameter_type: Box<Type<'input>>,
+    pub parameter_type: Option<Type<'input>>,
     pub equals: Option<Span>,
     pub ellipsis: Option<Span>,
+    pub variable: Option<VariableType<'input>>,
     pub comma: Option<Span>,
 }
 
@@ -105,16 +107,15 @@ impl HasSpan for CallableTypeParameters<'_> {
 
 impl HasSpan for CallableTypeParameter<'_> {
     fn span(&self) -> Span {
-        match &self.comma {
-            Some(comma) => self.parameter_type.span().join(*comma),
-            None => match &self.ellipsis {
-                Some(ellipsis) => self.parameter_type.span().join(*ellipsis),
-                None => match &self.equals {
-                    Some(equals) => self.parameter_type.span().join(*equals),
-                    None => self.parameter_type.span(),
-                },
-            },
-        }
+        let start = match &self.parameter_type {
+            Some(parameter_type) => parameter_type.span(),
+            None => self.equals.or(self.ellipsis).or(self.variable.as_ref().map(|v| v.span())).or(self.comma).unwrap(),
+        };
+
+        let end =
+            self.comma.or(self.variable.as_ref().map(|v| v.span())).or(self.ellipsis).or(self.equals).unwrap_or(start);
+
+        start.join(end)
     }
 }
 
@@ -132,11 +133,18 @@ impl std::fmt::Display for CallableTypeReturnType<'_> {
 
 impl std::fmt::Display for CallableTypeParameter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.parameter_type)?;
+        if let Some(parameter_type) = &self.parameter_type {
+            write!(f, "{parameter_type}")?;
+        }
+
         if self.equals.is_some() {
             write!(f, "=")?;
         } else if self.ellipsis.is_some() {
             write!(f, "...")?;
+        }
+
+        if let Some(variable) = &self.variable {
+            write!(f, " {variable}")?;
         }
 
         Ok(())

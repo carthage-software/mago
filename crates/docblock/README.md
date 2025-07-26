@@ -10,7 +10,6 @@ Given the lack of a strict standard for PHPDoc formatting, we've established our
   - [Comment Structure](#comment-structure)
     - [Single-Line Comments](#single-line-comments)
     - [Multi-Line Comments](#multi-line-comments)
-  - [Indentation Rules](#indentation-rules)
 - [Parsing Elements](#parsing-elements)
   - [Text](#text)
     - [Inline Code](#inline-code)
@@ -47,23 +46,11 @@ PHPDoc comments must start with `/**` and end with `*/`. Comments can be single-
 
 #### Single-line Comments
 
-For single-line comments:
-
-- There must be a space after the opening `/**`.
-- There must be a space before the closing `*/`.
-- The entire content is placed on the same line.
-
 ```php
 /** This is a single-line PHPDoc comment */
 ```
 
 #### Multi-line Comments
-
-For multi-line comments:
-
-- Each line (except the first and last) must start with an asterisk `*`.
-- There must be a space after the asterisk `*`.
-- All lines must be indented consistently.
 
 ```php
 /**
@@ -71,12 +58,6 @@ For multi-line comments:
  * Each line starts with an asterisk.
  */
 ```
-
-### Indentation Rules
-
-- All lines after the opening `/**` must have the same level of indentation.
-- Inconsistent indentation levels will result in a parsing error.
-- This ensures that the comment is visually consistent and properly formatted.
 
 ## Parsing Elements
 
@@ -158,7 +139,7 @@ Tags provide metadata and additional information about the code. They start with
 #### Tag Syntax
 
 - Begins with `@` followed by the tag name.
-- The tag name must only contain letters, numbers, and hyphens.
+- The tag name must only contain letters, numbers, hyphens, and colons.
 - After the tag name, a description can follow, which can span multiple lines until an empty line or another tag/code block is encountered.
 
 ##### Example
@@ -213,11 +194,6 @@ The parser provides detailed error messages and suggestions to help users correc
 - Invalid Tag Name: The tag name contains invalid characters.
 - Invalid Annotation Name: The annotation name is invalid.
 - Unclosed Annotation Arguments: Annotation arguments are missing a closing `)`.
-- Inconsistent Indentation: Indentation levels are not consistent across lines.
-- Missing Asterisk: A line in a multi-line comment is missing the leading `\*`.
-- Missing Whitespace After Asterisk: No space after the `*` in a line.
-- Missing Whitespace After Opening Asterisk: No space after the opening `/**` in a single-line comment.
-- Missing Whitespace Before Closing Asterisk: No space before the closing `*/` in a single-line comment.
 
 Each error includes:
 

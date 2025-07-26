@@ -1,11 +1,14 @@
+use mago_codex::constant_exists;
+use mago_codex::function_exists;
+use mago_names::ResolvedNames;
+use mago_source::Source;
 use toml::value::Value;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_fixer::FixPlan;
 use mago_interner::StringIdentifier;
 use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
-use mago_project::module::Module;
-use mago_reflection::CodebaseReflection;
 use mago_reporting::Annotation;
 use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
@@ -29,8 +32,9 @@ pub struct LintContext<'a> {
     pub php_version: PHPVersion,
     pub rule: &'a ConfiguredRule,
     pub interner: &'a ThreadedInterner,
-    pub codebase: &'a CodebaseReflection,
-    pub module: &'a Module,
+    pub codebase: &'a CodebaseMetadata,
+    pub source: &'a Source,
+    pub resolved_names: &'a ResolvedNames,
     pub pragmas: Vec<&'a Pragma<'a>>,
     pub scope: ScopeStack,
 
@@ -44,8 +48,9 @@ impl<'a> LintContext<'a> {
         php_version: PHPVersion,
         rule: &'a ConfiguredRule,
         interner: &'a ThreadedInterner,
-        codebase: &'a CodebaseReflection,
-        module: &'a Module,
+        codebase: &'a CodebaseMetadata,
+        source: &'a Source,
+        resolved_names: &'a ResolvedNames,
         pragmas: Vec<&'a Pragma<'a>>,
     ) -> LintContext<'a> {
         LintContext {
@@ -53,7 +58,8 @@ impl<'a> LintContext<'a> {
             rule,
             interner,
             codebase,
-            module,
+            source,
+            resolved_names,
             pragmas,
             scope: ScopeStack::new(),
             unused_pragmas: Vec::new(),
@@ -83,7 +89,7 @@ impl<'a> LintContext<'a> {
 
     /// Checks if a name at a given position is imported.
     pub fn is_name_imported(&self, position: &impl HasPosition) -> bool {
-        self.module.names.is_imported(&position.position())
+        self.resolved_names.is_imported(&position.position())
     }
 
     /// Retrieves the name associated with a given position in the code.
@@ -92,7 +98,7 @@ impl<'a> LintContext<'a> {
     ///
     /// Panics if no name is found at the specified position.
     pub fn lookup_name(&self, position: &impl HasPosition) -> &str {
-        let name_id = self.module.names.get(&position.position());
+        let name_id = self.resolved_names.get(&position.position());
 
         self.lookup(name_id)
     }
@@ -120,7 +126,7 @@ impl<'a> LintContext<'a> {
     /// # Note
     ///
     /// Function names in PHP are case-insensitive; they are stored and looked up in lowercase
-    /// within the codebase reflection.
+    /// within the codebase metadata.
     pub fn resolve_function_name(&self, identifier: &Identifier) -> &str {
         // Check if the function name is explicitly imported via `use` statement.
         // If it is, directly resolve it to the imported name.
@@ -140,14 +146,14 @@ impl<'a> LintContext<'a> {
 
         // If no leading `\`, resolve based on the namespace hierarchy:
         // 1. Check if the fully qualified function name (FQFN) exists in the current context.
-        let fqfn_id = self.module.names.get(&identifier.position());
-        if self.codebase.function_exists(self.interner, fqfn_id) {
+        let fqfn_id = self.resolved_names.get(&identifier.position());
+        if function_exists(self.codebase, self.interner, fqfn_id) {
             // The FQFN exists, so return it.
             return self.lookup(fqfn_id);
         }
 
         // If FQFN doesn't exist, check if the global function name exists.
-        if !name.contains('\\') && self.codebase.function_exists(self.interner, name_id) {
+        if !name.contains('\\') && function_exists(self.codebase, self.interner, name_id) {
             // If global function name exists, return it.
             return name;
         }
@@ -198,14 +204,15 @@ impl<'a> LintContext<'a> {
 
         // If no leading `\`, resolve based on the namespace hierarchy:
         // 1. Check if the fully qualified constant name (FQCN) exists in the current context.
-        let fqcn_id = self.module.names.get(&identifier.position());
-        if self.codebase.constant_exists(self.interner, fqcn_id) {
+        let fqcn_id = self.resolved_names.get(&identifier.position());
+
+        if constant_exists(self.codebase, self.interner, fqcn_id) {
             // The FQCN exists, so return it.
             return self.lookup(fqcn_id);
         }
 
         // If FQCN doesn't exist, check if the global constant name exists.
-        if !name.contains('\\') && self.codebase.constant_exists(self.interner, name_id) {
+        if !name.contains('\\') && constant_exists(self.codebase, self.interner, name_id) {
             // If global constant name exists,
             return name;
         }
@@ -219,7 +226,7 @@ impl<'a> LintContext<'a> {
     /// This function takes a type hint (e.g., an identifier, nullable type, union type)
     /// and resolves it into a string that can be used in error messages or similar contexts.
     /// The return value is not guaranteed to match the exact type representation in the code
-    /// or in the internal reflection system—it is specifically formatted for readability.
+    /// or in the internal metadata system—it is specifically formatted for readability.
     ///
     /// # Arguments
     ///
@@ -294,8 +301,8 @@ impl<'a> LintContext<'a> {
     /// A vector of applicable pragmas of the specified kind.
     #[inline]
     fn take_applicable_pragmas(&mut self, node: impl HasSpan, kind: PragmaKind) -> Vec<&'a Pragma<'a>> {
-        let node_start_line = self.module.source.line_number(node.span().start.offset);
-        let node_end_line = self.module.source.line_number(node.span().end.offset);
+        let node_start_line = self.source.line_number(node.span().start.offset);
+        let node_end_line = self.source.line_number(node.span().end.offset);
 
         let mut applicable_pragmas = Vec::new();
         let mut remaining = Vec::with_capacity(self.pragmas.len());
@@ -451,7 +458,7 @@ impl<'a> LintContext<'a> {
             return self.report(issue);
         }
 
-        let issue = issue.with_suggestion(self.module.source.identifier, plan);
+        let issue = issue.with_suggestion(self.source.identifier, plan);
 
         self.report(issue)
     }
@@ -487,23 +494,21 @@ impl<'a> LintContext<'a> {
         }
 
         let should_pop_scope = if let Some(scope) = match ast_node.node {
-            Node::Class(class) => Some(Scope::ClassLike(ClassLikeScope::Class(*self.module.names.get(&class.name)))),
+            Node::Class(class) => Some(Scope::ClassLike(ClassLikeScope::Class(*self.resolved_names.get(&class.name)))),
             Node::Interface(interface) => {
-                Some(Scope::ClassLike(ClassLikeScope::Interface(*self.module.names.get(&interface.name))))
+                Some(Scope::ClassLike(ClassLikeScope::Interface(*self.resolved_names.get(&interface.name))))
             }
             Node::Trait(r#trait) => {
-                Some(Scope::ClassLike(ClassLikeScope::Trait(*self.module.names.get(&r#trait.name))))
+                Some(Scope::ClassLike(ClassLikeScope::Trait(*self.resolved_names.get(&r#trait.name))))
             }
-            Node::Enum(r#enum) => Some(Scope::ClassLike(ClassLikeScope::Enum(*self.module.names.get(&r#enum.name)))),
+            Node::Enum(r#enum) => Some(Scope::ClassLike(ClassLikeScope::Enum(*self.resolved_names.get(&r#enum.name)))),
             Node::AnonymousClass(class) => Some(Scope::ClassLike(ClassLikeScope::AnonymousClass(class.span()))),
-            Node::Function(function) => {
-                Some(Scope::FunctionLike(FunctionLikeScope::Function(*self.module.names.get(&function.name))))
+            Node::Function(func) => {
+                Some(Scope::FunctionLike(FunctionLikeScope::Function(*self.resolved_names.get(&func.name))))
             }
             Node::Method(method) => Some(Scope::FunctionLike(FunctionLikeScope::Method(method.name.value))),
-            Node::Closure(closure) => Some(Scope::FunctionLike(FunctionLikeScope::Closure(closure.span()))),
-            Node::ArrowFunction(arrow_function) => {
-                Some(Scope::FunctionLike(FunctionLikeScope::ArrowFunction(arrow_function.span())))
-            }
+            Node::Closure(closure) => Some(Scope::FunctionLike(FunctionLikeScope::Closure(closure.span().start))),
+            Node::ArrowFunction(func) => Some(Scope::FunctionLike(FunctionLikeScope::Closure(func.span().start))),
             _ => None,
         } {
             self.scope.push(scope);

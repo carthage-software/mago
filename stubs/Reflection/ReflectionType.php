@@ -19,7 +19,6 @@ abstract class ReflectionType implements Stringable
      * @return bool Returns {@see true} if {@see null} is allowed, otherwise {@see false}
      * @since 7.0
      */
-    #[TentativeType]
     public function allowsNull(): bool
     {
     }

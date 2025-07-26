@@ -5,97 +5,91 @@ class stdClass
 }
 
 /**
- * @template TKey
- * @template-covariant TValue
+ * @template K
+ * @template-covariant V
+ *
+ * @inheritors IteratorAggregate|Generator|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
  */
 interface Traversable
 {
 }
 
 /**
- * @template TKey
- * @template-covariant TValue
- * @template-extends Traversable<TKey, TValue>
+ * @template K
+ * @template-covariant V
+ *
+ * @extends Traversable<K, V>
  */
 interface IteratorAggregate extends Traversable
 {
     /**
-     * @return Traversable<TKey, TValue>
+     * @return Traversable<K, V>
      *
      * @throws Exception
      */
-    #[TentativeType]
     public function getIterator(): Traversable;
 }
 
 /**
- * @template TKey
- * @template-covariant TValue
- * @template-extends Traversable<TKey, TValue>
+ * @template K
+ * @template-covariant V
+ *
+ * @extends Traversable<K, V>
  */
 interface Iterator extends Traversable
 {
     /**
-     * @return TValue
+     * @return null|V
      */
-    #[TentativeType]
     public function current(): mixed;
 
-    #[TentativeType]
     public function next(): void;
 
     /**
-     * @return TKey|null
+     * @return null|K
      */
-    #[TentativeType]
     public function key(): mixed;
 
-    #[TentativeType]
     public function valid(): bool;
 
-    #[TentativeType]
     public function rewind(): void;
 }
 
 /**
- * @template TKey
- * @template TValue
+ * @template K
+ * @template V
  */
 interface ArrayAccess
 {
     /**
-     * @param TKey $offset
+     * @param K $offset
      *
      * @no-named-arguments
      */
-    #[TentativeType]
     public function offsetExists(mixed $offset): bool;
 
     /**
-     * @param TKey $offset
+     * @param K $offset
      *
-     * @return TValue
+     * @return V
      *
      * @no-named-arguments
      */
-    #[TentativeType]
     public function offsetGet(mixed $offset): mixed;
 
     /**
-     * @param TKey $offset
-     * @param TValue $value
+     * @param K $offset
+     * @param V $value
      *
      * @no-named-arguments
      */
-    #[TentativeType]
     public function offsetSet(mixed $offset, mixed $value): void;
 
     /**
-     * @param TKey $offset
+     * @param K $offset
      *
      * @no-named-arguments
      */
-    #[TentativeType]
     public function offsetUnset(mixed $offset): void;
 }
 
@@ -110,6 +104,7 @@ interface Serializable
 
     /**
      * @param string $data
+     *
      * @return void
      */
     public function unserialize(string $data);
@@ -206,7 +201,6 @@ class Exception implements Throwable
     {
     }
 
-    #[TentativeType]
     public function __toString(): string
     {
     }
@@ -215,7 +209,6 @@ class Exception implements Throwable
     {
     }
 
-    #[TentativeType]
     public function __wakeup(): void
     {
     }
@@ -301,7 +294,6 @@ class Error implements Throwable
     {
     }
 
-    #[TentativeType]
     public function __wakeup(): void
     {
     }
@@ -415,14 +407,23 @@ final class Closure
     {
     }
 
+    /**
+     * @pure
+     */
     public static function fromCallable(callable $callback): Closure
+    {
+    }
+
+    /**
+     * @pure
+     */
+    public static function getCurrent(): Closure
     {
     }
 }
 
 interface Countable
 {
-    #[TentativeType]
     public function count(): int;
 }
 
@@ -457,15 +458,16 @@ final class WeakReference
 }
 
 /**
- * @template TKey of object
- * @template TValue
+ * @template K of object
+ * @template V
  *
- * @template-implements IteratorAggregate<TKey, TValue>
+ * @implements ArrayAccess<K, V>
+ * @implements IteratorAggregate<K, V>
  */
 final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
 {
     /**
-     * @param TKey $object
+     * @param K $object
      *
      * @pure
      * @no-named-arguments
@@ -475,9 +477,9 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
     }
 
     /**
-     * @param TKey $object
+     * @param K $object
      *
-     * @return TValue
+     * @return V
      *
      * @pure
      * @no-named-arguments
@@ -487,8 +489,8 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
     }
 
     /**
-     * @param TKey $object
-     * @param TValue $value
+     * @param K $object
+     * @param V $value
      *
      * @no-named-arguments
      */
@@ -497,7 +499,7 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
     }
 
     /**
-     * @param TKey $object
+     * @param K $object
      *
      * @no-named-arguments
      */
@@ -506,7 +508,7 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
     }
 
     /**
-     * @return Iterator<TKey, TValue>
+     * @return Iterator<K, V>
      *
      * @pure
      */
@@ -571,6 +573,9 @@ final class InternalIterator implements Iterator
     }
 }
 
+/**
+ * @enum-interface
+ */
 interface UnitEnum
 {
     public readonly string $name;
@@ -583,6 +588,9 @@ interface UnitEnum
     public static function cases(): array;
 }
 
+/**
+ * @enum-interface
+ */
 interface BackedEnum extends UnitEnum
 {
     public readonly int|string $value;
@@ -602,7 +610,7 @@ interface BackedEnum extends UnitEnum
 }
 
 /**
- * @internal
+ * @enum-interface
  */
 interface IntBackedEnum extends BackedEnum
 {
@@ -622,7 +630,7 @@ interface IntBackedEnum extends BackedEnum
 }
 
 /**
- * @internal
+ * @enum-interface
  */
 interface StringBackedEnum extends BackedEnum
 {
@@ -784,7 +792,6 @@ final class Deprecated
  * @return non-empty-string
  *
  * @pure
- * @no-named-arguments
  */
 function zend_version(): string
 {
@@ -792,7 +799,6 @@ function zend_version(): string
 
 /**
  * @pure
- * @no-named-arguments
  */
 function func_num_args(): int
 {
@@ -800,7 +806,6 @@ function func_num_args(): int
 
 /**
  * @pure
- * @no-named-arguments
  */
 function func_get_arg(int $position): mixed
 {
@@ -899,7 +904,7 @@ function str_increment(string $string): string
 /**
  * @no-named-arguments
  */
-function error_reporting(null|int $error_level): int
+function error_reporting(null|int $error_level = null): int
 {
 }
 
@@ -965,7 +970,7 @@ function property_exists(object|string $object_or_class, string $property): bool
 /**
  * @param string $trait
  *
- * @assert-if-true trait-string $trait
+ * @assert-if-true =trait-string $trait
  *
  * @pure
  * @no-named-arguments
@@ -977,7 +982,7 @@ function trait_exists(string $trait, bool $autoload = true): bool
 /**
  * @param string $class
  *
- * @assert-if-true class-string $class
+ * @assert-if-true =class-string $class
  *
  * @pure
  * @no-named-arguments
@@ -989,7 +994,7 @@ function class_exists(string $class, bool $autoload = true): bool
 /**
  * @param string $interface
  *
- * @assert-if-true interface-string $interface
+ * @assert-if-true =interface-string $interface
  *
  * @pure
  * @no-named-arguments
@@ -1001,7 +1006,7 @@ function interface_exists(string $interface, bool $autoload = true): bool
 /**
  * @param string $function
  *
- * @assert-if-true non-empty-string $function
+ * @assert-if-true =non-empty-string $function
  *
  * @pure
  * @no-named-arguments
@@ -1013,7 +1018,7 @@ function function_exists(string $function): bool
 /**
  * @param string $enum
  *
- * @assert-if-true enum-string $enum
+ * @assert-if-true =enum-string $enum
  *
  * @pure
  * @no-named-arguments
@@ -1224,7 +1229,7 @@ function debug_backtrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT, int $lim
 {
 }
 
-function debug_print_backtrace(int $options = 0, #[PhpStormStubsElementAvailable(from: '7.0')] int $limit = 0): void
+function debug_print_backtrace(int $options = 0, int $limit = 0): void
 {
 }
 

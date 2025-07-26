@@ -1,0 +1,22 @@
+[package]
+name = "mago-semantics"
+description = "PHP Semantics Checker."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-reporting = { workspace = true }
+mago-interner = { workspace = true }
+mago-syntax = { workspace = true }
+mago-php-version = { workspace = true }
+mago-span = { workspace = true }
+mago-names = { workspace = true }
+mago-source = { workspace = true }

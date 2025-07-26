@@ -21,7 +21,7 @@ pub enum Literal {
     Null(Keyword),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(C)]
 pub enum LiteralStringKind {
@@ -32,7 +32,7 @@ pub enum LiteralStringKind {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[repr(C)]
 pub struct LiteralString {
-    pub kind: LiteralStringKind,
+    pub kind: Option<LiteralStringKind>,
     pub span: Span,
     pub raw: StringIdentifier,
     pub value: Option<String>,

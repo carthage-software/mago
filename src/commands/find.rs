@@ -4,8 +4,7 @@ use std::str::FromStr;
 use clap::Parser;
 
 use mago_interner::ThreadedInterner;
-use mago_project::module::Module;
-use mago_project::module::ModuleBuildOptions;
+use mago_names::resolver::NameResolver;
 use mago_reference::Reference;
 use mago_reference::ReferenceFinder;
 use mago_reference::ReferenceKind;
@@ -17,6 +16,7 @@ use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 use mago_source::SourceCategory;
 use mago_source::SourceManager;
+use mago_syntax::parser::parse_source;
 
 use crate::config::Configuration;
 use crate::enum_variants;
@@ -115,8 +115,7 @@ pub async fn execute(command: FindCommand, configuration: Configuration) -> Resu
     .await?;
 
     // Gather references
-    let references =
-        find_references(&interner, &configuration, &source_manager, query, command.include_external).await?;
+    let references = find_references(&interner, &source_manager, query, command.include_external).await?;
 
     // Convert references to issues, then report
     Reporter::new(interner.clone(), source_manager, command.reporting_target).report(
@@ -130,8 +129,8 @@ pub async fn execute(command: FindCommand, configuration: Configuration) -> Resu
 /// Finds references to a symbol or pattern across multiple source files.
 ///
 /// # Parameters
+///
 /// - `interner`: The global string interner for symbol lookups.
-/// - `configuration`: Holds user-defined settings (e.g., target PHP version).
 /// - `manager`: The [`SourceManager`] for loading and iterating code.
 /// - `query`: The parsed [`Query`] representing how to match references.
 /// - `include_externals`: If `true`, includes external (vendor/system) sources.
@@ -139,17 +138,14 @@ pub async fn execute(command: FindCommand, configuration: Configuration) -> Resu
 /// # Returns
 /// A list of all [`Reference`](mago_reference::Reference) matches discovered.
 ///
-/// This function spawns parallel tasks (one per source file) to build a [`Module`]
+/// This function spawns parallel tasks (one per source file) to build a [`Program`]
 /// and run the [`ReferenceFinder`].
 pub async fn find_references(
     interner: &ThreadedInterner,
-    configuration: &Configuration,
     manager: &SourceManager,
     query: Query,
     include_externals: bool,
 ) -> Result<Vec<Reference>, Error> {
-    let php_version = configuration.php_version;
-
     // Choose which sources to analyze
     let sources: Vec<_> = if include_externals {
         manager.source_ids_for_category(SourceCategory::UserDefined)
@@ -169,15 +165,11 @@ pub async fn find_references(
         let query = query.clone();
 
         handles.push(tokio::spawn(async move {
-            // 1) Load the source code
             let source = manager.load(&source_id)?;
-            // 2) Build module
-            let (module, program) =
-                Module::build_with_ast(&interner, php_version, source, ModuleBuildOptions::new(false, false));
-            // 3) Use the reference finder
-            let references = ReferenceFinder::new(&interner).find(&module, &program, query);
+            let program = parse_source(&interner, &source).0;
+            let resolved_names = NameResolver::new(&interner).resolve(&program);
+            let references = ReferenceFinder::new(&interner).find(&program, &resolved_names, query);
 
-            // Increment progress after finishing this file
             progress_bar.inc(1);
 
             Result::<_, Error>::Ok(references)

@@ -1,6 +1,7 @@
 use std::env::home_dir;
 use std::path::PathBuf;
 
+use analyzer::AnalyzeConfiguration;
 use config::Config;
 use config::ConfigBuilder;
 use config::Environment;
@@ -19,6 +20,7 @@ use crate::config::source::SourceConfiguration;
 use crate::consts::*;
 use crate::error::Error;
 
+pub mod analyzer;
 pub mod formatter;
 pub mod linter;
 pub mod source;
@@ -49,6 +51,10 @@ pub struct Configuration {
     /// Configuration options for the formatter.
     #[serde(default)]
     pub format: FormatterConfiguration,
+
+    /// Configuration options for the analyzer.
+    #[serde(default)]
+    pub analyze: AnalyzeConfiguration,
 
     /// The log filter.
     ///
@@ -165,6 +171,7 @@ impl Configuration {
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
             format: FormatterConfiguration::default(),
+            analyze: AnalyzeConfiguration::default(),
             log: Value::new(None, ValueKind::Nil),
         }
     }
@@ -191,6 +198,7 @@ impl ConfigurationEntry for Configuration {
         builder = self.source.configure(builder)?;
         builder = self.linter.configure(builder)?;
         builder = self.format.configure(builder)?;
+        builder = self.analyze.configure(builder)?;
 
         Ok(builder)
     }
@@ -239,6 +247,8 @@ impl ConfigurationEntry for Configuration {
 
         self.source.normalize()?;
         self.linter.normalize()?;
+        self.format.normalize()?;
+        self.analyze.normalize()?;
 
         Ok(())
     }

@@ -36,6 +36,23 @@ impl<'input> TypeLexer<'input> {
         self.input.current_position()
     }
 
+    /// Returns a string slice within a specified absolute range.
+    ///
+    /// This method exposes the underlying `Input::slice_in_range` functionality but
+    /// returns a `&str` instead of a `&[u8]`. It assumes the source is valid UTF-8.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The absolute starting byte offset.
+    /// * `to` - The absolute ending byte offset (exclusive).
+    #[inline]
+    pub fn slice_in_range(&self, from: usize, to: usize) -> &'input str {
+        let bytes_slice = self.input.slice_in_range(from, to);
+
+        // Reuse the same safe UTF-8 conversion logic as the `token` method.
+        bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
+    }
+
     #[inline]
     pub fn advance(&mut self) -> Option<Result<TypeToken<'input>, SyntaxError>> {
         if self.input.has_reached_eof() {
@@ -51,8 +68,13 @@ impl<'input> TypeLexer<'input> {
         }
 
         let (kind, length) = match self.input.read(3) {
+            [b'*', ..] => (TypeTokenKind::Asterisk, 1),
             [b'n' | b'N', b'o' | b'O', b'n' | b'N'] => {
-                if self.input.is_at(b"non-empty-literal-string", true) {
+                if self.input.is_at(b"non-positive-int", true) {
+                    (TypeTokenKind::NonPositiveInt, 16)
+                } else if self.input.is_at(b"non-negative-int", true) {
+                    (TypeTokenKind::NonNegativeInt, 16)
+                } else if self.input.is_at(b"non-empty-literal-string", true) {
                     (TypeTokenKind::NonEmptyUnspecifiedLiteralString, 26)
                 } else if self.input.is_at(b"non-empty-string", true) {
                     (TypeTokenKind::NonEmptyString, 16)
@@ -60,6 +82,8 @@ impl<'input> TypeLexer<'input> {
                     (TypeTokenKind::NonEmptyArray, 15)
                 } else if self.input.is_at(b"non-empty-list", true) {
                     (TypeTokenKind::NonEmptyList, 14)
+                } else if self.input.is_at(b"non-falsy-string", true) {
+                    (TypeTokenKind::NonFalsyString, 16)
                 } else {
                     self.read_identifier()
                 }
@@ -156,7 +180,7 @@ impl<'input> TypeLexer<'input> {
             }
             [b'l' | b'L', b'o' | b'O', b'w' | b'W'] => {
                 if self.input.is_at(b"lowercase-string", true) {
-                    (TypeTokenKind::LowercaseString, 15)
+                    (TypeTokenKind::LowercaseString, 16)
                 } else {
                     self.read_identifier()
                 }
@@ -439,12 +463,16 @@ impl<'input> TypeLexer<'input> {
     }
 
     fn read_identifier(&self) -> (TypeTokenKind, usize) {
-        const KEYWORD_TYPES: [(&[u8], TypeTokenKind); 24] = [
+        const KEYWORD_TYPES: [(&[u8], TypeTokenKind); 28] = [
             (b"list", TypeTokenKind::List),
             (b"int", TypeTokenKind::Int),
+            (b"integer", TypeTokenKind::Integer),
             (b"string", TypeTokenKind::String),
             (b"float", TypeTokenKind::Float),
+            (b"double", TypeTokenKind::Double),
+            (b"real", TypeTokenKind::Real),
             (b"bool", TypeTokenKind::Bool),
+            (b"boolean", TypeTokenKind::Boolean),
             (b"false", TypeTokenKind::False),
             (b"true", TypeTokenKind::True),
             (b"object", TypeTokenKind::Object),

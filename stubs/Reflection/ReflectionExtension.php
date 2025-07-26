@@ -23,7 +23,7 @@ class ReflectionExtension implements Reflector
      * @param string $name Name of the extension.
      * @throws ReflectionException if the extension does not exist.
      */
-    public function __construct(#[LanguageLevelTypeAware(['8.0' => 'string'], default: '')]  $name) {}
+    public function __construct(string  $name) {}
 
     /**
      * To string
@@ -32,7 +32,6 @@ class ReflectionExtension implements Reflector
      * @return string the exported extension as a string, in the same way as
      * the {@see ReflectionExtension::export()}.
      */
-    #[TentativeType]
     public function __toString(): string
     {
     }
@@ -44,7 +43,6 @@ class ReflectionExtension implements Reflector
      * @return string The extensions name.
      */
     #[Pure]
-    #[TentativeType]
     public function getName(): string
     {
     }
@@ -56,7 +54,6 @@ class ReflectionExtension implements Reflector
      * @return string|null The version of the extension.
      */
     #[Pure]
-    #[TentativeType]
     public function getVersion(): null|string
     {
     }
@@ -70,7 +67,6 @@ class ReflectionExtension implements Reflector
      * names. If no function are defined, an empty array is returned.
      */
     #[Pure]
-    #[TentativeType]
     public function getFunctions(): array
     {
     }
@@ -82,7 +78,6 @@ class ReflectionExtension implements Reflector
      * @return array An associative array with constant names as keys.
      */
     #[Pure]
-    #[TentativeType]
     public function getConstants(): array
     {
     }
@@ -95,7 +90,6 @@ class ReflectionExtension implements Reflector
      * with their defined values as values.
      */
     #[Pure]
-    #[TentativeType]
     public function getINIEntries(): array
     {
     }
@@ -109,7 +103,6 @@ class ReflectionExtension implements Reflector
      * an empty array is returned.
      */
     #[Pure]
-    #[TentativeType]
     public function getClasses(): array
     {
     }
@@ -122,7 +115,6 @@ class ReflectionExtension implements Reflector
      * If no classes are defined, an empty array is returned.
      */
     #[Pure]
-    #[TentativeType]
     public function getClassNames(): array
     {
     }
@@ -135,7 +127,6 @@ class ReflectionExtension implements Reflector
      * either Required, Optional or Conflicts as the values.
      */
     #[Pure]
-    #[TentativeType]
     public function getDependencies(): array
     {
     }
@@ -146,7 +137,6 @@ class ReflectionExtension implements Reflector
      * @link https://php.net/manual/en/reflectionextension.info.php
      * @return void Print extension info
      */
-    #[TentativeType]
     public function info(): void
     {
     }
@@ -159,7 +149,6 @@ class ReflectionExtension implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function isPersistent(): bool
     {
     }
@@ -172,7 +161,6 @@ class ReflectionExtension implements Reflector
      * @since 5.4
      */
     #[Pure]
-    #[TentativeType]
     public function isTemporary(): bool
     {
     }

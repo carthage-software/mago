@@ -16,10 +16,17 @@ pub fn parse_callable_type_specifications<'input>(
 
                 while !stream.is_at(TypeTokenKind::RightParenthesis)? {
                     let entry = CallableTypeParameter {
-                        parameter_type: Box::new(parse_type(stream)?),
+                        parameter_type: {
+                            if stream.is_at(TypeTokenKind::Ellipsis)? { None } else { Some(parse_type(stream)?) }
+                        },
                         equals: if stream.is_at(TypeTokenKind::Equals)? { Some(stream.consume()?.span) } else { None },
                         ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
                             Some(stream.consume()?.span)
+                        } else {
+                            None
+                        },
+                        variable: if stream.is_at(TypeTokenKind::Variable)? {
+                            Some(VariableType::from(stream.consume()?))
                         } else {
                             None
                         },

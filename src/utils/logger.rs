@@ -15,15 +15,17 @@ use crate::utils::progress::GLOBAL_PROGRESS_MANAGER;
 /// * `directive` - A logging directive that controls the log level and filtering rules.
 /// * `env_var` - The environment variable used to override log filtering rules.
 pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>) {
-    fmt()
+    let logger = fmt()
         .with_env_filter(
             EnvFilter::builder().with_default_directive(directive.into()).with_env_var(env_var.into()).from_env_lossy(),
         )
-        .with_writer(LoggerWriter::stderr)
-        .with_target(cfg!(debug_assertions))
-        .without_time()
-        .compact()
-        .init();
+        .with_writer(LoggerWriter::stderr);
+
+    if cfg!(debug_assertions) {
+        logger.with_target(cfg!(debug_assertions)).with_line_number(true).with_thread_names(true).init()
+    } else {
+        logger.without_time().compact().init()
+    }
 }
 
 /// A writer that allows feedback output to be redirected to the specified writer,

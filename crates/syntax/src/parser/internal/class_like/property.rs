@@ -33,7 +33,7 @@ pub fn parse_property_with_attributes_and_modifiers(
             var,
             hint,
             item,
-            hooks: parse_property_hook_list(stream)?,
+            hook_list: parse_property_hook_list(stream)?,
         }));
     }
 

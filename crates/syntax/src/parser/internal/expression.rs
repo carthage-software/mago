@@ -37,7 +37,7 @@ pub fn parse_expression_with_precedence(
     stream: &mut TokenStream<'_, '_>,
     precedence: Precedence,
 ) -> Result<Expression, ParseError> {
-    let mut left = parse_lhs_expression(stream)?;
+    let mut left = parse_lhs_expression(stream, precedence)?;
 
     while let Some(next) = utils::maybe_peek(stream)? {
         if !stream.state.within_indirect_variable
@@ -83,11 +83,14 @@ pub fn parse_expression_with_precedence(
 }
 
 #[inline]
-fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, ParseError> {
+fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>, precedence: Precedence) -> Result<Expression, ParseError> {
     let token = utils::peek(stream)?;
     let next = utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind);
 
-    if token.kind.is_literal() {
+    let is_call = precedence != Precedence::New && matches!(next, Some(T!["("]));
+    let is_call_or_access = is_call || matches!(next, Some(T!["[" | "::" | "->" | "?->"]));
+
+    if token.kind.is_literal() && (!token.kind.is_keyword() || !is_call_or_access) {
         return literal::parse_literal(stream).map(Expression::Literal);
     }
 
@@ -113,8 +116,8 @@ fn parse_lhs_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, 
 
     Ok(match (token.kind, next) {
         (T!["static"], _) => Expression::Static(utils::expect_any_keyword(stream)?),
-        (T!["self"], _) => Expression::Self_(utils::expect_any_keyword(stream)?),
-        (T!["parent"], _) => Expression::Parent(utils::expect_any_keyword(stream)?),
+        (T!["self"], _) if !is_call => Expression::Self_(utils::expect_any_keyword(stream)?),
+        (T!["parent"], _) if !is_call => Expression::Parent(utils::expect_any_keyword(stream)?),
         (kind, _) if kind.is_construct() => Expression::Construct(parse_construct(stream)?),
         (T!["list"], Some(T!["("])) => Expression::List(parse_list(stream)?),
         (T!["new"], Some(T!["class" | "#["])) => Expression::AnonymousClass(parse_anonymous_class(stream)?),

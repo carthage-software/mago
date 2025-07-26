@@ -64,7 +64,7 @@ impl Position {
     ///
     /// The position moved by the given offset.
     pub const fn forward(&self, offset: usize) -> Self {
-        Self { source: self.source, offset: self.offset + offset }
+        Self { source: self.source, offset: self.offset.saturating_add(offset) }
     }
 
     /// Return the position moved back by the given offset.
@@ -77,11 +77,11 @@ impl Position {
     ///
     /// The position moved back by the given offset.
     pub fn backward(&self, offset: usize) -> Self {
-        Self { source: self.source, offset: self.offset - offset }
+        Self { source: self.source, offset: self.offset.saturating_sub(offset) }
     }
 
     pub fn range_for(&self, length: usize) -> Range<usize> {
-        self.offset..self.offset + length
+        self.offset..self.offset.saturating_add(length)
     }
 }
 
