@@ -183,13 +183,13 @@ mod tests {
 
             $integers = [1, 2, 3];
             $strings = map_vector($integers, fn(int $i): string => (string) $i);
-            $flaots = map_vector($integers, fn(int $i): float => (float) $i);
+            $floats = map_vector($integers, fn(int $i): float => (float) $i);
 
             foreach ($strings as $s) {
                 i_take_string($s);
             }
 
-            foreach ($flaots as $f) {
+            foreach ($floats as $f) {
                 i_take_float($f);
             }
         "#}
