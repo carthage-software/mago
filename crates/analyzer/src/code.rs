@@ -179,6 +179,7 @@ impl Code {
     pub const TRAIT_INSTANTIATION: &'static str = "trait-instantiation";
     pub const ENUM_INSTANTIATION: &'static str = "enum-instantiation";
     pub const DEPRECATED_CLASS: &'static str = "deprecated-class";
+    pub const DEPRECATED_TRAIT: &'static str = "deprecated-trait";
     pub const UNSAFE_INSTANTIATION: &'static str = "unsafe-instantiation";
     pub const AMBIGUOUS_INSTANTIATION_TARGET: &'static str = "ambiguous-instantiation-target";
     pub const UNKNOWN_CONSTANT_SELECTOR_TYPE: &'static str = "unknown-constant-selector-type";
@@ -220,6 +221,7 @@ impl Code {
     pub const INVALID_EXTEND: &'static str = "invalid-extend";
     pub const INVALID_IMPLEMENT: &'static str = "invalid-implement";
     pub const MISSING_REQUIRED_INTERFACE: &'static str = "missing-required-interface";
+    pub const MISSING_REQUIRED_PARENT: &'static str = "missing-required-parent";
     pub const MISSING_TEMPLATE_PARAMETER: &'static str = "missing-template-parameter";
     pub const EXCESS_TEMPLATE_PARAMETER: &'static str = "excess-template-parameter";
     pub const INCONSISTENT_TEMPLATE: &'static str = "inconsistent-template";
@@ -246,4 +248,5 @@ impl Code {
     pub const UNREACHABLE_SWITCH_CASE: &'static str = "unreachable-switch-case";
     pub const UNREACHABLE_SWITCH_DEFAULT: &'static str = "unnecessary-switch-default";
     pub const INVALID_ISSET_EXPRESSION: &'static str = "invalid-isset-expression";
+    pub const INVALID_TRAIT_USE: &'static str = "invalid-trait-use";
 }

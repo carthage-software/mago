@@ -331,14 +331,12 @@ impl ClassLikeMetadata {
     /// Adds a single required extend entry.
     #[inline]
     pub fn add_require_extend(&mut self, require: StringIdentifier) {
-        self.all_parent_classes.push(require);
         self.require_extends.push(require);
     }
 
     /// Adds a single required implement entry.
     #[inline]
     pub fn add_require_implement(&mut self, require: StringIdentifier) {
-        self.all_parent_interfaces.push(require);
         self.require_implements.push(require);
     }
 

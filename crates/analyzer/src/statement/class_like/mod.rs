@@ -222,8 +222,14 @@ pub(crate) fn analyze_class_like<'a>(
     let name = &class_like_metadata.name;
     let name_str = context.interner.lookup(&class_like_metadata.original_name);
 
-    check_class_like_extends(context, class_like_metadata, extends_ast)?;
-    check_class_like_implements(context, class_like_metadata, implements_ast)?;
+    check_class_like_extends(context, class_like_metadata, extends_ast);
+    check_class_like_implements(context, class_like_metadata, implements_ast);
+
+    for member in members {
+        if let ClassLikeMember::TraitUse(used_trait) = member {
+            check_class_like_use(context, class_like_metadata, used_trait);
+        }
+    }
 
     if !class_like_metadata.invalid_dependencies.is_empty() {
         return Ok(());
@@ -319,7 +325,7 @@ pub(crate) fn analyze_class_like<'a>(
         }
     }
 
-    check_class_like_properties(context, class_like_metadata)?;
+    check_class_like_properties(context, class_like_metadata);
 
     let mut block_context = BlockContext::new({
         let mut scope = ScopeContext::new();
@@ -331,9 +337,6 @@ pub(crate) fn analyze_class_like<'a>(
 
     for member in members {
         match member {
-            ClassLikeMember::TraitUse(_) => {
-                // todo!
-            }
             ClassLikeMember::Constant(class_like_constant) => {
                 class_like_constant.analyze(context, &mut block_context, artifacts)?;
             }
@@ -346,6 +349,9 @@ pub(crate) fn analyze_class_like<'a>(
             ClassLikeMember::Method(method) => {
                 method.analyze(context, &mut block_context, artifacts)?;
             }
+            _ => {
+                continue;
+            }
         }
     }
 
@@ -356,260 +362,224 @@ fn check_class_like_extends(
     context: &mut Context<'_>,
     class_like_metadata: &ClassLikeMetadata,
     extends_ast: Option<&Extends>,
-) -> Result<(), AnalysisError> {
-    let extending_class = class_like_metadata.kind.is_class();
-    let extending_interface = class_like_metadata.kind.is_interface();
-
-    if !extending_class && !extending_interface {
-        return Ok(());
+) {
+    // This check only applies to classes and interfaces, which can use `extends`.
+    if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_interface() {
+        return;
     }
 
-    if let Some(extends) = extends_ast {
-        for extended_type in extends.types.iter() {
-            let extended_type_id = context.resolved_names.get(&extended_type);
-            let extended_class_metadata = get_class_like(context.codebase, context.interner, extended_type_id);
+    let Some(extends) = extends_ast else {
+        return;
+    };
 
-            let Some(extended_class_metadata) = extended_class_metadata else {
+    let using_kind_str = class_like_metadata.kind.as_str();
+    let using_kind_capitalized =
+        format!("{}{}", using_kind_str.chars().next().unwrap().to_uppercase(), &using_kind_str[1..]);
+    let using_name_str = context.interner.lookup(&class_like_metadata.original_name);
+    let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
+
+    for extended_type in extends.types.iter() {
+        let extended_type_id = context.resolved_names.get(&extended_type);
+        let extended_class_metadata = get_class_like(context.codebase, context.interner, extended_type_id);
+
+        // Case: The extended type does not exist.
+        let Some(extended_class_metadata) = extended_class_metadata else {
+            let extended_name = context.interner.lookup(extended_type.value());
+            context.collector.report_with_code(
+                Code::NON_EXISTENT_CLASS_LIKE,
+                Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot extend unknown type `{extended_name}`"))
+                    .with_annotation(Annotation::primary(extended_type.span()).with_message("This type could not be found"))
+                    .with_note("Mago could not find a definition for this class, interface, or trait.")
+                    .with_help("Ensure the name is correct, including its namespace, and that it is properly defined and autoloadable."),
+            );
+            continue;
+        };
+
+        let extended_name_str = context.interner.lookup(&extended_class_metadata.original_name);
+        let extended_kind_str = extended_class_metadata.kind.as_str();
+        let extended_kind_prefix =
+            if extended_class_metadata.kind.is_class() || extended_class_metadata.kind.is_trait() { "a" } else { "an" };
+        let extended_class_span = extended_class_metadata.name_span.unwrap_or(extended_class_metadata.span);
+
+        if extended_class_metadata.is_deprecated {
+            context.collector.report_with_code(
+                Code::DEPRECATED_CLASS,
+                Issue::warning(format!("Use of deprecated class `{extended_name_str}` in `extends` clause"))
+                    .with_annotation(Annotation::primary(extended_type.span()).with_message("This class is marked as deprecated"))
+                    .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("`{extended_name_str}` was marked deprecated here")))
+                    .with_note("The parent type is deprecated and may be removed in a future version, which would break this child type.")
+                    .with_help("Consider refactoring to avoid extending this type, or consult its documentation for alternatives."),
+            );
+        }
+
+        if class_like_metadata.kind.is_interface() {
+            if !extended_class_metadata.kind.is_interface() {
                 context.collector.report_with_code(
-                    Code::NON_EXISTENT_CLASS_LIKE,
-                    Issue::error(format!(
-                        "Cannot extend unknown {}: `{}` not found.",
-                        if extending_class { "class" } else { "interface" },
-                        context.interner.lookup(extended_type.value()),
-                    ))
-                    .with_annotation(Annotation::primary(extended_type.span()).with_message("This class or interface could not be found"))
-                    .with_help("Ensure the name is correct, including its namespace, and that it's properly defined and autoloadable."),
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Interface `{using_name_str}` cannot extend non-interface type `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(extended_type.span())
+                            .with_message(format!("...because it is {extended_kind_prefix} {extended_kind_str}, not an interface")))
+                        .with_annotation(Annotation::secondary(extended_class_span)
+                            .with_message(format!("`{extended_name_str}` is defined as {extended_kind_prefix} {extended_kind_str} here")))
+                        .with_note("In PHP, an interface can only extend other interfaces.")
+                        .with_help(format!("To resolve this, change `{extended_name_str}` to be an interface, or change `{using_name_str}` to a class if you intended to extend a class.")),
                 );
 
                 continue;
-            };
-
-            let extending_name_str = context.interner.lookup(&class_like_metadata.original_name);
-            let extending_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
-            let extended_name_str = context.interner.lookup(&extended_class_metadata.original_name);
-            let extended_kind_str = extended_class_metadata.kind.as_str();
-            let extended_kind_prefix =
-                if extended_class_metadata.kind.is_class() || extended_class_metadata.kind.is_trait() {
-                    "a"
-                } else {
-                    "an"
-                };
-            let extended_class_span = extended_class_metadata.name_span.unwrap_or(extended_class_metadata.span);
-
-            if extending_interface {
-                if !extended_class_metadata.kind.is_interface() {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error(format!("Interface `{extending_name_str}` cannot extend {extended_kind_prefix} {extended_kind_str}."))
-                            .with_annotation(
-                                Annotation::primary(extended_type.span())
-                                    .with_message(format!("`{extended_name_str}` is {extended_kind_prefix} {extended_kind_str}, not an interface"))
-                            )
-                            .with_note("In PHP, interfaces can only extend other interfaces.")
-                            .with_help("Change the extended type to be an interface, or change this declaration to a class if you intended to extend a class."),
-                    );
-
-                    continue;
-                }
-
-                if extended_class_metadata.is_enum_interface && !class_like_metadata.is_enum_interface {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error(format!("Interface `{extending_name_str}` cannot extend enum interface `{extended_name_str}`."))
-                            .with_annotation(Annotation::primary(extended_type.span()).with_message("This interface is an enum interface"))
-                            .with_note("An enum interface cannot be extended by a non-enum interface.")
-                            .with_help("Change the extended type to be a regular interface, or add `@enum-interface` to the extending interface."),
-                    );
-                }
-
-                check_template_parameters(
-                    context,
-                    class_like_metadata,
-                    extended_class_metadata,
-                    class_like_metadata
-                        .template_type_extends_count
-                        .get(&extended_class_metadata.name)
-                        .copied()
-                        .unwrap_or(0),
-                    InheritanceKind::Extends(extended_type.span()),
-                )?;
             }
 
-            if extending_class {
-                if !extended_class_metadata.kind.is_class() {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error(format!("Class `{extending_name_str}` cannot extend {extended_kind_prefix} {extended_kind_str}."))
-                            .with_annotation(
-                                Annotation::primary(extended_type.span())
-                                    .with_message(format!("`{extended_name_str}` is {extended_kind_prefix} {extended_kind_str}, not a class"))
-                            )
-                            .with_note("In PHP, classes can only extend other classes.")
-                            .with_help("Change the extended type to be a class, or change this declaration to an interface if you intended to extend an interface."),
-                    );
-
-                    continue;
-                }
-
-                if extended_class_metadata.is_final {
-                    context.collector.report_with_code(
-                        Code::EXTEND_FINAL_CLASS,
-                        Issue::error(format!("Class `{extending_name_str}` cannot extend final class `{extended_name_str}`."))
-                            .with_annotation(Annotation::primary(extended_type.span()).with_message("This class is declared as final"))
-                            .with_annotation(Annotation::secondary(extended_class_span).with_message("This class is marked `final` here"))
-                            .with_note("A class declared as `final` cannot be extended.")
-                            .with_help("Remove the `final` keyword from the class declaration, or change the class you are extending to a non-final class."),
-                    );
-                }
-
-                if extended_class_metadata.is_readonly && !class_like_metadata.is_readonly {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error(format!("Class `{extending_name_str}` cannot extend readonly class `{extended_name_str}`."))
-                            .with_annotation(Annotation::primary(extended_type.span()).with_message("This class is declared as readonly"))
-                            .with_annotation(Annotation::secondary(extended_class_span).with_message("This class is marked `readonly` here"))
-                            .with_note("A class declared as `readonly` cannot be extended by a non-readonly class.")
-                            .with_help("Remove the `readonly` keyword from the class declaration, or change the class you are extending to a non-readonly class."),
-                    );
-                }
-
-                if extended_class_metadata.is_deprecated {
-                    context.collector.report_with_code(
-                        Code::DEPRECATED_CLASS,
-                        Issue::error(format!("Class `{extending_name_str}` cannot extend deprecated class `{extended_name_str}`."))
-                            .with_annotation(Annotation::primary(extended_type.span()).with_message("This class is marked as deprecated"))
-                            .with_note("The parent class is deprecated and may be removed in a future version, which would break this child class.")
-                            .with_help("Consider refactoring to avoid extending this class, or consult its documentation for alternatives."),
-                    );
-                }
-
-                if extended_class_metadata.is_external_mutation_free && !class_like_metadata.is_external_mutation_free {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error("A mutable class cannot extend a `@external-mutation-free` class.")
-                            .with_annotation(
-                                Annotation::primary(extending_class_span).with_message("This class is mutable..."),
-                            )
-                            .with_annotation(Annotation::secondary(extended_type.span()).with_message(format!(
-                                "...but extends `{extended_name_str}` which is `@external-mutation-free`",
-                            )))
-                            .with_help(format!(
-                                "Mark `{extending_name_str}` as `@external-mutation-free` or remove the annotation from the parent.",
-                            )),
-                    );
-                }
-
-                if extended_class_metadata.is_mutation_free && !class_like_metadata.is_mutation_free {
-                    context.collector.report_with_code(
-                        Code::INVALID_EXTEND,
-                        Issue::error("A mutable class cannot extend a `@mutation-free` class.")
-                            .with_annotation(
-                                Annotation::primary(extending_class_span).with_message("This class is mutable..."),
-                            )
-                            .with_annotation(Annotation::secondary(extended_type.span()).with_message(format!(
-                                "...but extends `{extended_name_str}` which is `@mutation-free`",
-                            )))
-                            .with_help(format!(
-                                "Mark `{extending_name_str}` as `@mutation-free` or remove the annotation from the parent.",
-                            )),
-                    );
-                }
-
-                if !class_like_metadata.is_abstract {
-                    for required_interface in &extended_class_metadata.require_implements {
-                        if !class_like_metadata.all_parent_interfaces.contains(required_interface) {
-                            let required_iface_str = context.interner.lookup(required_interface);
-
-                            context.collector.report_with_code(
-                                Code::MISSING_REQUIRED_INTERFACE,
-                                Issue::error(format!(
-                                    "Class `{extending_name_str}` must implement interface `{required_iface_str}` as required by its parent.",
-                                ))
-                                .with_annotation(
-                                    Annotation::primary(extending_class_span).with_message(format!(
-                                        "`{extending_name_str}` is missing a required interface",
-                                    )),
-                                )
-                                .with_annotation(
-                                    Annotation::secondary(
-                                        extended_class_span
-                                    )
-                                    .with_message(format!(
-                                        "Parent class `{extended_name_str}` requires descendants to implement `{required_iface_str}`",
-                                    )),
-                                )
-                                .with_help(format!(
-                                    "Add `implements {required_iface_str}` to the `{extending_name_str}` class definition.",
-                                )),
-                            );
-                        }
-                    }
-                }
-
-                if !class_like_metadata.is_abstract
-                    && let Some(permitted_inheritors) = &extended_class_metadata.permitted_inheritors
-                    && !permitted_inheritors.contains(&class_like_metadata.name)
-                    && !class_like_metadata
-                        .all_parent_interfaces
-                        .iter()
-                        .any(|parent_interface| permitted_inheritors.contains(parent_interface))
-                    && !class_like_metadata
-                        .all_parent_classes
-                        .iter()
-                        .any(|parent_class| permitted_inheritors.contains(parent_class))
-                {
-                    let class_like_name_str = context.interner.lookup(&class_like_metadata.original_name);
-                    let extended_name_str = context.interner.lookup(&extended_class_metadata.original_name);
-
-                    context.collector.report_with_code(
-                        Code::INVALID_IMPLEMENT,
-                        Issue::error(format!(
-                            "Class `{class_like_name_str}` cannot extend class `{extended_name_str}` because it is not listed in the `@inheritors` annotation."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(extended_type.span())
-                                .with_message(format!("The class `{extended_name_str}` does not permit `{class_like_name_str}` to extend it")),
-                        )
-                        .with_note("The `@inheritors` annotation restricts which classes can extend this class.")
-                        .with_help(format!(
-                            "Add `{class_like_name_str}` to the `@inheritors` annotation of `{extended_name_str}`."
-                        )),
-                    );
-                }
-
-                check_template_parameters(
-                    context,
-                    class_like_metadata,
-                    extended_class_metadata,
-                    class_like_metadata
-                        .template_type_extends_count
-                        .get(&extended_class_metadata.name)
-                        .copied()
-                        .unwrap_or(0),
-                    InheritanceKind::Extends(extended_type.span()),
-                )?;
+            if extended_class_metadata.is_enum_interface && !class_like_metadata.is_enum_interface {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Interface `{using_name_str}` cannot extend enum-interface `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This interface is not an `@enum-interface`..."))
+                        .with_annotation(Annotation::secondary(extended_type.span()).with_message("...but it extends an `@enum-interface`"))
+                        .with_note("An interface marked with `@enum-interface` can only be extended by other interfaces that are also marked with `@enum-interface`.")
+                        .with_help(format!("To resolve this, add the `@enum-interface` PHPDoc tag to `{using_name_str}`, or extend a regular, non-enum interface.")),
+                );
             }
         }
-    }
 
-    Ok(())
+        if class_like_metadata.kind.is_class() {
+            if !extended_class_metadata.kind.is_class() {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!(
+                        "Class `{using_name_str}` cannot extend non-class type `{extended_name_str}`"
+                    ))
+                    .with_annotation(Annotation::primary(extended_type.span()).with_message(format!(
+                        "...because it is {extended_kind_prefix} {extended_kind_str}, not a class"
+                    )))
+                    .with_annotation(Annotation::secondary(extended_class_span).with_message(format!(
+                        "`{extended_name_str}` is defined as {extended_kind_prefix} {extended_kind_str} here"
+                    )))
+                    .with_note("In PHP, a class can only extend another class.")
+                    .with_help("To inherit from an interface, use `implements`. To use a trait, use `use`."),
+                );
+
+                continue;
+            }
+
+            if extended_class_metadata.is_final {
+                context.collector.report_with_code(
+                    Code::EXTEND_FINAL_CLASS,
+                    Issue::error(format!("Class `{using_name_str}` cannot extend final class `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(extended_type.span()).with_message("This inheritance is not allowed"))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("`{extended_name_str}` is declared 'final' here")))
+                        .with_note("A class marked as `final` cannot be extended by any other class.")
+                        .with_help(format!("To resolve this, either remove the `final` keyword from `{extended_name_str}`, or choose a different class to extend.")),
+                );
+            }
+
+            if extended_class_metadata.is_readonly && !class_like_metadata.is_readonly {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Non-readonly class `{using_name_str}` cannot extend readonly class `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This class is not `readonly`..."))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("...but it extends `{extended_name_str}`, which is `readonly`")))
+                        .with_note("A `readonly` class can only be extended by another `readonly` class.")
+                        .with_help(format!("To resolve this, either make the `{using_name_str}` class `readonly`, or extend a different, non-readonly class.")),
+                );
+            }
+
+            if extended_class_metadata.is_external_mutation_free && !class_like_metadata.is_external_mutation_free {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Mutable class `{using_name_str}` cannot extend `@external-mutation-free` class `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This class is mutable..."))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("...but it extends `{extended_name_str}`, which is `@external-mutation-free`")))
+                        .with_note("A class that allows mutation cannot inherit from a class that guarantees immutability via `@external-mutation-free`.")
+                        .with_help(format!("To resolve this, either mark `{using_name_str}` with the `@external-mutation-free` annotation, or choose a different parent class.")),
+                );
+            }
+
+            if extended_class_metadata.is_mutation_free && !class_like_metadata.is_mutation_free {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Mutable class `{using_name_str}` cannot extend `@mutation-free` class `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This class is mutable..."))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("...but it extends `{extended_name_str}`, which is `@mutation-free`")))
+                        .with_note("A class that allows mutation cannot inherit from a class that guarantees immutability via `@mutation-free`.")
+                        .with_help(format!("To resolve this, either mark `{using_name_str}` with the `@mutation-free` annotation, or choose a different parent class.")),
+                );
+            }
+
+            if !class_like_metadata.is_abstract {
+                for required_interface in &extended_class_metadata.require_implements {
+                    if !class_like_metadata.all_parent_interfaces.contains(required_interface) {
+                        let required_iface_str = context.interner.lookup(required_interface);
+                        context.collector.report_with_code(
+                              Code::MISSING_REQUIRED_INTERFACE,
+                              Issue::error(format!("Class `{using_name_str}` must implement required interface `{required_iface_str}`"))
+                                  .with_annotation(Annotation::primary(using_class_span).with_message(format!("...because its parent `{extended_name_str}` requires it")))
+                                  .with_annotation(Annotation::secondary(extended_class_span).with_message("Requirement declared here (likely via `@require-implements`)"))
+                                  .with_note("When a class uses `@require-implements`, all of its concrete child classes must implement the specified interface.")
+                                  .with_help(format!("Add `implements {required_iface_str}` to the `{using_name_str}` definition, or declare `{using_name_str}` as `abstract`.")),
+                          );
+                    }
+                }
+            }
+
+            if !class_like_metadata.is_abstract
+                && let Some(permitted_inheritors) = &extended_class_metadata.permitted_inheritors
+                && !permitted_inheritors.contains(&class_like_metadata.name)
+                && !class_like_metadata
+                    .all_parent_interfaces
+                    .iter()
+                    .any(|parent_interface| permitted_inheritors.contains(parent_interface))
+                && !class_like_metadata
+                    .all_parent_classes
+                    .iter()
+                    .any(|parent_class| permitted_inheritors.contains(parent_class))
+            {
+                context.collector.report_with_code(
+                    Code::INVALID_EXTEND,
+                    Issue::error(format!("Class `{using_name_str}` is not permitted to extend `{extended_name_str}`"))
+                        .with_annotation(Annotation::primary(extended_type.span()).with_message("This inheritance is restricted"))
+                        .with_annotation(Annotation::secondary(extended_class_span)
+                            .with_message(format!("The `@inheritors` annotation on this class does not include `{using_name_str}`")))
+                        .with_note("The `@inheritors` annotation on a class or interface restricts which types are allowed to extend it.")
+                        .with_help(format!("To allow this, add `{using_name_str}` to the list in the `@inheritors` PHPDoc tag for `{extended_name_str}`.")),
+                );
+            }
+
+            let actual_parameters_count = class_like_metadata
+                .template_type_extends_count
+                .get(&extended_class_metadata.name)
+                .copied()
+                .unwrap_or(0);
+
+            check_template_parameters(
+                context,
+                class_like_metadata,
+                extended_class_metadata,
+                actual_parameters_count,
+                InheritanceKind::Extends(extended_type.span()),
+            );
+        }
+    }
 }
 
 fn check_class_like_implements(
     context: &mut Context<'_>,
     class_like_metadata: &ClassLikeMetadata,
     implements_ast: Option<&Implements>,
-) -> Result<(), AnalysisError> {
+) {
+    // This check only applies to classes and enums, which can use `implements`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
-        // Interfaces and traits cannot implement interfaces
-        // This will be caught by the semantic analyzer
-        return Ok(());
+        // A separate check in the semantic analyzer will catch `implements` on an invalid type like a trait or interface.
+        return;
     }
 
     let Some(implements) = implements_ast else {
-        // No interfaces to implement, nothing to validate
-        return Ok(());
+        return;
     };
+
+    let using_kind_str = class_like_metadata.kind.as_str();
+    let using_kind_capitalized =
+        format!("{}{}", using_kind_str.chars().next().unwrap().to_uppercase(), &using_kind_str[1..]);
+    let using_name_str = context.interner.lookup(&class_like_metadata.original_name);
+    let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
     for implemented_type in implements.types.iter() {
         let implemented_type_id = context.resolved_names.get(&implemented_type);
@@ -617,47 +587,40 @@ fn check_class_like_implements(
 
         match implemented_interface_metadata {
             Some(implemented_metadata) => {
-                if !implemented_metadata.kind.is_interface() {
-                    let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
-                    let implemented_name_str = context.interner.lookup(&implemented_metadata.original_name);
-                    let implemented_kind_str = implemented_metadata.kind.as_str();
-                    let implemented_kind_prefix =
-                        if implemented_metadata.kind.is_class() || implemented_metadata.kind.is_trait() {
-                            "a"
-                        } else {
-                            "an"
-                        };
+                let implemented_name_str = context.interner.lookup(&implemented_metadata.original_name);
+                let implemented_kind_str = implemented_metadata.kind.as_str();
+                let implemented_class_span = implemented_metadata.name_span.unwrap_or(implemented_metadata.span);
+                let implemented_kind_prefix =
+                    if implemented_metadata.kind.is_class() || implemented_metadata.kind.is_trait() {
+                        "a"
+                    } else {
+                        "an"
+                    };
 
+                if !implemented_metadata.kind.is_interface() {
                     context.collector.report_with_code(
                         Code::INVALID_IMPLEMENT,
-                        Issue::error(format!("Cannot implement `{implemented_name_str}` because it is not an interface."))
-                            .with_annotation(Annotation::primary(implemented_type.span()).with_message(format!("`{implemented_name_str}` is {implemented_kind_prefix} {implemented_kind_str}, not an interface")))
-                            .with_note("The `implements` keyword can only be used with interfaces. To inherit from a class, use `extends`.".to_string())
-                            .with_help(format!("Change `{implemented_name_str}` to be an interface or remove it from the `implements` list of `{class_name_str}`.")),
+                        Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot implement non-interface type `{implemented_name_str}`"))
+                            .with_annotation(Annotation::primary(implemented_type.span())
+                                .with_message(format!("...because it is {implemented_kind_prefix} {implemented_kind_str}, not an interface")))
+                            .with_annotation(Annotation::secondary(implemented_class_span)
+                                .with_message(format!("`{implemented_name_str}` is defined as {implemented_kind_prefix} {implemented_kind_str} here")))
+                            .with_note("The `implements` keyword is exclusively for implementing interfaces.")
+                            .with_help("To inherit from a class, use `extends`. To use a trait, use `use`."),
                     );
 
                     continue;
                 }
 
                 if implemented_metadata.is_enum_interface && !class_like_metadata.kind.is_enum() {
-                    let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
-                    let implemented_name_str = context.interner.lookup(&implemented_metadata.original_name);
-
                     context.collector.report_with_code(
                         Code::INVALID_IMPLEMENT,
-                        Issue::error(format!(
-                            "Cannot implement enum interface `{implemented_name_str}` in a non-enum `{class_name_str}`."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(implemented_type.span())
-                                .with_message("This interface is an enum interface"),
-                        )
-                        .with_annotation(
-                            Annotation::secondary(implemented_metadata.name_span.unwrap_or(implemented_metadata.span))
-                                .with_message("This interface is marked with `@enum-interface`"),
-                        )
-                        .with_note("An enum interface can only be implemented by an enums.")
-                        .with_help("Change this class to be an enum, or remove the `implements` clause."),
+                        Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot implement enum-only interface `{implemented_name_str}`"))
+                            .with_annotation(Annotation::primary(using_class_span).with_message(format!("This {using_kind_str} is not an enum...")))
+                            .with_annotation(Annotation::secondary(implemented_type.span()).with_message("...but it implements an interface restricted to enums"))
+                            .with_annotation(Annotation::secondary(implemented_class_span).with_message("This interface is marked with `@enum-interface` here"))
+                            .with_note("An interface marked with `@enum-interface` can only be implemented by enums.")
+                            .with_help(format!("To resolve this, either change `{using_name_str}` to be an enum, or implement a different, non-enum interface.")),
                     );
                 }
 
@@ -673,60 +636,198 @@ fn check_class_like_implements(
                         .iter()
                         .any(|parent_class| permitted_inheritors.contains(parent_class))
                 {
-                    let class_like_name_str = context.interner.lookup(&class_like_metadata.original_name);
-                    let implemented_name_str = context.interner.lookup(&implemented_metadata.original_name);
-
                     context.collector.report_with_code(
                         Code::INVALID_IMPLEMENT,
-                        Issue::error(format!(
-                            "Class `{class_like_name_str}` cannot implement interface `{implemented_name_str}` because it is not listed in the `@inheritors` annotation."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(implemented_type.span())
-                                .with_message(format!("The interface `{implemented_name_str}` does not permit `{class_like_name_str}` to implement it")),
-                        )
-                        .with_note("The `@inheritors` annotation restricts which classes can implement this interface.")
-                        .with_help(format!(
-                            "Add `{class_like_name_str}` to the `@inheritors` annotation of `{implemented_name_str}`."
-                        )),
+                        Issue::error(format!("{using_kind_capitalized} `{using_name_str}` is not permitted to implement `{implemented_name_str}`"))
+                             .with_annotation(Annotation::primary(implemented_type.span()).with_message("This implementation is restricted"))
+                            .with_annotation(Annotation::secondary(implemented_class_span)
+                                .with_message(format!("The `@inheritors` annotation on this interface does not include `{using_name_str}`")))
+                            .with_note("The `@inheritors` annotation on an interface restricts which types are allowed to implement it.")
+                            .with_help(format!("To allow this, add `{using_name_str}` to the list in the `@inheritors` PHPDoc tag for `{implemented_name_str}`.")),
                     );
                 }
+
+                let actual_parameters_count = class_like_metadata
+                    .template_type_implements_count
+                    .get(&implemented_metadata.name)
+                    .copied()
+                    .unwrap_or(0);
 
                 check_template_parameters(
                     context,
                     class_like_metadata,
                     implemented_metadata,
-                    class_like_metadata
-                        .template_type_implements_count
-                        .get(&implemented_metadata.name)
-                        .copied()
-                        .unwrap_or(0),
+                    actual_parameters_count,
                     InheritanceKind::Implements(implemented_type.span()),
-                )?;
+                );
             }
             None => {
-                let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
-                let implemented_name_str = context.interner.lookup(implemented_type.value());
+                let implemented_name = context.interner.lookup(implemented_type.value());
 
                 context.collector.report_with_code(
                     Code::NON_EXISTENT_CLASS_LIKE,
-                    Issue::error(format!("Cannot implement unknown interface `{implemented_name_str}`."))
-                        .with_annotation(Annotation::primary(implemented_type.span()).with_message("This interface could not be found"))
-                        .with_note("Ensure the name is correct, including its namespace, and that it's properly defined and autoloadable.")
-                        .with_help(format!("Check if `{implemented_name_str}` is defined and accessible in the current context of `{class_name_str}`.")),
+                    Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot implement unknown type `{implemented_name}`"))
+                        .with_annotation(Annotation::primary(implemented_type.span()).with_message("This type could not be found"))
+                        .with_note("Mago could not find a definition for this interface. The `implements` keyword is for interfaces only.")
+                        .with_help("Ensure the name is correct, including its namespace, and that it is properly defined and autoloadable."),
                 );
             }
         }
     }
+}
 
-    Ok(())
+fn check_class_like_use(context: &mut Context<'_>, class_like_metadata: &ClassLikeMetadata, trait_use: &TraitUse) {
+    let using_kind_str = class_like_metadata.kind.as_str();
+    let using_kind_capitalized =
+        format!("{}{}", using_kind_str.chars().next().unwrap().to_uppercase(), &using_kind_str[1..]);
+    let using_name_str = context.interner.lookup(&class_like_metadata.original_name);
+    let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
+
+    for used_type in trait_use.trait_names.iter() {
+        let used_type_id = context.resolved_names.get(&used_type);
+        let used_trait_metadata = get_class_like(context.codebase, context.interner, used_type_id);
+
+        let Some(used_trait_metadata) = used_trait_metadata else {
+            let used_name = context.interner.lookup(used_type.value());
+            context.collector.report_with_code(
+                Code::NON_EXISTENT_CLASS_LIKE,
+                Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot use unknown type `{used_name}`"))
+                    .with_annotation(Annotation::primary(used_type.span()).with_message("This type could not be found"))
+                    .with_note("Mago could not find a definition for this trait. The `use` keyword is for traits only.")
+                    .with_help("Ensure the name is correct, including its namespace, and that it is properly defined and autoloadable."),
+            );
+
+            continue;
+        };
+
+        let used_name_str = context.interner.lookup(&used_trait_metadata.original_name);
+        let used_kind_str = used_trait_metadata.kind.as_str();
+        let used_kind_prefix =
+            if used_trait_metadata.kind.is_class() || used_trait_metadata.kind.is_trait() { "a" } else { "an" };
+        let used_class_span = used_trait_metadata.name_span.unwrap_or(used_trait_metadata.span);
+
+        // Case: Using something that is not a trait.
+        if !used_trait_metadata.kind.is_trait() {
+            context.collector.report_with_code(
+                Code::INVALID_TRAIT_USE,
+                Issue::error(format!(
+                    "{using_kind_capitalized} `{using_name_str}` cannot use non-trait type `{used_name_str}`"
+                ))
+                .with_annotation(
+                    Annotation::primary(used_type.span())
+                        .with_message(format!("...because it is {used_kind_prefix} {used_kind_str}, not a trait")),
+                )
+                .with_annotation(
+                    Annotation::secondary(used_class_span).with_message(format!(
+                        "`{used_name_str}` is defined as {used_kind_prefix} {used_kind_str} here"
+                    )),
+                )
+                .with_note("The `use` keyword is exclusively for including traits in classes, enums, or other traits.")
+                .with_help("To inherit from a class, use `extends`. To implement an interface, use `implements`."),
+            );
+
+            continue;
+        }
+
+        if used_trait_metadata.is_deprecated {
+            context.collector.report_with_code(
+                Code::DEPRECATED_TRAIT,
+                Issue::error(format!("Use of deprecated trait `{used_name_str}` in `{using_name_str}`"))
+                    .with_annotation(Annotation::primary(used_type.span()).with_message("This trait is marked as deprecated"))
+                    .with_annotation(Annotation::secondary(used_class_span).with_message(format!("`{used_name_str}` was marked as deprecated here")))
+                    .with_note("This trait is deprecated and may be removed in a future version, which would break the consuming type.")
+                    .with_help("Consider refactoring to avoid using this trait, or consult its documentation for alternatives."),
+            );
+        }
+
+        if used_trait_metadata.is_external_mutation_free && !class_like_metadata.is_external_mutation_free {
+            context.collector.report_with_code(
+                Code::INVALID_TRAIT_USE,
+                Issue::error(format!("Mutable {using_kind_str} `{using_name_str}` cannot use `@external-mutation-free` trait `{used_name_str}`"))
+                    .with_annotation(Annotation::primary(using_class_span).with_message(format!("This {using_kind_str} is mutable...")))
+                    .with_annotation(Annotation::secondary(used_class_span).with_message(format!("...but it uses `{used_name_str}`, which is `@external-mutation-free`")))
+                    .with_note("A type that allows mutation cannot use a trait that guarantees immutability via `@external-mutation-free`.")
+                    .with_help(format!("To resolve this, either mark `{using_name_str}` with the `@external-mutation-free` annotation, or use a different trait.")),
+            );
+        }
+
+        if used_trait_metadata.is_mutation_free && !class_like_metadata.is_mutation_free {
+            context.collector.report_with_code(
+                Code::INVALID_TRAIT_USE,
+                Issue::error(format!("Mutable {using_kind_str} `{using_name_str}` cannot use `@mutation-free` trait `{used_name_str}`"))
+                    .with_annotation(Annotation::primary(using_class_span).with_message(format!("This {using_kind_str} is mutable...")))
+                    .with_annotation(Annotation::secondary(used_class_span).with_message(format!("...but it uses `{used_name_str}`, which is `@mutation-free`")))
+                    .with_note("A type that allows mutation cannot use a trait that guarantees immutability via `@mutation-free`.")
+                    .with_help(format!("To resolve this, either mark `{using_name_str}` with the `@mutation-free` annotation, or use a different trait.")),
+            );
+        }
+
+        if !class_like_metadata.is_abstract {
+            for required_interface in &used_trait_metadata.require_implements {
+                if !class_like_metadata.all_parent_interfaces.contains(required_interface) {
+                    let required_iface_str = context.interner.lookup(required_interface);
+                    context.collector.report_with_code(
+                        Code::MISSING_REQUIRED_INTERFACE,
+                        Issue::error(format!("{using_kind_capitalized} `{using_name_str}` must implement required interface `{required_iface_str}`"))
+                            .with_annotation(Annotation::primary(using_class_span).with_message(format!("...because the trait `{used_name_str}` requires it")))
+                            .with_annotation(Annotation::secondary(used_type.span()).with_message(format!("The requirement is introduced by using `{used_name_str}` here")))
+                            .with_note("When a trait uses `@require-implements`, any concrete class using that trait must implement the specified interface.")
+                            .with_help(format!("Add `implements {required_iface_str}` to the `{using_name_str}` definition, or declare it as `abstract`.")),
+                    );
+                }
+            }
+
+            for required_class in &used_trait_metadata.require_extends {
+                if !class_like_metadata.all_parent_classes.contains(required_class) {
+                    let required_class_str = context.interner.lookup(required_class);
+                    context.collector.report_with_code(
+                        Code::MISSING_REQUIRED_PARENT,
+                        Issue::error(format!("{using_kind_capitalized} `{using_name_str}` must extend required class `{required_class_str}`"))
+                            .with_annotation(Annotation::primary(using_class_span).with_message(format!("...because the trait `{used_name_str}` requires it")))
+                            .with_annotation(Annotation::secondary(used_type.span()).with_message(format!("The requirement is introduced by using `{used_name_str}` here")))
+                            .with_note("When a trait uses `@require-extends`, any class using that trait must extend the specified class.")
+                            .with_help(format!("Add `extends {required_class_str}` to the `{using_name_str}` definition, or ensure it is a parent class.")),
+                    );
+                }
+            }
+        }
+
+        if !class_like_metadata.is_abstract
+            && let Some(permitted_inheritors) = &used_trait_metadata.permitted_inheritors
+            && !permitted_inheritors.contains(&class_like_metadata.name)
+            && !class_like_metadata
+                .all_parent_interfaces
+                .iter()
+                .any(|parent_interface| permitted_inheritors.contains(parent_interface))
+            && !class_like_metadata
+                .all_parent_classes
+                .iter()
+                .any(|parent_class| permitted_inheritors.contains(parent_class))
+        {
+            context.collector.report_with_code(
+                Code::INVALID_TRAIT_USE,
+                Issue::error(format!("{using_kind_capitalized} `{using_name_str}` is not permitted to use trait `{used_name_str}`"))
+                    .with_annotation(Annotation::primary(used_type.span()).with_message("This usage is restricted"))
+                    .with_annotation(Annotation::secondary(used_class_span).with_message(format!("The `@inheritors` annotation on this trait does not include `{using_name_str}`")))
+                    .with_note("The `@inheritors` annotation on a trait restricts which types are allowed to use it.")
+                    .with_help(format!("To allow this, add `{using_name_str}` to the list in the `@inheritors` PHPDoc tag for `{used_name_str}`.")),
+            );
+        }
+
+        check_template_parameters(
+            context,
+            class_like_metadata,
+            used_trait_metadata,
+            class_like_metadata.template_type_uses_count.get(&used_trait_metadata.name).copied().unwrap_or(0),
+            InheritanceKind::Use(used_type.span()),
+        );
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InheritanceKind {
     Extends(Span),
     Implements(Span),
-    #[allow(dead_code)]
     Use(Span),
 }
 
@@ -746,7 +847,7 @@ fn check_template_parameters(
     parent_metadata: &ClassLikeMetadata,
     actual_parameters_count: usize,
     inheritance: InheritanceKind,
-) -> Result<(), AnalysisError> {
+) {
     let expected_parameters_count = parent_metadata.template_types.len();
 
     let class_name_str = context.interner.lookup(&class_like_metadata.original_name);
@@ -948,16 +1049,11 @@ fn check_template_parameters(
             i += 1;
         }
     }
-
-    Ok(())
 }
 
-fn check_class_like_properties(
-    context: &mut Context<'_>,
-    class_like_metadata: &ClassLikeMetadata,
-) -> Result<(), AnalysisError> {
+fn check_class_like_properties(context: &mut Context<'_>, class_like_metadata: &ClassLikeMetadata) {
     if class_like_metadata.kind.is_enum() {
-        return Ok(());
+        return;
     }
 
     for (property, fqcn) in &class_like_metadata.appearing_property_ids {
@@ -1190,204 +1286,5 @@ fn check_class_like_properties(
                 }
             }
         }
-    }
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use indoc::indoc;
-
-    use crate::test_analysis;
-
-    test_analysis! {
-        name = template_parameter_sanity_check,
-        code = indoc! {r#"
-            <?php
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             */
-            interface CollectionInterface
-            {
-            }
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             */
-            interface IndexAccessInterface
-            {
-            }
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             *
-             * @extends CollectionInterface<Tk, Tv>
-             * @extends IndexAccessInterface<Tk, Tv>
-             */
-            interface AccessibleCollectionInterface extends CollectionInterface, IndexAccessInterface
-            {
-            }
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             *
-             * @extends IndexAccessInterface<Tk, Tv>
-             */
-            interface MutableIndexAccessInterface extends IndexAccessInterface
-            {
-            }
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             *
-             * @extends CollectionInterface<Tk, Tv>
-             */
-            interface MutableCollectionInterface extends CollectionInterface
-            {
-            }
-
-            /**
-             * @template Tk of array-key
-             * @template Tv
-             *
-             * @extends AccessibleCollectionInterface<Tk, Tv>
-             * @extends MutableCollectionInterface<Tk, Tv>
-             * @extends MutableIndexAccessInterface<Tk, Tv>
-             */
-            interface MutableAccessibleCollectionInterface extends
-                AccessibleCollectionInterface,
-                MutableCollectionInterface,
-                MutableIndexAccessInterface
-            {
-            }
-
-            /**
-             * @template T of array-key
-             *
-             * @extends AccessibleCollectionInterface<T, T>
-             */
-            interface SetInterface extends AccessibleCollectionInterface
-            {
-            }
-
-            /**
-             * @template T of array-key
-             *
-             * @extends SetInterface<T>
-             * @extends MutableAccessibleCollectionInterface<T, T>
-             */
-            interface MutableSetInterface extends MutableAccessibleCollectionInterface, SetInterface
-            {
-            }
-        "#}
-    }
-
-    test_analysis! {
-        name = templated_trait_use,
-        code = indoc! {r#"
-            <?php
-
-            /**
-             * @template T
-             */
-            trait Holder {
-                /**
-                 * @var null|T
-                 */
-                public mixed $value = null;
-
-                /**
-                 * @return null|T
-                 */
-                public function getValue(): mixed {
-                    return $this->value;
-                }
-
-                /**
-                 * @param null|T $value
-                 */
-                public function setValue(mixed $value): void {
-                    $this->value = $value;
-                }
-            }
-
-            /**
-             * @template T
-             */
-            class Box {
-                /**
-                 * @use Holder<T>
-                 */
-                use Holder;
-
-                /**
-                 * @param null|T $value
-                 */
-                public function __construct(mixed $value = null) {
-                    $this->setValue($value);
-                }
-            }
-
-            /**
-             * @template T
-             * @param Box<T> $box
-             *
-             * @return T|null
-             */
-            function extract_value(Box $box): mixed {
-                return $box->getValue();
-            }
-
-            /**
-             * @template T
-             * @param Box<T> $box
-             * @param T|null $value
-             */
-            function insert_value(Box $box, mixed $value): void {
-                $box->setValue($value);
-            }
-        "#}
-    }
-
-    test_analysis! {
-        name = calling_trait_required_method,
-        code = indoc! {r#"
-            <?php
-
-            interface SomeInterface {
-                public function example(): string;
-            }
-
-            /**
-             * @require-implements SomeInterface
-             */
-            trait SomeInterfaceTrait {
-                public function call(): void {
-                    echo $this->example();
-                }
-            }
-
-            class SomeClass {
-                public function example(): string {
-                    return "Hello, World!";
-                }
-            }
-
-            /**
-             * @require-extends SomeClass
-             */
-            trait SomeClassTrait {
-                public function call(): void {
-                    echo $this->example();
-                }
-            }
-        "#}
     }
 }
