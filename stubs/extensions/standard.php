@@ -4697,7 +4697,7 @@ function array_filter(array $array, null|callable $callback = null, int $mode = 
  * @param array<K, V> $array
  * @param array<S> ...$arrays
  *
- * @return array<K, U>
+ * @return ($array is list<V> ? list<U> : array<K, U>)
  */
 function array_map(null|callable $callback, array $array, array ...$arrays): array
 {
