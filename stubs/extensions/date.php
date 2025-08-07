@@ -722,6 +722,19 @@ class DateTimeZone
 
 class DateInterval
 {
+    public readonly int $y;
+    public readonly int $m;
+    public readonly int $d;
+    public readonly int $h;
+    public readonly int $i;
+    public readonly int $s;
+    public readonly float $f;
+    /** @var int<0, 1> */
+    public readonly int $invert;
+    public readonly int|false $days;
+    public readonly bool $from_string;
+    public readonly string $date_string;
+
     public function __construct(string $duration) {}
 
     public static function createFromDateString(string $datetime): DateInterval
