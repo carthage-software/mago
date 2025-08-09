@@ -135,7 +135,9 @@ impl Expression {
             Self::ArrayAccess(access) => {
                 access.array.is_constant(version, initialization) && access.index.is_constant(version, initialization)
             }
-            Self::Instantiation(instantiation) if initialization && version.is_supported(Feature::NewInInitializers) => {
+            Self::Instantiation(instantiation)
+                if initialization && version.is_supported(Feature::NewInInitializers) =>
+            {
                 instantiation.class.is_constant(version, initialization)
                     && instantiation
                         .argument_list
