@@ -86,3 +86,12 @@ jobs:
       - name: Analyze composer code
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: ./target/release/mago analyze --reporting-format=github
+
+  typos_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Search for misspellings
+        uses: crate-ci/typos@master
