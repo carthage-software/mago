@@ -716,7 +716,7 @@ pub fn check_property(
                 if !lowered_name.as_str().eq("set") && !lowered_name.as_str().eq("get") {
                     context.report(
                         Issue::error(format!(
-                            "Hooked property `{class_like_name}::{item_name}` contains an unknwon hook `{name}`, expected `set` or `get`."
+                            "Hooked property `{class_like_name}::{item_name}` contains an unknown hook `{name}`, expected `set` or `get`."
                         ))
                         .with_annotation(
                             Annotation::primary(hook.name.span())

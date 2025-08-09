@@ -270,7 +270,7 @@ fn parse_postfix_expression(
         }
         T!["->"] => {
             let arrow = utils::expect_any(stream)?.span;
-            let selector = member::parse_classlike_memeber_selector(stream)?;
+            let selector = member::parse_classlike_member_selector(stream)?;
 
             if Precedence::CallDim > precedence && matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
                 if matches!(
@@ -306,7 +306,7 @@ fn parse_postfix_expression(
         }
         T!["?->"] => {
             let question_mark_arrow = utils::expect_any(stream)?.span;
-            let selector = member::parse_classlike_memeber_selector(stream)?;
+            let selector = member::parse_classlike_member_selector(stream)?;
 
             if Precedence::CallDim > precedence && matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
                 Expression::Call(Call::NullSafeMethod(NullSafeMethodCall {

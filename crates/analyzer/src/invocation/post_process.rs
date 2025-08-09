@@ -32,7 +32,7 @@ use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::reconciler;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_expression_id;
 
@@ -209,7 +209,7 @@ fn apply_assertion_to_call_context<'a>(
     }
 
     reconciler::reconcile_keyed_types(
-        &mut ReconcilationContext::new(context.interner, context.codebase, &mut context.collector),
+        &mut ReconciliationContext::new(context.interner, context.codebase, &mut context.collector),
         &type_assertions,
         active_type_assertions,
         block_context,
@@ -317,7 +317,7 @@ fn resolve_invocation_assertion<'a>(
                             }
                             Assertion::IsIdentical(_) => {
                                 let intersection = match intersect_union_with_union(
-                                    &mut ReconcilationContext::new(
+                                    &mut ReconciliationContext::new(
                                         context.interner,
                                         context.codebase,
                                         &mut context.collector,

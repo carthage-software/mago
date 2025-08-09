@@ -44,9 +44,9 @@ impl<'a> FormatterState<'a> {
     where
         F: Fn(&Comment) -> bool,
     {
-        let mut peekable_trivias = self.comments.clone();
+        let mut peekable_trivia = self.comments.clone();
 
-        while let Some(comment) = peekable_trivias.peek() {
+        while let Some(comment) = peekable_trivia.peek() {
             let mut should_break = true;
             let comment = Comment::from_trivia(self.file, comment);
 
@@ -80,7 +80,7 @@ impl<'a> FormatterState<'a> {
                 break;
             }
 
-            peekable_trivias.next();
+            peekable_trivia.next();
         }
 
         false
@@ -89,9 +89,9 @@ impl<'a> FormatterState<'a> {
     #[must_use]
     #[inline]
     pub fn has_inner_comment(&self, range: Span) -> bool {
-        let peekable_trivias = self.comments.clone();
+        let peekable_trivia = self.comments.clone();
 
-        for comment in peekable_trivias {
+        for comment in peekable_trivia {
             let comment = Comment::from_trivia(self.file, &comment);
             if comment.start >= range.start.offset && comment.end <= range.end.offset {
                 return true;

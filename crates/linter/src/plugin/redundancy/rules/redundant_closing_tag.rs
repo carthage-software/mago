@@ -12,9 +12,9 @@ use crate::directive::LintDirective;
 use crate::rule::Rule;
 
 #[derive(Clone, Debug)]
-pub struct RedudnantClosingTagRule;
+pub struct RedundantClosingTagRule;
 
-impl Rule for RedudnantClosingTagRule {
+impl Rule for RedundantClosingTagRule {
     fn get_definition(&self) -> RuleDefinition {
         RuleDefinition::enabled("Redundant Closing Tag", Level::Help)
             .with_description(indoc! {"

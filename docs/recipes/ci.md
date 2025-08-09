@@ -1,4 +1,4 @@
-# Continous Integration
+# Continuous Integration
 
 This section describes how to set up Mago in a CI environment.
 

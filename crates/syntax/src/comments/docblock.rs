@@ -35,7 +35,7 @@ pub fn get_docblock_for_node<'a>(program: &'a Program, file: &File, node: impl H
 /// # Arguments
 ///
 /// * `file` - The file from which the trivia is derived.
-/// * `trivias` - A slice of trivia associated with the source code.
+/// * `trivia` - A slice of trivia associated with the source code.
 /// * `node_start_offset` - The start offset of the node for which to find the preceding docblock comment.
 ///
 /// # Returns
@@ -43,16 +43,16 @@ pub fn get_docblock_for_node<'a>(program: &'a Program, file: &File, node: impl H
 /// An `Option` containing a reference to the `Trivia` representing the docblock comment if found,
 pub fn get_docblock_before_position<'a>(
     file: &File,
-    trivias: &'a [Trivia],
+    trivia: &'a [Trivia],
     node_start_offset: usize,
 ) -> Option<&'a Trivia> {
-    let candidate_partition_idx = trivias.partition_point(|trivia| trivia.span.start.offset < node_start_offset);
+    let candidate_partition_idx = trivia.partition_point(|trivia| trivia.span.start.offset < node_start_offset);
     if candidate_partition_idx == 0 {
         return None;
     }
 
     for i in (0..candidate_partition_idx).rev() {
-        let trivia = &trivias[i];
+        let trivia = &trivia[i];
 
         match trivia.kind {
             TriviaKind::DocBlockComment => {

@@ -44,9 +44,9 @@ pub fn parse_property_with_attributes_and_modifiers(
         hint,
         items: {
             let mut items = vec![item];
-            let mut commans = Vec::new();
+            let mut commands = Vec::new();
             if matches!(next, T![","]) {
-                commans.push(utils::expect_any(stream)?);
+                commands.push(utils::expect_any(stream)?);
 
                 loop {
                     let item = parse_property_item(stream)?;
@@ -54,7 +54,7 @@ pub fn parse_property_with_attributes_and_modifiers(
 
                     match utils::maybe_expect(stream, T![","])? {
                         Some(comma) => {
-                            commans.push(comma);
+                            commands.push(comma);
                         }
                         None => {
                             break;
@@ -63,7 +63,7 @@ pub fn parse_property_with_attributes_and_modifiers(
                 }
             }
 
-            TokenSeparatedSequence::new(items, commans)
+            TokenSeparatedSequence::new(items, commands)
         },
         terminator: parse_terminator(stream)?,
     }))

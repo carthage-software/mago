@@ -30,7 +30,7 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula;
 use crate::formula::negate_or_synthesize;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::analyze_statements;
 use crate::utils::conditional;
@@ -175,11 +175,11 @@ impl Analyzable for If {
         let mut changed_variable_ids: HashSet<String> = HashSet::default();
 
         if !if_scope.negated_types.is_empty() {
-            let mut reconcilation_context =
-                ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+            let mut reconciliation_context =
+                ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
             reconcile_keyed_types(
-                &mut reconcilation_context,
+                &mut reconciliation_context,
                 &if_scope.negated_types,
                 BTreeMap::new(),
                 &mut temporary_else_context,
@@ -372,11 +372,11 @@ fn analyze_if_statement_block<'a>(
 
     if !reconcilable_if_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &reconcilable_if_types,
             active_if_types,
             &mut if_block_context,
@@ -737,11 +737,11 @@ fn analyze_else_if_clause<'a>(
 
     let mut newly_reconciled_variable_ids = HashSet::default();
     if !reconcilable_else_if_types.is_empty() {
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &reconcilable_else_if_types,
             active_else_if_types,
             &mut else_if_block_context,
@@ -856,7 +856,7 @@ fn analyze_else_if_clause<'a>(
             let mut implied_outer_context = else_if_block_context.clone();
 
             reconcile_keyed_types(
-                &mut ReconcilationContext::new(context.interner, context.codebase, &mut context.collector),
+                &mut ReconciliationContext::new(context.interner, context.codebase, &mut context.collector),
                 &negated_else_if_types,
                 BTreeMap::new(),
                 &mut implied_outer_context,
@@ -948,11 +948,11 @@ fn analyze_else_statements<'a>(
 
     if !else_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &else_types,
             BTreeMap::new(),
             else_block_context,

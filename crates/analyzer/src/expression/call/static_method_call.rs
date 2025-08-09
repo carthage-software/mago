@@ -22,11 +22,11 @@ impl Analyzable for StaticMethodCall {
         block_context: &mut BlockContext<'a>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let method_resultion =
+        let method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, &self.class, &self.method)?;
 
         let mut invocation_targets = vec![];
-        for resolved_method in method_resultion.resolved_methods {
+        for resolved_method in method_resolution.resolved_methods {
             let metadata = get_class_like(context.codebase, context.interner, &resolved_method.classname)
                 .expect("class-like metadata should exist for resolved method");
 
@@ -55,12 +55,12 @@ impl Analyzable for StaticMethodCall {
             context,
             block_context,
             artifacts,
-            method_resultion.template_result,
+            method_resolution.template_result,
             invocation_targets,
             InvocationArgumentsSource::ArgumentList(&self.argument_list),
             self.span(),
-            method_resultion.has_invalid_target,
-            method_resultion.encountered_mixed,
+            method_resolution.has_invalid_target,
+            method_resolution.encountered_mixed,
             false,
         )
     }

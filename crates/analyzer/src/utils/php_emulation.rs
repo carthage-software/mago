@@ -231,8 +231,8 @@ mod tests {
         assert_eq!(str_increment("9"), Some("10".to_string()));
         assert_eq!(str_increment("99"), Some("100".to_string()));
         assert_eq!(str_increment("999"), Some("1000".to_string()));
-        assert_eq!(str_increment("abc9"), Some("abd0".to_string()));
-        assert_eq!(str_increment("abc99"), Some("abd00".to_string()));
+        assert_eq!(str_increment("abc9"), Some("and0".to_string()));
+        assert_eq!(str_increment("abc99"), Some("and00".to_string()));
     }
 
     #[test]

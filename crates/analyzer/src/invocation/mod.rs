@@ -31,7 +31,7 @@ pub mod return_type_fetcher;
 #[derive(Debug, Clone)]
 pub struct Invocation<'a> {
     /// The resolved target of the call, which could be a named function/method
-    /// or a dynamic callable expression (e.g., a closure, an invokable object).
+    /// or a dynamic callable expression (e.g., a closure, an invocable object).
     pub target: InvocationTarget<'a>,
     /// The arguments provided to the call, either as a standard argument list
     /// or as the input from a pipe operator.
@@ -66,7 +66,7 @@ pub struct MethodTargetContext<'a> {
 pub enum InvocationTarget<'a> {
     /// The invocation target is a dynamic callable whose exact identity isn't known
     /// until runtime, but its signature (parameters, return type) is known.
-    /// Examples include closures, invokable objects, or variables holding callables.
+    /// Examples include closures, invocable objects, or variables holding callables.
     Callable {
         /// If the callable expression could be traced back to an original named function
         /// or method (e.g., `$callable = strlen(...); $callable()`), this might hold its identifier.
@@ -168,7 +168,7 @@ impl<'a> InvocationTarget<'a> {
     }
 
     /// Checks if the target is a dynamic callable that is not explicitly a closure type.
-    /// This can be true for `callable` type hints or invokable objects that aren't closures.
+    /// This can be true for `callable` type hints or invocable objects that aren't closures.
     #[inline]
     pub const fn is_non_closure_callable(&self) -> bool {
         match self {

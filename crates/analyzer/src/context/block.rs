@@ -23,7 +23,7 @@ use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::scope::var_has_root;
 use crate::expression::r#match::subtract_union_types;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::assertion_reconciler;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -283,7 +283,7 @@ impl<'a> BlockContext<'a> {
                         break;
                     }
 
-                    let mut context = ReconcilationContext::new(interner, codebase, collector);
+                    let mut context = ReconciliationContext::new(interner, codebase, collector);
                     let result_type = assertion_reconciler::reconcile(
                         &mut context,
                         assertion,

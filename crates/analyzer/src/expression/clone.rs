@@ -35,7 +35,7 @@ impl Analyzable for Clone {
 
         let mut invalid_clone_atomics = vec![];
         let mut has_mixed_type = false;
-        let mut has_clonable_object = false;
+        let mut has_cloneable_object = false;
 
         let mut atomic_types = object_type.types.iter().collect::<Vec<_>>();
         loop {
@@ -46,7 +46,7 @@ impl Analyzable for Clone {
             match atomic_type {
                 TAtomic::Object(object) => match object {
                     TObject::Any => {
-                        has_clonable_object = true;
+                        has_cloneable_object = true;
                     }
                     TObject::Enum(_) => {
                         invalid_clone_atomics.push(atomic_type);
@@ -55,7 +55,7 @@ impl Analyzable for Clone {
                         if !class_or_interface_exists(context.codebase, context.interner, &named_object.name) {
                             invalid_clone_atomics.push(atomic_type);
                         } else {
-                            has_clonable_object = true;
+                            has_cloneable_object = true;
                         }
                     }
                 },
@@ -72,7 +72,7 @@ impl Analyzable for Clone {
                     continue;
                 }
                 TAtomic::Callable(callable) if callable.get_signature().is_none_or(|s| s.is_closure()) => {
-                    has_clonable_object = true;
+                    has_cloneable_object = true;
                     continue;
                 }
                 _ => {
@@ -98,7 +98,7 @@ impl Analyzable for Clone {
             let invalid_types_str =
                 invalid_clone_atomics.iter().map(|t| t.get_id(Some(context.interner))).collect::<Vec<_>>().join("|");
 
-            if has_clonable_object || has_mixed_type {
+            if has_cloneable_object || has_mixed_type {
                 context.collector.report_with_code(
                     Code::POSSIBLY_INVALID_CLONE,
                     Issue::warning(format!(
@@ -139,7 +139,7 @@ impl Analyzable for Clone {
         let resulting_type = if !invalid_clone_atomics.is_empty() {
             Rc::new(if has_mixed_type {
                 TUnion::new(vec![TAtomic::Mixed(TMixed::new()), TAtomic::Never])
-            } else if has_clonable_object {
+            } else if has_cloneable_object {
                 combine_union_types(&object_type, &get_never(), context.codebase, context.interner, false)
             } else {
                 get_never()

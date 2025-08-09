@@ -7,7 +7,7 @@ declare(strict_types=1);
     // Guess executable path
     $platformFile = __DIR__ . '/.platform';
     if (!file_exists($platformFile)) {
-        throw new \RuntimeException('Unable to detect curent mago version. Please run "composer mago:install-binary"');
+        throw new \RuntimeException('Unable to detect current mago version. Please run "composer mago:install-binary"');
     }
 
     $executable = __DIR__ . '/'.file_get_contents($platformFile);

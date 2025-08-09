@@ -36,7 +36,7 @@ impl Rule for NoEmptyCommentsRule {
     fn lint_node(&self, node: Node<'_>, context: &mut LintContext<'_>) -> LintDirective {
         let Node::Program(program) = node else { return LintDirective::Abort };
 
-        let preseve_single_line =
+        let preserve_single_line =
             context.option(PRESERVE_SINGLE_LINE).and_then(|c| c.as_bool()).unwrap_or(PRESERVE_SINGLE_LINE_DEFAULT);
 
         for trivia in program.trivia.iter() {
@@ -44,7 +44,7 @@ impl Rule for NoEmptyCommentsRule {
                 continue;
             }
 
-            if trivia.kind.is_single_line_comment() && preseve_single_line {
+            if trivia.kind.is_single_line_comment() && preserve_single_line {
                 continue;
             }
 

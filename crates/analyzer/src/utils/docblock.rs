@@ -42,7 +42,7 @@ pub fn populate_docblock_variables<'a>(
             continue;
         };
 
-        insert_variabel_from_docblock(
+        insert_variable_from_docblock(
             context,
             block_context,
             variable_name,
@@ -239,7 +239,7 @@ pub fn get_type_from_var_docblock<'a>(
 /// * `variable_type`: The type of the variable as a `TUnion`, parsed from the docblock.
 /// * `variable_type_span`: The span of the variable type in the source code, used for error reporting.
 /// * `override_existing`: A boolean indicating whether to override an existing variable type
-pub fn insert_variabel_from_docblock<'a>(
+pub fn insert_variable_from_docblock<'a>(
     context: &mut Context<'a>,
     block_context: &mut BlockContext<'a>,
     variable_name: String,

@@ -31,13 +31,13 @@ use mago_codex::ttype::wrap_atomic;
 use mago_interner::ThreadedInterner;
 use mago_span::Span;
 
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
 pub fn reconcile(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     existing_var_type: Option<&TUnion>,
     possibly_undefined: bool,
@@ -128,7 +128,7 @@ pub fn reconcile(
 }
 
 pub(crate) fn refine_atomic_with_union(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     new_type: &TAtomic,
     existing_var_type: &TUnion,
 ) -> TUnion {
@@ -145,7 +145,7 @@ pub(crate) fn refine_atomic_with_union(
 }
 
 fn intersect_union_with_atomic(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     existing_var_type: &TUnion,
     new_type: &TAtomic,
 ) -> Option<TUnion> {
@@ -170,7 +170,7 @@ fn intersect_union_with_atomic(
 }
 
 pub(crate) fn intersect_atomic_with_atomic(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     first_type: &TAtomic,
     second_type: &TAtomic,
 ) -> Option<TAtomic> {
@@ -292,7 +292,7 @@ pub(crate) fn intersect_atomic_with_atomic(
 }
 
 fn intersect_list_arrays(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     first_list: &TList,
     second_list: &TList,
 ) -> Option<TAtomic> {
@@ -379,7 +379,7 @@ fn intersect_list_arrays(
 }
 
 fn intersect_keyed_arrays(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     first_keyed_array: &TKeyedArray,
     second_keyed_array: &TKeyedArray,
 ) -> Option<TAtomic> {
@@ -465,7 +465,7 @@ fn intersect_keyed_arrays(
 }
 
 pub(crate) fn intersect_union_with_union(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     type_1_param: &TUnion,
     type_2_param: &TUnion,
 ) -> Option<TUnion> {
@@ -495,7 +495,7 @@ pub(crate) fn intersect_union_with_union(
 }
 
 fn intersect_contained_atomic_with_another(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     super_atomic: &TAtomic,
     sub_atomic: &TAtomic,
     generic_coercion: bool,
@@ -569,7 +569,7 @@ fn get_missing_type(interner: &ThreadedInterner, assertion: &Assertion, inside_l
 }
 
 fn handle_literal_equality(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_type: &TAtomic,
     existing_var_type: &TUnion,
@@ -628,7 +628,7 @@ fn handle_literal_equality(
 }
 
 fn handle_literal_equality_with_int(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_integer: i64,
     existing_var_type: &TUnion,
@@ -714,7 +714,7 @@ fn handle_literal_equality_with_int(
 }
 
 fn handle_literal_equality_with_str(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_str_val: &str,
     existing_var_type: &TUnion,
@@ -795,7 +795,7 @@ fn handle_literal_equality_with_str(
 }
 
 fn handle_literal_equality_with_float(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_float_val: f64,
     existing_var_type: &TUnion,
@@ -885,7 +885,7 @@ fn handle_literal_equality_with_float(
 }
 
 fn handle_literal_equality_with_bool(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_bool_val: bool,
     existing_var_type: &TUnion,

@@ -69,7 +69,7 @@ impl Rule for NoFFIRule {
             context.report(
                 Issue::new(
                    context.level(),
-                   format!("Potentionally unsafe use of FFI class `{class_name}`."),
+                   format!("Potentially unsafe use of FFI class `{class_name}`."),
                 )
                 .with_annotation(Annotation::primary(identifier.span()).with_message("This class is part of the FFI extension."))
                 .with_note("FFI (Foreign Function Interface) allows interaction with code written in other languages such as C, C++, and Rust.")

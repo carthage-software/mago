@@ -56,15 +56,15 @@ impl TGenericParameter {
         self.defining_entity
     }
 
-    pub fn is_constrainted_as_numeric(&self) -> bool {
+    pub fn is_constrained_as_numeric(&self) -> bool {
         self.constraint.is_numeric()
     }
 
-    pub fn is_constrainted_as_mixed(&self) -> bool {
+    pub fn is_constrained_as_mixed(&self) -> bool {
         self.constraint.is_mixed()
     }
 
-    pub fn is_constrainted_as_objecty(&self) -> bool {
+    pub fn is_constrained_as_objecty(&self) -> bool {
         self.constraint.is_objecty()
     }
 

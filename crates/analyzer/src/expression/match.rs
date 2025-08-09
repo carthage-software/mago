@@ -28,7 +28,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::binary::utils::is_always_identical_to;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::negated_assertion_reconciler;
 
 impl Analyzable for Match {
@@ -155,7 +155,7 @@ impl Analyzable for Match {
             let mut arm_block_context = block_context.clone();
             arm_block_context.inside_conditional = true;
 
-            let mut definitly_matches = false;
+            let mut definitely_matches = false;
             let mut unreachable_conditions = vec![];
             for condition in match_expression_arm.conditions.iter() {
                 condition.analyze(context, &mut arm_block_context, artifacts)?;
@@ -207,7 +207,7 @@ impl Analyzable for Match {
                         .with_help("Recheck the match order and logic. If intentional, consider making this the final arm."),
                     );
 
-                    definitly_matches = true;
+                    definitely_matches = true;
                 } else {
                     remaining_subject_type =
                         subtract_union_types(context, remaining_subject_type, condition_type.clone());
@@ -302,7 +302,7 @@ impl Analyzable for Match {
                 }
             }
 
-            if definitly_matches {
+            if definitely_matches {
                 definite_match = Some(match_expression_arm);
                 possible_results = vec![expression_type];
             } else {
@@ -508,8 +508,8 @@ pub fn subtract_union_types(context: &mut Context<'_>, existing_type: TUnion, ty
     }
 
     let mut final_refined_union = subtract_handled_enum_cases(context, existing_type, &type_to_remove);
-    let mut reconcilation_context =
-        ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+    let mut reconciliation_context =
+        ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
     for atomic in type_to_remove.types {
         if let TAtomic::Object(TObject::Enum(_)) = atomic {
@@ -517,9 +517,9 @@ pub fn subtract_union_types(context: &mut Context<'_>, existing_type: TUnion, ty
         }
 
         let assertion = Assertion::IsNotType(atomic);
-        let key = final_refined_union.get_id(Some(reconcilation_context.interner));
+        let key = final_refined_union.get_id(Some(reconciliation_context.interner));
         final_refined_union = negated_assertion_reconciler::reconcile(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &assertion,
             &final_refined_union,
             false,

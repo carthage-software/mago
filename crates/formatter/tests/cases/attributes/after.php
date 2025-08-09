@@ -6,7 +6,7 @@ const FOO = 'foo';
 #[ATTRIBUTE]
 function aaa(
     int $bbb,
-    // this comment causes attribute to dissappear
+    // this comment causes attribute to disappear
     int $ccc,
 ) {
     var_dump('test');

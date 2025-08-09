@@ -96,18 +96,18 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn is_constant(&self, version: &PHPVersion, initilization: bool) -> bool {
+    pub fn is_constant(&self, version: &PHPVersion, initialization: bool) -> bool {
         match &self {
             Self::Binary(operation) => {
                 operation.operator.is_constant()
-                    && operation.lhs.is_constant(version, initilization)
-                    && operation.rhs.is_constant(version, initilization)
+                    && operation.lhs.is_constant(version, initialization)
+                    && operation.rhs.is_constant(version, initialization)
             }
             Self::UnaryPrefix(operation) => {
-                operation.operator.is_constant() && operation.operand.is_constant(version, initilization)
+                operation.operator.is_constant() && operation.operand.is_constant(version, initialization)
             }
             Self::UnaryPostfix(operation) => {
-                operation.operator.is_constant() && operation.operand.is_constant(version, initilization)
+                operation.operator.is_constant() && operation.operand.is_constant(version, initialization)
             }
             Self::Literal(_) => true,
             Self::Identifier(_) => true,
@@ -116,27 +116,27 @@ impl Expression {
             Self::Self_(_) => true,
             Self::Parent(_) => true,
             Self::Static(_) => true,
-            Self::Parenthesized(expression) => expression.expression.is_constant(version, initilization),
+            Self::Parenthesized(expression) => expression.expression.is_constant(version, initialization),
             Self::Access(access) => match access {
                 Access::ClassConstant(ClassConstantAccess { class, constant, .. }) => {
                     matches!(constant, ClassLikeConstantSelector::Identifier(_))
-                        && class.is_constant(version, initilization)
+                        && class.is_constant(version, initialization)
                 }
                 Access::Property(PropertyAccess { object, property, .. }) => {
                     matches!(property, ClassLikeMemberSelector::Identifier(_))
-                        && object.is_constant(version, initilization)
+                        && object.is_constant(version, initialization)
                 }
                 Access::NullSafeProperty(NullSafePropertyAccess { object, property, .. }) => {
                     matches!(property, ClassLikeMemberSelector::Identifier(_))
-                        && object.is_constant(version, initilization)
+                        && object.is_constant(version, initialization)
                 }
                 _ => false,
             },
             Self::ArrayAccess(access) => {
-                access.array.is_constant(version, initilization) && access.index.is_constant(version, initilization)
+                access.array.is_constant(version, initialization) && access.index.is_constant(version, initialization)
             }
-            Self::Instantiation(instantiation) if initilization && version.is_supported(Feature::NewInInitializers) => {
-                instantiation.class.is_constant(version, initilization)
+            Self::Instantiation(instantiation) if initialization && version.is_supported(Feature::NewInInitializers) => {
+                instantiation.class.is_constant(version, initialization)
                     && instantiation
                         .argument_list
                         .as_ref()
@@ -144,43 +144,43 @@ impl Expression {
                             arguments.arguments.iter().all(|argument| match &argument {
                                 Argument::Positional(positional_argument) => {
                                     positional_argument.ellipsis.is_none()
-                                        && positional_argument.value.is_constant(version, initilization)
+                                        && positional_argument.value.is_constant(version, initialization)
                                 }
                                 Argument::Named(named_argument) => {
-                                    named_argument.value.is_constant(version, initilization)
+                                    named_argument.value.is_constant(version, initialization)
                                 }
                             })
                         })
                         .unwrap_or(true)
             }
             Self::Conditional(conditional) => {
-                conditional.condition.is_constant(version, initilization)
-                    && conditional.then.as_ref().map(|e| e.is_constant(version, initilization)).unwrap_or(true)
-                    && conditional.r#else.is_constant(version, initilization)
+                conditional.condition.is_constant(version, initialization)
+                    && conditional.then.as_ref().map(|e| e.is_constant(version, initialization)).unwrap_or(true)
+                    && conditional.r#else.is_constant(version, initialization)
             }
             Self::Array(array) => array.elements.nodes.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {
-                    key_value_array_element.key.is_constant(version, initilization)
-                        && key_value_array_element.value.is_constant(version, initilization)
+                    key_value_array_element.key.is_constant(version, initialization)
+                        && key_value_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Value(value_array_element) => {
-                    value_array_element.value.is_constant(version, initilization)
+                    value_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Variadic(variadic_array_element) => {
-                    variadic_array_element.value.is_constant(version, initilization)
+                    variadic_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Missing(_) => false,
             }),
             Self::LegacyArray(array) => array.elements.nodes.iter().all(|element| match &element {
                 ArrayElement::KeyValue(key_value_array_element) => {
-                    key_value_array_element.key.is_constant(version, initilization)
-                        && key_value_array_element.value.is_constant(version, initilization)
+                    key_value_array_element.key.is_constant(version, initialization)
+                        && key_value_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Value(value_array_element) => {
-                    value_array_element.value.is_constant(version, initilization)
+                    value_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Variadic(variadic_array_element) => {
-                    variadic_array_element.value.is_constant(version, initilization)
+                    variadic_array_element.value.is_constant(version, initialization)
                 }
                 ArrayElement::Missing(_) => false,
             }),
@@ -209,14 +209,14 @@ impl Expression {
 
                 match closure_creation {
                     ClosureCreation::Function(function_closure_creation) => {
-                        function_closure_creation.function.is_constant(version, initilization)
+                        function_closure_creation.function.is_constant(version, initialization)
                     }
                     ClosureCreation::Method(method_closure_creation) => {
-                        method_closure_creation.object.is_constant(version, initilization)
+                        method_closure_creation.object.is_constant(version, initialization)
                             && matches!(method_closure_creation.method, ClassLikeMemberSelector::Identifier(_))
                     }
                     ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                        static_method_closure_creation.class.is_constant(version, initilization)
+                        static_method_closure_creation.class.is_constant(version, initialization)
                             && matches!(static_method_closure_creation.method, ClassLikeMemberSelector::Identifier(_))
                     }
                 }

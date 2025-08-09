@@ -189,8 +189,8 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
 
     check_members(&class.members, class.span(), "class", class_name, class_fqcn, context);
 
-    for memeber in class.members.iter() {
-        match &memeber {
+    for member in class.members.iter() {
+        match &member {
             ClassLikeMember::EnumCase(case) => {
                 context.report(
                     Issue::error(format!("Class `{class_name}` cannot contain enum cases."))
@@ -266,8 +266,8 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
 
     check_members(&interface.members, interface.span(), "interface", interface_name, interface_fqcn, context);
 
-    for memeber in interface.members.iter() {
-        match &memeber {
+    for member in interface.members.iter() {
+        match &member {
             ClassLikeMember::TraitUse(trait_use) => {
                 context.report(
                     Issue::error(format!("Interface `{interface_name}` cannot use traits."))

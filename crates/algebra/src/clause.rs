@@ -106,10 +106,10 @@ impl Clause {
     pub fn get_impossibilities(&self) -> BTreeMap<String, Vec<Assertion>> {
         let mut impossibilities = BTreeMap::new();
 
-        for (variable, possiblity) in &self.possibilities {
+        for (variable, possibility) in &self.possibilities {
             let mut negations = vec![];
 
-            for (_, assertion) in possiblity {
+            for (_, assertion) in possibility {
                 match assertion {
                     Assertion::IsIdentical(atomic) | Assertion::IsNotIdentical(atomic) => {
                         if atomic.is_literal() {

@@ -163,10 +163,10 @@ pub fn get_formula(
             }
         }
 
-        let unary_oprand_span = unary_prefix.operand.span();
+        let unary_operand_span = unary_prefix.operand.span();
         let negated = negate_formula(get_formula(
             conditional_object_id,
-            unary_oprand_span,
+            unary_operand_span,
             &unary_prefix.operand,
             assertion_context,
             artifacts,

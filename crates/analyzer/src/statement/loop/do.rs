@@ -21,7 +21,7 @@ use crate::context::scope::loop_scope::LoopScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::remove_clauses_with_mixed_variables;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop;
 
@@ -122,11 +122,11 @@ impl Analyzable for DoWhile {
         );
 
         if !negated_while_types.is_empty() {
-            let mut reconcilation_context =
-                ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+            let mut reconciliation_context =
+                ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
             reconcile_keyed_types(
-                &mut reconcilation_context,
+                &mut reconciliation_context,
                 &negated_while_types,
                 BTreeMap::new(),
                 &mut inner_loop_block_context,

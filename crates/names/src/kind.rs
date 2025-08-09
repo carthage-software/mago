@@ -45,7 +45,7 @@ impl NameKind {
     /// resolved case-insensitively.
     #[inline]
     pub const fn is_case_sensitive(&self) -> bool {
-        // Renamed from is_case_sensative
+        // Renamed from is_case_sensitive
         // Only constants are case-sensitive in PHP name resolution
         self.is_constant()
     }

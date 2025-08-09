@@ -481,7 +481,7 @@ fn increment_operand<'a>(
                                 callable.get_id(Some(context.interner))
                             ))
                             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid callable type for increment"))
-                            .with_note("Incrementing array callables or invokable objects without specific overload behavior leads to errors."),
+                            .with_note("Incrementing array callables or invocable objects without specific overload behavior leads to errors."),
                         );
 
                     possibilities.push(TAtomic::Mixed(TMixed::new()));
@@ -716,7 +716,7 @@ fn decrement_operand<'a>(
                             callable.get_id(Some(context.interner))
                         ))
                             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid callable type for decrement"))
-                            .with_note("Decrementing array callables or invokable objects without specific overload behavior leads to errors."),
+                            .with_note("Decrementing array callables or invocable objects without specific overload behavior leads to errors."),
                     );
 
                     possibilities.push(TAtomic::Mixed(TMixed::new()));

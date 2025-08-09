@@ -17,17 +17,17 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable;
 
-pub fn parse_classlike_memeber(stream: &mut TokenStream<'_, '_>) -> Result<ClassLikeMember, ParseError> {
+pub fn parse_classlike_member(stream: &mut TokenStream<'_, '_>) -> Result<ClassLikeMember, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["#["] => {
             let attributes = parse_attribute_list_sequence(stream)?;
 
-            parse_classlike_memeber_with_attributes(stream, attributes)?
+            parse_classlike_member_with_attributes(stream, attributes)?
         }
         k if k.is_modifier() => {
             let modifiers = parse_modifier_sequence(stream)?;
 
-            parse_classlike_memeber_with_attributes_and_modifiers(stream, Sequence::empty(), modifiers)?
+            parse_classlike_member_with_attributes_and_modifiers(stream, Sequence::empty(), modifiers)?
         }
         T!["const"] => ClassLikeMember::Constant(parse_class_like_constant_with_attributes_and_modifiers(
             stream,
@@ -49,7 +49,7 @@ pub fn parse_classlike_memeber(stream: &mut TokenStream<'_, '_>) -> Result<Class
     })
 }
 
-pub fn parse_classlike_memeber_with_attributes(
+pub fn parse_classlike_member_with_attributes(
     stream: &mut TokenStream<'_, '_>,
     attributes: Sequence<AttributeList>,
 ) -> Result<ClassLikeMember, ParseError> {
@@ -57,7 +57,7 @@ pub fn parse_classlike_memeber_with_attributes(
         k if k.is_modifier() => {
             let modifiers = parse_modifier_sequence(stream)?;
 
-            parse_classlike_memeber_with_attributes_and_modifiers(stream, attributes, modifiers)?
+            parse_classlike_member_with_attributes_and_modifiers(stream, attributes, modifiers)?
         }
         T!["case"] => ClassLikeMember::EnumCase(parse_enum_case_with_attributes(stream, attributes)?),
         T!["const"] => ClassLikeMember::Constant(parse_class_like_constant_with_attributes_and_modifiers(
@@ -76,7 +76,7 @@ pub fn parse_classlike_memeber_with_attributes(
     })
 }
 
-pub fn parse_classlike_memeber_with_attributes_and_modifiers(
+pub fn parse_classlike_member_with_attributes_and_modifiers(
     stream: &mut TokenStream<'_, '_>,
     attributes: Sequence<AttributeList>,
     modifiers: Sequence<Modifier>,
@@ -92,7 +92,7 @@ pub fn parse_classlike_memeber_with_attributes_and_modifiers(
     })
 }
 
-pub fn parse_classlike_memeber_selector(
+pub fn parse_classlike_member_selector(
     stream: &mut TokenStream<'_, '_>,
 ) -> Result<ClassLikeMemberSelector, ParseError> {
     let token = utils::peek(stream)?;

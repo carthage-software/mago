@@ -610,13 +610,13 @@ impl<'a> Format<'a> for ClosureUseClause {
                 variables.push(variable.format(f));
             }
 
-            let mut inner_conent = Document::join(variables, Separator::CommaLine);
-            inner_conent.insert(0, Document::Line(Line::soft()));
+            let mut inner_content = Document::join(variables, Separator::CommaLine);
+            inner_content.insert(0, Document::Line(Line::soft()));
             if f.settings.trailing_comma {
-                inner_conent.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                inner_content.push(Document::IfBreak(IfBreak::then(Document::String(","))));
             }
 
-            contents.push(Document::Indent(inner_conent));
+            contents.push(Document::Indent(inner_content));
             if let Some(comments) = f.print_dangling_comments(self.left_parenthesis.join(self.right_parenthesis), true)
             {
                 contents.push(comments);

@@ -119,7 +119,7 @@ pub(super) fn resolve_targets<'a>(
                     Annotation::primary(expression.span())
                         .with_message(format!("This expression (type `{type_name}` ) is not a valid callable"))
                 )
-                .with_note("To be callable, an expression must resolve to a function name (string), a Closure, an invokable object (object with `__invoke` method), or an array representing a static/instance method.")
+                .with_note("To be callable, an expression must resolve to a function name (string), a Closure, an invocable object (object with `__invoke` method), or an array representing a static/instance method.")
                 .with_help("Ensure the expression evaluates to a callable type. If it's a variable, check its assigned type. If it's a string, ensure it's a defined function name or valid callable array syntax.".to_string()),
             );
 

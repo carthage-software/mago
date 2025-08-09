@@ -40,7 +40,7 @@ use crate::error::AnalysisError;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::analyze_statements;
 use crate::utils::expression::get_expression_id;
@@ -503,7 +503,7 @@ impl<'a, 'b> SwitchAnalyzer<'a, 'b> {
             let mut changed_var_ids = HashSet::default();
 
             reconcile_keyed_types(
-                &mut ReconcilationContext::new(
+                &mut ReconciliationContext::new(
                     self.context.interner,
                     self.context.codebase,
                     &mut self.context.collector,

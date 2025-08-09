@@ -21,11 +21,11 @@ impl Analyzable for MethodClosureCreation {
         block_context: &mut BlockContext<'a>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let method_resultion =
+        let method_resolution =
             resolve_method_targets(context, block_context, artifacts, &self.object, &self.method, false, self.span())?;
 
         let mut callables = vec![];
-        for resolved_method in method_resultion.resolved_methods {
+        for resolved_method in method_resolution.resolved_methods {
             callables.push(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
                 *resolved_method.method_identifier.get_class_name(),
                 *resolved_method.method_identifier.get_method_name(),
@@ -33,7 +33,7 @@ impl Analyzable for MethodClosureCreation {
         }
 
         let resulting_type = if callables.is_empty() {
-            if method_resultion.has_invalid_target { get_never() } else { get_mixed_closure() }
+            if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
         } else {
             TUnion::new(callables)
         };

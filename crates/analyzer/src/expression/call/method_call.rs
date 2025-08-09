@@ -182,11 +182,11 @@ fn analyze_method_call<'a>(
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {
-    let method_resultion =
+    let method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
     let mut invocation_targets = vec![];
-    for resolved_method in method_resultion.resolved_methods {
+    for resolved_method in method_resolution.resolved_methods {
         let metadata = get_class_like(context.codebase, context.interner, &resolved_method.classname)
             .expect("class-like metadata should exist for resolved method");
 
@@ -214,13 +214,13 @@ fn analyze_method_call<'a>(
         context,
         block_context,
         artifacts,
-        method_resultion.template_result,
+        method_resolution.template_result,
         invocation_targets,
         InvocationArgumentsSource::ArgumentList(argument_list),
         span,
-        method_resultion.has_invalid_target,
-        method_resultion.encountered_mixed,
-        is_null_safe && method_resultion.encountered_null,
+        method_resolution.has_invalid_target,
+        method_resolution.encountered_mixed,
+        is_null_safe && method_resolution.encountered_null,
     )
 }
 

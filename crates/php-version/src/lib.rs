@@ -223,7 +223,7 @@ impl PHPVersion {
             | Feature::TypedProperties => self.0 >= 0x070400,
             Feature::NonCapturingCatches
             | Feature::NativeUnionTypes
-            | Feature::LessOverridenParametersWithVariadic
+            | Feature::LessOverriddenParametersWithVariadic
             | Feature::ThrowExpression
             | Feature::ClassConstantOnExpression
             | Feature::PromotedProperties

@@ -7,7 +7,7 @@ $value = strtr($this->fileExcerpt($trace['file'], $trace['line'], 5), [
     '#FF8000' => 'var(--highlight-comment)',
 ]);
 
-it('needs a propery payload', function () {
+it('needs a proper payload', function () {
     post(route('mosquito-deployment.store'), [
         'artifactUuid' => str()->uuid()->toString(),
     ])->assertInvalid();

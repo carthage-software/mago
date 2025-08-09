@@ -8,7 +8,7 @@ pub enum Feature {
     NonCapturingCatches,
     NativeUnionTypes,
     RequiredParameterAfterOptional,
-    LessOverridenParametersWithVariadic,
+    LessOverriddenParametersWithVariadic,
     ThrowExpression,
     ClassConstantOnExpression,
     PromotedProperties,

@@ -27,7 +27,7 @@ use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::utils::conditional;
 
 #[inline]
@@ -103,11 +103,11 @@ pub fn analyze_logical_and_operation<'a>(
     if !left_assertions.is_empty() {
         right_block_context = block_context.clone();
 
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconciler::reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &left_assertions,
             active_left_assertions,
             &mut right_block_context,
@@ -344,11 +344,11 @@ pub fn analyze_logical_or_operation<'a>(
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
     } else {
         if !negated_type_assertions.is_empty() {
-            let mut reconcilation_context =
-                ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+            let mut reconciliation_context =
+                ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
             reconciler::reconcile_keyed_types(
-                &mut reconcilation_context,
+                &mut reconciliation_context,
                 &negated_type_assertions,
                 active_negated_type_assertions,
                 &mut right_block_context,
@@ -464,13 +464,13 @@ pub fn analyze_logical_or_operation<'a>(
         );
 
         if !right_type_assertions.is_empty() {
-            let mut reconcilation_context =
-                ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+            let mut reconciliation_context =
+                ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
             let mut right_changed_var_ids = HashSet::default();
 
             reconciler::reconcile_keyed_types(
-                &mut reconcilation_context,
+                &mut reconciliation_context,
                 &right_type_assertions,
                 active_right_type_assertions,
                 &mut right_block_context.clone(),

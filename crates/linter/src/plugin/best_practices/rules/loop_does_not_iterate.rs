@@ -61,7 +61,7 @@ impl Rule for LoopDoesNotIterateRule {
                 "#},
             ))
             .with_example(RuleUsageExample::valid(
-                "A `while` that condtionally continues",
+                "A `while` that conditionally continues",
                 indoc! {r#"
                     <?php
 

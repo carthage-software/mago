@@ -72,7 +72,7 @@ pub fn analyze_assignment<'a>(
         assignment_operator = None;
     }
 
-    analyze_assignement_target(target_expression, context, block_context, artifacts)?;
+    analyze_assignment_target(target_expression, context, block_context, artifacts)?;
 
     let target_variable_id = get_expression_id(
         target_expression,
@@ -683,7 +683,7 @@ fn analyze_destructuring<'a>(
     Ok(())
 }
 
-fn analyze_assignement_target<'a>(
+fn analyze_assignment_target<'a>(
     expression: &Expression,
     context: &mut Context<'a>,
     block_context: &mut BlockContext<'a>,
@@ -700,30 +700,30 @@ fn analyze_assignement_target<'a>(
             for element in elements.iter() {
                 match element {
                     ArrayElement::KeyValue(key_value_array_element) => {
-                        analyze_assignement_target(&key_value_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(&key_value_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Value(value_array_element) => {
-                        analyze_assignement_target(&value_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(&value_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Variadic(variadic_array_element) => {
-                        analyze_assignement_target(&variadic_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(&variadic_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Missing(_) => {}
                 }
             }
         }
         Expression::ArrayAccess(array_access) => {
-            analyze_assignement_target(&array_access.array, context, block_context, artifacts)?;
-            analyze_assignement_target(&array_access.index, context, block_context, artifacts)?;
+            analyze_assignment_target(&array_access.array, context, block_context, artifacts)?;
+            analyze_assignment_target(&array_access.index, context, block_context, artifacts)?;
         }
         Expression::Access(Access::Property(property_access)) => {
-            analyze_assignement_target(&property_access.object, context, block_context, artifacts)?;
+            analyze_assignment_target(&property_access.object, context, block_context, artifacts)?;
         }
         Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
-            analyze_assignement_target(&null_safe_property_access.object, context, block_context, artifacts)?;
+            analyze_assignment_target(&null_safe_property_access.object, context, block_context, artifacts)?;
         }
         Expression::Access(Access::StaticProperty(static_property_access)) => {
-            analyze_assignement_target(&static_property_access.class, context, block_context, artifacts)?;
+            analyze_assignment_target(&static_property_access.class, context, block_context, artifacts)?;
         }
         _ => {}
     }

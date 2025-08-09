@@ -356,14 +356,14 @@ fn update_array_assignment_child_type(
                             None
                         } else if existing_array.parameters.is_none() {
                             if let Some(known_items) = existing_array.known_items.as_ref() {
-                                let indeces = known_items
+                                let indices = known_items
                                     .keys()
                                     .map(|k| k.get_integer())
                                     .collect::<Option<Vec<_>>>()
                                     .unwrap_or_default();
 
-                                if indeces.is_empty() || indeces.iter().any(|&i| i >= 0) {
-                                    indeces.last().cloned()
+                                if indices.is_empty() || indices.iter().any(|&i| i >= 0) {
+                                    indices.last().cloned()
                                 } else {
                                     None
                                 }

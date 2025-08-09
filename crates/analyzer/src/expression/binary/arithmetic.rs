@@ -99,9 +99,9 @@ pub fn analyze_arithmetic_operation<'a>(
         );
     }
 
-    if is_arithmetic_compatiable_generic(context, &left_type, &right_type) {
+    if is_arithmetic_compatible_generic(context, &left_type, &right_type) {
         final_result_type = Some(left_type.as_ref().clone());
-    } else if is_arithmetic_compatiable_generic(context, &right_type, &left_type) {
+    } else if is_arithmetic_compatible_generic(context, &right_type, &left_type) {
         final_result_type = Some(right_type.as_ref().clone());
     }
 
@@ -472,7 +472,7 @@ pub fn analyze_arithmetic_operation<'a>(
 }
 
 #[inline]
-fn is_arithmetic_compatiable_generic<'a>(context: &Context<'a>, union: &TUnion, other_union: &TUnion) -> bool {
+fn is_arithmetic_compatible_generic<'a>(context: &Context<'a>, union: &TUnion, other_union: &TUnion) -> bool {
     if !union.is_single() {
         return false;
     }

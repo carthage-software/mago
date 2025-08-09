@@ -1,7 +1,7 @@
 use crate::definition::PluginDefinition;
 use crate::plugin::Plugin;
 use crate::plugin::redundancy::rules::redundant_block::RedundantBlockRule;
-use crate::plugin::redundancy::rules::redundant_closing_tag::RedudnantClosingTagRule;
+use crate::plugin::redundancy::rules::redundant_closing_tag::RedundantClosingTagRule;
 use crate::plugin::redundancy::rules::redundant_continue::RedundantContinueRule;
 use crate::plugin::redundancy::rules::redundant_file::RedundantFileRule;
 use crate::plugin::redundancy::rules::redundant_final_method_modifier::RedundantFinalMethodModifierRule;
@@ -33,7 +33,7 @@ impl Plugin for RedundancyPlugin {
         vec![
             Box::new(RedundantParenthesesRule),
             Box::new(RedundantBlockRule),
-            Box::new(RedudnantClosingTagRule),
+            Box::new(RedundantClosingTagRule),
             Box::new(RedundantContinueRule),
             Box::new(RedundantFileRule),
             Box::new(RedundantStringConcatRule),

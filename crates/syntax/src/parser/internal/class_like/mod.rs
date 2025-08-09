@@ -6,7 +6,7 @@ use crate::parser::internal::argument::parse_optional_argument_list;
 use crate::parser::internal::attribute::parse_attribute_list_sequence;
 use crate::parser::internal::class_like::inheritance::parse_optional_extends;
 use crate::parser::internal::class_like::inheritance::parse_optional_implements;
-use crate::parser::internal::class_like::member::parse_classlike_memeber;
+use crate::parser::internal::class_like::member::parse_classlike_member;
 use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::modifier::parse_modifier_sequence;
 use crate::parser::internal::token_stream::TokenStream;
@@ -38,7 +38,7 @@ pub fn parse_interface_with_attributes(
                     break;
                 }
 
-                members.push(parse_classlike_memeber(stream)?);
+                members.push(parse_classlike_member(stream)?);
             }
 
             Sequence::new(members)
@@ -76,7 +76,7 @@ pub fn parse_class_with_attributes_and_modifiers(
                     break;
                 }
 
-                members.push(parse_classlike_memeber(stream)?);
+                members.push(parse_classlike_member(stream)?);
             }
 
             Sequence::new(members)
@@ -102,7 +102,7 @@ pub fn parse_anonymous_class(stream: &mut TokenStream<'_, '_>) -> Result<Anonymo
                     break;
                 }
 
-                members.push(parse_classlike_memeber(stream)?);
+                members.push(parse_classlike_member(stream)?);
             }
 
             Sequence::new(members)
@@ -127,7 +127,7 @@ pub fn parse_trait_with_attributes(
                     break;
                 }
 
-                members.push(parse_classlike_memeber(stream)?);
+                members.push(parse_classlike_member(stream)?);
             }
             Sequence::new(members)
         },
@@ -153,7 +153,7 @@ pub fn parse_enum_with_attributes(
                     break;
                 }
 
-                members.push(parse_classlike_memeber(stream)?);
+                members.push(parse_classlike_member(stream)?);
             }
             Sequence::new(members)
         },

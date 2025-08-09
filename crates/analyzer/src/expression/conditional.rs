@@ -26,7 +26,7 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
-use crate::reconciler::ReconcilationContext;
+use crate::reconciler::ReconciliationContext;
 use crate::reconciler::assertion_reconciler;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::conditional;
@@ -173,11 +173,11 @@ pub(super) fn analyze_conditional<'a>(
 
     if !reconcilable_if_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &reconcilable_if_types,
             active_if_types,
             &mut if_block_context,
@@ -207,11 +207,11 @@ pub(super) fn analyze_conditional<'a>(
 
     if !if_scope.negated_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         reconcile_keyed_types(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &if_scope.negated_types,
             Default::default(), // todo: this is sort of a hack, we should probably pass the active types here
             &mut else_block_context,
@@ -345,11 +345,11 @@ pub(super) fn analyze_conditional<'a>(
             then_type = Some(rc_then_type);
         }
     } else if let Some(condition_type) = condition_type.as_ref() {
-        let mut reconcilation_context =
-            ReconcilationContext::new(context.interner, context.codebase, &mut context.collector);
+        let mut reconciliation_context =
+            ReconciliationContext::new(context.interner, context.codebase, &mut context.collector);
 
         let if_return_type_reconciled = assertion_reconciler::reconcile(
-            &mut reconcilation_context,
+            &mut reconciliation_context,
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
             false,

@@ -53,13 +53,13 @@ pub mod simple_negated_assertion_reconciler;
 mod macros;
 
 #[derive(Debug)]
-pub struct ReconcilationContext<'a, 's> {
+pub struct ReconciliationContext<'a, 's> {
     pub interner: &'a ThreadedInterner,
     pub codebase: &'a CodebaseMetadata,
     pub collector: &'a mut Collector<'s>,
 }
 
-impl<'a, 's> ReconcilationContext<'a, 's> {
+impl<'a, 's> ReconciliationContext<'a, 's> {
     pub fn new(
         interner: &'a ThreadedInterner,
         codebase: &'a CodebaseMetadata,
@@ -70,7 +70,7 @@ impl<'a, 's> ReconcilationContext<'a, 's> {
 }
 
 pub fn reconcile_keyed_types(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     new_types: &BTreeMap<String, Vec<Vec<Assertion>>>,
     mut active_new_types: BTreeMap<String, HashSet<usize>>,
     block_context: &mut BlockContext<'_>,
@@ -548,7 +548,7 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
 }
 
 fn get_value_for_key(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     key: String,
     block_context: &mut BlockContext<'_>,
     new_assertions: &BTreeMap<String, Vec<Vec<Assertion>>>,
@@ -851,7 +851,7 @@ fn get_value_for_key(
 }
 
 fn get_property_type(
-    context: &ReconcilationContext<'_, '_>,
+    context: &ReconciliationContext<'_, '_>,
     classlike_name: &StringIdentifier,
     property_name_str: &str,
 ) -> Option<TUnion> {
@@ -885,7 +885,7 @@ fn get_property_type(
 }
 
 pub(crate) fn trigger_issue_for_impossible(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     old_var_type_string: &String,
     key: &String,
     assertion: &Assertion,
@@ -930,7 +930,7 @@ pub(crate) fn trigger_issue_for_impossible(
 }
 
 fn report_impossible_issue(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_string: &String,
     key: &String,
@@ -1008,7 +1008,7 @@ fn report_impossible_issue(
 }
 
 fn report_redundant_issue(
-    context: &mut ReconcilationContext<'_, '_>,
+    context: &mut ReconciliationContext<'_, '_>,
     assertion: &Assertion,
     assertion_string: &String,
     key: &String,

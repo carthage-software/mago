@@ -101,7 +101,7 @@ impl TAtomic {
     }
 
     pub fn is_templated_as_mixed(&self) -> bool {
-        matches!(self, TAtomic::GenericParameter(parameter) if parameter.is_constrainted_as_mixed())
+        matches!(self, TAtomic::GenericParameter(parameter) if parameter.is_constrained_as_mixed())
     }
 
     pub fn map_generic_parameter_constraint<F, T>(&self, f: F) -> Option<T>
@@ -123,7 +123,7 @@ impl TAtomic {
         match self {
             TAtomic::Object(_) => true,
             TAtomic::Callable(callable) => callable.get_signature().is_none_or(|signature| signature.is_closure()),
-            TAtomic::GenericParameter(parameter) => parameter.is_constrainted_as_objecty(),
+            TAtomic::GenericParameter(parameter) => parameter.is_constrained_as_objecty(),
             _ => false,
         }
     }

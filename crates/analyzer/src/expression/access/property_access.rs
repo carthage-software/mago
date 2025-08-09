@@ -169,7 +169,7 @@ mod tests {
              *
              * @return null|non-empty-string
              */
-            function read_entrys(Collection $collection, int $key): null|string {
+            function read_entries(Collection $collection, int $key): null|string {
                 return $collection->items[$key] ?? null;
             }
         "#}
