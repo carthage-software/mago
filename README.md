@@ -2,13 +2,13 @@
     <img src="assets/banner.svg" alt="Mago Banner" width="600" />
 </p>
 
-<p align="center">
+<div align="center">
 
 **An extremely fast PHP linter, formatter, and static analyzer, written in Rust.**
 
-</p>
+</div>
 
-<p align="center">
+<div align="center">
 
 [![CI Status](https://github.com/carthage-software/mago/actions/workflows/ci.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/ci.yml)
 [![CD Status](https://github.com/carthage-software/mago/actions/workflows/cd.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/cd.yml)
@@ -18,7 +18,7 @@
 [![Total Composer Downloads](http://poser.pugx.org/carthage-software/mago/downloads)](https://packagist.org/packages/carthage-software/mago)
 [![License](https://img.shields.io/crates/l/mago.svg)](https://github.com/carthage-software/mago/blob/main/LICENSE-MIT)
 
-</p>
+</div>
 
 **Mago** is a comprehensive toolchain for PHP that helps developers write better code. Inspired by the Rust ecosystem, Mago brings speed, reliability, and an exceptional developer experience to PHP projects of all sizes.
 
