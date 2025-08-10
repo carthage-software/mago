@@ -87,7 +87,7 @@ jobs:
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: ./target/release/mago analyze --reporting-format=github
 
-  typos_check:
+  typos-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
