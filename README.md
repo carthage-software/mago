@@ -3,17 +3,21 @@
 </p>
 
 <p align="center">
-    <strong>An extremely fast PHP linter, formatter, and static analyzer, written in Rust.</strong>
+
+**An extremely fast PHP linter, formatter, and static analyzer, written in Rust.**
+
 </p>
 
 <p align="center">
-    <a href="https://github.com/carthage-software/mago/actions/workflows/ci.yml"><img src="https://github.com/carthage-software/mago/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
-    <a href="https://github.com/carthage-software/mago/actions/workflows/cd.yml"><img src="https://github.com/carthage-software/mago/actions/workflows/cd.yml/badge.svg" alt="CD Status"></a>
-    <a href="https://crates.io/crates/mago"><img src="https://img.shields.io/crates/v/mago.svg" alt="Crates.io"></a>
-    <a href="https://packagist.org/packages/carthage-software/mago"><img src="https://poser.pugx.org/carthage-software/mago/v" alt="Latest Stable Version for PHP"></a>
-    <a href="https://packagist.org/packages/carthage-software/mago"><img src="https://poser.pugx.org/carthage-software/mago/v/unstable" alt="Latest Unstable Version for PHP"></a>
-    <a href="https://packagist.org/packages/carthage-software/mago"><img src="http://poser.pugx.org/carthage-software/mago/downloads" alt="Total Composer Downloads"></a>
-    <a href="https://github.com/carthage-software/mago/blob/main/LICENSE-MIT"><img src="https://img.shields.io/crates/l/mago.svg" alt="License"></a>
+
+[![CI Status](https://github.com/carthage-software/mago/actions/workflows/ci.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/ci.yml)
+[![CD Status](https://github.com/carthage-software/mago/actions/workflows/cd.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/cd.yml)
+[![Crates.io](https://img.shields.io/crates/v/mago.svg)](https://crates.io/crates/mago)
+[![Latest Stable Version for PHP](https://poser.pugx.org/carthage-software/mago/v)](https://packagist.org/packages/carthage-software/mago)
+[![Latest Unstable Version for PHP](https://poser.pugx.org/carthage-software/mago/v/unstable)](https://packagist.org/packages/carthage-software/mago)
+[![Total Composer Downloads](http://poser.pugx.org/carthage-software/mago/downloads)](https://packagist.org/packages/carthage-software/mago)
+[![License](https://img.shields.io/crates/l/mago.svg)](https://github.com/carthage-software/mago/blob/main/LICENSE-MIT)
+
 </p>
 
 **Mago** is a comprehensive toolchain for PHP that helps developers write better code. Inspired by the Rust ecosystem, Mago brings speed, reliability, and an exceptional developer experience to PHP projects of all sizes.
