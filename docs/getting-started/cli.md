@@ -26,16 +26,6 @@ The `lint` command is used to analyze PHP files in your project and report any i
   - `--reporting-format`: Specify the output format for issue reports (e.g., `rich`, `github`, `json`, `checkstyle`, ...).
   - `--reporting-target`: Specify the target for issue reports (e.g., `stdout`, `stderr` ).
 
-### `mago fix`
-
-The `fix` command is used to automatically fix issues identified during linting.
-
-- Usage: `mago fix [OPTIONS]`
-- Options:
-  - `--dry-run`: Preview changes without applying them.
-  - `--unsafe`: Apply unsafe fixes.
-  - `--potentially-unsafe`: Apply potentially unsafe fixes.
-
 ### `mago help`
 
 The `help` command provides information about available commands and their usage.
