@@ -82,3 +82,12 @@ jobs:
       - name: Lint composer code
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: ./target/release/mago lint --reporting-format=github
+
+  typos-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Search for misspellings
+        uses: crate-ci/typos@master

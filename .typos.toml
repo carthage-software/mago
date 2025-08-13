@@ -1,0 +1,25 @@
+[files]
+extend-exclude = [
+    ".git/",
+    "stubs/extensions/",
+    "crates/formatter/tests/cases/array_alignment/after.php",
+    "crates/formatter/tests/cases/array_alignment/before.php",
+]
+ignore-hidden = false
+
+[default]
+extend-ignore-re = [
+    # Typo in cruet
+    "has_seperator: false",
+    '"k" \. "nown"',
+    '"abd00?"\.to_string',
+    "<<<FOF",
+    "FOF;",
+    '"nd",',
+]
+
+[default.extend-words]
+"trivias" = "trivias"
+
+[default.extend-identifiers]
+"Gaurd" = "Gaurd"
