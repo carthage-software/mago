@@ -1940,3 +1940,550 @@ class Imagick
     {
     }
 }
+
+class ImagickDraw
+{
+    public function affine(array $affine): bool
+    {
+    }
+
+    public function annotation(float $x, float $y, string $text): bool
+    {
+    }
+
+    public function arc(
+        float $start_x,
+        float $start_y,
+        float $end_x,
+        float $end_y,
+        float $start_angle,
+        float $end_angle,
+    ): bool {
+    }
+
+    public function bezier(array $coordinates): bool
+    {
+    }
+
+    public function circle(float $origin_x, float $origin_y, float $perimeter_x, float $perimeter_y): bool
+    {
+    }
+
+    public function clear(): bool
+    {
+    }
+
+    public function clone(): ImagickDraw
+    {
+    }
+
+    public function color(float $x, float $y, int $paint): bool
+    {
+    }
+
+    public function comment(string $comment): bool
+    {
+    }
+
+    public function composite(int $composite, float $x, float $y, float $width, float $height, Imagick $image): bool
+    {
+    }
+
+    public function destroy(): bool
+    {
+    }
+
+    public function ellipse(
+        float $origin_x,
+        float $origin_y,
+        float $radius_x,
+        float $radius_y,
+        float $angle_start,
+        float $angle_end,
+    ): bool {
+    }
+
+    public function getClipPath(): false|string
+    {
+    }
+
+    public function getClipRule(): int
+    {
+    }
+
+    public function getClipUnits(): int
+    {
+    }
+
+    public function getFillColor(): ImagickPixel
+    {
+    }
+
+    public function getFillOpacity(): float
+    {
+    }
+
+    public function getFillRule(): int
+    {
+    }
+
+    public function getFont(): string
+    {
+    }
+
+    public function getFontFamily(): string
+    {
+    }
+
+    public function getFontSize(): float
+    {
+    }
+
+    public function getFontStretch(): int
+    {
+    }
+
+    public function getFontStyle(): int
+    {
+    }
+
+    public function getFontWeight(): int
+    {
+    }
+
+    public function getGravity(): int
+    {
+    }
+
+    public function getStrokeAntialias(): bool
+    {
+    }
+
+    public function getStrokeColor(): ImagickPixel
+    {
+    }
+
+    public function getStrokeDashArray(): array
+    {
+    }
+
+    public function getStrokeDashOffset(): float
+    {
+    }
+
+    public function getStrokeLineCap(): int
+    {
+    }
+
+    public function getStrokeLineJoin(): int
+    {
+    }
+
+    public function getStrokeMiterLimit(): int
+    {
+    }
+
+    public function getStrokeOpacity(): float
+    {
+    }
+
+    public function getStrokeWidth(): float
+    {
+    }
+
+    public function getTextAlignment(): int
+    {
+    }
+
+    public function getTextAntialias(): bool
+    {
+    }
+
+    public function getTextDecoration(): int
+    {
+    }
+
+    public function getTextEncoding(): false|string
+    {
+    }
+
+    public function getTextInterlineSpacing(): float
+    {
+    }
+
+    public function getTextInterwordSpacing(): float
+    {
+    }
+
+    public function getTextKerning(): float
+    {
+    }
+
+    public function getTextUnderColor(): ImagickPixel
+    {
+    }
+
+    public function getVectorGraphics(): string
+    {
+    }
+
+    public function line(float $start_x, float $start_y, float $end_x, float $end_y): bool
+    {
+    }
+
+    public function matte(float $x, float $y, int $paint): bool
+    {
+    }
+
+    public function pathClose(): bool
+    {
+    }
+
+    public function pathCurveToAbsolute(float $x1, float $y1, float $x2, float $y2, float $x, float $y): bool
+    {
+    }
+
+    public function pathCurveToQuadraticBezierAbsolute(float $x1, float $y1, float $x_end, float $y): bool
+    {
+    }
+
+    public function pathCurveToQuadraticBezierRelative(float $x1, float $y1, float $x_end, float $y): bool
+    {
+    }
+
+    public function pathCurveToQuadraticBezierSmoothAbsolute(float $x, float $y): bool
+    {
+    }
+
+    public function pathCurveToQuadraticBezierSmoothRelative(float $x, float $y): bool
+    {
+    }
+
+    public function pathCurveToRelative(float $x1, float $y1, float $x2, float $y2, float $x, float $y): bool
+    {
+    }
+
+    public function pathCurveToSmoothAbsolute(float $x2, float $y2, float $x, float $y): bool
+    {
+    }
+
+    public function pathCurveToSmoothRelative(float $x2, float $y2, float $x, float $y): bool
+    {
+    }
+
+    public function pathEllipticArcAbsolute(
+        float $rx,
+        float $ry,
+        float $x_axis_rotation,
+        bool $large_arc,
+        bool $sweep,
+        float $x,
+        float $y,
+    ): bool {
+    }
+
+    public function pathEllipticArcRelative(
+        float $rx,
+        float $ry,
+        float $x_axis_rotation,
+        bool $large_arc,
+        bool $sweep,
+        float $x,
+        float $y,
+    ): bool {
+    }
+
+    public function pathFinish(): bool
+    {
+    }
+
+    public function pathLineToAbsolute(float $x, float $y): bool
+    {
+    }
+
+    public function pathLineToHorizontalAbsolute(float $x): bool
+    {
+    }
+
+    public function pathLineToHorizontalRelative(float $x): bool
+    {
+    }
+
+    public function pathLineToRelative(float $x, float $y): bool
+    {
+    }
+
+    public function pathLineToVerticalAbsolute(float $y): bool
+    {
+    }
+
+    public function pathLineToVerticalRelative(float $y): bool
+    {
+    }
+
+    public function pathMoveToAbsolute(float $x, float $y): bool
+    {
+    }
+
+    public function pathMoveToRelative(float $x, float $y): bool
+    {
+    }
+
+    public function pathStart(): bool
+    {
+    }
+
+    public function point(float $x, float $y): bool
+    {
+    }
+
+    public function polygon(array $coordinates): bool
+    {
+    }
+
+    public function polyline(array $coordinates): bool
+    {
+    }
+
+    public function pop(): bool
+    {
+    }
+
+    public function popClipPath(): bool
+    {
+    }
+
+    public function popDefs(): bool
+    {
+    }
+
+    public function popPattern(): bool
+    {
+    }
+
+    public function push(): bool
+    {
+    }
+
+    public function pushClipPath(string $clip_mask_id): bool
+    {
+    }
+
+    public function pushDefs(): bool
+    {
+    }
+
+    public function pushPattern(string $pattern_id, float $x, float $y, float $width, float $height): bool
+    {
+    }
+
+    public function rectangle(float $top_left_x, float $top_left_y, float $bottom_right_x, float $bottom_right_y): bool
+    {
+    }
+
+    public function render(): bool
+    {
+    }
+
+    public function resetVectorGraphics(): bool
+    {
+    }
+
+    public function rotate(float $degrees): bool
+    {
+    }
+
+    public function roundRectangle(
+        float $top_left_x,
+        float $top_left_y,
+        float $bottom_right_x,
+        float $bottom_right_y,
+        float $rounding_x,
+        float $rounding_y,
+    ): bool {
+    }
+
+    public function scale(float $x, float $y): bool
+    {
+    }
+
+    public function setClipPath(string $clip_mask): bool
+    {
+    }
+
+    public function setClipRule(int $fillrule): bool
+    {
+    }
+
+    public function setClipUnits(int $pathunits): bool
+    {
+    }
+
+    public function setFillAlpha(float $alpha): bool
+    {
+    }
+
+    public function setFillColor(ImagickPixel|string $fill_color): bool
+    {
+    }
+
+    public function setFillOpacity(float $opacity): bool
+    {
+    }
+
+    public function setFillPatternURL(string $fill_url): bool
+    {
+    }
+
+    public function setFillRule(int $fillrule): bool
+    {
+    }
+
+    public function setFont(string $font_name): bool
+    {
+    }
+
+    public function setFontFamily(string $font_family): bool
+    {
+    }
+
+    public function setFontSize(float $point_size): bool
+    {
+    }
+
+    public function setFontStretch(int $stretch): bool
+    {
+    }
+
+    public function setFontStyle(int $style): bool
+    {
+    }
+
+    public function setFontWeight(int $weight): bool
+    {
+    }
+
+    public function setGravity(int $gravity): bool
+    {
+    }
+
+    public function setResolution(float $resolution_x, float $resolution_y): bool
+    {
+    }
+
+    public function setStrokeAlpha(float $alpha): bool
+    {
+    }
+
+    public function setStrokeAntialias(bool $enabled): bool
+    {
+    }
+
+    public function setStrokeColor(ImagickPixel|string $color): bool
+    {
+    }
+
+    public function setStrokeDashArray(null|array $dashes): bool
+    {
+    }
+
+    public function setStrokeDashOffset(float $dash_offset): bool
+    {
+    }
+
+    public function setStrokeLineCap(int $linecap): bool
+    {
+    }
+
+    public function setStrokeLineJoin(int $linejoin): bool
+    {
+    }
+
+    public function setStrokeMiterLimit(int $miterlimit): bool
+    {
+    }
+
+    public function setStrokeOpacity(float $opacity): bool
+    {
+    }
+
+    public function setStrokePatternURL(string $stroke_url): bool
+    {
+    }
+
+    public function setStrokeWidth(float $width): bool
+    {
+    }
+
+    public function setTextAlignment(int $align): bool
+    {
+    }
+
+    public function setTextAntialias(bool $antialias): bool
+    {
+    }
+
+    public function setTextDecoration(int $decoration): bool
+    {
+    }
+
+    public function setTextEncoding(string $encoding): bool
+    {
+    }
+
+    public function setTextInterlineSpacing(float $spacing): bool
+    {
+    }
+
+    public function setTextInterwordSpacing(float $spacing): bool
+    {
+    }
+
+    public function setTextKerning(float $kerning): bool
+    {
+    }
+
+    public function setTextUnderColor(ImagickPixel|string $under_color): bool
+    {
+    }
+
+    public function setVectorGraphics(string $xml): bool
+    {
+    }
+
+    public function setViewbox(int $left_x, int $top_y, int $right_x, int $bottom_y): bool
+    {
+    }
+
+    public function skewX(float $degrees): bool
+    {
+    }
+
+    public function skewY(float $degrees): bool
+    {
+    }
+
+    public function translate(float $x, float $y): bool
+    {
+    }
+}
+
+class ImagickException extends Exception
+{
+}
+
+class ImagickDrawException extends Exception
+{
+}
+
+class ImagickPixelIteratorException extends Exception
+{
+}
+
+class ImagickPixelException extends Exception
+{
+}
+
+class ImagickKernelException extends Exception
+{
+}
