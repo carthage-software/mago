@@ -142,3 +142,5 @@ test_case!(reference_constraint_violation);
 test_case!(unreferencable_expression);
 test_case!(pass_by_ref);
 test_case!(return_by_ref);
+test_case!(array_refs);
+test_case!(ref_constraint_conflict);
