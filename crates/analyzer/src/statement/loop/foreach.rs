@@ -24,29 +24,20 @@ impl Analyzable for Foreach {
         block_context: &mut BlockContext<'a>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let mut has_reference = false;
         let mut safe_variable_ids = HashSet::default();
         if let Some(key_expression) = self.target.key() {
-            let (key_has_references, key_safe_variables) =
-                r#loop::scrape_variables_from_expression(context, key_expression);
-
-            has_reference = key_has_references;
-            safe_variable_ids.extend(key_safe_variables);
+            safe_variable_ids.extend(r#loop::scrape_variables_from_expression(context, key_expression));
         }
 
-        let (value_has_references, value_safe_variables) =
-            r#loop::scrape_variables_from_expression(context, self.target.value());
+        let value_safe_variables = r#loop::scrape_variables_from_expression(context, self.target.value());
 
-        has_reference |= value_has_references;
         safe_variable_ids.extend(value_safe_variables);
 
         let iterator = self.expression.as_ref();
-        has_reference = has_reference
-            || if let Expression::UnaryPrefix(UnaryPrefix { operator, .. }) = iterator {
-                matches!(operator, UnaryPrefixOperator::Reference(_))
-            } else {
-                false
-            };
+        let is_by_reference = match &self.target {
+            ForeachTarget::Value(v) => v.value.is_reference(),
+            ForeachTarget::KeyValue(kv) => kv.value.is_reference(),
+        };
 
         let iterator_variable_id = get_expression_id(
             iterator,
@@ -56,7 +47,7 @@ impl Analyzable for Foreach {
             Some(context.codebase),
         );
 
-        let (always_enters_loop, key_type, value_type) =
+        let (always_enters_loop, key_type, mut value_type) =
             r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id.as_ref(), self)?;
 
         if key_type.is_never() || value_type.is_never() {
@@ -112,6 +103,14 @@ impl Analyzable for Foreach {
             Some(context.codebase),
         );
 
+        value_type.by_reference = is_by_reference;
+
+        if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
+            let variable_str = context.interner.lookup(&direct_variable.name);
+
+            loop_block_context.references_to_external_scope.remove(variable_str);
+        };
+
         let assigned = assign_to_expression(
             context,
             &mut loop_block_context,
@@ -138,17 +137,11 @@ impl Analyzable for Foreach {
             );
         }
 
-        if has_reference {
-            context.collector.report_with_code(
-                Code::UNSUPPORTED_REFERENCE_OPERATION,
-                Issue::error("Using references in `foreach` is not supported.")
-                    .with_annotation(
-                        Annotation::primary(self.span()).with_message("References in `foreach` are not supported"),
-                    )
-                    .with_note("Using references in `foreach` is not yet supported by the analyzer.")
-                    .with_help("Consider using a regular variable assignment instead of a reference."),
-            );
-        }
+        if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
+            let variable_str = context.interner.lookup(&direct_variable.name);
+
+            loop_block_context.references_to_external_scope.insert(variable_str.to_string());
+        };
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
 

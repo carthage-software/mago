@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::ops::Add;
 use std::ops::Sub;
+use std::rc::Rc;
 
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_method_id;
@@ -62,29 +63,13 @@ impl Analyzable for UnaryPrefix {
 
         let operand_type = artifacts.get_rc_expression_type(&self.operand).cloned();
         match self.operator {
-            UnaryPrefixOperator::Reference(reference_span) => {
-                context.collector.report_with_code(
-                    Code::UNSUPPORTED_REFERENCE_OPERATION,
-                    Issue::warning("Mago's analysis has limited support for by-reference operations (`&`).")
-                        .with_annotation(
-                            Annotation::primary(reference_span).with_message("By-reference operation (`&`) used here"),
-                        )
-                        .with_annotation(Annotation::secondary(self.operand.span()).with_message("On this expression"))
-                        .with_note("Mago's type analysis will generally treat this as a value, not a true reference.")
-                        .with_note(
-                            "Full alias tracking or by-reference modification effects may not be accurately reflected.",
-                        )
-                        .with_note("This can lead to incorrect type inferences or missed diagnostics.")
-                        .with_help("Avoid explicit `&` here; use objects for shared mutable state if needed."),
-                );
-
-                if let Some(operand_type) = operand_type {
-                    artifacts.set_rc_expression_type(self, operand_type);
-                } else {
-                    artifacts.set_expression_type(self, get_mixed());
-                }
-            }
             // operators that always retain the type of the operand
+            UnaryPrefixOperator::Reference(_) => {
+                let mut referenced_type = operand_type.map(|t| t.as_ref().clone()).unwrap_or_else(get_mixed);
+                referenced_type.by_reference = true;
+
+                artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
+            }
             UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::Plus(_) => {
                 if let Some(operand_type) = operand_type {
                     artifacts.set_rc_expression_type(self, operand_type);

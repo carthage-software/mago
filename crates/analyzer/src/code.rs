@@ -148,8 +148,6 @@ impl Code {
     pub const INVALID_FOREACH_VALUE: &'static str = "invalid-foreach-value";
     pub const UNDEFINED_VARIABLE_IN_CLOSURE_USE: &'static str = "undefined-variable-in-closure-use";
     pub const DUPLICATE_CLOSURE_USE_VARIABLE: &'static str = "duplicate-closure-use-variable";
-    pub const UNSUPPORTED_REFERENCE_IN_CLOSURE_USE: &'static str = "unsupported-reference-in-closure-use";
-    pub const UNSUPPORTED_REFERENCE_OPERATION: &'static str = "unsupported-reference-operation";
     pub const INVALID_YIELD_VALUE_TYPE: &'static str = "invalid-yield-value-type";
     pub const INVALID_YIELD_KEY_TYPE: &'static str = "invalid-yield-key-type";
     pub const UNKNOWN_YIELD_FROM_ITERATOR_TYPE: &'static str = "unknown-yield-from-iterator-type";
@@ -240,4 +238,6 @@ impl Code {
     pub const INVALID_ISSET_EXPRESSION: &'static str = "invalid-isset-expression";
     pub const INVALID_TRAIT_USE: &'static str = "invalid-trait-use";
     pub const PSALM_TRACE: &'static str = "psalm-trace";
+    pub const REFERENCE_CONSTRAINT_VIOLATION: &'static str = "reference-constraint-violation";
+    pub const INVALID_PASS_BY_REFERENCE: &'static str = "invalid-pass-by-reference";
 }

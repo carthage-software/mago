@@ -134,6 +134,7 @@ pub fn analyze_invocation<'a>(
             context,
             block_context,
             artifacts,
+            &invocation.target,
             argument_expression,
             *argument_offset,
             &mut analyzed_argument_types,
@@ -199,6 +200,7 @@ pub fn analyze_invocation<'a>(
             context,
             block_context,
             artifacts,
+            &invocation.target,
             argument_expression,
             *argument_offset,
             &mut analyzed_argument_types,
@@ -448,6 +450,7 @@ pub fn analyze_invocation<'a>(
                             context,
                             block_context,
                             artifacts,
+                            &invocation.target,
                             argument_expression,
                             usize::MAX,
                             &mut analyzed_argument_types,
@@ -703,6 +706,7 @@ fn analyze_and_store_argument_type<'a>(
     context: &mut Context<'a>,
     block_context: &mut BlockContext<'a>,
     artifacts: &mut AnalysisArtifacts,
+    invocation_target: &InvocationTarget<'_>,
     argument_expression: &Expression,
     argument_offset: usize,
     analyzed_argument_types: &mut HashMap<usize, (TUnion, Span)>,
@@ -757,6 +761,29 @@ fn analyze_and_store_argument_type<'a>(
 
     if argument_offset != usize::MAX {
         analyzed_argument_types.insert(argument_offset, (argument_type, argument_expression.span()));
+    }
+
+    if referenced_parameter && !argument_expression.is_referenceable() {
+        let target_kind_str = invocation_target.guess_kind();
+        let target_name_str = invocation_target.guess_name(context.interner);
+
+        context.collector.report_with_code(
+            Code::INVALID_PASS_BY_REFERENCE,
+            Issue::error(format!(
+                "Argument #{} of {} `{}` cannot be passed by reference.",
+                argument_offset + 1,
+                target_kind_str,
+                target_name_str,
+            ))
+            .with_annotation(
+                Annotation::primary(argument_expression.span())
+                    .with_message("This expression is not a valid reference."),
+            )
+            .with_note(
+                "Only variables, array elements, or object properties can be passed by reference. Literals and the results of most expressions cannot."
+            )
+            .with_help("To fix this, assign this value to a variable first, and then pass the variable to the function."),
+        );
     }
 
     Ok(())

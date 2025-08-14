@@ -147,7 +147,33 @@ pub fn handle_return_value<'a>(
         },
     );
 
-    if return_value.is_some() {
+    let function_name = function_like_identifier.as_string(context.interner);
+
+    if let Some(return_value) = return_value {
+        if function_like_metadata.flags.is_by_reference() {
+            inferred_return_type.by_reference = true;
+
+            if !return_value.is_referenceable() {
+                context.collector.report_with_code(
+                    Code::INVALID_RETURN_STATEMENT,
+                    Issue::error(format!(
+                        "Cannot return a reference to a non-variable expression in function `{function_name}`.",
+                    ))
+                    .with_annotation(Annotation::primary(return_value.span()).with_message(
+                        "This expression cannot be referenced.",
+                    ))
+                    .with_annotation(
+                        Annotation::primary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+                            .with_message(
+                                format!("Function `{function_name}` is declared to return a reference."),
+                            ),
+                    )
+                    .with_note("A function declared to return a reference must return a variable, a property, or an array element.")
+                    .with_help("Change the return type declaration to not return a reference, or ensure that the returned value is a variable, property, or array element."),
+                );
+            }
+        }
+
         artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 
@@ -188,8 +214,6 @@ pub fn handle_return_value<'a>(
 
             get_mixed()
         };
-
-    let function_name = function_like_identifier.as_string(context.interner);
 
     if function_like_metadata.flags.has_yield() {
         match get_generator_return_type(context, &expected_return_type) {

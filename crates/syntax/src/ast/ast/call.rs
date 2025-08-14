@@ -51,6 +51,11 @@ pub struct StaticMethodCall {
 
 impl Call {
     #[inline]
+    pub const fn is_null_safe(&self) -> bool {
+        matches!(self, Call::NullSafeMethod(_))
+    }
+
+    #[inline]
     pub fn get_argument_list(&self) -> &ArgumentList {
         match self {
             Call::Function(f) => &f.argument_list,

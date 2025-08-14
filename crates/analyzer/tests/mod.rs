@@ -138,3 +138,5 @@ test_case!(value_of_enum_resolution);
 test_case!(assert_or_type);
 test_case!(infere_closure_parameter_type);
 test_case!(negated_union_type);
+test_case!(reference_constraint_violation);
+test_case!(unreferencable_expression);

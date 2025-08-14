@@ -1,5 +1,3 @@
-use ahash::HashMap;
-
 use mago_codex::context::ScopeContext;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -70,11 +68,10 @@ impl Analyzable for Method {
         analyze_function_like(
             context,
             artifacts,
-            scope,
+            &mut BlockContext::new(scope),
             method_metadata,
             &self.parameter_list,
             FunctionLikeBody::Statements(concrete_body.statements.as_slice()),
-            HashMap::default(),
             None,
         )?;
 

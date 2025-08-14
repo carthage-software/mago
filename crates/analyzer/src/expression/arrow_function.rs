@@ -1,5 +1,5 @@
-use ahash::HashMap;
 use ahash::HashSet;
+
 use mago_codex::context::ScopeContext;
 use mago_codex::get_closure;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -45,35 +45,38 @@ impl Analyzable for ArrowFunction {
         scope.set_class_like(block_context.scope.get_class_like());
         scope.set_static(self.r#static.is_some());
 
-        let mut imported_variables = HashMap::default();
+        let mut inner_block_context = BlockContext::new(scope);
+
         let variables = get_variables_referenced_in_expression(self.expression.as_ref(), true);
-        let parameter_names =
-            self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();
+        let params = self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();
 
         for (variable, _) in variables {
-            if parameter_names.contains(&variable) {
+            if params.contains(&variable) {
                 continue;
             }
 
-            let variable_str = context.interner.lookup(&variable);
-            if imported_variables.contains_key(variable_str) {
+            let imported_variable = context.interner.lookup(&variable);
+            if inner_block_context.variables_possibly_in_scope.contains(imported_variable) {
                 continue;
             }
 
-            if let Some(existing_type) = block_context.locals.get(variable_str).cloned() {
-                imported_variables.insert(variable_str.to_string(), existing_type);
+            block_context.add_conditionally_referenced_variable(imported_variable);
+
+            if let Some(existing_type) = block_context.locals.get(imported_variable).cloned() {
+                inner_block_context.locals.insert(imported_variable.to_string(), existing_type);
             }
+
+            inner_block_context.variables_possibly_in_scope.insert(imported_variable.to_string());
         }
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
-        let (_, inner_artifacts) = analyze_function_like(
+        let inner_artifacts = analyze_function_like(
             context,
             artifacts,
-            scope,
+            &mut inner_block_context,
             function_metadata,
             &self.parameter_list,
             FunctionLikeBody::Expression(&self.expression),
-            imported_variables,
             inferred_parameter_types,
         )?;
 

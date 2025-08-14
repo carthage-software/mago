@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 
-use mago_codex::context::ScopeContext;
 use mago_codex::get_class_like;
 use mago_codex::get_interface;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
@@ -25,16 +25,14 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_reporting::Annotation;
-use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::code::Code;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraint;
 use crate::error::AnalysisError;
 use crate::resolver::property::localize_property_type;
 use crate::statement::analyze_statements;
@@ -54,37 +52,30 @@ pub enum FunctionLikeBody<'a> {
 pub fn analyze_function_like<'a, 'ast>(
     context: &mut Context<'a>,
     parent_artifacts: &mut AnalysisArtifacts,
-    scope: ScopeContext<'a>,
+    block_context: &mut BlockContext<'a>,
     function_like_metadata: &'a FunctionLikeMetadata,
     parameter_list: &'ast FunctionLikeParameterList,
     body: FunctionLikeBody<'ast>,
-    import_variables: HashMap<String, Rc<TUnion>>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
-) -> Result<(BlockContext<'a>, AnalysisArtifacts), AnalysisError> {
+) -> Result<AnalysisArtifacts, AnalysisError> {
     let mut previous_type_resolution_context = std::mem::replace(
         &mut context.type_resolution_context,
         function_like_metadata.type_resolution_context.clone().unwrap_or_default(),
     );
 
-    let mut block_context = BlockContext::new(scope);
     let mut artifacts = AnalysisArtifacts::new();
 
     add_parameter_types_to_context(
         context,
-        &mut block_context,
+        block_context,
         &mut artifacts,
         function_like_metadata,
         parameter_list,
         inferred_parameter_types,
     )?;
 
-    for (variable_name, variable_type) in import_variables {
-        block_context.possibly_assigned_variable_ids.insert(variable_name.clone());
-        block_context.locals.insert(variable_name, variable_type);
-    }
-
-    if !scope.is_static()
-        && let Some(class_like_metadata) = scope.get_class_like()
+    if !block_context.scope.is_static()
+        && let Some(class_like_metadata) = block_context.scope.get_class_like()
     {
         block_context.locals.insert(
             "$this".to_string(),
@@ -113,30 +104,23 @@ pub fn analyze_function_like<'a, 'ast>(
     if let Some(calling_class) = block_context.scope.get_class_like_name()
         && let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, calling_class)
     {
-        add_properties_to_context(context, &mut block_context, class_like_metadata, function_like_metadata)?;
+        add_properties_to_context(context, block_context, class_like_metadata, function_like_metadata)?;
     }
 
     if !function_like_metadata.flags.is_unchecked() {
         match body {
             FunctionLikeBody::Statements(statements) => {
-                analyze_statements(statements, context, &mut block_context, &mut artifacts)?;
+                analyze_statements(statements, context, block_context, &mut artifacts)?;
             }
             FunctionLikeBody::Expression(value) => {
                 block_context.inside_return = true;
-                value.analyze(context, &mut block_context, &mut artifacts)?;
+                value.analyze(context, block_context, &mut artifacts)?;
                 block_context.inside_return = false;
                 block_context.conditionally_referenced_variable_ids = Default::default();
 
                 let value_type = artifacts.get_expression_type(value).cloned().unwrap_or_else(get_mixed);
 
-                handle_return_value(
-                    context,
-                    &mut block_context,
-                    &mut artifacts,
-                    Some(value),
-                    value_type,
-                    value.span(),
-                )?;
+                handle_return_value(context, block_context, &mut artifacts, Some(value), value_type, value.span())?;
             }
         }
     }
@@ -146,7 +130,7 @@ pub fn analyze_function_like<'a, 'ast>(
         parent_artifacts.expression_types.insert(expression_range, expression_type);
     }
 
-    Ok((block_context, artifacts))
+    Ok(artifacts)
 }
 
 fn add_parameter_types_to_context<'a>(
@@ -158,76 +142,39 @@ fn add_parameter_types_to_context<'a>(
     mut inferred_parameter_types: Option<HashMap<usize, TUnion>>,
 ) -> Result<(), AnalysisError> {
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
-        let declared_parameter_type = if let Some(type_signature) = parameter_metadata.get_type_metadata() {
-            add_symbol_references(
-                &type_signature.type_union,
-                block_context.scope.get_function_like_identifier().as_ref(),
-                artifacts,
-            );
+        let parameter_variable_str = context.interner.lookup(&parameter_metadata.get_name().0);
 
-            let signature_union = type_signature.type_union.clone();
-
-            if !signature_union.is_mixed() {
-                let mut parameter_type = signature_union.clone();
-                let calling_class = block_context.scope.get_class_like_name();
-
-                expander::expand_union(
-                    context.codebase,
-                    context.interner,
-                    &mut parameter_type,
-                    &TypeExpansionOptions {
-                        self_class: calling_class,
-                        static_class_type: if let Some(calling_class) = calling_class {
-                            StaticClassType::Name(*calling_class)
-                        } else {
-                            StaticClassType::None
-                        },
-                        evaluate_class_constants: true,
-                        evaluate_conditional_types: true,
-                        function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
-                            method_metadata.is_final
-                        } else {
-                            false
-                        },
-                        expand_generic: true,
-                        expand_templates: true,
-                        ..Default::default()
-                    },
-                );
-
-                for type_node in parameter_type.get_all_child_nodes() {
-                    if let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = type_node {
-                        context.collector.report_with_code(
-                            Code::NON_EXISTENT_CLASS_LIKE,
-                            Issue::error(format!(
-                                "Class or interface or enum `{}` not found",
-                                context.interner.lookup(name)
-                            ))
-                            .with_annotation(Annotation::primary(type_signature.span).with_message(
-                                "This type contains a reference to a class or interface or enum that does not exist.",
-                            ))
-                            .with_note("Ensure that the class or interface or enum is defined and imported correctly.")
-                            .with_help("If this is a class or interface or enum that is defined in another file, ensure that the file is included or autoloaded correctly."),
-                        );
-                    }
-                }
-
-                parameter_type
-            } else {
-                signature_union
-            }
+        let declared_parameter_type = if let Some(type_metadata) = parameter_metadata.get_type_metadata() {
+            expand_type_metadata(context, block_context, artifacts, function_like_metadata, type_metadata)
         } else {
             get_mixed()
         };
 
         // Now, decide which type to use: the inferred one or the declared one.
-        let final_parameter_type = if let Some(inferred_map) = inferred_parameter_types.as_mut() {
+        let mut final_parameter_type = if let Some(inferred_map) = inferred_parameter_types.as_mut() {
             // If an inferred type exists for this parameter index, take it.
             // Otherwise, fall back to the type we derived from the signature.
             inferred_map.remove(&i).unwrap_or(declared_parameter_type)
         } else {
             declared_parameter_type
         };
+
+        if parameter_metadata.flags.is_by_reference() {
+            final_parameter_type.by_reference = parameter_metadata.flags.is_by_reference();
+
+            let constraint_type = parameter_metadata
+                .out_type
+                .as_ref()
+                .map(|type_metadata| {
+                    expand_type_metadata(context, block_context, artifacts, function_like_metadata, type_metadata)
+                })
+                .unwrap_or_else(|| final_parameter_type.clone());
+
+            block_context.by_reference_constraints.insert(
+                parameter_variable_str.to_string(),
+                ReferenceConstraint::new(parameter_metadata.span, true, Some(constraint_type)),
+            );
+        }
 
         let parameter_node = if let Some(parameter_node) = parameter_list.parameters.get(i) {
             parameter_node
@@ -257,13 +204,59 @@ fn add_parameter_types_to_context<'a>(
             final_parameter_type
         };
 
-        block_context.locals.insert(
-            context.interner.lookup(&parameter_metadata.get_name().0).to_string(),
-            Rc::new(final_parameter_type),
-        );
+        block_context.locals.insert(parameter_variable_str.to_string(), Rc::new(final_parameter_type));
     }
 
     Ok(())
+}
+
+fn expand_type_metadata<'a>(
+    context: &mut Context<'a>,
+    block_context: &mut BlockContext<'a>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &FunctionLikeMetadata,
+    type_metadata: &TypeMetadata,
+) -> TUnion {
+    add_symbol_references(
+        &type_metadata.type_union,
+        block_context.scope.get_function_like_identifier().as_ref(),
+        artifacts,
+    );
+
+    let signature_union = type_metadata.type_union.clone();
+
+    if !signature_union.is_mixed() {
+        let mut parameter_type = signature_union.clone();
+        let calling_class = block_context.scope.get_class_like_name();
+
+        expander::expand_union(
+            context.codebase,
+            context.interner,
+            &mut parameter_type,
+            &TypeExpansionOptions {
+                self_class: calling_class,
+                static_class_type: if let Some(calling_class) = calling_class {
+                    StaticClassType::Name(*calling_class)
+                } else {
+                    StaticClassType::None
+                },
+                evaluate_class_constants: true,
+                evaluate_conditional_types: true,
+                function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
+                    method_metadata.is_final
+                } else {
+                    false
+                },
+                expand_generic: true,
+                expand_templates: true,
+                ..Default::default()
+            },
+        );
+
+        parameter_type
+    } else {
+        signature_union
+    }
 }
 
 fn add_properties_to_context<'a>(

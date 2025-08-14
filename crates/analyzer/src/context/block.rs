@@ -10,6 +10,8 @@ use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_collector::Collector;
@@ -33,6 +35,13 @@ pub enum BreakContext {
 }
 
 #[derive(Clone, Debug)]
+pub struct ReferenceConstraint {
+    pub constraint_span: Span,
+    pub is_parameter: bool,
+    pub constraint_type: Option<TUnion>,
+}
+
+#[derive(Clone, Debug)]
 pub struct BlockContext<'a> {
     pub scope: ScopeContext<'a>,
     pub locals: BTreeMap<String, Rc<TUnion>>,
@@ -41,6 +50,29 @@ pub struct BlockContext<'a> {
     pub conditionally_referenced_variable_ids: HashSet<String>,
     pub assigned_variable_ids: HashMap<String, u32>,
     pub possibly_assigned_variable_ids: HashSet<String>,
+
+    /// Maps variable names to the number of times they have been referenced in the current scope.
+    ///
+    /// This might not contain all variables in `locals`, as it is only updated when a variable is referenced.
+    pub referenced_counts: HashMap<String, u32>,
+
+    /// Maps variable names to the local variable that they reference.
+    ///
+    /// All keys and values in this map are guaranteed to be set in `locals`.
+    pub references_in_scope: HashMap<String, String>,
+
+    /// Set of references to variables in another scope. These references will be marked as used if they are assigned to.
+    pub references_to_external_scope: HashSet<String>,
+
+    /// A set of references that might still be in scope from a scope likely to cause confusion. This applies
+    /// to references set inside a loop or if statement, since it's easy to forget about PHP's weird scope
+    /// rules, and assigning to a reference will change the referenced variable rather than shadowing it.
+    pub references_possibly_from_confusing_scope: HashSet<String>,
+
+    /// A map of variable names to their reference constraints,
+    /// where the key is the variable name and the value is the reference constraint.
+    pub by_reference_constraints: HashMap<String, ReferenceConstraint>,
+
     pub inside_conditional: bool,
     pub inside_coalescing: bool,
     pub inside_isset: bool,
@@ -84,6 +116,31 @@ impl BreakContext {
     }
 }
 
+impl ReferenceConstraint {
+    pub fn new(constraint_span: Span, is_parameter: bool, constraint_type: Option<TUnion>) -> Self {
+        let constraint_type = match constraint_type {
+            Some(mut constraint_type) => {
+                if constraint_type.has_literal_string() {
+                    constraint_type.types.push(TAtomic::Scalar(TScalar::string()));
+                }
+
+                if constraint_type.has_literal_int() {
+                    constraint_type.types.push(TAtomic::Scalar(TScalar::int()));
+                }
+
+                if constraint_type.has_literal_float() {
+                    constraint_type.types.push(TAtomic::Scalar(TScalar::float()));
+                }
+
+                Some(constraint_type)
+            }
+            None => None,
+        };
+
+        Self { constraint_span, is_parameter, constraint_type }
+    }
+}
+
 impl<'a> BlockContext<'a> {
     pub fn new(scope: ScopeContext<'a>) -> Self {
         Self {
@@ -94,6 +151,11 @@ impl<'a> BlockContext<'a> {
             conditionally_referenced_variable_ids: HashSet::default(),
             assigned_variable_ids: HashMap::default(),
             possibly_assigned_variable_ids: HashSet::default(),
+            referenced_counts: HashMap::default(),
+            references_in_scope: HashMap::default(),
+            references_to_external_scope: HashSet::default(),
+            references_possibly_from_confusing_scope: HashSet::default(),
+            by_reference_constraints: HashMap::default(),
             inside_conditional: false,
             inside_coalescing: false,
             inside_isset: false,
@@ -128,6 +190,24 @@ impl<'a> BlockContext<'a> {
 
     pub fn is_global_scope(&self) -> bool {
         self.scope.is_global()
+    }
+
+    pub fn update_references_possibly_from_confusing_scope(&mut self, confusing_scope_context: &BlockContext<'_>) {
+        let references = confusing_scope_context
+            .references_in_scope
+            .keys()
+            .chain(confusing_scope_context.references_to_external_scope.iter());
+
+        for reference_id in references {
+            if !self.references_in_scope.contains_key(reference_id)
+                && !self.references_to_external_scope.contains(reference_id)
+            {
+                self.references_possibly_from_confusing_scope.insert(reference_id.to_owned());
+            }
+        }
+
+        self.references_possibly_from_confusing_scope
+            .extend(confusing_scope_context.references_possibly_from_confusing_scope.iter().cloned());
     }
 
     pub fn get_redefined_locals(
@@ -378,8 +458,40 @@ impl<'a> BlockContext<'a> {
         });
     }
 
+    /// Registers a variable that is referenced conditionally, like in a property
+    /// or array access (`$foo->bar`, `$foo[0]`).
+    pub fn add_conditionally_referenced_variable(&mut self, var_name: &str) {
+        /// Strips an accessor suffix (from the first `->` or `[`) from a variable name.
+        /// Returns the original slice if no accessor is found.
+        fn strip_accessor_suffix(var_name: &str) -> &str {
+            let first_separator_pos = var_name
+                .find("->")
+                .map(|pos| {
+                    // If we find '->', see if '[' comes before it.
+                    var_name.find('[').map_or(pos, |bracket_pos| pos.min(bracket_pos))
+                })
+                .or_else(|| {
+                    // If '->' wasn't found, just look for '['.
+                    var_name.find('[')
+                });
+
+            if let Some(pos) = first_separator_pos { &var_name[..pos] } else { var_name }
+        }
+
+        let stripped_var = strip_accessor_suffix(var_name);
+
+        // A variable is conditionally referenced if it's part of an access chain
+        // (i.e., its suffix was stripped) and the base variable is not `$this`.
+        if stripped_var != var_name && stripped_var != "$this" {
+            self.conditionally_referenced_variable_ids.insert(var_name.to_owned());
+        }
+    }
+
+    /// Checks if a variable exists in the local scope, while also registering it
+    /// as a conditionally referenced variable if it's part of an access chain.
+    #[must_use]
     pub fn has_variable(&mut self, var_name: &str) -> bool {
-        self.conditionally_referenced_variable_ids.insert(var_name.to_owned());
+        self.add_conditionally_referenced_variable(var_name);
         self.locals.contains_key(var_name)
     }
 
@@ -403,6 +515,36 @@ impl<'a> BlockContext<'a> {
     }
 
     pub fn remove_possible_reference(&mut self, remove_var_id: &String) {
+        if let Some(reference_count) = self.referenced_counts.get(remove_var_id)
+            && *reference_count > 0
+        {
+            // If a referenced variable goes out of scope, we need to update the references.
+            // All of the references to this variable are still references to the same value,
+            // so we pick the first one and make the rest of the references point to it.
+            let mut references = vec![];
+            for (reference, referenced) in &self.references_in_scope {
+                if referenced == remove_var_id {
+                    references.push(reference.to_owned());
+                }
+            }
+
+            for reference in references.iter() {
+                self.references_in_scope.remove(reference);
+            }
+
+            let first_reference = references.remove(0);
+            if !references.is_empty() {
+                self.referenced_counts.insert(first_reference.to_owned(), references.len() as u32);
+                for reference in references {
+                    self.references_in_scope.insert(reference.to_owned(), first_reference.to_owned());
+                }
+            }
+        }
+
+        if self.references_in_scope.contains_key(remove_var_id) {
+            self.decrement_reference_count(remove_var_id);
+        }
+
         self.locals.remove(remove_var_id);
         self.variables_possibly_in_scope.remove(remove_var_id);
         self.assigned_variable_ids.remove(remove_var_id);
@@ -456,6 +598,27 @@ impl<'a> BlockContext<'a> {
 
             self.locals.insert(variable_id.clone(), Rc::new(resulting_type));
         }
+    }
+
+    /// Decrement the reference count of the variable that $ref_id is referring to. This needs to
+    /// be done before $ref_id is changed to no longer reference its currently referenced variable,
+    /// for example by unsetting, reassigning to another reference, or being shadowed by a global.
+    pub fn decrement_reference_count(&mut self, ref_id: &str) -> bool {
+        let Some(ref_id) = self.references_in_scope.get(ref_id) else {
+            return false;
+        };
+
+        let Some(reference_count) = self.referenced_counts.get_mut(ref_id) else {
+            return false;
+        };
+
+        if *reference_count < 1 {
+            return false;
+        }
+
+        *reference_count -= 1;
+
+        true
     }
 }
 

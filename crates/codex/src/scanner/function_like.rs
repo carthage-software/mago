@@ -45,6 +45,10 @@ pub fn scan_method(
         flags |= MetadataFlags::BUILTIN;
     }
 
+    if method.ampersand.is_some() {
+        flags |= MetadataFlags::BY_REFERENCE;
+    }
+
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span, flags);
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
@@ -123,6 +127,10 @@ pub fn scan_function(
         flags |= MetadataFlags::HAS_THROW;
     }
 
+    if function.ampersand.is_some() {
+        flags |= MetadataFlags::BY_REFERENCE;
+    }
+
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags)
         .with_name(Some(functionlike_id.1), Some(function.name.span))
         .with_parameters(
@@ -172,6 +180,10 @@ pub fn scan_closure(
         flags |= MetadataFlags::HAS_THROW;
     }
 
+    if closure.ampersand.is_some() {
+        flags |= MetadataFlags::BY_REFERENCE;
+    }
+
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span, flags).with_parameters(
         closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
     );
@@ -217,6 +229,10 @@ pub fn scan_arrow_function(
 
     if utils::expression_has_throws(&arrow_function.expression) {
         flags |= MetadataFlags::HAS_THROW;
+    }
+
+    if arrow_function.ampersand.is_some() {
+        flags |= MetadataFlags::BY_REFERENCE;
     }
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, span, flags).with_parameters(

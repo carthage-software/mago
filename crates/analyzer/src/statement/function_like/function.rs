@@ -1,5 +1,3 @@
-use ahash::HashMap;
-
 use mago_codex::context::ScopeContext;
 use mago_codex::get_function;
 use mago_span::HasSpan;
@@ -50,11 +48,10 @@ impl Analyzable for Function {
         analyze_function_like(
             context,
             artifacts,
-            scope,
+            &mut BlockContext::new(scope),
             function_metadata,
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice()),
-            HashMap::default(),
             None,
         )?;
 

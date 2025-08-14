@@ -1255,41 +1255,24 @@ fn analyze_iterator<'a>(
 ///
 /// # Returns
 ///
-/// A tuple `(bool, HashSet<String>)`:
-/// - The `bool` is `true` if a `UnaryPrefixOperator::Reference` was found anywhere
-///   within the expression (including nested expressions), `false` otherwise.
-/// - The `HashSet<String>` contains the string names of all `Variable::Direct` found.
-fn scrape_variables_from_expression(context: &Context<'_>, expression: &Expression) -> (bool, HashSet<String>) {
+/// A `HashSet<String>` contains the string names of all `Variable::Direct` found.
+fn scrape_variables_from_expression(context: &Context<'_>, expression: &Expression) -> HashSet<String> {
     let mut set = HashSet::default();
 
-    fn walk<'a>(
-        context: &'a Context<'_>,
-        current_expression: &'a Expression,
-        current_set: &mut HashSet<String>,
-    ) -> bool {
-        let mut found_reference_in_this_branch = false;
-
+    fn walk<'a>(context: &'a Context<'_>, current_expression: &'a Expression, current_set: &mut HashSet<String>) {
         match current_expression {
-            Expression::UnaryPrefix(UnaryPrefix { operator, operand, .. }) => {
-                if matches!(operator, UnaryPrefixOperator::Reference(_)) {
-                    found_reference_in_this_branch = true;
-                }
-
-                let operand_had_reference = walk(context, operand, current_set);
-                found_reference_in_this_branch |= operand_had_reference;
+            Expression::UnaryPrefix(UnaryPrefix { operand, .. }) => {
+                walk(context, operand, current_set);
             }
             Expression::Access(access) => match access {
                 Access::Property(property_access) => {
-                    let object_had_reference = walk(context, &property_access.object, current_set);
-                    found_reference_in_this_branch |= object_had_reference;
+                    walk(context, &property_access.object, current_set);
                 }
                 Access::NullSafeProperty(null_safe_property_access) => {
-                    let object_had_reference = walk(context, &null_safe_property_access.object, current_set);
-                    found_reference_in_this_branch |= object_had_reference;
+                    walk(context, &null_safe_property_access.object, current_set);
                 }
                 Access::StaticProperty(static_property_access) => {
-                    let class_expr_had_reference = walk(context, &static_property_access.class, current_set);
-                    found_reference_in_this_branch |= class_expr_had_reference;
+                    walk(context, &static_property_access.class, current_set);
                 }
                 _ => {}
             },
@@ -1301,23 +1284,19 @@ fn scrape_variables_from_expression(context: &Context<'_>, expression: &Expressi
             | Expression::LegacyArray(LegacyArray { elements, .. }) => {
                 for element in elements.iter() {
                     if let Some(key_expression) = element.get_key() {
-                        let key_had_reference = walk(context, key_expression, current_set);
-                        found_reference_in_this_branch |= key_had_reference;
+                        walk(context, key_expression, current_set);
                     }
 
                     if let Some(value_expression) = element.get_value() {
-                        let value_had_reference = walk(context, value_expression, current_set);
-                        found_reference_in_this_branch |= value_had_reference;
+                        walk(context, value_expression, current_set);
                     }
                 }
             }
             _ => {}
         }
-
-        found_reference_in_this_branch
     }
 
-    let found_reference = walk(context, expression, &mut set);
+    walk(context, expression, &mut set);
 
-    (found_reference, set)
+    set
 }

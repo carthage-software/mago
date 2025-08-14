@@ -3,11 +3,12 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
+use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
-use mago_algebra::assertion_set::AssertionSet;
 use regex::Regex;
 
+use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::class_like_exists;
 use mago_codex::class_or_interface_exists;
@@ -84,6 +85,36 @@ pub fn reconcile_keyed_types(
 ) {
     if new_types.is_empty() {
         return;
+    }
+
+    let mut reference_graph: HashMap<String, HashSet<String>> = HashMap::default();
+    if !block_context.references_in_scope.is_empty() {
+        // PHP behaves oddly when passing an array containing references: https://bugs.php.net/bug.php?id=20993
+        // To work around the issue, if there are any references, we have to recreate the array and fix the
+        // references so they're properly scoped and won't affect the caller. Starting with a new array is
+        // required for some unclear reason, just cloning elements of the existing array doesn't work properly.
+        let old_locals = std::mem::take(&mut block_context.locals);
+
+        let mut cloned_references = HashSet::default();
+        for (reference, referenced) in &block_context.references_in_scope {
+            if cloned_references.contains(referenced) {
+                block_context.locals.insert(referenced.to_owned(), old_locals[referenced].clone());
+                cloned_references.insert(reference.to_owned());
+            }
+        }
+
+        block_context.locals.extend(old_locals);
+        for (reference, referenced) in &block_context.references_in_scope {
+            reference_graph.entry(reference.to_owned()).or_default().insert(referenced.to_owned());
+
+            let referenced_graph = reference_graph.get(referenced).cloned().unwrap_or_default();
+            for existing_referenced in referenced_graph {
+                reference_graph.entry(existing_referenced.to_owned()).or_default().insert(reference.to_owned());
+                reference_graph.entry(reference.to_owned()).or_default().insert(existing_referenced.to_owned());
+            }
+
+            reference_graph.entry(referenced.to_owned()).or_default().insert(reference.to_owned());
+        }
     }
 
     let inside_loop = block_context.inside_loop;
@@ -195,7 +226,7 @@ pub fn reconcile_keyed_types(
             changed_var_ids.insert(key.clone());
 
             if key.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
-                adjust_array_type(key_parts, block_context, changed_var_ids, &result_type);
+                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
             } else if key != "$this" {
                 let mut removable_keys = Vec::new();
                 for (new_key, _) in block_context.locals.iter() {
@@ -204,6 +235,40 @@ pub fn reconcile_keyed_types(
                     }
 
                     if is_real && !new_types.contains_key(new_key) && var_has_root(new_key, key) {
+                        if let Some(references_map) = reference_graph.get(new_key) {
+                            let references_to_fix = references_map.iter().cloned().collect::<Vec<_>>();
+
+                            match references_to_fix.len() {
+                                1 => {
+                                    let reference_to_fix = &references_to_fix[0];
+                                    reference_graph.remove(reference_to_fix);
+                                    block_context.references_in_scope.remove(reference_to_fix);
+                                }
+                                _ => {
+                                    for reference in &references_to_fix {
+                                        if let Some(inner_map) = reference_graph.get_mut(reference) {
+                                            inner_map.remove(new_key);
+                                        }
+                                    }
+
+                                    if let Some(new_primary_reference) = reference_graph
+                                        .get(&references_to_fix[0])
+                                        .and_then(|inner_map| inner_map.iter().next().cloned())
+                                    {
+                                        block_context.references_in_scope.remove(&new_primary_reference);
+
+                                        for (_, referenced_value) in block_context.references_in_scope.iter_mut() {
+                                            if referenced_value == new_key {
+                                                *referenced_value = new_primary_reference.clone();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        reference_graph.remove(new_key);
+                        block_context.references_in_scope.remove(new_key);
                         removable_keys.push(new_key.clone());
                     }
                 }
@@ -218,6 +283,19 @@ pub fn reconcile_keyed_types(
 
         if !has_object_array_access {
             block_context.locals.insert(key.clone(), Rc::new(result_type));
+        }
+
+        if let Some(existing_type) = block_context.locals.get(key).cloned()
+            && !did_type_exist
+            && reference_graph.contains_key(&key_parts[0])
+        {
+            // If key is new, create references for other variables that reference the root variable.
+            let mut reference_key_parts = key_parts.clone();
+            for reference in reference_graph[&key_parts[0]].iter() {
+                reference_key_parts[0] = reference.clone();
+                let reference_key = reference_key_parts.join("");
+                block_context.locals.insert(reference_key, existing_type.clone());
+            }
         }
     }
 }

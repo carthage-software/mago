@@ -37,6 +37,7 @@ use crate::ttype::get_mixed;
 pub struct TUnion {
     pub types: Vec<TAtomic>,
     pub had_template: bool,
+    pub by_reference: bool,
     pub reference_free: bool,
     pub possibly_undefined_from_try: bool,
     pub possibly_undefined: bool,
@@ -90,6 +91,7 @@ impl TUnion {
             types,
             had_template: false,
             reference_free: false,
+            by_reference: false,
             possibly_undefined_from_try: false,
             possibly_undefined: false,
             ignore_falsable_issues: false,
@@ -103,6 +105,7 @@ impl TUnion {
         TUnion {
             types: vec![type_],
             had_template: false,
+            by_reference: false,
             reference_free: false,
             possibly_undefined_from_try: false,
             possibly_undefined: false,
@@ -125,6 +128,7 @@ impl TUnion {
         TUnion {
             types,
             had_template: self.had_template,
+            by_reference: self.by_reference,
             reference_free: self.reference_free,
             possibly_undefined_from_try: self.possibly_undefined_from_try,
             possibly_undefined: self.possibly_undefined,
@@ -139,6 +143,7 @@ impl TUnion {
         TUnion {
             types: self.get_non_nullable_types(),
             had_template: self.had_template,
+            by_reference: self.by_reference,
             reference_free: self.reference_free,
             possibly_undefined_from_try: self.possibly_undefined_from_try,
             possibly_undefined: self.possibly_undefined,
@@ -153,6 +158,7 @@ impl TUnion {
         TUnion {
             types: self.get_truthy_types(),
             had_template: self.had_template,
+            by_reference: self.by_reference,
             reference_free: self.reference_free,
             possibly_undefined_from_try: self.possibly_undefined_from_try,
             possibly_undefined: self.possibly_undefined,
@@ -202,25 +208,18 @@ impl TUnion {
             .collect()
     }
 
-    pub fn as_nullable(self) -> TUnion {
-        TUnion {
-            types: {
-                let mut types = self.types;
-                if !types.iter().any(|t| matches!(t, TAtomic::Null)) {
-                    types.push(TAtomic::Null);
-                }
+    pub fn as_nullable(mut self) -> TUnion {
+        self.types.iter_mut().for_each(|atomic| {
+            if let TAtomic::Mixed(mixed) = atomic {
+                *mixed = mixed.with_is_non_null(false);
+            }
+        });
 
-                types
-            },
-            had_template: self.had_template,
-            reference_free: self.reference_free,
-            possibly_undefined_from_try: self.possibly_undefined_from_try,
-            possibly_undefined: self.possibly_undefined,
-            ignore_falsable_issues: self.ignore_falsable_issues,
-            ignore_nullable_issues: self.ignore_nullable_issues,
-            from_template_default: self.from_template_default,
-            populated: self.populated,
+        if !self.types.iter().any(|atomic| atomic.is_null() || atomic.is_mixed()) {
+            self.types.push(TAtomic::Null);
         }
+
+        self
     }
 
     pub fn remove_type(&mut self, bad_type: &TAtomic) {
@@ -990,6 +989,27 @@ impl TUnion {
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn has_literal_float(&self) -> bool {
+        self.types.iter().any(|atomic| match atomic {
+            TAtomic::Scalar(scalar) => scalar.is_literal_float(),
+            _ => false,
+        })
+    }
+
+    pub fn has_literal_int(&self) -> bool {
+        self.types.iter().any(|atomic| match atomic {
+            TAtomic::Scalar(scalar) => scalar.is_literal_int(),
+            _ => false,
+        })
+    }
+
+    pub fn has_literal_string(&self) -> bool {
+        self.types.iter().any(|atomic| match atomic {
+            TAtomic::Scalar(scalar) => scalar.is_known_literal_string(),
+            _ => false,
+        })
     }
 
     pub fn has_literal_value(&self) -> bool {

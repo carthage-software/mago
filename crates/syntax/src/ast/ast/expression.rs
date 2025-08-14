@@ -342,6 +342,18 @@ impl Expression {
     }
 
     #[inline]
+    pub const fn is_referenceable(&self) -> bool {
+        match self {
+            Expression::Variable(_) => true,
+            Expression::ArrayAccess(array_access) => array_access.array.is_referenceable(),
+            Expression::Access(Access::Property(_) | Access::StaticProperty(_)) => true,
+            Expression::Pipe(_) => true,
+            Expression::Call(call) if !call.is_null_safe() => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
     pub fn get_array_like_elements(&self) -> Option<&[ArrayElement]> {
         match self {
             Expression::Parenthesized(expression) => expression.expression.get_array_like_elements(),

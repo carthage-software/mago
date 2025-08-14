@@ -1,15 +1,14 @@
 use std::rc::Rc;
 
 use ahash::HashMap;
-use ahash::HashSet;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::get_closure;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
-use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::get_mixed;
@@ -52,8 +51,8 @@ impl Analyzable for Closure {
         scope.set_function_like(Some(function_metadata));
         scope.set_static(self.r#static.is_some());
 
-        let mut referenced_variables = HashSet::default();
-        let mut imported_variables = HashMap::default();
+        let mut inner_block_context = BlockContext::new(scope);
+
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
             for use_variable in use_clause.variables.iter() {
@@ -66,33 +65,7 @@ impl Analyzable for Closure {
                 let variable_span = use_variable.variable.span;
                 let variable_str = context.interner.lookup(&variable);
 
-                if let Some(ampersand_span) = use_variable.ampersand.as_ref() {
-                    context.collector.report_with_code(
-                        Code::UNSUPPORTED_REFERENCE_IN_CLOSURE_USE,
-                        Issue::warning(format!(
-                            "Unsupported by-reference import: Mago does not analyze by-reference captures (`use (&$var)`) for closures like `{variable_str}`.",
-                        ))
-                        .with_annotation(
-                            Annotation::primary(*ampersand_span)
-                                .with_message("This by-reference import (`&`) is not supported by Mago's analysis."),
-                        )
-                        .with_annotation(
-                            Annotation::secondary(variable_span)
-                                .with_message(format!("Variable `{variable_str}` impacted")),
-                        )
-                        .with_note(
-                            format!("Mago will treat `{variable_str}` as if it were imported by value. This WILL lead to incorrect type tracking and potentially missed errors or false positives if the reference is modified and its state is shared.")
-                        )
-                        .with_note(
-                            "Due to the complexities of tracking by-reference semantics accurately in all cases for closures, Mago is unlikely to support this feature."
-                        )
-                        .with_help(
-                            "Avoid by-reference `use` variables with Mago. For shared mutable state, use an object instead, as objects are always passed by reference in PHP and their state changes can be tracked more reliably."
-                        ),
-                    );
-
-                    referenced_variables.insert(variable);
-                }
+                let is_by_reference = use_variable.ampersand.is_some();
 
                 if let Some(previous_span) = variable_spans.get(&variable) {
                     context.collector.report_with_code(
@@ -134,49 +107,60 @@ impl Analyzable for Closure {
 
                 variable_spans.insert(variable, variable_span);
 
-                let rc_type = Rc::new(match block_context.locals.remove(variable_str) {
-                    Some(existing_type) => existing_type.as_ref().to_owned(),
-                    None => get_mixed(),
-                });
+                let mut variable_type =
+                    block_context.locals.get(variable_str).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
-                block_context.locals.insert(variable_str.to_string(), rc_type.clone());
-                imported_variables.insert(variable_str.to_string(), rc_type);
+                if is_by_reference {
+                    let inner_variable_type = Rc::make_mut(&mut variable_type);
+                    inner_variable_type.by_reference = true;
+
+                    inner_block_context.references_to_external_scope.insert(variable_str.to_string());
+                }
+
+                inner_block_context.locals.insert(variable_str.to_string(), variable_type.clone());
+                inner_block_context.variables_possibly_in_scope.insert(variable_str.to_string());
+
+                for (variable_id, variable_type) in block_context.locals.iter() {
+                    let Some(stripped_variable_id) = variable_id.strip_prefix(variable_str) else {
+                        continue;
+                    };
+
+                    if stripped_variable_id.starts_with('[') || stripped_variable_id.starts_with('-') {
+                        inner_block_context.locals.insert(variable_id.to_string(), variable_type.clone());
+                        inner_block_context.variables_possibly_in_scope.insert(variable_id.to_string());
+                    }
+                }
             }
         }
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
-        let (inner_block_context, inner_artifacts) = analyze_function_like(
+        let inner_artifacts = analyze_function_like(
             context,
             artifacts,
-            scope,
+            &mut inner_block_context,
             function_metadata,
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice()),
-            imported_variables,
             inferred_parameter_types,
         )?;
 
-        for referenced_variable in referenced_variables {
-            let variable_str = context.interner.lookup(&referenced_variable);
-            let Some(inner_variable_type) = inner_block_context.locals.get(variable_str) else {
-                block_context.locals.insert(variable_str.to_string(), Rc::new(get_mixed()));
-
+        for referenced_variable in inner_block_context.references_to_external_scope {
+            let Some(inner_type) = inner_block_context.locals.remove(&referenced_variable) else {
                 continue;
             };
 
-            let Some(outer_variable_type) = block_context.locals.get(variable_str) else {
-                continue;
+            let variable_type = match block_context.locals.remove(&referenced_variable) {
+                Some(existing_type) => Rc::new(add_union_type(
+                    Rc::unwrap_or_clone(inner_type),
+                    &existing_type,
+                    context.codebase,
+                    context.interner,
+                    false,
+                )),
+                None => inner_type,
             };
 
-            let combined_type = combine_union_types(
-                outer_variable_type.as_ref(),
-                inner_variable_type.as_ref(),
-                context.codebase,
-                context.interner,
-                false,
-            );
-
-            block_context.locals.insert(variable_str.to_string(), Rc::new(combined_type));
+            block_context.locals.insert(referenced_variable, variable_type);
         }
 
         let function_identifier = FunctionLikeIdentifier::Closure(s.file_id, s.start);
