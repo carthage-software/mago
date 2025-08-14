@@ -342,13 +342,13 @@ impl Expression {
     }
 
     #[inline]
-    pub const fn is_referenceable(&self) -> bool {
+    pub const fn is_referenceable(&self, include_calls: bool) -> bool {
         match self {
             Expression::Variable(_) => true,
-            Expression::ArrayAccess(array_access) => array_access.array.is_referenceable(),
+            Expression::ArrayAccess(array_access) => array_access.array.is_referenceable(include_calls),
             Expression::Access(Access::Property(_) | Access::StaticProperty(_)) => true,
-            Expression::Pipe(_) => true,
-            Expression::Call(call) if !call.is_null_safe() => true,
+            Expression::Pipe(_) if include_calls => true,
+            Expression::Call(call) if include_calls && !call.is_null_safe() => true,
             _ => false,
         }
     }

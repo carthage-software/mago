@@ -11,6 +11,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::Code;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraint;
 use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
@@ -57,11 +58,16 @@ impl Analyzable for Static {
             let variable_id = context.interner.lookup(&variable.name);
             let variable_span = variable.span();
 
-            let variable_type = match (
-                inferred_type,
-                get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), self.items.len() == 1),
-            ) {
+            let docblock_type =
+                get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), self.items.len() == 1);
+
+            let variable_type = match (inferred_type, docblock_type) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
+                    block_context.by_reference_constraints.insert(
+                        variable_id.to_owned(),
+                        ReferenceConstraint::new(docblock_type_span, false, Some(docblock_type.clone())),
+                    );
+
                     check_docblock_type_incompatibility(
                         context,
                         Some(variable_id),
@@ -74,7 +80,14 @@ impl Analyzable for Static {
 
                     Rc::new(docblock_type)
                 }
-                (None, Some((docblock_type, _))) => Rc::new(docblock_type),
+                (None, Some((docblock_type, docblock_type_span))) => {
+                    block_context.by_reference_constraints.insert(
+                        variable_id.to_owned(),
+                        ReferenceConstraint::new(docblock_type_span, false, Some(docblock_type.clone())),
+                    );
+
+                    Rc::new(docblock_type)
+                }
                 (Some(inferred_type), None) => inferred_type,
                 (None, None) => Rc::new(get_mixed()),
             };

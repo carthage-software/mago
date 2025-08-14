@@ -478,6 +478,7 @@ fn analyze<'a, 'b>(
             }
 
             continue_context.clauses.clone_from(&pre_loop_context.clauses);
+            continue_context.by_reference_constraints.clone_from(&pre_loop_context.by_reference_constraints);
 
             let (result, new_recorded_issues) = context.record(|context| -> Result<LoopScope, AnalysisError> {
                 if !is_do {
@@ -778,6 +779,9 @@ fn analyze<'a, 'b>(
     if let Some(inner_do_context) = inner_do_context {
         continue_context = inner_do_context;
     }
+
+    // Track references set in the loop to make sure they aren't reused later
+    loop_parent_context.update_references_possibly_from_confusing_scope(&continue_context);
 
     Ok((continue_context, loop_scope))
 }

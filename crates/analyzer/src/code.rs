@@ -240,4 +240,5 @@ impl Code {
     pub const PSALM_TRACE: &'static str = "psalm-trace";
     pub const REFERENCE_CONSTRAINT_VIOLATION: &'static str = "reference-constraint-violation";
     pub const INVALID_PASS_BY_REFERENCE: &'static str = "invalid-pass-by-reference";
+    pub const CONFLICTING_REFERENCE_CONSTRAINT: &'static str = "conflicting-reference-constraint";
 }

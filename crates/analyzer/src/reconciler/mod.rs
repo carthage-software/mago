@@ -239,6 +239,7 @@ pub fn reconcile_keyed_types(
                             let references_to_fix = references_map.iter().cloned().collect::<Vec<_>>();
 
                             match references_to_fix.len() {
+                                0 => {}
                                 1 => {
                                     let reference_to_fix = &references_to_fix[0];
                                     reference_graph.remove(reference_to_fix);
@@ -246,14 +247,14 @@ pub fn reconcile_keyed_types(
                                 }
                                 _ => {
                                     for reference in &references_to_fix {
-                                        if let Some(inner_map) = reference_graph.get_mut(reference) {
-                                            inner_map.remove(new_key);
+                                        if let Some(innset_set) = reference_graph.get_mut(reference) {
+                                            innset_set.remove(new_key);
                                         }
                                     }
 
                                     if let Some(new_primary_reference) = reference_graph
                                         .get(&references_to_fix[0])
-                                        .and_then(|inner_map| inner_map.iter().next().cloned())
+                                        .and_then(|inner_set| inner_set.iter().next().cloned())
                                     {
                                         block_context.references_in_scope.remove(&new_primary_reference);
 
@@ -268,8 +269,8 @@ pub fn reconcile_keyed_types(
                         }
 
                         reference_graph.remove(new_key);
-                        block_context.references_in_scope.remove(new_key);
                         removable_keys.push(new_key.clone());
+                        block_context.references_in_scope.remove(new_key);
                     }
                 }
 

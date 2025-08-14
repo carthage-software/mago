@@ -24,9 +24,17 @@ pub fn fetch_invocation_return_type<'a>(
         return return_type;
     }
 
-    let Some(return_type) = invocation.target.get_return_type().cloned() else {
-        return get_mixed();
+    let mut resulting_type = if let Some(return_type) = invocation.target.get_return_type().cloned() {
+        resolve_invocation_type(context, invocation, template_result, parameters, return_type)
+    } else {
+        get_mixed()
     };
 
-    resolve_invocation_type(context, invocation, template_result, parameters, return_type)
+    if let Some(function_like_metadata) = invocation.target.get_function_like_metadata()
+        && function_like_metadata.flags.is_by_reference()
+    {
+        resulting_type.by_reference = true;
+    }
+
+    resulting_type
 }

@@ -532,11 +532,20 @@ impl<'a> BlockContext<'a> {
                 self.references_in_scope.remove(reference);
             }
 
-            let first_reference = references.remove(0);
+            debug_assert!(
+                !references.is_empty(),
+                "No references found for variable {}, even though it has a reference count of {}",
+                remove_var_id,
+                reference_count
+            );
+
             if !references.is_empty() {
-                self.referenced_counts.insert(first_reference.to_owned(), references.len() as u32);
-                for reference in references {
-                    self.references_in_scope.insert(reference.to_owned(), first_reference.to_owned());
+                let first_reference = references.remove(0);
+                if !references.is_empty() {
+                    self.referenced_counts.insert(first_reference.to_owned(), references.len() as u32);
+                    for reference in references {
+                        self.references_in_scope.insert(reference.to_owned(), first_reference.to_owned());
+                    }
                 }
             }
         }

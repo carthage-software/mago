@@ -140,3 +140,5 @@ test_case!(infere_closure_parameter_type);
 test_case!(negated_union_type);
 test_case!(reference_constraint_violation);
 test_case!(unreferencable_expression);
+test_case!(pass_by_ref);
+test_case!(return_by_ref);

@@ -151,25 +151,28 @@ pub fn handle_return_value<'a>(
 
     if let Some(return_value) = return_value {
         if function_like_metadata.flags.is_by_reference() {
-            inferred_return_type.by_reference = true;
+            let is_referenceable = return_value.is_referenceable(false)
+                || (return_value.is_referenceable(true) && inferred_return_type.by_reference);
 
-            if !return_value.is_referenceable() {
+            if !is_referenceable {
                 context.collector.report_with_code(
                     Code::INVALID_RETURN_STATEMENT,
                     Issue::error(format!(
-                        "Cannot return a reference to a non-variable expression in function `{function_name}`.",
+                        "Cannot return a non-referenceable value from function `{function_name}`.",
                     ))
                     .with_annotation(Annotation::primary(return_value.span()).with_message(
-                        "This expression cannot be referenced.",
+                        "This value cannot be returned by reference.",
                     ))
                     .with_annotation(
-                        Annotation::primary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
-                            .with_message(
-                                format!("Function `{function_name}` is declared to return a reference."),
-                            ),
+                        Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+                            .with_message("Function is declared to return by reference here."),
                     )
-                    .with_note("A function declared to return a reference must return a variable, a property, or an array element.")
-                    .with_help("Change the return type declaration to not return a reference, or ensure that the returned value is a variable, property, or array element."),
+                    .with_note(
+                        "You can only return variables, properties, array elements, or the result of another function call that itself returns a reference."
+                    )
+                    .with_help(
+                        "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
+                    ),
                 );
             }
         }

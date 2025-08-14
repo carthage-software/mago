@@ -414,6 +414,64 @@ pub fn analyze_assignment_to_variable<'a>(
     variable_id: &str,
     destructuring: bool,
 ) {
+    if let Some(constraint) = block_context.by_reference_constraints.get(variable_id) {
+        if let Some(constraint_type) = constraint.constraint_type.as_ref()
+            && !union_comparator::is_contained_by(
+                context.codebase,
+                context.interner,
+                &assigned_type,
+                constraint_type,
+                assigned_type.ignore_nullable_issues,
+                assigned_type.ignore_falsable_issues,
+                false,
+                &mut ComparisonResult::default(),
+            )
+        {
+            let assigned_type_str = assigned_type.get_id(Some(context.interner));
+            let constraint_type_str = constraint_type.get_id(Some(context.interner));
+            let primary_error_span = source_expression.map_or(variable_span, |expr| expr.span());
+
+            let issue = if constraint.is_parameter {
+                Issue::error(format!(
+                    "Invalid type assignment to by-reference parameter `{variable_id}`.",
+                ))
+                .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                    "This value has type `{assigned_type_str}`, but the parameter is expected to be `{constraint_type_str}`.",
+                )))
+                .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                    "Parameter type defined here."
+                ))
+                .with_note(
+                    "Assigning an incompatible type to a by-reference parameter can cause unexpected behavior for the caller."
+                )
+                .with_help(
+                    "If this parameter is intended to have a different type upon function exit, use a `@param-out` docblock tag to declare it."
+                )
+            } else {
+                Issue::error(format!(
+                    "Invalid type assignment to constrained variable `{variable_id}`.",
+                ))
+                .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                    "This assignment of type `{assigned_type_str}` violates the variable's expected type of `{constraint_type_str}`.",
+                )))
+                .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                    "Variable constraint defined here."
+                ))
+                .with_note(
+                    "Modifying a constrained variable with an incompatible type can lead to widespread errors in other parts of the application."
+                )
+                .with_help(format!(
+                    "Ensure the assigned value is compatible with the `{}` type.",
+                    constraint_type_str
+                ))
+            };
+
+            context.collector.report_with_code(Code::REFERENCE_CONSTRAINT_VIOLATION, issue);
+        }
+
+        assigned_type.by_reference = true;
+    }
+
     if variable_id.eq("$this") {
         context.collector.report_with_code(
             Code::ASSIGNMENT_TO_THIS,
@@ -424,61 +482,6 @@ pub fn analyze_assignment_to_variable<'a>(
                 .with_note("The `$this` variable is read-only and refers to the current object instance.")
                 .with_help("Use a different variable name for the assignment."),
         );
-    }
-
-    if let Some(constraint) = block_context.by_reference_constraints.get(variable_id)
-        && let Some(constraint_type) = constraint.constraint_type.as_ref()
-        && !union_comparator::is_contained_by(
-            context.codebase,
-            context.interner,
-            &assigned_type,
-            constraint_type,
-            assigned_type.ignore_nullable_issues,
-            assigned_type.ignore_falsable_issues,
-            false,
-            &mut ComparisonResult::default(),
-        )
-    {
-        let assigned_type_str = assigned_type.get_id(Some(context.interner));
-        let constraint_type_str = constraint_type.get_id(Some(context.interner));
-        let primary_error_span = source_expression.map_or(variable_span, |expr| expr.span());
-
-        let issue = if constraint.is_parameter {
-            Issue::error(format!(
-                "Invalid type assignment to by-reference parameter `{variable_id}`.",
-            ))
-            .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
-                "This value has type `{assigned_type_str}`, but the parameter is expected to be `{constraint_type_str}`.",
-            )))
-            .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
-                "Parameter type defined here."
-            ))
-            .with_note(
-                "Assigning an incompatible type to a by-reference parameter can cause unexpected behavior for the caller."
-            )
-            .with_help(
-                "If this parameter is intended to have a different type upon function exit, use a `@param-out` docblock tag to declare it."
-            )
-        } else {
-            Issue::error(format!(
-                "Invalid type assignment to constrained variable `{variable_id}`.",
-            ))
-            .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
-                "This assignment of type `{assigned_type_str}` violates the variable's expected type of `{constraint_type_str}`.",
-            )))
-            .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
-                "Variable constraint defined here."
-            ))
-            .with_note(
-                "Modifying a constrained variable with an incompatible type can lead to widespread errors in other parts of the application."
-            )
-            .with_help(format!(
-                "Ensure the assigned value is compatible with the `{}` type.",
-                constraint_type_str
-            ))
-        };
-
-        context.collector.report_with_code(Code::REFERENCE_CONSTRAINT_VIOLATION, issue);
     }
 
     if assigned_type.is_never() {

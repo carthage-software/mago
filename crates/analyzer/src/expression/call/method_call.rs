@@ -25,9 +25,9 @@ use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
-use crate::invocation::analyzer::populate_template_result_from_invocation;
 use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
+use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::resolver::method::resolve_method_targets;
 use crate::visibility::check_method_visibility;
 
