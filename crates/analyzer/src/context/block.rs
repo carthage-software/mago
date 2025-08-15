@@ -35,9 +35,17 @@ pub enum BreakContext {
 }
 
 #[derive(Clone, Debug)]
+pub enum ReferenceConstraintSource {
+    Global,
+    Static,
+    Parameter,
+    Argument,
+}
+
+#[derive(Clone, Debug)]
 pub struct ReferenceConstraint {
     pub constraint_span: Span,
-    pub is_parameter: bool,
+    pub source: ReferenceConstraintSource,
     pub constraint_type: Option<TUnion>,
 }
 
@@ -117,7 +125,7 @@ impl BreakContext {
 }
 
 impl ReferenceConstraint {
-    pub fn new(constraint_span: Span, is_parameter: bool, constraint_type: Option<TUnion>) -> Self {
+    pub fn new(constraint_span: Span, source: ReferenceConstraintSource, constraint_type: Option<TUnion>) -> Self {
         let constraint_type = match constraint_type {
             Some(mut constraint_type) => {
                 if constraint_type.has_literal_string() {
@@ -137,7 +145,7 @@ impl ReferenceConstraint {
             None => None,
         };
 
-        Self { constraint_span, is_parameter, constraint_type }
+        Self { constraint_span, source, constraint_type }
     }
 }
 
@@ -628,6 +636,17 @@ impl<'a> BlockContext<'a> {
         *reference_count -= 1;
 
         true
+    }
+}
+
+impl std::fmt::Display for ReferenceConstraintSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReferenceConstraintSource::Global => write!(f, "global"),
+            ReferenceConstraintSource::Static => write!(f, "static"),
+            ReferenceConstraintSource::Parameter => write!(f, "parameter"),
+            ReferenceConstraintSource::Argument => write!(f, "argument"),
+        }
     }
 }
 

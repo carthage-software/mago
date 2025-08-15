@@ -24,6 +24,7 @@ use crate::artifacts::get_expression_range;
 use crate::code::Code;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
@@ -431,39 +432,75 @@ pub fn analyze_assignment_to_variable<'a>(
             let constraint_type_str = constraint_type.get_id(Some(context.interner));
             let primary_error_span = source_expression.map_or(variable_span, |expr| expr.span());
 
-            let issue = if constraint.is_parameter {
-                Issue::error(format!(
-                    "Invalid type assignment to by-reference parameter `{variable_id}`.",
-                ))
-                .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
-                    "This value has type `{assigned_type_str}`, but the parameter is expected to be `{constraint_type_str}`.",
-                )))
-                .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
-                    "Parameter type defined here."
-                ))
-                .with_note(
-                    "Assigning an incompatible type to a by-reference parameter can cause unexpected behavior for the caller."
-                )
-                .with_help(
-                    "If this parameter is intended to have a different type upon function exit, use a `@param-out` docblock tag to declare it."
-                )
-            } else {
-                Issue::error(format!(
-                    "Invalid type assignment to constrained variable `{variable_id}`.",
-                ))
-                .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
-                    "This assignment of type `{assigned_type_str}` violates the variable's expected type of `{constraint_type_str}`.",
-                )))
-                .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
-                    "Variable constraint defined here."
-                ))
-                .with_note(
-                    "Modifying a constrained variable with an incompatible type can lead to widespread errors in other parts of the application."
-                )
-                .with_help(format!(
-                    "Ensure the assigned value is compatible with the `{}` type.",
-                    constraint_type_str
-                ))
+            let issue = match constraint.source {
+                ReferenceConstraintSource::Parameter => {
+                    Issue::error(format!(
+                        "Invalid assignment to by-reference parameter `{variable_id}`.",
+                    ))
+                    .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                        "This value has type `{assigned_type_str}`, but the parameter expects `{constraint_type_str}`.",
+                    )))
+                    .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                        "Parameter is defined with a by-reference type constraint here.",
+                    ))
+                    .with_note(
+                        "Assigning an incompatible type to a by-reference parameter can cause unexpected `TypeError`s in the calling scope.",
+                    )
+                    .with_help(
+                        "If the parameter should have a different type on exit, declare it using a `@param-out` docblock tag.",
+                    )
+                },
+                ReferenceConstraintSource::Argument => {
+                    Issue::error(format!(
+                        "Potentially invalid assignment to referenced variable `{variable_id}`.",
+                    ))
+                    .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                        "This assignment to type `{assigned_type_str}` may violate a reference constraint.",
+                    )))
+                    .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                        format!("Variable was passed as a by-reference argument here, constraining it to type `{constraint_type_str}`."),
+                    ))
+                    .with_note(
+                        "An object may still hold a reference to this variable. Changing its type can lead to a `TypeError` at runtime.",
+                    )
+                    .with_help(
+                        "Ensure this variable's type remains compatible, or refactor to avoid holding onto the external reference.",
+                    )
+                },
+                ReferenceConstraintSource::Static => {
+                    Issue::error(format!(
+                        "Invalid assignment to constrained static variable `{variable_id}`.",
+                    ))
+                    .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                        "This value of type `{assigned_type_str}` is not compatible with the expected type `{constraint_type_str}`.",
+                    )))
+                    .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                        "Static variable's type is constrained here.",
+                    ))
+                    .with_note(
+                        "Static variables maintain their state across function calls. Violating the type constraint can cause errors in subsequent calls.",
+                    )
+                    .with_help(format!(
+                        "Ensure the assigned value is compatible with the `{constraint_type_str}` type.",
+                    ))
+                },
+                ReferenceConstraintSource::Global => {
+                    Issue::error(format!(
+                        "Invalid assignment to constrained global variable `{variable_id}`.",
+                    ))
+                    .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                        "This value of type `{assigned_type_str}` is not compatible with the global's expected type `{constraint_type_str}`.",
+                    )))
+                    .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                        "Global variable is imported with a type constraint here.",
+                    ))
+                    .with_note(
+                        "Global variables are shared across the application. Changing a global to an incompatible type can lead to widespread errors.",
+                    )
+                    .with_help(format!(
+                        "Ensure the assigned value is compatible with the `{constraint_type_str}` type.",
+                    ))
+                },
             };
 
             context.collector.report_with_code(Code::REFERENCE_CONSTRAINT_VIOLATION, issue);

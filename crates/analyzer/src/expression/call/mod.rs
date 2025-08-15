@@ -132,7 +132,7 @@ fn analyze_invocation_targets<'a>(
             &template_result,
             &argument_types,
             true,
-        );
+        )?;
     }
 
     let resulting_type = match resulting_type {

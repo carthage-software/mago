@@ -167,7 +167,7 @@ pub fn analyze_implicit_method_call<'a>(
         &template_result,
         &HashMap::default(),
         false,
-    );
+    )?;
 
     Ok(result)
 }

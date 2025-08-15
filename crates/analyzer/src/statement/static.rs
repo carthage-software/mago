@@ -12,6 +12,7 @@ use crate::code::Code;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
+use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
@@ -65,7 +66,11 @@ impl Analyzable for Static {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
                         variable_id.to_owned(),
-                        ReferenceConstraint::new(docblock_type_span, false, Some(docblock_type.clone())),
+                        ReferenceConstraint::new(
+                            docblock_type_span,
+                            ReferenceConstraintSource::Static,
+                            Some(docblock_type.clone()),
+                        ),
                     );
 
                     check_docblock_type_incompatibility(
@@ -83,7 +88,11 @@ impl Analyzable for Static {
                 (None, Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
                         variable_id.to_owned(),
-                        ReferenceConstraint::new(docblock_type_span, false, Some(docblock_type.clone())),
+                        ReferenceConstraint::new(
+                            docblock_type_span,
+                            ReferenceConstraintSource::Static,
+                            Some(docblock_type.clone()),
+                        ),
                     );
 
                     Rc::new(docblock_type)

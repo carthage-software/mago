@@ -33,6 +33,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
+use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::resolver::property::localize_property_type;
 use crate::statement::analyze_statements;
@@ -172,7 +173,11 @@ fn add_parameter_types_to_context<'a>(
 
             block_context.by_reference_constraints.insert(
                 parameter_variable_str.to_string(),
-                ReferenceConstraint::new(parameter_metadata.span, true, Some(constraint_type)),
+                ReferenceConstraint::new(
+                    parameter_metadata.span,
+                    ReferenceConstraintSource::Parameter,
+                    Some(constraint_type),
+                ),
             );
         }
 

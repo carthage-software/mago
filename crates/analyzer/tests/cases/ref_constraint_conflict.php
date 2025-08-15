@@ -30,7 +30,7 @@ function get_bool(): bool
 /**
  * @mago-expect analysis:conflicting-reference-constraint
  */
-function main(): void
+function constraint_conflict(): void
 {
     if (get_bool()) {
         $v = 5;
@@ -39,6 +39,35 @@ function main(): void
         $v = 'hello';
         $c = new B($v); // $v is constrained to a string
     }
+}
 
-    $v = 8;
+/**
+ * @mago-expect reference-constraint-violation
+ */
+function arg_constraint_violation(): void
+{
+    $v = 5;
+    $c = new A($v);
+    $v = 'hello'; // constraint violation
+}
+
+/**
+ * @mago-expect reference-constraint-violation
+ */
+function param_constraint_violation(string &$str): void
+{
+    $str = 12; // constraint violation
+}
+
+/**
+ * @mago-expect reference-constraint-violation
+ */
+function &static_constraint_violation(): array
+{
+    /** @var string $foo */
+    static $foo = 'hello';
+
+    $foo = []; // static constraint violation
+
+    return $foo;
 }

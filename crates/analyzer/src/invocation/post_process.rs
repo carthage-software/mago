@@ -32,6 +32,10 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::Code;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraint;
+use crate::context::block::ReferenceConstraintSource;
+use crate::error::AnalysisError;
+use crate::expression::assignment::assign_to_expression;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
@@ -50,15 +54,15 @@ pub fn post_invocation_process<'a>(
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
     apply_assertions: bool,
-) {
-    update_by_reference_argument_types(context, block_context, invoication, template_result, parameters);
+) -> Result<(), AnalysisError> {
+    update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
 
     let Some(identifier) = invoication.target.get_function_like_identifier() else {
-        return;
+        return Ok(());
     };
 
     let Some(metadata) = invoication.target.get_function_like_metadata() else {
-        return;
+        return Ok(());
     };
 
     let (callable_kind_str, full_callable_name) = match identifier {
@@ -126,7 +130,7 @@ pub fn post_invocation_process<'a>(
     }
 
     if !apply_assertions {
-        return;
+        return Ok(());
     }
 
     let range = (invoication.span.start.offset, invoication.span.end.offset);
@@ -171,6 +175,8 @@ pub fn post_invocation_process<'a>(
         template_result,
         parameters,
     );
+
+    Ok(())
 }
 
 fn apply_assertion_to_call_context<'a>(
@@ -221,16 +227,19 @@ fn apply_assertion_to_call_context<'a>(
 fn update_by_reference_argument_types<'a>(
     context: &mut Context<'a>,
     block_context: &mut BlockContext<'a>,
+    artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
-) {
+) -> Result<(), AnalysisError> {
+    let constraint_type = invocation.target.is_method_call();
+
     for (parameter_offset, parameter_ref) in invocation.target.get_parameters().into_iter().enumerate() {
         if !parameter_ref.is_by_reference() {
             continue;
         }
 
-        let (_, argument_id) = get_argument_for_parameter(
+        let (argument, argument_id) = get_argument_for_parameter(
             context,
             block_context,
             invocation,
@@ -238,16 +247,48 @@ fn update_by_reference_argument_types<'a>(
             parameter_ref.get_name().map(|name| name.0),
         );
 
-        if let Some(argument_id) = argument_id {
-            let unresolved_new_type =
-                parameter_ref.get_out_type().or_else(|| parameter_ref.get_type()).cloned().unwrap_or_else(get_mixed);
+        if let Some(argument) = argument {
+            let mut new_type = parameter_ref
+                .get_out_type()
+                .or_else(|| parameter_ref.get_type())
+                .cloned()
+                .map(|new_type| resolve_invocation_type(context, invocation, template_result, parameters, new_type))
+                .unwrap_or_else(get_mixed);
 
-            let new_type =
-                resolve_invocation_type(context, invocation, template_result, parameters, unresolved_new_type);
+            new_type.by_reference = true;
 
-            block_context.locals.insert(argument_id, Rc::new(new_type));
+            if constraint_type && let Some(argument_id) = argument_id {
+                assign_to_expression(
+                    context,
+                    block_context,
+                    artifacts,
+                    argument,
+                    Some(argument_id.clone()),
+                    Some(argument),
+                    new_type.clone(),
+                    false,
+                )?;
+
+                block_context.by_reference_constraints.insert(
+                    argument_id,
+                    ReferenceConstraint::new(argument.span(), ReferenceConstraintSource::Argument, Some(new_type)),
+                );
+            } else {
+                assign_to_expression(
+                    context,
+                    block_context,
+                    artifacts,
+                    argument,
+                    argument_id,
+                    Some(argument),
+                    new_type,
+                    false,
+                )?;
+            }
         }
     }
+
+    Ok(())
 }
 
 fn resolve_invocation_assertion<'a>(

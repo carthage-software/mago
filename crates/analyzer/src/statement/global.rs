@@ -13,6 +13,7 @@ use crate::common::global::get_global_variable_type;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
+use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_variable_id;
 
@@ -51,9 +52,10 @@ impl Analyzable for Global {
 
             if !is_argc_or_argv {
                 block_context.variables_possibly_in_scope.insert(var_id.clone());
-                block_context
-                    .by_reference_constraints
-                    .insert(var_id.clone(), ReferenceConstraint::new(variable.span(), false, None));
+                block_context.by_reference_constraints.insert(
+                    var_id.clone(),
+                    ReferenceConstraint::new(variable.span(), ReferenceConstraintSource::Global, None),
+                );
             }
 
             block_context.references_to_external_scope.insert(var_id.clone());

@@ -37,6 +37,7 @@ use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
+use crate::invocation::post_process::post_invocation_process;
 use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::utils::template::get_generic_parameter_for_offset;
@@ -281,7 +282,7 @@ fn analyze_class_instantiation<'a>(
 
         artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_declraing_id);
 
-        let constructor_invocation = Invocation {
+        let constructor_call = Invocation {
             target: InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
                     *constructor_declraing_id.get_class_name(),
@@ -302,14 +303,26 @@ fn analyze_class_instantiation<'a>(
             span: instantiation_span,
         };
 
+        let mut argument_types = HashMap::default();
         analyze_invocation(
             context,
             block_context,
             artifacts,
-            &constructor_invocation,
+            &constructor_call,
             Some((metadata.name, None)),
             &mut template_result,
-            &mut HashMap::default(),
+            &mut argument_types,
+        )?;
+
+        post_invocation_process(
+            context,
+            block_context,
+            artifacts,
+            &constructor_call,
+            None,
+            &template_result,
+            &argument_types,
+            true,
         )?;
 
         if !check_method_visibility(

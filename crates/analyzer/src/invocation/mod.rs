@@ -169,6 +169,10 @@ impl<'a> InvocationTarget<'a> {
         }
     }
 
+    pub const fn is_method_call(&self) -> bool {
+        matches!(self.get_function_like_identifier(), Some(FunctionLikeIdentifier::Method(_, _)))
+    }
+
     /// Checks if the target is a dynamic callable that is not explicitly a closure type.
     /// This can be true for `callable` type hints or invocable objects that aren't closures.
     #[inline]
