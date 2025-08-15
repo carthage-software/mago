@@ -36,6 +36,29 @@ pub struct Assignment {
     pub rhs: Box<Expression>,
 }
 
+impl AssignmentOperator {
+    #[inline]
+    pub const fn is_assign(&self) -> bool {
+        matches!(self, Self::Assign(_))
+    }
+
+    #[inline]
+    pub const fn is_arithmetic(&self) -> bool {
+        matches!(
+            self,
+            Self::Addition(_) | Self::Subtraction(_) | Self::Multiplication(_) | Self::Division(_) | Self::Modulo(_)
+        )
+    }
+
+    #[inline]
+    pub const fn is_bitwise(&self) -> bool {
+        matches!(
+            self,
+            Self::BitwiseAnd(_) | Self::BitwiseOr(_) | Self::BitwiseXor(_) | Self::LeftShift(_) | Self::RightShift(_)
+        )
+    }
+}
+
 impl HasSpan for AssignmentOperator {
     fn span(&self) -> Span {
         match self {

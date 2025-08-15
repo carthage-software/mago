@@ -820,7 +820,13 @@ fn scrape_type_properties(
         combination.integers = HashSet::default();
         combination.literal_floats = HashSet::default();
         combination.value_types.retain(|k, _| {
-            k != "string" && k != "bool" && k != "false" && k != "true" && k != "float" && k != "arraykey" && k != "num"
+            k != "string"
+                && k != "bool"
+                && k != "false"
+                && k != "true"
+                && k != "float"
+                && k != "array-key"
+                && k != "numeric"
         });
 
         combination.value_types.insert(atomic.get_id(None), atomic);
@@ -834,20 +840,20 @@ fn scrape_type_properties(
 
         combination.literal_strings = HashSet::default();
         combination.integers = HashSet::default();
-        combination.value_types.retain(|k, _| k != "string");
+        combination.value_types.retain(|k, _| k != "string" && k != "int");
         combination.value_types.insert(atomic.get_id(None), atomic);
 
         return;
     }
 
     if let TAtomic::Scalar(TScalar::String(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key("arraykey") || combination.value_types.contains_key("scalar"))
+        && (combination.value_types.contains_key("array-key") || combination.value_types.contains_key("scalar"))
     {
         return;
     }
 
     if let TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key("num") || combination.value_types.contains_key("scalar"))
+        && (combination.value_types.contains_key("numeric") || combination.value_types.contains_key("scalar"))
     {
         return;
     }

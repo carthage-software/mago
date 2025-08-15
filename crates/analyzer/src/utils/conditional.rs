@@ -66,15 +66,17 @@ pub(crate) fn analyze<'a>(
 
     let externally_applied_if_cond_expr = get_definitely_evaluated_expression_after_if(condition);
     let internally_applied_if_cond_expr = get_definitely_evaluated_expression_inside_if(condition);
-    let mut if_body_context = None;
     let mut externally_applied_context = if has_outer_context_changes { outer_context } else { old_outer_context };
-    if externally_applied_if_cond_expr != internally_applied_if_cond_expr {
-        if_body_context = Some(externally_applied_context.clone());
-    }
 
     let pre_condition_locals = externally_applied_context.locals.clone();
     let pre_referenced_var_ids = std::mem::take(&mut externally_applied_context.conditionally_referenced_variable_ids);
     let pre_assigned_var_ids = std::mem::take(&mut externally_applied_context.assigned_variable_ids);
+
+    let mut if_body_context = None;
+    if externally_applied_if_cond_expr != internally_applied_if_cond_expr {
+        if_body_context = Some(externally_applied_context.clone());
+    }
+
     let was_inside_conditional = externally_applied_context.inside_conditional;
 
     externally_applied_context.inside_conditional = true;

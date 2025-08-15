@@ -19,7 +19,7 @@ impl Analyzable for IssetConstruct {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         for value in self.values.iter() {
-            if !matches!(value, Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_)) {
+            if !is_valid_isset_expression(value) {
                 context.collector.report_with_code(
                     Code::INVALID_ISSET_EXPRESSION,
                     Issue::error("Cannot use `isset()` on the result of an expression.")
@@ -40,5 +40,13 @@ impl Analyzable for IssetConstruct {
         artifacts.set_expression_type(self, get_bool());
 
         Ok(())
+    }
+}
+
+const fn is_valid_isset_expression(expression: &Expression) -> bool {
+    match expression {
+        Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_) => true,
+        Expression::Assignment(assignment) => assignment.operator.is_assign() && assignment.rhs.is_reference(),
+        _ => false,
     }
 }

@@ -482,7 +482,7 @@ impl<'a> BlockContext<'a> {
 
         // A variable is conditionally referenced if it's part of an access chain
         // (i.e., its suffix was stripped) and the base variable is not `$this`.
-        if stripped_var != var_name && stripped_var != "$this" {
+        if stripped_var != "$this" || stripped_var != var_name {
             self.conditionally_referenced_variable_ids.insert(var_name.to_owned());
         }
     }

@@ -25,6 +25,8 @@ use mago_syntax::ast::*;
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::Code;
+use crate::common::synthetic::new_synthetic_call;
+use crate::common::synthetic::new_synthetic_negation;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::conditional_scope::IfConditionalScope;
@@ -253,9 +255,7 @@ impl Analyzable for If {
 
         block_context.variables_possibly_in_scope.extend(if_scope.new_variables_possibly_in_scope);
         block_context.possibly_assigned_variable_ids.extend(if_scope.possibly_assigned_variable_ids);
-        if let Some(variable_ids) = if_scope.assigned_variable_ids {
-            block_context.assigned_variable_ids.extend(variable_ids);
-        }
+        block_context.assigned_variable_ids.extend(if_scope.assigned_variable_ids.unwrap_or_default());
 
         if let Some(new_variables) = if_scope.new_variables {
             for (variable_id, variable_type) in new_variables {
@@ -307,14 +307,16 @@ impl Analyzable for If {
             let new_type =
                 combine_union_types(&existing_type, &variable_type, context.codebase, context.interner, false);
 
-            block_context.remove_descendants(
-                context.interner,
-                context.codebase,
-                &mut context.collector,
-                &variable_id,
-                &existing_type,
-                Some(&new_type),
-            );
+            if !new_type.eq(&existing_type) {
+                block_context.remove_descendants(
+                    context.interner,
+                    context.codebase,
+                    &mut context.collector,
+                    &variable_id,
+                    &existing_type,
+                    Some(&new_type),
+                );
+            }
 
             block_context.locals.insert(variable_id.clone(), Rc::new(new_type));
         }
@@ -1121,12 +1123,32 @@ fn add_conditionally_assigned_variables_to_context<'a>(
     condition: &Expression,
     assigned_in_conditional_variable_ids: &HashMap<String, u32>,
 ) -> Result<(), AnalysisError> {
-    let negated_expression = Expression::UnaryPrefix(UnaryPrefix {
-        operator: UnaryPrefixOperator::Not(condition.span()),
-        operand: Box::new(condition.clone()),
+    if assigned_in_conditional_variable_ids.is_empty() {
+        return Ok(());
+    }
+
+    let old_expression_types = artifacts.expression_types.clone();
+    let expressions = get_definitely_evaluated_ored_expressions(condition);
+
+    let (result, _) = context.record(|context| {
+        for expression in expressions {
+            let negated_expression = new_synthetic_negation(expression);
+            let assertion = new_synthetic_call(context.interner, "assert", negated_expression);
+
+            let was_inside_negation = post_leaving_if_block_context.inside_negation;
+            post_leaving_if_block_context.inside_negation = true;
+
+            assertion.analyze(context, post_leaving_if_block_context, artifacts)?;
+
+            post_leaving_if_block_context.inside_negation = was_inside_negation;
+        }
+
+        Ok(())
     });
 
-    context.record(|context| negated_expression.analyze(context, post_leaving_if_block_context, artifacts)).0?;
+    result?;
+
+    artifacts.expression_types = old_expression_types;
 
     for variable_id in assigned_in_conditional_variable_ids.keys() {
         if let Some(variable_type) = post_leaving_if_block_context.locals.get(variable_id) {
@@ -1302,6 +1324,22 @@ fn reconcile_branch_reference_constraints<'a>(
             outer_block_context.by_reference_constraints.insert(variable.clone(), constraint.clone());
         }
     }
+}
+
+fn get_definitely_evaluated_ored_expressions(expression: &Expression) -> Vec<&Expression> {
+    if let Expression::Binary(Binary {
+        lhs,
+        operator: BinaryOperator::Or(_) | BinaryOperator::LowOr(_) | BinaryOperator::LowXor(_),
+        rhs,
+    }) = expression
+    {
+        return get_definitely_evaluated_ored_expressions(lhs)
+            .into_iter()
+            .chain(get_definitely_evaluated_ored_expressions(rhs))
+            .collect();
+    }
+
+    vec![expression]
 }
 
 #[cfg(test)]

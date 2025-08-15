@@ -12,24 +12,23 @@ use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::DirectVariable;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Switch;
 use mago_syntax::ast::SwitchCase;
 use mago_syntax::ast::SwitchExpressionCase;
-use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::Code;
+use crate::common::synthetic::new_synthetic_disjunctive_equality;
+use crate::common::synthetic::new_synthetic_equals;
+use crate::common::synthetic::new_synthetic_or;
+use crate::common::synthetic::new_synthetic_variable;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::BreakContext;
@@ -747,29 +746,4 @@ impl<'a, 'b> SwitchAnalyzer<'a, 'b> {
             _ => None,
         }
     }
-}
-
-fn new_synthetic_disjunctive_equality(subject: &Expression, left: &Expression, right: Vec<&Expression>) -> Expression {
-    let mut expr = new_synthetic_equals(subject, left);
-    for r in right {
-        expr = new_synthetic_or(&expr, &new_synthetic_equals(subject, r));
-    }
-
-    expr
-}
-
-fn new_synthetic_or(left: &Expression, right: &Expression) -> Expression {
-    new_synthetic_binary(left, BinaryOperator::Or(Span::dummy(0, 1)), right)
-}
-
-fn new_synthetic_equals(left: &Expression, right: &Expression) -> Expression {
-    new_synthetic_binary(left, BinaryOperator::Equal(Span::dummy(0, 1)), right)
-}
-
-fn new_synthetic_binary(left: &Expression, operator: BinaryOperator, right: &Expression) -> Expression {
-    Expression::Binary(Binary { lhs: Box::new(left.clone()), operator, rhs: Box::new(right.clone()) })
-}
-
-fn new_synthetic_variable(interner: &ThreadedInterner, name: &str) -> Expression {
-    Expression::Variable(Variable::Direct(DirectVariable { span: Span::dummy(0, 1), name: interner.intern(name) }))
 }

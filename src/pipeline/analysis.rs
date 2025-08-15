@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::settings::Settings;
@@ -13,6 +15,8 @@ use mago_syntax::parser::parse_file;
 use crate::error::Error;
 use crate::pipeline::ParallelPipeline;
 use crate::pipeline::Reducer;
+
+const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_millis(5000);
 
 /// The "reduce" step for the analysis pipeline.
 ///
@@ -76,6 +80,15 @@ pub fn run_analysis_pipeline(
 
             analysis_result.issues.extend(semantics_checker.check(&source_file, &program, &resolved_names));
             analyzer.analyze(&program, &mut analysis_result)?;
+
+            if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
+                tracing::warn!(
+                    "Analysis of source file '{}' took longer than {}s: {}s",
+                    source_file.name,
+                    ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
+                    analysis_result.time_in_analysis.as_secs_f32()
+                );
+            }
 
             Ok(analysis_result)
         },

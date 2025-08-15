@@ -1066,8 +1066,19 @@ impl TType for TUnion {
 
 impl PartialEq for TUnion {
     fn eq(&self, other: &TUnion) -> bool {
-        let len = self.types.len();
+        if self.reference_free != other.reference_free
+            || self.by_reference != other.by_reference
+            || self.had_template != other.had_template
+            || self.possibly_undefined_from_try != other.possibly_undefined_from_try
+            || self.possibly_undefined != other.possibly_undefined
+            || self.ignore_falsable_issues != other.ignore_falsable_issues
+            || self.ignore_nullable_issues != other.ignore_nullable_issues
+            || self.from_template_default != other.from_template_default
+        {
+            return false;
+        }
 
+        let len = self.types.len();
         if len != other.types.len() {
             return false;
         }
