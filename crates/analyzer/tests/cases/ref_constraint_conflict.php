@@ -29,6 +29,7 @@ function get_bool(): bool
 
 /**
  * @mago-expect analysis:conflicting-reference-constraint
+ * @mago-expect reference-constraint-violation
  */
 function constraint_conflict(): void
 {
@@ -39,6 +40,8 @@ function constraint_conflict(): void
         $v = 'hello';
         $c = new B($v); // $v is constrained to a string
     }
+
+    $v = []; // constraint violation (`int` <- `array`)
 }
 
 /**
