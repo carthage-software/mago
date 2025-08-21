@@ -1,42 +1,40 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum OpeningTag {
-    Full(FullOpeningTag),
+#[repr(u8)]
+pub enum OpeningTag<'arena> {
+    Full(FullOpeningTag<'arena>),
     Short(ShortOpeningTag),
     Echo(EchoOpeningTag),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct FullOpeningTag {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct FullOpeningTag<'arena> {
     pub span: Span,
-    pub value: StringIdentifier,
+    pub value: &'arena str,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ShortOpeningTag {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct EchoOpeningTag {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ClosingTag {
     pub span: Span,
 }
 
-impl HasSpan for OpeningTag {
+impl HasSpan for OpeningTag<'_> {
     fn span(&self) -> Span {
         match &self {
             OpeningTag::Full(t) => t.span(),
@@ -46,7 +44,7 @@ impl HasSpan for OpeningTag {
     }
 }
 
-impl HasSpan for FullOpeningTag {
+impl HasSpan for FullOpeningTag<'_> {
     fn span(&self) -> Span {
         self.span
     }

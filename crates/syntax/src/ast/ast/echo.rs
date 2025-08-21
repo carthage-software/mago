@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -19,14 +18,14 @@ use crate::ast::sequence::TokenSeparatedSequence;
 /// echo "Hello, World!";
 /// echo $a, $b, $c;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Echo {
-    pub echo: Keyword,
-    pub values: TokenSeparatedSequence<Expression>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Echo<'arena> {
+    pub echo: Keyword<'arena>,
+    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl HasSpan for Echo {
+impl HasSpan for Echo<'_> {
     fn span(&self) -> Span {
         self.echo.span().join(self.terminator.span())
     }

@@ -31,18 +31,18 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::resolver::method::resolve_method_targets;
 use crate::visibility::check_method_visibility;
 
-impl Analyzable for MethodCall {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_method_call(
             context,
             block_context,
             artifacts,
-            &self.object,
+            self.object,
             &self.method,
             &self.argument_list,
             false, // is_nullsafe
@@ -51,18 +51,18 @@ impl Analyzable for MethodCall {
     }
 }
 
-impl Analyzable for NullSafeMethodCall {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_method_call(
             context,
             block_context,
             artifacts,
-            &self.object,
+            self.object,
             &self.method,
             &self.argument_list,
             true, // is_nullsafe
@@ -103,15 +103,15 @@ impl Analyzable for NullSafeMethodCall {
 ///
 /// A `Result` containing the `TUnion` type of the method's return value. If the method
 /// is not visible, it returns the `never` type.
-pub fn analyze_implicit_method_call<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object_type: &TObject,
     method_identifier: MethodIdentifier,
-    class_like_metadata: &ClassLikeMetadata,
-    method_metadata: &FunctionLikeMetadata,
-    arguments_source: Option<InvocationArgumentsSource<'a>>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    method_metadata: &'ctx FunctionLikeMetadata,
+    arguments_source: Option<InvocationArgumentsSource<'ast, 'arena>>,
     span: Span,
 ) -> Result<TUnion, AnalysisError> {
     if !check_method_visibility(
@@ -172,13 +172,13 @@ pub fn analyze_implicit_method_call<'a>(
     Ok(result)
 }
 
-fn analyze_method_call<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_method_call<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    object: &Expression,
-    selector: &ClassLikeMemberSelector,
-    argument_list: &ArgumentList,
+    object: &'ast Expression<'arena>,
+    selector: &'ast ClassLikeMemberSelector<'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {

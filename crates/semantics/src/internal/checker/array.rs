@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_list(list: &List, context: &mut Context<'_>) {
+pub fn check_list(list: &List, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::TrailingCommaInListSyntax)
         && let Some(token) = list.elements.get_trailing_token()
     {
@@ -20,8 +20,8 @@ pub fn check_list(list: &List, context: &mut Context<'_>) {
     if !context.version.is_supported(Feature::ListReferenceAssignment) {
         for element in list.elements.iter() {
             let value = match element {
-                ArrayElement::KeyValue(kv) => kv.value.as_ref(),
-                ArrayElement::Value(v) => v.value.as_ref(),
+                ArrayElement::KeyValue(kv) => kv.value,
+                ArrayElement::Value(v) => v.value,
                 _ => continue,
             };
 

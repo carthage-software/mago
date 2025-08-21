@@ -6,7 +6,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::token::Precedence;
 
-pub fn parse_yield(stream: &mut TokenStream<'_, '_>) -> Result<Yield, ParseError> {
+pub fn parse_yield<'arena>(stream: &mut TokenStream<'arena>) -> Result<Yield<'arena>, ParseError> {
     let r#yield = utils::expect_keyword(stream, T!["yield"])?;
 
     Ok(match utils::peek(stream)?.kind {
@@ -14,7 +14,11 @@ pub fn parse_yield(stream: &mut TokenStream<'_, '_>) -> Result<Yield, ParseError
         T!["from"] => Yield::From(YieldFrom {
             r#yield,
             from: utils::expect_keyword(stream, T!["from"])?,
-            iterator: Box::new(parse_expression_with_precedence(stream, Precedence::YieldFrom)?),
+            iterator: {
+                let expr = parse_expression_with_precedence(stream, Precedence::YieldFrom)?;
+
+                stream.alloc(expr)
+            },
         }),
         _ => {
             let key_or_value = parse_expression_with_precedence(stream, Precedence::Yield)?;
@@ -22,12 +26,16 @@ pub fn parse_yield(stream: &mut TokenStream<'_, '_>) -> Result<Yield, ParseError
             if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["=>"])) {
                 Yield::Pair(YieldPair {
                     r#yield,
-                    key: Box::new(key_or_value),
+                    key: stream.alloc(key_or_value),
                     arrow: utils::expect_span(stream, T!["=>"])?,
-                    value: Box::new(parse_expression_with_precedence(stream, Precedence::Yield)?),
+                    value: {
+                        let expr = parse_expression_with_precedence(stream, Precedence::Yield)?;
+
+                        stream.alloc(expr)
+                    },
                 })
             } else {
-                Yield::Value(YieldValue { r#yield, value: Some(Box::new(key_or_value)) })
+                Yield::Value(YieldValue { r#yield, value: Some(stream.alloc(key_or_value)) })
             }
         }
     })

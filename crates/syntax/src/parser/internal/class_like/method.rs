@@ -9,11 +9,11 @@ use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_method_with_attributes_and_modifiers(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-    modifiers: Sequence<Modifier>,
-) -> Result<Method, ParseError> {
+pub fn parse_method_with_attributes_and_modifiers<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+    modifiers: Sequence<'arena, Modifier<'arena>>,
+) -> Result<Method<'arena>, ParseError> {
     Ok(Method {
         attribute_lists: attributes,
         modifiers,
@@ -26,7 +26,7 @@ pub fn parse_method_with_attributes_and_modifiers(
     })
 }
 
-pub fn parse_method_body(stream: &mut TokenStream<'_, '_>) -> Result<MethodBody, ParseError> {
+pub fn parse_method_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<MethodBody<'arena>, ParseError> {
     let next = utils::maybe_peek(stream)?;
     Ok(match next.map(|t| t.kind) {
         Some(T![";"]) => MethodBody::Abstract(MethodAbstractBody { semicolon: utils::expect_any(stream)?.span }),

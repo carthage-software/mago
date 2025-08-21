@@ -1,15 +1,14 @@
 use ahash::HashSet;
 
-use mago_interner::StringIdentifier;
 use mago_span::Span;
 use mago_syntax::ast::*;
 use mago_syntax::walker::*;
 
 #[inline]
-pub fn get_variables_referenced_in_expression(
-    expression: &Expression,
+pub fn get_variables_referenced_in_expression<'arena>(
+    expression: &Expression<'arena>,
     ignore_symbols: bool,
-) -> HashSet<(StringIdentifier, Span)> {
+) -> HashSet<(&'arena str, Span)> {
     let mut scanner = VariableScanner { ignore_symbols, ..Default::default() };
 
     scanner.walk_expression(expression, &mut ());
@@ -17,21 +16,21 @@ pub fn get_variables_referenced_in_expression(
 }
 
 #[derive(Debug, Default)]
-struct VariableScanner {
+struct VariableScanner<'arena> {
     ignore_symbols: bool,
-    variables: HashSet<(StringIdentifier, Span)>,
+    variables: HashSet<(&'arena str, Span)>,
 }
 
-impl MutWalker<()> for VariableScanner {
+impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for VariableScanner<'arena> {
     #[inline]
-    fn walk_in_direct_variable(&mut self, direct_variable: &DirectVariable, _: &mut ()) {
+    fn walk_in_direct_variable(&mut self, direct_variable: &'ast DirectVariable<'arena>, _: &mut ()) {
         self.variables.insert((direct_variable.name, direct_variable.span));
     }
 
     #[inline]
-    fn walk_arrow_function(&mut self, arrow_function: &ArrowFunction, context: &mut ()) {
+    fn walk_arrow_function(&mut self, arrow_function: &'ast ArrowFunction<'arena>, context: &mut ()) {
         if self.ignore_symbols {
-            self.walk_expression(&arrow_function.expression, context);
+            self.walk_expression(arrow_function.expression, context);
 
             return;
         }
@@ -40,7 +39,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_closure(&mut self, closure: &Closure, context: &mut ()) {
+    fn walk_closure(&mut self, closure: &'ast Closure<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             if let Some(closure_use_clause) = closure.use_clause.as_ref() {
                 walk_closure_use_clause_mut(self, closure_use_clause, context);
@@ -53,7 +52,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_function(&mut self, function: &Function, context: &mut ()) {
+    fn walk_function(&mut self, function: &'ast Function<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             return;
         }
@@ -62,7 +61,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_class(&mut self, class: &Class, context: &mut ()) {
+    fn walk_class(&mut self, class: &'ast Class<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             return;
         }
@@ -71,7 +70,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_interface(&mut self, interface: &Interface, context: &mut ()) {
+    fn walk_interface(&mut self, interface: &'ast Interface<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             return;
         }
@@ -80,7 +79,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_trait(&mut self, trait_: &Trait, context: &mut ()) {
+    fn walk_trait(&mut self, trait_: &'ast Trait<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             return;
         }
@@ -89,7 +88,7 @@ impl MutWalker<()> for VariableScanner {
     }
 
     #[inline]
-    fn walk_enum(&mut self, enum_: &Enum, context: &mut ()) {
+    fn walk_enum(&mut self, enum_: &'ast Enum<'arena>, context: &mut ()) {
         if self.ignore_symbols {
             return;
         }

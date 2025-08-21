@@ -81,7 +81,7 @@ impl LintRule for NoClosingTagRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -113,8 +113,7 @@ impl NoClosingTagRule {
                 return;
             }
 
-            let value = ctx.interner.lookup(&inline.value);
-            if value.bytes().all(|b| b.is_ascii_whitespace()) {
+            if inline.value.bytes().all(|b| b.is_ascii_whitespace()) {
                 let Some(Statement::ClosingTag(tag)) = sequence.get(stmts_len - 2) else {
                     return;
                 };

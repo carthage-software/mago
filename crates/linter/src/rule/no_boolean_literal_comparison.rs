@@ -83,7 +83,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -94,7 +94,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
             _ => return,
         };
 
-        let Some(literal_val) = get_boolean_literal(&binary.lhs).or_else(|| get_boolean_literal(&binary.rhs)) else {
+        let Some(literal_val) = get_boolean_literal(binary.lhs).or_else(|| get_boolean_literal(binary.rhs)) else {
             return;
         };
 
@@ -125,7 +125,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
 }
 
 /// Attempts to extract a boolean literal from an expression, looking through parentheses.
-const fn get_boolean_literal(expr: &Expression) -> Option<bool> {
+fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<bool> {
     match expr {
         Expression::Literal(Literal::True(_)) => Some(true),
         Expression::Literal(Literal::False(_)) => Some(false),

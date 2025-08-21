@@ -32,19 +32,23 @@ use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::statement::analyze_statements;
 
-impl Analyzable for Try {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut catch_actions = vec![];
         let mut all_catches_leave = !self.catch_clauses.is_empty();
 
         for catch_clause in self.catch_clauses.iter() {
-            let actions =
-                ControlAction::from_statements(catch_clause.block.statements.to_vec(), vec![], Some(artifacts), true);
+            let actions = ControlAction::from_statements(
+                catch_clause.block.statements.iter().collect::<Vec<_>>(),
+                vec![],
+                Some(artifacts),
+                true,
+            );
 
             all_catches_leave = all_catches_leave && !actions.contains(&ControlAction::None);
             catch_actions.push(actions);
@@ -66,8 +70,12 @@ impl Analyzable for Try {
         block_context.inside_try = was_inside_try;
         block_context.has_returned = false;
 
-        let try_block_control_actions =
-            ControlAction::from_statements(self.block.statements.to_vec(), vec![], Some(artifacts), true);
+        let try_block_control_actions = ControlAction::from_statements(
+            self.block.statements.iter().collect::<Vec<_>>(),
+            vec![],
+            Some(artifacts),
+            true,
+        );
 
         let newly_assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
         block_context.assigned_variable_ids.extend(assigned_variable_ids);
@@ -129,23 +137,11 @@ impl Analyzable for Try {
 
         if !all_catches_leave {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                block_context.remove_variable_from_conflicting_clauses(
-                    context.interner,
-                    context.codebase,
-                    &mut context.collector,
-                    assigned_variable_id,
-                    None,
-                );
+                block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
             }
         } else {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                try_block_context.remove_variable_from_conflicting_clauses(
-                    context.interner,
-                    context.codebase,
-                    &mut context.collector,
-                    assigned_variable_id,
-                    None,
-                );
+                try_block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
             }
         }
 
@@ -202,16 +198,9 @@ impl Analyzable for Try {
                         .collect(),
                 );
 
-                let catch_variable_id = context.interner.lookup(&catch_variable.name);
-                catch_block_context.locals.insert(catch_variable_id.to_owned(), Rc::new(exception_type));
-                catch_block_context.remove_variable_from_conflicting_clauses(
-                    context.interner,
-                    context.codebase,
-                    &mut context.collector,
-                    catch_variable_id,
-                    None,
-                );
-                catch_block_context.variables_possibly_in_scope.insert(catch_variable_id.to_owned());
+                catch_block_context.locals.insert(catch_variable.name.to_owned(), Rc::new(exception_type));
+                catch_block_context.remove_variable_from_conflicting_clauses(context, catch_variable.name, None);
+                catch_block_context.variables_possibly_in_scope.insert(catch_variable.name.to_owned());
             }
 
             let old_catch_assigned_variable_ids = std::mem::take(&mut catch_block_context.assigned_variable_ids);
@@ -221,7 +210,7 @@ impl Analyzable for Try {
             // recalculate in case there's a no-return clause
             if let Some(actions) = catch_actions.get_mut(i) {
                 *actions = ControlAction::from_statements(
-                    catch_clause.block.statements.to_vec(),
+                    catch_clause.block.statements.iter().collect::<Vec<_>>(),
                     vec![],
                     Some(artifacts),
                     true,
@@ -385,20 +374,27 @@ impl Analyzable for Try {
     }
 }
 
-pub(crate) fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> HashSet<StringIdentifier> {
+pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    hint: &'ast Hint<'arena>,
+) -> HashSet<StringIdentifier> {
     let mut caught_identifiers: HashMap<StringIdentifier, Span> = HashMap::default();
 
-    fn walk(context: &mut Context<'_>, hint: &Hint, caught: &mut HashMap<StringIdentifier, Span>) {
+    fn walk<'ctx, 'ast, 'arena>(
+        context: &mut Context<'ctx, 'arena>,
+        hint: &'ast Hint<'arena>,
+        caught: &mut HashMap<StringIdentifier, Span>,
+    ) {
         match hint {
             Hint::Identifier(identifier) => {
-                let id = *context.resolved_names.get(identifier);
+                let name = context.resolved_names.get(identifier);
+                let id = context.interner.intern(name);
 
                 if let Some(&first_span) = caught.get(&id) {
                     context.collector.report_with_code(
                         IssueCode::DuplicateCaughtType,
                         Issue::error(format!(
-                            "Type `{}` is caught multiple times in the same `catch` clause.",
-                            context.interner.lookup(&id)
+                            "Type `{name}` is caught multiple times in the same `catch` clause.",
                         ))
                         .with_annotation(
                             Annotation::primary(hint.span())
@@ -406,7 +402,7 @@ pub(crate) fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> Hash
                         )
                         .with_annotation(
                             Annotation::secondary(first_span)
-                                .with_message(format!("`{}` was already specified here", context.interner.lookup(&id))),
+                                .with_message(format!("`{name}` was already specified here")),
                         )
                         .with_help("Remove the redundant type from the `catch` union. Each exception type should only be listed once."),
                     );
@@ -415,8 +411,8 @@ pub(crate) fn get_caught_classes(context: &mut Context<'_>, hint: &Hint) -> Hash
                 }
             }
             Hint::Union(union_hint) => {
-                walk(context, &union_hint.left, caught);
-                walk(context, &union_hint.right, caught);
+                walk(context, union_hint.left, caught);
+                walk(context, union_hint.right, caught);
             }
             _ => {
                 context.collector.report_with_code(

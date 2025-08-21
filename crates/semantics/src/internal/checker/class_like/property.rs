@@ -14,11 +14,10 @@ pub fn check_property(
     class_like_name: &str,
     class_like_fqcn: &str,
     class_like_is_interface: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_, '_>,
 ) {
     let first_variable = property.first_variable();
-    let first_variable_id = first_variable.name;
-    let first_variable_name = context.interner.lookup(&first_variable_id);
+    let first_variable_name = first_variable.name;
 
     let modifiers = property.modifiers();
     let mut last_final: Option<Span> = None;
@@ -385,10 +384,9 @@ pub fn check_property(
 
             for item in plain_property.items.iter() {
                 if let PropertyItem::Concrete(property_concrete_item) = &item {
-                    let item_name_id = property_concrete_item.variable.name;
-                    let item_name = context.interner.lookup(&item_name_id);
+                    let item_name = property_concrete_item.variable.name;
 
-                    if !property_concrete_item.value.is_constant(context.version, false) {
+                    if !property_concrete_item.value.is_constant(&context.version, false) {
                         context.report(
                             Issue::error(format!(
                                 "Property `{class_like_name}::{item_name}` value contains a non-constant expression."
@@ -442,8 +440,7 @@ pub fn check_property(
                 context.report(issue);
             }
 
-            let item_name_id = hooked_property.item.variable().name;
-            let item_name = context.interner.lookup(&item_name_id);
+            let item_name = hooked_property.item.variable().name;
 
             if let Some(readonly) = last_readonly {
                 context.report(
@@ -489,7 +486,7 @@ pub fn check_property(
 
             let mut hook_names: Vec<(std::string::String, Span)> = vec![];
             for hook in hooked_property.hook_list.hooks.iter() {
-                let name = context.interner.lookup(&hook.name.value);
+                let name = hook.name.value;
                 let lowered_name = name.to_ascii_lowercase();
 
                 if !hook.modifiers.is_empty() {
@@ -571,7 +568,7 @@ pub fn check_property(
                                 );
                             } else {
                                 let first_parameter = parameter_list.parameters.first().unwrap();
-                                let first_parameter_name = context.interner.lookup(&first_parameter.variable.name);
+                                let first_parameter_name = first_parameter.variable.name;
 
                                 if first_parameter.hint.is_none() {
                                     context.report(

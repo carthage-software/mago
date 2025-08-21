@@ -19,12 +19,12 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_class_like_constants(
+pub fn scan_class_like_constants<'input, 'ast, 'arena>(
     class_like_metadata: &mut ClassLikeMetadata,
-    constant: &ClassLikeConstant,
+    constant: &'ast ClassLikeConstant<'arena>,
     classname: Option<&StringIdentifier>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &NamespaceScope,
 ) -> Vec<ClassLikeConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
@@ -60,7 +60,12 @@ pub fn scan_class_like_constants(
         .items
         .iter()
         .map(|item| {
-            let mut meta = ClassLikeConstantMetadata::new(item.name.value, item.span(), visibility, flags);
+            let mut meta = ClassLikeConstantMetadata::new(
+                context.interner.intern(item.name.value),
+                item.span(),
+                visibility,
+                flags,
+            );
             if let Some(type_declaration) = type_declaration.as_ref().cloned() {
                 meta.set_type_declaration(type_declaration);
             }

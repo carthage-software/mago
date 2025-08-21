@@ -45,7 +45,7 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
     match expression {
         Expression::Literal(literal) => match literal {
             Literal::String(literal_string) => {
-                Some(match literal_string.value.as_deref() {
+                Some(match literal_string.value {
                     Some(value) => {
                         if value.is_empty() {
                             get_empty_string()
@@ -189,24 +189,22 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
             Construct::Print(_) => Some(get_literal_int(1)),
             _ => None,
         },
-        Expression::ConstantAccess(access) => infer_constant(interner, resolved_names, &access.name),
+        Expression::ConstantAccess(access) => infer_constant(resolved_names, &access.name),
         Expression::Access(Access::ClassConstant(ClassConstantAccess {
             class,
             constant: ClassLikeConstantSelector::Identifier(identifier),
             ..
         })) => {
-            let class_name = if let Expression::Identifier(identifier) = class.as_ref() {
+            let class_name_str = if let Expression::Identifier(identifier) = class {
                 resolved_names.get(identifier)
             } else {
                 return None;
             };
 
-            let class_name_str = interner.lookup(class_name);
-            let member_name = interner.lookup(&identifier.value);
-            Some(wrap_atomic(if member_name.eq_ignore_ascii_case("class") {
-                TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(*class_name)))
+            Some(wrap_atomic(if identifier.value.eq_ignore_ascii_case("class") {
+                TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(interner.intern(class_name_str))))
             } else if class_name_str.eq_ignore_ascii_case("Attribute") {
-                let bits = match member_name {
+                let bits = match identifier.value {
                     "TARGET_CLASS" => Some(AttributeFlags::TARGET_CLASS.bits()),
                     "TARGET_FUNCTION" => Some(AttributeFlags::TARGET_FUNCTION.bits()),
                     "TARGET_METHOD" => Some(AttributeFlags::TARGET_METHOD.bits()),
@@ -222,14 +220,14 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
                 match bits {
                     Some(bits) => return Some(get_literal_int(bits as i64)),
                     None => TAtomic::Reference(TReference::Member {
-                        class_like_name: *class_name,
-                        member_selector: TReferenceMemberSelector::Identifier(identifier.value),
+                        class_like_name: interner.intern(class_name_str),
+                        member_selector: TReferenceMemberSelector::Identifier(interner.intern(identifier.value)),
                     }),
                 }
             } else {
                 TAtomic::Reference(TReference::Member {
-                    class_like_name: *class_name,
-                    member_selector: TReferenceMemberSelector::Identifier(identifier.value),
+                    class_like_name: interner.intern(class_name_str),
+                    member_selector: TReferenceMemberSelector::Identifier(interner.intern(identifier.value)),
                 })
             }))
         }
@@ -243,7 +241,7 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
                     return None;
                 };
 
-                entries.insert(i, (false, infer(interner, resolved_names, &element.value)?));
+                entries.insert(i, (false, infer(interner, resolved_names, element.value)?));
             }
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
@@ -262,8 +260,8 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
                     return None;
                 };
 
-                let key_type = infer(interner, resolved_names, &element.key).and_then(|v| v.get_single_array_key())?;
-                known_items.insert(key_type, (false, infer(interner, resolved_names, &element.value)?));
+                let key_type = infer(interner, resolved_names, element.key).and_then(|v| v.get_single_array_key())?;
+                known_items.insert(key_type, (false, infer(interner, resolved_names, element.value)?));
 
                 if known_items.len() > 100 {
                     return None;
@@ -297,7 +295,7 @@ pub fn infer(interner: &ThreadedInterner, resolved_names: &ResolvedNames, expres
 }
 
 #[inline]
-fn infer_constant(interner: &ThreadedInterner, names: &ResolvedNames, constant: &Identifier) -> Option<TUnion> {
+fn infer_constant(names: &ResolvedNames, constant: &Identifier) -> Option<TUnion> {
     const DIR_SEPARATOR_SLICE: &[TAtomic] = &[
         TAtomic::Scalar(TScalar::String(TString {
             literal: Some(TStringLiteral::Value(Cow::Borrowed("/"))),
@@ -336,18 +334,11 @@ fn infer_constant(interner: &ThreadedInterner, names: &ResolvedNames, constant: 
     ];
 
     let (short_name, _) = if names.is_imported(constant) {
-        let name = interner.lookup(names.get(constant));
-
-        (name, name)
+        (names.get(constant), names.get(constant))
+    } else if let Some(stripped) = constant.value().strip_prefix('\\') {
+        (stripped, names.get(constant))
     } else {
-        let short_name = interner.lookup(constant.value());
-        let imported_name = interner.lookup(names.get(constant));
-
-        if let Some(stripped) = short_name.strip_prefix('\\') {
-            (stripped, imported_name)
-        } else {
-            (short_name, imported_name)
-        }
+        (constant.value(), names.get(constant))
     };
 
     Some(match short_name {

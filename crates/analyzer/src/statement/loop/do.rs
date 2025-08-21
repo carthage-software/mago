@@ -23,11 +23,11 @@ use crate::formula::remove_clauses_with_mixed_variables;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop;
 
-impl Analyzable for DoWhile {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut loop_block_context = block_context.clone();
@@ -46,7 +46,7 @@ impl Analyzable for DoWhile {
         let mut while_clauses = get_formula(
             self.condition.span(),
             self.condition.span(),
-            &self.condition,
+            self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
         )
@@ -94,9 +94,9 @@ impl Analyzable for DoWhile {
 
         let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
             context,
-            std::slice::from_ref(self.statement.as_ref()),
+            std::slice::from_ref(self.statement),
             vec![],
-            r#loop::get_and_expressions(&self.condition),
+            r#loop::get_and_expressions(self.condition),
             loop_scope,
             &mut loop_block_context,
             block_context,
@@ -120,10 +120,8 @@ impl Analyzable for DoWhile {
         );
 
         if !negated_while_types.is_empty() {
-            let mut reconciliation_context = context.get_reconciliation_context();
-
             reconcile_keyed_types(
-                &mut reconciliation_context,
+                context,
                 &negated_while_types,
                 IndexMap::new(),
                 &mut inner_loop_block_context,

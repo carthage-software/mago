@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -10,31 +9,31 @@ use crate::ast::ast::type_hint::Hint;
 use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Try {
-    pub r#try: Keyword,
-    pub block: Block,
-    pub catch_clauses: Sequence<TryCatchClause>,
-    pub finally_clause: Option<TryFinallyClause>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Try<'arena> {
+    pub r#try: Keyword<'arena>,
+    pub block: Block<'arena>,
+    pub catch_clauses: Sequence<'arena, TryCatchClause<'arena>>,
+    pub finally_clause: Option<TryFinallyClause<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct TryCatchClause {
-    pub r#catch: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct TryCatchClause<'arena> {
+    pub r#catch: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub hint: Hint,
-    pub variable: Option<DirectVariable>,
+    pub hint: Hint<'arena>,
+    pub variable: Option<DirectVariable<'arena>>,
     pub right_parenthesis: Span,
-    pub block: Block,
+    pub block: Block<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct TryFinallyClause {
-    pub r#finally: Keyword,
-    pub block: Block,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct TryFinallyClause<'arena> {
+    pub r#finally: Keyword<'arena>,
+    pub block: Block<'arena>,
 }
 
-impl HasSpan for Try {
+impl HasSpan for Try<'_> {
     fn span(&self) -> Span {
         match &self.finally_clause {
             Some(finally) => Span::between(self.r#try.span(), finally.span()),
@@ -46,13 +45,13 @@ impl HasSpan for Try {
     }
 }
 
-impl HasSpan for TryCatchClause {
+impl HasSpan for TryCatchClause<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#catch.span(), self.block.span())
     }
 }
 
-impl HasSpan for TryFinallyClause {
+impl HasSpan for TryFinallyClause<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#finally.span(), self.block.span())
     }

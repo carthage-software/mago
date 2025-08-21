@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,42 +10,42 @@ use crate::ast::ast::terminator::Terminator;
 use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Static {
-    pub r#static: Keyword,
-    pub items: TokenSeparatedSequence<StaticItem>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Static<'arena> {
+    pub r#static: Keyword<'arena>,
+    pub items: TokenSeparatedSequence<'arena, StaticItem<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum StaticItem {
-    Abstract(StaticAbstractItem),
-    Concrete(StaticConcreteItem),
+#[repr(u8)]
+pub enum StaticItem<'arena> {
+    Abstract(StaticAbstractItem<'arena>),
+    Concrete(StaticConcreteItem<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct StaticAbstractItem {
-    pub variable: DirectVariable,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct StaticAbstractItem<'arena> {
+    pub variable: DirectVariable<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct StaticConcreteItem {
-    pub variable: DirectVariable,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct StaticConcreteItem<'arena> {
+    pub variable: DirectVariable<'arena>,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'arena>,
 }
 
-impl StaticItem {
-    pub fn variable(&self) -> &DirectVariable {
+impl<'arena> StaticItem<'arena> {
+    pub fn variable(&self) -> &DirectVariable<'arena> {
         match self {
             StaticItem::Abstract(item) => &item.variable,
             StaticItem::Concrete(item) => &item.variable,
         }
     }
 
-    pub fn value(&self) -> Option<&Expression> {
+    pub fn value(&self) -> Option<&Expression<'arena>> {
         match self {
             StaticItem::Abstract(_) => None,
             StaticItem::Concrete(item) => Some(&item.value),
@@ -54,13 +53,13 @@ impl StaticItem {
     }
 }
 
-impl HasSpan for Static {
+impl HasSpan for Static<'_> {
     fn span(&self) -> Span {
         self.r#static.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for StaticItem {
+impl HasSpan for StaticItem<'_> {
     fn span(&self) -> Span {
         match self {
             StaticItem::Abstract(item) => item.span(),
@@ -69,13 +68,13 @@ impl HasSpan for StaticItem {
     }
 }
 
-impl HasSpan for StaticAbstractItem {
+impl HasSpan for StaticAbstractItem<'_> {
     fn span(&self) -> Span {
         self.variable.span()
     }
 }
 
-impl HasSpan for StaticConcreteItem {
+impl HasSpan for StaticConcreteItem<'_> {
     fn span(&self) -> Span {
         self.variable.span().join(self.value.span())
     }

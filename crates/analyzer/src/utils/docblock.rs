@@ -31,9 +31,9 @@ use crate::context::block::BlockContext;
 /// * `block_context`: The current block context, which holds local variables and their types.
 /// * `artifacts`: The analysis artifacts, which may be used to store or retrieve additional information.
 /// * `override_existing`: A boolean indicating whether to override existing variable types in the block context.
-pub fn populate_docblock_variables<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn populate_docblock_variables<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     override_existing: bool,
 ) {
@@ -76,16 +76,17 @@ pub fn populate_docblock_variables<'a>(
 /// - `Option<String>`: The variable name if specified, or `None` if the tag is unnamed.
 /// - `TUnion`: The parsed type from the tag.
 /// - `Span`: The span of the tag in the source code.
-pub fn get_docblock_variables<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn get_docblock_variables<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
 ) -> Vec<(Option<String>, TUnion, Span)> {
-    context
-        .get_parsed_docblock()
-        .map(|document| document.elements)
-        .unwrap_or_default()
+    let Some(elements) = context.get_parsed_docblock().map(|document| document.elements) else {
+        return vec![];
+    };
+
+    elements
         .into_iter()
         // Filter out non-tag elements
         .filter_map(|element| match element {
@@ -94,7 +95,7 @@ pub fn get_docblock_variables<'a>(
         })
         .filter_map(|tag| {
             if allow_tracing && let TagKind::PsalmTrace = tag.kind {
-                let variable_name = context.interner.lookup(&tag.description).trim();
+                let variable_name = tag.description.trim();
                 match block_context.locals.get(variable_name) {
                     Some(variable_type) => {
                         let variable_type_str = variable_type.get_id(Some(context.interner));
@@ -140,7 +141,7 @@ pub fn get_docblock_variables<'a>(
                 return None;
             }
 
-            let tag_content = context.interner.lookup(&tag.description);
+            let tag_content = tag.description;
 
             let var_tag = parse_var_tag(tag_content, tag.description_span)?;
             let variable_name = var_tag.variable_name;
@@ -204,9 +205,9 @@ pub fn get_docblock_variables<'a>(
 ///
 /// An `Option<TUnion>` containing the parsed type if a valid, matching `@var` tag
 /// was found and successfully parsed. Returns `None` otherwise.
-pub fn get_type_from_var_docblock<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn get_type_from_var_docblock<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     value_expression_variable_id: Option<&str>,
     mut allow_unnamed: bool,
@@ -239,9 +240,9 @@ pub fn get_type_from_var_docblock<'a>(
 /// * `variable_type`: The type of the variable as a `TUnion`, parsed from the docblock.
 /// * `variable_type_span`: The span of the variable type in the source code, used for error reporting.
 /// * `override_existing`: A boolean indicating whether to override an existing variable type
-pub fn insert_variable_from_docblock<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn insert_variable_from_docblock<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     variable_name: String,
     variable_type: TUnion,
     variable_type_span: Span,
@@ -281,8 +282,8 @@ pub fn insert_variable_from_docblock<'a>(
     block_context.locals.insert(variable_name, Rc::new(variable_type));
 }
 
-pub fn check_docblock_type_incompatibility<'a>(
-    context: &mut Context<'a>,
+pub fn check_docblock_type_incompatibility<'ctx>(
+    context: &mut Context<'ctx, '_>,
     value_expression_variable_id: Option<&str>,
     value_expression_span: Span,
     inferred_type: &TUnion,

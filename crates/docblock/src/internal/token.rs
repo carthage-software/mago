@@ -1,8 +1,8 @@
 use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum Token<'a> {
-    Line { content: &'a str, span: Span },
+pub enum Token<'arena> {
+    Line { content: &'arena str, span: Span },
     EmptyLine { span: Span },
 }
 

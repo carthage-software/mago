@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use mago_database::ReadDatabase;
-use mago_interner::ThreadedInterner;
 use mago_linter::Linter;
+use mago_linter::registry::RuleRegistry;
 use mago_names::resolver::NameResolver;
 use mago_php_version::PHPVersion;
 use mago_reporting::Issue;
@@ -37,8 +39,8 @@ impl StatelessReducer<IssueCollection, IssueCollection> for LintResultReducer {
 pub struct LintContext {
     /// The target PHP version for analysis.
     pub php_version: PHPVersion,
-    /// A pre-configured `Linter` instance.
-    pub linter: Linter,
+    /// A pre-configured `RuleRegistry` instance.
+    pub registry: Arc<RuleRegistry>,
     /// The operational mode, determining which checks to run.
     pub mode: LintMode,
 }
@@ -56,14 +58,10 @@ pub enum LintMode {
 ///
 /// This function selects the appropriate parallel pipeline (`Stateful` or `Stateless`)
 /// based on the requested [`LintMode`] and executes it.
-pub fn run_lint_pipeline(
-    interner: &ThreadedInterner,
-    database: ReadDatabase,
-    context: LintContext,
-) -> Result<IssueCollection, Error> {
+pub fn run_lint_pipeline(database: ReadDatabase, context: LintContext) -> Result<IssueCollection, Error> {
     match context.mode {
-        LintMode::Full => run_full_pipeline(interner, database, context),
-        LintMode::SemanticsOnly => run_semantics_pipeline(interner, database, context),
+        LintMode::Full => run_full_pipeline(database, context),
+        LintMode::SemanticsOnly => run_semantics_pipeline(database, context),
     }
 }
 
@@ -71,24 +69,22 @@ pub fn run_lint_pipeline(
 ///
 /// This pipeline compiles a global `CodebaseMetadata` and provides it to each
 /// linting task, enabling rules that require cross-file awareness.
-fn run_full_pipeline(
-    interner: &ThreadedInterner,
-    database: ReadDatabase,
-    context: LintContext,
-) -> Result<IssueCollection, Error> {
-    StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, interner, context, Box::new(LintResultReducer)).run(
-        |context, interner, file| {
-            let (program, parsing_error) = parse_file(&interner, &file);
-            let resolved_names = NameResolver::new(&interner).resolve(&program);
+fn run_full_pipeline(database: ReadDatabase, context: LintContext) -> Result<IssueCollection, Error> {
+    StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, context, Box::new(LintResultReducer)).run(
+        |context, arena, file| {
+            let (program, parsing_error) = parse_file(arena, &file);
+            let resolved_names = NameResolver::new(arena).resolve(&program);
 
             let mut issues = IssueCollection::new();
             if let Some(error) = parsing_error {
                 issues.push(Issue::from(&error));
             }
 
-            let semantics_checker = SemanticsChecker::new(&context.php_version, &interner);
+            let semantics_checker = SemanticsChecker::new(context.php_version);
+            let linter = Linter::from_registry(arena, context.registry, context.php_version);
+
             issues.extend(semantics_checker.check(&file, &program, &resolved_names));
-            issues.extend(context.linter.lint(&file, &program, &resolved_names));
+            issues.extend(linter.lint(&file, &program, &resolved_names));
 
             Ok(issues)
         },
@@ -99,22 +95,19 @@ fn run_full_pipeline(
 ///
 /// This pipeline does not compile a global `CodebaseMetadata`, making it much
 /// faster. It is suitable for quick, syntax-aware checks.
-fn run_semantics_pipeline(
-    interner: &ThreadedInterner,
-    database: ReadDatabase,
-    context: LintContext,
-) -> Result<IssueCollection, Error> {
-    StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, interner, context, Box::new(LintResultReducer)).run(
-        |context, interner, file| {
-            let (program, parsing_error) = parse_file(&interner, &file);
-            let resolved_names = NameResolver::new(&interner).resolve(&program);
+fn run_semantics_pipeline(database: ReadDatabase, context: LintContext) -> Result<IssueCollection, Error> {
+    StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, context, Box::new(LintResultReducer)).run(
+        |context, arena, file| {
+            let (program, parsing_error) = parse_file(arena, &file);
+            let resolved_names = NameResolver::new(arena).resolve(&program);
 
             let mut issues = IssueCollection::new();
             if let Some(error) = parsing_error {
                 issues.push(Issue::from(&error));
             }
 
-            let semantics_checker = SemanticsChecker::new(&context.php_version, &interner);
+            let semantics_checker = SemanticsChecker::new(context.php_version);
+
             issues.extend(semantics_checker.check(&file, &program, &resolved_names));
 
             Ok(issues)

@@ -88,7 +88,7 @@ impl LintRule for BracedStringInterpolationRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::CompositeString(composite_string) = node else {
             return;
         };
@@ -102,10 +102,10 @@ impl LintRule for BracedStringInterpolationRule {
             unbraced_expressions.push((
                 expression.span(),
                 !matches!(
-                    expression.as_ref(),
+                    expression,
                     Expression::Variable(Variable::Indirect(variable))
                     if matches!(
-                        variable.expression.as_ref(),
+                        variable.expression,
                         Expression::Identifier(_) | Expression::Variable(_)
                     )
                 ),

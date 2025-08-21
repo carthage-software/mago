@@ -10,13 +10,13 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_declare(stream: &mut TokenStream<'_, '_>) -> Result<Declare, ParseError> {
+pub fn parse_declare<'arena>(stream: &mut TokenStream<'arena>) -> Result<Declare<'arena>, ParseError> {
     Ok(Declare {
         declare: utils::expect_keyword(stream, T!["declare"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         items: {
-            let mut items = Vec::new();
-            let mut commas = Vec::new();
+            let mut items = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 let next = utils::peek(stream)?;
                 if matches!(next.kind, T![")"]) {
@@ -40,7 +40,7 @@ pub fn parse_declare(stream: &mut TokenStream<'_, '_>) -> Result<Declare, ParseE
     })
 }
 
-pub fn parse_declare_item(stream: &mut TokenStream<'_, '_>) -> Result<DeclareItem, ParseError> {
+pub fn parse_declare_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<DeclareItem<'arena>, ParseError> {
     Ok(DeclareItem {
         name: parse_local_identifier(stream)?,
         equal: utils::expect_span(stream, T!["="])?,
@@ -48,22 +48,26 @@ pub fn parse_declare_item(stream: &mut TokenStream<'_, '_>) -> Result<DeclareIte
     })
 }
 
-pub fn parse_declare_body(stream: &mut TokenStream<'_, '_>) -> Result<DeclareBody, ParseError> {
+pub fn parse_declare_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<DeclareBody<'arena>, ParseError> {
     let next = utils::peek(stream)?;
 
     Ok(match next.kind {
         T![":"] => DeclareBody::ColonDelimited(parse_declare_colon_delimited_body(stream)?),
-        _ => DeclareBody::Statement(Box::new(parse_statement(stream)?)),
+        _ => DeclareBody::Statement({
+            let stmt = parse_statement(stream)?;
+
+            stream.alloc(stmt)
+        }),
     })
 }
 
-pub fn parse_declare_colon_delimited_body(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<DeclareColonDelimitedBody, ParseError> {
+pub fn parse_declare_colon_delimited_body<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<DeclareColonDelimitedBody<'arena>, ParseError> {
     Ok(DeclareColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.new_vec();
             loop {
                 let next = utils::peek(stream)?;
                 if matches!(next.kind, T!["enddeclare"]) {

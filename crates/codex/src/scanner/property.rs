@@ -22,11 +22,11 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_promoted_property(
-    parameter: &FunctionLikeParameter,
+pub fn scan_promoted_property<'ast, 'arena>(
+    parameter: &'ast FunctionLikeParameter<'arena>,
     parameter_metadata: &FunctionLikeParameterMetadata,
     class_metadata: &ClassLikeMetadata,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) -> PropertyMetadata {
     debug_assert!(parameter.is_promoted_property(), "Parameter is not a promoted property");
 
@@ -95,12 +95,12 @@ pub fn scan_promoted_property(
 }
 
 #[inline]
-pub fn scan_properties(
-    property: &Property,
+pub fn scan_properties<'ast, 'arena>(
+    property: &'ast Property<'arena>,
     class_like_metadata: &mut ClassLikeMetadata,
     classname: Option<&StringIdentifier>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, 'ast, 'arena>,
     scope: &NamespaceScope,
 ) -> Vec<PropertyMetadata> {
     let docblock = match PropertyDocblockComment::create(context, property) {
@@ -272,13 +272,13 @@ pub fn scan_properties(
 }
 
 #[inline]
-pub fn scan_property_item(
-    property_item: &PropertyItem,
-    context: &mut Context<'_>,
+pub fn scan_property_item<'ast, 'arena>(
+    property_item: &'ast PropertyItem<'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
     match property_item {
         PropertyItem::Abstract(property_abstract_item) => {
-            let name = VariableIdentifier(property_abstract_item.variable.name);
+            let name = VariableIdentifier(context.interner.intern(property_abstract_item.variable.name));
             let name_span = property_abstract_item.variable.span;
             let has_default = false;
             let default_type = None;
@@ -286,7 +286,7 @@ pub fn scan_property_item(
             (name, name_span, has_default, default_type)
         }
         PropertyItem::Concrete(property_concrete_item) => {
-            let name = VariableIdentifier(property_concrete_item.variable.name);
+            let name = VariableIdentifier(context.interner.intern(property_concrete_item.variable.name));
             let name_span = property_concrete_item.variable.span;
             let has_default = true;
             let default_type =

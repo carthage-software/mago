@@ -200,17 +200,17 @@ impl ResolvedClassname {
 ///
 /// It reports errors for syntactically invalid uses (e.g., `self` outside a class)
 /// or when an expression's type is fundamentally incompatible with being a class name.
-pub fn resolve_classnames_from_expression<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_classnames_from_expression<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    class_expression: &Expression,
+    class_expression: &Expression<'arena>,
     class_is_analyzed: bool,
 ) -> Result<Vec<ResolvedClassname>, AnalysisError> {
     let mut possible_types = vec![];
     match class_expression.unparenthesized() {
         Expression::Identifier(name_node) => {
-            let fq_class_id = *context.resolved_names.get(name_node);
+            let fq_class_id = context.interner.intern(context.resolved_names.get(name_node));
 
             possible_types.push(ResolvedClassname::new(
                 Some(fq_class_id),
@@ -422,7 +422,7 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
     get_class_name_from_atomic_impl(interner, atomic, None)
 }
 
-fn get_intersections_from_metadata(context: &Context<'_>, metadata: &ClassLikeMetadata) -> Vec<ResolvedClassname> {
+fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLikeMetadata) -> Vec<ResolvedClassname> {
     if metadata.kind.is_enum() {
         return vec![];
     }

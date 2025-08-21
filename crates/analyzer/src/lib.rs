@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
+use bumpalo::Bump;
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_collector::Collector;
@@ -41,26 +42,32 @@ mod visibility;
 const COLLECTOR_CATEGORY: &str = "analysis";
 
 #[derive(Clone, Debug)]
-pub struct Analyzer<'a> {
-    pub source_file: &'a File,
-    pub resolved_names: &'a ResolvedNames,
-    pub codebase: &'a CodebaseMetadata,
-    pub interner: &'a ThreadedInterner,
+pub struct Analyzer<'ctx, 'ast, 'arena> {
+    pub arena: &'arena Bump,
+    pub source_file: &'ctx File,
+    pub resolved_names: &'ast ResolvedNames<'arena>,
+    pub codebase: &'ctx CodebaseMetadata,
+    pub interner: &'ctx ThreadedInterner,
     pub settings: Settings,
 }
 
-impl<'a> Analyzer<'a> {
+impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
     pub fn new(
-        source_file: &'a File,
-        resolved_names: &'a ResolvedNames,
-        codebase: &'a CodebaseMetadata,
-        interner: &'a ThreadedInterner,
+        arena: &'arena Bump,
+        source_file: &'ctx File,
+        resolved_names: &'ast ResolvedNames<'arena>,
+        codebase: &'ctx CodebaseMetadata,
+        interner: &'ctx ThreadedInterner,
         settings: Settings,
     ) -> Self {
-        Self { source_file, resolved_names, codebase, interner, settings }
+        Self { arena, source_file, resolved_names, codebase, interner, settings }
     }
 
-    pub fn analyze(&self, program: &Program, analysis_result: &mut AnalysisResult) -> Result<(), AnalysisError> {
+    pub fn analyze(
+        &self,
+        program: &'ast Program<'arena>,
+        analysis_result: &mut AnalysisResult,
+    ) -> Result<(), AnalysisError> {
         let start_time = std::time::Instant::now();
 
         if !program.has_script() {
@@ -71,7 +78,7 @@ impl<'a> Analyzer<'a> {
 
         let statements = program.statements.as_slice();
 
-        let mut collector = Collector::new(self.source_file, program, self.interner, COLLECTOR_CATEGORY);
+        let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORY);
         if !self.settings.mixed_issues {
             collector.add_disabled_codes(IssueCode::get_mixed_issue_code_values());
         }
@@ -148,18 +155,17 @@ impl<'a> Analyzer<'a> {
             collector.add_disabled_codes(IssueCode::get_iterator_issue_code_values());
         }
 
-        let mut context = {
-            Context::new(
-                self.interner,
-                self.codebase,
-                self.source_file,
-                self.resolved_names,
-                &self.settings,
-                statements[0].span(),
-                program.trivia.as_slice(),
-                collector,
-            )
-        };
+        let mut context = Context::new(
+            self.arena,
+            self.interner,
+            self.codebase,
+            self.source_file,
+            self.resolved_names,
+            &self.settings,
+            statements[0].span(),
+            program.trivia.as_slice(),
+            collector,
+        );
 
         let mut block_context = BlockContext::new(ScopeContext::new());
         let mut artifacts = AnalysisArtifacts::new();
@@ -234,23 +240,24 @@ mod tests {
     }
 
     fn run_test_case_inner(config: TestCase) {
+        let arena = bumpalo::Bump::new();
         let interner = ThreadedInterner::new();
         let source_file = File::ephemeral(Cow::Borrowed(config.name), Cow::Borrowed(config.content));
 
-        let (program, parse_issues) = parse_file(&interner, &source_file);
+        let (program, parse_issues) = parse_file(&arena, &source_file);
         if parse_issues.is_some() {
             panic!("Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
         }
 
-        let resolver = NameResolver::new(&interner);
+        let resolver = NameResolver::new(&arena);
         let resolved_names = resolver.resolve(&program);
-        let mut codebase = scan_program(&interner, &source_file, &program, &resolved_names);
+        let mut codebase = scan_program(&interner, &arena, &source_file, &program, &resolved_names);
         let mut symbol_references = SymbolReferences::new();
 
         populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
 
         let mut analysis_result = AnalysisResult::new(symbol_references);
-        let analyzer = Analyzer::new(&source_file, &resolved_names, &codebase, &interner, config.settings);
+        let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, &interner, config.settings);
 
         let analysis_run_result = analyzer.analyze(&program, &mut analysis_result);
 

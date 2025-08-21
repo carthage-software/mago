@@ -1,8 +1,9 @@
+use std::borrow::Cow;
+
 use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
 use mago_syntax::ast::*;
 
 use crate::kind::NameKind;
@@ -107,12 +108,12 @@ impl NamespaceScope {
     ///   into actual string (`&str`) representations.
     /// * `r#use` - A reference to the `Use` AST node representing the `use` statement.
     ///   (Parameter is named `r#use` because `use` is a Rust keyword).
-    pub fn populate_from_use(&mut self, interner: &ThreadedInterner, r#use: &Use) {
+    pub fn populate_from_use(&mut self, r#use: &Use<'_>) {
         match &r#use.items {
             UseItems::Sequence(use_item_sequence) => {
                 for use_item in use_item_sequence.items.iter() {
-                    let name = interner.lookup(use_item.name.value()).trim_start_matches("\\");
-                    let alias = use_item.alias.as_ref().map(|alias_node| interner.lookup(&alias_node.identifier.value));
+                    let name = use_item.name.value().trim_start_matches("\\");
+                    let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add as a default (class/namespace) alias
                     self.add(NameKind::Default, name, alias);
@@ -126,8 +127,8 @@ impl NamespaceScope {
                 };
 
                 for use_item in typed_use_item_sequence.items.iter() {
-                    let name = interner.lookup(use_item.name.value()).trim_start_matches("\\");
-                    let alias = use_item.alias.as_ref().map(|alias_node| interner.lookup(&alias_node.identifier.value));
+                    let name = use_item.name.value().trim_start_matches("\\");
+                    let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add with the determined kind (Function or Constant)
                     self.add(name_kind, name, alias);
@@ -141,11 +142,11 @@ impl NamespaceScope {
                 };
 
                 // Get the common namespace prefix for the group
-                let prefix = interner.lookup(typed_use_item_list.namespace.value()).trim_start_matches("\\");
+                let prefix = (typed_use_item_list.namespace.value()).trim_start_matches("\\");
 
                 for use_item in typed_use_item_list.items.iter() {
-                    let name_part = interner.lookup(use_item.name.value());
-                    let alias = use_item.alias.as_ref().map(|alias_node| interner.lookup(&alias_node.identifier.value));
+                    let name_part = use_item.name.value();
+                    let alias = use_item.alias.as_ref().map(|alias_node| &alias_node.identifier.value);
 
                     // Construct the full FQN by combining prefix and name part
                     let fully_qualified_name = format!("{prefix}\\{name_part}");
@@ -156,7 +157,7 @@ impl NamespaceScope {
             }
             UseItems::MixedList(mixed_use_item_list) => {
                 // Get the common namespace prefix for the group
-                let prefix = interner.lookup(mixed_use_item_list.namespace.value()).trim_start_matches("\\");
+                let prefix = (mixed_use_item_list.namespace.value()).trim_start_matches("\\");
 
                 for mixed_use_item in mixed_use_item_list.items.iter() {
                     // Determine the kind for *this specific item* within the mixed list
@@ -167,12 +168,8 @@ impl NamespaceScope {
                     };
 
                     // Extract name/alias from the nested item structure (assuming `item` field)
-                    let name_part = interner.lookup(mixed_use_item.item.name.value());
-                    let alias = mixed_use_item
-                        .item
-                        .alias
-                        .as_ref()
-                        .map(|alias_node| interner.lookup(&alias_node.identifier.value));
+                    let name_part = mixed_use_item.item.name.value();
+                    let alias = mixed_use_item.item.alias.as_ref().map(|alias_node| &alias_node.identifier.value);
 
                     // Construct the full FQN: prefix\name_part
                     let fully_qualified_name = format!("{prefix}\\{name_part}");
@@ -236,18 +233,16 @@ impl NamespaceScope {
     /// in the global scope, the namespace is empty, or the input name was not simple.
     #[inline]
     pub fn qualify_name(&self, name: impl AsRef<str>) -> String {
-        self.qualify_name_str(name.as_ref())
+        self.qualify_name_str(name.as_ref()).into_owned()
     }
 
     /// non-generic version of `qualify_name` that takes a string slice.
-    fn qualify_name_str(&self, name_ref: &str) -> String {
+    fn qualify_name_str<'a>(&self, name_ref: &'a str) -> Cow<'a, str> {
         match &self.namespace_name {
             // If we have a non-empty namespace, prepend it.
-            Some(ns) if !ns.is_empty() => {
-                format!("{ns}\\{name_ref}")
-            }
+            Some(ns) if !ns.is_empty() => Cow::Owned(format!("{ns}\\{name_ref}")),
             // Otherwise (no namespace, or empty namespace), return the name as is.
-            _ => name_ref.to_owned(),
+            _ => Cow::Borrowed(name_ref),
         }
     }
 
@@ -264,18 +259,21 @@ impl NamespaceScope {
     ///  - `true` if resolved via explicit alias/construct (step 1), `false` otherwise.
     #[inline]
     pub fn resolve(&self, kind: NameKind, name: impl AsRef<str>) -> (String, bool) {
-        self.resolve_str(kind, name.as_ref())
+        let (cow, imported) = self.resolve_str(kind, name.as_ref());
+
+        (cow.into_owned(), imported)
     }
 
     /// non-generic version of `resolve` that takes a string slice.
-    fn resolve_str(&self, kind: NameKind, name_ref: &str) -> (String, bool) {
+    #[inline]
+    pub fn resolve_str<'a>(&self, kind: NameKind, name_ref: &'a str) -> (Cow<'a, str>, bool) {
         // Try resolving using explicit aliases and constructs
-        if let Some(resolved_name) = self.resolve_alias(kind, name_ref) {
+        if let Some(resolved_name) = self.resolve_alias_str(kind, name_ref) {
             return (resolved_name, true); // Resolved via alias or explicit construct
         }
 
         // Qualify it using the current namespace.
-        (self.qualify_name(name_ref), false)
+        (self.qualify_name_str(name_ref), false)
     }
 
     /// Attempts to resolve a name using *only* explicit aliases and constructs.
@@ -293,18 +291,18 @@ impl NamespaceScope {
     /// * `None` if no explicit rule resolves the name.
     #[inline]
     pub fn resolve_alias(&self, kind: NameKind, name: impl AsRef<str>) -> Option<String> {
-        self.resolve_alias_str(kind, name.as_ref())
+        self.resolve_alias_str(kind, name.as_ref()).map(|cow| cow.into_owned())
     }
 
     /// non-generic version of `resolve_alias` that takes a string slice.
-    fn resolve_alias_str(&self, kind: NameKind, name_ref: &str) -> Option<String> {
+    fn resolve_alias_str<'a>(&self, kind: NameKind, name_ref: &'a str) -> Option<Cow<'a, str>> {
         if name_ref.is_empty() {
             return None;
         }
 
         // Handle `\FQN`
         if let Some(fqn) = name_ref.strip_prefix('\\') {
-            return Some(fqn.to_owned());
+            return Some(Cow::Borrowed(fqn));
         }
 
         let parts = name_ref.split('\\').collect::<Vec<_>>();
@@ -321,9 +319,9 @@ impl NamespaceScope {
                         let mut resolved = namespace_prefix.clone();
                         resolved.push('\\');
                         resolved.push_str(&suffix);
-                        Some(resolved)
+                        Some(Cow::Owned(resolved))
                     }
-                    None => Some(suffix), // Relative to global "" namespace
+                    None => Some(Cow::Owned(suffix)), // Relative to global "" namespace
                 }
             } else {
                 // Handle `Alias\Suffix`
@@ -332,18 +330,19 @@ impl NamespaceScope {
                         let mut resolved = resolved_alias_fqn.clone();
                         resolved.push('\\');
                         resolved.push_str(&suffix);
-                        Some(resolved)
+                        Some(Cow::Owned(resolved))
                     }
                     None => None, // Alias not found
                 }
             }
         } else {
             // Handle single-part alias lookup
-            match kind {
+            (match kind {
                 NameKind::Default => self.default_aliases.get(&first_part_lower).cloned(),
                 NameKind::Function => self.function_aliases.get(&first_part_lower).cloned(),
                 NameKind::Constant => self.constant_aliases.get(&first_part_lower).cloned(),
-            }
+            })
+            .map(Cow::Owned)
         }
     }
 }

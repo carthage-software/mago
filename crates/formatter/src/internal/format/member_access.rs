@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -18,21 +20,21 @@ use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
 #[derive(Debug)]
-pub(super) struct MemberAccessChain<'a> {
-    pub base: &'a Expression,
-    pub accesses: Vec<MemberAccess<'a>>,
+pub(super) struct MemberAccessChain<'ast, 'arena> {
+    pub base: &'ast Expression<'arena>,
+    pub accesses: Vec<MemberAccess<'ast, 'arena>>,
 }
 
 #[derive(Debug)]
-pub(super) enum MemberAccess<'a> {
-    PropertyAccess(&'a PropertyAccess),
-    NullSafePropertyAccess(&'a NullSafePropertyAccess),
-    StaticMethodCall(&'a StaticMethodCall),
-    MethodCall(&'a MethodCall),
-    NullSafeMethodCall(&'a NullSafeMethodCall),
+pub(super) enum MemberAccess<'ast, 'arena> {
+    PropertyAccess(&'ast PropertyAccess<'arena>),
+    NullSafePropertyAccess(&'ast NullSafePropertyAccess<'arena>),
+    StaticMethodCall(&'ast StaticMethodCall<'arena>),
+    MethodCall(&'ast MethodCall<'arena>),
+    NullSafeMethodCall(&'ast NullSafeMethodCall<'arena>),
 }
 
-impl<'a> MemberAccess<'a> {
+impl<'ast, 'arena> MemberAccess<'ast, 'arena> {
     #[inline]
     const fn is_property_access(&self) -> bool {
         matches!(self, MemberAccess::PropertyAccess(_) | MemberAccess::NullSafePropertyAccess(_))
@@ -59,7 +61,7 @@ impl<'a> MemberAccess<'a> {
     }
 
     #[inline]
-    const fn get_selector(&self) -> &'a ClassLikeMemberSelector {
+    const fn get_selector(&self) -> &'ast ClassLikeMemberSelector<'arena> {
         match self {
             MemberAccess::PropertyAccess(c) => &c.property,
             MemberAccess::NullSafePropertyAccess(c) => &c.property,
@@ -70,7 +72,7 @@ impl<'a> MemberAccess<'a> {
     }
 
     #[inline]
-    fn get_arguments_list(&self) -> Option<&'a ArgumentList> {
+    fn get_arguments_list(&self) -> Option<&'ast ArgumentList<'arena>> {
         match self {
             MemberAccess::MethodCall(call) => Some(&call.argument_list),
             MemberAccess::NullSafeMethodCall(call) => Some(&call.argument_list),
@@ -80,9 +82,9 @@ impl<'a> MemberAccess<'a> {
     }
 }
 
-impl MemberAccessChain<'_> {
+impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
     #[inline]
-    fn get_eligibility_score(&self, f: &FormatterState) -> usize {
+    fn get_eligibility_score(&self, f: &FormatterState<'_, 'ast, 'arena>) -> usize {
         let mut score: i32 = 0;
         let mut account_for_simple_calls = true;
         let mut always_account_for_simple_calls = false;
@@ -154,7 +156,7 @@ impl MemberAccessChain<'_> {
     }
 
     #[inline]
-    pub fn is_eligible_for_chaining(&self, f: &FormatterState) -> bool {
+    pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'ast, 'arena>) -> bool {
         if f.settings.preserve_breaking_member_access_chain && self.is_already_broken(f) {
             return true;
         }
@@ -195,7 +197,7 @@ impl MemberAccessChain<'_> {
 
                     match &self.base {
                         Expression::Variable(Variable::Direct(v)) => {
-                            if string_width(f.interner.lookup(&v.name)) > 5 {
+                            if string_width(v.name) > 5 {
                                 4
                             } else {
                                 5
@@ -313,7 +315,7 @@ impl MemberAccessChain<'_> {
                 })
             }
             Expression::Variable(Variable::Direct(variable)) => {
-                f.interner.lookup(&variable.name) == "$this" && self.accesses.len() > 3
+                variable.name == "$this" && self.accesses.len() > 3
             }
             _ => false,
         };
@@ -384,7 +386,9 @@ impl MemberAccessChain<'_> {
     }
 }
 
-pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAccessChain<'_>> {
+pub(super) fn collect_member_access_chain<'ast, 'arena>(
+    expr: &'ast Expression<'arena>,
+) -> Option<MemberAccessChain<'ast, 'arena>> {
     let expr = unwrap_parenthesized(expr);
 
     let mut member_access = Vec::new();
@@ -395,29 +399,29 @@ pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAcc
             Expression::Call(Call::StaticMethod(static_method_call)) if !member_access.is_empty() => {
                 member_access.push(MemberAccess::StaticMethodCall(static_method_call));
 
-                current_expr = unwrap_parenthesized(&static_method_call.class);
+                current_expr = unwrap_parenthesized(static_method_call.class);
 
                 break;
             }
             Expression::Access(Access::Property(property_access)) => {
                 member_access.push(MemberAccess::PropertyAccess(property_access));
 
-                current_expr = unwrap_parenthesized(&property_access.object);
+                current_expr = unwrap_parenthesized(property_access.object);
             }
             Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
                 member_access.push(MemberAccess::NullSafePropertyAccess(null_safe_property_access));
 
-                current_expr = unwrap_parenthesized(&null_safe_property_access.object);
+                current_expr = unwrap_parenthesized(null_safe_property_access.object);
             }
             Expression::Call(Call::Method(method_call)) => {
                 member_access.push(MemberAccess::MethodCall(method_call));
 
-                current_expr = unwrap_parenthesized(&method_call.object);
+                current_expr = unwrap_parenthesized(method_call.object);
             }
             Expression::Call(Call::NullSafeMethod(null_safe_method_call)) => {
                 member_access.push(MemberAccess::NullSafeMethodCall(null_safe_method_call));
 
-                current_expr = unwrap_parenthesized(&null_safe_method_call.object);
+                current_expr = unwrap_parenthesized(null_safe_method_call.object);
             }
             _ => {
                 break;
@@ -434,15 +438,15 @@ pub(super) fn collect_member_access_chain(expr: &Expression) -> Option<MemberAcc
     }
 }
 
-pub(super) fn print_member_access_chain<'a>(
-    member_access_chain: &MemberAccessChain<'a>,
-    f: &mut FormatterState<'a>,
-) -> Document<'a> {
+pub(super) fn print_member_access_chain<'ast, 'arena>(
+    member_access_chain: &MemberAccessChain<'ast, 'arena>,
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+) -> Document<'arena> {
     let base_document = member_access_chain.base.format(f);
     let mut parts = if base_needs_parerns(f, member_access_chain.base) {
-        vec![Document::String("("), base_document, Document::String(")")]
+        vec![in f.arena; Document::String("("), base_document, Document::String(")")]
     } else {
-        vec![base_document]
+        vec![in f.arena; base_document]
     };
 
     let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();
@@ -454,7 +458,7 @@ pub(super) fn print_member_access_chain<'a>(
     // Handle the first access
     if (!f.settings.method_chain_breaking_style.is_next_line()
         || member_access_chain.is_first_link_static_method_call()
-        || matches!(member_access_chain.base, Expression::Variable(Variable::Direct(variable)) if f.interner.lookup(&variable.name) == "$this"))
+        || matches!(member_access_chain.base, Expression::Variable(Variable::Direct(variable)) if variable.name == "$this"))
         && fluent_access_chain_start.is_none_or(|start| start != 0)
         && let Some((_, first_chain_link)) = accesses_iter.next()
     {
@@ -469,7 +473,7 @@ pub(super) fn print_member_access_chain<'a>(
         parts.push(selector.format(f));
         last_element_end = selector.span().end;
         if let Some(argument_list) = first_chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec![print_argument_list(f, argument_list, false)];
+            let mut formatted_argument_list = vec![in f.arena; print_argument_list(f, argument_list, false)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }
@@ -492,9 +496,13 @@ pub(super) fn print_member_access_chain<'a>(
         };
 
         let mut contents = if must_have_new_line {
-            if must_break { vec![Document::Line(Line::hard())] } else { vec![Document::Line(Line::soft())] }
+            if must_break {
+                vec![in f.arena; Document::Line(Line::hard())]
+            } else {
+                vec![in f.arena; Document::Line(Line::soft())]
+            }
         } else {
-            vec![] // No newline if in fluent chain and last was property
+            vec![in f.arena;] // No newline if in fluent chain and last was property
         };
 
         contents.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_str()));
@@ -502,7 +510,7 @@ pub(super) fn print_member_access_chain<'a>(
         last_element_end = selector.span().end;
         contents.push(selector.format(f));
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec![print_argument_list(f, argument_list, false)];
+            let mut formatted_argument_list = vec![in f.arena; print_argument_list(f, argument_list, false)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }
@@ -531,9 +539,9 @@ pub(super) fn print_member_access_chain<'a>(
     Document::Group(Group::new(parts).with_id(group_id))
 }
 
-fn base_needs_parerns(f: &FormatterState<'_>, base: &Expression) -> bool {
+fn base_needs_parerns<'ast, 'arena>(f: &FormatterState<'_, 'ast, 'arena>, base: &'ast Expression<'arena>) -> bool {
     if let Expression::Parenthesized(parenthesized) = base {
-        return base_needs_parerns(f, &parenthesized.expression);
+        return base_needs_parerns(f, parenthesized.expression);
     }
 
     match base {
@@ -553,7 +561,11 @@ fn base_needs_parerns(f: &FormatterState<'_>, base: &Expression) -> bool {
     }
 }
 
-pub(super) fn format_access_operator<'a>(f: &mut FormatterState<'a>, span: Span, operator: &'a str) -> Document<'a> {
+pub(super) fn format_access_operator<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    span: Span,
+    operator: &'arena str,
+) -> Document<'arena> {
     let leading = f.print_leading_comments(span);
     let doc = Document::String(operator);
 

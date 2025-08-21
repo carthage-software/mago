@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_span::*;
 use mago_syntax::ast::*;
 
@@ -11,15 +13,15 @@ use crate::internal::format::call_arguments::print_call_arguments;
 use super::member_access::format_access_operator;
 use super::misc;
 
-pub(super) enum CallLikeNode<'a> {
-    Call(&'a Call),
-    Instantiation(&'a Instantiation),
-    Attribute(&'a Attribute),
-    DieConstruct(&'a DieConstruct),
-    ExitConstruct(&'a ExitConstruct),
+pub(super) enum CallLikeNode<'ast, 'arena> {
+    Call(&'ast Call<'arena>),
+    Instantiation(&'ast Instantiation<'arena>),
+    Attribute(&'ast Attribute<'arena>),
+    DieConstruct(&'ast DieConstruct<'arena>),
+    ExitConstruct(&'ast ExitConstruct<'arena>),
 }
 
-impl<'a> CallLikeNode<'a> {
+impl<'ast, 'arena> CallLikeNode<'ast, 'arena> {
     #[inline]
     pub const fn is_instantiation(&self) -> bool {
         matches!(self, CallLikeNode::Instantiation(_))
@@ -35,7 +37,7 @@ impl<'a> CallLikeNode<'a> {
         matches!(self, CallLikeNode::Attribute(_))
     }
 
-    pub fn arguments(&self) -> Option<&'a ArgumentList> {
+    pub fn arguments(&self) -> Option<&'ast ArgumentList<'arena>> {
         match self {
             CallLikeNode::Call(call) => Some(match call {
                 Call::Function(c) => &c.argument_list,
@@ -51,7 +53,7 @@ impl<'a> CallLikeNode<'a> {
     }
 }
 
-impl HasSpan for CallLikeNode<'_> {
+impl HasSpan for CallLikeNode<'_, '_> {
     fn span(&self) -> Span {
         match self {
             CallLikeNode::Call(call) => call.span(),
@@ -63,20 +65,23 @@ impl HasSpan for CallLikeNode<'_> {
     }
 }
 
-pub(super) fn print_call_like_node<'a>(f: &mut FormatterState<'a>, node: CallLikeNode<'a>) -> Document<'a> {
+pub(super) fn print_call_like_node<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    node: CallLikeNode<'ast, 'arena>,
+) -> Document<'arena> {
     // format the callee-like expression
     let mut parts = match node {
         CallLikeNode::Call(c) => match c {
-            Call::Function(c) => vec![c.function.format(f)],
-            Call::StaticMethod(c) => vec![c.class.format(f), Document::String("::"), c.method.format(f)],
+            Call::Function(c) => vec![in f.arena; c.function.format(f)],
+            Call::StaticMethod(c) => vec![in f.arena; c.class.format(f), Document::String("::"), c.method.format(f)],
             _ => {
                 return print_access_call_node(f, c);
             }
         },
-        CallLikeNode::Instantiation(i) => vec![i.new.format(f), Document::space(), i.class.format(f)],
-        CallLikeNode::Attribute(a) => vec![a.name.format(f)],
-        CallLikeNode::DieConstruct(d) => vec![d.die.format(f)],
-        CallLikeNode::ExitConstruct(e) => vec![e.exit.format(f)],
+        CallLikeNode::Instantiation(i) => vec![in f.arena; i.new.format(f), Document::space(), i.class.format(f)],
+        CallLikeNode::Attribute(a) => vec![in f.arena; a.name.format(f)],
+        CallLikeNode::DieConstruct(d) => vec![in f.arena; d.die.format(f)],
+        CallLikeNode::ExitConstruct(e) => vec![in f.arena; e.exit.format(f)],
     };
 
     parts.push(print_call_arguments(f, node));
@@ -84,7 +89,10 @@ pub(super) fn print_call_like_node<'a>(f: &mut FormatterState<'a>, node: CallLik
     Document::Group(Group::new(parts))
 }
 
-fn print_access_call_node<'a>(f: &mut FormatterState<'a>, node: &'a Call) -> Document<'a> {
+fn print_access_call_node<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    node: &'ast Call<'arena>,
+) -> Document<'arena> {
     let (base, operator, operator_str, selector) = match node {
         Call::Method(method_call) => (&method_call.object, method_call.arrow, "->", &method_call.method),
         Call::NullSafeMethod(null_safe_method_call) => (
@@ -103,6 +111,7 @@ fn print_access_call_node<'a>(f: &mut FormatterState<'a>, node: &'a Call) -> Doc
 
     if should_break {
         Document::Group(Group::new(vec![
+            in f.arena;
             base.format(f),
             Document::Line(Line::hard()),
             format_access_operator(f, operator, operator_str),
@@ -111,6 +120,7 @@ fn print_access_call_node<'a>(f: &mut FormatterState<'a>, node: &'a Call) -> Doc
         ]))
     } else {
         Document::Group(Group::new(vec![
+            in f.arena;
             base.format(f),
             format_access_operator(f, operator, operator_str),
             selector.format(f),

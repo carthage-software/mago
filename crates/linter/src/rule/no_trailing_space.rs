@@ -80,7 +80,7 @@ impl LintRule for NoTrailingSpaceRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -91,8 +91,7 @@ impl LintRule for NoTrailingSpaceRule {
             }
 
             let comment_span = trivia.span();
-            let value = ctx.interner.lookup(&trivia.value);
-            let lines = value.lines().collect::<Vec<_>>();
+            let lines = trivia.value.lines().collect::<Vec<_>>();
 
             let mut offset = 0;
             for line in lines.iter() {

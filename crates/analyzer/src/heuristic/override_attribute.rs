@@ -8,7 +8,11 @@ use mago_syntax::ast::*;
 use crate::code::IssueCode;
 use crate::context::Context;
 
-pub fn check_override_attribute(metadata: &ClassLikeMetadata, members: &[ClassLikeMember], context: &mut Context<'_>) {
+pub fn check_override_attribute<'ctx, 'arena>(
+    metadata: &'ctx ClassLikeMetadata,
+    members: &[ClassLikeMember<'arena>],
+    context: &mut Context<'ctx, 'arena>,
+) {
     let class_name = context.interner.lookup(&metadata.original_name);
 
     for member in members {
@@ -19,8 +23,7 @@ pub fn check_override_attribute(metadata: &ClassLikeMetadata, members: &[ClassLi
         let (override_attribute, attribute_list_index) = 'outer: {
             for (index, attribute_list) in method.attribute_lists.iter().enumerate() {
                 for attribute in attribute_list.attributes.iter() {
-                    let fqcn_id = context.resolved_names.get(&attribute.name);
-                    let fqcn = context.interner.lookup(fqcn_id);
+                    let fqcn = context.resolved_names.get(&attribute.name);
 
                     if fqcn.eq_ignore_ascii_case("Override") {
                         break 'outer (Some(attribute), index);
@@ -31,7 +34,7 @@ pub fn check_override_attribute(metadata: &ClassLikeMetadata, members: &[ClassLi
             (None, 0)
         };
 
-        let name = context.interner.lookup(&method.name.value);
+        let name = method.name.value.to_lowercase();
         if name.eq_ignore_ascii_case("__construct") {
             if let Some(attribute) = override_attribute {
                 let issue = Issue::error("Invalid `#[Override]` attribute on constructor.")
@@ -56,7 +59,7 @@ pub fn check_override_attribute(metadata: &ClassLikeMetadata, members: &[ClassLi
             continue;
         }
 
-        let lowercase_name = context.interner.lowered(&method.name.value);
+        let lowercase_name = context.interner.intern(method.name.value.to_lowercase());
         let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
             if let Some(attribute) = override_attribute {
                 let issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))

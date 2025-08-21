@@ -25,19 +25,19 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 #[inline]
-pub fn analyze_string_concat_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_string_concat_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    binary.lhs.as_ref().analyze(context, block_context, artifacts)?;
-    binary.rhs.as_ref().analyze(context, block_context, artifacts)?;
+    binary.lhs.analyze(context, block_context, artifacts)?;
+    binary.rhs.analyze(context, block_context, artifacts)?;
 
-    analyze_string_concat_operand(context, artifacts, &binary.lhs, "Left")?;
-    analyze_string_concat_operand(context, artifacts, &binary.rhs, "Right")?;
+    analyze_string_concat_operand(context, artifacts, binary.lhs, "Left")?;
+    analyze_string_concat_operand(context, artifacts, binary.rhs, "Right")?;
 
-    let result_type = concat_operands(&binary.lhs, &binary.rhs, context, artifacts);
+    let result_type = concat_operands(binary.lhs, binary.rhs, context, artifacts);
 
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
@@ -45,10 +45,10 @@ pub fn analyze_string_concat_operation<'a>(
 }
 
 #[inline]
-fn analyze_string_concat_operand(
-    context: &mut Context<'_>,
+fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
-    operand: &Expression,
+    operand: &'ast Expression<'arena>,
     side: &'static str,
 ) -> Result<(), AnalysisError> {
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
@@ -331,10 +331,10 @@ fn analyze_string_concat_operand(
     Ok(())
 }
 
-fn concat_operands(
-    left: &Expression,
-    right: &Expression,
-    context: &mut Context<'_>,
+fn concat_operands<'ctx, 'ast, 'arena>(
+    left: &'ast Expression<'arena>,
+    right: &'ast Expression<'arena>,
+    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
 ) -> TUnion {
     let left_type = artifacts.get_expression_type(left);
@@ -401,7 +401,7 @@ fn concat_operands(
 }
 
 #[inline]
-fn get_operand_strings(context: &mut Context<'_>, operand_type: &TUnion) -> Vec<TString> {
+fn get_operand_strings<'ctx, 'arena>(context: &mut Context<'ctx, 'arena>, operand_type: &TUnion) -> Vec<TString> {
     let mut operand_strings = vec![];
 
     for operand_atomic_type in operand_type.types.as_ref() {

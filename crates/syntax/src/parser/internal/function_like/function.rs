@@ -9,10 +9,10 @@ use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_function_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Function, ParseError> {
+pub fn parse_function_with_attributes<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+) -> Result<Function<'arena>, ParseError> {
     Ok(Function {
         attribute_lists: attributes,
         function: utils::expect_keyword(stream, T!["function"])?,

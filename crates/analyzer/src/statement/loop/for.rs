@@ -8,11 +8,11 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::statement::r#loop;
 
-impl Analyzable for For {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for For<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let infinite_loop = self.initializations.is_empty() && self.conditions.is_empty() && self.increments.is_empty();

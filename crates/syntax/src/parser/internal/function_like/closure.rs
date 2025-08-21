@@ -10,10 +10,10 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable::parse_direct_variable;
 
-pub fn parse_closure_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<Closure, ParseError> {
+pub fn parse_closure_with_attributes<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+) -> Result<Closure<'arena>, ParseError> {
     Ok(Closure {
         attribute_lists: attributes,
         r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
@@ -26,22 +26,24 @@ pub fn parse_closure_with_attributes(
     })
 }
 
-pub fn parse_optional_closure_use_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<ClosureUseClause>, ParseError> {
+pub fn parse_optional_closure_use_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<ClosureUseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["use"]) => Some(parse_closure_use_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_closure_use_clause(stream: &mut TokenStream<'_, '_>) -> Result<ClosureUseClause, ParseError> {
+pub fn parse_closure_use_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<ClosureUseClause<'arena>, ParseError> {
     Ok(ClosureUseClause {
         r#use: utils::expect_keyword(stream, T!["use"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         variables: {
-            let mut variables = Vec::new();
-            let mut commas = Vec::new();
+            let mut variables = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 let token = utils::peek(stream)?;
                 if T![")"] == token.kind {
@@ -64,9 +66,9 @@ pub fn parse_closure_use_clause(stream: &mut TokenStream<'_, '_>) -> Result<Clos
     })
 }
 
-pub fn parse_closure_use_clause_variable(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<ClosureUseClauseVariable, ParseError> {
+pub fn parse_closure_use_clause_variable<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<ClosureUseClauseVariable<'arena>, ParseError> {
     Ok(ClosureUseClauseVariable {
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
         variable: parse_direct_variable(stream)?,

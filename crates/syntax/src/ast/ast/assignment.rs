@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -8,9 +7,9 @@ use mago_span::Span;
 use crate::ast::ast::expression::Expression;
 
 /// Represents a PHP assignment operator.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
+#[repr(u8)]
 pub enum AssignmentOperator {
     Assign(Span),
     Addition(Span),
@@ -29,11 +28,11 @@ pub enum AssignmentOperator {
 }
 
 /// Represents a PHP assignment operation
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Assignment {
-    pub lhs: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Assignment<'arena> {
+    pub lhs: &'arena Expression<'arena>,
     pub operator: AssignmentOperator,
-    pub rhs: Box<Expression>,
+    pub rhs: &'arena Expression<'arena>,
 }
 
 impl AssignmentOperator {
@@ -80,7 +79,7 @@ impl HasSpan for AssignmentOperator {
     }
 }
 
-impl HasSpan for Assignment {
+impl HasSpan for Assignment<'_> {
     fn span(&self) -> Span {
         self.lhs.span().join(self.rhs.span())
     }

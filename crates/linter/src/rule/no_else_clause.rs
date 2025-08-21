@@ -99,7 +99,7 @@ impl LintRule for NoElseClauseRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::If(if_stmt) = node else {
             return;
         };

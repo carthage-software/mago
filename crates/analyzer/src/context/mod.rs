@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_codex::function_exists;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::resolution::TypeResolutionContext;
@@ -22,7 +23,6 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::assertion::AssertionContext;
 use crate::context::block::BlockContext;
-use crate::reconciler::ReconciliationContext;
 use crate::settings::Settings;
 
 pub mod assertion;
@@ -31,31 +31,34 @@ pub mod scope;
 pub mod utils;
 
 #[derive(Debug)]
-pub struct Context<'a> {
-    pub(super) interner: &'a ThreadedInterner,
-    pub(super) codebase: &'a CodebaseMetadata,
-    pub(super) source_file: &'a File,
-    pub(super) resolved_names: &'a ResolvedNames,
+pub struct Context<'ctx, 'arena> {
+    pub(super) arena: &'arena Bump,
+    pub(super) interner: &'ctx ThreadedInterner,
+    pub(super) codebase: &'ctx CodebaseMetadata,
+    pub(super) source_file: &'ctx File,
+    pub(super) resolved_names: &'ctx ResolvedNames<'arena>,
     pub(super) type_resolution_context: TypeResolutionContext,
-    pub(super) comments: &'a [Trivia],
-    pub(super) settings: &'a Settings,
+    pub(super) comments: &'ctx [Trivia<'arena>],
+    pub(super) settings: &'ctx Settings,
     pub(super) scope: NamespaceScope,
-    pub(super) collector: Collector<'a>,
+    pub(super) collector: Collector<'ctx, 'arena>,
     pub(super) statement_span: Span,
 }
 
-impl<'a> Context<'a> {
+impl<'ctx, 'arena> Context<'ctx, 'arena> {
     pub fn new(
-        interner: &'a ThreadedInterner,
-        codebase: &'a CodebaseMetadata,
-        source: &'a File,
-        resolved_names: &'a ResolvedNames,
-        settings: &'a Settings,
+        arena: &'arena Bump,
+        interner: &'ctx ThreadedInterner,
+        codebase: &'ctx CodebaseMetadata,
+        source: &'ctx File,
+        resolved_names: &'ctx ResolvedNames<'arena>,
+        settings: &'ctx Settings,
         statement_span: Span,
-        comments: &'a [Trivia],
-        collector: Collector<'a>,
+        comments: &'ctx [Trivia<'arena>],
+        collector: Collector<'ctx, 'arena>,
     ) -> Self {
         Self {
+            arena,
             interner,
             codebase,
             source_file: source,
@@ -93,43 +96,43 @@ impl<'a> Context<'a> {
     ///
     /// Function names in PHP are case-insensitive; they are stored and looked up in lowercase
     /// within the codebase metadata.
-    pub fn resolve_function_name(&self, identifier: &Identifier) -> &str {
+    pub fn resolve_function_name<'ast>(&self, identifier: &'ast Identifier<'arena>) -> &'arena str {
         if self.resolved_names.is_imported(identifier) {
-            let fqfn_id = self.resolved_names.get(identifier);
-
-            return self.interner.lookup(fqfn_id);
+            return self.resolved_names.get(identifier);
         }
 
-        let name_id = identifier.value();
-        let name = self.interner.lookup(name_id);
+        let name = identifier.value();
 
         if let Some(stripped) = name.strip_prefix('\\') {
             return stripped;
         }
 
         let fqfn_id = self.resolved_names.get(&identifier);
-        if function_exists(self.codebase, self.interner, fqfn_id) {
-            return self.interner.lookup(fqfn_id);
+        if function_exists(self.codebase, self.interner, &self.interner.intern(fqfn_id)) {
+            return fqfn_id;
         }
 
-        if !name.contains('\\') && function_exists(self.codebase, self.interner, name_id) {
+        if !name.contains('\\') && function_exists(self.codebase, self.interner, &self.interner.intern(name)) {
             return name;
         }
 
-        self.interner.lookup(fqfn_id)
+        fqfn_id
     }
 
-    pub fn get_reconciliation_context<'b>(&'b mut self) -> ReconciliationContext<'b, 'a> {
-        ReconciliationContext::new(self.interner, self.codebase, &mut self.collector)
-    }
-
-    pub fn get_assertion_context_from_block<'b>(&'b self, block_context: &'a BlockContext<'_>) -> AssertionContext<'b> {
+    pub fn get_assertion_context_from_block(
+        &self,
+        block_context: &BlockContext<'ctx>,
+    ) -> AssertionContext<'ctx, 'arena> {
         self.get_assertion_context(block_context.scope.get_class_like_name())
     }
 
     #[inline]
-    pub fn get_assertion_context<'b>(&'b self, this_class_name: Option<&'a StringIdentifier>) -> AssertionContext<'b> {
+    pub fn get_assertion_context(
+        &self,
+        this_class_name: Option<&'ctx StringIdentifier>,
+    ) -> AssertionContext<'ctx, 'arena> {
         AssertionContext {
+            arena: self.arena,
             resolved_names: self.resolved_names,
             interner: self.interner,
             codebase: self.codebase,
@@ -137,7 +140,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn get_docblock(&self) -> Option<&'a Trivia> {
+    pub fn get_docblock(&self) -> Option<&'ctx Trivia<'arena>> {
         comments::docblock::get_docblock_before_position(
             self.source_file,
             self.comments,
@@ -145,10 +148,10 @@ impl<'a> Context<'a> {
         )
     }
 
-    pub fn get_parsed_docblock(&mut self) -> Option<Document> {
+    pub fn get_parsed_docblock(&mut self) -> Option<Document<'arena>> {
         let trivia = self.get_docblock()?;
 
-        match mago_docblock::parse_trivia(self.interner, trivia) {
+        match mago_docblock::parse_trivia(self.arena, trivia) {
             Ok(document) => Some(document),
             Err(error) => {
                 let error_span = error.span();
@@ -179,7 +182,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn record<T>(&mut self, callback: impl FnOnce(&mut Context<'a>) -> T) -> (T, IssueCollection) {
+    pub fn record<T>(&mut self, callback: impl FnOnce(&mut Context<'ctx, 'arena>) -> T) -> (T, IssueCollection) {
         self.collector.start_recording();
         let result = callback(self);
         let issues = self.collector.finish_recording().unwrap_or_default();

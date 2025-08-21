@@ -13,11 +13,11 @@ use crate::error::AnalysisError;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 
-impl Analyzable for EnumCase {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCase<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -32,11 +32,11 @@ impl Analyzable for EnumCase {
     }
 }
 
-impl Analyzable for EnumCaseItem {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseItem<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         match self {
@@ -46,11 +46,11 @@ impl Analyzable for EnumCaseItem {
     }
 }
 
-impl Analyzable for EnumCaseBackedItem {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let Some(current_enum) = block_context.scope.get_class_like() else {
@@ -61,7 +61,7 @@ impl Analyzable for EnumCaseBackedItem {
         };
 
         let enum_name = context.interner.lookup(&current_enum.original_name);
-        let case_name = context.interner.lookup(&self.name.value);
+        let case_name = self.name.value;
 
         let Some(backing_type) = &current_enum.enum_type else {
             context.collector.report_with_code(

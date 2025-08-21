@@ -85,12 +85,12 @@ impl LintRule for EnumNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Enum(r#enum) = node else {
             return;
         };
 
-        let name = ctx.lookup(&r#enum.name.value);
+        let name = r#enum.name.value;
         let fqcn = ctx.lookup_name(&r#enum.name);
 
         if !is_class_case(name) {

@@ -17,11 +17,11 @@ use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 
-impl Analyzable for Static {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         if block_context.scope.is_pure() {
@@ -56,16 +56,20 @@ impl Analyzable for Static {
                 inferred_type = artifacts.get_rc_expression_type(initial_value).cloned();
             }
 
-            let variable_id = context.interner.lookup(&variable.name);
             let variable_span = variable.span();
 
-            let docblock_type =
-                get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), self.items.len() == 1);
+            let docblock_type = get_type_from_var_docblock(
+                context,
+                block_context,
+                artifacts,
+                Some(variable.name),
+                self.items.len() == 1,
+            );
 
             let variable_type = match (inferred_type, docblock_type) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
-                        variable_id.to_owned(),
+                        variable.name.to_owned(),
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
@@ -75,7 +79,7 @@ impl Analyzable for Static {
 
                     check_docblock_type_incompatibility(
                         context,
-                        Some(variable_id),
+                        Some(variable.name),
                         variable_span,
                         &inferred_type,
                         &docblock_type,
@@ -87,7 +91,7 @@ impl Analyzable for Static {
                 }
                 (None, Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
-                        variable_id.to_owned(),
+                        variable.name.to_owned(),
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
@@ -101,9 +105,9 @@ impl Analyzable for Static {
                 (None, None) => Rc::new(get_mixed()),
             };
 
-            block_context.locals.insert(variable_id.to_owned(), variable_type);
-            block_context.assigned_variable_ids.insert(variable_id.to_owned(), item.span().start.offset);
-            block_context.static_locals.insert(variable_id.to_owned());
+            block_context.locals.insert(variable.name.to_owned(), variable_type);
+            block_context.assigned_variable_ids.insert(variable.name.to_owned(), item.span().start.offset);
+            block_context.static_locals.insert(variable.name.to_owned());
         }
 
         Ok(())

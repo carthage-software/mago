@@ -16,6 +16,7 @@ use crate::integration::IntegrationSet;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::call::function_call_matches;
+use crate::rule::utils::laravel::is_method_named;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -90,12 +91,16 @@ impl LintRule for PreferViewArrayRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::MethodCall(call @ MethodCall { object, method, .. }) = node else {
             return;
         };
 
-        if !is_function_call_to(ctx, object.as_ref(), "view") || !is_method_named(ctx, method, "with") {
+        let Expression::Call(Call::Function(function_call)) = object else {
+            return;
+        };
+
+        if !function_call_matches(ctx, function_call, "view") || !is_method_named(method, "with") {
             return;
         }
 
@@ -109,22 +114,5 @@ impl LintRule for PreferViewArrayRule {
                 .with_note("Passing data directly as an array parameter to `view()` is preferred.")
                 .with_help("Refactor the code to use the array parameter in the `view()` function."),
         );
-    }
-}
-
-fn is_function_call_to(context: &LintContext, expression: &Expression, function_name: &str) -> bool {
-    let Expression::Call(Call::Function(call)) = expression else {
-        return false;
-    };
-
-    function_call_matches(context, call, function_name)
-}
-
-fn is_method_named(context: &LintContext, member: &ClassLikeMemberSelector, name: &str) -> bool {
-    match member {
-        ClassLikeMemberSelector::Identifier(method) => {
-            context.interner.lookup(&method.value).eq_ignore_ascii_case(name)
-        }
-        _ => false,
     }
 }

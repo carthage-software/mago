@@ -1,11 +1,13 @@
+use bumpalo::collections::Vec;
+
 use crate::document::Document;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Indentation<'a> {
+pub enum Indentation<'arena> {
     Root,
     Indent,
-    Alignment(&'a str),
-    Combined(Vec<Indentation<'a>>),
+    Alignment(&'arena str),
+    Combined(Vec<'arena, Indentation<'arena>>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,10 +17,10 @@ pub enum Mode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Command<'a> {
-    pub indentation: Indentation<'a>,
+pub struct Command<'arena> {
+    pub indentation: Indentation<'arena>,
     pub mode: Mode,
-    pub document: Document<'a>,
+    pub document: Document<'arena>,
 }
 
 impl Indentation<'_> {
@@ -60,8 +62,8 @@ impl Mode {
     }
 }
 
-impl<'a> Command<'a> {
-    pub fn new(indent: Indentation<'a>, mode: Mode, document: Document<'a>) -> Self {
+impl<'arena> Command<'arena> {
+    pub fn new(indent: Indentation<'arena>, mode: Mode, document: Document<'arena>) -> Self {
         Self { indentation: indent, mode, document }
     }
 

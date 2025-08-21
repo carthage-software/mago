@@ -15,7 +15,6 @@ use mago_codex::class_or_interface_exists;
 use mago_codex::get_class_constant_type;
 use mago_codex::get_declaring_class_for_property;
 use mago_codex::get_property;
-use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -37,14 +36,13 @@ use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_collector::Collector;
 use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
 
 use crate::code::IssueCode;
+use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
 
@@ -55,28 +53,11 @@ pub mod simple_negated_assertion_reconciler;
 
 mod macros;
 
-#[derive(Debug)]
-pub struct ReconciliationContext<'a, 's> {
-    pub interner: &'a ThreadedInterner,
-    pub codebase: &'a CodebaseMetadata,
-    pub collector: &'a mut Collector<'s>,
-}
-
-impl<'a, 's> ReconciliationContext<'a, 's> {
-    pub fn new(
-        interner: &'a ThreadedInterner,
-        codebase: &'a CodebaseMetadata,
-        collector: &'a mut Collector<'s>,
-    ) -> Self {
-        Self { interner, codebase, collector }
-    }
-}
-
-pub fn reconcile_keyed_types(
-    context: &mut ReconciliationContext<'_, '_>,
+pub fn reconcile_keyed_types<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     new_types: &IndexMap<String, AssertionSet>,
     mut active_new_types: IndexMap<String, HashSet<usize>>,
-    block_context: &mut BlockContext<'_>,
+    block_context: &mut BlockContext<'ctx>,
     changed_var_ids: &mut HashSet<String>,
     referenced_var_ids: &HashSet<String>,
     span: &Span,
@@ -301,9 +282,9 @@ pub fn reconcile_keyed_types(
     }
 }
 
-fn adjust_array_type(
+fn adjust_array_type<'ctx>(
     mut key_parts: Vec<String>,
-    context: &mut BlockContext<'_>,
+    context: &mut BlockContext<'ctx>,
     changed_var_ids: &mut HashSet<String>,
     result_type: &TUnion,
 ) {
@@ -413,10 +394,10 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
     Regex::new(r"^[0-9]+$").unwrap_unchecked()
 });
 
-fn add_nested_assertions(
+fn add_nested_assertions<'ctx>(
     new_types: &mut IndexMap<String, AssertionSet>,
     active_new_types: &mut IndexMap<String, HashSet<usize>>,
-    context: &BlockContext<'_>,
+    context: &BlockContext<'ctx>,
 ) {
     let mut keys_to_remove = vec![];
 
@@ -628,10 +609,10 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
     parts
 }
 
-fn get_value_for_key(
-    context: &mut ReconciliationContext<'_, '_>,
+fn get_value_for_key<'ctx>(
+    context: &mut Context<'_, '_>,
     key: String,
-    block_context: &mut BlockContext<'_>,
+    block_context: &mut BlockContext<'ctx>,
     new_assertions: &IndexMap<String, AssertionSet>,
     has_isset: bool,
     has_inverted_isset: bool,
@@ -932,7 +913,7 @@ fn get_value_for_key(
 }
 
 fn get_property_type(
-    context: &ReconciliationContext<'_, '_>,
+    context: &Context<'_, '_>,
     classlike_name: &StringIdentifier,
     property_name_str: &str,
 ) -> Option<TUnion> {
@@ -966,7 +947,7 @@ fn get_property_type(
 }
 
 pub(crate) fn trigger_issue_for_impossible(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     old_var_type_string: &String,
     key: &String,
     assertion: &Assertion,
@@ -1011,7 +992,7 @@ pub(crate) fn trigger_issue_for_impossible(
 }
 
 fn report_impossible_issue(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     assertion_string: &String,
     key: &String,
@@ -1089,7 +1070,7 @@ fn report_impossible_issue(
 }
 
 fn report_redundant_issue(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     assertion_string: &String,
     key: &String,

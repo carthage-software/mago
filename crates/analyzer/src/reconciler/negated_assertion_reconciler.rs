@@ -25,13 +25,13 @@ use mago_codex::ttype::wrap_atomic;
 use mago_interner::StringIdentifier;
 use mago_span::Span;
 
-use crate::reconciler::ReconciliationContext;
+use crate::reconciler::Context;
 use crate::reconciler::assertion_reconciler::intersect_atomic_with_atomic;
 use crate::reconciler::simple_negated_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
 pub(crate) fn reconcile(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     possibly_undefined: bool,
@@ -123,7 +123,7 @@ pub(crate) fn reconcile(
 }
 
 fn subtract_complex_type(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion_type: &TAtomic,
     existing_var_type: &mut TUnion,
     can_be_disjunct: &mut bool,
@@ -255,7 +255,7 @@ fn subtract_complex_type(
 }
 
 fn handle_negated_class(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     child_classlikes: &HashSet<StringIdentifier>,
     existing_atomic: &TAtomic,
     assertion_classlike_name: &StringIdentifier,
@@ -285,7 +285,7 @@ fn handle_negated_class(
 }
 
 fn handle_literal_negated_equality(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,

@@ -6,16 +6,16 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_class_like_constant(
-    class_like_constant: &ClassLikeConstant,
+pub fn check_class_like_constant<'ast, 'arena>(
+    class_like_constant: &'ast ClassLikeConstant<'arena>,
     class_like_span: Span,
     class_like_kind: &str,
     class_like_name: &str,
     class_like_fqcn: &str,
-    context: &mut Context,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let first_item = class_like_constant.first_item();
-    let first_item_name = context.interner.lookup(&first_item.name.value);
+    let first_item_name = first_item.name.value;
 
     let mut last_final: Option<Span> = None;
     let mut last_visibility: Option<Span> = None;
@@ -28,18 +28,15 @@ pub fn check_class_like_constant(
             | Modifier::ProtectedSet(k)
             | Modifier::PublicSet(k) => {
                 context.report(
-                    Issue::error(format!(
-                        "`{}` modifier is not allowed on constants",
-                        context.interner.lookup(&k.value),
-                    ))
-                    .with_annotation(Annotation::primary(modifier.span()))
-                    .with_annotations([
-                        Annotation::secondary(first_item.span()).with_message(format!(
-                            "{class_like_kind} constant `{class_like_name}::{first_item_name}` is declared here."
-                        )),
-                        Annotation::secondary(class_like_span)
-                            .with_message(format!("{class_like_kind} `{class_like_fqcn}` is declared here.")),
-                    ]),
+                    Issue::error(format!("`{}` modifier is not allowed on constants", k.value))
+                        .with_annotation(Annotation::primary(modifier.span()))
+                        .with_annotations([
+                            Annotation::secondary(first_item.span()).with_message(format!(
+                                "{class_like_kind} constant `{class_like_name}::{first_item_name}` is declared here."
+                            )),
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` is declared here.")),
+                        ]),
                 );
             }
             Modifier::Final(_) => {
@@ -112,9 +109,9 @@ pub fn check_class_like_constant(
     };
 
     for item in class_like_constant.items.iter() {
-        let item_name = context.interner.lookup(&item.name.value);
+        let item_name = item.name.value;
 
-        if !item.value.is_constant(context.version, false) {
+        if !item.value.is_constant(&context.version, false) {
             context.report(
                 Issue::error(format!(
                     "Constant `{class_like_name}::{item_name}` value contains a non-constant expression."

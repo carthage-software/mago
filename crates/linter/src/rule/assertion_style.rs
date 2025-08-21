@@ -111,17 +111,18 @@ impl LintRule for AssertionStyleRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };
 
-        let name = ctx.lookup(&method.name.value);
-        if !name.starts_with("test") || name.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase()) {
+        if !method.name.value.starts_with("test")
+            || method.name.value.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase())
+        {
             return;
         }
 
-        for reference in find_testing_or_assertion_references_in_method(method, ctx) {
+        for reference in find_testing_or_assertion_references_in_method(method) {
             let (to_replace, current_style) = match reference {
                 MethodReference::MethodCall(c) => (c.object.span().join(c.arrow), AssertionStyle::This),
                 MethodReference::MethodClosureCreation(c) => (c.object.span().join(c.arrow), AssertionStyle::This),
@@ -129,13 +130,12 @@ impl LintRule for AssertionStyleRule {
                     class,
                     double_colon,
                     ..
-                }) => match class.as_ref() {
+                }) => match class {
                     Expression::Static(_) => (class.span().join(*double_colon), AssertionStyle::Static),
                     Expression::Self_(_) => (class.span().join(*double_colon), AssertionStyle::Self_),
                     _ => continue,
                 },
-                MethodReference::StaticMethodCall(StaticMethodCall { class, double_colon, .. }) => match class.as_ref()
-                {
+                MethodReference::StaticMethodCall(StaticMethodCall { class, double_colon, .. }) => match class {
                     Expression::Static(_) => (class.span().join(*double_colon), AssertionStyle::Static),
                     Expression::Self_(_) => (class.span().join(*double_colon), AssertionStyle::Self_),
                     _ => continue,

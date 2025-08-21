@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -12,53 +10,53 @@ use crate::token::GetPrecedence;
 use crate::token::Precedence;
 
 /// Represents a PHP binary operator.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum BinaryOperator {
-    Addition(Span),           // `+`
-    Subtraction(Span),        // `-`
-    Multiplication(Span),     // `*`
-    Division(Span),           // `/`
-    Modulo(Span),             // `%`
-    Exponentiation(Span),     // `**`
-    BitwiseAnd(Span),         // `&`
-    BitwiseOr(Span),          // `|`
-    BitwiseXor(Span),         // `^`
-    LeftShift(Span),          // `<<`
-    RightShift(Span),         // `>>`
-    NullCoalesce(Span),       // `??`
-    Equal(Span),              // `==`
-    NotEqual(Span),           // `!=`
-    Identical(Span),          // `===`
-    NotIdentical(Span),       // `!==`
-    AngledNotEqual(Span),     // `<>`
-    LessThan(Span),           // `<`
-    LessThanOrEqual(Span),    // `<=`
-    GreaterThan(Span),        // `>`
-    GreaterThanOrEqual(Span), // `>=`
-    Spaceship(Span),          // `<=>`
-    StringConcat(Span),       // `.`
-    Instanceof(Keyword),      // `instanceof`
-    And(Span),                // `&&`
-    Or(Span),                 // `||`
-    LowAnd(Keyword),          // `and`
-    LowOr(Keyword),           // `or`
-    LowXor(Keyword),          // `xor`
-    Elvis(Span),              // `?:`
+#[repr(u8)]
+pub enum BinaryOperator<'arena> {
+    Addition(Span),              // `+`
+    Subtraction(Span),           // `-`
+    Multiplication(Span),        // `*`
+    Division(Span),              // `/`
+    Modulo(Span),                // `%`
+    Exponentiation(Span),        // `**`
+    BitwiseAnd(Span),            // `&`
+    BitwiseOr(Span),             // `|`
+    BitwiseXor(Span),            // `^`
+    LeftShift(Span),             // `<<`
+    RightShift(Span),            // `>>`
+    NullCoalesce(Span),          // `??`
+    Equal(Span),                 // `==`
+    NotEqual(Span),              // `!=`
+    Identical(Span),             // `===`
+    NotIdentical(Span),          // `!==`
+    AngledNotEqual(Span),        // `<>`
+    LessThan(Span),              // `<`
+    LessThanOrEqual(Span),       // `<=`
+    GreaterThan(Span),           // `>`
+    GreaterThanOrEqual(Span),    // `>=`
+    Spaceship(Span),             // `<=>`
+    StringConcat(Span),          // `.`
+    Instanceof(Keyword<'arena>), // `instanceof`
+    And(Span),                   // `&&`
+    Or(Span),                    // `||`
+    LowAnd(Keyword<'arena>),     // `and`
+    LowOr(Keyword<'arena>),      // `or`
+    LowXor(Keyword<'arena>),     // `xor`
+    Elvis(Span),                 // `?:`
 }
 
 /// Represents a PHP binary operation.
 ///
 /// A binary operation is an operation that takes two operands, a left-hand side and a right-hand side.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Binary {
-    pub lhs: Box<Expression>,
-    pub operator: BinaryOperator,
-    pub rhs: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Binary<'arena> {
+    pub lhs: &'arena Expression<'arena>,
+    pub operator: BinaryOperator<'arena>,
+    pub rhs: &'arena Expression<'arena>,
 }
 
-impl BinaryOperator {
+impl<'arena> BinaryOperator<'arena> {
     #[inline]
     pub const fn is_constant(&self) -> bool {
         !matches!(self, Self::Elvis(_) | Self::Instanceof(_))
@@ -166,7 +164,7 @@ impl BinaryOperator {
     }
 
     #[inline]
-    pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
+    pub fn as_str(&self) -> &'arena str {
         match self {
             Self::Addition(_) => "+",
             Self::Subtraction(_) => "-",
@@ -194,10 +192,10 @@ impl BinaryOperator {
             Self::And(_) => "&&",
             Self::Or(_) => "||",
             Self::Elvis(_) => "?:",
-            Self::Instanceof(keyword) => interner.lookup(&keyword.value),
-            Self::LowAnd(keyword) => interner.lookup(&keyword.value),
-            Self::LowOr(keyword) => interner.lookup(&keyword.value),
-            Self::LowXor(keyword) => interner.lookup(&keyword.value),
+            Self::Instanceof(keyword) => keyword.value,
+            Self::LowAnd(keyword) => keyword.value,
+            Self::LowOr(keyword) => keyword.value,
+            Self::LowXor(keyword) => keyword.value,
         }
     }
 
@@ -239,7 +237,7 @@ impl BinaryOperator {
     }
 }
 
-impl GetPrecedence for BinaryOperator {
+impl GetPrecedence for BinaryOperator<'_> {
     #[inline]
     fn precedence(&self) -> Precedence {
         match self {
@@ -272,7 +270,7 @@ impl GetPrecedence for BinaryOperator {
     }
 }
 
-impl HasSpan for BinaryOperator {
+impl HasSpan for BinaryOperator<'_> {
     fn span(&self) -> Span {
         match self {
             Self::Addition(span) => *span,
@@ -309,7 +307,7 @@ impl HasSpan for BinaryOperator {
     }
 }
 
-impl HasSpan for Binary {
+impl HasSpan for Binary<'_> {
     fn span(&self) -> Span {
         self.lhs.span().join(self.rhs.span())
     }

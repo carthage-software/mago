@@ -8,10 +8,10 @@ use crate::parser::internal::function_like::r#return::parse_optional_function_li
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_arrow_function_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<ArrowFunction, ParseError> {
+pub fn parse_arrow_function_with_attributes<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+) -> Result<ArrowFunction<'arena>, ParseError> {
     Ok(ArrowFunction {
         attribute_lists: attributes,
         r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
@@ -20,6 +20,10 @@ pub fn parse_arrow_function_with_attributes(
         parameter_list: parse_function_like_parameter_list(stream)?,
         return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: Box::new(parse_expression(stream)?),
+        expression: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
     })
 }

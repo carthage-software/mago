@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -25,25 +24,25 @@ use crate::ast::sequence::Sequence;
 ///    }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Method {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
-    pub function: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Method<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
+    pub function: Keyword<'arena>,
     pub ampersand: Option<Span>,
-    pub name: LocalIdentifier,
-    pub parameter_list: FunctionLikeParameterList,
-    pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
-    pub body: MethodBody,
+    pub name: LocalIdentifier<'arena>,
+    pub parameter_list: FunctionLikeParameterList<'arena>,
+    pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,
+    pub body: MethodBody<'arena>,
 }
 
 /// Represents the body of a method statement in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum MethodBody {
+#[repr(u8)]
+pub enum MethodBody<'arena> {
     Abstract(MethodAbstractBody),
-    Concrete(Block),
+    Concrete(Block<'arena>),
 }
 
 /// Represents the abstract body of a method statement in PHP.
@@ -58,12 +57,12 @@ pub enum MethodBody {
 /// }
 ///
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MethodAbstractBody {
     pub semicolon: Span,
 }
 
-impl Method {
+impl Method<'_> {
     /// Returns `true` if the method contains any promoted properties.
     pub fn has_promoted_properties(&self) -> bool {
         self.parameter_list.parameters.iter().any(|parameter| parameter.is_promoted_property())
@@ -82,7 +81,7 @@ impl Method {
     }
 }
 
-impl HasSpan for Method {
+impl HasSpan for Method<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return Span::between(attribute_list.span(), self.body.span());
@@ -96,7 +95,7 @@ impl HasSpan for Method {
     }
 }
 
-impl HasSpan for MethodBody {
+impl HasSpan for MethodBody<'_> {
     fn span(&self) -> Span {
         match self {
             MethodBody::Abstract(body) => body.span(),

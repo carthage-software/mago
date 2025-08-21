@@ -28,11 +28,11 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_method(
+pub fn scan_method<'input, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
-    method: &Method,
+    method: &'ast Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
 ) -> FunctionLikeMetadata {
@@ -52,8 +52,8 @@ pub fn scan_method(
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span, flags);
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
-    metadata.name = Some(context.interner.lowered(&method.name.value));
-    metadata.original_name = Some(method.name.value);
+    metadata.name = Some(context.interner.intern(method.name.value.to_lowercase()));
+    metadata.original_name = Some(context.interner.intern(method.name.value));
 
     metadata.name_span = Some(method.name.span);
     metadata.parameters = method
@@ -71,7 +71,7 @@ pub fn scan_method(
         )));
     }
 
-    let method_name_str = context.interner.lookup(&method.name.value);
+    let method_name_str = method.name.value;
 
     let mut method_metadata = MethodMetadata {
         is_final: method.modifiers.contains_final(),
@@ -106,11 +106,11 @@ pub fn scan_method(
 }
 
 #[inline]
-pub fn scan_function(
+pub fn scan_function<'input, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
-    function: &Function,
+    function: &'ast Function<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -137,8 +137,8 @@ pub fn scan_function(
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags);
 
-    metadata.name = Some(context.interner.lowered(name));
-    metadata.original_name = Some(*name);
+    metadata.name = Some(context.interner.intern(name.to_lowercase()));
+    metadata.original_name = Some(context.interner.intern(name));
     metadata.name_span = Some(function.name.span);
     metadata.parameters = function
         .parameter_list
@@ -165,11 +165,11 @@ pub fn scan_function(
 }
 
 #[inline]
-pub fn scan_closure(
+pub fn scan_closure<'input, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
-    closure: &Closure,
+    closure: &'ast Closure<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -216,11 +216,11 @@ pub fn scan_closure(
 }
 
 #[inline]
-pub fn scan_arrow_function(
+pub fn scan_arrow_function<'input, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
-    arrow_function: &ArrowFunction,
+    arrow_function: &'ast ArrowFunction<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -233,11 +233,11 @@ pub fn scan_arrow_function(
         flags |= MetadataFlags::BUILTIN;
     }
 
-    if utils::expression_has_yield(&arrow_function.expression) {
+    if utils::expression_has_yield(arrow_function.expression) {
         flags |= MetadataFlags::HAS_YIELD;
     }
 
-    if utils::expression_has_throws(&arrow_function.expression) {
+    if utils::expression_has_throws(arrow_function.expression) {
         flags |= MetadataFlags::HAS_THROW;
     }
 
@@ -266,12 +266,12 @@ pub fn scan_arrow_function(
     metadata
 }
 
-fn scan_function_like_docblock(
+fn scan_function_like_docblock<'input, 'ast, 'arena>(
     span: Span,
     functionlike_id: (StringIdentifier, StringIdentifier),
     metadata: &mut FunctionLikeMetadata,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) {
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
@@ -628,11 +628,11 @@ fn scan_function_like_docblock(
     }
 }
 
-fn parse_assertion_string(
+fn parse_assertion_string<'input, 'ast, 'arena>(
     mut type_string: TypeString,
     classname: Option<&StringIdentifier>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
 ) -> Vec<Assertion> {

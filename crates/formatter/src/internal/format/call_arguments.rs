@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_span::*;
 use mago_syntax::ast::*;
 
@@ -16,13 +18,16 @@ use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::will_break;
 
-pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: CallLikeNode<'a>) -> Document<'a> {
+pub(super) fn print_call_arguments<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    expression: CallLikeNode<'ast, 'arena>,
+) -> Document<'arena> {
     let Some(argument_list) = expression.arguments() else {
         return if (expression.is_instantiation() && f.settings.parentheses_in_new_expression)
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
-            let mut contents = vec![];
+            let mut contents = vec![in f.arena];
             if f.settings.space_before_argument_list_parenthesis {
                 contents.push(Document::String(" "));
             }
@@ -45,6 +50,7 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: C
     {
         return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
             Document::Array(vec![
+                in f.arena;
                 if f.settings.space_before_argument_list_parenthesis {
                     Document::String(" (")
                 } else {
@@ -61,14 +67,15 @@ pub(super) fn print_call_arguments<'a>(f: &mut FormatterState<'a>, expression: C
     print_argument_list(f, argument_list, expression.is_attribute())
 }
 
-pub(super) fn print_argument_list<'a>(
-    f: &mut FormatterState<'a>,
-    argument_list: &'a ArgumentList,
+pub(super) fn print_argument_list<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
     for_attribute: bool,
-) -> Document<'a> {
+) -> Document<'arena> {
     let mut should_break = false;
     let left_parenthesis = {
         let mut contents = vec![
+            in f.arena;
             if f.settings.space_before_argument_list_parenthesis { Document::space() } else { Document::empty() },
             Document::String("("),
         ];
@@ -86,7 +93,7 @@ pub(super) fn print_argument_list<'a>(
         Document::Array(contents)
     };
 
-    let mut contents = vec![left_parenthesis.clone()];
+    let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
     // First, run all the decision functions with unformatted arguments
     let should_break_all = should_break || should_break_all_arguments(f, argument_list, for_attribute);
@@ -96,7 +103,7 @@ pub(super) fn print_argument_list<'a>(
     let is_single_late_breaking_argument = !should_break && is_single_late_breaking_argument(f, argument_list);
 
     let arguments_count = argument_list.arguments.len();
-    let mut formatted_arguments: Vec<Document<'a>> = argument_list
+    let mut formatted_arguments: Vec<Document<'arena>> = argument_list
         .arguments
         .iter()
         .enumerate()
@@ -134,8 +141,8 @@ pub(super) fn print_argument_list<'a>(
         return Document::Array(contents);
     }
 
-    let get_printed_arguments = |f: &mut FormatterState<'a>, should_break: bool, skip_index: isize| {
-        let mut printed_arguments = vec![];
+    let get_printed_arguments = |f: &mut FormatterState<'_, 'ast, 'arena>, should_break: bool, skip_index: isize| {
+        let mut printed_arguments = vec![in f.arena];
         let mut length = arguments_count;
         let arguments_range: Box<dyn Iterator<Item = (usize, usize)>> = match skip_index {
             _ if skip_index > 0 => {
@@ -151,7 +158,7 @@ pub(super) fn print_argument_list<'a>(
 
         for (i, arg_idx) in arguments_range {
             let element = &argument_list.arguments.as_slice()[arg_idx];
-            let mut argument = vec![formatted_arguments[arg_idx].clone()];
+            let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (length - 1) {
                 argument.push(Document::String(","));
 
@@ -172,10 +179,11 @@ pub(super) fn print_argument_list<'a>(
         printed_arguments
     };
 
-    let all_arguments_broken_out = |f: &mut FormatterState<'a>| {
-        let mut parts = vec![];
-        parts.push(left_parenthesis.clone());
+    let all_arguments_broken_out = |f: &mut FormatterState<'_, 'ast, 'arena>| {
+        let mut parts = vec![in f.arena];
+        parts.push(clone_in_arena(f.arena, &left_parenthesis));
         parts.push(Document::Indent(vec![
+            in f.arena;
             Document::Line(Line::hard()),
             Document::Group(Group::new(get_printed_arguments(f, true, 0))),
             if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
@@ -195,44 +203,50 @@ pub(super) fn print_argument_list<'a>(
         let right_parenthesis = print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None);
 
         return Document::IfBreak(IfBreak::new(
+            f.arena,
             Document::Group(Group::new(vec![
-                left_parenthesis.clone(),
+                in f.arena;
+                clone_in_arena(f.arena, &left_parenthesis),
                 Document::IndentIfBreak(IndentIfBreak::new(vec![
+                    in f.arena;
                     Document::Line(Line::default()),
-                    Document::Group(Group::new(vec![single_argument.clone()])),
+                    Document::Group(Group::new(vec![in f.arena; clone_in_arena(f.arena, &single_argument)])),
                     if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
                 ])),
-                right_parenthesis.clone(),
+                clone_in_arena(f.arena, &right_parenthesis)
             ])),
-            Document::Group(Group::new(vec![left_parenthesis, single_argument, right_parenthesis])),
+            Document::Group(Group::new(vec![in f.arena; left_parenthesis, single_argument, right_parenthesis])),
         ));
     }
 
     if should_inline {
         return Document::Group(Group::new(vec![
+            in f.arena;
             left_parenthesis,
-            Document::Group(Group::new(Document::join(formatted_arguments, Separator::CommaSpace))),
+            Document::Group(Group::new(Document::join(f.arena, formatted_arguments, Separator::CommaSpace))),
             print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)),
         ]));
     }
 
     if should_expand_first {
-        let mut first_doc = formatted_arguments[0].clone();
+        let mut first_doc = clone_in_arena(f.arena, &formatted_arguments[0]);
 
         if will_break(&mut first_doc) {
             let last_doc = get_printed_arguments(f, false, 1).pop().unwrap();
 
             return Document::Array(vec![
+                in f.arena;
                 Document::BreakParent,
                 Document::Group(Group::conditional(
                     vec![
-                        left_parenthesis.clone(),
-                        Document::Group(Group::new(vec![first_doc]).with_break(true)),
+                        in f.arena;
+                        clone_in_arena(f.arena, &left_parenthesis),
+                        Document::Group(Group::new(vec![in f.arena; first_doc]).with_break(true)),
                         Document::String(", "),
                         last_doc,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                     ],
-                    vec![all_arguments_broken_out(f)],
+                    vec![in f.arena; all_arguments_broken_out(f)],
                 )),
             ]);
         }
@@ -240,7 +254,7 @@ pub(super) fn print_argument_list<'a>(
 
     if should_expand_last {
         let mut printed_arguments = get_printed_arguments(f, false, -1);
-        let original_printed_arguments = printed_arguments.clone();
+        let original_printed_arguments = clone_vec_in_arena(f.arena, &printed_arguments);
         if printed_arguments.iter_mut().any(will_break) {
             return all_arguments_broken_out(f);
         }
@@ -250,36 +264,42 @@ pub(super) fn print_argument_list<'a>(
             printed_arguments.push(Document::Line(Line::default()));
         }
 
-        let last_doc = formatted_arguments.last().unwrap().clone();
-        let mut last_doc_clone = last_doc.clone();
+        let last_doc = clone_in_arena(f.arena, formatted_arguments.last().unwrap());
+        let mut last_doc_clone = clone_in_arena(f.arena, &last_doc);
 
         if will_break(&mut last_doc_clone) {
             return Document::Array(vec![
+                in f.arena;
                 Document::BreakParent,
                 Document::Group(Group::conditional(
                     vec![
-                        left_parenthesis.clone(),
+                        in f.arena;
+                        clone_in_arena(f.arena, &left_parenthesis),
                         Document::Array(printed_arguments),
-                        Document::Group(Group::new(vec![last_doc]).with_break(true)),
+                        Document::Group(Group::new(vec![in f.arena; last_doc]).with_break(true)),
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                     ],
-                    vec![all_arguments_broken_out(f)],
+                    vec![in f.arena; all_arguments_broken_out(f)],
                 )),
             ]);
         }
 
         return Document::Group(Group::conditional(
             vec![
-                left_parenthesis.clone(),
+                in f.arena;
+                clone_in_arena(f.arena, &left_parenthesis),
                 Document::Array(printed_arguments),
-                last_doc.clone(),
+                last_doc,
                 print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
             ],
             vec![
+                in f.arena;
                 Document::Array(vec![
-                    left_parenthesis.clone(),
+                    in f.arena;
+                    clone_in_arena(f.arena, &left_parenthesis),
                     if arguments_count > 1 {
                         Document::Array(vec![
+                            in f.arena;
                             Document::Array(original_printed_arguments),
                             Document::String(","),
                             Document::Line(Line::default()),
@@ -287,7 +307,7 @@ pub(super) fn print_argument_list<'a>(
                     } else {
                         Document::empty()
                     },
-                    Document::Group(Group::new(vec![last_doc]).with_break(true)),
+                    Document::Group(Group::new(vec![in f.arena; last_doc_clone]).with_break(true)),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ]),
                 all_arguments_broken_out(f),
@@ -300,23 +320,23 @@ pub(super) fn print_argument_list<'a>(
     printed_arguments.insert(0, Document::Line(Line::soft()));
     contents.push(Document::IndentIfBreak(IndentIfBreak::new(printed_arguments)));
     if f.settings.trailing_comma {
-        contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+        contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
     }
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
 
     Document::Group(Group::new(contents))
 }
 
-fn print_right_parenthesis<'a>(
-    f: &mut FormatterState<'a>,
-    dangling_comments: Option<&Document<'a>>,
-    right_parenthesis: &Document<'a>,
+fn print_right_parenthesis<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    dangling_comments: Option<&Document<'arena>>,
+    right_parenthesis: &Document<'arena>,
     breaking: Option<bool>,
-) -> Document<'a> {
-    let mut contents = vec![];
+) -> Document<'arena> {
+    let mut contents = vec![in f.arena];
 
     if let Some(dangling) = dangling_comments {
-        contents.push(dangling.clone());
+        contents.push(clone_in_arena(f.arena, dangling));
     } else {
         match breaking {
             Some(true) => {
@@ -337,7 +357,7 @@ fn print_right_parenthesis<'a>(
         }
     }
 
-    contents.push(right_parenthesis.clone());
+    contents.push(clone_in_arena(f.arena, right_parenthesis));
 
     Document::Array(contents)
 }
@@ -373,7 +393,10 @@ fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, 
 }
 
 #[inline]
-fn is_single_late_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
+fn is_single_late_breaking_argument<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
+) -> bool {
     let arguments = argument_list.arguments.as_slice();
     if arguments.len() != 1 {
         return false;
@@ -388,11 +411,11 @@ fn is_single_late_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &
         return false;
     };
 
-    if is_simple_expression(&arrow_function.expression) {
+    if is_simple_expression(arrow_function.expression) {
         return true;
     }
 
-    let Expression::Call(call) = arrow_function.expression.as_ref() else {
+    let Expression::Call(call) = arrow_function.expression else {
         return false;
     };
 
@@ -400,7 +423,10 @@ fn is_single_late_breaking_argument<'a>(f: &FormatterState<'a>, argument_list: &
 }
 
 #[inline]
-fn should_inline_breaking_arguments<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
+fn should_inline_breaking_arguments<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
+) -> bool {
     let arguments = argument_list.arguments.as_slice();
 
     match arguments.len() {
@@ -445,7 +471,11 @@ fn should_inline_breaking_arguments<'a>(f: &FormatterState<'a>, argument_list: &
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>
-pub fn should_expand_first_arg<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList, nested_args: bool) -> bool {
+pub fn should_expand_first_arg<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
+    nested_args: bool,
+) -> bool {
     if argument_list.arguments.len() != 2 {
         return false;
     }
@@ -466,7 +496,11 @@ pub fn should_expand_first_arg<'a>(f: &FormatterState<'a>, argument_list: &'a Ar
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/52829385bcc4d785e58ae2602c0b098a643523c9/src/language-js/print/call-arguments.js#L234-L258>
-pub fn should_expand_last_arg<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList, nested_args: bool) -> bool {
+pub fn should_expand_last_arg<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
+    nested_args: bool,
+) -> bool {
     let Some(last_argument) = argument_list.arguments.last() else { return false };
     if f.has_comment(last_argument.span(), CommentFlags::Leading | CommentFlags::Trailing) {
         return false;
@@ -503,8 +537,8 @@ pub fn should_expand_last_arg<'a>(f: &FormatterState<'a>, argument_list: &'a Arg
 fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
     loop {
         node = match node {
-            Expression::Parenthesized(parenthesized) => &parenthesized.expression,
-            Expression::UnaryPrefix(operation) if !operation.operator.is_cast() => operation.operand.as_ref(),
+            Expression::Parenthesized(parenthesized) => parenthesized.expression,
+            Expression::UnaryPrefix(operation) if !operation.operator.is_cast() => operation.operand,
             _ => break,
         };
     }
@@ -524,14 +558,14 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
             instantiation.argument_list.as_ref().is_none_or(|argument_list| argument_list.arguments.len() < 2)
         }
         Expression::Binary(operation) => {
-            is_simple_call_argument(&operation.lhs, 1) && is_simple_call_argument(&operation.rhs, 1)
+            is_simple_call_argument(operation.lhs, 1) && is_simple_call_argument(operation.rhs, 1)
         }
         _ => is_simple_call_argument(node, 2),
     }
 }
 
-fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
-    let is_child_simple = |node: &'a Expression| {
+fn is_simple_call_argument<'ast, 'arena>(node: &'ast Expression<'arena>, depth: usize) -> bool {
+    let is_child_simple = |node: &'ast Expression<'arena>| {
         if depth <= 1 {
             return false;
         }
@@ -539,10 +573,10 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
         is_simple_call_argument(node, depth - 1)
     };
 
-    let is_simple_element = |node: &'a ArrayElement| match node {
-        ArrayElement::KeyValue(element) => is_child_simple(&element.key) && is_child_simple(&element.value),
-        ArrayElement::Value(element) => is_child_simple(&element.value),
-        ArrayElement::Variadic(element) => is_child_simple(&element.value),
+    let is_simple_element = |node: &'ast ArrayElement<'arena>| match node {
+        ArrayElement::KeyValue(element) => is_child_simple(element.key) && is_child_simple(element.value),
+        ArrayElement::Value(element) => is_child_simple(element.value),
+        ArrayElement::Variadic(element) => is_child_simple(element.value),
         ArrayElement::Missing(_) => true,
     };
 
@@ -551,7 +585,7 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
     }
 
     match node {
-        Expression::Parenthesized(parenthesized) => is_simple_call_argument(&parenthesized.expression, depth),
+        Expression::Parenthesized(parenthesized) => is_simple_call_argument(parenthesized.expression, depth),
         Expression::UnaryPrefix(operation) => {
             if let UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_) = operation.operator {
                 return false;
@@ -561,35 +595,35 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
                 return false;
             }
 
-            is_simple_call_argument(&operation.operand, depth)
+            is_simple_call_argument(operation.operand, depth)
         }
         Expression::Array(array) => array.elements.iter().all(is_simple_element),
         Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
         Expression::Call(call) => {
             let argument_list = match call {
                 Call::Function(function_call) => {
-                    if !is_simple_call_argument(&function_call.function, depth) {
+                    if !is_simple_call_argument(function_call.function, depth) {
                         return false;
                     }
 
                     &function_call.argument_list
                 }
                 Call::Method(method_call) => {
-                    if !is_simple_call_argument(&method_call.object, depth) {
+                    if !is_simple_call_argument(method_call.object, depth) {
                         return false;
                     }
 
                     &method_call.argument_list
                 }
                 Call::NullSafeMethod(null_safe_method_call) => {
-                    if !is_simple_call_argument(&null_safe_method_call.object, depth) {
+                    if !is_simple_call_argument(null_safe_method_call.object, depth) {
                         return false;
                     }
 
                     &null_safe_method_call.argument_list
                 }
                 Call::StaticMethod(static_method_call) => {
-                    if !is_simple_call_argument(&static_method_call.class, depth) {
+                    if !is_simple_call_argument(static_method_call.class, depth) {
                         return false;
                     }
 
@@ -611,10 +645,10 @@ fn is_simple_call_argument<'a>(node: &'a Expression, depth: usize) -> bool {
             is_simple_call_argument(object_or_class, depth)
         }
         Expression::ArrayAccess(array_access) => {
-            is_simple_call_argument(&array_access.array, depth) && is_simple_call_argument(&array_access.index, depth)
+            is_simple_call_argument(array_access.array, depth) && is_simple_call_argument(array_access.index, depth)
         }
         Expression::Instantiation(instantiation) => {
-            if is_simple_call_argument(&instantiation.class, depth) {
+            if is_simple_call_argument(instantiation.class, depth) {
                 match &instantiation.argument_list {
                     Some(argument_list) => {
                         argument_list.arguments.len() <= depth

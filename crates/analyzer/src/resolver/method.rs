@@ -76,12 +76,12 @@ pub struct MethodResolutionResult {
 /// 2. Resolving the `selector` to get potential method names.
 /// 3. Finding all matching methods on the object's possible types.
 /// 4. Reporting any issues found, such as "method not found" or "call on mixed".
-pub fn resolve_method_targets<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    object: &Expression,
-    selector: &ClassLikeMemberSelector,
+    object: &'ast Expression<'arena>,
+    selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
     access_span: Span,
 ) -> Result<MethodResolutionResult, AnalysisError> {
@@ -186,11 +186,11 @@ pub fn resolve_method_targets<'a>(
     Ok(result)
 }
 
-pub fn resolve_method_from_object<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
-    object: &Expression,
-    selector: &ClassLikeMemberSelector,
+pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+    object: &'ast Expression<'arena>,
+    selector: &'ast ClassLikeMemberSelector<'arena>,
     object_type: &TObject,
     method_name: StringIdentifier,
     access_span: Span,
@@ -251,17 +251,17 @@ pub fn resolve_method_from_object<'a>(
     resolved_methods
 }
 
-pub fn get_method_ids_from_object<'a, 'b>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
-    object: &Expression,
-    selector: &ClassLikeMemberSelector,
-    object_type: &'b TObject,
-    outer_object: &'b TObject,
+pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+    object: &'ast Expression<'arena>,
+    selector: &'ast ClassLikeMemberSelector<'arena>,
+    object_type: &'object TObject,
+    outer_object: &'object TObject,
     method_name: StringIdentifier,
     access_span: Span,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'a ClassLikeMetadata, MethodIdentifier, &'b TObject, StringIdentifier)> {
+) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, &'object TObject, StringIdentifier)> {
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,19 +10,19 @@ use crate::ast::ast::tag::OpeningTag;
 /// A statement terminator.
 ///
 /// A PHP statement can be terminated with a semicolon `;` or a closing tag `?>`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Terminator {
+#[repr(u8)]
+pub enum Terminator<'arena> {
     /// A semicolon.
     Semicolon(Span),
     /// A closing tag.
     ClosingTag(ClosingTag),
     /// A closing tag followed immediately by an opening tag.
-    TagPair(ClosingTag, OpeningTag),
+    TagPair(ClosingTag, OpeningTag<'arena>),
 }
 
-impl Terminator {
+impl Terminator<'_> {
     #[must_use]
     #[inline]
     pub const fn is_semicolon(&self) -> bool {
@@ -37,7 +36,7 @@ impl Terminator {
     }
 }
 
-impl HasSpan for Terminator {
+impl HasSpan for Terminator<'_> {
     fn span(&self) -> Span {
         match self {
             Terminator::Semicolon(s) => *s,

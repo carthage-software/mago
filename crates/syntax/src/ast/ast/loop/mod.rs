@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -26,11 +25,11 @@ pub mod r#while;
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Continue {
-    pub r#continue: Keyword,
-    pub level: Option<Expression>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Continue<'arena> {
+    pub r#continue: Keyword<'arena>,
+    pub level: Option<Expression<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
 /// Represents a break statement in PHP.
@@ -46,20 +45,20 @@ pub struct Continue {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Break {
-    pub r#break: Keyword,
-    pub level: Option<Expression>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Break<'arena> {
+    pub r#break: Keyword<'arena>,
+    pub level: Option<Expression<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl HasSpan for Continue {
+impl HasSpan for Continue<'_> {
     fn span(&self) -> Span {
         self.r#continue.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for Break {
+impl HasSpan for Break<'_> {
     fn span(&self) -> Span {
         self.r#break.span().join(self.terminator.span())
     }

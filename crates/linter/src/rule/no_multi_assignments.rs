@@ -81,12 +81,12 @@ impl LintRule for NoMultiAssignmentsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Assignment(assignment) = node else {
             return;
         };
 
-        let Expression::Assignment(other_assignment) = assignment.rhs.as_ref() else {
+        let Expression::Assignment(other_assignment) = assignment.rhs else {
             return;
         };
 

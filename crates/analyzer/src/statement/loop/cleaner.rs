@@ -8,8 +8,8 @@ use crate::artifacts::AnalysisArtifacts;
 #[repr(transparent)]
 pub struct TypeCleaningWalker;
 
-impl Walker<AnalysisArtifacts> for TypeCleaningWalker {
-    fn walk_in_expression(&self, expression: &Expression, artifacts: &mut AnalysisArtifacts) {
+impl<'ast, 'arena> Walker<'ast, 'arena, AnalysisArtifacts> for TypeCleaningWalker {
+    fn walk_in_expression(&self, expression: &'ast Expression<'arena>, artifacts: &mut AnalysisArtifacts) {
         let expression_span = expression.span();
         let expression_id = (expression_span.start.offset, expression_span.end.offset);
 
@@ -17,7 +17,7 @@ impl Walker<AnalysisArtifacts> for TypeCleaningWalker {
     }
 }
 
-pub fn clean_nodes(stmts: &[Statement], artifacts: &mut AnalysisArtifacts) {
+pub fn clean_nodes<'ast, 'arena>(stmts: &'ast [Statement<'arena>], artifacts: &mut AnalysisArtifacts) {
     for stmt in stmts {
         TypeCleaningWalker.walk_statement(stmt, artifacts);
     }

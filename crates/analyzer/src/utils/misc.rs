@@ -17,7 +17,7 @@ use crate::code::IssueCode;
 /// and a new set of assertions (`formula_2`) from a conditional expression.
 pub fn check_for_paradox(
     interner: &ThreadedInterner,
-    collector: &mut Collector<'_>,
+    collector: &mut Collector<'_, '_>,
     formula_1: &[Rc<Clause>],
     formula_2: &[Clause],
     span: Span,
@@ -73,7 +73,7 @@ pub fn check_for_paradox(
 
 fn report_redundant_condition(
     interner: &ThreadedInterner,
-    collector: &mut Collector<'_>,
+    collector: &mut Collector<'_, '_>,
     redundant_clause: &Clause,
     redundant_span: Span,
     original_span: Span,
@@ -103,7 +103,7 @@ fn report_redundant_condition(
 
 fn report_paradoxical_condition(
     interner: &ThreadedInterner,
-    collector: &mut Collector<'_>,
+    collector: &mut Collector<'_, '_>,
     original_clause: &Clause,
     negated_conflicting_clause: &Clause,
     paradox_span: Span,
@@ -138,9 +138,9 @@ fn report_paradoxical_condition(
 }
 
 #[inline]
-pub const fn unwrap_expression(expression: &Expression) -> &Expression {
+pub const fn unwrap_expression<'ast, 'arena>(expression: &'ast Expression<'arena>) -> &'ast Expression<'arena> {
     match expression {
-        Expression::Parenthesized(parenthesized) => unwrap_expression(&parenthesized.expression),
+        Expression::Parenthesized(parenthesized) => unwrap_expression(parenthesized.expression),
         _ => expression,
     }
 }

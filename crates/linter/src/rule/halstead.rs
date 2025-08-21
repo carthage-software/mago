@@ -2,7 +2,6 @@ use mago_span::HasSpan;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -84,7 +83,7 @@ impl LintRule for HalsteadRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let kind = match node.kind() {
             NodeKind::PropertyHookConcreteBody => "Hook",
             NodeKind::Method => "Method",
@@ -142,7 +141,7 @@ struct HalsteadMetrics {
 }
 
 #[inline]
-fn gather_and_compute_halstead(node: Node<'_>) -> HalsteadMetrics {
+fn gather_and_compute_halstead<'ast, 'arena>(node: Node<'ast, 'arena>) -> HalsteadMetrics {
     let (operators, operands) = gather_operators_and_operands(node);
 
     compute_halstead_metrics(&operators, &operands)
@@ -152,14 +151,14 @@ fn gather_and_compute_halstead(node: Node<'_>) -> HalsteadMetrics {
 struct Operator(NodeKind);
 
 #[derive(Debug, Hash, Eq, PartialEq)]
-struct Operand(StringIdentifier);
+struct Operand<'arena>(&'arena str);
 
 #[inline]
-fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>) {
+fn gather_operators_and_operands<'ast, 'arena>(node: Node<'ast, 'arena>) -> (Vec<Operator>, Vec<Operand<'arena>>) {
     let mut operators = Vec::new();
     let mut operands = Vec::new();
 
-    fn recurse(n: Node<'_>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand>) {
+    fn recurse<'ast, 'arena>(n: Node<'ast, 'arena>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand<'arena>>) {
         if n.is_declaration() {
             return;
         }
@@ -181,7 +180,7 @@ fn gather_operators_and_operands(node: Node<'_>) -> (Vec<Operator>, Vec<Operand>
 /// Check if the node is considered an operator or operand in Halstead terms
 /// and record a textual representation.
 #[inline]
-fn categorize_node(node: Node<'_>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand>) {
+fn categorize_node<'arena>(node: Node<'_, 'arena>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand<'arena>>) {
     match node {
         Node::Binary(_)
         | Node::Assignment(_)

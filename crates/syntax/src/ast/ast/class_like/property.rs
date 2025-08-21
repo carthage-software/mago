@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -19,12 +18,12 @@ use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Property {
-    Plain(PlainProperty),
-    Hooked(HookedProperty),
+#[repr(u8)]
+pub enum Property<'arena> {
+    Plain(PlainProperty<'arena>),
+    Hooked(HookedProperty<'arena>),
 }
 
 /// Represents a class-like property declaration in PHP.
@@ -39,14 +38,14 @@ pub enum Property {
 ///    protected $bar = 42;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PlainProperty {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
-    pub var: Option<Keyword>,
-    pub hint: Option<Hint>,
-    pub items: TokenSeparatedSequence<PropertyItem>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PlainProperty<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
+    pub var: Option<Keyword<'arena>>,
+    pub hint: Option<Hint<'arena>>,
+    pub items: TokenSeparatedSequence<'arena, PropertyItem<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
 /// Represents a class-like property declaration in PHP with hooks.
@@ -69,23 +68,23 @@ pub struct PlainProperty {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct HookedProperty {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
-    pub var: Option<Keyword>,
-    pub hint: Option<Hint>,
-    pub item: PropertyItem,
-    pub hook_list: PropertyHookList,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct HookedProperty<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
+    pub var: Option<Keyword<'arena>>,
+    pub hint: Option<Hint<'arena>>,
+    pub item: PropertyItem<'arena>,
+    pub hook_list: PropertyHookList<'arena>,
 }
 
 /// Represents a property item in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum PropertyItem {
-    Abstract(PropertyAbstractItem),
-    Concrete(PropertyConcreteItem),
+#[repr(u8)]
+pub enum PropertyItem<'arena> {
+    Abstract(PropertyAbstractItem<'arena>),
+    Concrete(PropertyConcreteItem<'arena>),
 }
 
 /// Represents an abstract property item in a class-like property declaration in PHP.
@@ -99,9 +98,9 @@ pub enum PropertyItem {
 ///    public $foo;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyAbstractItem {
-    pub variable: DirectVariable,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyAbstractItem<'arena> {
+    pub variable: DirectVariable<'arena>,
 }
 
 /// Represents a concrete property item in a class-like property declaration in PHP.
@@ -115,11 +114,11 @@ pub struct PropertyAbstractItem {
 ///   public $foo = 42;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyConcreteItem {
-    pub variable: DirectVariable,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyConcreteItem<'arena> {
+    pub variable: DirectVariable<'arena>,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'arena>,
 }
 
 /// Represents a list of property hooks in a class-like property declaration in PHP.
@@ -140,10 +139,10 @@ pub struct PropertyConcreteItem {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyHookList {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyHookList<'arena> {
     pub left_brace: Span,
-    pub hooks: Sequence<PropertyHook>,
+    pub hooks: Sequence<'arena, PropertyHook<'arena>>,
     pub right_brace: Span,
 }
 
@@ -162,77 +161,77 @@ pub struct PropertyHookList {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyHook {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyHook<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
     pub ampersand: Option<Span>,
-    pub name: LocalIdentifier,
-    pub parameters: Option<FunctionLikeParameterList>,
-    pub body: PropertyHookBody,
+    pub name: LocalIdentifier<'arena>,
+    pub parameters: Option<FunctionLikeParameterList<'arena>>,
+    pub body: PropertyHookBody<'arena>,
 }
 
 /// Represents the body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum PropertyHookBody {
+#[repr(u8)]
+pub enum PropertyHookBody<'arena> {
     Abstract(PropertyHookAbstractBody),
-    Concrete(PropertyHookConcreteBody),
+    Concrete(PropertyHookConcreteBody<'arena>),
 }
 
 /// Represents an abstract body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PropertyHookAbstractBody {
     pub semicolon: Span,
 }
 
 /// Represents a concrete body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum PropertyHookConcreteBody {
-    Block(Block),
-    Expression(PropertyHookConcreteExpressionBody),
+#[repr(u8)]
+pub enum PropertyHookConcreteBody<'arena> {
+    Block(Block<'arena>),
+    Expression(PropertyHookConcreteExpressionBody<'arena>),
 }
 
 /// Represents an expression body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyHookConcreteExpressionBody {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyHookConcreteExpressionBody<'arena> {
     pub arrow: Span,
-    pub expression: Expression,
+    pub expression: Expression<'arena>,
     pub semicolon: Span,
 }
 
-impl Property {
-    pub fn modifiers(&self) -> &Sequence<Modifier> {
+impl<'arena> Property<'arena> {
+    pub fn modifiers(&self) -> &Sequence<'arena, Modifier<'arena>> {
         match &self {
             Property::Hooked(h) => &h.modifiers,
             Property::Plain(p) => &p.modifiers,
         }
     }
 
-    pub fn var(&self) -> Option<&Keyword> {
+    pub fn var(&self) -> Option<&Keyword<'arena>> {
         match &self {
             Property::Hooked(h) => h.var.as_ref(),
             Property::Plain(p) => p.var.as_ref(),
         }
     }
 
-    pub fn first_variable(&self) -> &DirectVariable {
+    pub fn first_variable(&self) -> &DirectVariable<'arena> {
         self.variables()
             .first()
             .expect("expected property to have at least 1 item. this is a bug in mago. please report it.")
     }
 
-    pub fn variables(&self) -> Vec<&DirectVariable> {
+    pub fn variables(&self) -> Vec<&DirectVariable<'arena>> {
         match &self {
             Property::Plain(inner) => inner.items.iter().map(|item| item.variable()).collect(),
             Property::Hooked(inner) => vec![inner.item.variable()],
         }
     }
 
-    pub fn hint(&self) -> Option<&Hint> {
+    pub fn hint(&self) -> Option<&Hint<'arena>> {
         match &self {
             Property::Hooked(h) => h.hint.as_ref(),
             Property::Plain(p) => p.hint.as_ref(),
@@ -240,8 +239,8 @@ impl Property {
     }
 }
 
-impl PropertyItem {
-    pub fn variable(&self) -> &DirectVariable {
+impl<'arena> PropertyItem<'arena> {
+    pub fn variable(&self) -> &DirectVariable<'arena> {
         match &self {
             PropertyItem::Abstract(item) => &item.variable,
             PropertyItem::Concrete(item) => &item.variable,
@@ -249,7 +248,7 @@ impl PropertyItem {
     }
 }
 
-impl HasSpan for Property {
+impl HasSpan for Property<'_> {
     fn span(&self) -> Span {
         match &self {
             Property::Plain(inner) => inner.span(),
@@ -258,7 +257,7 @@ impl HasSpan for Property {
     }
 }
 
-impl HasSpan for PlainProperty {
+impl HasSpan for PlainProperty<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.terminator.span());
@@ -289,7 +288,7 @@ impl HasSpan for PlainProperty {
     }
 }
 
-impl HasSpan for HookedProperty {
+impl HasSpan for HookedProperty<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return Span::between(attribute_list.span(), self.hook_list.span());
@@ -316,7 +315,7 @@ impl HasSpan for HookedProperty {
     }
 }
 
-impl HasSpan for PropertyItem {
+impl HasSpan for PropertyItem<'_> {
     fn span(&self) -> Span {
         match self {
             PropertyItem::Abstract(item) => item.span(),
@@ -325,25 +324,25 @@ impl HasSpan for PropertyItem {
     }
 }
 
-impl HasSpan for PropertyAbstractItem {
+impl HasSpan for PropertyAbstractItem<'_> {
     fn span(&self) -> Span {
         self.variable.span()
     }
 }
 
-impl HasSpan for PropertyConcreteItem {
+impl HasSpan for PropertyConcreteItem<'_> {
     fn span(&self) -> Span {
         Span::between(self.variable.span(), self.value.span())
     }
 }
 
-impl HasSpan for PropertyHookList {
+impl HasSpan for PropertyHookList<'_> {
     fn span(&self) -> Span {
         Span::between(self.left_brace, self.right_brace)
     }
 }
 
-impl HasSpan for PropertyHook {
+impl HasSpan for PropertyHook<'_> {
     fn span(&self) -> Span {
         if let Some(attributes) = self.attribute_lists.first() {
             return Span::between(attributes.span(), self.body.span());
@@ -361,7 +360,7 @@ impl HasSpan for PropertyHook {
     }
 }
 
-impl HasSpan for PropertyHookBody {
+impl HasSpan for PropertyHookBody<'_> {
     fn span(&self) -> Span {
         match self {
             PropertyHookBody::Abstract(body) => body.span(),
@@ -376,7 +375,7 @@ impl HasSpan for PropertyHookAbstractBody {
     }
 }
 
-impl HasSpan for PropertyHookConcreteBody {
+impl HasSpan for PropertyHookConcreteBody<'_> {
     fn span(&self) -> Span {
         match self {
             PropertyHookConcreteBody::Block(body) => body.span(),
@@ -385,7 +384,7 @@ impl HasSpan for PropertyHookConcreteBody {
     }
 }
 
-impl HasSpan for PropertyHookConcreteExpressionBody {
+impl HasSpan for PropertyHookConcreteExpressionBody<'_> {
     fn span(&self) -> Span {
         Span::between(self.arrow, self.semicolon)
     }

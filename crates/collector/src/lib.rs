@@ -1,7 +1,10 @@
 use ahash::HashMap;
+use bumpalo::Bump;
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
+
 use mago_database::file::File;
 use mago_fixer::FixPlan;
-use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
@@ -24,36 +27,44 @@ mod walk;
 /// - Filtering issues based on configuration or suppression pragmas (`@mago-ignore`, `@mago-expect`).
 /// - Reporting unused or unfulfilled pragmas.
 #[derive(Debug)]
-pub struct Collector<'i> {
+pub struct Collector<'input, 'arena> {
+    /// The arena used for allocation of issues and pragmas.
+    arena: &'arena Bump,
     /// The source file from which this collector was created.
-    file: &'i File,
+    file: &'input File,
     /// All pragmas that have not yet been applied to a node.
-    pragmas: Vec<Pragma<'i>>,
+    pragmas: Vec<'arena, Pragma<'arena>>,
     /// The collection of issues that have been reported and not suppressed.
     issues: IssueCollection,
     /// A stack of issue collections for recording issues speculatively.
-    recordings: Vec<IssueCollection>,
+    recordings: Vec<'arena, IssueCollection>,
     /// A list of issue codes that should be silently ignored.
-    disabled_codes: Vec<&'static str>,
+    disabled_codes: Vec<'arena, &'static str>,
     /// A map of legacy issue codes to their new, canonical counterparts.
     aliases: HashMap<&'static str, &'static str>,
     /// An optional URL template for generating links to issue documentation.
     link_template: Option<&'static str>,
 }
 
-impl<'i> Collector<'i> {
+impl<'input, 'arena> Collector<'input, 'arena> {
     /// Creates a new `Collector` from a slice of trivia.
     ///
     /// This is the primary constructor. It pre-parses the given trivia to find pragmas
     /// relevant to the specified category. This is useful when the full program AST is not
     /// needed or available.
-    pub fn new(file: &'i File, program: &'i Program, interner: &'i ThreadedInterner, category: &'static str) -> Self {
+    pub fn new<'ast>(
+        arena: &'arena Bump,
+        file: &'input File,
+        program: &'ast Program<'arena>,
+        category: &'static str,
+    ) -> Self {
         let mut collector = Self {
+            arena,
             file,
-            pragmas: Pragma::extract(file, program.trivia.as_slice(), interner, Some(category)),
+            pragmas: Pragma::extract(arena, file, program.trivia.as_slice(), Some(category)),
             issues: IssueCollection::new(),
-            recordings: Vec::new(),
-            disabled_codes: Vec::new(),
+            recordings: Vec::new_in(arena),
+            disabled_codes: Vec::new_in(arena),
             aliases: HashMap::default(),
             link_template: None,
         };
@@ -84,7 +95,7 @@ impl<'i> Collector<'i> {
     /// Overwrites the list of disabled issue codes.
     #[inline]
     pub fn set_disabled_codes(&mut self, codes: impl IntoIterator<Item = &'static str>) {
-        self.disabled_codes = codes.into_iter().collect();
+        self.disabled_codes = codes.into_iter().collect_in(self.arena);
     }
 
     /// Adds new codes to the list of disabled issue codes.
@@ -339,7 +350,7 @@ impl<'i> Collector<'i> {
         issue_span: Span,
         kind: PragmaKind,
         issue_code: &str,
-    ) -> Option<&mut Pragma<'i>> {
+    ) -> Option<&mut Pragma<'arena>> {
         let issue_start_line = self.file.line_number(issue_span.start.offset);
 
         let mut best_match_index = None;

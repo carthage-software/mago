@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -23,26 +22,26 @@ use crate::ast::sequence::TokenSeparatedSequence;
 ///   echo $i;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct For {
-    pub r#for: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct For<'arena> {
+    pub r#for: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub initializations: TokenSeparatedSequence<Expression>,
+    pub initializations: TokenSeparatedSequence<'arena, Expression<'arena>>,
     pub initializations_semicolon: Span,
-    pub conditions: TokenSeparatedSequence<Expression>,
+    pub conditions: TokenSeparatedSequence<'arena, Expression<'arena>>,
     pub conditions_semicolon: Span,
-    pub increments: TokenSeparatedSequence<Expression>,
+    pub increments: TokenSeparatedSequence<'arena, Expression<'arena>>,
     pub right_parenthesis: Span,
-    pub body: ForBody,
+    pub body: ForBody<'arena>,
 }
 
 /// Represents the body of a for statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum ForBody {
-    Statement(Box<Statement>),
-    ColonDelimited(ForColonDelimitedBody),
+#[repr(u8)]
+pub enum ForBody<'arena> {
+    Statement(&'arena Statement<'arena>),
+    ColonDelimited(ForColonDelimitedBody<'arena>),
 }
 
 /// Represents a colon-delimited for statement body.
@@ -56,17 +55,17 @@ pub enum ForBody {
 ///   echo $i;
 /// endfor;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ForColonDelimitedBody {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ForColonDelimitedBody<'arena> {
     pub colon: Span,
-    pub statements: Sequence<Statement>,
-    pub end_for: Keyword,
-    pub terminator: Terminator,
+    pub statements: Sequence<'arena, Statement<'arena>>,
+    pub end_for: Keyword<'arena>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl ForBody {
+impl<'arena> ForBody<'arena> {
     #[inline]
-    pub fn statements(&self) -> &[Statement] {
+    pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             ForBody::Statement(statement) => std::slice::from_ref(statement),
             ForBody::ColonDelimited(body) => body.statements.as_slice(),
@@ -74,13 +73,13 @@ impl ForBody {
     }
 }
 
-impl HasSpan for For {
+impl HasSpan for For<'_> {
     fn span(&self) -> Span {
         self.r#for.span().join(self.body.span())
     }
 }
 
-impl HasSpan for ForBody {
+impl HasSpan for ForBody<'_> {
     fn span(&self) -> Span {
         match self {
             ForBody::Statement(statement) => statement.span(),
@@ -89,7 +88,7 @@ impl HasSpan for ForBody {
     }
 }
 
-impl HasSpan for ForColonDelimitedBody {
+impl HasSpan for ForColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         self.colon.join(self.terminator.span())
     }

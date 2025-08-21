@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -21,13 +20,13 @@ use crate::ast::ast::keyword::Keyword;
 ///     yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Yield {
-    Value(YieldValue),
-    Pair(YieldPair),
-    From(YieldFrom),
+#[repr(u8)]
+pub enum Yield<'arena> {
+    Value(YieldValue<'arena>),
+    Pair(YieldPair<'arena>),
+    From(YieldFrom<'arena>),
 }
 
 /// Represents a PHP `yield` expression with a value.
@@ -41,10 +40,10 @@ pub enum Yield {
 ///    yield 1;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct YieldValue {
-    pub r#yield: Keyword,
-    pub value: Option<Box<Expression>>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct YieldValue<'arena> {
+    pub r#yield: Keyword<'arena>,
+    pub value: Option<&'arena Expression<'arena>>,
 }
 
 /// Represents a PHP `yield` expression with a key-value pair.
@@ -58,12 +57,12 @@ pub struct YieldValue {
 ///   yield 2 => 3;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct YieldPair {
-    pub r#yield: Keyword,
-    pub key: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct YieldPair<'arena> {
+    pub r#yield: Keyword<'arena>,
+    pub key: &'arena Expression<'arena>,
     pub arrow: Span,
-    pub value: Box<Expression>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a PHP `yield from` expression.
@@ -77,14 +76,14 @@ pub struct YieldPair {
 ///  yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct YieldFrom {
-    pub r#yield: Keyword,
-    pub from: Keyword,
-    pub iterator: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct YieldFrom<'arena> {
+    pub r#yield: Keyword<'arena>,
+    pub from: Keyword<'arena>,
+    pub iterator: &'arena Expression<'arena>,
 }
 
-impl HasSpan for Yield {
+impl HasSpan for Yield<'_> {
     fn span(&self) -> Span {
         match self {
             Yield::Value(y) => y.span(),
@@ -94,19 +93,19 @@ impl HasSpan for Yield {
     }
 }
 
-impl HasSpan for YieldValue {
+impl HasSpan for YieldValue<'_> {
     fn span(&self) -> Span {
         if let Some(value) = &self.value { self.r#yield.span().join(value.span()) } else { self.r#yield.span() }
     }
 }
 
-impl HasSpan for YieldPair {
+impl HasSpan for YieldPair<'_> {
     fn span(&self) -> Span {
         self.r#yield.span().join(self.value.span())
     }
 }
 
-impl HasSpan for YieldFrom {
+impl HasSpan for YieldFrom<'_> {
     fn span(&self) -> Span {
         self.r#yield.span().join(self.iterator.span())
     }

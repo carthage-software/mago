@@ -85,7 +85,7 @@ impl LintRule for NoErrorControlOperatorRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::UnaryPrefix(unary_prefix) = node else {
             return;
         };

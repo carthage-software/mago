@@ -81,7 +81,7 @@ pub struct TraitUseDocblockComment {
 
 impl ClassLikeDocblockComment {
     pub fn create(
-        context: &Context<'_>,
+        context: &Context<'_, '_, '_>,
         class_like: impl HasSpan,
         scope: &mut NamespaceScope,
     ) -> Result<Option<ClassLikeDocblockComment>, ParseError> {
@@ -105,7 +105,7 @@ impl ClassLikeDocblockComment {
         let mut is_enum_interface = false;
         let mut unchecked = false;
 
-        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -144,7 +144,7 @@ impl ClassLikeDocblockComment {
                     has_sealed_methods = Some(false);
                 }
                 TagKind::Inheritors | TagKind::PsalmInheritors => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((inheritors_tag, _)) = split_tag_content(description_str, description_span) {
@@ -157,7 +157,7 @@ impl ClassLikeDocblockComment {
                 | TagKind::TemplateInvariant
                 | TagKind::PhpstanTemplateInvariant
                 | TagKind::PsalmTemplateInvariant => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some(template) = parse_template_tag(description_str, description_span, false, false) {
@@ -169,7 +169,7 @@ impl ClassLikeDocblockComment {
                 TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant
                 | TagKind::TemplateContravariant => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some(template) = parse_template_tag(description_str, description_span, false, true) {
@@ -179,7 +179,7 @@ impl ClassLikeDocblockComment {
                     }
                 }
                 TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant | TagKind::TemplateCovariant => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some(template) = parse_template_tag(description_str, description_span, true, false) {
@@ -189,7 +189,7 @@ impl ClassLikeDocblockComment {
                     }
                 }
                 TagKind::TemplateExtends | TagKind::Extends => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
@@ -197,7 +197,7 @@ impl ClassLikeDocblockComment {
                     }
                 }
                 TagKind::TemplateImplements | TagKind::Implements => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
@@ -211,16 +211,11 @@ impl ClassLikeDocblockComment {
                     has_consistent_templates = true;
                 }
                 TagKind::RequireExtends | TagKind::PhpstanRequireExtends | TagKind::PsalmRequireExtends => {
-                    require_extends.push(TypeString {
-                        value: context.interner.lookup(&tag.description).to_string(),
-                        span: tag.description_span,
-                    });
+                    require_extends.push(TypeString { value: tag.description.to_string(), span: tag.description_span });
                 }
                 TagKind::RequireImplements | TagKind::PhpstanRequireImplements | TagKind::PsalmRequireImplements => {
-                    require_implements.push(TypeString {
-                        value: context.interner.lookup(&tag.description).to_string(),
-                        span: tag.description_span,
-                    });
+                    require_implements
+                        .push(TypeString { value: tag.description.to_string(), span: tag.description_span });
                 }
                 _ => {
                     // Ignore other tags
@@ -251,7 +246,7 @@ impl ClassLikeDocblockComment {
 
 impl FunctionLikeDocblockComment {
     pub fn create(
-        context: &Context<'_>,
+        context: &Context<'_, '_, '_>,
         function: impl HasSpan,
         scope: &mut NamespaceScope,
     ) -> Result<Option<FunctionLikeDocblockComment>, ParseError> {
@@ -280,7 +275,7 @@ impl FunctionLikeDocblockComment {
         let mut unchecked = false;
         let mut must_use = false;
 
-        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -301,9 +296,7 @@ impl FunctionLikeDocblockComment {
                     is_internal = true;
                 }
                 TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
-                    if let Some(param) =
-                        parse_param_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(param) = parse_param_tag(tag.description, tag.description_span) {
                         parameters.push(param);
                     }
                 }
@@ -316,21 +309,14 @@ impl FunctionLikeDocblockComment {
                 | TagKind::TemplateInvariant
                 | TagKind::PhpstanTemplateInvariant
                 | TagKind::PsalmTemplateInvariant => {
-                    if let Some(t) = parse_template_tag(
-                        context.interner.lookup(&tag.description),
-                        tag.description_span,
-                        false,
-                        false,
-                    ) {
+                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, false, false) {
                         scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
                         templates.push(t);
                     }
                 }
                 TagKind::TemplateCovariant | TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant => {
-                    if let Some(t) =
-                        parse_template_tag(context.interner.lookup(&tag.description), tag.description_span, true, false)
-                    {
+                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, true, false) {
                         scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
                         templates.push(t);
@@ -339,39 +325,29 @@ impl FunctionLikeDocblockComment {
                 TagKind::TemplateContravariant
                 | TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant => {
-                    if let Some(t) =
-                        parse_template_tag(context.interner.lookup(&tag.description), tag.description_span, false, true)
-                    {
+                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, false, true) {
                         scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
                         templates.push(t);
                     }
                 }
                 TagKind::Return => {
-                    if let Some(return_tag) =
-                        parse_return_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
                         generic_return_type = Some(return_tag);
                     }
                 }
                 TagKind::PhpstanReturn => {
-                    if let Some(return_tag) =
-                        parse_return_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
                         phpstan_return_type = Some(return_tag);
                     }
                 }
                 TagKind::PsalmReturn => {
-                    if let Some(return_tag) =
-                        parse_return_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
                         psalm_return_type = Some(return_tag);
                     }
                 }
                 TagKind::Throws => {
-                    if let Some(throws_tag) =
-                        parse_throws_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(throws_tag) = parse_throws_tag(tag.description, tag.description_span) {
                         throws.push(throws_tag);
                     }
                 }
@@ -385,37 +361,27 @@ impl FunctionLikeDocblockComment {
                     is_pure = true;
                 }
                 TagKind::PsalmParamOut | TagKind::ParamOut => {
-                    if let Some(param_out) =
-                        parse_param_out_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(param_out) = parse_param_out_tag(tag.description, tag.description_span) {
                         parameters_out.push(param_out);
                     }
                 }
                 TagKind::Assert | TagKind::PsalmAssert | TagKind::PhpstanAssert => {
-                    if let Some(assertion) =
-                        parse_assertion_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
                         assertions.push(assertion);
                     }
                 }
                 TagKind::AssertIfTrue | TagKind::PsalmAssertIfTrue | TagKind::PhpstanAssertIfTrue => {
-                    if let Some(assertion) =
-                        parse_assertion_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
                         if_true_assertions.push(assertion);
                     }
                 }
                 TagKind::AssertIfFalse | TagKind::PsalmAssertIfFalse | TagKind::PhpstanAssertIfFalse => {
-                    if let Some(assertion) =
-                        parse_assertion_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
                         if_false_assertions.push(assertion);
                     }
                 }
                 TagKind::Where => {
-                    if let Some(where_tag) =
-                        parse_where_tag(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(where_tag) = parse_where_tag(tag.description, tag.description_span) {
                         where_constraints.push(where_tag);
                     }
                 }
@@ -460,7 +426,7 @@ impl FunctionLikeDocblockComment {
 
 impl PropertyDocblockComment {
     pub fn create(
-        context: &Context<'_>,
+        context: &Context<'_, '_, '_>,
         property: impl HasSpan,
     ) -> Result<Option<PropertyDocblockComment>, ParseError> {
         let Some(docblock) = context.get_docblock(property) else {
@@ -474,7 +440,7 @@ impl PropertyDocblockComment {
         let mut phpstan_type_string: Option<TypeString> = None;
         let mut psalm_type_string: Option<TypeString> = None;
 
-        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -492,23 +458,17 @@ impl PropertyDocblockComment {
                     is_readonly = true;
                 }
                 TagKind::PsalmVar => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         psalm_type_string = Some(type_string_tag.0);
                     }
                 }
                 TagKind::PhpstanVar => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         phpstan_type_string = Some(type_string_tag.0);
                     }
                 }
                 TagKind::Var => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         generic_type_string = Some(type_string_tag.0);
                     }
                 }
@@ -528,7 +488,7 @@ impl PropertyDocblockComment {
 
 impl ConstantDocblockComment {
     pub fn create(
-        context: &Context<'_>,
+        context: &Context<'_, '_, '_>,
         constant: impl HasSpan,
     ) -> Result<Option<ConstantDocblockComment>, ParseError> {
         let Some(docblock) = context.get_docblock(constant) else {
@@ -543,7 +503,7 @@ impl ConstantDocblockComment {
         let mut phpstan_type_string: Option<TypeString> = None;
         let mut psalm_type_string: Option<TypeString> = None;
 
-        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -561,23 +521,17 @@ impl ConstantDocblockComment {
                     is_final = true;
                 }
                 TagKind::PsalmVar => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         psalm_type_string = Some(type_string_tag.0);
                     }
                 }
                 TagKind::PhpstanVar => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         phpstan_type_string = Some(type_string_tag.0);
                     }
                 }
                 TagKind::Var => {
-                    if let Some(type_string_tag) =
-                        split_tag_content(context.interner.lookup(&tag.description), tag.description_span)
-                    {
+                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
                         generic_type_string = Some(type_string_tag.0);
                     }
                 }
@@ -597,7 +551,7 @@ impl ConstantDocblockComment {
 
 impl TraitUseDocblockComment {
     pub fn create(
-        context: &Context<'_>,
+        context: &Context<'_, '_, '_>,
         trait_use: impl HasSpan,
     ) -> Result<Option<TraitUseDocblockComment>, ParseError> {
         let Some(docblock) = context.get_docblock(trait_use) else {
@@ -608,7 +562,7 @@ impl TraitUseDocblockComment {
         let mut template_implements = Vec::new();
         let mut template_use = Vec::new();
 
-        let parsed_docblock = parse_trivia(context.interner, docblock)?;
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
             let Element::Tag(tag) = element else {
@@ -617,7 +571,7 @@ impl TraitUseDocblockComment {
 
             match tag.kind {
                 TagKind::TemplateExtends | TagKind::Extends => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
@@ -625,7 +579,7 @@ impl TraitUseDocblockComment {
                     }
                 }
                 TagKind::TemplateImplements | TagKind::Implements => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
@@ -633,7 +587,7 @@ impl TraitUseDocblockComment {
                     }
                 }
                 TagKind::Use | TagKind::TemplateUse => {
-                    let description_str = context.interner.lookup(&tag.description);
+                    let description_str = tag.description;
                     let description_span = tag.description_span;
 
                     if let Some((used_type, _)) = split_tag_content(description_str, description_span) {

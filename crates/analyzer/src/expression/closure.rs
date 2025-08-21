@@ -28,11 +28,11 @@ use crate::heuristic;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 
-impl Analyzable for Closure {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let s = self.span();
@@ -64,44 +64,43 @@ impl Analyzable for Closure {
 
                 let variable = use_variable.variable.name;
                 let variable_span = use_variable.variable.span;
-                let variable_str = context.interner.lookup(&variable);
 
                 let is_by_reference = use_variable.ampersand.is_some();
 
                 if let Some(previous_span) = variable_spans.get(&variable) {
                     context.collector.report_with_code(
                         IssueCode::DuplicateClosureUseVariable,
-                        Issue::error(
-                            format!("Variable `{variable_str}` is imported multiple times into the closure.",),
-                        )
-                        .with_annotation(
-                            Annotation::primary(variable_span)
-                                .with_message(format!("Duplicate import of `{variable_str}`")),
-                        )
-                        .with_annotation(
-                            Annotation::secondary(*previous_span)
-                                .with_message(format!("Variable `{variable_str}` was already imported here")),
-                        )
-                        .with_note("A variable can only be imported into a closure's scope once via the `use` clause.")
-                        .with_help(format!("Remove the redundant import of `{variable_str}`.")),
+                        Issue::error(format!("Variable `{variable}` is imported multiple times into the closure.",))
+                            .with_annotation(
+                                Annotation::primary(variable_span)
+                                    .with_message(format!("Duplicate import of `{variable}`")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(*previous_span)
+                                    .with_message(format!("Variable `{variable}` was already imported here")),
+                            )
+                            .with_note(
+                                "A variable can only be imported into a closure's scope once via the `use` clause.",
+                            )
+                            .with_help(format!("Remove the redundant import of `{variable}`.")),
                     );
                 }
 
-                if !block_context.has_variable(variable_str) {
+                if !block_context.has_variable(variable) {
                     context.collector.report_with_code(
                         IssueCode::UndefinedVariableInClosureUse,
                         Issue::error(format!(
-                            "Cannot import undefined variable `{variable_str}` into closure.",
+                            "Cannot import undefined variable `{variable}` into closure.",
                         ))
                         .with_annotation(
                             Annotation::primary(use_variable.variable.span)
-                                .with_message(format!("Variable `{variable_str}` is not defined in the parent scope")),
+                                .with_message(format!("Variable `{variable}` is not defined in the parent scope")),
                         )
                         .with_note(
                             "Only variables that exist in the scope where the closure is defined can be captured using the `use` keyword."
                         )
                         .with_help(format!(
-                            "Ensure `{variable_str}` is defined and assigned a value in the parent scope before the closure definition, or remove it from the `use` clause.",
+                            "Ensure `{variable}` is defined and assigned a value in the parent scope before the closure definition, or remove it from the `use` clause.",
                         )),
                     );
                 }
@@ -109,20 +108,20 @@ impl Analyzable for Closure {
                 variable_spans.insert(variable, variable_span);
 
                 let mut variable_type =
-                    block_context.locals.get(variable_str).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
+                    block_context.locals.get(variable).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
                 if is_by_reference {
                     let inner_variable_type = Rc::make_mut(&mut variable_type);
                     inner_variable_type.by_reference = true;
 
-                    inner_block_context.references_to_external_scope.insert(variable_str.to_string());
+                    inner_block_context.references_to_external_scope.insert(variable.to_string());
                 }
 
-                inner_block_context.locals.insert(variable_str.to_string(), variable_type.clone());
-                inner_block_context.variables_possibly_in_scope.insert(variable_str.to_string());
+                inner_block_context.locals.insert(variable.to_string(), variable_type.clone());
+                inner_block_context.variables_possibly_in_scope.insert(variable.to_string());
 
                 for (variable_id, variable_type) in block_context.locals.iter() {
-                    let Some(stripped_variable_id) = variable_id.strip_prefix(variable_str) else {
+                    let Some(stripped_variable_id) = variable_id.strip_prefix(variable) else {
                         continue;
                     };
 

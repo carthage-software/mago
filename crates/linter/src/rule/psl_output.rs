@@ -83,7 +83,7 @@ impl LintRule for PslOutputRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let (used_directive, is_stdout) = match node {
             Node::Echo(_) => ("echo", true),
             Node::PrintConstruct(_) => ("print", true),
@@ -94,11 +94,9 @@ impl LintRule for PslOutputRule {
                     let Some(arg) = call.argument_list.arguments.get(0) else { return };
                     let Expression::ConstantAccess(constant) = arg.value() else { return };
 
-                    let name = ctx.interner.lookup(constant.name.value());
-
-                    if name.eq_ignore_ascii_case("STDOUT") {
+                    if constant.name.value().eq_ignore_ascii_case("STDOUT") {
                         ("fwrite", true)
-                    } else if name.eq_ignore_ascii_case("STDERR") {
+                    } else if constant.name.value().eq_ignore_ascii_case("STDERR") {
                         ("fwrite", false)
                     } else {
                         return;

@@ -10,15 +10,15 @@ use crate::internal::checker::returns_generator;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_method(
-    method: &Method,
+pub fn check_method<'ast, 'arena>(
+    method: &'ast Method<'arena>,
     method_name: &str,
     class_like_span: Span,
     class_like_name: &str,
     class_like_fqcn: &str,
     class_like_kind: &str,
     class_like_is_interface: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let mut last_static: Option<Span> = None;
     let mut last_final: Option<Span> = None;
@@ -178,7 +178,7 @@ pub fn check_method(
                 }
             }
             Modifier::PrivateSet(k) | Modifier::ProtectedSet(k) | Modifier::PublicSet(k) => {
-                let modifier_name = context.interner.lookup(&k.value);
+                let modifier_name = k.value;
 
                 context.report(
                     Issue::error(format!("`{modifier_name}` modifier is not allowed on methods"))

@@ -6,9 +6,12 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameterList, context: &mut Context<'_>) {
+pub fn check_parameter_list(
+    function_like_parameter_list: &FunctionLikeParameterList,
+    context: &mut Context<'_, '_, '_>,
+) {
     let mut last_variadic = None;
-    let mut parameters_seen = vec![];
+    let mut parameters_seen: Vec<(&str, Span)> = vec![];
     for parameter in function_like_parameter_list.parameters.iter() {
         if parameter.is_promoted_property() && !context.version.is_supported(Feature::PromotedProperties) {
             context.report(
@@ -18,9 +21,9 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
             );
         }
 
-        let name = context.interner.lookup(&parameter.variable.name);
+        let name = parameter.variable.name;
         if let Some(prev_span) =
-            parameters_seen.iter().find_map(|(n, s)| if parameter.variable.name.eq(n) { Some(s) } else { None })
+            parameters_seen.iter().find_map(|(n, s)| if parameter.variable.name.eq(*n) { Some(s) } else { None })
         {
             context.report(
                 Issue::error(format!("Parameter `{name}` is already defined."))
@@ -44,20 +47,16 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
             match &modifier {
                 Modifier::Static(keyword) | Modifier::Final(keyword) | Modifier::Abstract(keyword) => {
                     context.report(
-                        Issue::error(format!(
-                            "Parameter `{}` cannot have the `{}` modifier.",
-                            name,
-                            context.interner.lookup(&keyword.value)
-                        ))
-                        .with_annotation(Annotation::primary(modifier.span()).with_message(format!(
-                            "Invalid `{}` modifier used here.",
-                            context.interner.lookup(&keyword.value)
-                        )))
-                        .with_annotation(
-                            Annotation::secondary(parameter.variable.span)
-                                .with_message(format!("Parameter `{name}` defined here.")),
-                        )
-                        .with_help("Remove the invalid modifier from the parameter."),
+                        Issue::error(format!("Parameter `{}` cannot have the `{}` modifier.", name, keyword.value))
+                            .with_annotation(
+                                Annotation::primary(modifier.span())
+                                    .with_message(format!("Invalid `{}` modifier used here.", keyword.value)),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(parameter.variable.span)
+                                    .with_message(format!("Parameter `{name}` defined here.")),
+                            )
+                            .with_help("Remove the invalid modifier from the parameter."),
                     );
                 }
                 Modifier::Readonly(_) => {
@@ -119,17 +118,14 @@ pub fn check_parameter_list(function_like_parameter_list: &FunctionLikeParameter
         if let Some((n, s)) = last_variadic {
             context.report(
                 Issue::error(format!(
-                    "Invalid parameter order: parameter `{}` is defined after variadic parameter `{}`.",
-                    name,
-                    context.interner.lookup(&n)
+                    "Invalid parameter order: parameter `{name}` is defined after variadic parameter `{n}`.",
                 ))
                 .with_annotation(
                     Annotation::primary(parameter.variable.span())
                         .with_message(format!("Parameter `{name}` is defined here.")),
                 )
                 .with_annotation(
-                    Annotation::secondary(s)
-                        .with_message(format!("Variadic parameter `{}` is defined here.", context.interner.lookup(&n))),
+                    Annotation::secondary(s).with_message(format!("Variadic parameter `{n}` is defined here.")),
                 )
                 .with_help("Move all parameters following the variadic parameter to the end of the parameter list."),
             );

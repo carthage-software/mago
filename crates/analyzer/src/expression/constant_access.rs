@@ -14,37 +14,37 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for ConstantAccess {
-    fn analyze(
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
+    fn analyze<'ctx>(
         &self,
-        context: &mut Context<'_>,
-        _block_context: &mut BlockContext,
+        context: &mut Context<'ctx, 'arena>,
+        _block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let name = context.resolved_names.get(self);
+        let name_id = context.interner.intern(name);
         let unqualified_name = self.name.value();
+        let unqualified_name_id = context.interner.intern(unqualified_name);
 
-        let constant_metadata = get_constant(context.codebase, context.interner, name)
-            .or_else(|| get_constant(context.codebase, context.interner, unqualified_name));
+        let constant_metadata = get_constant(context.codebase, context.interner, &name_id)
+            .or_else(|| get_constant(context.codebase, context.interner, &unqualified_name_id));
 
         let Some(constant_metadata) = constant_metadata else {
-            let constant_name = context.interner.lookup(name);
-
             context.collector.report_with_code(
                 IssueCode::NonExistentConstant,
                 Issue::error(format!(
-                    "Undefined constant: `{constant_name}`."
+                    "Undefined constant: `{name}`."
                 ))
                 .with_annotation(
                     Annotation::primary(self.span())
-                        .with_message(format!("Constant `{constant_name}` is not defined."))
+                        .with_message(format!("Constant `{name}` is not defined."))
                 )
                 .with_note(
                     "The constant might be misspelled, not defined, or not imported."
                 )
                 .with_help(
                     format!(
-                        "Define the constant `{constant_name}` using `define()` or `const`, or check for typos and ensure it's available in this scope."
+                        "Define the constant `{name}` using `define()` or `const`, or check for typos and ensure it's available in this scope."
                     )
                 ),
             );
@@ -53,14 +53,12 @@ impl Analyzable for ConstantAccess {
         };
 
         if constant_metadata.flags.is_deprecated() {
-            let constant_name = context.interner.lookup(name);
-
             context.collector.report_with_code(
                 IssueCode::DeprecatedConstant,
-                Issue::warning(format!("Using deprecated constant: `{constant_name}`."))
+                Issue::warning(format!("Using deprecated constant: `{name}`."))
                     .with_annotation(Annotation::primary(self.span()).with_message("This constant is deprecated."))
                     .with_note("Consider using an alternative constant or variable.")
-                    .with_help("Check `{constant_name}` documentation for alternatives or updates."),
+                    .with_help("Check `{name}` documentation for alternatives or updates."),
             );
         }
 

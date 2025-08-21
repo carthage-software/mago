@@ -7,10 +7,10 @@ use crate::internal::checker::expression::check_for_new_without_parenthesis;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_access(access: &Access, context: &mut Context<'_>) {
+pub fn check_access(access: &Access, context: &mut Context<'_, '_, '_>) {
     match access {
         Access::Property(property_access) => {
-            check_for_new_without_parenthesis(&property_access.object, context, "property access");
+            check_for_new_without_parenthesis(property_access.object, context, "property access");
         }
         Access::NullSafeProperty(null_safe_access) => {
             if !context.version.is_supported(Feature::NullSafeOperator) {
@@ -24,7 +24,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_>) {
                 );
             }
 
-            check_for_new_without_parenthesis(&null_safe_access.object, context, "nullsafe property access");
+            check_for_new_without_parenthesis(null_safe_access.object, context, "nullsafe property access");
         }
         Access::ClassConstant(class_constant_access) => {
             if context.version.is_supported(Feature::AccessClassOnObject) {
@@ -33,7 +33,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_>) {
 
             // If the class is an identifier, static, self, or parent, it's fine.
             if let Expression::Identifier(_) | Expression::Static(_) | Expression::Self_(_) | Expression::Parent(_) =
-                class_constant_access.class.as_ref()
+                class_constant_access.class
             {
                 return;
             }
@@ -44,7 +44,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_>) {
             };
 
             // If the constant is not `class`, we don't care.
-            let value = context.interner.lookup(&local_identifier.value);
+            let value = local_identifier.value;
             if !value.eq_ignore_ascii_case("class") {
                 return;
             }

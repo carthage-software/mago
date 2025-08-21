@@ -90,7 +90,7 @@ impl LintRule for ExplicitNullableParamRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::FunctionLikeParameter(function_like_parameter) = node else {
             return;
         };
@@ -111,7 +111,7 @@ impl LintRule for ExplicitNullableParamRule {
             return;
         };
 
-        let parameter_name = ctx.lookup(&function_like_parameter.variable.name);
+        let parameter_name = function_like_parameter.variable.name;
 
         let issue = Issue::new(
             self.cfg.level(),

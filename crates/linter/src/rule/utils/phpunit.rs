@@ -1,8 +1,6 @@
 use mago_syntax::ast::*;
 use mago_syntax::utils::reference::*;
 
-use crate::context::LintContext;
-
 pub const TESTING_METHODS: [&str; 57] = [
     "anything",
     "arrayHasKey",
@@ -240,40 +238,36 @@ pub const ASSERTION_METHODS: [&str; 173] = [
 ];
 
 #[inline]
-pub fn find_all_assertion_references_in_method<'a>(
-    method: &'a Method,
-    context: &LintContext<'_>,
-) -> Vec<MethodReference<'a>> {
-    find_assertion_references_in_method(method, context, &ASSERTION_METHODS)
+pub fn find_all_assertion_references_in_method<'ast, 'arena>(
+    method: &'ast Method<'arena>,
+) -> Vec<MethodReference<'ast, 'arena>> {
+    find_assertion_references_in_method(method, &ASSERTION_METHODS)
 }
 
 #[inline]
-pub fn find_testing_or_assertion_references_in_method<'a>(
-    method: &'a Method,
-    context: &LintContext<'_>,
-) -> Vec<MethodReference<'a>> {
+pub fn find_testing_or_assertion_references_in_method<'ast, 'arena>(
+    method: &'ast Method<'arena>,
+) -> Vec<MethodReference<'ast, 'arena>> {
     find_assertion_references_in_method(
         method,
-        context,
         ASSERTION_METHODS.into_iter().chain(TESTING_METHODS).collect::<Vec<_>>().as_slice(),
     )
 }
 
 #[inline]
-pub fn find_assertion_references_in_method<'a>(
-    method: &'a Method,
-    context: &LintContext<'_>,
+pub fn find_assertion_references_in_method<'ast, 'arena>(
+    method: &'ast Method<'arena>,
     method_names: &[&str],
-) -> Vec<MethodReference<'a>> {
+) -> Vec<MethodReference<'ast, 'arena>> {
     let MethodBody::Concrete(block) = &method.body else {
-        return vec![];
+        return Vec::new();
     };
 
     find_method_references_in_block(block, &|reference| {
         let class_or_object = reference.get_class_or_object();
 
         if let Expression::Variable(Variable::Direct(variable)) = class_or_object {
-            if context.lookup(&variable.name) != "$this" {
+            if !variable.name.eq("$this") {
                 return false;
             }
         } else if !matches!(class_or_object, Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_)) {
@@ -284,8 +278,6 @@ pub fn find_assertion_references_in_method<'a>(
             return false;
         };
 
-        let name = context.lookup(&identifier.value);
-
-        method_names.iter().any(|&method_name| name.eq_ignore_ascii_case(method_name))
+        method_names.iter().any(|&method_name| identifier.value.eq_ignore_ascii_case(method_name))
     })
 }

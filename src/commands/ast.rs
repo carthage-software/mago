@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use bumpalo::Bump;
 use clap::Parser;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -9,7 +10,6 @@ use mago_names::resolver::NameResolver;
 use serde_json::json;
 use termtree::Tree;
 
-use mago_interner::ThreadedInterner;
 use mago_reporting::Issue;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
@@ -81,18 +81,16 @@ pub struct AstCommand {
 ///
 /// An error is returned if the file does not exist or is not readable.
 pub fn execute(command: AstCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    // Initialize interner and source manager.
-    let interner = ThreadedInterner::new();
+    let bump = Bump::new();
     let file = File::read(&configuration.source.workspace, &command.file, FileType::Host)?;
 
     // Parse the source file into an AST.
-    let (ast, error) = parse_file(&interner, &file);
+    let (ast, error) = parse_file(&bump, &file);
 
     let has_error = error.is_some();
     if command.json {
         // Prepare and display JSON output.
         let result = json!({
-            "interner": interner.all().into_iter().collect::<Vec<_>>(),
             "program": ast,
             "error": error.map(|e| Into::<Issue>::into(&e)),
         });
@@ -105,12 +103,10 @@ pub fn execute(command: AstCommand, configuration: Configuration) -> Result<Exit
         println!("{tree}");
 
         if command.include_names {
-            let resolver = NameResolver::new(&interner);
+            let resolver = NameResolver::new(&bump);
             let names = resolver.resolve(&ast);
 
-            for (position, (value, is_imported)) in names.all() {
-                let name = interner.lookup(value);
-
+            for (position, (name, is_imported)) in names.all() {
                 println!("{}: {}{}", position, name, if *is_imported { " (imported)" } else { "" });
             }
         }
@@ -136,7 +132,7 @@ pub fn execute(command: AstCommand, configuration: Configuration) -> Result<Exit
 /// # Returns
 ///
 /// A `Tree` representation of the AST node and its children.
-fn node_to_tree(node: Node<'_>) -> Tree<NodeKind> {
+fn node_to_tree(node: Node<'_, '_>) -> Tree<NodeKind> {
     let mut tree = Tree::new(node.kind());
     for child in node.children() {
         tree.push(node_to_tree(child));

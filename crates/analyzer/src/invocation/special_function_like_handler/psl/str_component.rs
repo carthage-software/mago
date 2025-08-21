@@ -14,13 +14,13 @@ use crate::invocation::special_function_like_handler::utils::get_argument;
 pub struct StrComponentFunctionsHandler;
 
 impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
-    fn get_return_type<'a>(
+    fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'a>,
-        _block_context: &BlockContext<'a>,
+        _context: &mut Context<'ctx, 'arena>,
+        _block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
-        invocation: &Invocation,
+        invocation: &Invocation<'ctx, 'ast, 'arena>,
     ) -> Option<TUnion> {
         match function_like_name {
             "psl\\str\\after"
@@ -47,7 +47,7 @@ impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
             | "psl\\str\\grapheme\\before_ci"
             | "psl\\str\\grapheme\\before_last"
             | "psl\\str\\grapheme\\before_last_ci" => {
-                let haystack = get_argument(context, invocation.arguments_source, 0, vec!["haystack"])?;
+                let haystack = get_argument(invocation.arguments_source, 0, vec!["haystack"])?;
                 let haystack_type = artifacts.get_expression_type(haystack)?.get_single_string()?;
 
                 Some(TUnion::from_vec(vec![
@@ -82,7 +82,7 @@ impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
             | "psl\\str\\grapheme\\trim"
             | "psl\\str\\grapheme\\trim_left"
             | "psl\\str\\grapheme\\trim_right" => {
-                let string = get_argument(context, invocation.arguments_source, 0, vec!["string"])?;
+                let string = get_argument(invocation.arguments_source, 0, vec!["string"])?;
                 let string_type = artifacts.get_expression_type(string)?.get_single_string()?;
 
                 Some(if string_type.is_literal_origin() {
@@ -102,8 +102,8 @@ impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
                 })
             }
             "psl\\str\\splice" | "psl\\str\\byte\\splice" | "psl\\str\\grapheme\\splice" => {
-                let string = get_argument(context, invocation.arguments_source, 0, vec!["string"])?;
-                let replacement = get_argument(context, invocation.arguments_source, 1, vec!["replacement"])?;
+                let string = get_argument(invocation.arguments_source, 0, vec!["string"])?;
+                let replacement = get_argument(invocation.arguments_source, 1, vec!["replacement"])?;
 
                 let string_type = artifacts.get_expression_type(string)?.get_single_string()?;
                 let replacement_type = artifacts.get_expression_type(replacement)?.get_single_string()?;
@@ -125,7 +125,7 @@ impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
                 })
             }
             "psl\\str\\lowercase" | "psl\\str\\byte\\lowercase" | "psl\\str\\grapheme\\lowercase" => {
-                let string = get_argument(context, invocation.arguments_source, 0, vec!["string"])?;
+                let string = get_argument(invocation.arguments_source, 0, vec!["string"])?;
                 let string_type = artifacts.get_expression_type(string)?.get_single_string()?;
 
                 Some(match string_type.literal {
@@ -146,7 +146,7 @@ impl SpecialFunctionLikeHandlerTrait for StrComponentFunctionsHandler {
                 })
             }
             "psl\\str\\uppercase" | "psl\\str\\byte\\uppercase" | "psl\\str\\grapheme\\uppercase" => {
-                let string = get_argument(context, invocation.arguments_source, 0, vec!["string"])?;
+                let string = get_argument(invocation.arguments_source, 0, vec!["string"])?;
                 let string_type = artifacts.get_expression_type(string)?.get_single_string()?;
 
                 Some(match string_type.literal {

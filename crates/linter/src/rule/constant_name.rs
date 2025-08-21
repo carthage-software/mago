@@ -95,11 +95,11 @@ impl LintRule for ConstantNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Constant(constant) => {
                 for item in constant.items.iter() {
-                    let name = ctx.lookup(&item.name.value);
+                    let name = item.name.value;
                     if !is_constant_case(name) {
                         ctx.collector.report(
                             Issue::new(
@@ -125,7 +125,7 @@ impl LintRule for ConstantNameRule {
             }
             Node::ClassLikeConstant(class_like_constant) => {
                 for item in class_like_constant.items.iter() {
-                    let name = ctx.lookup(&item.name.value);
+                    let name = item.name.value;
 
                     if !is_constant_case(name) {
                         ctx.collector.report(

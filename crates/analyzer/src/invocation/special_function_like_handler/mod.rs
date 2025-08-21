@@ -17,21 +17,21 @@ mod standard;
 mod utils;
 
 trait SpecialFunctionLikeHandlerTrait {
-    fn get_return_type<'a>(
+    fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'a>,
-        block_context: &BlockContext<'a>,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
-        invocation: &Invocation,
+        invocation: &Invocation<'ctx, 'ast, 'arena>,
     ) -> Option<TUnion>;
 }
 
-pub fn handle_special_functions<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn handle_special_functions<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
-    invocation: &Invocation,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
 ) -> Option<TUnion> {
     const HANDLERS: &[&dyn SpecialFunctionLikeHandlerTrait] = &[
         // Core function handlers

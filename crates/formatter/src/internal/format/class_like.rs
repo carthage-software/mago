@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -22,13 +24,13 @@ enum ClassLikeMemberKind {
     Method,
 }
 
-pub fn print_class_like_body<'a>(
-    f: &mut FormatterState<'a>,
-    left_brace: &'a Span,
-    class_like_members: &'a Sequence<ClassLikeMember>,
-    right_brace: &'a Span,
+pub fn print_class_like_body<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    left_brace: &'ast Span,
+    class_like_members: &'ast Sequence<'arena, ClassLikeMember<'arena>>,
+    right_brace: &'ast Span,
     anonymous_class_signature_id: Option<GroupIdentifier>,
-) -> Document<'a> {
+) -> Document<'arena> {
     let is_body_empty = block_is_empty(f, left_brace, right_brace);
     let should_inline = is_body_empty
         && if anonymous_class_signature_id.is_some() {
@@ -39,7 +41,7 @@ pub fn print_class_like_body<'a>(
 
     let length = class_like_members.len();
     let class_like_members = {
-        let mut contents = vec![];
+        let mut contents = vec![in f.arena;];
         contents.push(Document::String("{"));
         if let Some(c) = f.print_trailing_comments(*left_brace) {
             contents.push(c);
@@ -48,7 +50,7 @@ pub fn print_class_like_body<'a>(
         if length != 0 {
             let mut last_member_kind = None;
             let mut last_has_line_after = false;
-            let mut members = vec![Document::Line(Line::hard())];
+            let mut members = vec![in f.arena; Document::Line(Line::hard())];
             for (i, item) in class_like_members.iter().enumerate() {
                 let member_kind = match item {
                     ClassLikeMember::TraitUse(_) => ClassLikeMemberKind::TraitUse,
@@ -102,6 +104,7 @@ pub fn print_class_like_body<'a>(
     };
 
     Document::Group(Group::new(vec![
+        in f.arena;
         if should_inline {
             Document::space()
         } else {
@@ -110,15 +113,16 @@ pub fn print_class_like_body<'a>(
                     BraceStyle::SameLine => Document::space(),
                     BraceStyle::NextLine => Document::IfBreak(
                         IfBreak::new(
+                            f.arena,
                             Document::space(),
-                            Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
+                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                         )
                         .with_id(signature_id),
                     ),
                 },
                 None => match f.settings.classlike_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![Document::Line(Line::hard()), Document::BreakParent]),
+                    BraceStyle::NextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                 },
             }
         },
@@ -128,7 +132,7 @@ pub fn print_class_like_body<'a>(
 
 #[inline]
 fn should_add_empty_line_before(
-    f: &mut FormatterState<'_>,
+    f: &mut FormatterState<'_, '_, '_>,
     class_like_member_kind: ClassLikeMemberKind,
     last_class_like_member_kind: Option<ClassLikeMemberKind>,
 ) -> bool {
@@ -143,7 +147,10 @@ fn should_add_empty_line_before(
 }
 
 #[inline]
-const fn should_add_empty_line_after(f: &mut FormatterState<'_>, class_like_member_kind: ClassLikeMemberKind) -> bool {
+const fn should_add_empty_line_after(
+    f: &mut FormatterState<'_, '_, '_>,
+    class_like_member_kind: ClassLikeMemberKind,
+) -> bool {
     match class_like_member_kind {
         ClassLikeMemberKind::TraitUse => f.settings.empty_line_after_trait_use,
         ClassLikeMemberKind::Constant => f.settings.empty_line_after_class_like_constant,

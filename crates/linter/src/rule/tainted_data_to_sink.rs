@@ -90,7 +90,7 @@ impl LintRule for TaintedDataToSinkRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Echo(echo) => {
                 for value in echo.values.iter() {
@@ -98,7 +98,7 @@ impl LintRule for TaintedDataToSinkRule {
                 }
             }
             Node::PrintConstruct(print_construct) => {
-                self.check_tainted_data_to_sink(ctx, print_construct.print.span, &print_construct.value);
+                self.check_tainted_data_to_sink(ctx, print_construct.print.span, print_construct.value);
             }
             Node::FunctionCall(function_call) => {
                 let sinks = self.cfg.known_sink_functions.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
@@ -116,8 +116,13 @@ impl LintRule for TaintedDataToSinkRule {
 }
 
 impl TaintedDataToSinkRule {
-    fn check_tainted_data_to_sink(&self, ctx: &mut LintContext, used_in: Span, value: &Expression) {
-        if !is_user_input(ctx, value) {
+    fn check_tainted_data_to_sink<'ast, 'arena>(
+        &self,
+        ctx: &mut LintContext<'_, 'ast, 'arena>,
+        used_in: Span,
+        value: &'ast Expression<'arena>,
+    ) {
+        if !is_user_input(value) {
             return;
         }
 

@@ -53,7 +53,7 @@ pub fn function_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner,
 /// The lookup for the namespace part of the constant name is case-insensitive,
 /// but the constant name itself is case-sensitive, matching PHP's behavior.
 pub fn constant_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = lower_constant_name(interner, id);
+    let lowered_id = lower_constant_name(interner, interner.lookup(id));
     codebase.constants.contains_key(&lowered_id)
 }
 
@@ -304,7 +304,7 @@ pub fn get_constant<'a>(
     interner: &ThreadedInterner,
     id: &StringIdentifier,
 ) -> Option<&'a ConstantMetadata> {
-    let lowered_id = lower_constant_name(interner, id);
+    let lowered_id = lower_constant_name(interner, interner.lookup(id));
 
     codebase.constants.get(&lowered_id)
 }
@@ -773,13 +773,12 @@ pub fn get_class_constant_type<'a>(
 ///
 /// For example, `My\Namespace\MY_CONST` becomes `my\namespace\MY_CONST`. This is necessary because
 /// PHP constant lookups are case-insensitive for the namespace but case-sensitive for the final constant name.
-fn lower_constant_name(interner: &ThreadedInterner, name: &StringIdentifier) -> StringIdentifier {
-    let name_str = interner.lookup(name);
-    if !name_str.contains('\\') {
-        return *name;
+fn lower_constant_name(interner: &ThreadedInterner, name: &str) -> StringIdentifier {
+    if !name.contains('\\') {
+        return interner.intern(name);
     }
 
-    let mut parts: Vec<_> = name_str.split('\\').map(str::to_owned).collect();
+    let mut parts: Vec<_> = name.split('\\').map(str::to_owned).collect();
     let total_parts = parts.len();
     if total_parts > 1 {
         parts = parts

@@ -86,7 +86,7 @@ impl LintRule for StrictTypesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -95,9 +95,7 @@ impl LintRule for StrictTypesRule {
         for statement in program.statements.iter() {
             if let Statement::Declare(declare) = statement {
                 for item in declare.items.iter() {
-                    let name = ctx.lookup(&item.name.value);
-
-                    if name != STRICT_TYPES_DIRECTIVE {
+                    if item.name.value != STRICT_TYPES_DIRECTIVE {
                         continue;
                     }
 

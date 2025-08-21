@@ -10,52 +10,41 @@ use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_literal(stream: &mut TokenStream<'_, '_>) -> Result<Literal, ParseError> {
+pub fn parse_literal<'arena>(stream: &mut TokenStream<'arena>) -> Result<Literal<'arena>, ParseError> {
     let token = utils::expect_any(stream)?;
 
     Ok(match &token.kind {
-        T![LiteralFloat] => {
-            let source = stream.interner().lookup(&token.value);
-
-            Literal::Float(LiteralFloat {
-                span: token.span,
-                raw: token.value,
-                value: OrderedFloat(parse_literal_float(source).unwrap_or_else(|| {
-                    unreachable!("lexer generated invalid float `{}`; this should never happen.", source)
-                })),
-            })
-        }
-        T![LiteralInteger] => {
-            let source = stream.interner().lookup(&token.value);
-
-            Literal::Integer(LiteralInteger {
-                span: token.span,
-                raw: token.value,
-                value: parse_literal_integer(source),
-            })
-        }
+        T![LiteralFloat] => Literal::Float(LiteralFloat {
+            span: token.span,
+            raw: token.value,
+            value: OrderedFloat(parse_literal_float(token.value).unwrap_or_else(|| {
+                unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
+            })),
+        }),
+        T![LiteralInteger] => Literal::Integer(LiteralInteger {
+            span: token.span,
+            raw: token.value,
+            value: parse_literal_integer(token.value),
+        }),
         T!["true"] => Literal::True(utils::to_keyword(token)),
         T!["false"] => Literal::False(utils::to_keyword(token)),
         T!["null"] => Literal::Null(utils::to_keyword(token)),
-        T![LiteralString] => {
-            let value = stream.interner().lookup(&token.value);
-
-            Literal::String(LiteralString {
-                kind: Some(if value.starts_with('"') {
-                    LiteralStringKind::DoubleQuoted
-                } else {
-                    LiteralStringKind::SingleQuoted
-                }),
-                span: token.span,
-                raw: token.value,
-                value: parse_literal_string(value, None, true),
-            })
-        }
+        T![LiteralString] => Literal::String(LiteralString {
+            kind: Some(if token.value.starts_with('"') {
+                LiteralStringKind::DoubleQuoted
+            } else {
+                LiteralStringKind::SingleQuoted
+            }),
+            span: token.span,
+            raw: token.value,
+            value: parse_literal_string(token.value, None, true).map(|s| stream.str(&s)),
+        }),
         T![PartialLiteralString] => {
-            let value = stream.interner().lookup(&token.value);
-
-            let kind =
-                if value.starts_with('"') { LiteralStringKind::DoubleQuoted } else { LiteralStringKind::SingleQuoted };
+            let kind = if token.value.starts_with('"') {
+                LiteralStringKind::DoubleQuoted
+            } else {
+                LiteralStringKind::SingleQuoted
+            };
 
             return Err(ParseError::UnclosedLiteralString(kind, token.span));
         }

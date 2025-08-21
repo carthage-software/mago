@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_for_new_without_parenthesis(object_expr: &Expression, context: &mut Context<'_>, operation: &str) {
+pub fn check_for_new_without_parenthesis(object_expr: &Expression, context: &mut Context<'_, '_, '_>, operation: &str) {
     if context.version.is_supported(Feature::NewWithoutParentheses) {
         return;
     }
@@ -27,7 +27,7 @@ pub fn check_for_new_without_parenthesis(object_expr: &Expression, context: &mut
 }
 
 #[inline]
-pub fn check_unary_prefix_operator(unary_prefix_operator: &UnaryPrefixOperator, context: &mut Context<'_>) {
+pub fn check_unary_prefix_operator(unary_prefix_operator: &UnaryPrefixOperator, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::UnsetCast)
         && let UnaryPrefixOperator::UnsetCast(span, _) = unary_prefix_operator
     {

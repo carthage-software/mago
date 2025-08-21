@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -16,24 +14,24 @@ use crate::ast::sequence::Sequence;
 /// ```php
 /// final class Foo {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Modifier {
-    Static(Keyword),
-    Final(Keyword),
-    Abstract(Keyword),
-    Readonly(Keyword),
-    Public(Keyword),
-    PublicSet(Keyword),
-    Protected(Keyword),
-    ProtectedSet(Keyword),
-    Private(Keyword),
-    PrivateSet(Keyword),
+#[repr(u8)]
+pub enum Modifier<'arena> {
+    Static(Keyword<'arena>),
+    Final(Keyword<'arena>),
+    Abstract(Keyword<'arena>),
+    Readonly(Keyword<'arena>),
+    Public(Keyword<'arena>),
+    PublicSet(Keyword<'arena>),
+    Protected(Keyword<'arena>),
+    ProtectedSet(Keyword<'arena>),
+    Private(Keyword<'arena>),
+    PrivateSet(Keyword<'arena>),
 }
 
-impl Modifier {
-    pub fn get_keyword(&self) -> &Keyword {
+impl<'arena> Modifier<'arena> {
+    pub fn get_keyword(&self) -> &Keyword<'arena> {
         match self {
             Modifier::Static(k) => k,
             Modifier::Final(k) => k,
@@ -120,24 +118,9 @@ impl Modifier {
     pub const fn is_private_set(&self) -> bool {
         matches!(self, Modifier::PrivateSet(..))
     }
-
-    pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
-        match self {
-            Modifier::Static(k) => interner.lookup(&k.value),
-            Modifier::Final(k) => interner.lookup(&k.value),
-            Modifier::Abstract(k) => interner.lookup(&k.value),
-            Modifier::Readonly(k) => interner.lookup(&k.value),
-            Modifier::Public(k) => interner.lookup(&k.value),
-            Modifier::Protected(k) => interner.lookup(&k.value),
-            Modifier::Private(k) => interner.lookup(&k.value),
-            Modifier::PrivateSet(k) => interner.lookup(&k.value),
-            Modifier::ProtectedSet(k) => interner.lookup(&k.value),
-            Modifier::PublicSet(k) => interner.lookup(&k.value),
-        }
-    }
 }
 
-impl HasSpan for Modifier {
+impl HasSpan for Modifier<'_> {
     fn span(&self) -> Span {
         match self {
             Modifier::Static(value)
@@ -154,9 +137,9 @@ impl HasSpan for Modifier {
     }
 }
 
-impl Sequence<Modifier> {
+impl<'arena> Sequence<'arena, Modifier<'arena>> {
     /// Returns the first abstract modifier in the sequence, if any.
-    pub fn get_static(&self) -> Option<&Modifier> {
+    pub fn get_static(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Static(..)))
     }
 
@@ -166,7 +149,7 @@ impl Sequence<Modifier> {
     }
 
     /// Return the first final modifier in the sequence, if any.
-    pub fn get_final(&self) -> Option<&Modifier> {
+    pub fn get_final(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Final(_)))
     }
 
@@ -176,7 +159,7 @@ impl Sequence<Modifier> {
     }
 
     /// Returns the first abstract modifier in the sequence, if any.
-    pub fn get_abstract(&self) -> Option<&Modifier> {
+    pub fn get_abstract(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Abstract(..)))
     }
 
@@ -186,7 +169,7 @@ impl Sequence<Modifier> {
     }
 
     /// Returns the first abstract modifier in the sequence, if any.
-    pub fn get_readonly(&self) -> Option<&Modifier> {
+    pub fn get_readonly(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Readonly(..)))
     }
 
@@ -195,7 +178,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::Readonly(..)))
     }
 
-    pub fn get_first_visibility(&self) -> Option<&Modifier> {
+    pub fn get_first_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| {
             matches!(
                 modifier,
@@ -209,12 +192,12 @@ impl Sequence<Modifier> {
         })
     }
 
-    pub fn get_first_read_visibility(&self) -> Option<&Modifier> {
+    pub fn get_first_read_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter()
             .find(|modifier| matches!(modifier, Modifier::Public(..) | Modifier::Protected(..) | Modifier::Private(..)))
     }
 
-    pub fn get_first_write_visibility(&self) -> Option<&Modifier> {
+    pub fn get_first_write_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| {
             matches!(modifier, Modifier::PrivateSet(..) | Modifier::ProtectedSet(..) | Modifier::PublicSet(..))
         })
@@ -225,7 +208,7 @@ impl Sequence<Modifier> {
         self.iter().any(Modifier::is_visibility)
     }
 
-    pub fn get_public(&self) -> Option<&Modifier> {
+    pub fn get_public(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Public(..)))
     }
 
@@ -234,7 +217,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::Public(..)))
     }
 
-    pub fn get_protected(&self) -> Option<&Modifier> {
+    pub fn get_protected(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Protected(..)))
     }
 
@@ -243,7 +226,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::Protected(..)))
     }
 
-    pub fn get_private(&self) -> Option<&Modifier> {
+    pub fn get_private(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Private(..)))
     }
 
@@ -252,7 +235,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::Private(..)))
     }
 
-    pub fn get_private_set(&self) -> Option<&Modifier> {
+    pub fn get_private_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::PrivateSet(..)))
     }
 
@@ -260,7 +243,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::PrivateSet(..)))
     }
 
-    pub fn get_protected_set(&self) -> Option<&Modifier> {
+    pub fn get_protected_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::ProtectedSet(..)))
     }
 
@@ -268,7 +251,7 @@ impl Sequence<Modifier> {
         self.iter().any(|modifier| matches!(modifier, Modifier::ProtectedSet(..)))
     }
 
-    pub fn get_public_set(&self) -> Option<&Modifier> {
+    pub fn get_public_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::PublicSet(..)))
     }
 

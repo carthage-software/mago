@@ -55,7 +55,7 @@ pub struct TemplateInferenceViolation {
 }
 
 fn infer_templates_from_input_and_container_types(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     container_type: &TUnion,
     input_type: &TUnion,
     template_result: &mut TemplateResult,
@@ -788,12 +788,12 @@ fn infer_templates_from_input_and_container_types(
     }
 }
 
-pub fn infer_templates_for_method_call(
-    context: &mut Context<'_>,
+pub fn infer_templates_for_method_call<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     object_type: &TNamedObject,
-    method_target_context: &MethodTargetContext,
-    method_metadata: &MethodMetadata,
-    declaring_class_like_metadata: &ClassLikeMetadata,
+    method_target_context: &MethodTargetContext<'ctx>,
+    method_metadata: &'ctx MethodMetadata,
+    declaring_class_like_metadata: &'ctx ClassLikeMetadata,
     template_result: &mut TemplateResult,
 ) {
     if declaring_class_like_metadata.name != method_target_context.class_like_metadata.name {
@@ -872,8 +872,8 @@ pub fn infer_templates_for_method_call(
 /// * `argument_span`: The source code location of the argument, for error reporting.
 /// * `is_callable_argument`: A flag indicating if the argument is a callable, which
 ///   can influence inference strategy.
-pub fn infer_parameter_templates_from_argument(
-    context: &mut Context<'_>,
+pub fn infer_parameter_templates_from_argument<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     parameter_type: &TUnion,
     argument_type: &TUnion,
     template_result: &mut TemplateResult,
@@ -933,8 +933,8 @@ pub fn infer_parameter_templates_from_argument(
 /// * `parameter_type`: The declared type of the parameter (the "container").
 /// * `default_type`: The type of the parameter's default value (the "input").
 /// * `template_result`: The map where inferred template types are stored.
-pub fn infer_parameter_templates_from_default(
-    context: &mut Context<'_>,
+pub fn infer_parameter_templates_from_default<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     parameter_type: &TUnion,
     default_type: &TUnion,
     template_result: &mut TemplateResult,

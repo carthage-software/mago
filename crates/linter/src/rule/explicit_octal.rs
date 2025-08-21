@@ -80,12 +80,12 @@ impl LintRule for ExplicitOctalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::LiteralInteger(literal_integer) = node else {
             return;
         };
 
-        let literal_text = ctx.lookup(&literal_integer.raw);
+        let literal_text = literal_integer.raw;
         if !literal_text.starts_with('0') {
             return;
         }

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -13,33 +12,33 @@ use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Closure {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub r#static: Option<Keyword>,
-    pub function: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Closure<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub r#static: Option<Keyword<'arena>>,
+    pub function: Keyword<'arena>,
     pub ampersand: Option<Span>,
-    pub parameter_list: FunctionLikeParameterList,
-    pub use_clause: Option<ClosureUseClause>,
-    pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
-    pub body: Block,
+    pub parameter_list: FunctionLikeParameterList<'arena>,
+    pub use_clause: Option<ClosureUseClause<'arena>>,
+    pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,
+    pub body: Block<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ClosureUseClause {
-    pub r#use: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClosureUseClause<'arena> {
+    pub r#use: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub variables: TokenSeparatedSequence<ClosureUseClauseVariable>,
+    pub variables: TokenSeparatedSequence<'arena, ClosureUseClauseVariable<'arena>>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ClosureUseClauseVariable {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClosureUseClauseVariable<'arena> {
     pub ampersand: Option<Span>,
-    pub variable: DirectVariable,
+    pub variable: DirectVariable<'arena>,
 }
 
-impl HasSpan for Closure {
+impl HasSpan for Closure<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.body.span());
@@ -53,13 +52,13 @@ impl HasSpan for Closure {
     }
 }
 
-impl HasSpan for ClosureUseClause {
+impl HasSpan for ClosureUseClause<'_> {
     fn span(&self) -> Span {
         Span::between(self.r#use.span(), self.right_parenthesis)
     }
 }
 
-impl HasSpan for ClosureUseClauseVariable {
+impl HasSpan for ClosureUseClauseVariable<'_> {
     fn span(&self) -> Span {
         if let Some(ampersand) = self.ampersand {
             Span::between(ampersand, self.variable.span())

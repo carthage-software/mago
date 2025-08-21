@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -27,11 +26,11 @@ use crate::ast::ast::terminator::Terminator;
 ///
 /// ?>
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Goto {
-    pub goto: Keyword,
-    pub label: LocalIdentifier,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Goto<'arena> {
+    pub goto: Keyword<'arena>,
+    pub label: LocalIdentifier<'arena>,
+    pub terminator: Terminator<'arena>,
 }
 
 /// Represents a Go-To label statement in PHP.
@@ -43,19 +42,19 @@ pub struct Goto {
 ///
 /// foo:
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Label {
-    pub name: LocalIdentifier,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Label<'arena> {
+    pub name: LocalIdentifier<'arena>,
     pub colon: Span,
 }
 
-impl HasSpan for Goto {
+impl HasSpan for Goto<'_> {
     fn span(&self) -> Span {
         Span::between(self.goto.span(), self.terminator.span())
     }
 }
 
-impl HasSpan for Label {
+impl HasSpan for Label<'_> {
     fn span(&self) -> Span {
         Span::between(self.name.span(), self.colon)
     }

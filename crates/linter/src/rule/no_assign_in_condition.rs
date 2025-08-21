@@ -91,18 +91,18 @@ impl LintRule for NoAssignInConditionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let (condition, assignment) = match node {
-            Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(&r#if.condition)),
-            Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(&r#while.condition)),
-            Node::DoWhile(do_while) => (&do_while.condition, get_assignment_from_expression(&do_while.condition)),
+            Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(r#if.condition)),
+            Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(r#while.condition)),
+            Node::DoWhile(do_while) => (&do_while.condition, get_assignment_from_expression(do_while.condition)),
             Node::IfStatementBodyElseIfClause(if_statement_body_else_if_clause) => (
                 &if_statement_body_else_if_clause.condition,
-                get_assignment_from_expression(&if_statement_body_else_if_clause.condition),
+                get_assignment_from_expression(if_statement_body_else_if_clause.condition),
             ),
             Node::IfColonDelimitedBodyElseIfClause(if_colon_delimited_body_else_if_clause) => (
                 &if_colon_delimited_body_else_if_clause.condition,
-                get_assignment_from_expression(&if_colon_delimited_body_else_if_clause.condition),
+                get_assignment_from_expression(if_colon_delimited_body_else_if_clause.condition),
             ),
             _ => return,
         };
@@ -126,9 +126,11 @@ impl LintRule for NoAssignInConditionRule {
 }
 
 #[inline]
-fn get_assignment_from_expression(expression: &Expression) -> Option<&Assignment> {
+fn get_assignment_from_expression<'ast, 'arena>(
+    expression: &'ast Expression<'arena>,
+) -> Option<&'ast Assignment<'arena>> {
     match expression {
-        Expression::Parenthesized(parenthesized) => get_assignment_from_expression(&parenthesized.expression),
+        Expression::Parenthesized(parenthesized) => get_assignment_from_expression(parenthesized.expression),
         Expression::Assignment(assignment) => Some(assignment),
         _ => None,
     }

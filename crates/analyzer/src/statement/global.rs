@@ -17,11 +17,11 @@ use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_variable_id;
 
-impl Analyzable for Global {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         _artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         if block_context.is_global_scope() {
@@ -35,34 +35,34 @@ impl Analyzable for Global {
         }
 
         for variable in self.variables.iter() {
-            if let Some(var_id) = get_variable_id(variable, context.interner) {
-                block_context.locals.insert(var_id, Rc::new(get_mixed()));
+            if let Some(var_id) = get_variable_id(variable) {
+                block_context.locals.insert(var_id.to_owned(), Rc::new(get_mixed()));
             }
         }
 
         for variable in self.variables.iter() {
-            let Some(var_id) = get_variable_id(variable, context.interner) else {
+            let Some(var_id) = get_variable_id(variable) else {
                 continue;
             };
 
             let is_argc_or_argv = var_id == "$argc" || var_id == "$argv";
-            let global_type = get_global_variable_type(&var_id).unwrap_or_else(|| Rc::new(get_mixed()));
+            let global_type = get_global_variable_type(var_id).unwrap_or_else(|| Rc::new(get_mixed()));
 
-            block_context.locals.insert(var_id.clone(), global_type);
+            block_context.locals.insert(var_id.to_owned(), global_type);
 
             if !is_argc_or_argv {
-                block_context.variables_possibly_in_scope.insert(var_id.clone());
+                block_context.variables_possibly_in_scope.insert(var_id.to_owned());
                 block_context.by_reference_constraints.insert(
-                    var_id.clone(),
+                    var_id.to_owned(),
                     ReferenceConstraint::new(variable.span(), ReferenceConstraintSource::Global, None),
                 );
             }
 
-            block_context.references_to_external_scope.insert(var_id.clone());
+            block_context.references_to_external_scope.insert(var_id.to_owned());
 
-            if block_context.references_in_scope.contains_key(&var_id) {
-                block_context.decrement_reference_count(&var_id);
-                block_context.references_in_scope.remove(&var_id);
+            if block_context.references_in_scope.contains_key(var_id) {
+                block_context.decrement_reference_count(var_id);
+                block_context.references_in_scope.remove(var_id);
             }
         }
 

@@ -3,53 +3,53 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-pub(crate) trait Analyzable {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+pub(crate) trait Analyzable<'ast, 'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError>;
 }
 
-impl<T> Analyzable for Box<T>
+impl<'ast, 'arena, T> Analyzable<'ast, 'arena> for Box<T>
 where
-    T: Analyzable,
+    T: Analyzable<'ast, 'arena>,
 {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         (**self).analyze(context, block_context, artifacts)
     }
 }
 
-impl<T> Analyzable for &T
+impl<'ast, 'arena, T> Analyzable<'ast, 'arena> for &T
 where
-    T: Analyzable,
+    T: Analyzable<'ast, 'arena>,
 {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        (**self).analyze(context, block_context, artifacts)
+        (*self).analyze(context, block_context, artifacts)
     }
 }
 
-impl<T> Analyzable for Option<T>
+impl<'ast, 'arena, T> Analyzable<'ast, 'arena> for Option<T>
 where
-    T: Analyzable,
+    T: Analyzable<'ast, 'arena>,
 {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        if let Some(value) = self { value.analyze(context, block_context, artifacts) } else { Ok(()) }
+        if let Some(inner) = self { inner.analyze(context, block_context, artifacts) } else { Ok(()) }
     }
 }

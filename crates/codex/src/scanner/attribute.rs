@@ -8,16 +8,18 @@ use crate::scanner::Context;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_attribute_lists<'ast>(
-    attribute_lists: &'ast Sequence<AttributeList>,
-    context: &'ast mut Context<'_>,
+pub fn scan_attribute_lists<'input, 'ast, 'arena>(
+    attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
+    context: &mut Context<'input, 'ast, 'arena>,
 ) -> Vec<AttributeMetadata> {
     let mut metadata = vec![];
 
     for attribute_list in attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
-            metadata
-                .push(AttributeMetadata { name: *context.resolved_names.get(&attribute.name), span: attribute.span() });
+            metadata.push(AttributeMetadata {
+                name: context.interner.intern(context.resolved_names.get(&attribute.name)),
+                span: attribute.span(),
+            });
         }
     }
 
@@ -25,10 +27,10 @@ pub fn scan_attribute_lists<'ast>(
 }
 
 #[inline]
-pub fn get_attribute_flags<'ast>(
+pub fn get_attribute_flags<'input, 'ast, 'arena>(
     class_like_name: StringIdentifier,
-    attribute_lists: &'ast Sequence<AttributeList>,
-    context: &'ast mut Context<'_>,
+    attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
+    context: &mut Context<'input, 'ast, 'arena>,
 ) -> Option<AttributeFlags> {
     let class_like_name_str = context.interner.lookup(&class_like_name);
     if class_like_name_str.eq_ignore_ascii_case("Attribute") {
@@ -36,7 +38,7 @@ pub fn get_attribute_flags<'ast>(
     }
 
     for attribute in attribute_lists.iter().flat_map(|list| list.attributes.iter()) {
-        let attribute_name = context.interner.lookup(context.resolved_names.get(&attribute.name));
+        let attribute_name = context.resolved_names.get(&attribute.name);
         if !attribute_name.eq_ignore_ascii_case("Attribute") {
             continue;
         }

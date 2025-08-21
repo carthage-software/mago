@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -9,16 +8,16 @@ use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Unset {
-    pub unset: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Unset<'arena> {
+    pub unset: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub values: TokenSeparatedSequence<Expression>,
+    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
     pub right_parenthesis: Span,
-    pub terminator: Terminator,
+    pub terminator: Terminator<'arena>,
 }
 
-impl HasSpan for Unset {
+impl HasSpan for Unset<'_> {
     fn span(&self) -> Span {
         self.unset.span().join(self.terminator.span())
     }

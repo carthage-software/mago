@@ -20,11 +20,11 @@ mod logical;
 mod null_coalesce;
 mod spaceship;
 
-impl Analyzable for Binary {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         match &self.operator {
@@ -75,7 +75,7 @@ impl Analyzable for Binary {
                 self.lhs.analyze(context, block_context, artifacts)?;
 
                 if !matches!(
-                    self.rhs.as_ref(),
+                    self.rhs,
                     Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_)
                 ) {
                     self.rhs.analyze(context, block_context, artifacts)?;

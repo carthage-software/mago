@@ -9,16 +9,18 @@ use crate::parser::internal::identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_optional_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<Option<ArgumentList>, ParseError> {
+pub fn parse_optional_argument_list<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<ArgumentList<'arena>>, ParseError> {
     if utils::peek(stream)?.kind == T!["("] { Ok(Some(parse_argument_list(stream)?)) } else { Ok(None) }
 }
 
-pub fn parse_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<ArgumentList, ParseError> {
+pub fn parse_argument_list<'arena>(stream: &mut TokenStream<'arena>) -> Result<ArgumentList<'arena>, ParseError> {
     Ok(ArgumentList {
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         arguments: {
-            let mut arguments = Vec::new();
-            let mut commas = Vec::new();
+            let mut arguments = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 let next = utils::peek(stream)?;
                 if next.kind == T![")"] {
@@ -46,13 +48,13 @@ pub fn parse_argument_list(stream: &mut TokenStream<'_, '_>) -> Result<ArgumentL
 ///
 /// This is a helper for parsing constructs where an argument list follows an initial expression,
 /// allowing the parser to reuse the standard argument list parsing logic without backtracking.
-pub fn parse_remaining_argument_list(
-    stream: &mut TokenStream<'_, '_>,
+pub fn parse_remaining_argument_list<'arena>(
+    stream: &mut TokenStream<'arena>,
     left_parenthesis: Span,
-    initial_argument: Argument,
-) -> Result<ArgumentList, ParseError> {
-    let mut arguments = vec![initial_argument];
-    let mut commas = Vec::new();
+    initial_argument: Argument<'arena>,
+) -> Result<ArgumentList<'arena>, ParseError> {
+    let mut arguments = stream.new_vec_of(initial_argument);
+    let mut commas = stream.new_vec();
 
     // Loop to parse the rest of the arguments
     loop {
@@ -81,7 +83,7 @@ pub fn parse_remaining_argument_list(
     })
 }
 
-pub fn parse_argument(stream: &mut TokenStream<'_, '_>) -> Result<Argument, ParseError> {
+pub fn parse_argument<'arena>(stream: &mut TokenStream<'arena>) -> Result<Argument<'arena>, ParseError> {
     if utils::peek(stream)?.kind.is_identifier_maybe_reserved()
         && matches!(utils::maybe_peek_nth(stream, 1)?.map(|token| token.kind), Some(T![":"]))
     {

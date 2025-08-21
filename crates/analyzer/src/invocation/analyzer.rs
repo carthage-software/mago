@@ -49,24 +49,23 @@ use crate::invocation::template_result::refine_template_result_for_function_like
 /// * `invocation` - The invocation being analyzed.
 /// * `calling_class_like` - Optional info about the class context if called via `parent::` etc.
 /// * `template_result` - Stores inferred template types; assumed empty initially, populated during analysis.
-pub fn analyze_invocation<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_invocation<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'_>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     calling_class_like: Option<(StringIdentifier, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
     parameter_types: &mut HashMap<StringIdentifier, TUnion>,
 ) -> Result<(), AnalysisError> {
-    fn get_parameter_of_argument<'r>(
-        context: &Context<'_>,
-        parameters: &[InvocationTargetParameter<'r>],
-        argument: &InvocationArgument<'_>,
+    fn get_parameter_of_argument<'invocation, 'ctx, 'ast, 'arena>(
+        context: &Context<'ctx, 'arena>,
+        parameters: &[InvocationTargetParameter<'invocation>],
+        argument: &InvocationArgument<'ast, 'arena>,
         mut argument_offset: usize,
-    ) -> Option<(usize, InvocationTargetParameter<'r>)> {
+    ) -> Option<(usize, InvocationTargetParameter<'invocation>)> {
         if let Some(named_argument) = argument.get_named_argument() {
-            let argument_name_str = context.interner.lookup(&named_argument.name.value);
-            let argument_variable_name_str = format!("${argument_name_str}");
+            let argument_variable_name_str = format!("${}", named_argument.name.value);
             let argument_variable_name = context.interner.intern(&argument_variable_name_str);
 
             let named_offset = parameters.iter().position(|parameter| {
@@ -95,9 +94,9 @@ pub fn analyze_invocation<'a>(
     let parameter_refs = invocation.target.get_parameters();
     let mut analyzed_argument_types: HashMap<usize, (TUnion, Span)> = HashMap::default();
 
-    let mut non_closure_arguments: Vec<(usize, InvocationArgument<'_>)> = Vec::new();
-    let mut closure_arguments: Vec<(usize, InvocationArgument<'_>)> = Vec::new();
-    let mut unpacked_arguments: Vec<InvocationArgument<'_>> = Vec::new();
+    let mut non_closure_arguments: Vec<(usize, InvocationArgument<'ast, 'arena>)> = Vec::new();
+    let mut closure_arguments: Vec<(usize, InvocationArgument<'ast, 'arena>)> = Vec::new();
+    let mut unpacked_arguments: Vec<InvocationArgument<'ast, 'arena>> = Vec::new();
     for (offset, argument) in invocation.arguments_source.get_arguments().into_iter().enumerate() {
         if argument.is_unpacked() {
             unpacked_arguments.push(argument);
@@ -253,9 +252,7 @@ pub fn analyze_invocation<'a>(
                         IssueCode::DuplicateNamedArgument,
                         Issue::error(format!(
                             "Duplicate named argument `${}` in call to {} `{}`.",
-                            context.interner.lookup(&named_argument.name.value),
-                            target_kind_str,
-                            target_name_str
+                            named_argument.name.value, target_kind_str, target_name_str
                         ))
                         .with_annotation(
                             Annotation::primary(named_argument.name.span()).with_message("Duplicate argument name"),
@@ -273,7 +270,7 @@ pub fn analyze_invocation<'a>(
                                 IssueCode::NamedArgumentOverridesPositional,
                                 Issue::error(format!(
                                     "Named argument `${}` for {} `{}` targets a parameter already provided positionally.",
-                                    context.interner.lookup(&named_argument.name.value), target_kind_str, target_name_str
+                                    named_argument.name.value, target_kind_str, target_name_str
                                 ))
                                 .with_annotation(Annotation::primary(named_argument.name.span()).with_message("This named argument"))
                                 .with_annotation(Annotation::secondary(*previous_span).with_message("Parameter already filled by positional argument here"))
@@ -284,7 +281,7 @@ pub fn analyze_invocation<'a>(
                                 IssueCode::NamedArgumentAfterPositional,
                                  Issue::warning(format!(
                                     "Named argument `${}` for {} `{}` targets a variadic parameter that has already captured positional arguments.",
-                                    context.interner.lookup(&named_argument.name.value), target_kind_str, target_name_str
+                                    named_argument.name.value, target_kind_str, target_name_str
                                 ))
                                 .with_annotation(Annotation::primary(named_argument.name.span()).with_message("Named argument for variadic parameter"))
                                 .with_annotation(Annotation::secondary(*previous_span).with_message("Positional arguments already captured by variadic here"))
@@ -328,7 +325,7 @@ pub fn analyze_invocation<'a>(
                 &invocation.target,
             );
         } else if let Some(named_argument) = argument.get_named_argument() {
-            let argument_name = context.interner.lookup(&named_argument.name.value);
+            let argument_name = named_argument.name.value;
 
             context.collector.report_with_code(
                 IssueCode::InvalidNamedArgument,
@@ -611,11 +608,11 @@ pub fn analyze_invocation<'a>(
 /// # Returns
 ///
 /// A `TUnion` representing the resolved type of the parameter in the context of the call.
-fn get_parameter_type(
-    context: &Context<'_>,
+fn get_parameter_type<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
     invocation_target_parameter: Option<InvocationTargetParameter<'_>>,
-    base_class_metadata: Option<&ClassLikeMetadata>,
-    calling_class_like_metadata: Option<&ClassLikeMetadata>,
+    base_class_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
 ) -> TUnion {
     let Some(invocation_target_parameter) = invocation_target_parameter else {

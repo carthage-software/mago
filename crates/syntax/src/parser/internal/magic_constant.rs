@@ -5,7 +5,7 @@ use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_magic_constant(stream: &mut TokenStream<'_, '_>) -> Result<MagicConstant, ParseError> {
+pub fn parse_magic_constant<'arena>(stream: &mut TokenStream<'arena>) -> Result<MagicConstant<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {

@@ -43,21 +43,21 @@ impl AttributeTarget {
     }
 }
 
-pub fn analyze_attributes(
-    context: &mut Context<'_>,
-    _block_context: &mut BlockContext<'_>,
+pub fn analyze_attributes<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    _block_context: &mut BlockContext<'ctx>,
     _artifacts: &mut AnalysisArtifacts,
-    attribute_lists: &[AttributeList],
+    attribute_lists: &[AttributeList<'arena>],
     target: AttributeTarget,
 ) -> Result<(), AnalysisError> {
     let attributes = attribute_lists.iter().flat_map(|list| list.attributes.iter()).collect::<Vec<_>>();
 
     let mut used_attributes = HashMap::default();
     for attribute in attributes {
-        let attribute_name = context.resolved_names.get(&attribute.name);
-        let attribute_name_str = context.interner.lookup(attribute_name);
+        let attribute_name_str = context.resolved_names.get(&attribute.name);
+        let attribute_name = context.interner.intern(attribute_name_str);
 
-        let Some(metadata) = get_class_like(context.codebase, context.interner, attribute_name) else {
+        let Some(metadata) = get_class_like(context.codebase, context.interner, &attribute_name) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentAttributeClass,
                 Issue::error(format!("Attribute class `{attribute_name_str}` not found or could not be autoloaded."))
@@ -139,7 +139,7 @@ pub fn analyze_attributes(
             continue;
         };
 
-        if let Some(first_usage_span) = used_attributes.get(attribute_name)
+        if let Some(first_usage_span) = used_attributes.get(&attribute_name)
             && !attribute_flags.is_repeatable()
         {
             context.collector.report_with_code(
@@ -187,10 +187,10 @@ pub fn analyze_attributes(
     Ok(())
 }
 
-fn report_invalid_target(
-    context: &mut Context<'_>,
-    metadata: &ClassLikeMetadata,
-    attribute: &Attribute,
+fn report_invalid_target<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    metadata: &'ctx ClassLikeMetadata,
+    attribute: &Attribute<'arena>,
     target: AttributeTarget,
     flags: AttributeFlags,
 ) {

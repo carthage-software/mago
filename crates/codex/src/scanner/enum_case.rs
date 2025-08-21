@@ -8,7 +8,10 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_enum_case(case: &EnumCase, context: &mut Context<'_>) -> EnumCaseMetadata {
+pub fn scan_enum_case<'input, 'ast, 'arena>(
+    case: &'ast EnumCase<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
+) -> EnumCaseMetadata {
     let span = case.span();
     let attributes = scan_attribute_lists(&case.attribute_lists, context);
 
@@ -21,7 +24,7 @@ pub fn scan_enum_case(case: &EnumCase, context: &mut Context<'_>) -> EnumCaseMet
                 flags |= MetadataFlags::BUILTIN;
             }
 
-            let mut meta = EnumCaseMetadata::new(item.name.value, item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(context.interner.intern(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
             meta.value_type = None;
@@ -35,7 +38,7 @@ pub fn scan_enum_case(case: &EnumCase, context: &mut Context<'_>) -> EnumCaseMet
                 flags |= MetadataFlags::BUILTIN;
             }
 
-            let mut meta = EnumCaseMetadata::new(item.name.value, item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(context.interner.intern(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
             meta.value_type =

@@ -94,7 +94,7 @@ impl LintRule for BlockStatementRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let mut report = |construct_name: &str, construct_span: Span, body_span: Span| {
             let issue = Issue::new(
                 self.cfg.level,
@@ -122,18 +122,18 @@ impl LintRule for BlockStatementRule {
                     return;
                 };
 
-                if !matches!(body.statement.as_ref(), Statement::Block(_)) {
+                if !matches!(body.statement, Statement::Block(_)) {
                     report("if", if_stmt.r#if.span(), body.statement.span());
                 }
 
                 for else_if_clause in body.else_if_clauses.iter() {
-                    if !matches!(else_if_clause.statement.as_ref(), Statement::Block(_)) {
+                    if !matches!(else_if_clause.statement, Statement::Block(_)) {
                         report("else if", else_if_clause.elseif.span(), else_if_clause.statement.span());
                     }
                 }
 
                 if let Some(else_clause) = &body.else_clause
-                    && !matches!(else_clause.statement.as_ref(), Statement::Block(_))
+                    && !matches!(else_clause.statement, Statement::Block(_))
                 {
                     report("else", else_clause.r#else.span(), else_clause.statement.span());
                 }
@@ -143,7 +143,7 @@ impl LintRule for BlockStatementRule {
                     return;
                 };
 
-                if !matches!(statement.as_ref(), Statement::Block(_)) {
+                if !matches!(statement, Statement::Block(_)) {
                     report("for", r#for.r#for.span(), statement.span());
                 }
             }
@@ -152,7 +152,7 @@ impl LintRule for BlockStatementRule {
                     return;
                 };
 
-                if !matches!(statement.as_ref(), Statement::Block(_)) {
+                if !matches!(statement, Statement::Block(_)) {
                     report("foreach", r#foreach.r#foreach.span(), statement.span());
                 }
             }
@@ -161,12 +161,12 @@ impl LintRule for BlockStatementRule {
                     return;
                 };
 
-                if !matches!(statement.as_ref(), Statement::Block(_)) {
+                if !matches!(statement, Statement::Block(_)) {
                     report("while", r#while.r#while.span(), statement.span());
                 }
             }
             Node::DoWhile(do_while) => {
-                if !matches!(do_while.statement.as_ref(), Statement::Block(_)) {
+                if !matches!(do_while.statement, Statement::Block(_)) {
                     report("do-while", do_while.r#do.span(), do_while.statement.span());
                 }
             }

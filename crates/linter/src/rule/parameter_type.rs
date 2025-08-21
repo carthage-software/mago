@@ -94,7 +94,7 @@ impl LintRule for ParameterTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Function(function) => {
                 for parameter in function.parameter_list.parameters.iter() {
@@ -142,17 +142,21 @@ impl ParameterTypeRule {
             return;
         }
 
-        let parameter_name = ctx.lookup(&function_like_parameter.variable.name);
-
         ctx.collector.report(
-            Issue::new(self.cfg.level(), format!("Parameter `{}` is missing a type hint.", parameter_name))
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(function_like_parameter.span())
-                        .with_message(format!("Parameter `{}` is declared here", parameter_name)),
-                )
-                .with_note("Type hints improve code readability and help prevent type-related errors.")
-                .with_help(format!("Consider adding a type hint to parameter `{}`.", parameter_name)),
+            Issue::new(
+                self.cfg.level(),
+                format!("Parameter `{}` is missing a type hint.", function_like_parameter.variable.name),
+            )
+            .with_code(self.meta.code)
+            .with_annotation(
+                Annotation::primary(function_like_parameter.span())
+                    .with_message(format!("Parameter `{}` is declared here", function_like_parameter.variable.name)),
+            )
+            .with_note("Type hints improve code readability and help prevent type-related errors.")
+            .with_help(format!(
+                "Consider adding a type hint to parameter `{}`.",
+                function_like_parameter.variable.name
+            )),
         );
     }
 

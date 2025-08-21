@@ -10,11 +10,11 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for PrintConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for PrintConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_construct_inputs(
@@ -23,7 +23,7 @@ impl Analyzable for PrintConstruct {
             artifacts,
             "print",
             self.print.span,
-            ConstructInput::Expression(&self.value),
+            ConstructInput::Expression(self.value),
             get_string(),
             false,
             false,

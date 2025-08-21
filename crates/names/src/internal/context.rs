@@ -1,5 +1,5 @@
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use bumpalo::Bump;
+
 use mago_syntax::ast::Use;
 
 use crate::kind::NameKind;
@@ -13,21 +13,20 @@ use crate::scope::NamespaceScope;
 ///
 /// It serves as a bridge between the AST walker and the `NamespaceScope`.
 #[derive(Debug)]
-pub struct NameResolutionContext<'a> {
-    interner: &'a ThreadedInterner,
+pub struct NameResolutionContext<'arena> {
+    arena: &'arena Bump,
     scope: NamespaceScope,
 }
 
-impl<'a> NameResolutionContext<'a> {
+impl<'arena> NameResolutionContext<'arena> {
     /// Creates a new `NameResolutionContext`, initialized to the global namespace scope.
     ///
     /// # Arguments
     ///
-    /// * `interner` - A reference to the `ThreadedInterner` to be used throughout
-    ///   the context's lifetime.
-    pub fn new(interner: &'a ThreadedInterner) -> Self {
+    /// * `arena` - A reference to the arena (`Bump`) used for memory allocation.
+    pub fn new(arena: &'arena Bump) -> Self {
         NameResolutionContext {
-            interner,
+            arena,
             // Start in the global scope by default.
             scope: NamespaceScope::global(),
         }
@@ -43,11 +42,9 @@ impl<'a> NameResolutionContext<'a> {
     /// * `namespace` - An `Option<&StringIdentifier>` representing the declared namespace name.
     ///   - `Some(id)`: Enters the namespace identified by `id`.
     ///   - `None`: Enters the global namespace (e.g., from `namespace;`).
-    pub fn enter_namespace(&mut self, namespace: Option<&StringIdentifier>) {
-        match namespace {
-            Some(namespace_id) => {
-                // Look up the string name for the namespace ID.
-                let namespace_name = self.interner.lookup(namespace_id);
+    pub fn enter_namespace(&mut self, namespace_name: Option<&str>) {
+        match namespace_name {
+            Some(namespace_name) => {
                 // Create a new scope specific to this namespace.
                 self.scope = NamespaceScope::for_namespace(namespace_name);
             }
@@ -72,7 +69,7 @@ impl<'a> NameResolutionContext<'a> {
     ///
     /// * `r#use` - The `Use` AST node to process.
     pub fn populate_from_use(&mut self, r#use: &Use) {
-        self.scope.populate_from_use(self.interner, r#use);
+        self.scope.populate_from_use(r#use);
     }
 
     /// Qualifies a simple name identifier relative to the current namespace scope.
@@ -84,14 +81,10 @@ impl<'a> NameResolutionContext<'a> {
     /// # Returns
     ///
     /// The `StringIdentifier` for the potentially qualified name.
-    pub fn qualify_name(&self, name: &StringIdentifier) -> StringIdentifier {
-        // Changed to &self
-        // Convert ID to string
-        let name_str = self.interner.lookup(name);
-        // Qualify the string using the current scope's logic
-        let qualified_str = self.scope.qualify_name(name_str);
-        // Convert the resulting string back to an ID
-        self.interner.intern(qualified_str)
+    pub fn qualify_name(&self, name: &str) -> &'arena str {
+        let qualified_str = self.scope.qualify_name(name);
+
+        self.arena.alloc_str(&qualified_str)
     }
 
     /// Performs full name resolution for a given identifier within the current scope.
@@ -99,7 +92,6 @@ impl<'a> NameResolutionContext<'a> {
     /// # Arguments
     ///
     /// * `kind` - The `NameKind` (Default, Function, Constant) indicating the context.
-    /// * `name_id` - The `StringIdentifier` of the name to resolve.
     ///
     /// # Returns
     ///
@@ -108,16 +100,9 @@ impl<'a> NameResolutionContext<'a> {
     ///  - The `bool` is `true` if resolution occurred via an explicit alias or construct
     ///    (like `\` or `namespace\`), and `false` otherwise (e.g., resolved relative
     ///    to the namespace or returned as-is).
-    pub fn resolve(&self, kind: NameKind, name_id: &StringIdentifier) -> (StringIdentifier, bool) {
-        // Convert input ID to string
-        let name_str = self.interner.lookup(name_id);
+    pub fn resolve<'a>(&self, kind: NameKind, name_str: &'a str) -> (&'arena str, bool) {
+        let (cow, is_imported) = self.scope.resolve_str(kind, name_str);
 
-        // Resolve the string using the current scope's full resolution logic
-        let (resolved_name_str, is_imported) = self.scope.resolve(kind, name_str);
-
-        // Convert the resulting resolved string back to an ID
-        let resolved_name_id = self.interner.intern(resolved_name_str);
-
-        (resolved_name_id, is_imported)
+        (self.arena.alloc_str(&cow), is_imported)
     }
 }

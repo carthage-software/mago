@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -9,54 +8,54 @@ use crate::ast::ast::argument::ArgumentList;
 use crate::ast::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Call {
-    Function(FunctionCall),
-    Method(MethodCall),
-    NullSafeMethod(NullSafeMethodCall),
-    StaticMethod(StaticMethodCall),
+#[repr(u8)]
+pub enum Call<'arena> {
+    Function(FunctionCall<'arena>),
+    Method(MethodCall<'arena>),
+    NullSafeMethod(NullSafeMethodCall<'arena>),
+    StaticMethod(StaticMethodCall<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct FunctionCall {
-    pub function: Box<Expression>,
-    pub argument_list: ArgumentList,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct FunctionCall<'arena> {
+    pub function: &'arena Expression<'arena>,
+    pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct MethodCall {
-    pub object: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct MethodCall<'arena> {
+    pub object: &'arena Expression<'arena>,
     pub arrow: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'arena>,
+    pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct NullSafeMethodCall {
-    pub object: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NullSafeMethodCall<'arena> {
+    pub object: &'arena Expression<'arena>,
     pub question_mark_arrow: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'arena>,
+    pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct StaticMethodCall {
-    pub class: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct StaticMethodCall<'arena> {
+    pub class: &'arena Expression<'arena>,
     pub double_colon: Span,
-    pub method: ClassLikeMemberSelector,
-    pub argument_list: ArgumentList,
+    pub method: ClassLikeMemberSelector<'arena>,
+    pub argument_list: ArgumentList<'arena>,
 }
 
-impl Call {
+impl<'arena> Call<'arena> {
     #[inline]
     pub const fn is_null_safe(&self) -> bool {
         matches!(self, Call::NullSafeMethod(_))
     }
 
     #[inline]
-    pub fn get_argument_list(&self) -> &ArgumentList {
+    pub fn get_argument_list(&self) -> &ArgumentList<'arena> {
         match self {
             Call::Function(f) => &f.argument_list,
             Call::Method(m) => &m.argument_list,
@@ -66,7 +65,7 @@ impl Call {
     }
 }
 
-impl HasSpan for Call {
+impl HasSpan for Call<'_> {
     fn span(&self) -> Span {
         match self {
             Call::Function(f) => f.span(),
@@ -77,25 +76,25 @@ impl HasSpan for Call {
     }
 }
 
-impl HasSpan for FunctionCall {
+impl HasSpan for FunctionCall<'_> {
     fn span(&self) -> Span {
         self.function.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for MethodCall {
+impl HasSpan for MethodCall<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for NullSafeMethodCall {
+impl HasSpan for NullSafeMethodCall<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.argument_list.span())
     }
 }
 
-impl HasSpan for StaticMethodCall {
+impl HasSpan for StaticMethodCall<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.argument_list.span())
     }

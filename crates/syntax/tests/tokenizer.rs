@@ -1,7 +1,7 @@
+use bumpalo::Bump;
 use mago_database::file::FileId;
 use pretty_assertions::assert_eq;
 
-use mago_interner::ThreadedInterner;
 use mago_syntax_core::input::Input;
 
 use mago_syntax::error::SyntaxError;
@@ -1058,9 +1058,9 @@ fn test_use_fully_qualified() -> Result<(), SyntaxError> {
 }
 
 fn test_lexer(code: &[u8], expected_kinds: Vec<TokenKind>) -> Result<(), SyntaxError> {
-    let interner = ThreadedInterner::new();
+    let arena = Bump::new();
     let input = Input::new(FileId::zero(), code);
-    let mut lexer = Lexer::new(&interner, input);
+    let mut lexer = Lexer::new(&arena, input);
 
     let mut tokens = Vec::new();
     let mut error = None;
@@ -1084,7 +1084,7 @@ fn test_lexer(code: &[u8], expected_kinds: Vec<TokenKind>) -> Result<(), SyntaxE
 
     let mut found = String::new();
     for token in tokens.iter() {
-        found.push_str(interner.lookup(&token.value));
+        found.push_str(token.value);
     }
 
     assert_eq!(code, found.as_bytes());

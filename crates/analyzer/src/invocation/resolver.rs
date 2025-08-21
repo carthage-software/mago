@@ -25,9 +25,9 @@ use crate::invocation::Invocation;
 
 /// Resolve a type that resulting from an invocation, this could be the
 /// return type of a function, a `@param-out` type, an assertion type, etc.
-pub fn resolve_invocation_type(
-    context: &Context<'_>,
-    invocation: &Invocation<'_>,
+pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
     invocation_type: TUnion,
@@ -70,9 +70,9 @@ pub fn resolve_invocation_type(
     resolve_union(context, invocation, &template_result, parameters, invocation_type)
 }
 
-fn resolve_union(
-    context: &Context<'_>,
-    invocation: &Invocation<'_>,
+fn resolve_union<'ctx, 'ast, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
     union_to_resolve: TUnion,
@@ -143,9 +143,9 @@ fn resolve_union(
     resulting_union
 }
 
-fn resolve_atomic(
-    context: &Context<'_>,
-    invocation: &Invocation<'_>,
+fn resolve_atomic<'ctx, 'ast, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
     atomic_to_resolve: TAtomic,

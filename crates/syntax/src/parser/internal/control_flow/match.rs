@@ -6,16 +6,20 @@ use crate::parser::internal::expression::parse_expression;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_match(stream: &mut TokenStream<'_, '_>) -> Result<Match, ParseError> {
+pub fn parse_match<'arena>(stream: &mut TokenStream<'arena>) -> Result<Match<'arena>, ParseError> {
     Ok(Match {
         r#match: utils::expect_keyword(stream, T!["match"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        expression: Box::new(parse_expression(stream)?),
+        expression: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         left_brace: utils::expect_span(stream, T!["{"])?,
         arms: {
-            let mut arms = vec![];
-            let mut commas = vec![];
+            let mut arms = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["}"]) {
                     break;
@@ -39,18 +43,20 @@ pub fn parse_match(stream: &mut TokenStream<'_, '_>) -> Result<Match, ParseError
     })
 }
 
-pub fn parse_match_arm(stream: &mut TokenStream<'_, '_>) -> Result<MatchArm, ParseError> {
+pub fn parse_match_arm<'arena>(stream: &mut TokenStream<'arena>) -> Result<MatchArm<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["default"] => MatchArm::Default(parse_match_default_arm(stream)?),
         _ => MatchArm::Expression(parse_match_expression_arm(stream)?),
     })
 }
 
-pub fn parse_match_expression_arm(stream: &mut TokenStream<'_, '_>) -> Result<MatchExpressionArm, ParseError> {
+pub fn parse_match_expression_arm<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<MatchExpressionArm<'arena>, ParseError> {
     Ok(MatchExpressionArm {
         conditions: {
-            let mut conditions = vec![];
-            let mut commas = vec![];
+            let mut conditions = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["=>"]) {
                     break;
@@ -71,14 +77,24 @@ pub fn parse_match_expression_arm(stream: &mut TokenStream<'_, '_>) -> Result<Ma
             TokenSeparatedSequence::new(conditions, commas)
         },
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: Box::new(parse_expression(stream)?),
+        expression: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
     })
 }
 
-pub fn parse_match_default_arm(stream: &mut TokenStream<'_, '_>) -> Result<MatchDefaultArm, ParseError> {
+pub fn parse_match_default_arm<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<MatchDefaultArm<'arena>, ParseError> {
     Ok(MatchDefaultArm {
         default: utils::expect_keyword(stream, T!["default"])?,
         arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: Box::new(parse_expression(stream)?),
+        expression: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
     })
 }

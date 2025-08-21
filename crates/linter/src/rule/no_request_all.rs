@@ -122,33 +122,31 @@ impl LintRule for NoRequestAllRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Block(block) = node else { return };
 
         let request_all_references = find_method_references_in_block(block, &|reference| {
             let ClassLikeMemberSelector::Identifier(method) = reference.get_selector() else { return false };
 
-            if !ctx.lookup(&method.value).eq_ignore_ascii_case(ALL_METHOD) {
+            if !method.value.eq_ignore_ascii_case(ALL_METHOD) {
                 return false;
             }
 
             match reference {
-                MethodReference::MethodCall(method_call) => match method_call.object.as_ref() {
-                    Expression::Variable(Variable::Direct(variable)) => {
-                        ctx.lookup(&variable.name).eq_ignore_ascii_case(REQUEST_VAR)
-                    }
+                MethodReference::MethodCall(method_call) => match method_call.object {
+                    Expression::Variable(Variable::Direct(variable)) => variable.name.eq_ignore_ascii_case(REQUEST_VAR),
                     Expression::Call(Call::Function(call)) if call.argument_list.arguments.is_empty() => {
                         function_call_matches(ctx, call, REQUEST_HELPER)
                     }
                     _ => false,
                 },
                 MethodReference::StaticMethodCall(static_method_call) => {
-                    let Expression::Identifier(identifier) = static_method_call.class.as_ref() else { return false };
+                    let Expression::Identifier(identifier) = static_method_call.class else { return false };
                     let fqcn = ctx.lookup_name(identifier);
 
                     fqcn.eq_ignore_ascii_case(REQUEST_FACADE)
                         || fqcn.eq_ignore_ascii_case(REQUEST_FQCN)
-                        || ctx.lookup(identifier.value()).eq_ignore_ascii_case(REQUEST_CLASS)
+                        || identifier.value().eq_ignore_ascii_case(REQUEST_CLASS)
                 }
                 _ => false,
             }

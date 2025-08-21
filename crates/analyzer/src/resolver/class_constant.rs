@@ -48,12 +48,12 @@ pub struct ConstantResolutionResult {
 }
 
 /// Resolves all possible class constants from a class expression and a constant selector.
-pub fn resolve_class_constants<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    class_expr: &Expression,
-    constant_selector: &ClassLikeConstantSelector,
+    class_expr: &'ast Expression<'arena>,
+    constant_selector: &'ast ClassLikeConstantSelector<'arena>,
     class_expr_is_analyzed: bool,
 ) -> Result<ConstantResolutionResult, AnalysisError> {
     let mut result = ConstantResolutionResult::default();
@@ -140,13 +140,13 @@ pub fn resolve_class_constants<'a>(
 }
 
 /// Specific handler for the `::class` magic constant.
-fn handle_class_magic_constant(
-    context: &mut Context,
-    block_context: &mut BlockContext,
+fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_resolution: &ResolvedClassname,
-    class_expr: &Expression,
-    selector: &ClassLikeConstantSelector,
+    class_expr: &'ast Expression<'arena>,
+    selector: &'ast ClassLikeConstantSelector<'arena>,
 ) -> Option<TUnion> {
     if matches!(class_resolution.origin, ResolutionOrigin::AnyString) {
         context.collector.report_with_code(
@@ -182,9 +182,9 @@ fn handle_class_magic_constant(
 }
 
 /// Finds a constant or enum case by name within a class.
-fn find_constant_in_class(
-    context: &mut Context,
-    metadata: &ClassLikeMetadata,
+fn find_constant_in_class<'ctx>(
+    context: &mut Context<'ctx, '_>,
+    metadata: &'ctx ClassLikeMetadata,
     const_name: StringIdentifier,
     class_span: Span,
     const_span: Span,
@@ -215,7 +215,7 @@ fn find_constant_in_class(
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.
-fn report_non_existent_class(context: &mut Context, class_id: &StringIdentifier, class_span: Span) {
+fn report_non_existent_class(context: &mut Context<'_, '_>, class_id: &StringIdentifier, class_span: Span) {
     let class_name_str = context.interner.lookup(class_id);
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
@@ -230,9 +230,9 @@ fn report_non_existent_class(context: &mut Context, class_id: &StringIdentifier,
     );
 }
 
-fn report_non_existent_constant(
-    context: &mut Context,
-    metadata: &ClassLikeMetadata,
+fn report_non_existent_constant<'ctx>(
+    context: &mut Context<'ctx, '_>,
+    metadata: &'ctx ClassLikeMetadata,
     const_name: StringIdentifier,
     class_span: Span,
     const_span: Span,
@@ -270,7 +270,10 @@ fn report_non_existent_constant(
 }
 
 /// Reports a warning when a constant is accessed on an ambiguous type like `object` or `class-string`.
-fn report_ambiguous_constant_access(context: &mut Context, class_expr: &Expression) {
+fn report_ambiguous_constant_access<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_expr: &'ast Expression<'arena>,
+) {
     context.collector.report_with_code(
         IssueCode::AmbiguousClassLikeConstantAccess,
         Issue::warning("Cannot reliably determine class for constant access due to an ambiguous type.")

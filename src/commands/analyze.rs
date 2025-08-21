@@ -71,5 +71,5 @@ pub fn execute(command: AnalyzeCommand, configuration: Configuration) -> Result<
     let mut issues = analysis_results.issues;
     issues.filter_out_ignored(&configuration.analyzer.ignore);
 
-    command.reporting.process_issues(issues, configuration, interner, database)
+    command.reporting.process_issues(issues, configuration, database)
 }

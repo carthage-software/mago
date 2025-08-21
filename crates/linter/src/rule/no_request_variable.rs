@@ -79,13 +79,12 @@ impl LintRule for NoRequestVariableRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::DirectVariable(direct_variable) = node else {
             return;
         };
 
-        let name = ctx.interner.lookup(&direct_variable.name);
-        if !REQUEST_VARIABLE.eq(name) {
+        if !REQUEST_VARIABLE.eq(direct_variable.name) {
             return;
         }
 

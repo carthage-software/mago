@@ -1,5 +1,8 @@
+use bumpalo::Bump;
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
+
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_span::Span;
 use mago_syntax::ast::Trivia;
 use mago_syntax::comments::comment_lines;
@@ -65,7 +68,7 @@ impl PragmaKind {
     }
 }
 
-impl<'a> Pragma<'a> {
+impl<'arena> Pragma<'arena> {
     /// Extracts and returns all pragmas from a slice of trivia that match the specified category.
     ///
     /// This function scans all comments in the trivia, calculates the precise span for each
@@ -75,7 +78,6 @@ impl<'a> Pragma<'a> {
     ///
     /// - `file`: The source file being analyzed.
     /// - `trivias`: The slice of trivia (comments and whitespace) to scan.
-    /// - `interner`: The interner for string resolution.
     /// - `category`: The category of pragmas to collect (e.g., "lint", "analysis"), or
     ///   `None` to collect all pragmas regardless of category.
     ///
@@ -83,30 +85,30 @@ impl<'a> Pragma<'a> {
     ///
     /// A vector of `Pragma` structs, each containing a parsed pragma and its precise location.
     pub fn extract(
+        arena: &'arena Bump,
         file: &File,
-        trivias: &[Trivia],
-        interner: &'a ThreadedInterner,
+        trivias: &[Trivia<'arena>],
         category: Option<&'static str>,
-    ) -> Vec<Pragma<'a>> {
+    ) -> Vec<'arena, Pragma<'arena>> {
         trivias
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
-            .flat_map(|trivia| parse_pragmas_in_trivia(file, trivia, interner, category))
-            .collect()
+            .flat_map(|trivia| parse_pragmas_in_trivia(arena, file, trivia, category))
+            .collect_in(arena)
     }
 }
 
 /// Parses all pragmas within a single trivia (comment) node.
-fn parse_pragmas_in_trivia<'a>(
+fn parse_pragmas_in_trivia<'arena>(
+    arena: &'arena Bump,
     file: &File,
-    trivia: &Trivia,
-    interner: &'a ThreadedInterner,
+    trivia: &Trivia<'arena>,
     category_filter: Option<&'static str>,
-) -> Vec<Pragma<'a>> {
-    let mut pragmas = Vec::new();
+) -> Vec<'arena, Pragma<'arena>> {
+    let mut pragmas: Vec<'arena, Pragma<'arena>> = Vec::new_in(arena);
     let base_offset = trivia.span.start;
 
-    for (line_offset_in_trivia, line) in comment_lines(trivia, interner) {
+    for (line_offset_in_trivia, line) in comment_lines(trivia) {
         let absolute_line_start = base_offset + line_offset_in_trivia;
         let trimmed = line.trim_start();
         let leading_whitespace = line.len() - trimmed.len();

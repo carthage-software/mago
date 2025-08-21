@@ -1,4 +1,4 @@
-use mago_interner::ThreadedInterner;
+use bumpalo::Bump;
 use mago_syntax::ast::Program;
 use mago_syntax::walker::MutWalker;
 
@@ -9,18 +9,17 @@ use crate::internal::walker::NameWalker;
 /// Orchestrates the process of resolving names within a PHP Abstract Syntax Tree (AST).
 ///
 /// This struct acts as the main entry point for the name resolution pass.
-/// It requires a string interner to efficiently handle string lookups during
-/// the AST traversal.
+/// It requires an arena to store resolved names.
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct NameResolver<'i> {
-    interner: &'i ThreadedInterner,
+pub struct NameResolver<'arena> {
+    arena: &'arena Bump,
 }
 
-impl<'i> NameResolver<'i> {
+impl<'arena> NameResolver<'arena> {
     /// Creates a new `NameResolver` instance.
-    pub fn new(interner: &'i ThreadedInterner) -> Self {
-        Self { interner }
+    pub fn new(arena: &'arena Bump) -> Self {
+        NameResolver { arena }
     }
 
     /// Resolves names within the provided PHP AST `Program`.
@@ -34,8 +33,8 @@ impl<'i> NameResolver<'i> {
     ///
     /// A `ResolvedNames` struct containing the mapping of original names/nodes
     /// to their resolved fully qualified names.
-    pub fn resolve(&self, program: &Program) -> ResolvedNames {
-        let mut context = NameResolutionContext::new(self.interner);
+    pub fn resolve<'ast>(&self, program: &'ast Program<'arena>) -> ResolvedNames<'arena> {
+        let mut context = NameResolutionContext::new(self.arena);
         let mut walker = NameWalker::default();
 
         walker.walk_program(program, &mut context);

@@ -1,9 +1,8 @@
-use mago_php_version::PHPVersion;
-use mago_php_version::feature::Feature;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
+use mago_php_version::PHPVersion;
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -48,53 +47,53 @@ use crate::ast::ast::variable::Variable;
 use crate::ast::ast::r#yield::Yield;
 use crate::ast::node::NodeKind;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Parenthesized {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Parenthesized<'arena> {
     pub left_parenthesis: Span,
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Expression {
-    Binary(Binary),
-    UnaryPrefix(UnaryPrefix),
-    UnaryPostfix(UnaryPostfix),
-    Parenthesized(Parenthesized),
-    Literal(Literal),
-    CompositeString(CompositeString),
-    Assignment(Assignment),
-    Conditional(Conditional),
-    Array(Array),
-    LegacyArray(LegacyArray),
-    List(List),
-    ArrayAccess(ArrayAccess),
-    ArrayAppend(ArrayAppend),
-    AnonymousClass(AnonymousClass),
-    Closure(Closure),
-    ArrowFunction(ArrowFunction),
-    Variable(Variable),
-    ConstantAccess(ConstantAccess),
-    Identifier(Identifier),
-    Match(Match),
-    Yield(Yield),
-    Construct(Construct),
-    Throw(Throw),
-    Clone(Clone),
-    Call(Call),
-    Access(Access),
-    ClosureCreation(ClosureCreation),
-    Parent(Keyword),
-    Static(Keyword),
-    Self_(Keyword),
-    Instantiation(Instantiation),
-    MagicConstant(MagicConstant),
-    Pipe(Pipe),
+#[repr(u8)]
+pub enum Expression<'arena> {
+    Binary(Binary<'arena>),
+    UnaryPrefix(UnaryPrefix<'arena>),
+    UnaryPostfix(UnaryPostfix<'arena>),
+    Parenthesized(Parenthesized<'arena>),
+    Literal(Literal<'arena>),
+    CompositeString(CompositeString<'arena>),
+    Assignment(Assignment<'arena>),
+    Conditional(Conditional<'arena>),
+    Array(Array<'arena>),
+    LegacyArray(LegacyArray<'arena>),
+    List(List<'arena>),
+    ArrayAccess(ArrayAccess<'arena>),
+    ArrayAppend(ArrayAppend<'arena>),
+    AnonymousClass(AnonymousClass<'arena>),
+    Closure(Closure<'arena>),
+    ArrowFunction(ArrowFunction<'arena>),
+    Variable(Variable<'arena>),
+    ConstantAccess(ConstantAccess<'arena>),
+    Identifier(Identifier<'arena>),
+    Match(Match<'arena>),
+    Yield(Yield<'arena>),
+    Construct(Construct<'arena>),
+    Throw(Throw<'arena>),
+    Clone(Clone<'arena>),
+    Call(Call<'arena>),
+    Access(Access<'arena>),
+    ClosureCreation(ClosureCreation<'arena>),
+    Parent(Keyword<'arena>),
+    Static(Keyword<'arena>),
+    Self_(Keyword<'arena>),
+    Instantiation(Instantiation<'arena>),
+    MagicConstant(MagicConstant<'arena>),
+    Pipe(Pipe<'arena>),
 }
 
-impl Expression {
+impl<'arena> Expression<'arena> {
     pub fn is_constant(&self, version: &PHPVersion, initialization: bool) -> bool {
         match &self {
             Self::Binary(operation) => {
@@ -227,12 +226,12 @@ impl Expression {
     }
 
     #[inline]
-    pub const fn unparenthesized(&self) -> &Expression {
-        if let Expression::Parenthesized(expression) = self { &expression.expression } else { self }
+    pub const fn unparenthesized(&self) -> &Expression<'arena> {
+        if let Expression::Parenthesized(expression) = self { expression.expression } else { self }
     }
 
     #[inline]
-    pub fn is_assignment(&self) -> bool {
+    pub const fn is_assignment(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_assignment()
         } else {
@@ -324,7 +323,7 @@ impl Expression {
     }
 
     #[inline]
-    pub const fn is_literal(&self) -> bool {
+    pub fn is_literal(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_literal()
         } else {
@@ -333,7 +332,7 @@ impl Expression {
     }
 
     #[inline]
-    pub const fn is_string_literal(&self) -> bool {
+    pub fn is_string_literal(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_string_literal()
         } else {
@@ -342,7 +341,7 @@ impl Expression {
     }
 
     #[inline]
-    pub const fn is_referenceable(&self, include_calls: bool) -> bool {
+    pub fn is_referenceable(&self, include_calls: bool) -> bool {
         match self {
             Expression::Variable(_) => true,
             Expression::ArrayAccess(array_access) => array_access.array.is_referenceable(include_calls),
@@ -354,7 +353,7 @@ impl Expression {
     }
 
     #[inline]
-    pub fn get_array_like_elements(&self) -> Option<&[ArrayElement]> {
+    pub fn get_array_like_elements(&self) -> Option<&[ArrayElement<'arena>]> {
         match self {
             Expression::Parenthesized(expression) => expression.expression.get_array_like_elements(),
             Expression::Array(array) => Some(array.elements.as_slice()),
@@ -404,13 +403,13 @@ impl Expression {
     }
 }
 
-impl HasSpan for Parenthesized {
+impl HasSpan for Parenthesized<'_> {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for Expression {
+impl HasSpan for Expression<'_> {
     fn span(&self) -> Span {
         match &self {
             Expression::Binary(expression) => expression.span(),

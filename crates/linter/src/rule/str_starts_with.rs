@@ -94,7 +94,7 @@ impl LintRule for StrStartsWithRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -108,7 +108,7 @@ impl LintRule for StrStartsWithRule {
         };
 
         // if one side is `0` and the other is a `strpos($a, $b)` call, we can suggest using `str_starts_with($a, $b)`
-        let (left, call) = match (binary.lhs.as_ref(), binary.rhs.as_ref()) {
+        let (left, call) = match (binary.lhs, binary.rhs) {
             (
                 Expression::Literal(Literal::Integer(LiteralInteger { value: Some(0), .. })),
                 Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),

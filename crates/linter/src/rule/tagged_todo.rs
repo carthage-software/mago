@@ -88,7 +88,7 @@ impl LintRule for TaggedTodoRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -98,7 +98,7 @@ impl LintRule for TaggedTodoRule {
                 continue;
             }
 
-            for (_, line) in comment_lines(trivia, ctx.interner) {
+            for (_, line) in comment_lines(trivia) {
                 let trimmied = line.trim_start().to_lowercase();
                 if !trimmied.starts_with("todo") {
                     continue;

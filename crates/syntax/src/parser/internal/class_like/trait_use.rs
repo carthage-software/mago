@@ -10,12 +10,12 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_trait_use(stream: &mut TokenStream<'_, '_>) -> Result<TraitUse, ParseError> {
+pub fn parse_trait_use<'arena>(stream: &mut TokenStream<'arena>) -> Result<TraitUse<'arena>, ParseError> {
     Ok(TraitUse {
         r#use: utils::expect_keyword(stream, T!["use"])?,
         trait_names: {
-            let mut traits = Vec::new();
-            let mut commas = Vec::new();
+            let mut traits = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 let next = utils::peek(stream)?;
                 if matches!(next.kind, T!["{" | ";" | "?>"]) {
@@ -40,14 +40,16 @@ pub fn parse_trait_use(stream: &mut TokenStream<'_, '_>) -> Result<TraitUse, Par
     })
 }
 
-pub fn parse_trait_use_specification(stream: &mut TokenStream<'_, '_>) -> Result<TraitUseSpecification, ParseError> {
+pub fn parse_trait_use_specification<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TraitUseSpecification<'arena>, ParseError> {
     let next = utils::peek(stream)?;
     Ok(match next.kind {
         T![";" | "?>"] => TraitUseSpecification::Abstract(TraitUseAbstractSpecification(parse_terminator(stream)?)),
         _ => TraitUseSpecification::Concrete(TraitUseConcreteSpecification {
             left_brace: utils::expect_span(stream, T!["{"])?,
             adaptations: {
-                let mut adaptations = Vec::new();
+                let mut adaptations = stream.new_vec();
                 loop {
                     let next = utils::peek(stream)?;
                     if next.kind == T!["}"] {
@@ -63,7 +65,9 @@ pub fn parse_trait_use_specification(stream: &mut TokenStream<'_, '_>) -> Result
     })
 }
 
-pub fn parse_trait_use_adaptation(stream: &mut TokenStream<'_, '_>) -> Result<TraitUseAdaptation, ParseError> {
+pub fn parse_trait_use_adaptation<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TraitUseAdaptation<'arena>, ParseError> {
     Ok(match parse_trait_use_method_reference(stream)? {
         TraitUseMethodReference::Absolute(reference) => {
             let next = utils::peek(stream)?;
@@ -82,8 +86,8 @@ pub fn parse_trait_use_adaptation(stream: &mut TokenStream<'_, '_>) -> Result<Tr
                     method_reference: reference,
                     insteadof: utils::expect_any_keyword(stream)?,
                     trait_names: {
-                        let mut items = Vec::new();
-                        let mut commas = Vec::new();
+                        let mut items = stream.new_vec();
+                        let mut commas = stream.new_vec();
                         loop {
                             if matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {
                                 break;
@@ -123,18 +127,18 @@ pub fn parse_trait_use_adaptation(stream: &mut TokenStream<'_, '_>) -> Result<Tr
     })
 }
 
-pub fn parse_trait_use_method_reference(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<TraitUseMethodReference, ParseError> {
+pub fn parse_trait_use_method_reference<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TraitUseMethodReference<'arena>, ParseError> {
     Ok(match utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind) {
         Some(T!["::"]) => TraitUseMethodReference::Absolute(parse_trait_use_absolute_method_reference(stream)?),
         _ => TraitUseMethodReference::Identifier(parse_local_identifier(stream)?),
     })
 }
 
-pub fn parse_trait_use_absolute_method_reference(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<TraitUseAbsoluteMethodReference, ParseError> {
+pub fn parse_trait_use_absolute_method_reference<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TraitUseAbsoluteMethodReference<'arena>, ParseError> {
     Ok(TraitUseAbsoluteMethodReference {
         trait_name: parse_identifier(stream)?,
         double_colon: utils::expect_span(stream, T!["::"])?,

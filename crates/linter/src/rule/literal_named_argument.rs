@@ -90,7 +90,7 @@ impl LintRule for LiteralNamedArgumentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::PositionalArgument(positional_argument) = node else {
             return;
         };
@@ -100,9 +100,9 @@ impl LintRule for LiteralNamedArgumentRule {
         };
 
         let literal_value = match literal {
-            Literal::String(lit_str) => ctx.interner.lookup(&lit_str.raw),
-            Literal::Integer(lit_int) => ctx.interner.lookup(&lit_int.raw),
-            Literal::Float(lit_float) => ctx.interner.lookup(&lit_float.raw),
+            Literal::String(lit_str) => lit_str.raw,
+            Literal::Integer(lit_int) => lit_int.raw,
+            Literal::Float(lit_float) => lit_float.raw,
             Literal::True(_) => "true",
             Literal::False(_) => "false",
             Literal::Null(_) => "null",

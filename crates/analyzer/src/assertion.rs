@@ -29,7 +29,7 @@ pub enum OtherValuePosition {
 pub fn scrape_assertions(
     expression: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
 
@@ -72,7 +72,7 @@ pub fn scrape_assertions(
                 // the lhs is non-null.
                 Call::NullSafeMethod(null_safe_method_call) => {
                     let object_var_id = get_expression_id(
-                        &null_safe_method_call.object,
+                        null_safe_method_call.object,
                         assertion_context.this_class_name,
                         assertion_context.resolved_names,
                         assertion_context.interner,
@@ -89,7 +89,7 @@ pub fn scrape_assertions(
         Expression::Construct(construct) => match construct {
             Construct::Empty(empty_construct) => {
                 let Some(value_id) = get_expression_id(
-                    &empty_construct.value,
+                    empty_construct.value,
                     assertion_context.this_class_name,
                     assertion_context.resolved_names,
                     assertion_context.interner,
@@ -98,7 +98,7 @@ pub fn scrape_assertions(
                     return vec![];
                 };
 
-                if let Expression::Variable(variable) = empty_construct.value.as_ref()
+                if let Expression::Variable(variable) = empty_construct.value
                     && let Some(expression_type) = artifacts.get_expression_type(variable)
                     && !expression_type.is_mixed()
                     && !expression_type.possibly_undefined
@@ -131,7 +131,8 @@ pub fn scrape_assertions(
                         let mut root_array_id = None;
                         let mut root_array: &Expression = value;
                         while let (None, Expression::ArrayAccess(array_access)) = (root_array_id.as_ref(), root_array) {
-                            root_array = array_access.array.as_ref();
+                            root_array = array_access.array;
+
                             root_array_id = get_expression_id(
                                 root_array,
                                 assertion_context.this_class_name,
@@ -152,27 +153,27 @@ pub fn scrape_assertions(
         Expression::Binary(binary) => match binary.operator {
             BinaryOperator::Equal(_) | BinaryOperator::Identical(_) => {
                 return scrape_equality_assertions(
-                    &binary.lhs,
+                    binary.lhs,
                     binary.operator.is_identity(),
-                    &binary.rhs,
+                    binary.rhs,
                     artifacts,
                     assertion_context,
                 );
             }
             BinaryOperator::NotEqual(_) | BinaryOperator::NotIdentical(_) | BinaryOperator::AngledNotEqual(_) => {
                 return scrape_inequality_assertions(
-                    &binary.lhs,
+                    binary.lhs,
                     &binary.operator,
-                    &binary.rhs,
+                    binary.rhs,
                     artifacts,
                     assertion_context,
                 );
             }
             BinaryOperator::NullCoalesce(_) => {
-                let rhs = unwrap_expression(&binary.rhs);
+                let rhs = unwrap_expression(binary.rhs);
                 if matches!(rhs, Expression::Literal(Literal::Null(_))) {
                     let var_name = get_expression_id(
-                        &binary.lhs,
+                        binary.lhs,
                         assertion_context.this_class_name,
                         assertion_context.resolved_names,
                         assertion_context.interner,
@@ -186,30 +187,30 @@ pub fn scrape_assertions(
             }
             BinaryOperator::GreaterThan(_) | BinaryOperator::GreaterThanOrEqual(_) => {
                 return scrape_greater_than_assertions(
-                    &binary.lhs,
+                    binary.lhs,
                     &binary.operator,
-                    &binary.rhs,
+                    binary.rhs,
                     artifacts,
                     assertion_context,
                 );
             }
             BinaryOperator::LessThan(_) | BinaryOperator::LessThanOrEqual(_) => {
                 return scrape_lesser_than_assertions(
-                    &binary.lhs,
+                    binary.lhs,
                     &binary.operator,
-                    &binary.rhs,
+                    binary.rhs,
                     artifacts,
                     assertion_context,
                 );
             }
             BinaryOperator::Instanceof(_) => {
-                return scrape_instanceof_assertions(&binary.lhs, &binary.rhs, artifacts, assertion_context);
+                return scrape_instanceof_assertions(binary.lhs, binary.rhs, artifacts, assertion_context);
             }
             _ => {}
         },
         Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
             let object_var_id = get_expression_id(
-                &null_safe_property_access.object,
+                null_safe_property_access.object,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 assertion_context.interner,
@@ -257,21 +258,20 @@ fn process_custom_assertions(
 }
 
 fn scrape_special_function_call_assertions(
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     function_call: &FunctionCall,
 ) -> HashMap<String, AssertionSet> {
     let mut if_types = HashMap::default();
 
-    let Expression::Identifier(function_identifier) = function_call.function.as_ref() else {
+    let Expression::Identifier(function_identifier) = function_call.function else {
         return if_types;
     };
 
-    let resolved_function_name_id = assertion_context.resolved_names.get(function_identifier);
-    let resolved_function_name = assertion_context.interner.lookup(resolved_function_name_id);
+    let resolved_function_name = assertion_context.resolved_names.get(function_identifier);
     let function_name = if resolved_function_name.starts_with("is_") || resolved_function_name.starts_with("ctype_") {
         resolved_function_name
     } else if function_identifier.is_local() {
-        assertion_context.interner.lookup(function_identifier.value())
+        function_identifier.value()
     } else {
         return if_types;
     };
@@ -311,9 +311,9 @@ pub(super) fn scrape_equality_assertions(
     is_identity: bool,
     right: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+    match resolve_count_comparison(left, right, artifacts) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -384,9 +384,9 @@ fn scrape_inequality_assertions(
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+    match resolve_count_comparison(left, right, artifacts) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -462,7 +462,7 @@ fn get_empty_array_equality_assertions(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -494,7 +494,7 @@ fn get_empty_array_inequality_assertions(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -525,7 +525,7 @@ fn get_empty_array_inequality_assertions(
 fn get_enum_case_equality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
@@ -556,7 +556,7 @@ fn get_enum_case_equality_assertions(
 fn get_enum_case_inequality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
@@ -587,7 +587,7 @@ fn get_enum_case_inequality_assertions(
 fn get_null_equality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -614,7 +614,7 @@ fn get_null_equality_assertions(
 fn get_null_inequality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -641,7 +641,7 @@ fn get_null_inequality_assertions(
 fn get_false_inquality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -668,7 +668,7 @@ fn get_false_inquality_assertions(
 fn get_true_inquality_assertions(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -697,9 +697,9 @@ fn scrape_lesser_than_assertions(
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+    match resolve_count_comparison(left, right, artifacts) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -853,9 +853,9 @@ fn scrape_greater_than_assertions(
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts, assertion_context) {
+    match resolve_count_comparison(left, right, artifacts) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -1008,7 +1008,7 @@ fn scrape_instanceof_assertions(
     left: &Expression,
     right: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    context: AssertionContext<'_>,
+    context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
 
@@ -1027,7 +1027,9 @@ fn scrape_instanceof_assertions(
 
                 if_types.insert(
                     counter_variable_id,
-                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(*resolved_name))))]],
+                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(
+                        context.interner.intern(resolved_name),
+                    ))))]],
                 );
             }
             Expression::Self_(_) => {
@@ -1108,11 +1110,10 @@ fn resolve_count_comparison(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
 ) -> (Option<i64>, Option<i64>) {
-    if is_count_or_size_of_call(assertion_context, left) {
+    if is_count_or_size_of_call(left) {
         (None, get_expression_integer_value(artifacts, right).and_then(|integer| integer.get_literal_value()))
-    } else if is_count_or_size_of_call(assertion_context, right) {
+    } else if is_count_or_size_of_call(right) {
         (get_expression_integer_value(artifacts, left).and_then(|integer| integer.get_literal_value()), None)
     } else {
         (None, None)
@@ -1134,7 +1135,7 @@ fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expr
         .filter(|integer| !integer.is_unspecified())
 }
 
-fn is_count_or_size_of_call(assertion_context: AssertionContext<'_>, expression: &Expression) -> bool {
+fn is_count_or_size_of_call(expression: &Expression) -> bool {
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
     };
@@ -1143,11 +1144,11 @@ fn is_count_or_size_of_call(assertion_context: AssertionContext<'_>, expression:
         return false;
     }
 
-    let Expression::Identifier(function_identifier) = function.as_ref() else {
+    let Expression::Identifier(function_identifier) = function else {
         return false;
     };
 
-    let func_name = assertion_context.interner.lookup(function_identifier.value());
+    let func_name = function_identifier.value();
 
     func_name.eq_ignore_ascii_case("count") || func_name.eq_ignore_ascii_case("sizeof")
 }
@@ -1157,7 +1158,7 @@ fn get_true_equality_assertions(
     is_identity: bool,
     right: &Expression,
     artifacts: &mut AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -1192,7 +1193,7 @@ pub fn has_typed_value_comparison(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> Option<OtherValuePosition> {
     let left_var_id = get_expression_id(
         left,
@@ -1232,7 +1233,7 @@ fn get_false_equality_assertions(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -1267,7 +1268,7 @@ fn get_typed_value_equality_assertions(
     is_identity: bool,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -1359,7 +1360,7 @@ fn get_typed_value_inequality_assertions(
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
@@ -1443,7 +1444,7 @@ fn get_typed_value_inequality_assertions(
 
 #[inline]
 fn get_first_argument_expression_id(
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     expression: &Expression,
 ) -> Option<String> {
     let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression else {

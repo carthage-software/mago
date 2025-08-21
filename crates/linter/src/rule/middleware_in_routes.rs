@@ -94,7 +94,7 @@ impl LintRule for MiddlewareInRoutesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::MethodCall(call @ MethodCall { object, method, .. }) = node else {
             return;
         };
@@ -103,7 +103,7 @@ impl LintRule for MiddlewareInRoutesRule {
             return;
         }
 
-        if !is_this(ctx, object) || !is_method_named(ctx, method, "middleware") {
+        if !is_this(object) || !is_method_named(method, "middleware") {
             return;
         }
 

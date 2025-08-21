@@ -6,7 +6,10 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_argument_list(argument_list: &ArgumentList, context: &mut Context<'_>) {
+pub fn check_argument_list<'ast, 'arena>(
+    argument_list: &'ast ArgumentList<'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
+) {
     let mut last_named_argument: Option<Span> = None;
     let mut last_unpacking: Option<Span> = None;
 

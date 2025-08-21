@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use bumpalo::Bump;
 use mago_collector::Collector;
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
@@ -29,34 +29,52 @@ pub mod settings;
 const COLLECTOR_CATEGORY: &str = "lint";
 
 #[derive(Debug, Clone)]
-pub struct Linter {
-    interner: ThreadedInterner,
+pub struct Linter<'arena> {
+    arena: &'arena Bump,
     registry: Arc<RuleRegistry>,
     php_version: PHPVersion,
 }
 
-impl Linter {
+impl<'arena> Linter<'arena> {
     /// Creates a new Linter instance.
     ///
     /// # Arguments
     ///
+    /// * `arena` - The bump allocator to use for memory management.
+    /// * `settings` - The settings to use for configuring the linter.
     /// * `only` - If `Some`, only the rules with the specified codes will be loaded.
     ///   If `None`, all rules enabled by the settings will be loaded.
-    pub fn new(interner: ThreadedInterner, settings: Settings, only: Option<&[String]>) -> Self {
-        Self { interner, php_version: settings.php_version, registry: Arc::new(RuleRegistry::build(settings, only)) }
+    pub fn new(arena: &'arena Bump, settings: Settings, only: Option<&[String]>) -> Self {
+        Self { arena, php_version: settings.php_version, registry: Arc::new(RuleRegistry::build(settings, only)) }
+    }
+
+    /// Creates a new Linter instance from an existing RuleRegistry.
+    ///
+    /// # Arguments
+    ///
+    /// * `arena` - The bump allocator to use for memory management.
+    /// * `registry` - The rule registry to use for linting.
+    /// * `php_version` - The PHP version to use for linting.
+    pub fn from_registry(arena: &'arena Bump, registry: Arc<RuleRegistry>, php_version: PHPVersion) -> Self {
+        Self { arena, php_version, registry }
     }
 
     pub fn rules(&self) -> &[AnyRule] {
         self.registry.rules()
     }
 
-    pub fn lint(&self, source_file: &File, program: &Program, resolved_names: &ResolvedNames) -> IssueCollection {
-        let mut collector = Collector::new(source_file, program, &self.interner, COLLECTOR_CATEGORY);
+    pub fn lint<'input, 'ast>(
+        &self,
+        source_file: &'input File,
+        program: &'ast Program<'arena>,
+        resolved_names: &'ast ResolvedNames<'arena>,
+    ) -> IssueCollection {
+        let mut collector = Collector::new(self.arena, source_file, program, COLLECTOR_CATEGORY);
 
         // Set legacy rule code mappings for compatibility with the old linter.
         collector.set_aliases(LEGACY_RULE_CODE_MAPPINGS);
 
-        let mut context = LintContext::new(self.php_version, &self.interner, source_file, resolved_names, collector);
+        let mut context = LintContext::new(self.php_version, self.arena, source_file, resolved_names, collector);
 
         walk(Node::Program(program), &mut context, &self.registry);
 
@@ -64,7 +82,11 @@ impl Linter {
     }
 }
 
-fn walk<'a>(node: Node<'a>, ctx: &mut LintContext<'a>, reg: &RuleRegistry) {
+fn walk<'input, 'ast, 'arena>(
+    node: Node<'ast, 'arena>,
+    ctx: &mut LintContext<'input, 'ast, 'arena>,
+    reg: &RuleRegistry,
+) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);

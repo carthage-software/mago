@@ -12,17 +12,17 @@ use crate::invocation::special_function_like_handler::utils::get_argument;
 pub struct StringFunctionsHandler;
 
 impl SpecialFunctionLikeHandlerTrait for StringFunctionsHandler {
-    fn get_return_type<'a>(
+    fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'a>,
-        _block_context: &BlockContext<'a>,
+        _context: &mut Context<'ctx, 'arena>,
+        _block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
-        invocation: &Invocation,
+        invocation: &Invocation<'ctx, 'ast, 'arena>,
     ) -> Option<TUnion> {
         match function_like_name {
             "strlen" => {
-                let string_argument = get_argument(context, invocation.arguments_source, 0, vec!["string"])?;
+                let string_argument = get_argument(invocation.arguments_source, 0, vec!["string"])?;
                 let string_argument_type = artifacts.get_expression_type(string_argument)?;
                 let string_literal = string_argument_type.get_single_literal_string_value()?;
 

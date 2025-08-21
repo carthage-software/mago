@@ -109,7 +109,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };
@@ -141,7 +141,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
             _ => return,
         };
 
-        if matches_method(&name, &parameters, expression) {
+        if matches_method(name, &parameters, expression) {
             let issue = Issue::new(self.cfg.level(), "Redundant method override.")
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(method.span()))
@@ -159,10 +159,10 @@ impl LintRule for NoRedundantMethodOverrideRule {
     }
 }
 
-fn matches_method(
-    method_name: &mago_interner::StringIdentifier,
-    parameters: &[(bool, mago_interner::StringIdentifier)],
-    expression: &Expression,
+fn matches_method<'arena>(
+    method_name: &'arena str,
+    parameters: &[(bool, &'arena str)],
+    expression: &Expression<'arena>,
 ) -> bool {
     let Expression::Call(Call::StaticMethod(StaticMethodCall { class, method, argument_list: arguments, .. })) =
         expression
@@ -170,7 +170,7 @@ fn matches_method(
         return false;
     };
 
-    if !matches!(class.as_ref(), Expression::Parent(_))
+    if !matches!(class, Expression::Parent(_))
         || !matches!(method, ClassLikeMemberSelector::Identifier(identifier) if identifier.value.eq(method_name))
         || arguments.arguments.len() != parameters.len()
     {
@@ -184,7 +184,7 @@ fn matches_method(
         };
 
         if variadic.eq(is_variadic)
-            || !matches!(value, Expression::Variable(Variable::Direct(variable)) if variable.name.eq(parameter))
+            || !matches!(value, Expression::Variable(Variable::Direct(variable)) if variable.name.eq(*parameter))
         {
             return false;
         }

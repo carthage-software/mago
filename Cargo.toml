@@ -43,7 +43,6 @@ mago-symbol-table = { path = "crates/symbol-table", version = "1.0.0-alpha.12" }
 mago-traverser = { path = "crates/traverser", version = "1.0.0-alpha.12" }
 mago-wasm = { path = "crates/wasm", version = "1.0.0-alpha.12" }
 mago-php-version = { path = "crates/php-version", version = "1.0.0-alpha.12" }
-mago-reference = { path = "crates/reference", version = "1.0.0-alpha.12" }
 mago-analyzer = { path = "crates/analyzer", version = "1.0.0-alpha.12" }
 mago-algebra = { path = "crates/algebra", version = "1.0.0-alpha.12" }
 mago-codex = { path = "crates/codex", version = "1.0.0-alpha.12" }
@@ -96,6 +95,8 @@ glob = "0.3.2"
 walkdir = "2"
 globset = "0.4"
 rayon = "1.10.0"
+bumpalo = { version = "3", features = ["collections", "boxed", "serde"] }
+bumpalo-herd = { version = "0.1.2" }
 
 [dependencies]
 mago-syntax = { workspace = true }
@@ -107,7 +108,6 @@ mago-names = { workspace = true }
 mago-formatter = { workspace = true }
 mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
-mago-reference = { workspace = true }
 mago-composer = { workspace = true }
 mago-semantics = { workspace = true }
 mago-codex = { workspace = true }
@@ -132,6 +132,8 @@ dialoguer = { workspace = true }
 blake3 = { workspace = true }
 rayon = { workspace = true }
 indoc = { workspace = true }
+bumpalo = { workspace = true }
+bumpalo-herd = { workspace = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"

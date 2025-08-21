@@ -13,7 +13,7 @@ use crate::context::block::BlockContext;
 use crate::context::scope::control_action::ControlAction;
 
 #[derive(Clone, Debug, Default)]
-pub struct IfScope<'a> {
+pub struct IfScope<'ctx> {
     pub new_variables: Option<BTreeMap<String, TUnion>>,
     pub new_variables_possibly_in_scope: HashSet<String>,
     pub redefined_variables: Option<HashMap<String, TUnion>>,
@@ -27,10 +27,10 @@ pub struct IfScope<'a> {
     pub reasonable_clauses: Vec<Rc<Clause>>,
     pub final_actions: HashSet<ControlAction>,
     pub if_actions: HashSet<ControlAction>,
-    pub post_leaving_if_context: Option<BlockContext<'a>>,
+    pub post_leaving_if_context: Option<BlockContext<'ctx>>,
 }
 
-impl<'a> IfScope<'a> {
+impl<'ctx> IfScope<'ctx> {
     pub fn new() -> Self {
         Self {
             new_variables: None,

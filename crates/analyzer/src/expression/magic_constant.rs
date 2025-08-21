@@ -16,11 +16,11 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for MagicConstant {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let constant_type = match self {

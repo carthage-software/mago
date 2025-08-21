@@ -82,7 +82,7 @@ impl LintRule for NoRedundantLabelRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(_) = node else {
             return;
         };
@@ -96,12 +96,10 @@ impl LintRule for NoRedundantLabelRule {
 
         let gotos = node.filter_map(|node| if let Node::Goto(goto) = node { Some(goto.label.value) } else { None });
 
-        for (label_id, label_span) in labels.into_iter() {
-            if gotos.contains(&label_id) {
+        for (label_name, label_span) in labels.into_iter() {
+            if gotos.contains(&label_name) {
                 continue;
             }
-
-            let label_name = ctx.interner.lookup(&label_id);
 
             let issue = Issue::new(self.cfg.level(), format!("Redundant goto label `{}`.", label_name))
                 .with_code(self.meta.code)

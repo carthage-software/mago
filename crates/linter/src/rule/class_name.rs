@@ -88,10 +88,10 @@ impl LintRule for ClassNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Class(class) = node else { return };
         let mut issues = vec![];
-        let name = ctx.lookup(&class.name.value);
+        let name = class.name.value;
 
         if !is_class_case(name) {
             let issue = Issue::new(self.cfg.level(), format!("Class name `{}` should be in class case.", name))

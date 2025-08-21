@@ -237,7 +237,7 @@ pub trait LintRule {
 
     fn build(settings: RuleSettings<Self::Config>) -> Self;
 
-    fn check(&self, ctx: &mut LintContext, node: Node);
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>);
 }
 
 macro_rules! define_rules {
@@ -301,7 +301,7 @@ macro_rules! define_rules {
             }
 
             #[inline]
-            pub fn check(&self, ctx: &mut LintContext<'_>, node: Node)  {
+            pub fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>)  {
                 match self {
                     $( AnyRule::$variant(r) => r.check(ctx, node), )*
                 }

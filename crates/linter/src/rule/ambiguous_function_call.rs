@@ -101,7 +101,7 @@ impl LintRule for AmbiguousFunctionCallRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         if ctx.scope.get_namespace().is_empty() {
             return;
         }
@@ -110,7 +110,7 @@ impl LintRule for AmbiguousFunctionCallRule {
             return;
         };
 
-        let Expression::Identifier(identifier) = call.function.as_ref() else {
+        let Expression::Identifier(identifier) = call.function else {
             return;
         };
 
@@ -122,7 +122,7 @@ impl LintRule for AmbiguousFunctionCallRule {
             return;
         }
 
-        let function_name = ctx.interner.lookup(identifier.value());
+        let function_name = identifier.value();
 
         ctx.collector.report(
             Issue::new(self.cfg.level, "Ambiguous function call detected.")

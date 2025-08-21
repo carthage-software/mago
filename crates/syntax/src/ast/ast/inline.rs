@@ -1,12 +1,10 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum InlineKind {
     Text,
@@ -24,14 +22,14 @@ pub enum InlineKind {
 /// ?>
 /// This is another inline text.
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Inline {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Inline<'arena> {
     pub kind: InlineKind,
     pub span: Span,
-    pub value: StringIdentifier,
+    pub value: &'arena str,
 }
 
-impl HasSpan for Inline {
+impl HasSpan for Inline<'_> {
     fn span(&self) -> Span {
         self.span
     }

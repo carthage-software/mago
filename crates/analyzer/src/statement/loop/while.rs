@@ -8,14 +8,14 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::statement::r#loop;
 
-impl Analyzable for While {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let is_while_true = match self.condition.as_ref() {
+        let is_while_true = match self.condition {
             Expression::Literal(literal) => match literal {
                 Literal::True(_) => true,
                 Literal::Integer(integer) => integer.value.is_none_or(|v| v > 0),
@@ -29,7 +29,7 @@ impl Analyzable for While {
             block_context,
             artifacts,
             &[],
-            std::slice::from_ref(&self.condition),
+            std::slice::from_ref(self.condition),
             &[],
             self.body.statements(),
             self.span(),

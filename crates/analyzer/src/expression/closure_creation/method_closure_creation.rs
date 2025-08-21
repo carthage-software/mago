@@ -14,15 +14,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::method::resolve_method_targets;
 
-impl Analyzable for MethodClosureCreation {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodClosureCreation<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let method_resolution =
-            resolve_method_targets(context, block_context, artifacts, &self.object, &self.method, false, self.span())?;
+            resolve_method_targets(context, block_context, artifacts, self.object, &self.method, false, self.span())?;
 
         let mut callables = vec![];
         for resolved_method in method_resolution.resolved_methods {

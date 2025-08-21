@@ -18,11 +18,11 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::assignment;
 
-impl Analyzable for Variable {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Variable<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         match self {
@@ -33,15 +33,14 @@ impl Analyzable for Variable {
     }
 }
 
-impl Analyzable for DirectVariable {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for DirectVariable<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let name = context.interner.lookup(&self.name);
-        let resulting_type = read_variable(context, block_context, artifacts, name, self.span());
+        let resulting_type = read_variable(context, block_context, artifacts, self.name, self.span());
 
         artifacts.set_rc_expression_type(self, resulting_type);
 
@@ -49,11 +48,11 @@ impl Analyzable for DirectVariable {
     }
 }
 
-impl Analyzable for IndirectVariable {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for IndirectVariable<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         self.expression.analyze(context, block_context, artifacts)?;
@@ -78,11 +77,11 @@ impl Analyzable for IndirectVariable {
     }
 }
 
-impl Analyzable for NestedVariable {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         self.variable.analyze(context, block_context, artifacts)?;
@@ -107,9 +106,9 @@ impl Analyzable for NestedVariable {
     }
 }
 
-fn read_variable<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn read_variable<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_name: &str,
     variable_span: Span,
@@ -240,7 +239,7 @@ fn read_variable<'a>(
     variable_type
 }
 
-fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<String> {
+fn find_similar_variable_names<'ctx>(context: &BlockContext<'ctx>, target: &str) -> Vec<String> {
     let mut suggestions: Vec<(usize, &String)> = Vec::new();
 
     for local in context.locals.keys() {

@@ -15,15 +15,15 @@ use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
 use crate::resolver::static_method::resolve_static_method_targets;
 
-impl Analyzable for StaticMethodCall {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let method_resolution =
-            resolve_static_method_targets(context, block_context, artifacts, &self.class, &self.method)?;
+            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method)?;
 
         let mut invocation_targets = vec![];
         for resolved_method in method_resolution.resolved_methods {

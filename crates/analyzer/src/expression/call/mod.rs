@@ -33,11 +33,11 @@ pub mod method_call;
 pub mod pipe;
 pub mod static_method_call;
 
-impl Analyzable for Call {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Call<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         match self {
@@ -49,13 +49,13 @@ impl Analyzable for Call {
     }
 }
 
-fn analyze_invocation_targets<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     mut template_result: TemplateResult,
-    invocation_targets: Vec<InvocationTarget<'a>>,
-    invocation_arguments: InvocationArgumentsSource,
+    invocation_targets: Vec<InvocationTarget<'ctx>>,
+    invocation_arguments: InvocationArgumentsSource<'ast, 'arena>,
     call_span: Span,
     encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
@@ -96,7 +96,7 @@ fn analyze_invocation_targets<'a>(
             }
         }
 
-        let invocation = Invocation::new(target, invocation_arguments, call_span);
+        let invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
         let mut argument_types = HashMap::default();
 
         analyze_invocation(
@@ -185,12 +185,12 @@ fn analyze_invocation_targets<'a>(
     Ok(())
 }
 
-fn get_function_like_target<'a>(
-    context: &mut Context<'a>,
+fn get_function_like_target<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-) -> Result<Option<InvocationTarget<'a>>, AnalysisError> {
+) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
     let mut identifier = function_like;
 
     let metadata = context.codebase.get_function_like(&identifier, context.interner).or_else(|| {
@@ -236,12 +236,12 @@ fn get_function_like_target<'a>(
     Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, method_context: None, span }))
 }
 
-fn inspect_arguments<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn inspect_arguments<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    target: &InvocationTarget<'a>,
-    invocation_arguments: &InvocationArgumentsSource,
+    target: &InvocationTarget<'ctx>,
+    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
 ) -> Result<(), AnalysisError> {
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
@@ -292,12 +292,12 @@ fn inspect_arguments<'a>(
     Ok(())
 }
 
-fn confirm_argument_type<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn confirm_argument_type<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    target: &InvocationTarget<'a>,
-    invocation_arguments: &InvocationArgumentsSource,
+    target: &InvocationTarget<'ctx>,
+    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
 ) -> Result<(), AnalysisError> {
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {

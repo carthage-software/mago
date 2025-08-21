@@ -29,10 +29,10 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 #[inline]
-pub fn analyze_arithmetic_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_arithmetic_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let was_inside_general_use = block_context.inside_general_use;
@@ -482,7 +482,11 @@ pub fn analyze_arithmetic_operation<'a>(
 }
 
 #[inline]
-fn is_arithmetic_compatible_generic<'a>(context: &Context<'a>, union: &TUnion, other_union: &TUnion) -> bool {
+fn is_arithmetic_compatible_generic<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    union: &TUnion,
+    other_union: &TUnion,
+) -> bool {
     if !union.is_single() {
         return false;
     }
@@ -510,11 +514,20 @@ fn is_arithmetic_compatible_generic<'a>(context: &Context<'a>, union: &TUnion, o
 }
 
 #[inline]
-pub fn assign_arithmetic_type(artifacts: &mut AnalysisArtifacts, cond_type: TUnion, binary: &Binary) {
+pub fn assign_arithmetic_type<'ast, 'arena>(
+    artifacts: &mut AnalysisArtifacts,
+    cond_type: TUnion,
+    binary: &'ast Binary<'arena>,
+) {
     artifacts.set_expression_type(binary, cond_type);
 }
 
-fn determine_numeric_result(op: &BinaryOperator, left: &TAtomic, right: &TAtomic, in_loop: bool) -> Vec<TAtomic> {
+fn determine_numeric_result<'ast, 'arena>(
+    op: &'ast BinaryOperator<'arena>,
+    left: &TAtomic,
+    right: &TAtomic,
+    in_loop: bool,
+) -> Vec<TAtomic> {
     if in_loop
         && (matches!(left, TAtomic::Scalar(TScalar::Integer(_)))
             || matches!(right, TAtomic::Scalar(TScalar::Integer(_))))
@@ -568,7 +581,11 @@ fn determine_numeric_result(op: &BinaryOperator, left: &TAtomic, right: &TAtomic
     }
 }
 
-fn calculate_int_arithmetic(op: &BinaryOperator, left: TInteger, right: TInteger) -> Option<TInteger> {
+fn calculate_int_arithmetic<'ast, 'arena>(
+    op: &'ast BinaryOperator<'arena>,
+    left: TInteger,
+    right: TInteger,
+) -> Option<TInteger> {
     use TInteger::*;
 
     let result = match op {

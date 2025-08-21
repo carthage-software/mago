@@ -10,11 +10,11 @@ pub mod function_closure_creation;
 pub mod method_closure_creation;
 pub mod static_method_closure_creation;
 
-impl Analyzable for ClosureCreation {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClosureCreation<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         match self {

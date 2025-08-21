@@ -19,21 +19,16 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::static_property::resolve_static_properties;
 
-pub(crate) fn analyze<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(crate) fn analyze<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    property_access: &StaticPropertyAccess,
+    property_access: &StaticPropertyAccess<'arena>,
     assigned_value_type: &TUnion,
     property_access_id: &Option<String>,
 ) -> Result<(), AnalysisError> {
-    let property_resolution = resolve_static_properties(
-        context,
-        block_context,
-        artifacts,
-        &property_access.class,
-        &property_access.property,
-    )?;
+    let property_resolution =
+        resolve_static_properties(context, block_context, artifacts, property_access.class, &property_access.property)?;
 
     let mut resolved_property_type = None;
     let mut matched_all_properties = true;

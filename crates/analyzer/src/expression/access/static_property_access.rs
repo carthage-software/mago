@@ -14,15 +14,15 @@ use crate::error::AnalysisError;
 use crate::resolver::static_property::resolve_static_properties;
 use crate::utils::expression::get_static_property_access_expression_id;
 
-impl Analyzable for StaticPropertyAccess {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let property_access_id = get_static_property_access_expression_id(
-            &self.class,
+            self.class,
             &self.property,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
@@ -40,7 +40,7 @@ impl Analyzable for StaticPropertyAccess {
         }
 
         let resolution_result =
-            resolve_static_properties(context, block_context, artifacts, &self.class, &self.property)?;
+            resolve_static_properties(context, block_context, artifacts, self.class, &self.property)?;
 
         let mut resulting_expression_type = None;
         if !resolution_result.has_error_path {

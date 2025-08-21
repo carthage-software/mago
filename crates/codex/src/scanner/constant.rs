@@ -13,7 +13,10 @@ use crate::scanner::docblock::ConstantDocblockComment;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<ConstantMetadata> {
+pub fn scan_constant<'input, 'ast, 'arena>(
+    constant: &'ast Constant<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
+) -> Vec<ConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let docblock = ConstantDocblockComment::create(context, constant);
 
@@ -66,12 +69,15 @@ pub fn scan_constant(constant: &Constant, context: &mut Context<'_>) -> Vec<Cons
 }
 
 #[inline]
-pub fn scan_defined_constant(define: &FunctionCall, context: &mut Context<'_>) -> Option<ConstantMetadata> {
-    let Expression::Identifier(identifier) = define.function.as_ref() else {
+pub fn scan_defined_constant<'input, 'ast, 'arena>(
+    define: &'ast FunctionCall<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
+) -> Option<ConstantMetadata> {
+    let Expression::Identifier(identifier) = define.function else {
         return None;
     };
 
-    let function_name = context.interner.lookup(identifier.value());
+    let function_name = identifier.value();
     if function_name != "define" {
         return None;
     }
@@ -85,8 +91,7 @@ pub fn scan_defined_constant(define: &FunctionCall, context: &mut Context<'_>) -
         return None;
     };
 
-    let name = context.interner.intern(name_string.value.as_deref()?);
-    let name = lower_constant_name(context.interner, &name);
+    let name = lower_constant_name(context.interner, name_string.value?);
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
         flags |= MetadataFlags::USER_DEFINED;

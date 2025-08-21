@@ -47,11 +47,11 @@ use crate::error::AnalysisError;
 ///    'key2' => 'value2',
 /// ];
 /// ```
-impl Analyzable for Array {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Array<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_array_elements(context, block_context, artifacts, self.span(), self.elements.as_slice())
@@ -65,11 +65,11 @@ impl Analyzable for Array {
 /// ```php
 /// $array = array('key1' => 'value1', 'key2' => 'value2');
 /// ```
-impl Analyzable for LegacyArray {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for LegacyArray<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_array_elements(context, block_context, artifacts, self.span(), self.elements.as_slice())
@@ -89,12 +89,12 @@ struct ArrayCreationInfo {
     can_be_empty: bool,
 }
 
-fn analyze_array_elements<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_array_elements<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
-    elements: &[ArrayElement],
+    elements: &[ArrayElement<'arena>],
 ) -> Result<(), AnalysisError> {
     if elements.is_empty() {
         artifacts.set_expression_type(&expression_span, get_empty_keyed_array());
@@ -123,7 +123,7 @@ fn analyze_array_elements<'a>(
                 block_context.inside_general_use = was_inside_general_use;
 
                 let (item_key_value, key_type) = artifacts
-                    .get_expression_type(key_value_array_element.key.as_ref())
+                    .get_expression_type(key_value_array_element.key)
                     .map(|item_key_type| {
                         let key_type = if item_key_type.is_null() {
                             get_literal_string("".to_string())
@@ -184,7 +184,7 @@ fn analyze_array_elements<'a>(
                     })
                     .unwrap_or((None, get_mixed()));
 
-                (item_key_value, key_type, false, key_value_array_element.value.as_ref())
+                (item_key_value, key_type, false, key_value_array_element.value)
             }
             ArrayElement::Value(value_array_element) => {
                 // check if we have reached PHP_INT_MAX
@@ -218,7 +218,7 @@ fn analyze_array_elements<'a>(
                     Some(ArrayKey::Integer(array_creation_info.int_offset)),
                     get_literal_int(array_creation_info.int_offset),
                     true,
-                    value_array_element.value.as_ref(),
+                    value_array_element.value,
                 )
             }
             ArrayElement::Variadic(variadic_array_element) => {
@@ -418,10 +418,10 @@ fn get_numeric_key_from_string(key: &str) -> Option<i64> {
     key.parse::<i64>().ok()
 }
 
-fn handle_variadic_array_element(
-    context: &mut Context<'_>,
+fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     array_creation_info: &mut ArrayCreationInfo,
-    variadic_array_element: &VariadicArrayElement,
+    variadic_array_element: &'ast VariadicArrayElement<'arena>,
     variadic_array_element_type: &TUnion,
 ) {
     let mut all_non_empty = true;

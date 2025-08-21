@@ -14,11 +14,11 @@ use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_array_access_id;
 use crate::utils::expression::get_expression_id;
 
-impl Analyzable for ArrayAccess {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let keyed_array_var_id = get_array_access_id(
@@ -30,7 +30,7 @@ impl Analyzable for ArrayAccess {
         );
 
         let extended_var_id = get_expression_id(
-            &self.array,
+            self.array,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
             context.interner,

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -14,36 +13,36 @@ use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
 /// Represents a parameter list in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct FunctionLikeParameterList {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct FunctionLikeParameterList<'arena> {
     pub left_parenthesis: Span,
-    pub parameters: TokenSeparatedSequence<FunctionLikeParameter>,
+    pub parameters: TokenSeparatedSequence<'arena, FunctionLikeParameter<'arena>>,
     pub right_parenthesis: Span,
 }
 
 /// Represents a function-like parameter in PHP.
 ///
 /// Example: `int $foo`, `string &$bar`, `bool ...$baz`, `mixed $qux = null`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct FunctionLikeParameter {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
-    pub hint: Option<Hint>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct FunctionLikeParameter<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
+    pub hint: Option<Hint<'arena>>,
     pub ampersand: Option<Span>,
     pub ellipsis: Option<Span>,
-    pub variable: DirectVariable,
-    pub default_value: Option<FunctionLikeParameterDefaultValue>,
-    pub hooks: Option<PropertyHookList>,
+    pub variable: DirectVariable<'arena>,
+    pub default_value: Option<FunctionLikeParameterDefaultValue<'arena>>,
+    pub hooks: Option<PropertyHookList<'arena>>,
 }
 
 /// Represents the default value of a function-like parameter.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct FunctionLikeParameterDefaultValue {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct FunctionLikeParameterDefaultValue<'arena> {
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'arena>,
 }
 
-impl FunctionLikeParameter {
+impl FunctionLikeParameter<'_> {
     /// Returns whether the parameter is a promoted property.
     ///
     /// A promoted property is a property that is declared in a constructor parameter list.
@@ -67,13 +66,13 @@ impl FunctionLikeParameter {
     }
 }
 
-impl HasSpan for FunctionLikeParameterList {
+impl HasSpan for FunctionLikeParameterList<'_> {
     fn span(&self) -> Span {
         Span::between(self.left_parenthesis, self.right_parenthesis)
     }
 }
 
-impl HasSpan for FunctionLikeParameter {
+impl HasSpan for FunctionLikeParameter<'_> {
     fn span(&self) -> Span {
         let right = self.hooks.as_ref().map(|hooks| hooks.span()).unwrap_or_else(|| {
             self.default_value.as_ref().map_or_else(|| self.variable.span(), |default_value| default_value.span())
@@ -103,7 +102,7 @@ impl HasSpan for FunctionLikeParameter {
     }
 }
 
-impl HasSpan for FunctionLikeParameterDefaultValue {
+impl HasSpan for FunctionLikeParameterDefaultValue<'_> {
     fn span(&self) -> Span {
         Span::between(self.equals, self.value.span())
     }

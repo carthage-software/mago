@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -15,18 +17,22 @@ use crate::internal::utils::get_left_side;
 use crate::internal::utils::has_naked_left_side;
 use crate::internal::utils::unwrap_parenthesized;
 
-pub fn format_return_value<'a>(f: &mut FormatterState<'a>, value: &'a Expression) -> Document<'a> {
+pub fn format_return_value<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    value: &'ast Expression<'arena>,
+) -> Document<'arena> {
     let mut value = unwrap_parenthesized(value);
     if f.in_pipe_chain_arrow_segment {
         while let Expression::Pipe(pipe) = value {
-            value = unwrap_parenthesized(pipe.input.as_ref());
+            value = unwrap_parenthesized(pipe.input);
         }
     }
 
     if return_argument_has_leading_comment(f, value) {
         return Document::Array(vec![
+            in f.arena;
             (Document::String("(")),
-            (Document::Indent(vec![Document::Line(Line::hard()), value.format(f)])),
+            (Document::Indent(vec![in f.arena; Document::Line(Line::hard()), value.format(f)])),
             (Document::Line(Line::hard())),
             (Document::String(")")),
         ]);
@@ -34,36 +40,45 @@ pub fn format_return_value<'a>(f: &mut FormatterState<'a>, value: &'a Expression
 
     match value {
         Expression::Binary(binary)
-            if (!is_simple_expression(&binary.lhs) && !is_simple_expression(&binary.rhs))
+            if (!is_simple_expression(binary.lhs) && !is_simple_expression(binary.rhs))
                 || (binary.lhs.is_binary() || binary.rhs.is_binary()) =>
         {
             Document::Group(Group::new(vec![
-                Document::IfBreak(IfBreak::then(Document::String("("))),
-                Document::IndentIfBreak(IndentIfBreak::new(vec![Document::Line(Line::soft()), value.format(f)])),
+                in f.arena;
+                Document::IfBreak(IfBreak::then(f.arena, Document::String("("))),
+                Document::IndentIfBreak(IndentIfBreak::new(
+                    vec![in f.arena; Document::Line(Line::soft()), value.format(f)],
+                )),
                 Document::Line(Line::soft()),
-                Document::IfBreak(IfBreak::then(Document::String(")"))),
+                Document::IfBreak(IfBreak::then(f.arena, Document::String(")"))),
             ]))
         }
         Expression::Conditional(conditional)
             if conditional.then.is_none()
-                || (matches!(conditional.then.as_ref().map(|e| e.as_ref()), Some(Expression::Conditional(_)))
-                    && matches!(conditional.r#else.as_ref(), Expression::Conditional(_))) =>
+                || (matches!(conditional.then.as_ref(), Some(Expression::Conditional(_)))
+                    && matches!(conditional.r#else, Expression::Conditional(_))) =>
         {
             Document::Group(Group::new(vec![
-                Document::IfBreak(IfBreak::then(Document::String("("))),
-                Document::IndentIfBreak(IndentIfBreak::new(vec![Document::Line(Line::soft()), value.format(f)])),
+                in f.arena;
+                Document::IfBreak(IfBreak::then(f.arena, Document::String("("))),
+                Document::IndentIfBreak(IndentIfBreak::new(
+                    vec![in f.arena; Document::Line(Line::soft()), value.format(f)],
+                )),
                 Document::Line(Line::soft()),
-                Document::IfBreak(IfBreak::then(Document::String(")"))),
+                Document::IfBreak(IfBreak::then(f.arena, Document::String(")"))),
             ]))
         }
         _ => value.format(f),
     }
 }
 
-fn return_argument_has_leading_comment<'a>(f: &mut FormatterState<'a>, argument: &'a Expression) -> bool {
+fn return_argument_has_leading_comment<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    argument: &'ast Expression<'arena>,
+) -> bool {
     if f.has_leading_own_line_comment(argument.span())
         || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {
-            has_new_line_in_range(&f.file.contents, comment.start, comment.end)
+            has_new_line_in_range(f.source_text, comment.start, comment.end)
         })
     {
         return true;

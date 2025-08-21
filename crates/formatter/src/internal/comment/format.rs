@@ -1,5 +1,9 @@
 use std::borrow::Cow;
 
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Expression;
@@ -14,18 +18,18 @@ use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
 use crate::internal::utils::unwrap_parenthesized;
 
-impl<'a> FormatterState<'a> {
+impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     #[must_use]
     pub(crate) fn print_comments(
         &mut self,
-        before: Option<Document<'a>>,
-        document: Document<'a>,
-        after: Option<Document<'a>>,
-    ) -> Document<'a> {
+        before: Option<Document<'arena>>,
+        document: Document<'arena>,
+        after: Option<Document<'arena>>,
+    ) -> Document<'arena> {
         match (before, after) {
-            (Some(before), Some(after)) => Document::Array(vec![before, document, after]),
-            (Some(before), None) => Document::Array(vec![before, document]),
-            (None, Some(after)) => Document::Array(vec![document, after]),
+            (Some(before), Some(after)) => Document::Array(vec![in self.arena; before, document, after]),
+            (Some(before), None) => Document::Array(vec![in self.arena; before, document]),
+            (None, Some(after)) => Document::Array(vec![in self.arena; document, after]),
             (None, None) => document,
         }
     }
@@ -61,7 +65,7 @@ impl<'a> FormatterState<'a> {
             return false;
         };
 
-        let remaining_content = &self.file.contents[next_content_offset as usize..];
+        let remaining_content = &self.source_text[next_content_offset as usize..];
 
         remaining_content.starts_with("//")
             || remaining_content.starts_with("/*")
@@ -136,8 +140,8 @@ impl<'a> FormatterState<'a> {
     }
 
     #[must_use]
-    pub(crate) fn print_leading_comments(&mut self, range: Span) -> Option<Document<'a>> {
-        let mut parts = vec![];
+    pub(crate) fn print_leading_comments(&mut self, range: Span) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
         while let Some(comment) = self.comments.peek() {
             let comment = Comment::from_trivia(self.file, comment);
             // Comment before the span
@@ -156,23 +160,26 @@ impl<'a> FormatterState<'a> {
         Some(Document::Array(parts))
     }
 
-    fn print_leading_comment(&mut self, parts: &mut Vec<Document<'a>>, comment: Comment) {
+    fn print_leading_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
         let comment_document = if comment.is_block {
             if self.has_newline(comment.end, /* backwards */ false) {
                 if self.has_newline(comment.start, /* backwards */ true) {
                     Document::Array(vec![
+                        in self.arena;
                         self.print_comment(comment),
                         Document::BreakParent,
                         Document::Line(Line::hard()),
                     ])
                 } else {
-                    Document::Array(vec![self.print_comment(comment), Document::Line(Line::default())])
+                    Document::Array(vec![in self.arena; self.print_comment(comment), Document::Line(Line::default())])
                 }
             } else {
-                Document::Array(vec![self.print_comment(comment), Document::space()])
+                Document::Array(vec![in self.arena; self.print_comment(comment), Document::space()])
             }
         } else {
-            Document::Array(vec![self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())])
+            Document::Array(
+                vec![in self.arena; self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())],
+            )
         };
 
         parts.push(comment_document);
@@ -188,12 +195,12 @@ impl<'a> FormatterState<'a> {
     }
 
     #[must_use]
-    pub(crate) fn print_trailing_comments_for_node(&mut self, node: Node<'_>) -> Option<Document<'a>> {
+    pub(crate) fn print_trailing_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena>> {
         let range = match node {
             Node::ArrowFunction(arrow_function) if self.in_pipe_chain_arrow_segment => {
-                let mut value = unwrap_parenthesized(&arrow_function.expression);
+                let mut value = unwrap_parenthesized(arrow_function.expression);
                 while let Expression::Pipe(pipe) = value {
-                    value = unwrap_parenthesized(pipe.input.as_ref());
+                    value = unwrap_parenthesized(pipe.input);
                 }
 
                 value.span()
@@ -205,8 +212,8 @@ impl<'a> FormatterState<'a> {
     }
 
     #[must_use]
-    pub(crate) fn print_trailing_comments(&mut self, range: Span) -> Option<Document<'a>> {
-        let mut parts = vec![];
+    pub(crate) fn print_trailing_comments(&mut self, range: Span) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
         let mut previous_comment: Option<Comment> = None;
 
         while let Some(comment) = self.comments.peek() {
@@ -230,7 +237,7 @@ impl<'a> FormatterState<'a> {
 
     fn print_trailing_comment(
         &mut self,
-        parts: &mut Vec<Document<'a>>,
+        parts: &mut Vec<Document<'arena>>,
         comment: Comment,
         previous: Option<Comment>,
     ) -> Comment {
@@ -241,7 +248,7 @@ impl<'a> FormatterState<'a> {
         {
             parts.push(printed);
             let suffix = {
-                let mut parts = vec![Document::BreakParent, Document::Line(Line::hard())];
+                let mut parts = vec![in self.arena; Document::BreakParent, Document::Line(Line::hard())];
 
                 if self.is_previous_line_empty(comment.start) {
                     parts.push(Document::Line(Line::hard()));
@@ -256,19 +263,19 @@ impl<'a> FormatterState<'a> {
         }
 
         if comment.is_inline_comment() || previous.is_some_and(|c| c.has_line_suffix) {
-            parts.push(Document::LineSuffix(vec![Document::space(), printed]));
+            parts.push(Document::LineSuffix(vec![in self.arena; Document::space(), printed]));
 
             return comment.with_line_suffix(true);
         }
 
-        parts.push(Document::Array(vec![Document::space(), printed]));
+        parts.push(Document::Array(vec![in self.arena; Document::space(), printed]));
 
         comment.with_line_suffix(false)
     }
 
     #[must_use]
-    pub(crate) fn print_inner_comment(&mut self, range: Span, should_indent: bool) -> Option<Document<'a>> {
-        let mut parts = vec![];
+    pub(crate) fn print_inner_comment(&mut self, range: Span, should_indent: bool) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
         let mut must_break = false;
         while let Some(comment) = self.comments.peek() {
             let span = comment.span;
@@ -277,7 +284,9 @@ impl<'a> FormatterState<'a> {
             if comment.start >= range.start.offset && comment.end <= range.end.offset {
                 must_break = must_break || !comment.is_block;
                 if !should_indent && self.is_next_line_empty(span) {
-                    parts.push(Document::Array(vec![self.print_comment(comment), Document::Line(Line::hard())]));
+                    parts.push(Document::Array(
+                        vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
+                    ));
                     must_break = true;
                 } else {
                     parts.push(self.print_comment(comment));
@@ -293,12 +302,13 @@ impl<'a> FormatterState<'a> {
             return None;
         }
 
-        let document = Document::Array(Document::join(parts, Separator::HardLine));
+        let document = Document::Array(Document::join(self.arena, parts, Separator::HardLine));
 
         Some(if should_indent {
             Document::Group(
                 Group::new(vec![
-                    Document::Indent(vec![Document::Line(Line::default()), document]),
+                    in self.arena;
+                    Document::Indent(vec![in self.arena; Document::Line(Line::default()), document]),
                     Document::Line(Line::default()),
                 ])
                 .with_break(must_break),
@@ -306,7 +316,8 @@ impl<'a> FormatterState<'a> {
         } else {
             Document::Group(
                 Group::new(vec![
-                    Document::Array(vec![Document::Line(Line::default()), document]),
+                    in self.arena;
+                    Document::Array(vec![in self.arena; Document::Line(Line::default()), document]),
                     Document::Line(Line::default()),
                 ])
                 .with_break(must_break),
@@ -315,15 +326,17 @@ impl<'a> FormatterState<'a> {
     }
 
     #[must_use]
-    pub(crate) fn print_dangling_comments(&mut self, range: Span, indented: bool) -> Option<Document<'a>> {
-        let mut parts = vec![];
+    pub(crate) fn print_dangling_comments(&mut self, range: Span, indented: bool) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
         while let Some(comment) = self.comments.peek() {
             let span = comment.span;
             let comment = Comment::from_trivia(self.file, comment);
             // Comment within the span
             if comment.end <= range.end.offset {
                 if !indented && self.is_next_line_empty(span) {
-                    parts.push(Document::Array(vec![self.print_comment(comment), Document::Line(Line::hard())]));
+                    parts.push(Document::Array(
+                        vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
+                    ));
                 } else {
                     parts.push(self.print_comment(comment));
                 }
@@ -338,21 +351,26 @@ impl<'a> FormatterState<'a> {
             return None;
         }
 
-        let document = Document::Array(Document::join(parts, Separator::HardLine));
+        let document = Document::Array(Document::join(self.arena, parts, Separator::HardLine));
 
         Some(if indented {
             Document::Array(vec![
-                Document::Indent(vec![Document::BreakParent, Document::Line(Line::hard()), document]),
+                in self.arena;
+                Document::Indent(vec![in self.arena; Document::BreakParent, Document::Line(Line::hard()), document]),
                 Document::Line(Line::hard()),
             ])
         } else {
-            Document::Array(vec![document, Document::Line(Line::hard())])
+            Document::Array(vec![in self.arena; document, Document::Line(Line::hard())])
         })
     }
 
     #[must_use]
-    pub(crate) fn print_dangling_comments_between_nodes(&mut self, after: Span, before: Span) -> Option<Document<'a>> {
-        let mut parts = vec![];
+    pub(crate) fn print_dangling_comments_between_nodes(
+        &mut self,
+        after: Span,
+        before: Span,
+    ) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
 
         while let Some(comment) = self.comments.peek() {
             let comment = Comment::from_trivia(self.file, comment);
@@ -374,15 +392,16 @@ impl<'a> FormatterState<'a> {
         }
 
         Some(Document::Indent(vec![
+            in self.arena;
             Document::BreakParent,
             Document::Line(Line::hard()),
-            Document::Array(Document::join(parts, Separator::HardLine)),
+            Document::Array(Document::join(self.arena, parts, Separator::HardLine)),
         ]))
     }
 
     #[must_use]
-    fn print_comment(&self, comment: Comment) -> Document<'a> {
-        let mut content = &self.file.contents[comment.start as usize..comment.end as usize];
+    fn print_comment(&self, comment: Comment) -> Document<'arena> {
+        let mut content = &self.source_text[comment.start as usize..comment.end as usize];
 
         if comment.is_inline_comment() {
             if !comment.is_single_line {
@@ -400,7 +419,7 @@ impl<'a> FormatterState<'a> {
             return Document::String(content);
         }
 
-        let lines = content.lines().collect::<Vec<_>>();
+        let lines = content.lines().collect_in::<Vec<_>>(self.arena);
 
         let should_add_astricks = if content.starts_with("/**") {
             true
@@ -426,10 +445,10 @@ impl<'a> FormatterState<'a> {
             }
         };
 
-        let mut contents = vec![];
+        let mut contents = vec![in self.arena];
 
         // Process each line according to the specified rules
-        let mut processed_lines = Vec::with_capacity(lines.len());
+        let mut processed_lines = Vec::with_capacity_in(lines.len(), self.arena);
         for (i, line) in lines.iter().enumerate() {
             let trimmed_line = line.trim_start();
             let processed_line = if i == 0 {

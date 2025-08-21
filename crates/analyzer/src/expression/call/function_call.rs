@@ -19,16 +19,16 @@ use crate::expression::call::get_function_like_target;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 
-impl Analyzable for FunctionCall {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut template_result = TemplateResult::default();
         let (invocation_targets, encountered_invalid_targets) =
-            resolve_targets(context, block_context, artifacts, &self.function, &mut template_result)?;
+            resolve_targets(context, block_context, artifacts, self.function, &mut template_result)?;
 
         analyze_invocation_targets(
             context,
@@ -45,20 +45,22 @@ impl Analyzable for FunctionCall {
     }
 }
 
-pub(super) fn resolve_targets<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(super) fn resolve_targets<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    expression: &Expression,
+    expression: &Expression<'arena>,
     template_result: &mut TemplateResult,
-) -> Result<(Vec<InvocationTarget<'a>>, bool), AnalysisError> {
+) -> Result<(Vec<InvocationTarget<'ctx>>, bool), AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
         let name = context.resolved_names.get(function_name);
+        let name_id = context.interner.intern(name);
         let unqualified_name = function_name.value();
+        let unqualified_name_id = context.interner.intern(unqualified_name);
 
-        let identifier = FunctionLikeIdentifier::Function(*name);
+        let identifier = FunctionLikeIdentifier::Function(name_id);
         let alternative = if function_name.is_local() && unqualified_name != name {
-            Some(FunctionLikeIdentifier::Function(*unqualified_name))
+            Some(FunctionLikeIdentifier::Function(unqualified_name_id))
         } else {
             None
         };

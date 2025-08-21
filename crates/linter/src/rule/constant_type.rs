@@ -108,7 +108,7 @@ impl LintRule for ConstantTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::ClassLikeConstant(class_like_constant) = node else {
             return;
         };
@@ -119,7 +119,7 @@ impl LintRule for ConstantTypeRule {
 
         let item = class_like_constant.first_item();
 
-        let constant_name = ctx.lookup(&item.name.value);
+        let constant_name = item.name.value;
 
         ctx.collector.report(
             Issue::new(self.cfg.level(), format!("Class constant `{}` is missing a type hint.", constant_name))

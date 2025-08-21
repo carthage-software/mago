@@ -87,13 +87,13 @@ impl LintRule for NoRedundantMathRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
 
         let issue = match &binary.operator {
-            BinaryOperator::Division(_) => match get_expression_value(&binary.rhs) {
+            BinaryOperator::Division(_) => match get_expression_value(binary.rhs) {
                 Some(1) => {
                     let mut issue = Issue::new(
                         self.cfg.level(),
@@ -139,7 +139,7 @@ impl LintRule for NoRedundantMathRule {
                 }
             },
             BinaryOperator::Multiplication(_) => {
-                match (get_expression_value(&binary.lhs), get_expression_value(&binary.rhs)) {
+                match (get_expression_value(binary.lhs), get_expression_value(binary.rhs)) {
                     values @ (Some(1), _) | values @ (_, Some(1)) => {
                         let mut issue = Issue::new(
                             self.cfg.level(),
@@ -199,9 +199,9 @@ impl LintRule for NoRedundantMathRule {
                 }
             }
             BinaryOperator::Addition(_) => {
-                let zero = if let Some(0) = get_expression_value(&binary.lhs) {
+                let zero = if let Some(0) = get_expression_value(binary.lhs) {
                     &binary.lhs
-                } else if let Some(0) = get_expression_value(&binary.rhs) {
+                } else if let Some(0) = get_expression_value(binary.rhs) {
                     &binary.rhs
                 } else {
                     return;
@@ -225,9 +225,9 @@ impl LintRule for NoRedundantMathRule {
                 issue
             }
             BinaryOperator::Subtraction(_) => {
-                let zero = if let Some(0) = get_expression_value(&binary.lhs) {
+                let zero = if let Some(0) = get_expression_value(binary.lhs) {
                     &binary.lhs
-                } else if let Some(0) = get_expression_value(&binary.rhs) {
+                } else if let Some(0) = get_expression_value(binary.rhs) {
                     &binary.rhs
                 } else {
                     return;
@@ -252,7 +252,7 @@ impl LintRule for NoRedundantMathRule {
 
                 issue
             }
-            BinaryOperator::Modulo(_) => match get_expression_value(&binary.rhs) {
+            BinaryOperator::Modulo(_) => match get_expression_value(binary.rhs) {
                 Some(1) => {
                     let mut issue = Issue::new(self.cfg.level(), "Redundant modulo by `1`: the result is always `0`.")
                         .with_code(self.meta.code)
@@ -292,7 +292,7 @@ impl LintRule for NoRedundantMathRule {
                 }
             },
             BinaryOperator::BitwiseAnd(_) => {
-                if !matches!(get_expression_value(&binary.rhs), Some(-1)) {
+                if !matches!(get_expression_value(binary.rhs), Some(-1)) {
                     return;
                 }
 
@@ -316,7 +316,7 @@ impl LintRule for NoRedundantMathRule {
                 issue
             }
             BinaryOperator::BitwiseOr(_) | BinaryOperator::BitwiseXor(_) => {
-                if !matches!(get_expression_value(&binary.rhs), Some(0)) {
+                if !matches!(get_expression_value(binary.rhs), Some(0)) {
                     return;
                 }
 
@@ -347,7 +347,7 @@ impl LintRule for NoRedundantMathRule {
                 issue
             }
             BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => {
-                if !matches!(get_expression_value(&binary.rhs), Some(0)) {
+                if !matches!(get_expression_value(binary.rhs), Some(0)) {
                     return;
                 }
 
@@ -388,15 +388,12 @@ impl LintRule for NoRedundantMathRule {
 ///
 /// This function is used to evaluate the value of an expression, if possible.
 #[inline]
-const fn get_expression_value(expression: &Expression) -> Option<isize> {
+fn get_expression_value<'ast, 'arena>(expression: &'ast Expression<'arena>) -> Option<isize> {
     match expression {
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_expression_value(expression),
         Expression::Literal(Literal::Integer(LiteralInteger { value: Some(it), .. })) => Some(*it as isize),
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let value = match get_expression_value(operand) {
-                Some(it) => it,
-                None => return None,
-            };
+            let value = get_expression_value(operand)?;
 
             match operator {
                 UnaryPrefixOperator::Negation(_) => Some(-value),
@@ -408,14 +405,8 @@ const fn get_expression_value(expression: &Expression) -> Option<isize> {
             }
         }
         Expression::Binary(Binary { lhs, operator, rhs }) => {
-            let lhs_value = match get_expression_value(lhs) {
-                Some(it) => it,
-                None => return None,
-            };
-            let rhs_value = match get_expression_value(rhs) {
-                Some(it) => it,
-                None => return None,
-            };
+            let lhs_value = get_expression_value(lhs)?;
+            let rhs_value = get_expression_value(rhs)?;
 
             match operator {
                 BinaryOperator::Addition(_) => Some(lhs_value + rhs_value),

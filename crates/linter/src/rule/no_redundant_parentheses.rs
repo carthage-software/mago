@@ -92,19 +92,19 @@ impl LintRule for NoRedundantParenthesesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let parenthesized = match node {
             Node::Parenthesized(parenthesized) => {
-                if let Expression::Parenthesized(inner) = parenthesized.expression.as_ref() {
+                if let Expression::Parenthesized(inner) = parenthesized.expression {
                     inner
                 } else {
                     return;
                 }
             }
-            Node::ExpressionStatement(expression_statement) => match expression_statement.expression.as_ref() {
+            Node::ExpressionStatement(expression_statement) => match expression_statement.expression {
                 Expression::Parenthesized(parenthesized) => parenthesized,
                 Expression::Assignment(assignment) => {
-                    if let Expression::Parenthesized(rhs) = assignment.rhs.as_ref() {
+                    if let Expression::Parenthesized(rhs) = assignment.rhs {
                         if rhs.expression.is_binary() {
                             return; // Allow parentheses around binary expressions on the right-hand side of an assignment.
                         }
@@ -135,22 +135,21 @@ impl LintRule for NoRedundantParenthesesRule {
                 }
             }
             Node::If(r#if) => {
-                if let Expression::Parenthesized(condition) = r#if.condition.as_ref() {
+                if let Expression::Parenthesized(condition) = r#if.condition {
                     condition
                 } else {
                     return;
                 }
             }
             Node::IfStatementBodyElseIfClause(if_statement_body_else_if_clause) => {
-                if let Expression::Parenthesized(condition) = if_statement_body_else_if_clause.condition.as_ref() {
+                if let Expression::Parenthesized(condition) = if_statement_body_else_if_clause.condition {
                     condition
                 } else {
                     return;
                 }
             }
             Node::IfColonDelimitedBodyElseIfClause(if_colon_delimited_body_else_if_clause) => {
-                if let Expression::Parenthesized(condition) = if_colon_delimited_body_else_if_clause.condition.as_ref()
-                {
+                if let Expression::Parenthesized(condition) = if_colon_delimited_body_else_if_clause.condition {
                     condition
                 } else {
                     return;

@@ -1,16 +1,10 @@
 use std::collections::HashSet;
 
 use ahash::HashMap;
-use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_span::HasPosition;
 use mago_span::Position;
-use mago_syntax::ast::Program;
-
-use crate::resolver::NameResolver;
 
 pub mod kind;
 pub mod resolver;
@@ -23,33 +17,13 @@ mod internal;
 /// Maps source code positions (specifically, the starting byte offset of identifiers)
 /// to their resolved fully qualified name (`StringIdentifier`) and a flag indicating
 /// whether the resolution involved an explicit `use` alias or construct.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct ResolvedNames {
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Default)]
+pub struct ResolvedNames<'arena> {
     /// Internal map storing: position (byte offset) -> (Resolved Name ID, Was Imported Flag)
-    names: HashMap<u32, (StringIdentifier, bool)>,
+    names: HashMap<u32, (&'arena str, bool)>,
 }
 
-impl ResolvedNames {
-    /// Resolves names in the given program.
-    ///
-    /// This method traverses the AST of the program, resolves names using a `NameResolver` and `NameContext`,
-    /// and returns a `Names` instance containing the resolved names.
-    ///
-    /// # Arguments
-    ///
-    /// * `interner` - A `ThreadedInterner` used for string interning.
-    /// * `program` - A reference to the `Program` AST node.
-    ///
-    /// # Returns
-    ///
-    /// A `Names` instance containing the resolved names.
-    #[deprecated = "use `NameResolver` instead."]
-    pub fn resolve(interner: &ThreadedInterner, program: &Program) -> Self {
-        let resolver = NameResolver::new(interner);
-
-        resolver.resolve(program)
-    }
-
+impl<'arena> ResolvedNames<'arena> {
     /// Returns the total number of resolved names stored.
     pub fn len(&self) -> usize {
         self.names.len()
@@ -71,11 +45,8 @@ impl ResolvedNames {
     ///
     /// Panics if no resolved name is found at the specified `position`.
     /// Use `contains` first if unsure.
-    pub fn get<T: HasPosition>(&self, position: &T) -> &StringIdentifier {
-        self.names
-            .get(&position.offset()) //
-            .map(|(name, _)| name)
-            .expect("resolved name not found at position")
+    pub fn get<T: HasPosition>(&self, position: &T) -> &'arena str {
+        self.names.get(&position.offset()).map(|(name, _)| name).expect("resolved name not found at position")
     }
 
     /// Checks if the name resolved at the given position originated from an explicit `use` alias or construct.
@@ -93,7 +64,7 @@ impl ResolvedNames {
     ///
     /// Associates the resolved `name` identifier and its `imported` status with the
     /// given `position` (byte offset).
-    pub(crate) fn insert_at<T: HasPosition>(&mut self, position: &T, name: StringIdentifier, imported: bool) {
+    pub(crate) fn insert_at<T: HasPosition>(&mut self, position: &T, name: &'arena str, imported: bool) {
         self.names.insert(position.offset(), (name, imported));
     }
 
@@ -101,7 +72,7 @@ impl ResolvedNames {
     ///
     /// Each element in the set is a reference to a tuple: `(&usize, &(StringIdentifier, bool))`,
     /// representing `(&position, &(resolved_name_id, was_imported_flag))`.
-    pub fn all(&self) -> HashSet<(&u32, &(StringIdentifier, bool))> {
+    pub fn all(&self) -> HashSet<(&u32, &(&'arena str, bool))> {
         HashSet::from_iter(self.names.iter())
     }
 }

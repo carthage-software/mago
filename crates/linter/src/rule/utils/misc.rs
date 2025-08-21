@@ -1,8 +1,6 @@
 use mago_syntax::ast::*;
 
-use crate::context::LintContext;
-
-pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) -> bool {
+pub fn is_method_setter_or_getter<'ast, 'arena>(method: &'ast Method<'arena>) -> bool {
     let MethodBody::Concrete(block) = &method.body else {
         return false;
     };
@@ -22,18 +20,18 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
                 return false;
             };
 
-            if !is_accessing_property_of_this(expression, context) {
+            if !is_accessing_property_of_this(expression) {
                 return false;
             }
 
             statements_len == 1
         }
         Statement::Expression(expression_statement) if method.parameter_list.parameters.len() == 1 => {
-            let Expression::Assignment(assignment) = expression_statement.expression.as_ref() else {
+            let Expression::Assignment(assignment) = expression_statement.expression else {
                 return false;
             };
 
-            if !is_accessing_property_of_this(assignment.lhs.as_ref(), context) {
+            if !is_accessing_property_of_this(assignment.lhs) {
                 return false;
             }
 
@@ -44,7 +42,7 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
                             return false;
                         };
 
-                        is_variable_named(expression, "$this", context)
+                        is_variable_named(expression, "$this")
                     }
                     _ => false,
                 },
@@ -55,7 +53,7 @@ pub fn is_method_setter_or_getter(method: &Method, context: &LintContext<'_>) ->
     }
 }
 
-fn is_accessing_property_of_this(expression: &Expression, context: &LintContext<'_>) -> bool {
+fn is_accessing_property_of_this<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
     let Expression::Access(access) = expression else {
         return false;
     };
@@ -64,10 +62,10 @@ fn is_accessing_property_of_this(expression: &Expression, context: &LintContext<
         return false;
     };
 
-    is_variable_named(&property_access.object, "$this", context)
+    is_variable_named(property_access.object, "$this")
 }
 
-fn is_variable_named(expression: &Expression, name: &str, context: &LintContext<'_>) -> bool {
+fn is_variable_named<'ast, 'arena>(expression: &'ast Expression<'arena>, name: &str) -> bool {
     let Expression::Variable(variable) = expression else {
         return false;
     };
@@ -76,5 +74,5 @@ fn is_variable_named(expression: &Expression, name: &str, context: &LintContext<
         return false;
     };
 
-    context.interner.lookup(&direct_variable.name) == name
+    direct_variable.name == name
 }

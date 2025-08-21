@@ -84,7 +84,7 @@ impl LintRule for PropertyTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let members = match node {
             Node::Class(class) => class.members.as_slice(),
             Node::Trait(r#trait) => r#trait.members.as_slice(),
@@ -101,19 +101,17 @@ impl LintRule for PropertyTypeRule {
             }
 
             for variable in property.variables() {
-                let name = ctx.lookup(&variable.name);
-
                 ctx.collector.report(
-                    Issue::new(self.cfg.level(), format!("Property `{}` is missing a type hint.", name))
+                    Issue::new(self.cfg.level(), format!("Property `{}` is missing a type hint.", variable.name))
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(property.span())
-                                .with_message(format!("Property `{}` is declared here.", name)),
+                                .with_message(format!("Property `{}` is declared here.", variable.name)),
                         )
                         .with_note(
                             "Adding a type hint to properties improves code readability and helps prevent type errors.",
                         )
-                        .with_help(format!("Consider specifying a type hint for `{}`.", name)),
+                        .with_help(format!("Consider specifying a type hint for `{}`.", variable.name)),
                 );
             }
         }

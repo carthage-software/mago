@@ -42,12 +42,12 @@ use crate::resolver::selector::resolve_member_selector;
 /// 2. Resolving the `method` selector to get potential method names.
 /// 3. Finding matching methods and validating them against static access rules.
 /// 4. Reporting issues like calling a non-static method, or calling a method on an interface.
-pub fn resolve_static_method_targets<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    class_expr: &Expression,
-    method_selector: &ClassLikeMemberSelector,
+    class_expr: &'ast Expression<'arena>,
+    method_selector: &'ast ClassLikeMemberSelector<'arena>,
 ) -> Result<MethodResolutionResult, AnalysisError> {
     let mut result = MethodResolutionResult::default();
 
@@ -94,9 +94,9 @@ pub fn resolve_static_method_targets<'a>(
     Ok(result)
 }
 
-fn resolve_method_from_classname<'a>(
-    context: &mut Context<'a>,
-    current_class_metadata: Option<&'a ClassLikeMetadata>,
+fn resolve_method_from_classname<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: StringIdentifier,
     class_span: Span,
     method_span: Span,
@@ -219,12 +219,12 @@ fn resolve_method_from_classname<'a>(
     resolved_methods
 }
 
-fn resolve_method_from_metadata<'a>(
-    context: &mut Context<'a>,
-    current_class_metadata: Option<&'a ClassLikeMetadata>,
+fn resolve_method_from_metadata<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: StringIdentifier,
     fq_class_id: &StringIdentifier,
-    defining_class_metadata: &'a ClassLikeMetadata,
+    defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
 ) -> Option<ResolvedMethod> {
     let method_id = get_method_id(&defining_class_metadata.original_name, &method_name);
@@ -253,10 +253,10 @@ fn resolve_method_from_metadata<'a>(
     })
 }
 
-fn get_metadata_object<'a>(
-    context: &Context<'a>,
-    class_like_metadata: &'a ClassLikeMetadata,
-    current_class_metadata: &'a ClassLikeMetadata,
+fn get_metadata_object<'ctx>(
+    context: &Context<'ctx, '_>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    current_class_metadata: &'ctx ClassLikeMetadata,
 ) -> TObject {
     if class_like_metadata.kind.is_enum() {
         return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });

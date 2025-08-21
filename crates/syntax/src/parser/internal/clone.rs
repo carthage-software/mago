@@ -19,12 +19,18 @@ use crate::token::TokenKind;
 /// next token is not a comma and the argument is a simple positional one, it assumes
 /// the legacy `clone (expr)` structure. Otherwise, it parses the expression as a
 /// standard function call.
-pub fn parse_ambiguous_clone_expression(stream: &mut TokenStream<'_, '_>) -> Result<Expression, ParseError> {
+pub fn parse_ambiguous_clone_expression<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Expression<'arena>, ParseError> {
     let clone = utils::expect_keyword(stream, T!["clone"])?;
     if utils::peek(stream)?.kind != TokenKind::LeftParenthesis {
         return Ok(Expression::Clone(Clone {
             clone,
-            object: Box::new(parse_expression_with_precedence(stream, Precedence::Clone)?),
+            object: {
+                let object = parse_expression_with_precedence(stream, Precedence::Clone)?;
+
+                stream.alloc(object)
+            },
         }));
     }
 
@@ -34,7 +40,7 @@ pub fn parse_ambiguous_clone_expression(stream: &mut TokenStream<'_, '_>) -> Res
         let right_parenthesis = utils::expect_span(stream, T![")"])?;
 
         return Ok(Expression::ClosureCreation(ClosureCreation::Function(FunctionClosureCreation {
-            function: Box::new(Expression::Identifier(Identifier::Local(LocalIdentifier {
+            function: stream.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier {
                 span: clone.span,
                 value: clone.value,
             }))),
@@ -53,7 +59,7 @@ pub fn parse_ambiguous_clone_expression(stream: &mut TokenStream<'_, '_>) -> Res
             let argument_list = parse_remaining_argument_list(stream, left_parenthesis, argument)?;
 
             return Ok(Expression::Call(Call::Function(FunctionCall {
-                function: Box::new(Expression::Identifier(Identifier::Local(LocalIdentifier {
+                function: stream.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier {
                     span: clone.span,
                     value: clone.value,
                 }))),
@@ -64,10 +70,14 @@ pub fn parse_ambiguous_clone_expression(stream: &mut TokenStream<'_, '_>) -> Res
 
     Ok(Expression::Clone(Clone {
         clone,
-        object: Box::new(Expression::Parenthesized(Parenthesized {
-            left_parenthesis,
-            expression: Box::new(cloned_expression),
-            right_parenthesis: utils::expect_span(stream, T![")"])?,
-        })),
+        object: {
+            let object = Expression::Parenthesized(Parenthesized {
+                left_parenthesis,
+                expression: stream.alloc(cloned_expression),
+                right_parenthesis: utils::expect_span(stream, T![")"])?,
+            });
+
+            stream.alloc(object)
+        },
     }))
 }

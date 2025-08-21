@@ -15,11 +15,11 @@ use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 
-impl Analyzable for Method {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -33,15 +33,13 @@ impl Analyzable for Method {
         let MethodBody::Concrete(concrete_body) = &self.body else { return Ok(()) };
 
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-            tracing::error!(
-                "Attempted to analyze method `{}` without class-like context.",
-                context.interner.lookup(&self.name.value),
-            );
+            tracing::error!("Attempted to analyze method `{}` without class-like context.", self.name.value);
 
             return Ok(());
         };
 
-        let lc_method_name = context.interner.lowered(&self.name.value);
+        let method_name = context.interner.intern(self.name.value);
+        let lc_method_name = context.interner.intern(self.name.value.to_lowercase());
         if context.settings.diff
             && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, lc_method_name))
         {
@@ -55,7 +53,7 @@ impl Analyzable for Method {
         ) else {
             tracing::error!(
                 "Failed to find method metadata for `{}` in class `{}`.",
-                context.interner.lookup(&self.name.value),
+                self.name.value,
                 context.interner.lookup(&class_like_metadata.original_name)
             );
 
@@ -77,7 +75,7 @@ impl Analyzable for Method {
             None,
         )?;
 
-        if !is_method_overriding(context.codebase, context.interner, &class_like_metadata.name, &self.name.value) {
+        if !is_method_overriding(context.codebase, context.interner, &class_like_metadata.name, &method_name) {
             heuristic::check_function_like(
                 method_metadata,
                 self.parameter_list.parameters.as_slice(),

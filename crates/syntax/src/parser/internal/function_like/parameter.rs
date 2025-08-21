@@ -12,23 +12,23 @@ use crate::parser::internal::utils;
 use crate::parser::internal::variable;
 use crate::token::Token;
 
-pub fn parse_optional_function_like_parameter_list(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<FunctionLikeParameterList>, ParseError> {
+pub fn parse_optional_function_like_parameter_list<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<FunctionLikeParameterList<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["("]) => Some(parse_function_like_parameter_list(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_function_like_parameter_list(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<FunctionLikeParameterList, ParseError> {
+pub fn parse_function_like_parameter_list<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<FunctionLikeParameterList<'arena>, ParseError> {
     Ok(FunctionLikeParameterList {
         left_parenthesis: utils::expect_span(stream, T!["("])?,
         parameters: {
-            let mut parameters = Vec::new();
-            let mut commas = Vec::new();
+            let mut parameters = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 let token = utils::peek(stream)?;
                 if T![")"] == token.kind {
@@ -52,7 +52,9 @@ pub fn parse_function_like_parameter_list(
     })
 }
 
-pub fn parse_function_like_parameter(stream: &mut TokenStream<'_, '_>) -> Result<FunctionLikeParameter, ParseError> {
+pub fn parse_function_like_parameter<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<FunctionLikeParameter<'arena>, ParseError> {
     Ok(FunctionLikeParameter {
         attribute_lists: attribute::parse_attribute_list_sequence(stream)?,
         modifiers: modifier::parse_modifier_sequence(stream)?,
@@ -65,9 +67,9 @@ pub fn parse_function_like_parameter(stream: &mut TokenStream<'_, '_>) -> Result
     })
 }
 
-pub fn parse_optional_function_like_parameter_default_value(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<FunctionLikeParameterDefaultValue>, ParseError> {
+pub fn parse_optional_function_like_parameter_default_value<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<FunctionLikeParameterDefaultValue<'arena>>, ParseError> {
     let token = utils::maybe_peek(stream)?;
     if let Some(Token { kind: T!["="], .. }) = token {
         Ok(Some(FunctionLikeParameterDefaultValue {

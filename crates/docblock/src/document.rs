@@ -1,62 +1,61 @@
-use mago_span::HasSpan;
-use serde::Deserialize;
+use bumpalo::collections::Vec;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Document {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Document<'arena> {
     pub span: Span,
-    pub elements: Vec<Element>,
+    pub elements: Vec<'arena, Element<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum Element {
-    Text(Text),
-    Code(Code),
-    Tag(Tag),
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum Element<'arena> {
+    Text(Text<'arena>),
+    Code(Code<'arena>),
+    Tag(Tag<'arena>),
     Line(Span),
-    Annotation(Annotation),
+    Annotation(Annotation<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Text {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Text<'arena> {
     pub span: Span,
-    pub segments: Vec<TextSegment>,
+    pub segments: Vec<'arena, TextSegment<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Code {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Code<'arena> {
     pub span: Span,
-    pub directives: Vec<StringIdentifier>,
-    pub content: StringIdentifier,
+    pub directives: Vec<'arena, &'arena str>,
+    pub content: &'arena str,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum TextSegment {
-    Paragraph { span: Span, content: StringIdentifier },
-    InlineCode(Code),
-    InlineTag(Tag),
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum TextSegment<'arena> {
+    Paragraph { span: Span, content: &'arena str },
+    InlineCode(Code<'arena>),
+    InlineTag(Tag<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Annotation {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Annotation<'arena> {
     pub span: Span,
-    pub name: StringIdentifier,
-    pub arguments: Option<StringIdentifier>,
+    pub name: &'arena str,
+    pub arguments: Option<&'arena str>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Tag {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Tag<'arena> {
     pub span: Span,
-    pub name: StringIdentifier,
+    pub name: &'arena str,
     pub kind: TagKind,
-    pub description: StringIdentifier,
+    pub description: &'arena str,
     pub description_span: Span,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum TagKind {
     Abstract,
@@ -212,7 +211,7 @@ pub enum TagKind {
     Other,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum TagVendor {
     Mago,
@@ -220,17 +219,17 @@ pub enum TagVendor {
     Psalm,
 }
 
-impl Document {
-    pub fn get_tags(&self) -> impl Iterator<Item = &Tag> {
+impl<'arena> Document<'arena> {
+    pub fn get_tags(&self) -> impl Iterator<Item = &Tag<'arena>> {
         self.elements.iter().filter_map(|element| if let Element::Tag(tag) = element { Some(tag) } else { None })
     }
 
-    pub fn get_tags_by_kind(&self, kind: TagKind) -> impl Iterator<Item = &Tag> {
+    pub fn get_tags_by_kind(&self, kind: TagKind) -> impl Iterator<Item = &Tag<'arena>> {
         self.get_tags().filter(move |tag| tag.kind == kind)
     }
 }
 
-impl HasSpan for Document {
+impl HasSpan for Document<'_> {
     fn span(&self) -> Span {
         self.span
     }

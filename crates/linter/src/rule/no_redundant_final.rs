@@ -87,7 +87,7 @@ impl LintRule for NoRedundantFinalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let (members, is_enum) = match node {
             Node::Class(class) => {
                 if !class.modifiers.contains_final() {
@@ -110,17 +110,15 @@ impl LintRule for NoRedundantFinalRule {
                     continue;
                 };
 
-                let method_name = ctx.interner.lookup(&method.name.value);
-
                 let message = if is_enum {
                     format!(
                         "The `final` modifier on enum method `{}` is redundant as enums cannot be extended.",
-                        method_name,
+                        method.name.value,
                     )
                 } else {
                     format!(
                         "The `final` modifier on method `{}` is redundant as the class is already final.",
-                        method_name,
+                        method.name.value,
                     )
                 };
 

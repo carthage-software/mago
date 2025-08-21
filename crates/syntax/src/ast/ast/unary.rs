@@ -1,9 +1,6 @@
-use mago_interner::ThreadedInterner;
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -11,54 +8,54 @@ use crate::ast::ast::expression::Expression;
 use crate::token::GetPrecedence;
 use crate::token::Precedence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum UnaryPrefixOperator {
-    ErrorControl(Span),                  // `@$expr`
-    Reference(Span),                     // `&$expr`
-    ArrayCast(Span, StringIdentifier),   // `(array) $expr`
-    BoolCast(Span, StringIdentifier),    // `(bool) $expr`
-    BooleanCast(Span, StringIdentifier), // `(boolean) $expr`
-    DoubleCast(Span, StringIdentifier),  // `(double) $expr`
-    RealCast(Span, StringIdentifier),    // `(real) $expr`
-    FloatCast(Span, StringIdentifier),   // `(float) $expr`
-    IntCast(Span, StringIdentifier),     // `(int) $expr`
-    IntegerCast(Span, StringIdentifier), // `(integer) $expr`
-    ObjectCast(Span, StringIdentifier),  // `(object) $expr`
-    UnsetCast(Span, StringIdentifier),   // `(unset) $expr`
-    StringCast(Span, StringIdentifier),  // `(string) $expr`
-    BinaryCast(Span, StringIdentifier),  // `(binary) $expr`
-    VoidCast(Span, StringIdentifier),    // `(void) $expr`
-    BitwiseNot(Span),                    // `~$expr`
-    Not(Span),                           // `!$expr`
-    PreIncrement(Span),                  // `++$expr`
-    PreDecrement(Span),                  // `--$expr`
-    Plus(Span),                          // `+$expr`
-    Negation(Span),                      // `-$expr`
+#[repr(u8)]
+pub enum UnaryPrefixOperator<'arena> {
+    ErrorControl(Span),             // `@$expr`
+    Reference(Span),                // `&$expr`
+    ArrayCast(Span, &'arena str),   // `(array) $expr`
+    BoolCast(Span, &'arena str),    // `(bool) $expr`
+    BooleanCast(Span, &'arena str), // `(boolean) $expr`
+    DoubleCast(Span, &'arena str),  // `(double) $expr`
+    RealCast(Span, &'arena str),    // `(real) $expr`
+    FloatCast(Span, &'arena str),   // `(float) $expr`
+    IntCast(Span, &'arena str),     // `(int) $expr`
+    IntegerCast(Span, &'arena str), // `(integer) $expr`
+    ObjectCast(Span, &'arena str),  // `(object) $expr`
+    UnsetCast(Span, &'arena str),   // `(unset) $expr`
+    StringCast(Span, &'arena str),  // `(string) $expr`
+    BinaryCast(Span, &'arena str),  // `(binary) $expr`
+    VoidCast(Span, &'arena str),    // `(void) $expr`
+    BitwiseNot(Span),               // `~$expr`
+    Not(Span),                      // `!$expr`
+    PreIncrement(Span),             // `++$expr`
+    PreDecrement(Span),             // `--$expr`
+    Plus(Span),                     // `+$expr`
+    Negation(Span),                 // `-$expr`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
+#[repr(u8)]
 pub enum UnaryPostfixOperator {
     PostIncrement(Span), // `$expr++`
     PostDecrement(Span), // `$expr--`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPrefix {
-    pub operator: UnaryPrefixOperator,
-    pub operand: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct UnaryPrefix<'arena> {
+    pub operator: UnaryPrefixOperator<'arena>,
+    pub operand: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnaryPostfix {
-    pub operand: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct UnaryPostfix<'arena> {
+    pub operand: &'arena Expression<'arena>,
     pub operator: UnaryPostfixOperator,
 }
 
-impl UnaryPrefixOperator {
+impl<'arena> UnaryPrefixOperator<'arena> {
     #[inline]
     pub const fn is_error_control(&self) -> bool {
         matches!(self, Self::ErrorControl(_))
@@ -113,7 +110,7 @@ impl UnaryPrefixOperator {
     }
 
     #[inline]
-    pub fn as_str<'a>(&self, interner: &'a ThreadedInterner) -> &'a str {
+    pub fn as_str(&self) -> &'arena str {
         match self {
             UnaryPrefixOperator::ErrorControl(_) => "@",
             UnaryPrefixOperator::Reference(_) => "&",
@@ -129,7 +126,7 @@ impl UnaryPrefixOperator {
             | UnaryPrefixOperator::UnsetCast(_, value)
             | UnaryPrefixOperator::StringCast(_, value)
             | UnaryPrefixOperator::BinaryCast(_, value)
-            | UnaryPrefixOperator::VoidCast(_, value) => interner.lookup(value),
+            | UnaryPrefixOperator::VoidCast(_, value) => value,
             UnaryPrefixOperator::BitwiseNot(_) => "~",
             UnaryPrefixOperator::Not(_) => "!",
             UnaryPrefixOperator::PreIncrement(_) => "++",
@@ -201,7 +198,7 @@ impl GetPrecedence for UnaryPostfixOperator {
     }
 }
 
-impl HasSpan for UnaryPrefixOperator {
+impl HasSpan for UnaryPrefixOperator<'_> {
     fn span(&self) -> Span {
         match self {
             Self::ErrorControl(span) => *span,
@@ -238,13 +235,13 @@ impl HasSpan for UnaryPostfixOperator {
     }
 }
 
-impl HasSpan for UnaryPrefix {
+impl HasSpan for UnaryPrefix<'_> {
     fn span(&self) -> Span {
         self.operator.span().join(self.operand.span())
     }
 }
 
-impl HasSpan for UnaryPostfix {
+impl HasSpan for UnaryPostfix<'_> {
     fn span(&self) -> Span {
         self.operand.span().join(self.operator.span())
     }

@@ -6,7 +6,10 @@ use crate::internal::consts::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) {
+pub fn check_top_level_statements<'ast, 'arena>(
+    program: &'ast Program<'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
+) {
     let mut index = 0;
     let mut before = vec![];
 
@@ -30,9 +33,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
 
         if let Statement::Declare(declare) = statement {
             for item in declare.items.iter() {
-                let name = context.interner.lookup(&item.name.value);
-
-                if name.eq_ignore_ascii_case(STRICT_TYPES_DECLARE_DIRECTIVE) {
+                if item.name.value.eq_ignore_ascii_case(STRICT_TYPES_DECLARE_DIRECTIVE) {
                     context.report(
                         Issue::error("Strict type declaration must be the first statement in the file.")
                             .with_annotation(
@@ -87,7 +88,7 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
     }
 
     let namespaces =
-        Node::Program(context.program).filter_map(|node| if let Node::Namespace(ns) = node { Some(*ns) } else { None });
+        Node::Program(program).filter_map(|node| if let Node::Namespace(ns) = node { Some(*ns) } else { None });
 
     let mut last_unbraced = None;
     let mut last_braced = None;
@@ -161,9 +162,9 @@ pub fn check_top_level_statements(program: &Program, context: &mut Context<'_>) 
 }
 
 #[inline]
-pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
+pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_, '_>) {
     for item in declare.items.iter() {
-        let name = context.interner.lookup(&item.name.value);
+        let name = item.name.value;
 
         match name.to_ascii_lowercase().as_str() {
             STRICT_TYPES_DECLARE_DIRECTIVE => {
@@ -248,7 +249,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_>) {
+pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_, '_, '_>) {
     if context.ancestors.len() > 2 {
         // get the span of the parent, and label it.
         let parent = context.ancestors[context.ancestors.len() - 2];
@@ -269,7 +270,7 @@ pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_goto(goto: &Goto, context: &mut Context<'_>) {
+pub fn check_goto<'ast, 'arena>(goto: &'ast Goto<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let all_labels = Node::Program(context.program)
         .filter_map(|node| if let Node::Label(label) = node { Some(*label) } else { None });
 
@@ -280,12 +281,12 @@ pub fn check_goto(goto: &Goto, context: &mut Context<'_>) {
     // If we reach this point, the label was not found.
     // Attempt to find a label with the same name but different case.
     // If found, suggest the correct label.
-    let going_to = context.interner.lookup(&goto.label.value);
+    let going_to = goto.label.value;
     let mut suggestions = vec![];
 
     for label in all_labels {
-        let label_name = context.interner.lookup(&label.name.value);
-        if label_name.eq_ignore_ascii_case(going_to) {
+        let label_name = label.name.value;
+        if label.name.value.eq_ignore_ascii_case(going_to) {
             suggestions.push((label_name, label.name.span));
         }
     }

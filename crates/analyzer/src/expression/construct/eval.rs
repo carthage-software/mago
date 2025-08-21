@@ -10,11 +10,11 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for EvalConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for EvalConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_construct_inputs(
@@ -23,7 +23,7 @@ impl Analyzable for EvalConstruct {
             artifacts,
             "eval",
             self.eval.span,
-            ConstructInput::Expression(&self.value),
+            ConstructInput::Expression(self.value),
             get_string(),
             false, // is_variadic
             false, // is_optional

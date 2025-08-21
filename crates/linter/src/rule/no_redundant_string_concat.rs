@@ -80,7 +80,7 @@ impl LintRule for NoRedundantStringConcatRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -91,8 +91,7 @@ impl LintRule for NoRedundantStringConcatRule {
             return;
         }
 
-        let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) =
-            (lhs.as_ref(), rhs.as_ref())
+        let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) = (lhs, rhs)
         else {
             return;
         };
@@ -102,7 +101,7 @@ impl LintRule for NoRedundantStringConcatRule {
                 return;
             }
 
-            let dangerous = matches!(&ctx.interner.lookup(&right.raw).as_bytes()[1..], [b'{', ..]);
+            let dangerous = matches!(&right.raw.as_bytes()[1..], [b'{', ..]);
             if dangerous {
                 return;
             }

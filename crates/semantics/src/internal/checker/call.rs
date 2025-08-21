@@ -6,10 +6,10 @@ use crate::internal::checker::expression::check_for_new_without_parenthesis;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_call(call: &Call, context: &mut Context<'_>) {
+pub fn check_call(call: &Call, context: &mut Context<'_, '_, '_>) {
     match call {
         Call::Method(method_call) => {
-            check_for_new_without_parenthesis(&method_call.object, context, "method call");
+            check_for_new_without_parenthesis(method_call.object, context, "method call");
         }
         Call::NullSafeMethod(null_safe_method_call) => {
             if !context.version.is_supported(Feature::NullSafeOperator) {
@@ -23,7 +23,7 @@ pub fn check_call(call: &Call, context: &mut Context<'_>) {
                 );
             }
 
-            check_for_new_without_parenthesis(&null_safe_method_call.object, context, "nullsafe method call");
+            check_for_new_without_parenthesis(null_safe_method_call.object, context, "nullsafe method call");
         }
         _ => {}
     }

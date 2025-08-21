@@ -51,18 +51,18 @@ use crate::utils::expression::get_variable_id;
 pub mod function;
 
 #[derive(Debug, Clone, Copy)]
-pub enum FunctionLikeBody<'a> {
-    Statements(&'a [Statement]),
-    Expression(&'a Expression),
+pub enum FunctionLikeBody<'ast, 'arena> {
+    Statements(&'ast [Statement<'arena>]),
+    Expression(&'ast Expression<'arena>),
 }
 
-pub fn analyze_function_like<'a, 'ast>(
-    context: &mut Context<'a>,
+pub fn analyze_function_like<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     parent_artifacts: &mut AnalysisArtifacts,
-    block_context: &mut BlockContext<'a>,
-    function_like_metadata: &'a FunctionLikeMetadata,
-    parameter_list: &'ast FunctionLikeParameterList,
-    body: FunctionLikeBody<'ast>,
+    block_context: &mut BlockContext<'ctx>,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    parameter_list: &'ast FunctionLikeParameterList<'arena>,
+    body: FunctionLikeBody<'ast, 'arena>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
 ) -> Result<AnalysisArtifacts, AnalysisError> {
     let mut previous_type_resolution_context = std::mem::replace(
@@ -101,8 +101,8 @@ pub fn analyze_function_like<'a, 'ast>(
             };
 
             for variable in global.variables.iter() {
-                if let Some(var_id) = get_variable_id(variable, context.interner) {
-                    block_context.conditionally_referenced_variable_ids.insert(var_id);
+                if let Some(var_id) = get_variable_id(variable) {
+                    block_context.conditionally_referenced_variable_ids.insert(var_id.to_string());
                 }
             }
         }
@@ -141,12 +141,12 @@ pub fn analyze_function_like<'a, 'ast>(
     Ok(artifacts)
 }
 
-fn add_parameter_types_to_context<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn add_parameter_types_to_context<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    function_like_metadata: &FunctionLikeMetadata,
-    parameter_list: &FunctionLikeParameterList,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    parameter_list: &FunctionLikeParameterList<'arena>,
     mut inferred_parameter_types: Option<HashMap<usize, TUnion>>,
 ) -> Result<(), AnalysisError> {
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
@@ -222,9 +222,9 @@ fn add_parameter_types_to_context<'a>(
     Ok(())
 }
 
-fn expand_type_metadata<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn expand_type_metadata<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &FunctionLikeMetadata,
     type_metadata: &TypeMetadata,
@@ -266,11 +266,11 @@ fn expand_type_metadata<'a>(
     signature_union
 }
 
-fn add_properties_to_context<'a>(
-    context: &Context<'a>,
-    block_context: &mut BlockContext<'a>,
-    class_like_metadata: &ClassLikeMetadata,
-    function_like_metadata: &FunctionLikeMetadata,
+fn add_properties_to_context<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
 ) -> Result<(), AnalysisError> {
     let Some(calling_class) = block_context.scope.get_class_like_name() else {
         return Ok(());
@@ -341,7 +341,7 @@ fn add_properties_to_context<'a>(
 }
 
 fn get_this_type(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
 ) -> TObject {
@@ -469,11 +469,11 @@ fn add_symbol_references(
     }
 }
 
-fn check_thrown_types<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn check_thrown_types<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    function_like_metadata: &FunctionLikeMetadata,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
 ) -> Result<(), AnalysisError> {
     if !context.settings.check_throws {
         // If the setting is disabled, we skip the check.

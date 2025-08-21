@@ -14,7 +14,6 @@ workspace = true
 
 [dependencies]
 mago-reporting = { workspace = true }
-mago-interner = { workspace = true }
 mago-syntax = { workspace = true }
 mago-php-version = { workspace = true }
 mago-span = { workspace = true }

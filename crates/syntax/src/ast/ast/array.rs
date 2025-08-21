@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -8,17 +7,17 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ArrayAccess {
-    pub array: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ArrayAccess<'arena> {
+    pub array: &'arena Expression<'arena>,
     pub left_bracket: Span,
-    pub index: Box<Expression>,
+    pub index: &'arena Expression<'arena>,
     pub right_bracket: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ArrayAppend {
-    pub array: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ArrayAppend<'arena> {
+    pub array: &'arena Expression<'arena>,
     pub left_bracket: Span,
     pub right_bracket: Span,
 }
@@ -32,11 +31,11 @@ pub struct ArrayAppend {
 ///
 /// list($a, 'b' => $c, /* missing */, ...$rest) = $arr;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct List {
-    pub list: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct List<'arena> {
+    pub list: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'arena, ArrayElement<'arena>>,
     pub right_parenthesis: Span,
 }
 
@@ -49,10 +48,10 @@ pub struct List {
 ///
 /// $arr = ['apple', 'banana', 3 => 'orange'];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Array {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Array<'arena> {
     pub left_bracket: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'arena, ArrayElement<'arena>>,
     pub right_bracket: Span,
 }
 
@@ -65,22 +64,22 @@ pub struct Array {
 ///
 /// $arr = array('apple', 'banana', 3 => 'orange');
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct LegacyArray {
-    pub array: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct LegacyArray<'arena> {
+    pub array: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub elements: TokenSeparatedSequence<ArrayElement>,
+    pub elements: TokenSeparatedSequence<'arena, ArrayElement<'arena>>,
     pub right_parenthesis: Span,
 }
 
 /// Represents an array element.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum ArrayElement {
-    KeyValue(KeyValueArrayElement),
-    Value(ValueArrayElement),
-    Variadic(VariadicArrayElement),
+#[repr(u8)]
+pub enum ArrayElement<'arena> {
+    KeyValue(KeyValueArrayElement<'arena>),
+    Value(ValueArrayElement<'arena>),
+    Variadic(VariadicArrayElement<'arena>),
     Missing(MissingArrayElement),
 }
 
@@ -95,11 +94,11 @@ pub enum ArrayElement {
 ///   1 => 'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct KeyValueArrayElement {
-    pub key: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct KeyValueArrayElement<'arena> {
+    pub key: &'arena Expression<'arena>,
     pub double_arrow: Span,
-    pub value: Box<Expression>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a value in an array.
@@ -113,9 +112,9 @@ pub struct KeyValueArrayElement {
 ///   'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ValueArrayElement {
-    pub value: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ValueArrayElement<'arena> {
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a variadic array element.
@@ -129,10 +128,10 @@ pub struct ValueArrayElement {
 ///   ...$other,
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct VariadicArrayElement {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct VariadicArrayElement<'arena> {
     pub ellipsis: Span,
-    pub value: Box<Expression>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a missing array element.
@@ -147,12 +146,12 @@ pub struct VariadicArrayElement {
 ///   ,
 ///   'third',
 /// ];
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MissingArrayElement {
     pub comma: Span,
 }
 
-impl ArrayElement {
+impl<'arena> ArrayElement<'arena> {
     #[inline]
     pub const fn is_variadic(&self) -> bool {
         matches!(self, ArrayElement::Variadic(_))
@@ -174,9 +173,9 @@ impl ArrayElement {
     }
 
     #[inline]
-    pub fn get_key(&self) -> Option<&Expression> {
+    pub fn get_key(&self) -> Option<&Expression<'arena>> {
         match self {
-            ArrayElement::KeyValue(element) => Some(&element.key),
+            ArrayElement::KeyValue(element) => Some(element.key),
             ArrayElement::Value(_) => None,
             ArrayElement::Variadic(_) => None,
             ArrayElement::Missing(_) => None,
@@ -184,47 +183,47 @@ impl ArrayElement {
     }
 
     #[inline]
-    pub fn get_value(&self) -> Option<&Expression> {
+    pub fn get_value(&self) -> Option<&Expression<'arena>> {
         match self {
-            ArrayElement::KeyValue(element) => Some(&element.value),
-            ArrayElement::Value(element) => Some(&element.value),
-            ArrayElement::Variadic(element) => Some(&element.value),
+            ArrayElement::KeyValue(element) => Some(element.value),
+            ArrayElement::Value(element) => Some(element.value),
+            ArrayElement::Variadic(element) => Some(element.value),
             ArrayElement::Missing(_) => None,
         }
     }
 }
 
-impl HasSpan for ArrayAccess {
+impl HasSpan for ArrayAccess<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_bracket)
     }
 }
 
-impl HasSpan for ArrayAppend {
+impl HasSpan for ArrayAppend<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_bracket)
     }
 }
 
-impl HasSpan for List {
+impl HasSpan for List<'_> {
     fn span(&self) -> Span {
         self.list.span().join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for Array {
+impl HasSpan for Array<'_> {
     fn span(&self) -> Span {
         self.left_bracket.join(self.right_bracket)
     }
 }
 
-impl HasSpan for LegacyArray {
+impl HasSpan for LegacyArray<'_> {
     fn span(&self) -> Span {
         self.array.span().join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for ArrayElement {
+impl HasSpan for ArrayElement<'_> {
     fn span(&self) -> Span {
         match self {
             ArrayElement::KeyValue(element) => element.span(),
@@ -235,19 +234,19 @@ impl HasSpan for ArrayElement {
     }
 }
 
-impl HasSpan for KeyValueArrayElement {
+impl HasSpan for KeyValueArrayElement<'_> {
     fn span(&self) -> Span {
         self.key.span().join(self.value.span())
     }
 }
 
-impl HasSpan for ValueArrayElement {
+impl HasSpan for ValueArrayElement<'_> {
     fn span(&self) -> Span {
         self.value.span()
     }
 }
 
-impl HasSpan for VariadicArrayElement {
+impl HasSpan for VariadicArrayElement<'_> {
     fn span(&self) -> Span {
         self.ellipsis.join(self.value.span())
     }

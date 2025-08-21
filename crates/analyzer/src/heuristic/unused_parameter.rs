@@ -15,11 +15,11 @@ use crate::statement::function_like::FunctionLikeBody;
 
 const FUNC_GET_ARGS: &str = "func_get_args";
 
-pub fn check_unused_params(
-    metadata: &FunctionLikeMetadata,
-    params: &[FunctionLikeParameter],
-    body: FunctionLikeBody,
-    ctx: &mut Context<'_>,
+pub fn check_unused_params<'ctx, 'ast, 'arena>(
+    metadata: &'ctx FunctionLikeMetadata,
+    params: &'ast [FunctionLikeParameter<'arena>],
+    body: FunctionLikeBody<'ast, 'arena>,
+    ctx: &mut Context<'ctx, 'arena>,
 ) {
     match body {
         FunctionLikeBody::Statements(statements) => {
@@ -69,17 +69,17 @@ pub fn check_unused_params(
     }
 }
 
-fn report_parameter(
-    parameter: &FunctionLikeParameter,
+fn report_parameter<'ctx, 'ast, 'arena>(
+    parameter: &'ast FunctionLikeParameter<'arena>,
     function_like: Span,
-    context: &mut Context<'_>,
+    context: &mut Context<'ctx, 'arena>,
     kind: &'static str,
 ) {
     if parameter.ampersand.is_some() {
         return;
     }
 
-    let parameter_name = context.interner.lookup(&parameter.variable.name);
+    let parameter_name = parameter.variable.name;
     if parameter_name.starts_with("$_") {
         return;
     }
@@ -104,7 +104,6 @@ fn report_parameter(
 
 mod utils {
     use ahash::HashSet;
-    use mago_interner::StringIdentifier;
     use mago_syntax::ast::*;
     use mago_syntax::walker::Walker;
 
@@ -112,8 +111,8 @@ mod utils {
     use crate::heuristic::unused_parameter::utils::internal::FunctionCallWalker;
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub struct ForeignVariable {
-        pub name: StringIdentifier,
+    pub struct ForeignVariable<'arena> {
+        pub name: &'arena str,
         pub conditionally: bool,
     }
 
@@ -128,7 +127,11 @@ mod utils {
         is_super_global_variable(name) || "$this" == name
     }
 
-    pub fn potentially_contains_function_call(block: &[Statement], function_name: &str, context: &Context<'_>) -> bool {
+    pub fn potentially_contains_function_call<'ctx, 'ast, 'arena>(
+        block: &'ast [Statement<'arena>],
+        function_name: &'static str,
+        context: &Context<'ctx, 'arena>,
+    ) -> bool {
         let mut context = (false, context);
 
         let walker = FunctionCallWalker(function_name);
@@ -143,10 +146,10 @@ mod utils {
         context.0
     }
 
-    pub fn expression_potentially_contains_function_call(
-        expression: &Expression,
-        function_name: &str,
-        context: &Context<'_>,
+    pub fn expression_potentially_contains_function_call<'ctx, 'ast, 'arena>(
+        expression: &'ast Expression<'arena>,
+        function_name: &'static str,
+        context: &Context<'ctx, 'arena>,
     ) -> bool {
         let mut context = (false, context);
 
@@ -155,10 +158,10 @@ mod utils {
         context.0
     }
 
-    pub fn is_variable_used_in_expression(
-        expression: &Expression,
-        context: &Context<'_>,
-        variable: StringIdentifier,
+    pub fn is_variable_used_in_expression<'ctx, 'ast, 'arena>(
+        expression: &'ast Expression<'arena>,
+        context: &Context<'ctx, 'arena>,
+        variable: &'arena str,
     ) -> bool {
         use crate::heuristic::unused_parameter::utils::internal::VariableReference;
         use crate::heuristic::unused_parameter::utils::internal::VariableWalker;
@@ -171,8 +174,8 @@ mod utils {
         let mut reassigned = false;
         for variable_reference in variables {
             match variable_reference {
-                VariableReference::Use(string_identifier) => {
-                    if !reassigned && string_identifier == variable {
+                VariableReference::Use(var) => {
+                    if !reassigned && var == variable {
                         return true;
                     }
                 }
@@ -196,7 +199,10 @@ mod utils {
         false
     }
 
-    pub fn get_foreign_variable_names(stmts: &[Statement], context: &Context<'_>) -> Vec<ForeignVariable> {
+    pub fn get_foreign_variable_names<'arena>(
+        stmts: &[Statement<'arena>],
+        context: &Context<'_, 'arena>,
+    ) -> Vec<ForeignVariable<'arena>> {
         use internal::*;
 
         let mut walker_context = (Vec::default(), context, 0);
@@ -241,35 +247,44 @@ mod utils {
     mod internal {
         use super::is_predefined_variable;
 
-        use mago_interner::StringIdentifier;
         use mago_syntax::ast::*;
         use mago_syntax::walker::Walker;
 
         use crate::context::Context;
 
         #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-        pub(super) enum VariableReference {
-            Use(StringIdentifier),
-            Assign(StringIdentifier, bool),
-            Unset(StringIdentifier),
+        pub(super) enum VariableReference<'arena> {
+            Use(&'arena str),
+            Assign(&'arena str, bool),
+            Unset(&'arena str),
         }
 
         #[derive(Debug)]
         pub(super) struct VariableWalker;
 
         #[derive(Debug)]
-        pub(super) struct FunctionCallWalker<'a>(pub &'a str);
+        pub(super) struct FunctionCallWalker(pub &'static str);
 
-        impl<'a> Walker<(Vec<VariableReference>, &'a Context<'a>, usize)> for VariableWalker {
-            fn walk_if<'ast>(&self, r#if: &'ast If, context: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {
-                self.walk_expression(&r#if.condition, context);
+        impl<'ast, 'arena> Walker<'ast, 'arena, (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize)>
+            for VariableWalker
+        {
+            fn walk_if(
+                &self,
+                r#if: &'ast If<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
+                self.walk_expression(r#if.condition, context);
 
                 context.2 += 1;
                 self.walk_if_body(&r#if.body, context);
                 context.2 -= 1;
             }
 
-            fn walk_for<'ast>(&self, r#for: &'ast For, context: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {
+            fn walk_for(
+                &self,
+                r#for: &'ast For<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
                 for i in r#for.initializations.iter() {
                     self.walk_expression(i, context);
                 }
@@ -287,58 +302,58 @@ mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_while<'ast>(
+            fn walk_while(
                 &self,
-                r#while: &'ast While,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                r#while: &'ast While<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                self.walk_expression(&r#while.condition, context);
+                self.walk_expression(r#while.condition, context);
                 context.2 += 1;
                 self.walk_while_body(&r#while.body, context);
                 context.2 -= 1;
             }
 
-            fn walk_do_while<'ast>(
+            fn walk_do_while(
                 &self,
-                do_while: &'ast DoWhile,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                do_while: &'ast DoWhile<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.2 += 1;
-                self.walk_statement(&do_while.statement, context);
+                self.walk_statement(do_while.statement, context);
                 context.2 -= 1;
-                self.walk_expression(&do_while.condition, context);
+                self.walk_expression(do_while.condition, context);
             }
 
             fn walk_match_expression_arm(
                 &self,
-                match_expression_arm: &MatchExpressionArm,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                match_expression_arm: &'ast MatchExpressionArm<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 for c in match_expression_arm.conditions.iter() {
                     self.walk_expression(c, context);
                 }
 
                 context.2 += 1;
-                self.walk_expression(&match_expression_arm.expression, context);
+                self.walk_expression(match_expression_arm.expression, context);
                 context.2 -= 1;
             }
 
             fn walk_match_default_arm(
                 &self,
-                match_default_arm: &MatchDefaultArm,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                match_default_arm: &'ast MatchDefaultArm<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.2 += 1;
-                self.walk_expression(&match_default_arm.expression, context);
+                self.walk_expression(match_default_arm.expression, context);
                 context.2 -= 1;
             }
 
             fn walk_switch_expression_case(
                 &self,
-                switch_expression_case: &SwitchExpressionCase,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                switch_expression_case: &'ast SwitchExpressionCase<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                self.walk_expression(&switch_expression_case.expression, context);
+                self.walk_expression(switch_expression_case.expression, context);
                 context.2 += 1;
                 for statement in switch_expression_case.statements.iter() {
                     self.walk_statement(statement, context);
@@ -346,10 +361,10 @@ mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_switch_default_case<'ast>(
+            fn walk_switch_default_case(
                 &self,
-                switch_default_case: &'ast SwitchDefaultCase,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                switch_default_case: &'ast SwitchDefaultCase<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.2 += 1;
                 for statement in switch_default_case.statements.iter() {
@@ -358,10 +373,10 @@ mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_in_try_catch_clause<'ast>(
+            fn walk_in_try_catch_clause(
                 &self,
-                try_catch_clause: &'ast TryCatchClause,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                try_catch_clause: &'ast TryCatchClause<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 if let Some(variable) = &try_catch_clause.variable {
                     context.0.push(VariableReference::Assign(variable.name, true));
@@ -370,51 +385,51 @@ mod utils {
                 context.2 += 1;
             }
 
-            fn walk_out_try_catch_clause<'ast>(
+            fn walk_out_try_catch_clause(
                 &self,
-                _try_catch_clause: &'ast TryCatchClause,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                _try_catch_clause: &'ast TryCatchClause<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.2 -= 1;
             }
 
-            fn walk_in_foreach_value_target<'ast>(
+            fn walk_in_foreach_value_target(
                 &self,
-                foreach_value_target: &'ast ForeachValueTarget,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                foreach_value_target: &'ast ForeachValueTarget<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                scan_expression_for_assignment(&foreach_value_target.value, context.1, &mut context.0, true);
+                scan_expression_for_assignment(foreach_value_target.value, &mut context.0, true);
             }
 
-            fn walk_in_foreach_key_value_target<'ast>(
+            fn walk_in_foreach_key_value_target(
                 &self,
-                foreach_key_value_target: &'ast ForeachKeyValueTarget,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                foreach_key_value_target: &'ast ForeachKeyValueTarget<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                scan_expression_for_assignment(&foreach_key_value_target.key, context.1, &mut context.0, true);
-                scan_expression_for_assignment(&foreach_key_value_target.value, context.1, &mut context.0, true);
+                scan_expression_for_assignment(foreach_key_value_target.key, &mut context.0, true);
+                scan_expression_for_assignment(foreach_key_value_target.value, &mut context.0, true);
             }
 
-            fn walk_in_static_concrete_item<'ast>(
+            fn walk_in_static_concrete_item(
                 &self,
-                static_concrete_item: &'ast StaticConcreteItem,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                static_concrete_item: &'ast StaticConcreteItem<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.0.push(VariableReference::Assign(static_concrete_item.variable.name, context.2 > 0));
             }
 
-            fn walk_in_static_abstract_item<'ast>(
+            fn walk_in_static_abstract_item(
                 &self,
-                static_abstract_item: &'ast StaticAbstractItem,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                static_abstract_item: &'ast StaticAbstractItem<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.0.push(VariableReference::Assign(static_abstract_item.variable.name, context.2 > 0));
             }
 
-            fn walk_in_global<'ast>(
+            fn walk_in_global(
                 &self,
-                global: &'ast Global,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                global: &'ast Global<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 for variable in global.variables.iter() {
                     let Variable::Direct(variable) = variable else {
@@ -426,42 +441,46 @@ mod utils {
 
             fn walk_conditional(
                 &self,
-                conditional: &Conditional,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                conditional: &'ast Conditional<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                self.walk_expression(&conditional.condition, context);
+                self.walk_expression(conditional.condition, context);
 
                 context.2 += 1;
-                if let Some(expr) = conditional.then.as_deref() {
+                if let Some(expr) = conditional.then {
                     self.walk_expression(expr, context);
                 }
-                self.walk_expression(&conditional.r#else, context);
+                self.walk_expression(conditional.r#else, context);
                 context.2 -= 1;
             }
 
-            fn walk_binary(&self, binary: &Binary, context: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {
-                self.walk_expression(&binary.lhs, context);
+            fn walk_binary(
+                &self,
+                binary: &'ast Binary<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
+                self.walk_expression(binary.lhs, context);
 
                 if !binary.operator.is_elvis() && !binary.operator.is_null_coalesce() && !binary.operator.is_logical() {
-                    self.walk_expression(&binary.rhs, context);
+                    self.walk_expression(binary.rhs, context);
                     return;
                 };
 
                 context.2 += 1;
-                self.walk_expression(&binary.rhs, context);
+                self.walk_expression(binary.rhs, context);
                 context.2 -= 1;
             }
 
-            fn walk_assignment<'ast>(
+            fn walk_assignment(
                 &self,
-                assignment: &'ast Assignment,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                assignment: &'ast Assignment<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                self.walk_expression(&assignment.rhs, context);
+                self.walk_expression(assignment.rhs, context);
 
                 let is_conditional = context.2 > 0;
                 let mut variables = Vec::default();
-                scan_expression_for_assignment(&assignment.lhs, context.1, &mut variables, is_conditional);
+                scan_expression_for_assignment(assignment.lhs, &mut variables, is_conditional);
 
                 match assignment.operator {
                     AssignmentOperator::Assign(_) => {
@@ -479,24 +498,23 @@ mod utils {
                     }
                 }
 
-                self.walk_expression(&assignment.lhs, context);
+                self.walk_expression(assignment.lhs, context);
             }
 
-            fn walk_in_direct_variable<'ast>(
+            fn walk_in_direct_variable(
                 &self,
-                direct_variable: &'ast DirectVariable,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                direct_variable: &'ast DirectVariable<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                let name = context.1.interner.lookup(&direct_variable.name);
-                if !is_predefined_variable(name) {
+                if !is_predefined_variable(direct_variable.name) {
                     context.0.push(VariableReference::Use(direct_variable.name));
                 }
             }
 
-            fn walk_closure<'ast>(
+            fn walk_closure(
                 &self,
-                closure: &'ast Closure,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                closure: &'ast Closure<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 if let Some(use_clause) = &closure.use_clause {
                     for use_clause_variable in use_clause.variables.iter() {
@@ -505,20 +523,20 @@ mod utils {
                 }
             }
 
-            fn walk_in_arrow_function<'ast>(
+            fn walk_in_arrow_function(
                 &self,
-                arrow_function: &'ast ArrowFunction,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                arrow_function: &'ast ArrowFunction<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 for parameter in arrow_function.parameter_list.parameters.iter() {
                     context.0.push(VariableReference::Assign(parameter.variable.name, false));
                 }
             }
 
-            fn walk_out_arrow_function<'ast>(
+            fn walk_out_arrow_function(
                 &self,
-                arrow_function: &'ast ArrowFunction,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                arrow_function: &'ast ArrowFunction<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 for parameter in arrow_function.parameter_list.parameters.iter() {
                     context.0.push(VariableReference::Unset(parameter.variable.name));
@@ -526,10 +544,10 @@ mod utils {
             }
 
             #[inline]
-            fn walk_anonymous_class<'ast>(
+            fn walk_anonymous_class(
                 &self,
-                anonymous_class: &'ast AnonymousClass,
-                context: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                anonymous_class: &'ast AnonymousClass<'arena>,
+                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 if let Some(argument_list) = anonymous_class.argument_list.as_ref() {
                     self.walk_argument_list(argument_list, context);
@@ -537,46 +555,65 @@ mod utils {
             }
 
             #[inline]
-            fn walk_namespace<'ast>(
+            fn walk_namespace(
                 &self,
-                _: &'ast Namespace,
-                _: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                _: &'ast Namespace<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
             }
 
             #[inline]
-            fn walk_class<'ast>(&self, _: &'ast Class, _: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {}
-
-            #[inline]
-            fn walk_interface<'ast>(
+            fn walk_class(
                 &self,
-                _: &'ast Interface,
-                _: &mut (Vec<VariableReference>, &'a Context<'a>, usize),
+                _: &'ast Class<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
             }
 
             #[inline]
-            fn walk_trait<'ast>(&self, _: &'ast Trait, _: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {}
+            fn walk_interface(
+                &self,
+                _: &'ast Interface<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
+            }
 
             #[inline]
-            fn walk_enum<'ast>(&self, _: &'ast Enum, _: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {}
+            fn walk_trait(
+                &self,
+                _: &'ast Trait<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
+            }
 
             #[inline]
-            fn walk_function<'ast>(&self, _: &'ast Function, _: &mut (Vec<VariableReference>, &'a Context<'a>, usize)) {
+            fn walk_enum(
+                &self,
+                _: &'ast Enum<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
+            }
+
+            #[inline]
+            fn walk_function(
+                &self,
+                _: &'ast Function<'arena>,
+                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
+            ) {
             }
         }
 
-        impl<'a> Walker<(bool, &'a Context<'a>)> for FunctionCallWalker<'a> {
-            fn walk_in_function_call<'ast>(
+        impl<'ast, 'arena> Walker<'ast, 'arena, (bool, &Context<'_, 'arena>)> for FunctionCallWalker {
+            fn walk_in_function_call(
                 &self,
-                function_call: &'ast FunctionCall,
-                context: &mut (bool, &'a Context<'a>),
+                function_call: &'ast FunctionCall<'arena>,
+                context: &mut (bool, &Context<'_, 'arena>),
             ) {
                 if context.0 {
                     return;
                 }
 
-                let Expression::Identifier(func) = function_call.function.as_ref() else {
+                let Expression::Identifier(func) = function_call.function else {
                     return;
                 };
 
@@ -584,37 +621,36 @@ mod utils {
             }
 
             #[inline]
-            fn walk_closure<'ast>(&self, _: &'ast Closure, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_closure(&self, _: &'ast Closure<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_arrow_function<'ast>(&self, _: &'ast ArrowFunction, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_arrow_function(&self, _: &'ast ArrowFunction<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_namespace<'ast>(&self, _: &'ast Namespace, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_namespace(&self, _: &'ast Namespace<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_class<'ast>(&self, _: &'ast Class, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_class(&self, _: &'ast Class<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_interface<'ast>(&self, _: &'ast Interface, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_interface(&self, _: &'ast Interface<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_trait<'ast>(&self, _: &'ast Trait, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_trait(&self, _: &'ast Trait<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_enum<'ast>(&self, _: &'ast Enum, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_enum(&self, _: &'ast Enum<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_function<'ast>(&self, _: &'ast Function, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_function(&self, _: &'ast Function<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
 
             #[inline]
-            fn walk_anonymous_class<'ast>(&self, _: &'ast AnonymousClass, _: &mut (bool, &'a Context<'a>)) {}
+            fn walk_anonymous_class(&self, _: &'ast AnonymousClass<'arena>, _: &mut (bool, &Context<'_, 'arena>)) {}
         }
 
-        fn scan_expression_for_assignment(
-            expression: &Expression,
-            context: &Context<'_>,
-            variables: &mut Vec<VariableReference>,
+        fn scan_expression_for_assignment<'arena>(
+            expression: &Expression<'arena>,
+            variables: &mut Vec<VariableReference<'arena>>,
             is_conditional: bool,
         ) {
             match &expression {
@@ -623,8 +659,7 @@ mod utils {
                         return;
                     };
 
-                    let name = context.interner.lookup(&variable.name);
-                    if !is_predefined_variable(name) {
+                    if !is_predefined_variable(variable.name) {
                         variables.push(VariableReference::Assign(variable.name, is_conditional));
                     }
                 }
@@ -632,26 +667,15 @@ mod utils {
                     for element in array.elements.iter() {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
+                                scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);
                                 scan_expression_for_assignment(
-                                    &key_value_array_element.key,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
-                                scan_expression_for_assignment(
-                                    &key_value_array_element.value,
-                                    context,
+                                    key_value_array_element.value,
                                     variables,
                                     is_conditional,
                                 );
                             }
                             ArrayElement::Value(value_array_element) => {
-                                scan_expression_for_assignment(
-                                    &value_array_element.value,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
+                                scan_expression_for_assignment(value_array_element.value, variables, is_conditional);
                             }
                             _ => {}
                         }
@@ -661,26 +685,15 @@ mod utils {
                     for element in array.elements.iter() {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
+                                scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);
                                 scan_expression_for_assignment(
-                                    &key_value_array_element.key,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
-                                scan_expression_for_assignment(
-                                    &key_value_array_element.value,
-                                    context,
+                                    key_value_array_element.value,
                                     variables,
                                     is_conditional,
                                 );
                             }
                             ArrayElement::Value(value_array_element) => {
-                                scan_expression_for_assignment(
-                                    &value_array_element.value,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
+                                scan_expression_for_assignment(value_array_element.value, variables, is_conditional);
                             }
                             _ => {}
                         }
@@ -690,58 +703,47 @@ mod utils {
                     for element in list.elements.iter() {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
+                                scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);
                                 scan_expression_for_assignment(
-                                    &key_value_array_element.key,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
-                                scan_expression_for_assignment(
-                                    &key_value_array_element.value,
-                                    context,
+                                    key_value_array_element.value,
                                     variables,
                                     is_conditional,
                                 );
                             }
                             ArrayElement::Value(value_array_element) => {
-                                scan_expression_for_assignment(
-                                    &value_array_element.value,
-                                    context,
-                                    variables,
-                                    is_conditional,
-                                );
+                                scan_expression_for_assignment(value_array_element.value, variables, is_conditional);
                             }
                             _ => {}
                         }
                     }
                 }
                 Expression::ArrayAppend(append) => {
-                    if let Expression::Variable(Variable::Direct(variable)) = append.array.as_ref() {
-                        let name = context.interner.lookup(&variable.name);
+                    if let Expression::Variable(Variable::Direct(variable)) = append.array {
+                        let name = variable.name;
                         if !is_predefined_variable(name) {
                             variables.push(VariableReference::Use(variable.name));
                         }
                     }
 
-                    scan_expression_for_assignment(&append.array, context, variables, is_conditional);
+                    scan_expression_for_assignment(append.array, variables, is_conditional);
                 }
                 Expression::ArrayAccess(access) => {
-                    if let Expression::Variable(Variable::Direct(variable)) = access.array.as_ref() {
-                        let name = context.interner.lookup(&variable.name);
+                    if let Expression::Variable(Variable::Direct(variable)) = access.array {
+                        let name = variable.name;
                         if !is_predefined_variable(name) {
                             variables.push(VariableReference::Use(variable.name));
                         }
                     }
 
-                    if let Expression::Variable(Variable::Direct(variable)) = access.index.as_ref() {
-                        let name = context.interner.lookup(&variable.name);
+                    if let Expression::Variable(Variable::Direct(variable)) = access.index {
+                        let name = variable.name;
                         if !is_predefined_variable(name) {
                             variables.push(VariableReference::Use(variable.name));
                         }
                     }
 
-                    scan_expression_for_assignment(&access.array, context, variables, is_conditional);
-                    scan_expression_for_assignment(&access.index, context, variables, is_conditional);
+                    scan_expression_for_assignment(access.array, variables, is_conditional);
+                    scan_expression_for_assignment(access.index, variables, is_conditional);
                 }
                 _ => {}
             }

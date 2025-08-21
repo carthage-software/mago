@@ -1,4 +1,3 @@
-use mago_interner::StringIdentifier;
 use mago_syntax::ast::LiteralStringKind;
 
 use crate::internal::FormatterState;
@@ -55,13 +54,11 @@ fn make_string(raw_text: &str, enclosing_quote: char) -> String {
     result
 }
 
-pub(super) fn print_string<'a>(
-    f: &FormatterState<'a>,
+pub(super) fn print_string<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
     kind: Option<LiteralStringKind>,
-    value: &StringIdentifier,
-) -> &'a str {
-    let text = f.lookup(value);
-
+    text: &'arena str,
+) -> &'arena str {
     let quote = unsafe { text.chars().next().unwrap_unchecked() };
     let raw_text = &text[1..text.len() - 1];
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);

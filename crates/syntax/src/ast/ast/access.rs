@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -11,56 +10,56 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::ast::variable::Variable;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ConstantAccess {
-    pub name: Identifier,
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ConstantAccess<'arena> {
+    pub name: Identifier<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Access {
-    Property(PropertyAccess),
-    NullSafeProperty(NullSafePropertyAccess),
-    StaticProperty(StaticPropertyAccess),
-    ClassConstant(ClassConstantAccess),
+#[repr(u8)]
+pub enum Access<'arena> {
+    Property(PropertyAccess<'arena>),
+    NullSafeProperty(NullSafePropertyAccess<'arena>),
+    StaticProperty(StaticPropertyAccess<'arena>),
+    ClassConstant(ClassConstantAccess<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct PropertyAccess {
-    pub object: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyAccess<'arena> {
+    pub object: &'arena Expression<'arena>,
     pub arrow: Span,
-    pub property: ClassLikeMemberSelector,
+    pub property: ClassLikeMemberSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct NullSafePropertyAccess {
-    pub object: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NullSafePropertyAccess<'arena> {
+    pub object: &'arena Expression<'arena>,
     pub question_mark_arrow: Span,
-    pub property: ClassLikeMemberSelector,
+    pub property: ClassLikeMemberSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct StaticPropertyAccess {
-    pub class: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct StaticPropertyAccess<'arena> {
+    pub class: &'arena Expression<'arena>,
     pub double_colon: Span,
-    pub property: Variable,
+    pub property: Variable<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ClassConstantAccess {
-    pub class: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClassConstantAccess<'arena> {
+    pub class: &'arena Expression<'arena>,
     pub double_colon: Span,
-    pub constant: ClassLikeConstantSelector,
+    pub constant: ClassLikeConstantSelector<'arena>,
 }
 
-impl HasSpan for ConstantAccess {
+impl HasSpan for ConstantAccess<'_> {
     fn span(&self) -> Span {
         self.name.span()
     }
 }
 
-impl HasSpan for Access {
+impl HasSpan for Access<'_> {
     fn span(&self) -> Span {
         match self {
             Access::Property(p) => p.span(),
@@ -71,25 +70,25 @@ impl HasSpan for Access {
     }
 }
 
-impl HasSpan for PropertyAccess {
+impl HasSpan for PropertyAccess<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.property.span())
     }
 }
 
-impl HasSpan for NullSafePropertyAccess {
+impl HasSpan for NullSafePropertyAccess<'_> {
     fn span(&self) -> Span {
         self.object.span().join(self.property.span())
     }
 }
 
-impl HasSpan for StaticPropertyAccess {
+impl HasSpan for StaticPropertyAccess<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.property.span())
     }
 }
 
-impl HasSpan for ClassConstantAccess {
+impl HasSpan for ClassConstantAccess<'_> {
     fn span(&self) -> Span {
         self.class.span().join(self.constant.span())
     }

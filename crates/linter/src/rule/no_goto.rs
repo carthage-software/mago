@@ -95,7 +95,7 @@ impl LintRule for NoGotoRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Goto(goto) => {
                 let issue = Issue::new(self.cfg.level, "Avoid using `goto`.")
@@ -117,7 +117,7 @@ impl LintRule for NoGotoRule {
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(label.span())
-                            .with_message(format!("Label `{}` is declared here", ctx.interner.lookup(&label.name.value))),
+                            .with_message(format!("Label `{}` is declared here", label.name.value)),
                     )
                     .with_note(
                         "Labels are used with `goto` statements, which can lead to confusing 'spaghetti code'.",

@@ -16,11 +16,11 @@ use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
 use crate::utils::expression::get_property_access_expression_id;
 
-impl Analyzable for PropertyAccess {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_property_access(
@@ -28,7 +28,7 @@ impl Analyzable for PropertyAccess {
             block_context,
             artifacts,
             self.span(),
-            &self.object,
+            self.object,
             self.arrow.span(),
             &self.property,
             false,
@@ -36,11 +36,11 @@ impl Analyzable for PropertyAccess {
     }
 }
 
-impl Analyzable for NullSafePropertyAccess {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafePropertyAccess<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_property_access(
@@ -48,7 +48,7 @@ impl Analyzable for NullSafePropertyAccess {
             block_context,
             artifacts,
             self.span(),
-            &self.object,
+            self.object,
             self.question_mark_arrow.span(),
             &self.property,
             true,
@@ -57,14 +57,14 @@ impl Analyzable for NullSafePropertyAccess {
 }
 
 #[inline]
-fn analyze_property_access<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_property_access<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     span: Span,
-    object: &Expression,
+    object: &'ast Expression<'arena>,
     arrow_span: Span,
-    property_selector: &ClassLikeMemberSelector,
+    property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
 ) -> Result<(), AnalysisError> {
     let property_access_id = get_property_access_expression_id(

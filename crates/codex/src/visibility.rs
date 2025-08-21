@@ -56,10 +56,10 @@ impl std::fmt::Display for Visibility {
 }
 
 /// Attempts to convert an AST `Modifier` node into a `Visibility` level.
-impl TryFrom<&Modifier> for Visibility {
+impl TryFrom<&Modifier<'_>> for Visibility {
     type Error = ();
 
-    fn try_from(value: &Modifier) -> Result<Self, Self::Error> {
+    fn try_from(value: &Modifier<'_>) -> Result<Self, Self::Error> {
         match value {
             Modifier::Public(_) | Modifier::PublicSet(_) => Ok(Visibility::Public),
             Modifier::Protected(_) | Modifier::ProtectedSet(_) => Ok(Visibility::Protected),

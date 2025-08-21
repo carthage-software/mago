@@ -108,7 +108,7 @@ impl LintRule for TooManyMethodsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let members = match node {
             Node::Class(class) => class.members.as_slice(),
             Node::Trait(r#trait) => r#trait.members.as_slice(),
@@ -122,7 +122,7 @@ impl LintRule for TooManyMethodsRule {
         for member in members {
             match member {
                 ClassLikeMember::Method(method) => {
-                    if !self.cfg.count_setters_and_getters && is_method_setter_or_getter(method, ctx) {
+                    if !self.cfg.count_setters_and_getters && is_method_setter_or_getter(method) {
                         continue;
                     }
 

@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -9,13 +11,15 @@ use crate::document::Group;
 use crate::document::Line;
 use crate::internal::FormatterState;
 
-impl<'a> FormatterState<'a> {
-    pub(crate) fn wrap_parens(&mut self, document: Document<'a>, node: Node<'a>) -> Document<'a> {
+impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
+    pub(crate) fn wrap_parens(&mut self, document: Document<'arena>, node: Node<'ast, 'arena>) -> Document<'arena> {
         if self.need_parens(node) {
             if self.should_indent(node) {
                 Document::Group(Group::new(vec![
+                    in self.arena;
                     Document::String("("),
                     Document::Indent(vec![
+                        in self.arena;
                         if self.settings.space_within_grouping_parenthesis {
                             Document::Line(Line::default())
                         } else {
@@ -32,6 +36,7 @@ impl<'a> FormatterState<'a> {
                 ]))
             } else {
                 Document::Group(Group::new(vec![
+                    in self.arena;
                     Document::String("("),
                     if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
                     document,
@@ -44,7 +49,7 @@ impl<'a> FormatterState<'a> {
         }
     }
 
-    fn should_indent(&self, node: Node<'a>) -> bool {
+    fn should_indent(&self, node: Node<'ast, 'arena>) -> bool {
         if matches!(node, Node::Program(_)) || node.is_statement() {
             return false;
         }
@@ -52,7 +57,7 @@ impl<'a> FormatterState<'a> {
         self.is_unary_or_binary_or_ternary(node)
     }
 
-    fn need_parens(&mut self, node: Node<'a>) -> bool {
+    fn need_parens(&mut self, node: Node<'ast, 'arena>) -> bool {
         if matches!(node, Node::Program(_)) || node.is_statement() {
             return false;
         }
@@ -65,7 +70,7 @@ impl<'a> FormatterState<'a> {
             || self.pipe_node_needs_parens(node)
     }
 
-    fn literal_needs_parens(&self, node: Node<'a>) -> bool {
+    fn literal_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
         let Node::Literal(Literal::Integer(_) | Literal::Float(_)) = node else {
             return false;
         };
@@ -79,7 +84,7 @@ impl<'a> FormatterState<'a> {
         false
     }
 
-    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'a>) -> bool {
+    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'ast, 'arena>) -> bool {
         if !matches!(node, Node::Assignment(_) | Node::Conditional(_)) {
             return false;
         }
@@ -95,7 +100,7 @@ impl<'a> FormatterState<'a> {
         self.is_unary_or_binary_or_ternary(parent_node) || matches!(parent_node, Node::VariadicArrayElement(_))
     }
 
-    fn pipe_node_needs_parens(&self, node: Node<'a>) -> bool {
+    fn pipe_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
         let Node::Pipe(_) = node else {
             return false;
         };
@@ -119,7 +124,7 @@ impl<'a> FormatterState<'a> {
         }
     }
 
-    fn binary_node_needs_parens(&self, node: Node<'a>) -> bool {
+    fn binary_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
         let operator = match node {
             Node::Binary(e) => &e.operator,
             _ => return false,
@@ -189,7 +194,7 @@ impl<'a> FormatterState<'a> {
         precedence < parent_precedence
     }
 
-    fn unary_node_needs_parens(&self, node: Node<'a>) -> bool {
+    fn unary_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
         let unary_span = node.span();
         let precedence = match node {
             Node::UnaryPrefix(e) => {
@@ -248,7 +253,7 @@ impl<'a> FormatterState<'a> {
         precedence < parent_precedence
     }
 
-    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'a>) -> bool {
+    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'ast, 'arena>) -> bool {
         let Node::Expression(expression) = node else {
             return false;
         };
@@ -305,7 +310,11 @@ impl<'a> FormatterState<'a> {
         false
     }
 
-    const fn callee_expression_need_parenthesis(&self, expression: &'a Expression, instantiation: bool) -> bool {
+    const fn callee_expression_need_parenthesis(
+        &self,
+        expression: &'ast Expression<'arena>,
+        instantiation: bool,
+    ) -> bool {
         if instantiation && matches!(expression, Expression::Call(_)) {
             return true;
         }
@@ -332,7 +341,7 @@ impl<'a> FormatterState<'a> {
         )
     }
 
-    const fn function_callee_expression_need_parenthesis(&self, expression: &'a Expression) -> bool {
+    const fn function_callee_expression_need_parenthesis(&self, expression: &'ast Expression<'arena>) -> bool {
         !matches!(
             expression,
             Expression::Literal(_)
@@ -350,11 +359,11 @@ impl<'a> FormatterState<'a> {
         )
     }
 
-    const fn is_unary_or_binary_or_ternary(&self, node: Node<'a>) -> bool {
+    const fn is_unary_or_binary_or_ternary(&self, node: Node<'ast, 'arena>) -> bool {
         self.is_unary(node) || self.is_binaryish(node) || self.is_conditional(node)
     }
 
-    const fn is_binaryish(&self, node: Node<'a>) -> bool {
+    const fn is_binaryish(&self, node: Node<'ast, 'arena>) -> bool {
         match node {
             Node::Binary(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
@@ -363,16 +372,19 @@ impl<'a> FormatterState<'a> {
         }
     }
 
-    const fn is_unary(&self, node: Node<'a>) -> bool {
+    const fn is_unary(&self, node: Node<'ast, 'arena>) -> bool {
         matches!(node, Node::UnaryPrefix(_) | Node::UnaryPostfix(_))
     }
 
-    const fn is_conditional(&self, node: Node<'a>) -> bool {
+    const fn is_conditional(&self, node: Node<'ast, 'arena>) -> bool {
         if let Node::Conditional(op) = node { op.then.is_some() } else { false }
     }
 }
 
-pub(crate) fn instantiation_needs_parens(f: &FormatterState<'_>, i: &Instantiation) -> bool {
+pub(crate) fn instantiation_needs_parens<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    i: &'ast Instantiation<'arena>,
+) -> bool {
     if f.php_version.is_supported(Feature::NewWithoutParentheses) {
         if i.argument_list.as_ref().is_none_or(|list| list.arguments.is_empty()) {
             if f.settings.parentheses_in_new_expression {

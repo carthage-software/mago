@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -18,32 +17,32 @@ use crate::ast::ast::keyword::Keyword;
 /// ```php
 /// int
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Hint {
-    Identifier(Identifier),
-    Parenthesized(ParenthesizedHint),
-    Nullable(NullableHint),
-    Union(UnionHint),
-    Intersection(IntersectionHint),
-    Null(Keyword),
-    True(Keyword),
-    False(Keyword),
-    Array(Keyword),
-    Callable(Keyword),
-    Static(Keyword),
-    Self_(Keyword),
-    Parent(Keyword),
-    Void(LocalIdentifier),
-    Never(LocalIdentifier),
-    Float(LocalIdentifier),
-    Bool(LocalIdentifier),
-    Integer(LocalIdentifier),
-    String(LocalIdentifier),
-    Object(LocalIdentifier),
-    Mixed(LocalIdentifier),
-    Iterable(LocalIdentifier),
+#[repr(u8)]
+pub enum Hint<'arena> {
+    Identifier(Identifier<'arena>),
+    Parenthesized(ParenthesizedHint<'arena>),
+    Nullable(NullableHint<'arena>),
+    Union(UnionHint<'arena>),
+    Intersection(IntersectionHint<'arena>),
+    Null(Keyword<'arena>),
+    True(Keyword<'arena>),
+    False(Keyword<'arena>),
+    Array(Keyword<'arena>),
+    Callable(Keyword<'arena>),
+    Static(Keyword<'arena>),
+    Self_(Keyword<'arena>),
+    Parent(Keyword<'arena>),
+    Void(LocalIdentifier<'arena>),
+    Never(LocalIdentifier<'arena>),
+    Float(LocalIdentifier<'arena>),
+    Bool(LocalIdentifier<'arena>),
+    Integer(LocalIdentifier<'arena>),
+    String(LocalIdentifier<'arena>),
+    Object(LocalIdentifier<'arena>),
+    Mixed(LocalIdentifier<'arena>),
+    Iterable(LocalIdentifier<'arena>),
 }
 
 /// Represents a parenthesized type hint.
@@ -57,10 +56,10 @@ pub enum Hint {
 ///    return 'hello';
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ParenthesizedHint {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ParenthesizedHint<'arena> {
     pub left_parenthesis: Span,
-    pub hint: Box<Hint>,
+    pub hint: &'arena Hint<'arena>,
     pub right_parenthesis: Span,
 }
 
@@ -73,11 +72,11 @@ pub struct ParenthesizedHint {
 /// ```php
 /// int|string
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct UnionHint {
-    pub left: Box<Hint>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct UnionHint<'arena> {
+    pub left: &'arena Hint<'arena>,
     pub pipe: Span,
-    pub right: Box<Hint>,
+    pub right: &'arena Hint<'arena>,
 }
 
 /// Represents an intersection type.
@@ -89,11 +88,11 @@ pub struct UnionHint {
 /// ```php
 /// ArrayAccess&Countable
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct IntersectionHint {
-    pub left: Box<Hint>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct IntersectionHint<'arena> {
+    pub left: &'arena Hint<'arena>,
     pub ampersand: Span,
-    pub right: Box<Hint>,
+    pub right: &'arena Hint<'arena>,
 }
 
 /// Represents a nullable type.
@@ -105,13 +104,13 @@ pub struct IntersectionHint {
 /// ```php
 /// ?string
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct NullableHint {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NullableHint<'arena> {
     pub question_mark: Span,
-    pub hint: Box<Hint>,
+    pub hint: &'arena Hint<'arena>,
 }
 
-impl Hint {
+impl Hint<'_> {
     /// Returns `true` if the type hint is a standalone type hint.
     ///
     /// Standalone type hints are type hints that cannot be wrapped inside another type hint.
@@ -134,7 +133,7 @@ impl Hint {
     }
 
     #[inline]
-    pub const fn contains_null(&self) -> bool {
+    pub fn contains_null(&self) -> bool {
         match self {
             Hint::Mixed(_) => true,
             Hint::Nullable(_) => true,
@@ -178,7 +177,7 @@ impl Hint {
     ///
     /// A scalar type is a type that represents a single value.
     #[inline]
-    pub const fn is_scalar(&self) -> bool {
+    pub fn is_scalar(&self) -> bool {
         if let Hint::Union(union) = self {
             return union.left.is_scalar() && union.right.is_scalar();
         }
@@ -193,7 +192,7 @@ impl Hint {
     /// If the type is wrapped in parentheses, this method will unwrap the parentheses and
     ///  check if the unwrapped type is a union type.
     #[inline]
-    pub const fn is_union(&self) -> bool {
+    pub fn is_union(&self) -> bool {
         match self {
             Hint::Union(_) => true,
             Hint::Parenthesized(parenthesized) => parenthesized.hint.is_union(),
@@ -209,7 +208,7 @@ impl Hint {
     /// If the type is wrapped in parentheses, this method will unwrap the parentheses and
     ///  check if the unwrapped type is an intersection type.
     #[inline]
-    pub const fn is_intersection(&self) -> bool {
+    pub fn is_intersection(&self) -> bool {
         match self {
             Hint::Intersection(_) => true,
             Hint::Parenthesized(parenthesized) => parenthesized.hint.is_intersection(),
@@ -218,7 +217,7 @@ impl Hint {
     }
 }
 
-impl HasSpan for Hint {
+impl HasSpan for Hint<'_> {
     fn span(&self) -> Span {
         match &self {
             Hint::Identifier(identifier) => identifier.span(),
@@ -247,25 +246,25 @@ impl HasSpan for Hint {
     }
 }
 
-impl HasSpan for ParenthesizedHint {
+impl HasSpan for ParenthesizedHint<'_> {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
     }
 }
 
-impl HasSpan for UnionHint {
+impl HasSpan for UnionHint<'_> {
     fn span(&self) -> Span {
         self.left.span().join(self.right.span())
     }
 }
 
-impl HasSpan for IntersectionHint {
+impl HasSpan for IntersectionHint<'_> {
     fn span(&self) -> Span {
         self.left.span().join(self.right.span())
     }
 }
 
-impl HasSpan for NullableHint {
+impl HasSpan for NullableHint<'_> {
     fn span(&self) -> Span {
         Span::between(self.question_mark, self.hint.span())
     }

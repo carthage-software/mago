@@ -4,7 +4,7 @@ use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_opening_tag(stream: &mut TokenStream<'_, '_>) -> Result<OpeningTag, ParseError> {
+pub fn parse_opening_tag<'arena>(stream: &mut TokenStream<'arena>) -> Result<OpeningTag<'arena>, ParseError> {
     let token = utils::expect_one_of(stream, &[T!["<?php"], T!["<?="], T!["<?"]])?;
 
     Ok(match token.kind {
@@ -15,7 +15,7 @@ pub fn parse_opening_tag(stream: &mut TokenStream<'_, '_>) -> Result<OpeningTag,
     })
 }
 
-pub fn parse_closing_tag(stream: &mut TokenStream<'_, '_>) -> Result<ClosingTag, ParseError> {
+pub fn parse_closing_tag<'arena>(stream: &mut TokenStream<'arena>) -> Result<ClosingTag, ParseError> {
     let span = utils::expect_span(stream, T!["?>"])?;
 
     Ok(ClosingTag { span })

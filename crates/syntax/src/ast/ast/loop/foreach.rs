@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -22,24 +21,24 @@ use crate::ast::sequence::Sequence;
 ///    echo $value;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Foreach {
-    pub foreach: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Foreach<'arena> {
+    pub foreach: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub expression: Box<Expression>,
-    pub r#as: Keyword,
-    pub target: ForeachTarget,
+    pub expression: &'arena Expression<'arena>,
+    pub r#as: Keyword<'arena>,
+    pub target: ForeachTarget<'arena>,
     pub right_parenthesis: Span,
-    pub body: ForeachBody,
+    pub body: ForeachBody<'arena>,
 }
 
 /// Represents the target of a foreach statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum ForeachTarget {
-    Value(ForeachValueTarget),
-    KeyValue(ForeachKeyValueTarget),
+#[repr(u8)]
+pub enum ForeachTarget<'arena> {
+    Value(ForeachValueTarget<'arena>),
+    KeyValue(ForeachKeyValueTarget<'arena>),
 }
 
 /// Represents the target of a foreach statement that only assigns the value.
@@ -53,9 +52,9 @@ pub enum ForeachTarget {
 ///   echo $value;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ForeachValueTarget {
-    pub value: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ForeachValueTarget<'arena> {
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents the target of a foreach statement that assigns both the key and value.
@@ -69,22 +68,22 @@ pub struct ForeachValueTarget {
 ///   echo $key . ' => ' . $value . PHP_EOL;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ForeachKeyValueTarget {
-    pub key: Box<Expression>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ForeachKeyValueTarget<'arena> {
+    pub key: &'arena Expression<'arena>,
     pub double_arrow: Span,
-    pub value: Box<Expression>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents the body of a foreach statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum ForeachBody {
+#[repr(u8)]
+pub enum ForeachBody<'arena> {
     /// The body is a statement.
-    Statement(Box<Statement>),
+    Statement(&'arena Statement<'arena>),
     /// The body is a colon-delimited body.
-    ColonDelimited(ForeachColonDelimitedBody),
+    ColonDelimited(ForeachColonDelimitedBody<'arena>),
 }
 
 /// Represents a colon-delimited body of a foreach statement.
@@ -98,32 +97,32 @@ pub enum ForeachBody {
 ///   echo $value;
 /// endforeach;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ForeachColonDelimitedBody {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ForeachColonDelimitedBody<'arena> {
     pub colon: Span,
-    pub statements: Sequence<Statement>,
-    pub end_foreach: Keyword,
-    pub terminator: Terminator,
+    pub statements: Sequence<'arena, Statement<'arena>>,
+    pub end_foreach: Keyword<'arena>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl ForeachTarget {
-    pub fn key(&self) -> Option<&Expression> {
+impl<'arena> ForeachTarget<'arena> {
+    pub fn key(&self) -> Option<&Expression<'arena>> {
         match self {
             ForeachTarget::Value(_) => None,
-            ForeachTarget::KeyValue(key_value) => Some(&key_value.key),
+            ForeachTarget::KeyValue(key_value) => Some(key_value.key),
         }
     }
 
-    pub fn value(&self) -> &Expression {
+    pub fn value(&self) -> &Expression<'arena> {
         match self {
-            ForeachTarget::Value(value) => &value.value,
-            ForeachTarget::KeyValue(key_value) => &key_value.value,
+            ForeachTarget::Value(value) => value.value,
+            ForeachTarget::KeyValue(key_value) => key_value.value,
         }
     }
 }
 
-impl ForeachBody {
-    pub fn statements(&self) -> &[Statement] {
+impl<'arena> ForeachBody<'arena> {
+    pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             ForeachBody::Statement(statement) => std::slice::from_ref(statement),
             ForeachBody::ColonDelimited(body) => body.statements.as_slice(),
@@ -131,13 +130,13 @@ impl ForeachBody {
     }
 }
 
-impl HasSpan for Foreach {
+impl HasSpan for Foreach<'_> {
     fn span(&self) -> Span {
         self.foreach.span().join(self.body.span())
     }
 }
 
-impl HasSpan for ForeachTarget {
+impl HasSpan for ForeachTarget<'_> {
     fn span(&self) -> Span {
         match self {
             ForeachTarget::Value(value) => value.span(),
@@ -146,19 +145,19 @@ impl HasSpan for ForeachTarget {
     }
 }
 
-impl HasSpan for ForeachValueTarget {
+impl HasSpan for ForeachValueTarget<'_> {
     fn span(&self) -> Span {
         self.value.span()
     }
 }
 
-impl HasSpan for ForeachKeyValueTarget {
+impl HasSpan for ForeachKeyValueTarget<'_> {
     fn span(&self) -> Span {
         self.key.span().join(self.value.span())
     }
 }
 
-impl HasSpan for ForeachBody {
+impl HasSpan for ForeachBody<'_> {
     fn span(&self) -> Span {
         match self {
             ForeachBody::Statement(statement) => statement.span(),
@@ -167,7 +166,7 @@ impl HasSpan for ForeachBody {
     }
 }
 
-impl HasSpan for ForeachColonDelimitedBody {
+impl HasSpan for ForeachColonDelimitedBody<'_> {
     fn span(&self) -> Span {
         self.colon.join(self.terminator.span())
     }

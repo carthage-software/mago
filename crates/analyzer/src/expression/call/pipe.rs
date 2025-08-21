@@ -11,17 +11,17 @@ use crate::expression::call::analyze_invocation_targets;
 use crate::expression::call::function_call::resolve_targets;
 use crate::invocation::InvocationArgumentsSource;
 
-impl Analyzable for Pipe {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut template_result = TemplateResult::default();
 
         let (invocation_targets, encountered_invalid_targets) =
-            resolve_targets(context, block_context, artifacts, &self.callable, &mut template_result)?;
+            resolve_targets(context, block_context, artifacts, self.callable, &mut template_result)?;
 
         analyze_invocation_targets(
             context,

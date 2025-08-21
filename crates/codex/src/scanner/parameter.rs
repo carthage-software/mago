@@ -12,10 +12,10 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 
 #[inline]
-pub fn scan_function_like_parameter<'ast>(
-    parameter: &'ast FunctionLikeParameter,
+pub fn scan_function_like_parameter<'input, 'ast, 'arena>(
+    parameter: &'ast FunctionLikeParameter<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &'ast mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
 ) -> FunctionLikeParameterMetadata {
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
@@ -37,7 +37,7 @@ pub fn scan_function_like_parameter<'ast>(
     }
 
     let mut metadata = FunctionLikeParameterMetadata::new(
-        VariableIdentifier(parameter.variable.name),
+        VariableIdentifier(context.interner.intern(parameter.variable.name)),
         parameter.span(),
         parameter.variable.span,
         flags,

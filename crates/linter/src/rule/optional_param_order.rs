@@ -78,7 +78,7 @@ impl LintRule for OptionalParamOrderRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::FunctionLikeParameterList(function_like_parameter_list) = node else {
             return;
         };
@@ -86,7 +86,6 @@ impl LintRule for OptionalParamOrderRule {
         let mut optional_parameters = Vec::new();
 
         for parameter in function_like_parameter_list.parameters.iter() {
-            let name = ctx.lookup(&parameter.variable.name);
             if parameter.default_value.is_some() || parameter.ellipsis.is_some() {
                 optional_parameters.push((parameter.variable.name, parameter.variable.span()));
             } else if !optional_parameters.is_empty() {
@@ -94,22 +93,18 @@ impl LintRule for OptionalParamOrderRule {
                     self.cfg.level(),
                     format!(
                         "Optional parameter(s) `{}` defined before required parameter `{}`.",
-                        optional_parameters
-                            .iter()
-                            .map(|(opt_name, _)| ctx.lookup(opt_name).to_string())
-                            .collect::<Vec<_>>()
-                            .join("`, `"),
-                        name
+                        optional_parameters.iter().map(|(opt_name, _)| *opt_name).collect::<Vec<_>>().join("`, `"),
+                        parameter.variable.name
                     ),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(parameter.variable.span())
-                        .with_message(format!("Required parameter `{}` defined here", name)),
+                        .with_message(format!("Required parameter `{}` defined here", parameter.variable.name)),
                 )
                 .with_annotations(optional_parameters.iter().map(|(opt_name, opt_span)| {
                     Annotation::secondary(*opt_span)
-                        .with_message(format!("Optional parameter `{}` defined here", ctx.lookup(opt_name)))
+                        .with_message(format!("Optional parameter `{}` defined here", opt_name))
                 }))
                 .with_note("Parameters after an optional one are implicitly required.")
                 .with_note("Defining optional parameters before required ones has been deprecated since PHP 8.0.")

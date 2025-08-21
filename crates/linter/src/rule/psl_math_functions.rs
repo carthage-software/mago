@@ -86,9 +86,9 @@ impl LintRule for PslMathFunctionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::FunctionCall(function_call) = node else { return };
-        let Expression::Identifier(identifier) = function_call.function.as_ref() else { return };
+        let Expression::Identifier(identifier) = function_call.function else { return };
 
         let target_functions: Vec<&'static str> = MATH_FUNCTION_REPLACEMENTS.keys().copied().collect();
 

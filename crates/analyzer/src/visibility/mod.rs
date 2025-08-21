@@ -32,9 +32,9 @@ use crate::context::block::BlockContext;
 ///
 /// `true` if the method is visible, `false` otherwise. An error is reported to the
 /// context buffer if the method is not visible.
-pub fn check_method_visibility<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn check_method_visibility<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     fqc_id: &StringIdentifier,
     method_name_id: &StringIdentifier,
     access_span: Span,
@@ -100,9 +100,9 @@ pub fn check_method_visibility<'a>(
 
 /// Checks if a property is readable from the current scope and reports a detailed
 /// error if it is not.
-pub fn check_property_read_visibility<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn check_property_read_visibility<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     fqc_id: &StringIdentifier,
     property_id: &StringIdentifier,
     access_span: Span,
@@ -159,9 +159,9 @@ pub fn check_property_read_visibility<'a>(
     is_visible
 }
 
-pub fn check_property_write_visibility<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn check_property_write_visibility<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     fqc_id: &StringIdentifier,
     property_id: &StringIdentifier,
     access_span: Span,
@@ -234,7 +234,7 @@ pub fn check_property_write_visibility<'a>(
 }
 
 fn is_visible_from_scope(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     visibility: Visibility,
     declaring_class_id: &StringIdentifier,
     current_class_id_opt: Option<&StringIdentifier>,
@@ -265,7 +265,7 @@ fn is_visible_from_scope(
 }
 
 fn can_initialize_readonly_property(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     declaring_class_id: &StringIdentifier,
     current_class_id_opt: Option<&StringIdentifier>,
     current_function_opt: Option<&FunctionLikeMetadata>,
@@ -280,9 +280,9 @@ fn can_initialize_readonly_property(
         })
 }
 
-fn report_visibility_issue(
-    context: &mut Context<'_>,
-    block_context: &BlockContext<'_>,
+fn report_visibility_issue<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     code: IssueCode,
     title: String,
     visibility: Visibility,
@@ -322,9 +322,9 @@ fn report_visibility_issue(
     context.collector.report_with_code(code, issue);
 }
 
-fn report_readonly_issue(
-    context: &mut Context<'_>,
-    block_context: &BlockContext<'_>,
+fn report_readonly_issue<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     code: IssueCode,
     access_span: Span,
     member_span: Option<Span>,

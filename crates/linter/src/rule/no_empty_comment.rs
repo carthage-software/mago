@@ -88,7 +88,7 @@ impl LintRule for NoEmptyCommentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -102,7 +102,7 @@ impl LintRule for NoEmptyCommentRule {
                 continue;
             }
 
-            let is_empty = comment_lines(trivia, ctx.interner).iter().all(|(_, line)| line.trim().is_empty());
+            let is_empty = comment_lines(trivia).iter().all(|(_, line)| line.trim().is_empty());
 
             if is_empty {
                 let issue = Issue::new(self.cfg.level(), "Empty comments are not allowed.")

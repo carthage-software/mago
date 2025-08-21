@@ -40,11 +40,11 @@ mod array_assignment;
 mod property_assignment;
 mod static_property_assignment;
 
-impl Analyzable for Assignment {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Assignment<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_assignment(
@@ -52,22 +52,22 @@ impl Analyzable for Assignment {
             block_context,
             artifacts,
             Some(self.span()),
-            &self.lhs,
+            self.lhs,
             Some(&self.operator),
-            Some(&self.rhs),
+            Some(self.rhs),
             None,
         )
     }
 }
 
-pub fn analyze_assignment<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_assignment<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     assignment_span: Option<Span>,
-    target_expression: &Expression,
+    target_expression: &'ast Expression<'arena>,
     mut assignment_operator: Option<&AssignmentOperator>,
-    source_expression: Option<&Expression>,
+    source_expression: Option<&'ast Expression<'arena>>,
     source_type: Option<&TUnion>,
 ) -> Result<(), AnalysisError> {
     if let Some(AssignmentOperator::Assign(_)) = assignment_operator {
@@ -107,7 +107,7 @@ pub fn analyze_assignment<'a>(
                 block_context.inside_assignment_operation = true;
 
                 let binary_expression = Expression::Binary(Binary {
-                    lhs: Box::new(target_expression.clone()),
+                    lhs: context.arena.alloc(target_expression.clone()),
                     operator: match assignment_operator {
                         AssignmentOperator::Addition(span) => BinaryOperator::Addition(*span),
                         AssignmentOperator::Subtraction(span) => BinaryOperator::Subtraction(*span),
@@ -124,7 +124,7 @@ pub fn analyze_assignment<'a>(
                         AssignmentOperator::Coalesce(span) => BinaryOperator::NullCoalesce(*span),
                         AssignmentOperator::Assign(_) => unreachable!(),
                     },
-                    rhs: Box::new(source_expression.clone()),
+                    rhs: context.arena.alloc(source_expression.clone()),
                 });
 
                 binary_expression.analyze(context, block_context, artifacts)?;
@@ -165,8 +165,8 @@ pub fn analyze_assignment<'a>(
         && block_context.inside_loop
         && !block_context.inside_assignment_operation
         && let Some(Expression::Clone(clone_expression)) = source_expression
-        && let Expression::Variable(Variable::Direct(cloned_var)) = clone_expression.object.as_ref()
-        && context.interner.lookup(&cloned_var.name) == target_variable_id
+        && let Expression::Variable(Variable::Direct(cloned_var)) = clone_expression.object
+        && cloned_var.name == target_variable_id
         && let Some(assignment_span) = assignment_span
     {
         context.collector.report_with_code(
@@ -192,27 +192,14 @@ pub fn analyze_assignment<'a>(
     }
 
     if let (Some(target_variable_id), Some(existing_target_type)) = (&target_variable_id, &existing_target_type) {
-        block_context.remove_descendants(
-            context.interner,
-            context.codebase,
-            &mut context.collector,
-            target_variable_id,
-            existing_target_type,
-            Some(&source_type),
-        );
+        block_context.remove_descendants(context, target_variable_id, existing_target_type, Some(&source_type));
     } else {
-        let root_var_id = get_root_expression_id(target_expression, context.interner);
+        let root_var_id = get_root_expression_id(target_expression);
 
         if let Some(root_var_id) = root_var_id
             && let Some(existing_root_type) = block_context.locals.get(&root_var_id).cloned()
         {
-            block_context.remove_variable_from_conflicting_clauses(
-                context.interner,
-                context.codebase,
-                &mut context.collector,
-                &root_var_id,
-                Some(&existing_root_type),
-            );
+            block_context.remove_variable_from_conflicting_clauses(context, &root_var_id, Some(&existing_root_type));
         }
     }
 
@@ -269,13 +256,13 @@ pub fn analyze_assignment<'a>(
     Ok(())
 }
 
-pub(crate) fn assign_to_expression<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    target_expression: &Expression,
+    target_expression: &'ast Expression<'arena>,
     target_expression_id: Option<String>,
-    source_expression: Option<&Expression>,
+    source_expression: Option<&'ast Expression<'arena>>,
     mut source_type: TUnion,
     destructuring: bool,
 ) -> Result<bool, AnalysisError> {
@@ -349,11 +336,11 @@ pub(crate) fn assign_to_expression<'a>(
     Ok(true)
 }
 
-fn analyze_reference_assignment<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
-    target_expression: &Expression,
-    source_expression: &Expression,
+fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    target_expression: &'ast Expression<'arena>,
+    source_expression: &'ast Expression<'arena>,
 ) -> Result<(), AnalysisError> {
     let Expression::UnaryPrefix(UnaryPrefix {
         operator: UnaryPrefixOperator::Reference(_),
@@ -405,12 +392,12 @@ fn analyze_reference_assignment<'a>(
     Ok(())
 }
 
-pub fn analyze_assignment_to_variable<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_assignment_to_variable<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_span: Span,
-    source_expression: Option<&Expression>,
+    source_expression: Option<&Expression<'arena>>,
     mut assigned_type: TUnion,
     variable_id: &str,
     destructuring: bool,
@@ -608,14 +595,14 @@ pub fn analyze_assignment_to_variable<'a>(
     block_context.locals.insert(variable_id.to_owned(), Rc::new(assigned_type));
 }
 
-fn analyze_destructuring<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_destructuring<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    target_span: Span,                      // the span of the destructuring target ( list or array )
-    source_expression: Option<&Expression>, // the expression being destructured
-    array_type: TUnion,                     // the type of the array being destructured
-    target_elements: &[ArrayElement],       // the elements being destructured
+    target_span: Span, // the span of the destructuring target ( list or array )
+    source_expression: Option<&'ast Expression<'arena>>, // the expression being destructured
+    array_type: TUnion, // the type of the array being destructured
+    target_elements: &'ast [ArrayElement<'arena>], // the elements being destructured
 ) -> Result<(), AnalysisError> {
     let mut non_array = false;
 
@@ -743,7 +730,7 @@ fn analyze_destructuring<'a>(
                 key_value_element.key.analyze(context, block_context, artifacts)?;
 
                 let index_type =
-                    artifacts.get_expression_type(key_value_element.key.as_ref()).cloned().unwrap_or_else(get_mixed);
+                    artifacts.get_expression_type(key_value_element.key).cloned().unwrap_or_else(get_mixed);
 
                 let access_type = if impossible {
                     get_never()
@@ -770,9 +757,9 @@ fn analyze_destructuring<'a>(
                     block_context,
                     artifacts,
                     None,
-                    &key_value_element.value,
+                    key_value_element.value,
                     None,
-                    Some(&key_value_element.key),
+                    Some(key_value_element.key),
                     Some(&access_type),
                 )?;
             }
@@ -804,7 +791,7 @@ fn analyze_destructuring<'a>(
                     block_context,
                     artifacts,
                     None,
-                    &value_element.value,
+                    value_element.value,
                     None,
                     None,
                     Some(&access_type),
@@ -824,7 +811,7 @@ fn analyze_destructuring<'a>(
                     block_context,
                     artifacts,
                     None,
-                    &variadic_element.value,
+                    variadic_element.value,
                     None,
                     None,
                     Some(&get_never()),
@@ -841,10 +828,10 @@ fn analyze_destructuring<'a>(
     Ok(())
 }
 
-fn analyze_assignment_target<'a>(
-    expression: &Expression,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_assignment_target<'ctx, 'arena>(
+    expression: &Expression<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     match expression {
@@ -858,30 +845,30 @@ fn analyze_assignment_target<'a>(
             for element in elements.iter() {
                 match element {
                     ArrayElement::KeyValue(key_value_array_element) => {
-                        analyze_assignment_target(&key_value_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(key_value_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Value(value_array_element) => {
-                        analyze_assignment_target(&value_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(value_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Variadic(variadic_array_element) => {
-                        analyze_assignment_target(&variadic_array_element.value, context, block_context, artifacts)?;
+                        analyze_assignment_target(variadic_array_element.value, context, block_context, artifacts)?;
                     }
                     ArrayElement::Missing(_) => {}
                 }
             }
         }
         Expression::ArrayAccess(array_access) => {
-            analyze_assignment_target(&array_access.array, context, block_context, artifacts)?;
-            analyze_assignment_target(&array_access.index, context, block_context, artifacts)?;
+            analyze_assignment_target(array_access.array, context, block_context, artifacts)?;
+            analyze_assignment_target(array_access.index, context, block_context, artifacts)?;
         }
         Expression::Access(Access::Property(property_access)) => {
-            analyze_assignment_target(&property_access.object, context, block_context, artifacts)?;
+            analyze_assignment_target(property_access.object, context, block_context, artifacts)?;
         }
         Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
-            analyze_assignment_target(&null_safe_property_access.object, context, block_context, artifacts)?;
+            analyze_assignment_target(null_safe_property_access.object, context, block_context, artifacts)?;
         }
         Expression::Access(Access::StaticProperty(static_property_access)) => {
-            analyze_assignment_target(&static_property_access.class, context, block_context, artifacts)?;
+            analyze_assignment_target(static_property_access.class, context, block_context, artifacts)?;
         }
         _ => {}
     }
@@ -889,12 +876,12 @@ fn analyze_assignment_target<'a>(
     Ok(())
 }
 
-fn handle_assignment_with_boolean_logic(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_expression_id: Span,
-    source_expression: &Expression,
+    source_expression: &Expression<'arena>,
     variable_id: &str,
 ) {
     let Some(right_clauses) = get_formula(
@@ -908,14 +895,8 @@ fn handle_assignment_with_boolean_logic(
         return;
     };
 
-    let right_clauses = BlockContext::filter_clauses(
-        context.interner,
-        context.codebase,
-        &mut context.collector,
-        variable_id,
-        right_clauses.into_iter().map(Rc::new).collect(),
-        None,
-    );
+    let right_clauses =
+        BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
 
     let mut possibilities = IndexMap::default();
     possibilities.insert(variable_id.to_owned(), IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));

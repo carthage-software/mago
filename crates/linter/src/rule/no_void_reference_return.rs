@@ -86,7 +86,7 @@ impl LintRule for NoVoidReferenceReturnRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Function(function) => {
                 let Some(amperstand) = function.ampersand.as_ref() else {
@@ -149,8 +149,7 @@ impl LintRule for NoVoidReferenceReturnRule {
                 self.report(ctx, "arrow function", arrow_function.span(), amperstand, false);
             }
             Node::PropertyHook(property_hook) => {
-                let name = ctx.lookup(&property_hook.name.value);
-                if "set" != name {
+                if "set" != property_hook.name.value {
                     return;
                 }
 

@@ -43,12 +43,12 @@ use crate::invocation::InvocationTarget;
 ///
 /// * `Ok(())` if analysis completes successfully.
 /// * `Err(AnalysisError)` if an error occurs during the analysis of the argument's value.
-pub fn analyze_and_store_argument_type<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_and_store_argument_type<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation_target: &InvocationTarget<'_>,
-    argument_expression: &Expression,
+    invocation_target: &InvocationTarget<'ctx>,
+    argument_expression: &Expression<'arena>,
     argument_offset: usize,
     analyzed_argument_types: &mut HashMap<usize, (TUnion, Span)>,
     referenced_parameter: bool,
@@ -142,12 +142,12 @@ pub fn analyze_and_store_argument_type<'a>(
 /// (e.g., invalid type, possibly invalid, mixed argument, less specific argument)
 /// with appropriate severity and context. It also adds data flow edges from the argument
 /// sources to the parameter representation in the data flow graph.
-pub fn verify_argument_type(
-    context: &mut Context<'_>,
+pub fn verify_argument_type<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     input_type: &TUnion,
     parameter_type: &TUnion,
     argument_offset: usize,
-    input_expression: &Expression,
+    input_expression: &'ast Expression<'arena>,
     invocation_target: &InvocationTarget<'_>,
 ) {
     let target_kind_str = invocation_target.guess_kind();
@@ -404,7 +404,11 @@ pub fn verify_argument_type(
 /// # Returns
 ///
 /// A `TUnion` representing the combined type of the elements within the unpacked iterable.
-pub fn get_unpacked_argument_type(context: &mut Context<'_>, argument_value_type: &TUnion, span: Span) -> TUnion {
+pub fn get_unpacked_argument_type<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    argument_value_type: &TUnion,
+    span: Span,
+) -> TUnion {
     let mut potential_element_types = Vec::new();
     let mut reported_an_error = false;
 

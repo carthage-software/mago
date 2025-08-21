@@ -10,15 +10,14 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::class_constant::resolve_class_constants;
 
-impl Analyzable for ClassConstantAccess {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let resolution =
-            resolve_class_constants(context, block_context, artifacts, &self.class, &self.constant, false)?;
+        let resolution = resolve_class_constants(context, block_context, artifacts, self.class, &self.constant, false)?;
 
         let mut resulting_type = if resolution.has_ambiguous_path { Some(get_mixed()) } else { None };
         for resolved_constant in resolution.constants {

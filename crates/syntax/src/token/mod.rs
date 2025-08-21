@@ -1,20 +1,18 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::Span;
 
 use crate::T;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum DocumentKind {
     Heredoc,
     Nowdoc,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Associativity {
     NonAssociative,
@@ -22,7 +20,7 @@ pub enum Associativity {
     Right,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum Precedence {
     Lowest,
@@ -72,7 +70,7 @@ pub trait GetPrecedence {
     fn precedence(&self) -> Precedence;
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum TokenKind {
     Whitespace,                  // ` `
@@ -268,10 +266,10 @@ pub enum TokenKind {
     PipeGreaterThan,             // `|>`
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Token {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Token<'arena> {
     pub kind: TokenKind,
-    pub value: StringIdentifier,
+    pub value: &'arena str,
     pub span: Span,
 }
 
@@ -721,14 +719,14 @@ impl TokenKind {
     }
 }
 
-impl Token {
-    pub const fn new(kind: TokenKind, value: StringIdentifier, span: Span) -> Self {
+impl<'arena> Token<'arena> {
+    pub const fn new(kind: TokenKind, value: &'arena str, span: Span) -> Self {
         Self { kind, value, span }
     }
 }
 
-impl std::fmt::Display for Token {
+impl<'arena> std::fmt::Display for Token<'arena> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?} {}", self.kind, self.span)
+        write!(f, "{}({})", self.kind, self.value)
     }
 }

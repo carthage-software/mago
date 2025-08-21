@@ -16,12 +16,12 @@ workspace = true
 mago-syntax = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
-mago-interner = { workspace = true }
 mago-php-version = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 bitflags = { workspace = true }
 unicode-width = { workspace = true }
+bumpalo = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

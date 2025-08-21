@@ -10,7 +10,6 @@ use mago_php_version::PHPVersion;
 
 use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::ast::AstCommand;
-use crate::commands::find::FindCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
@@ -21,7 +20,6 @@ mod args;
 
 pub mod analyze;
 pub mod ast;
-pub mod find;
 pub mod format;
 pub mod init;
 pub mod lint;
@@ -55,9 +53,6 @@ pub enum MagoCommand {
     /// Format PHP code using Mago's formatter.
     #[command(name = "format")]
     Format(FormatCommand),
-    /// Find references to symbols in PHP code.
-    #[command(name = "find")]
-    Find(FindCommand),
     /// Update Mago to the latest version.
     #[command(name = "self-update")]
     SelfUpdate(SelfUpdateCommand),
@@ -68,7 +63,7 @@ pub enum MagoCommand {
     version,
     author,
     styles = CLAP_STYLING,
-    about = "Mago: The powerful PHP toolchain. Lint, format, find, and analyze your code with ease.",
+    about = "Mago: The powerful PHP toolchain. Lint, format, and analyze your code with ease.",
     long_about = r#"
 Welcome to Mago!
 
@@ -78,7 +73,6 @@ Features:
 
 * **Linting:** Identify and fix code style issues and potential bugs.
 * **Formatting:** Format your code consistently and automatically.
-* **Finding:** Quickly locate symbols and references in your codebase.
 * **Analyzing:** Analyze your code for structure, complexity, and dependencies.
 
 Get started by exploring the commands below!

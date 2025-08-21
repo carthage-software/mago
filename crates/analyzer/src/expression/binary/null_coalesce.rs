@@ -28,10 +28,10 @@ use crate::error::AnalysisError;
 /// - If the LHS is nullable (can be `null` or other types), the result type is the union of the
 ///   non-null parts of the LHS and the type of the RHS.
 /// - If the LHS type is unknown (`mixed`), the result type is `mixed`.
-pub fn analyze_null_coalesce_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let was_inside_isset = block_context.inside_isset;

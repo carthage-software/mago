@@ -6,13 +6,15 @@ use crate::parser::internal::identifier::parse_identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_optional_implements(stream: &mut TokenStream<'_, '_>) -> Result<Option<Implements>, ParseError> {
+pub fn parse_optional_implements<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<Implements<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["implements"]) => Some(Implements {
             implements: utils::expect_any_keyword(stream)?,
             types: {
-                let mut types = Vec::new();
-                let mut commas = Vec::new();
+                let mut types = stream.new_vec();
+                let mut commas = stream.new_vec();
                 loop {
                     types.push(parse_identifier(stream)?);
 
@@ -31,13 +33,13 @@ pub fn parse_optional_implements(stream: &mut TokenStream<'_, '_>) -> Result<Opt
     })
 }
 
-pub fn parse_optional_extends(stream: &mut TokenStream<'_, '_>) -> Result<Option<Extends>, ParseError> {
+pub fn parse_optional_extends<'arena>(stream: &mut TokenStream<'arena>) -> Result<Option<Extends<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["extends"]) => Some(Extends {
             extends: utils::expect_any_keyword(stream)?,
             types: {
-                let mut types = Vec::new();
-                let mut commas = Vec::new();
+                let mut types = stream.new_vec();
+                let mut commas = stream.new_vec();
                 loop {
                     types.push(parse_identifier(stream)?);
 

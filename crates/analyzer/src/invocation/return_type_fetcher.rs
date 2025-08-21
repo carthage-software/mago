@@ -12,11 +12,11 @@ use crate::invocation::Invocation;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::special_function_like_handler::handle_special_functions;
 
-pub fn fetch_invocation_return_type<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+pub fn fetch_invocation_return_type<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'_>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
 ) -> TUnion {

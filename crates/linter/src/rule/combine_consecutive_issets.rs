@@ -87,7 +87,7 @@ impl LintRule for CombineConsecutiveIssetsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -96,10 +96,10 @@ impl LintRule for CombineConsecutiveIssetsRule {
             return;
         };
 
-        let Some((left_parenthesized, left_isset)) = get_isset_construct(binary.lhs.as_ref(), true) else {
+        let Some((left_parenthesized, left_isset)) = get_isset_construct(binary.lhs, true) else {
             return;
         };
-        let Some((right_parenthesized, right_isset)) = get_isset_construct(binary.rhs.as_ref(), false) else {
+        let Some((right_parenthesized, right_isset)) = get_isset_construct(binary.rhs, false) else {
             return;
         };
 
@@ -129,11 +129,14 @@ impl LintRule for CombineConsecutiveIssetsRule {
     }
 }
 
-fn get_isset_construct(mut expression: &Expression, select_binary_rhs: bool) -> Option<(bool, &IssetConstruct)> {
+fn get_isset_construct<'ast, 'arena>(
+    mut expression: &'ast Expression<'arena>,
+    select_binary_rhs: bool,
+) -> Option<(bool, &'ast IssetConstruct<'arena>)> {
     let mut between_parentheses = false;
 
     while let Expression::Parenthesized(parenthesized) = expression {
-        expression = parenthesized.expression.as_ref();
+        expression = parenthesized.expression;
         between_parentheses = true;
     }
 
@@ -147,7 +150,7 @@ fn get_isset_construct(mut expression: &Expression, select_binary_rhs: bool) -> 
         }
         Expression::Binary(binary) if select_binary_rhs => {
             if let BinaryOperator::And(_) = binary.operator {
-                let (lhs_between_parentheses, lhs_isset) = get_isset_construct(binary.rhs.as_ref(), true)?;
+                let (lhs_between_parentheses, lhs_isset) = get_isset_construct(binary.rhs, true)?;
                 Some((between_parentheses || lhs_between_parentheses, lhs_isset))
             } else {
                 None

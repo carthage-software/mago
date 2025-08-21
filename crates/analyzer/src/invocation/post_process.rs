@@ -46,11 +46,11 @@ use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_expression_id;
 
-pub fn post_invocation_process<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn post_invocation_process<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invoication: &Invocation,
+    invoication: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: Option<String>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
@@ -204,11 +204,11 @@ pub fn post_invocation_process<'a>(
     Ok(())
 }
 
-fn apply_assertion_to_call_context<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: &Option<String>,
     assertions: &BTreeMap<StringIdentifier, Conjunction<Assertion>>,
     template_result: &TemplateResult,
@@ -237,7 +237,7 @@ fn apply_assertion_to_call_context<'a>(
     }
 
     reconciler::reconcile_keyed_types(
-        &mut context.get_reconciliation_context(),
+        context,
         &type_assertions,
         active_type_assertions,
         block_context,
@@ -249,11 +249,11 @@ fn apply_assertion_to_call_context<'a>(
     );
 }
 
-fn update_by_reference_argument_types<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
     parameters: &HashMap<StringIdentifier, TUnion>,
 ) -> Result<(), AnalysisError> {
@@ -316,11 +316,11 @@ fn update_by_reference_argument_types<'a>(
     Ok(())
 }
 
-fn resolve_invocation_assertion<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: &Option<String>,
     assertions: &BTreeMap<StringIdentifier, Disjunction<Assertion>>,
     template_result: &TemplateResult,
@@ -381,7 +381,7 @@ fn resolve_invocation_assertion<'a>(
                             }
                             Assertion::IsIdentical(_) => {
                                 let intersection = match intersect_union_with_union(
-                                    &mut context.get_reconciliation_context(),
+                                    context,
                                     asserted_type,
                                     &resolved_assertion_type,
                                 ) {
@@ -498,13 +498,13 @@ fn resolve_invocation_assertion<'a>(
 /// * If a special target is resolved, the tuple is `(None, Some(resolved_id))`.
 /// * If a regular argument is found, it returns the result from `get_argument_for_parameter`.
 /// * If nothing is found, it returns `(None, None)`.
-fn resolve_argument_or_special_target<'a>(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
-    invocation: &Invocation<'a>,
+fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     parameter_name: &StringIdentifier,
     this_variable: &Option<String>,
-) -> (Option<&'a Expression>, Option<String>) {
+) -> (Option<&'ast Expression<'arena>>, Option<String>) {
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(context, block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
@@ -531,9 +531,9 @@ fn resolve_argument_or_special_target<'a>(
 /// # Returns
 /// * `Some(String)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
-fn resolve_special_assertion_target(
-    context: &Context<'_>,
-    block_context: &BlockContext,
+fn resolve_special_assertion_target<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     target_name: &StringIdentifier,
     this_variable: &Option<String>,
 ) -> Option<String> {
@@ -574,13 +574,13 @@ fn resolve_special_assertion_target(
 /// A tuple containing:
 /// * `Option<&'a Expression>`: The argument's expression AST node, if found.
 /// * `Option<String>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
-fn get_argument_for_parameter<'a>(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
-    invocation: &Invocation<'a>,
+fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
     mut parameter_name: Option<StringIdentifier>,
-) -> (Option<&'a Expression>, Option<String>) {
+) -> (Option<&'ast Expression<'arena>>, Option<String>) {
     // If neither name nor offset is provided, we can't do anything.
     if parameter_name.is_none() && parameter_offset.is_none() {
         return (None, None);
@@ -615,11 +615,10 @@ fn get_argument_for_parameter<'a>(
 
         let variable = context.interner.lookup(&name);
         let variable_name = if let Some(variable) = variable.strip_prefix('$') { variable } else { variable };
-        let variable_name_id = context.interner.intern(variable_name);
 
         arguments.iter().find(|argument| {
             if let Some(named_argument) = argument.get_named_argument() {
-                named_argument.name.value == variable_name_id
+                named_argument.name.value == variable_name
             } else {
                 false
             }

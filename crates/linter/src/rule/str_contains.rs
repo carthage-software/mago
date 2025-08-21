@@ -96,7 +96,7 @@ impl LintRule for StrContainsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else { return };
 
         if !matches!(
@@ -106,7 +106,7 @@ impl LintRule for StrContainsRule {
             return;
         }
 
-        let (left, call) = match (binary.lhs.as_ref(), binary.rhs.as_ref()) {
+        let (left, call) = match (binary.lhs, binary.rhs) {
             (
                 Expression::Call(Call::Function(call @ FunctionCall { argument_list: arguments, .. })),
                 Expression::Literal(Literal::False(_)),

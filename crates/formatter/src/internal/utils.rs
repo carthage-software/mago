@@ -1,3 +1,5 @@
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
 use unicode_width::UnicodeWidthStr;
 
 use mago_syntax::ast::*;
@@ -29,37 +31,37 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
 }
 
 #[inline]
-pub const fn get_left_side(expression: &Expression) -> Option<&Expression> {
+pub fn get_left_side<'ast, 'a>(expression: &'ast Expression<'a>) -> Option<&'ast Expression<'a>> {
     match expression {
-        Expression::Binary(binary) => Some(&binary.lhs),
-        Expression::UnaryPostfix(unary) => Some(&unary.operand),
-        Expression::Assignment(assignment) => Some(&assignment.lhs),
-        Expression::Conditional(conditional) => Some(&conditional.condition),
-        Expression::ArrayAccess(array_access) => Some(&array_access.array),
-        Expression::ArrayAppend(array_append) => Some(&array_append.array),
+        Expression::Binary(binary) => Some(binary.lhs),
+        Expression::UnaryPostfix(unary) => Some(unary.operand),
+        Expression::Assignment(assignment) => Some(assignment.lhs),
+        Expression::Conditional(conditional) => Some(conditional.condition),
+        Expression::ArrayAccess(array_access) => Some(array_access.array),
+        Expression::ArrayAppend(array_append) => Some(array_append.array),
         Expression::Call(call) => Some(match call {
-            Call::Function(function_call) => &function_call.function,
-            Call::Method(method_call) => &method_call.object,
-            Call::NullSafeMethod(null_safe_method_call) => &null_safe_method_call.object,
-            Call::StaticMethod(static_method_call) => &static_method_call.class,
+            Call::Function(function_call) => function_call.function,
+            Call::Method(method_call) => method_call.object,
+            Call::NullSafeMethod(null_safe_method_call) => null_safe_method_call.object,
+            Call::StaticMethod(static_method_call) => static_method_call.class,
         }),
         Expression::Access(access) => Some(match access {
-            Access::Property(property_access) => &property_access.object,
-            Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
-            Access::StaticProperty(static_property_access) => &static_property_access.class,
-            Access::ClassConstant(class_constant_access) => &class_constant_access.class,
+            Access::Property(property_access) => property_access.object,
+            Access::NullSafeProperty(null_safe_property_access) => null_safe_property_access.object,
+            Access::StaticProperty(static_property_access) => static_property_access.class,
+            Access::ClassConstant(class_constant_access) => class_constant_access.class,
         }),
         Expression::ClosureCreation(closure_creation) => Some(match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => &function_closure_creation.function,
-            ClosureCreation::Method(method_closure_creation) => &method_closure_creation.object,
-            ClosureCreation::StaticMethod(static_method_closure_creation) => &static_method_closure_creation.class,
+            ClosureCreation::Function(function_closure_creation) => function_closure_creation.function,
+            ClosureCreation::Method(method_closure_creation) => method_closure_creation.object,
+            ClosureCreation::StaticMethod(static_method_closure_creation) => static_method_closure_creation.class,
         }),
         _ => None,
     }
 }
 
 #[inline]
-pub fn is_at_call_like_expression(f: &FormatterState<'_>) -> bool {
+pub fn is_at_call_like_expression(f: &FormatterState<'_, '_, '_>) -> bool {
     let Some(grant_parent) = f.grandparent_node() else {
         return false;
     };
@@ -77,16 +79,16 @@ pub fn is_at_call_like_expression(f: &FormatterState<'_>) -> bool {
 }
 
 #[inline]
-pub const fn unwrap_parenthesized(mut expression: &Expression) -> &Expression {
+pub fn unwrap_parenthesized<'ast, 'a>(mut expression: &'ast Expression<'a>) -> &'ast Expression<'a> {
     while let Expression::Parenthesized(parenthesized) = expression {
-        expression = &parenthesized.expression;
+        expression = parenthesized.expression;
     }
 
     expression
 }
 
 #[inline]
-pub fn is_at_callee(f: &FormatterState<'_>) -> bool {
+pub fn is_at_callee(f: &FormatterState<'_, '_, '_>) -> bool {
     let Node::Expression(expression) = f.parent_node() else {
         return false;
     };
@@ -96,20 +98,20 @@ pub fn is_at_callee(f: &FormatterState<'_>) -> bool {
     };
 
     match parent {
-        Node::FunctionCall(call) => call.function.as_ref() == expression,
-        Node::MethodCall(call) => call.object.as_ref() == expression,
-        Node::StaticMethodCall(call) => call.class.as_ref() == expression,
-        Node::NullSafeMethodCall(call) => call.object.as_ref() == expression,
-        Node::FunctionClosureCreation(closure) => closure.function.as_ref() == expression,
-        Node::MethodClosureCreation(closure) => closure.object.as_ref() == expression,
-        Node::StaticMethodClosureCreation(closure) => closure.class.as_ref() == expression,
+        Node::FunctionCall(call) => call.function == expression,
+        Node::MethodCall(call) => call.object == expression,
+        Node::StaticMethodCall(call) => call.class == expression,
+        Node::NullSafeMethodCall(call) => call.object == expression,
+        Node::FunctionClosureCreation(closure) => closure.function == expression,
+        Node::MethodClosureCreation(closure) => closure.object == expression,
+        Node::StaticMethodClosureCreation(closure) => closure.class == expression,
         _ => false,
     }
 }
 
 #[inline]
 pub fn will_break(document: &mut Document<'_>) -> bool {
-    let check_array = |array: &mut Vec<Document<'_>>| array.iter_mut().rev().any(|doc| will_break(doc));
+    let check_array = |array: &mut Vec<'_, Document<'_>>| array.iter_mut().rev().any(|doc| will_break(doc));
 
     match document {
         Document::BreakParent => true,
@@ -137,7 +139,12 @@ pub fn will_break(document: &mut Document<'_>) -> bool {
 }
 
 #[inline]
-pub fn replace_end_of_line(document: Document<'_>, replacement: Separator, halted_compilation: bool) -> Document<'_> {
+pub fn replace_end_of_line<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    document: Document<'arena>,
+    replacement: Separator,
+    halted_compilation: bool,
+) -> Document<'arena> {
     let Document::String(text) = document else {
         return document;
     };
@@ -147,11 +154,19 @@ pub fn replace_end_of_line(document: Document<'_>, replacement: Separator, halte
         return Document::String(text);
     }
 
-    Document::Array(Document::join(text.split("\n").map(Document::String).collect(), replacement))
+    Document::Array(Document::join(
+        f.arena,
+        text.split("\n").map(Document::String).collect_in::<Vec<_>>(f.arena),
+        replacement,
+    ))
 }
 
 #[inline]
-pub fn could_expand_value(f: &FormatterState<'_>, value: &Expression, nested_args: bool) -> bool {
+pub fn could_expand_value<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    value: &'ast Expression<'arena>,
+    nested_args: bool,
+) -> bool {
     match value {
         Expression::Array(expr) => !expr.elements.is_empty(),
         Expression::LegacyArray(expr) => !expr.elements.is_empty(),
@@ -159,13 +174,13 @@ pub fn could_expand_value(f: &FormatterState<'_>, value: &Expression, nested_arg
         Expression::AnonymousClass(_) => true,
         Expression::Closure(_) => true,
         Expression::Match(m) => !m.arms.is_empty(),
-        Expression::Binary(operation) => could_expand_value(f, &operation.lhs, nested_args),
-        Expression::ArrowFunction(arrow_function) => match arrow_function.expression.as_ref() {
+        Expression::Binary(operation) => could_expand_value(f, operation.lhs, nested_args),
+        Expression::ArrowFunction(arrow_function) => match arrow_function.expression {
             Expression::Call(_) | Expression::Conditional(_) => true,
             other => is_breaking_expression(other, true),
         },
         Expression::Instantiation(instantiation) => {
-            let Expression::Identifier(_) = instantiation.class.as_ref() else {
+            let Expression::Identifier(_) = instantiation.class else {
                 return false;
             };
 
@@ -176,15 +191,11 @@ pub fn could_expand_value(f: &FormatterState<'_>, value: &Expression, nested_arg
             arguments.arguments.len() > 2
         }
         Expression::Literal(Literal::String(literal_string)) => {
-            let string = f.interner.lookup(&literal_string.raw);
-
-            string.contains('\n') || string.contains('\r')
+            literal_string.raw.contains('\n') || literal_string.raw.contains('\r')
         }
         Expression::CompositeString(composite_string) => composite_string.parts().iter().any(|part| match part {
             StringPart::Literal(literal_string) => {
-                let string = f.interner.lookup(&literal_string.value);
-
-                string.contains('\n') || string.contains('\r')
+                literal_string.value.contains('\n') || literal_string.value.contains('\r')
             }
             _ => false,
         }),

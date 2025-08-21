@@ -30,10 +30,10 @@ use crate::reconciler;
 use crate::utils::conditional;
 
 #[inline]
-pub fn analyze_logical_and_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_logical_and_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let mut left_block_context = block_context.clone();
@@ -50,7 +50,7 @@ pub fn analyze_logical_and_operation<'a>(
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
-            check_logical_operand(context, &binary.lhs, &lhs_type, "Left", "&&")?;
+            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "&&")?;
 
             lhs_type
         }
@@ -60,7 +60,7 @@ pub fn analyze_logical_and_operation<'a>(
     let left_clauses = get_formula(
         binary.lhs.span(),
         binary.lhs.span(),
-        &binary.lhs,
+        binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
     )
@@ -102,10 +102,8 @@ pub fn analyze_logical_and_operation<'a>(
     if !left_assertions.is_empty() {
         right_block_context = block_context.clone();
 
-        let mut reconciliation_context = context.get_reconciliation_context();
-
         reconciler::reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &left_assertions,
             active_left_assertions,
             &mut right_block_context,
@@ -141,7 +139,7 @@ pub fn analyze_logical_and_operation<'a>(
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
             Some(rhs_type) => {
-                check_logical_operand(context, &binary.rhs, &rhs_type, "Right", "&&")?;
+                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "&&")?;
                 rhs_type
             }
             None => Rc::new(get_mixed()),
@@ -216,21 +214,21 @@ pub fn analyze_logical_and_operation<'a>(
 }
 
 #[inline]
-pub fn analyze_logical_or_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_logical_or_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let mut left_block_context;
     let mut left_referenced_var_ids;
     let left_assigned_var_ids;
 
-    if !is_logical_or_operation(&binary.lhs, 3) {
+    if !is_logical_or_operation(binary.lhs, 3) {
         let mut if_scope = IfScope::default();
 
         let (if_conditional_scope, applied_block_context) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, &binary.lhs, false)?;
+            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
         *block_context = applied_block_context;
 
         left_block_context = if_conditional_scope.if_body_context;
@@ -252,13 +250,7 @@ pub fn analyze_logical_or_operation<'a>(
         left_block_context.if_body_context = tmp_if_body_block_context;
 
         for var_id in &left_block_context.parent_conflicting_clause_variables {
-            block_context.remove_variable_from_conflicting_clauses(
-                context.interner,
-                context.codebase,
-                &mut context.collector,
-                var_id,
-                None,
-            );
+            block_context.remove_variable_from_conflicting_clauses(context, var_id, None);
         }
 
         let cloned_vars = block_context.locals.clone();
@@ -284,7 +276,7 @@ pub fn analyze_logical_or_operation<'a>(
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
-            check_logical_operand(context, &binary.lhs, &lhs_type, "Left", "||")?;
+            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "||")?;
 
             lhs_type
         }
@@ -294,7 +286,7 @@ pub fn analyze_logical_or_operation<'a>(
     let left_clauses = get_formula(
         binary.lhs.span(),
         binary.lhs.span(),
-        &binary.lhs,
+        binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
     )
@@ -302,7 +294,7 @@ pub fn analyze_logical_or_operation<'a>(
 
     let mut negated_left_clauses = negate_or_synthesize(
         left_clauses,
-        &binary.lhs,
+        binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
     );
@@ -342,10 +334,8 @@ pub fn analyze_logical_or_operation<'a>(
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
     } else {
         if !negated_type_assertions.is_empty() {
-            let mut reconciliation_context = context.get_reconciliation_context();
-
             reconciler::reconcile_keyed_types(
-                &mut reconciliation_context,
+                context,
                 &negated_type_assertions,
                 active_negated_type_assertions,
                 &mut right_block_context,
@@ -386,7 +376,7 @@ pub fn analyze_logical_or_operation<'a>(
 
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
             Some(rhs_type) => {
-                check_logical_operand(context, &binary.rhs, &rhs_type, "Right", "||")?;
+                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "||")?;
 
                 rhs_type
             }
@@ -438,7 +428,7 @@ pub fn analyze_logical_or_operation<'a>(
         let right_clauses = get_formula(
             binary.rhs.span(),
             binary.rhs.span(),
-            &binary.rhs,
+            binary.rhs,
             context.get_assertion_context_from_block(block_context),
             artifacts,
         )
@@ -461,12 +451,10 @@ pub fn analyze_logical_or_operation<'a>(
         );
 
         if !right_type_assertions.is_empty() {
-            let mut reconciliation_context = context.get_reconciliation_context();
-
             let mut right_changed_var_ids = HashSet::default();
 
             reconciler::reconcile_keyed_types(
-                &mut reconciliation_context,
+                context,
                 &right_type_assertions,
                 active_right_type_assertions,
                 &mut right_block_context.clone(),
@@ -519,10 +507,10 @@ pub fn analyze_logical_or_operation<'a>(
 /// and `false` otherwise. The result type is always `bool`.
 /// This function analyzes both operands, checks for problematic types in a boolean context,
 /// determines if the result can be statically known, and sets up data flow.
-pub fn analyze_logical_xor_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_logical_xor_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     binary.lhs.analyze(context, block_context, artifacts)?;
@@ -532,8 +520,8 @@ pub fn analyze_logical_xor_operation<'a>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_logical_operand(context, &binary.lhs, lhs_type, "Left", "xor")?;
-    check_logical_operand(context, &binary.rhs, rhs_type, "Right", "xor")?;
+    check_logical_operand(context, binary.lhs, lhs_type, "Left", "xor")?;
+    check_logical_operand(context, binary.rhs, rhs_type, "Right", "xor")?;
 
     let result_type = if lhs_type.is_always_truthy() && rhs_type.is_always_truthy() {
         if !block_context.inside_loop_expressions {
@@ -571,9 +559,9 @@ pub fn analyze_logical_xor_operation<'a>(
 /// Checks a single operand of a logical operation (like AND, OR, XOR) for problematic types.
 /// Reports errors for `mixed` and warnings for types that PHP coerces to boolean
 /// (e.g., `null`, `array`, `resource`, `object`).
-fn check_logical_operand(
-    context: &mut Context<'_>,
-    operand: &Expression,
+fn check_logical_operand<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    operand: &'ast Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
     operator_name: &'static str,
@@ -635,9 +623,9 @@ fn check_logical_operand(
 }
 
 /// Helper to report redundant logical operation issues.
-fn report_redundant_logical_operation(
-    context: &mut Context<'_>,
-    binary: &Binary,
+fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    binary: &'ast Binary<'arena>,
     lhs_description: &str,
     rhs_description: &str,
     result_value_str: &str,
@@ -652,7 +640,7 @@ fn report_redundant_logical_operation(
         IssueCode::RedundantLogicalOperation,
         Issue::help(format!(
             "Redundant `{}` operation: left operand is {} and right operand is {}.",
-            binary.operator.as_str(context.interner),
+            binary.operator.as_str(),
             lhs_description,
             rhs_description
         ))
@@ -664,7 +652,7 @@ fn report_redundant_logical_operation(
         )
         .with_note(format!(
             "The `{}` operator will always return {} in this case.",
-            binary.operator.as_str(context.interner),
+            binary.operator.as_str(),
             result_value_str
         ))
         .with_help(format!(
@@ -674,15 +662,15 @@ fn report_redundant_logical_operation(
 }
 
 #[inline]
-const fn is_logical_or_operation(expression: &Expression, max_nesting: usize) -> bool {
+const fn is_logical_or_operation<'ast, 'arena>(expression: &'ast Expression<'arena>, max_nesting: usize) -> bool {
     if max_nesting == 0 {
         return true;
     }
 
     match expression {
-        Expression::Parenthesized(p) => is_logical_or_operation(&p.expression, max_nesting),
+        Expression::Parenthesized(p) => is_logical_or_operation(p.expression, max_nesting),
         Expression::Binary(b) => match b.operator {
-            BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_logical_or_operation(&b.lhs, max_nesting - 1),
+            BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_logical_or_operation(b.lhs, max_nesting - 1),
             _ => false,
         },
         _ => false,

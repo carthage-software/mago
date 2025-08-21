@@ -32,32 +32,24 @@ use crate::reconciler::reconcile_keyed_types;
 use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
 
-impl Analyzable for Conditional {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Conditional<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        analyze_conditional(
-            context,
-            block_context,
-            artifacts,
-            self.condition.as_ref(),
-            self.then.as_deref(),
-            self.r#else.as_ref(),
-            self.span(),
-        )
+        analyze_conditional(context, block_context, artifacts, self.condition, self.then, self.r#else, self.span())
     }
 }
 
-pub(super) fn analyze_conditional<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    condition: &Expression,
-    then: Option<&Expression>,
-    r#else: &Expression,
+    condition: &'ast Expression<'arena>,
+    then: Option<&'ast Expression<'arena>>,
+    r#else: &'ast Expression<'arena>,
     span: Span,
 ) -> Result<(), AnalysisError> {
     let mut if_scope = IfScope::new();
@@ -173,10 +165,9 @@ pub(super) fn analyze_conditional<'a>(
 
     if !reconcilable_if_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconciliation_context = context.get_reconciliation_context();
 
         reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &reconcilable_if_types,
             active_if_types,
             &mut if_block_context,
@@ -206,10 +197,9 @@ pub(super) fn analyze_conditional<'a>(
 
     if !if_scope.negated_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconciliation_context = context.get_reconciliation_context();
 
         reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &if_scope.negated_types,
             Default::default(), // todo: this is sort of a hack, we should probably pass the active types here
             &mut else_block_context,
@@ -346,10 +336,8 @@ pub(super) fn analyze_conditional<'a>(
             then_type = Some(rc_then_type);
         }
     } else if let Some(condition_type) = condition_type.as_ref() {
-        let mut reconciliation_context = context.get_reconciliation_context();
-
         let if_return_type_reconciled = assertion_reconciler::reconcile(
-            &mut reconciliation_context,
+            context,
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
             false,

@@ -1,5 +1,8 @@
 use std::collections::VecDeque;
 
+use bumpalo::collections::Vec;
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -36,8 +39,8 @@ use crate::internal::utils::unwrap_parenthesized;
 use crate::settings::*;
 use crate::wrap;
 
-impl<'a> Format<'a> for Expression {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Expression<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         if let Expression::Parenthesized(parenthesized) = self {
             return parenthesized.expression.format(f);
         }
@@ -102,25 +105,25 @@ impl<'a> Format<'a> for Expression {
     }
 }
 
-impl<'a> Format<'a> for Binary {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, Binary, { binaryish::print_binaryish_expression(f, &self.lhs, &self.operator, &self.rhs) })
+impl<'ast, 'arena> Format<'ast, 'arena> for Binary<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, Binary, { binaryish::print_binaryish_expression(f, self.lhs, &self.operator, self.rhs) })
     }
 }
 
-impl<'a> Format<'a> for Pipe {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Pipe<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Pipe, {
             let has_trailing_comments = f.has_comment(self.span(), CommentFlags::Trailing);
             let mut should_break = has_trailing_comments;
 
-            let mut callables: Vec<&'a Expression> = Vec::new();
-            let mut input: &'a Expression = self.input.as_ref();
+            let mut callables: Vec<&'ast Expression<'arena>> = vec![in f.arena];
+            let mut input: &'ast Expression<'arena> = self.input;
 
-            callables.push(self.callable.as_ref());
+            callables.push(self.callable);
             while let Expression::Pipe(inner_pipe) = unwrap_parenthesized(input) {
-                callables.push(inner_pipe.callable.as_ref());
-                input = inner_pipe.input.as_ref();
+                callables.push(inner_pipe.callable);
+                input = inner_pipe.input;
             }
 
             // Always break if we have more than 3 callables
@@ -128,14 +131,14 @@ impl<'a> Format<'a> for Pipe {
 
             callables.reverse();
             let formatted_input = input.format(f);
-            let mut contents = vec![];
-            let mut callable_queue: VecDeque<&'a Expression> = callables.into_iter().collect();
+            let mut contents = vec![in f.arena; ];
+            let mut callable_queue: VecDeque<&'ast Expression<'arena>> = callables.into_iter().collect();
             while let Some(callable) = callable_queue.pop_front() {
                 contents.push(Document::Line(Line::default()));
                 contents.push(Document::String("|> "));
 
                 if let Expression::ArrowFunction(arrow_fn) = callable
-                    && let Expression::Pipe(inner_pipe) = unwrap_parenthesized(arrow_fn.expression.as_ref())
+                    && let Expression::Pipe(inner_pipe) = unwrap_parenthesized(arrow_fn.expression)
                 {
                     should_break = true;
 
@@ -143,11 +146,11 @@ impl<'a> Format<'a> for Pipe {
                     f.in_pipe_chain_arrow_segment = true;
                     contents.push(arrow_fn.format(f));
                     f.in_pipe_chain_arrow_segment = was_in_pipe_chain_arrow_segment;
-                    callable_queue.push_front(inner_pipe.callable.as_ref());
-                    let mut nested_input = inner_pipe.input.as_ref();
+                    callable_queue.push_front(inner_pipe.callable);
+                    let mut nested_input = inner_pipe.input;
                     while let Expression::Pipe(nested_pipe) = unwrap_parenthesized(nested_input) {
-                        callable_queue.push_front(nested_pipe.callable.as_ref());
-                        nested_input = nested_pipe.input.as_ref();
+                        callable_queue.push_front(nested_pipe.callable);
+                        nested_input = nested_pipe.input;
                     }
 
                     continue;
@@ -160,21 +163,23 @@ impl<'a> Format<'a> for Pipe {
                 }
             }
 
-            Document::Group(Group::new(vec![formatted_input, Document::Indent(contents)]).with_break(should_break))
+            Document::Group(
+                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)]).with_break(should_break),
+            )
         })
     }
 }
 
-impl<'a> Format<'a> for UnaryPrefix {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for UnaryPrefix<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPrefix, {
-            Document::Group(Group::new(vec![self.operator.format(f), self.operand.format(f)]))
+            Document::Group(Group::new(vec![in f.arena; self.operator.format(f), self.operand.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for UnaryPrefixOperator {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for UnaryPrefixOperator<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPrefixOperator, {
             let space_after = match self {
                 UnaryPrefixOperator::ErrorControl(_) => f.settings.space_after_error_control_unary_prefix_operator,
@@ -201,10 +206,10 @@ impl<'a> Format<'a> for UnaryPrefixOperator {
                 | UnaryPrefixOperator::VoidCast(_, _) => f.settings.space_after_cast_unary_prefix_operators,
             };
 
-            let value = self.as_str(f.interner);
+            let value = self.as_str();
 
             if space_after {
-                Document::Array(vec![Document::String(f.as_str(value.to_lowercase())), Document::space()])
+                Document::Array(vec![in f.arena; Document::String(f.as_str(value.to_lowercase())), Document::space()])
             } else {
                 Document::String(f.as_str(value.to_lowercase()))
             }
@@ -212,22 +217,22 @@ impl<'a> Format<'a> for UnaryPrefixOperator {
     }
 }
 
-impl<'a> Format<'a> for UnaryPostfix {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for UnaryPostfix<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPostfix, {
-            Document::Group(Group::new(vec![self.operand.format(f), self.operator.format(f)]))
+            Document::Group(Group::new(vec![in f.arena; self.operand.format(f), self.operator.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for UnaryPostfixOperator {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for UnaryPostfixOperator {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPostfixOperator, { Document::String(self.as_str()) })
     }
 }
 
-impl<'a> Format<'a> for Literal {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Literal<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Literal, {
             match self {
                 Literal::String(literal) => literal.format(f),
@@ -241,34 +246,26 @@ impl<'a> Format<'a> for Literal {
     }
 }
 
-impl<'a> Format<'a> for LiteralString {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, LiteralString, { Document::String(print_string(f, self.kind, &self.raw)) })
+impl<'ast, 'arena> Format<'ast, 'arena> for LiteralString<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, LiteralString, { Document::String(print_string(f, self.kind, self.raw)) })
     }
 }
 
-impl<'a> Format<'a> for LiteralInteger {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, LiteralInteger, {
-            let value = f.lookup(&self.raw);
-
-            Document::String(value)
-        })
+impl<'ast, 'arena> Format<'ast, 'arena> for LiteralInteger<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, LiteralInteger, { Document::String(self.raw) })
     }
 }
 
-impl<'a> Format<'a> for LiteralFloat {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, LiteralFloat, {
-            let value = f.lookup(&self.raw);
-
-            Document::String(value)
-        })
+impl<'ast, 'arena> Format<'ast, 'arena> for LiteralFloat<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, LiteralFloat, { Document::String(self.raw) })
     }
 }
 
-impl<'a> Format<'a> for Variable {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Variable<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Variable, {
             match self {
                 Variable::Direct(var) => var.format(f),
@@ -279,48 +276,50 @@ impl<'a> Format<'a> for Variable {
     }
 }
 
-impl<'a> Format<'a> for IndirectVariable {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for IndirectVariable<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, IndirectVariable, {
-            Document::Group(Group::new(vec![Document::String("${"), self.expression.format(f), Document::String("}")]))
+            Document::Group(Group::new(
+                vec![in f.arena; Document::String("${"), self.expression.format(f), Document::String("}")],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for DirectVariable {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, DirectVariable, { Document::String(f.lookup(&self.name)) })
+impl<'ast, 'arena> Format<'ast, 'arena> for DirectVariable<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, DirectVariable, { Document::String(self.name) })
     }
 }
 
-impl<'a> Format<'a> for NestedVariable {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for NestedVariable<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, NestedVariable, {
-            Document::Group(Group::new(vec![Document::String("$"), self.variable.format(f)]))
+            Document::Group(Group::new(vec![in f.arena; Document::String("$"), self.variable.format(f)]))
         })
     }
 }
 
-impl<'a> Format<'a> for Array {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Array<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Array, { print_array_like(f, ArrayLike::Array(self)) })
     }
 }
 
-impl<'a> Format<'a> for LegacyArray {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for LegacyArray<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, LegacyArray, { print_array_like(f, ArrayLike::LegacyArray(self)) })
     }
 }
 
-impl<'a> Format<'a> for List {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for List<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, List, { print_array_like(f, ArrayLike::List(self)) })
     }
 }
 
-impl<'a> Format<'a> for ArrayElement {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ArrayElement<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ArrayElement, {
             match self {
                 ArrayElement::KeyValue(e) => e.format(f),
@@ -332,43 +331,45 @@ impl<'a> Format<'a> for ArrayElement {
     }
 }
 
-impl<'a> Format<'a> for KeyValueArrayElement {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for KeyValueArrayElement<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, KeyValueArrayElement, {
             let lhs = self.key.format(f);
             let operator = Document::String("=>");
 
-            Document::Group(Group::new(vec![print_assignment(
+            Document::Group(Group::new(vec![in f.arena; print_assignment(
                 f,
                 AssignmentLikeNode::KeyValueArrayElement(self),
                 lhs,
                 operator,
-                &self.value,
+                self.value,
             )]))
         })
     }
 }
 
-impl<'a> Format<'a> for ValueArrayElement {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ValueArrayElement<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ValueArrayElement, { self.value.format(f) })
     }
 }
 
-impl<'a> Format<'a> for VariadicArrayElement {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, VariadicArrayElement, { Document::Array(vec![Document::String("..."), self.value.format(f)]) })
+impl<'ast, 'arena> Format<'ast, 'arena> for VariadicArrayElement<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, VariadicArrayElement, {
+            Document::Array(vec![in f.arena; Document::String("..."), self.value.format(f)])
+        })
     }
 }
 
-impl<'a> Format<'a> for MissingArrayElement {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MissingArrayElement {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MissingArrayElement, { Document::empty() })
     }
 }
 
-impl<'a> Format<'a> for Construct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Construct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Construct, {
             match self {
                 Construct::Isset(c) => c.format(f),
@@ -386,17 +387,16 @@ impl<'a> Format<'a> for Construct {
     }
 }
 
-impl<'a> Format<'a> for IssetConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for IssetConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, IssetConstruct, {
-            let mut contents = vec![self.isset.format(f), Document::String("(")];
+            let mut contents = vec![in f.arena; self.isset.format(f), Document::String("(")];
 
             if !self.values.is_empty() {
-                let mut values =
-                    Document::join(self.values.iter().map(|v| v.format(f)).collect(), Separator::CommaLine);
+                let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
                 if f.settings.trailing_comma {
-                    values.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                    values.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
 
                 values.insert(0, Document::Line(Line::soft()));
@@ -412,10 +412,11 @@ impl<'a> Format<'a> for IssetConstruct {
     }
 }
 
-impl<'a> Format<'a> for EmptyConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for EmptyConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, EmptyConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.empty.format(f),
                 Document::String("("),
                 self.value.format(f),
@@ -425,10 +426,11 @@ impl<'a> Format<'a> for EmptyConstruct {
     }
 }
 
-impl<'a> Format<'a> for EvalConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for EvalConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, EvalConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.eval.format(f),
                 Document::String("("),
                 self.value.format(f),
@@ -438,75 +440,80 @@ impl<'a> Format<'a> for EvalConstruct {
     }
 }
 
-impl<'a> Format<'a> for IncludeConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for IncludeConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, IncludeConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.include.format(f),
-                Document::Indent(vec![Document::Line(Line::default()), self.value.format(f)]),
+                Document::Indent(vec![in f.arena; Document::Line(Line::default()), self.value.format(f)]),
             ]))
         })
     }
 }
 
-impl<'a> Format<'a> for IncludeOnceConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for IncludeOnceConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, IncludeOnceConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.include_once.format(f),
-                Document::Indent(vec![Document::Line(Line::default()), self.value.format(f)]),
+                Document::Indent(vec![in f.arena; Document::Line(Line::default()), self.value.format(f)]),
             ]))
         })
     }
 }
 
-impl<'a> Format<'a> for RequireConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for RequireConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, RequireConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.require.format(f),
-                Document::Indent(vec![Document::Line(Line::default()), self.value.format(f)]),
+                Document::Indent(vec![in f.arena; Document::Line(Line::default()), self.value.format(f)]),
             ]))
         })
     }
 }
 
-impl<'a> Format<'a> for RequireOnceConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for RequireOnceConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, RequireOnceConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.require_once.format(f),
-                Document::Indent(vec![Document::Line(Line::default()), self.value.format(f)]),
+                Document::Indent(vec![in f.arena; Document::Line(Line::default()), self.value.format(f)]),
             ]))
         })
     }
 }
 
-impl<'a> Format<'a> for PrintConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for PrintConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, PrintConstruct, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.print.format(f),
-                Document::Indent(vec![Document::Line(Line::default()), self.value.format(f)]),
+                Document::Indent(vec![in f.arena; Document::Line(Line::default()), self.value.format(f)]),
             ]))
         })
     }
 }
 
-impl<'a> Format<'a> for ExitConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ExitConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ExitConstruct, { print_call_like_node(f, CallLikeNode::ExitConstruct(self)) })
     }
 }
 
-impl<'a> Format<'a> for DieConstruct {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for DieConstruct<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, DieConstruct, { print_call_like_node(f, CallLikeNode::DieConstruct(self)) })
     }
 }
 
-impl<'a> Format<'a> for Argument {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Argument<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Argument, {
             match self {
                 Argument::Positional(a) => a.format(f),
@@ -516,21 +523,22 @@ impl<'a> Format<'a> for Argument {
     }
 }
 
-impl<'a> Format<'a> for PositionalArgument {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for PositionalArgument<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, PositionalArgument, {
             match self.ellipsis {
-                Some(_) => Document::Group(Group::new(vec![Document::String("..."), self.value.format(f)])),
-                None => Document::Group(Group::new(vec![self.value.format(f)])),
+                Some(_) => Document::Group(Group::new(vec![in f.arena; Document::String("..."), self.value.format(f)])),
+                None => Document::Group(Group::new(vec![in f.arena; self.value.format(f)])),
             }
         })
     }
 }
 
-impl<'a> Format<'a> for NamedArgument {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for NamedArgument<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, NamedArgument, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.name.format(f),
                 Document::String(":"),
                 Document::space(),
@@ -540,8 +548,8 @@ impl<'a> Format<'a> for NamedArgument {
     }
 }
 
-impl<'a> Format<'a> for Assignment {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Assignment<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Assignment, {
             let lhs = self.lhs.format(f);
 
@@ -562,16 +570,16 @@ impl<'a> Format<'a> for Assignment {
                 AssignmentOperator::Coalesce(_) => Document::String("??="),
             };
 
-            print_assignment(f, AssignmentLikeNode::AssignmentOperation(self), lhs, operator, &self.rhs)
+            print_assignment(f, AssignmentLikeNode::AssignmentOperation(self), lhs, operator, self.rhs)
         })
     }
 }
 
-impl<'a> Format<'a> for ClosureUseClauseVariable {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClosureUseClauseVariable<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClosureUseClauseVariable, {
             if self.ampersand.is_some() {
-                Document::Group(Group::new(vec![Document::String("&"), self.variable.format(f)]))
+                Document::Group(Group::new(vec![in f.arena; Document::String("&"), self.variable.format(f)]))
             } else {
                 self.variable.format(f)
             }
@@ -579,25 +587,25 @@ impl<'a> Format<'a> for ClosureUseClauseVariable {
     }
 }
 
-impl<'a> Format<'a> for ClosureUseClause {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClosureUseClause<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClosureUseClause, {
-            let mut contents = vec![self.r#use.format(f)];
+            let mut contents = vec![in f.arena; self.r#use.format(f)];
             if f.settings.space_before_closure_use_clause_parenthesis {
                 contents.push(Document::space());
             }
 
             contents.push(Document::String("("));
 
-            let mut variables = vec![];
+            let mut variables = vec![in f.arena];
             for variable in self.variables.iter() {
                 variables.push(variable.format(f));
             }
 
-            let mut inner_content = Document::join(variables, Separator::CommaLine);
+            let mut inner_content = Document::join(f.arena, variables, Separator::CommaLine);
             inner_content.insert(0, Document::Line(Line::soft()));
             if f.settings.trailing_comma {
-                inner_content.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                inner_content.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
             }
 
             contents.push(Document::Indent(inner_content));
@@ -615,10 +623,10 @@ impl<'a> Format<'a> for ClosureUseClause {
     }
 }
 
-impl<'a> Format<'a> for Closure {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Closure<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Closure, {
-            let mut attributes = vec![];
+            let mut attributes = vec![in f.arena];
             for attribute_list in self.attribute_lists.iter() {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hard()));
@@ -626,9 +634,9 @@ impl<'a> Format<'a> for Closure {
             }
 
             let leading_comments =
-                f.print_leading_comments(self.r#static.as_ref().map(|c| c.span).unwrap_or_else(|| self.function.span));
+                f.print_leading_comments(self.r#static.map(|c| c.span).unwrap_or_else(|| self.function.span));
 
-            let mut signature = vec![];
+            let mut signature = vec![in f.arena];
             if let Some(s) = &self.r#static {
                 signature.push(s.format(f));
                 signature.push(Document::space());
@@ -657,14 +665,16 @@ impl<'a> Format<'a> for Closure {
             let signature_document = Document::Group(Group::new(signature).with_id(signature_id));
 
             Document::Group(Group::new(vec![
+                in f.arena;
                 Document::Group(Group::new(attributes)),
                 leading_comments.unwrap_or_else(Document::empty),
                 signature_document,
                 Document::Group(Group::new(vec![
+                    in f.arena;
                     match f.settings.closure_brace_style {
                         BraceStyle::SameLine => Document::space(),
                         BraceStyle::NextLine => Document::IfBreak(
-                            IfBreak::new(Document::space(), Document::Line(Line::hard())).with_id(signature_id),
+                            IfBreak::new(f.arena, Document::space(), Document::Line(Line::hard())).with_id(signature_id),
                         ),
                     },
                     self.body.format(f),
@@ -674,10 +684,10 @@ impl<'a> Format<'a> for Closure {
     }
 }
 
-impl<'a> Format<'a> for ArrowFunction {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ArrowFunction<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ArrowFunction, {
-            let mut contents = vec![];
+            let mut contents = vec![in f.arena];
             if let Some(attributes) = print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
                 contents.push(Document::Line(Line::default()));
@@ -703,15 +713,15 @@ impl<'a> Format<'a> for ArrowFunction {
             }
 
             contents.push(Document::String(" => "));
-            contents.push(format_return_value(f, self.expression.as_ref()));
+            contents.push(format_return_value(f, self.expression));
 
             Document::Group(Group::new(contents))
         })
     }
 }
 
-impl<'a> Format<'a> for ClassLikeMemberSelector {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClassLikeMemberSelector<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClassLikeMemberSelector, {
             match self {
                 ClassLikeMemberSelector::Identifier(s) => s.format(f),
@@ -722,16 +732,18 @@ impl<'a> Format<'a> for ClassLikeMemberSelector {
     }
 }
 
-impl<'a> Format<'a> for ClassLikeMemberExpressionSelector {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClassLikeMemberExpressionSelector<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClassLikeMemberExpressionSelector, {
-            Document::Group(Group::new(vec![Document::String("{"), self.expression.format(f), Document::String("}")]))
+            Document::Group(Group::new(
+                vec![in f.arena; Document::String("{"), self.expression.format(f), Document::String("}")],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for ClassLikeConstantSelector {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClassLikeConstantSelector<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClassLikeConstantSelector, {
             match self {
                 ClassLikeConstantSelector::Identifier(s) => s.format(f),
@@ -741,14 +753,14 @@ impl<'a> Format<'a> for ClassLikeConstantSelector {
     }
 }
 
-impl<'a> Format<'a> for ConstantAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ConstantAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ConstantAccess, { self.name.format(f) })
     }
 }
 
-impl<'a> Format<'a> for Access {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Access<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Access, {
             match self {
                 Access::Property(a) => a.format(f),
@@ -760,62 +772,73 @@ impl<'a> Format<'a> for Access {
     }
 }
 
-impl<'a> Format<'a> for PropertyAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for PropertyAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, PropertyAccess, {
-            Document::Group(Group::new(vec![self.object.format(f), Document::String("->"), self.property.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.object.format(f), Document::String("->"), self.property.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for NullSafePropertyAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for NullSafePropertyAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, NullSafePropertyAccess, {
-            Document::Group(Group::new(vec![self.object.format(f), Document::String("?->"), self.property.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.object.format(f), Document::String("?->"), self.property.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for StaticPropertyAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for StaticPropertyAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, StaticPropertyAccess, {
-            Document::Group(Group::new(vec![self.class.format(f), Document::String("::"), self.property.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.class.format(f), Document::String("::"), self.property.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for ClassConstantAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClassConstantAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClassConstantAccess, {
-            Document::Group(Group::new(vec![self.class.format(f), Document::String("::"), self.constant.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.class.format(f), Document::String("::"), self.constant.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for Call {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Call<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Call, { print_call_like_node(f, CallLikeNode::Call(self)) })
     }
 }
 
-impl<'a> Format<'a> for Throw {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Throw<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Throw, {
-            Document::Group(Group::new(vec![self.throw.format(f), Document::space(), self.exception.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.throw.format(f), Document::space(), self.exception.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for Instantiation {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Instantiation<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Instantiation, { print_call_like_node(f, CallLikeNode::Instantiation(self)) })
     }
 }
 
-impl<'a> Format<'a> for ArrayAccess {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ArrayAccess<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ArrayAccess, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.array.format(f),
                 Document::String("["),
                 self.index.format(f),
@@ -825,14 +848,16 @@ impl<'a> Format<'a> for ArrayAccess {
     }
 }
 
-impl<'a> Format<'a> for ArrayAppend {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
-        wrap!(f, self, ArrayAppend, { Document::Group(Group::new(vec![self.array.format(f), Document::String("[]")])) })
+impl<'ast, 'arena> Format<'ast, 'arena> for ArrayAppend<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+        wrap!(f, self, ArrayAppend, {
+            Document::Group(Group::new(vec![in f.arena; self.array.format(f), Document::String("[]")]))
+        })
     }
 }
 
-impl<'a> Format<'a> for MatchArm {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MatchArm<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchArm, {
             match self {
                 MatchArm::Expression(a) => a.format(f),
@@ -842,10 +867,11 @@ impl<'a> Format<'a> for MatchArm {
     }
 }
 
-impl<'a> Format<'a> for MatchDefaultArm {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MatchDefaultArm<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchDefaultArm, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.default.format(f),
                 format_token(f, self.arrow, " => "),
                 self.expression.format(f),
@@ -854,42 +880,45 @@ impl<'a> Format<'a> for MatchDefaultArm {
     }
 }
 
-impl<'a> Format<'a> for MatchExpressionArm {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MatchExpressionArm<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchExpressionArm, {
             let len = self.conditions.len();
-            let mut contents = vec![];
+            let mut contents = vec![in f.arena];
             for (i, condition) in self.conditions.iter().enumerate() {
                 contents.push(condition.format(f));
                 if i != (len - 1) {
                     contents.push(Document::String(","));
                     contents.push(Document::Line(Line::default()));
                 } else if f.settings.trailing_comma && i > 0 {
-                    contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                    contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
             }
 
             contents.push(Document::IndentIfBreak(IndentIfBreak::new(vec![
+                in f.arena;
                 Document::Line(Line::default()),
                 format_token(f, self.arrow, "=> "),
             ])));
 
             Document::Array(vec![
+                in f.arena;
                 Document::Group(Group::new(contents)),
-                Document::Group(Group::new(vec![self.expression.format(f)])),
+                Document::Group(Group::new(vec![in f.arena; self.expression.format(f)])),
             ])
         })
     }
 }
 
-impl<'a> Format<'a> for Match {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Match<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Match, {
             let mut contents = vec![
+                in f.arena;
                 self.r#match.format(f),
                 print_condition(
                     f,
-                    &self.expression,
+                    self.expression,
                     f.settings.space_before_match_parenthesis,
                     f.settings.space_within_match_parenthesis,
                 ),
@@ -911,13 +940,15 @@ impl<'a> Format<'a> for Match {
 
             if !self.arms.is_empty() {
                 let mut inner_contents =
-                    Document::join(self.arms.iter().map(|arm| arm.format(f)).collect::<Vec<_>>(), Separator::CommaLine);
+                    Document::join(f.arena, self.arms.iter().map(|arm| arm.format(f)), Separator::CommaLine);
 
                 if f.settings.trailing_comma {
-                    inner_contents.push(Document::IfBreak(IfBreak::then(Document::String(","))));
+                    inner_contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
 
-                contents.push(Document::Indent(vec![Document::Line(Line::default()), Document::Array(inner_contents)]));
+                contents.push(Document::Indent(
+                    vec![in f.arena; Document::Line(Line::default()), Document::Array(inner_contents)],
+                ));
             }
 
             if let Some(comments) = f.print_dangling_comments(self.left_brace.join(self.right_brace), true) {
@@ -936,8 +967,8 @@ impl<'a> Format<'a> for Match {
     }
 }
 
-impl<'a> Format<'a> for Conditional {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Conditional<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Conditional, {
             let must_break = f.settings.preserve_breaking_conditional_expression && {
                 misc::has_new_line_in_range(
@@ -965,24 +996,26 @@ impl<'a> Format<'a> for Conditional {
                     let then_id = f.next_id();
 
                     let break_group = must_break
-                        && matches!(unwrap_parenthesized(self.condition.as_ref()), Expression::Binary(Binary { lhs, rhs, .. }) if lhs.is_binary() || rhs.is_binary());
+                        && matches!(unwrap_parenthesized(self.condition), Expression::Binary(Binary { lhs, rhs, .. }) if lhs.is_binary() || rhs.is_binary());
 
                     Document::Group(
                         Group::new(vec![
+                            in f.arena;
                             self.condition.format(f),
                             Document::Indent(vec![
+                                in f.arena;
                                 Document::Line(if must_break { Line::hard() } else { Line::default() }),
                                 format_token(f, self.question_mark, "? "),
-                                Document::Group(Group::new(vec![then.format(f)]).with_id(then_id)),
+                                Document::Group(Group::new(vec![in f.arena; then.format(f)]).with_id(then_id)),
                                 {
                                     if inline_colon {
                                         if must_break {
                                             Document::space()
                                         } else {
                                             Document::IfBreak(
-                                                IfBreak::new(Document::space(), {
+                                                IfBreak::new(f.arena, Document::space(), {
                                                     Document::IfBreak(
-                                                        IfBreak::new(Document::Line(Line::hard()), Document::space())
+                                                        IfBreak::new(f.arena, Document::Line(Line::hard()), Document::space())
                                                             .with_id(conditional_id),
                                                     )
                                                 })
@@ -1002,10 +1035,13 @@ impl<'a> Format<'a> for Conditional {
                     )
                 }
                 None => Document::Group(Group::new(vec![
+                    in f.arena;
                     self.condition.format(f),
                     Document::Indent(vec![
+                        in f.arena;
                         Document::Line(if must_break { Line::hard() } else { Line::default() }),
                         Document::Group(Group::new(vec![
+                            in f.arena;
                             format_token(f, self.question_mark, "?"),
                             format_token(f, self.colon, ": "),
                             self.r#else.format(f),
@@ -1017,8 +1053,8 @@ impl<'a> Format<'a> for Conditional {
     }
 }
 
-impl<'a> Format<'a> for CompositeString {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for CompositeString<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, CompositeString, {
             match self {
                 CompositeString::ShellExecute(s) => s.format(f),
@@ -1029,19 +1065,17 @@ impl<'a> Format<'a> for CompositeString {
     }
 }
 
-impl<'a> Format<'a> for DocumentString {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for DocumentString<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, DocumentString, {
-            let label = f.lookup(&self.label);
-
-            let mut contents = vec![Document::String("<<<")];
+            let mut contents = vec![in f.arena; Document::String("<<<")];
             match self.kind {
                 DocumentKind::Heredoc => {
-                    contents.push(Document::String(label));
+                    contents.push(Document::String(self.label));
                 }
                 DocumentKind::Nowdoc => {
                     contents.push(Document::String("'"));
-                    contents.push(Document::String(label));
+                    contents.push(Document::String(self.label));
                     contents.push(Document::String("'"));
                 }
             }
@@ -1057,15 +1091,15 @@ impl<'a> Format<'a> for DocumentString {
             for part in self.parts.iter() {
                 let formatted = match part {
                     StringPart::Literal(l) => {
-                        let content = f.lookup(&l.value);
-                        let mut part_contents = vec![];
+                        let content = l.value;
+                        let mut part_contents = vec![in f.arena;];
                         let own_line = f.has_newline(l.span.start.offset, true);
-                        for mut line in FormatterState::split_lines(content) {
+                        for mut line in f.split_lines(content) {
                             if own_line {
                                 line = FormatterState::skip_leading_whitespace_up_to(line, indent);
                             }
 
-                            let mut line_content = vec![Document::String(line)];
+                            let mut line_content = vec![in f.arena; Document::String(line)];
                             if !line.is_empty() {
                                 line_content.push(Document::DoNotTrim);
                             }
@@ -1073,7 +1107,7 @@ impl<'a> Format<'a> for DocumentString {
                             part_contents.push(Document::Array(line_content));
                         }
 
-                        part_contents = Document::join(part_contents, Separator::HardLine);
+                        part_contents = Document::join(f.arena, part_contents, Separator::HardLine);
 
                         // if ends with a newline, add a newline
                         if content.ends_with('\n') {
@@ -1088,17 +1122,17 @@ impl<'a> Format<'a> for DocumentString {
                 contents.push(formatted);
             }
 
-            contents.push(Document::String(label));
+            contents.push(Document::String(self.label));
 
             Document::Group(Group::new(contents))
         })
     }
 }
 
-impl<'a> Format<'a> for InterpolatedString {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for InterpolatedString<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, InterpolatedString, {
-            let mut parts = vec![Document::String("\"")];
+            let mut parts = vec![in f.arena; Document::String("\"")];
 
             for part in self.parts.iter() {
                 parts.push(part.format(f));
@@ -1111,10 +1145,10 @@ impl<'a> Format<'a> for InterpolatedString {
     }
 }
 
-impl<'a> Format<'a> for ShellExecuteString {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ShellExecuteString<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ShellExecuteString, {
-            let mut parts = vec![Document::String("`")];
+            let mut parts = vec![in f.arena; Document::String("`")];
 
             for part in self.parts.iter() {
                 parts.push(part.format(f));
@@ -1127,8 +1161,8 @@ impl<'a> Format<'a> for ShellExecuteString {
     }
 }
 
-impl<'a> Format<'a> for StringPart {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for StringPart<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, StringPart, {
             match self {
                 StringPart::Literal(s) => s.format(f),
@@ -1139,24 +1173,26 @@ impl<'a> Format<'a> for StringPart {
     }
 }
 
-impl<'a> Format<'a> for LiteralStringPart {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for LiteralStringPart<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, LiteralStringPart, {
-            utils::replace_end_of_line(Document::String(f.interner.lookup(&self.value)), Separator::LiteralLine, false)
+            utils::replace_end_of_line(f, Document::String(self.value), Separator::LiteralLine, false)
         })
     }
 }
 
-impl<'a> Format<'a> for BracedExpressionStringPart {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for BracedExpressionStringPart<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, BracedExpressionStringPart, {
-            Document::Group(Group::new(vec![Document::String("{"), self.expression.format(f), Document::String("}")]))
+            Document::Group(Group::new(
+                vec![in f.arena; Document::String("{"), self.expression.format(f), Document::String("}")],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for Yield {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Yield<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Yield, {
             match self {
                 Yield::Value(y) => y.format(f),
@@ -1167,21 +1203,24 @@ impl<'a> Format<'a> for Yield {
     }
 }
 
-impl<'a> Format<'a> for YieldValue {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for YieldValue<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, YieldValue, {
             match &self.value {
-                Some(v) => Document::Group(Group::new(vec![self.r#yield.format(f), Document::space(), v.format(f)])),
+                Some(v) => Document::Group(Group::new(
+                    vec![in f.arena; self.r#yield.format(f), Document::space(), v.format(f)],
+                )),
                 None => self.r#yield.format(f),
             }
         })
     }
 }
 
-impl<'a> Format<'a> for YieldPair {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for YieldPair<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, YieldPair, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.r#yield.format(f),
                 Document::space(),
                 self.key.format(f),
@@ -1194,10 +1233,11 @@ impl<'a> Format<'a> for YieldPair {
     }
 }
 
-impl<'a> Format<'a> for YieldFrom {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for YieldFrom<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, YieldFrom, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.r#yield.format(f),
                 Document::space(),
                 self.from.format(f),
@@ -1208,16 +1248,18 @@ impl<'a> Format<'a> for YieldFrom {
     }
 }
 
-impl<'a> Format<'a> for Clone {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for Clone<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, Clone, {
-            Document::Group(Group::new(vec![self.clone.format(f), Document::space(), self.object.format(f)]))
+            Document::Group(Group::new(
+                vec![in f.arena; self.clone.format(f), Document::space(), self.object.format(f)],
+            ))
         })
     }
 }
 
-impl<'a> Format<'a> for MagicConstant {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MagicConstant<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MagicConstant, {
             match &self {
                 MagicConstant::Line(i) => i.format(f),
@@ -1234,8 +1276,8 @@ impl<'a> Format<'a> for MagicConstant {
     }
 }
 
-impl<'a> Format<'a> for ClosureCreation {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for ClosureCreation<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClosureCreation, {
             match &self {
                 ClosureCreation::Function(c) => c.format(f),
@@ -1246,18 +1288,19 @@ impl<'a> Format<'a> for ClosureCreation {
     }
 }
 
-impl<'a> Format<'a> for FunctionClosureCreation {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for FunctionClosureCreation<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, FunctionClosureCreation, {
-            Document::Group(Group::new(vec![self.function.format(f), Document::String("(...)")]))
+            Document::Group(Group::new(vec![in f.arena; self.function.format(f), Document::String("(...)")]))
         })
     }
 }
 
-impl<'a> Format<'a> for MethodClosureCreation {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for MethodClosureCreation<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, MethodClosureCreation, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.object.format(f),
                 Document::String("->"),
                 self.method.format(f),
@@ -1267,10 +1310,11 @@ impl<'a> Format<'a> for MethodClosureCreation {
     }
 }
 
-impl<'a> Format<'a> for StaticMethodClosureCreation {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for StaticMethodClosureCreation<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, StaticMethodClosureCreation, {
             Document::Group(Group::new(vec![
+                in f.arena;
                 self.class.format(f),
                 Document::String("::"),
                 self.method.format(f),
@@ -1280,11 +1324,11 @@ impl<'a> Format<'a> for StaticMethodClosureCreation {
     }
 }
 
-impl<'a> Format<'a> for AnonymousClass {
-    fn format(&'a self, f: &mut FormatterState<'a>) -> Document<'a> {
+impl<'ast, 'arena> Format<'ast, 'arena> for AnonymousClass<'arena> {
+    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
         wrap!(f, self, AnonymousClass, {
             let initialization = {
-                let mut contents = vec![self.new.format(f)];
+                let mut contents = vec![in f.arena; self.new.format(f)];
                 if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                     contents.push(Document::Line(Line::default()));
                     contents.push(attributes);
@@ -1320,6 +1364,7 @@ impl<'a> Format<'a> for AnonymousClass {
             let signature = Document::Group(Group::new(signature).with_id(signature_id));
 
             Document::Group(Group::new(vec![
+                in f.arena;
                 initialization,
                 signature,
                 print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id)),

@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_database::file::HasFileId;
 use memchr::memchr;
 use memchr::memmem::find;
@@ -47,6 +48,19 @@ impl<'a> Input<'a> {
     /// A new `Input` instance initialized with the file's ID and contents.
     pub fn from_file(file: &'a File) -> Self {
         Self::new(file.id, file.contents.as_bytes())
+    }
+
+    /// Creates a new `Input` instance from the contents of a `File`.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - A reference to the `File` containing the source code.
+    ///
+    /// # Returns
+    ///
+    /// A new `Input` instance initialized with the file's ID and contents.
+    pub fn from_file_in(arena: &'a Bump, file: &File) -> Self {
+        Self::new(file.id, arena.alloc_slice_clone(file.contents.as_bytes()))
     }
 
     /// Creates a new `Input` instance representing a byte slice that is

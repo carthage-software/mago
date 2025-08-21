@@ -10,11 +10,11 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::type_hint::parse_type_hint;
 use crate::parser::internal::utils;
 
-pub fn parse_class_like_constant_with_attributes_and_modifiers(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-    modifiers: Sequence<Modifier>,
-) -> Result<ClassLikeConstant, ParseError> {
+pub fn parse_class_like_constant_with_attributes_and_modifiers<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+    modifiers: Sequence<'arena, Modifier<'arena>>,
+) -> Result<ClassLikeConstant<'arena>, ParseError> {
     Ok(ClassLikeConstant {
         attribute_lists: attributes,
         modifiers,
@@ -24,8 +24,8 @@ pub fn parse_class_like_constant_with_attributes_and_modifiers(
             _ => Some(parse_type_hint(stream)?),
         },
         items: {
-            let mut items = vec![];
-            let mut commas = vec![];
+            let mut items = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T![";" | "?>"])) {
                     break;
@@ -47,7 +47,9 @@ pub fn parse_class_like_constant_with_attributes_and_modifiers(
     })
 }
 
-pub fn parse_constant_item(stream: &mut TokenStream<'_, '_>) -> Result<ClassLikeConstantItem, ParseError> {
+pub fn parse_constant_item<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<ClassLikeConstantItem<'arena>, ParseError> {
     Ok(ClassLikeConstantItem {
         name: parse_local_identifier(stream)?,
         equals: utils::expect_span(stream, T!["="])?,

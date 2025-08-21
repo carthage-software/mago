@@ -6,11 +6,11 @@ use crate::parser::internal::statement::parse_statement;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_block(stream: &mut TokenStream<'_, '_>) -> Result<Block, ParseError> {
+pub fn parse_block<'arena>(stream: &mut TokenStream<'arena>) -> Result<Block<'arena>, ParseError> {
     Ok(Block {
         left_brace: utils::expect_span(stream, T!["{"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.new_vec();
             loop {
                 let next = utils::peek(stream)?;
                 if matches!(next.kind, T!["}"]) {

@@ -1,7 +1,7 @@
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::token::GetPrecedence;
 
-pub fn should_flatten<'a>(operator: &'a BinaryOperator, parent_op: &'a BinaryOperator) -> bool {
+pub fn should_flatten<'ast>(operator: &'ast BinaryOperator, parent_op: &'ast BinaryOperator) -> bool {
     if operator.is_low_precedence() {
         return false;
     }

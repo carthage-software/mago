@@ -10,7 +10,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_use(stream: &mut TokenStream<'_, '_>) -> Result<Use, ParseError> {
+pub fn parse_use<'arena>(stream: &mut TokenStream<'arena>) -> Result<Use<'arena>, ParseError> {
     Ok(Use {
         r#use: utils::expect_keyword(stream, T!["use"])?,
         items: parse_use_items(stream)?,
@@ -18,7 +18,7 @@ pub fn parse_use(stream: &mut TokenStream<'_, '_>) -> Result<Use, ParseError> {
     })
 }
 
-pub fn parse_use_items(stream: &mut TokenStream<'_, '_>) -> Result<UseItems, ParseError> {
+pub fn parse_use_items<'arena>(stream: &mut TokenStream<'arena>) -> Result<UseItems<'arena>, ParseError> {
     let next = utils::peek(stream)?.kind;
 
     Ok(match next {
@@ -33,11 +33,13 @@ pub fn parse_use_items(stream: &mut TokenStream<'_, '_>) -> Result<UseItems, Par
     })
 }
 
-pub fn parse_use_item_sequence(stream: &mut TokenStream<'_, '_>) -> Result<UseItemSequence, ParseError> {
+pub fn parse_use_item_sequence<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<UseItemSequence<'arena>, ParseError> {
     let start = utils::peek(stream)?.span.start;
 
-    let mut items = Vec::new();
-    let mut commas = Vec::new();
+    let mut items = stream.new_vec();
+    let mut commas = stream.new_vec();
     loop {
         items.push(parse_use_item(stream)?);
 
@@ -52,10 +54,12 @@ pub fn parse_use_item_sequence(stream: &mut TokenStream<'_, '_>) -> Result<UseIt
     Ok(UseItemSequence { file_id: stream.file_id(), start, items: TokenSeparatedSequence::new(items, commas) })
 }
 
-pub fn parse_typed_use_item_sequence(stream: &mut TokenStream<'_, '_>) -> Result<TypedUseItemSequence, ParseError> {
+pub fn parse_typed_use_item_sequence<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TypedUseItemSequence<'arena>, ParseError> {
     let r#type = parse_use_type(stream)?;
-    let mut items = Vec::new();
-    let mut commas = Vec::new();
+    let mut items = stream.new_vec();
+    let mut commas = stream.new_vec();
     loop {
         items.push(parse_use_item(stream)?);
 
@@ -70,13 +74,15 @@ pub fn parse_typed_use_item_sequence(stream: &mut TokenStream<'_, '_>) -> Result
     Ok(TypedUseItemSequence { r#type, items: TokenSeparatedSequence::new(items, commas) })
 }
 
-pub fn parse_typed_use_item_list(stream: &mut TokenStream<'_, '_>) -> Result<TypedUseItemList, ParseError> {
+pub fn parse_typed_use_item_list<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<TypedUseItemList<'arena>, ParseError> {
     let r#type = parse_use_type(stream)?;
     let namespace = parse_identifier(stream)?;
     let namespace_separator = utils::expect_span(stream, T!["\\"])?;
     let left_brace = utils::expect_span(stream, T!["{"])?;
-    let mut items = Vec::new();
-    let mut commas = Vec::new();
+    let mut items = stream.new_vec();
+    let mut commas = stream.new_vec();
     loop {
         let next = utils::peek(stream)?;
         if matches!(next.kind, T!["}"]) {
@@ -104,12 +110,14 @@ pub fn parse_typed_use_item_list(stream: &mut TokenStream<'_, '_>) -> Result<Typ
     })
 }
 
-pub fn parse_mixed_use_item_list(stream: &mut TokenStream<'_, '_>) -> Result<MixedUseItemList, ParseError> {
+pub fn parse_mixed_use_item_list<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<MixedUseItemList<'arena>, ParseError> {
     let namespace = parse_identifier(stream)?;
     let namespace_separator = utils::expect_span(stream, T!["\\"])?;
     let left_brace = utils::expect_span(stream, T!["{"])?;
-    let mut items = Vec::new();
-    let mut commas = Vec::new();
+    let mut items = stream.new_vec();
+    let mut commas = stream.new_vec();
     loop {
         let next = utils::peek(stream)?;
         if matches!(next.kind, T!["}"]) {
@@ -136,11 +144,15 @@ pub fn parse_mixed_use_item_list(stream: &mut TokenStream<'_, '_>) -> Result<Mix
     })
 }
 
-pub fn parse_maybe_typed_use_item(stream: &mut TokenStream<'_, '_>) -> Result<MaybeTypedUseItem, ParseError> {
+pub fn parse_maybe_typed_use_item<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<MaybeTypedUseItem<'arena>, ParseError> {
     Ok(MaybeTypedUseItem { r#type: parse_optional_use_type(stream)?, item: parse_use_item(stream)? })
 }
 
-pub fn parse_optional_use_type(stream: &mut TokenStream<'_, '_>) -> Result<Option<UseType>, ParseError> {
+pub fn parse_optional_use_type<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<UseType<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["function"]) => Some(UseType::Function(utils::expect_any_keyword(stream)?)),
         Some(T!["const"]) => Some(UseType::Const(utils::expect_any_keyword(stream)?)),
@@ -148,7 +160,7 @@ pub fn parse_optional_use_type(stream: &mut TokenStream<'_, '_>) -> Result<Optio
     })
 }
 
-pub fn parse_use_type(stream: &mut TokenStream<'_, '_>) -> Result<UseType, ParseError> {
+pub fn parse_use_type<'arena>(stream: &mut TokenStream<'arena>) -> Result<UseType<'arena>, ParseError> {
     let next = utils::peek(stream)?;
 
     Ok(match next.kind {
@@ -158,18 +170,20 @@ pub fn parse_use_type(stream: &mut TokenStream<'_, '_>) -> Result<UseType, Parse
     })
 }
 
-pub fn parse_use_item(stream: &mut TokenStream<'_, '_>) -> Result<UseItem, ParseError> {
+pub fn parse_use_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<UseItem<'arena>, ParseError> {
     Ok(UseItem { name: parse_identifier(stream)?, alias: parse_optional_use_item_alias(stream)? })
 }
 
-pub fn parse_optional_use_item_alias(stream: &mut TokenStream<'_, '_>) -> Result<Option<UseItemAlias>, ParseError> {
+pub fn parse_optional_use_item_alias<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<UseItemAlias<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["as"]) => Some(parse_use_item_alias(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_use_item_alias(stream: &mut TokenStream<'_, '_>) -> Result<UseItemAlias, ParseError> {
+pub fn parse_use_item_alias<'arena>(stream: &mut TokenStream<'arena>) -> Result<UseItemAlias<'arena>, ParseError> {
     let r#as = utils::expect_keyword(stream, T!["as"])?;
     let identifier = parse_local_identifier(stream)?;
 

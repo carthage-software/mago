@@ -39,10 +39,10 @@ use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn register_anonymous_class(
+pub fn register_anonymous_class<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    class: &AnonymousClass,
-    context: &mut Context<'_>,
+    class: &'ast AnonymousClass<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let span = class.span();
@@ -76,15 +76,15 @@ pub fn register_anonymous_class(
 }
 
 #[inline]
-pub fn register_class(
+pub fn register_class<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    class: &Class,
-    context: &mut Context<'_>,
+    class: &'ast Class<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        *context.resolved_names.get(&class.name),
+        context.interner.intern(context.resolved_names.get(&class.name)),
         SymbolKind::Class,
         Some(class.name.span),
         class.span(),
@@ -112,15 +112,15 @@ pub fn register_class(
 }
 
 #[inline]
-pub fn register_interface(
+pub fn register_interface<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    interface: &Interface,
-    context: &mut Context<'_>,
+    interface: &'ast Interface<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        *context.resolved_names.get(&interface.name),
+        context.interner.intern(context.resolved_names.get(&interface.name)),
         SymbolKind::Interface,
         Some(interface.name.span),
         interface.span(),
@@ -148,15 +148,15 @@ pub fn register_interface(
 }
 
 #[inline]
-pub fn register_trait(
+pub fn register_trait<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    r#trait: &Trait,
-    context: &mut Context<'_>,
+    r#trait: &'ast Trait<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        *context.resolved_names.get(&r#trait.name),
+        context.interner.intern(context.resolved_names.get(&r#trait.name)),
         SymbolKind::Trait,
         Some(r#trait.name.span),
         r#trait.span(),
@@ -184,15 +184,15 @@ pub fn register_trait(
 }
 
 #[inline]
-pub fn register_enum(
+pub fn register_enum<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    r#enum: &Enum,
-    context: &mut Context<'_>,
+    r#enum: &'ast Enum<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        *context.resolved_names.get(&r#enum.name),
+        context.interner.intern(context.resolved_names.get(&r#enum.name)),
         SymbolKind::Enum,
         Some(r#enum.name.span),
         r#enum.span(),
@@ -221,19 +221,19 @@ pub fn register_enum(
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn scan_class_like(
+fn scan_class_like<'input, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     name: StringIdentifier,
     kind: SymbolKind,
     name_span: Option<Span>,
     span: Span,
-    attribute_lists: &Sequence<AttributeList>,
-    modifiers: Option<&Sequence<Modifier>>,
-    members: &Sequence<ClassLikeMember>,
-    extends: Option<&Extends>,
-    implements: Option<&Implements>,
-    enum_type: Option<&EnumBackingTypeHint>,
-    context: &mut Context<'_>,
+    attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
+    modifiers: Option<&'ast Sequence<Modifier<'arena>>>,
+    members: &'ast Sequence<ClassLikeMember<'arena>>,
+    extends: Option<&'ast Extends<'arena>>,
+    implements: Option<&'ast Implements<'arena>>,
+    enum_type: Option<&'ast EnumBackingTypeHint<'arena>>,
+    context: &mut Context<'input, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<ClassLikeMetadata> {
     let original_name = name;
@@ -283,7 +283,7 @@ fn scan_class_like(
 
             if let Some(extended_class) = extends.and_then(|e| e.types.first()) {
                 let parent_name = context.resolved_names.get(extended_class);
-                let parent_name = context.interner.lowered(parent_name);
+                let parent_name = context.interner.intern(parent_name.to_lowercase());
 
                 class_like_metadata.direct_parent_class = Some(parent_name);
                 class_like_metadata.all_parent_classes.insert(parent_name);
@@ -326,7 +326,7 @@ fn scan_class_like(
             if let Some(extends) = extends {
                 for extended_interface in extends.types.iter() {
                     let parent_name = context.resolved_names.get(extended_interface);
-                    let parent_name = context.interner.lowered(parent_name);
+                    let parent_name = context.interner.intern(parent_name.to_lowercase());
 
                     class_like_metadata.add_direct_parent_interface(parent_name);
                 }
@@ -339,7 +339,7 @@ fn scan_class_like(
     {
         for interface_name in implemented_interfaces.types.iter() {
             let interface_name = context.resolved_names.get(interface_name);
-            let interface_name = context.interner.lowered(interface_name);
+            let interface_name = context.interner.intern(interface_name.to_lowercase());
 
             class_like_metadata.add_direct_parent_interface(interface_name);
         }
@@ -920,7 +920,7 @@ fn scan_class_like(
                 for trait_use in trait_use.trait_names.iter() {
                     let trait_name = context.resolved_names.get(trait_use);
 
-                    class_like_metadata.add_used_trait(context.interner.lowered(trait_name));
+                    class_like_metadata.add_used_trait(context.interner.intern(trait_name.to_lowercase()));
                 }
 
                 if let TraitUseSpecification::Concrete(specification) = &trait_use.specification {
@@ -938,7 +938,10 @@ fn scan_class_like(
                                 };
 
                                 if let Some(alias) = &adaptation.alias {
-                                    class_like_metadata.add_trait_alias(*method_name, alias.value);
+                                    class_like_metadata.add_trait_alias(
+                                        context.interner.intern(method_name),
+                                        context.interner.intern(alias.value),
+                                    );
                                 }
 
                                 if let Some(visibility) = &adaptation.visibility {
@@ -947,7 +950,9 @@ fn scan_class_like(
                                         Modifier::Protected(_) => Visibility::Protected,
                                         Modifier::Private(_) => Visibility::Private,
                                         Modifier::Final(_) => {
-                                            class_like_metadata.trait_final_map.insert(*method_name);
+                                            class_like_metadata
+                                                .trait_final_map
+                                                .insert(context.interner.intern(method_name));
 
                                             continue;
                                         }
@@ -956,7 +961,8 @@ fn scan_class_like(
                                         }
                                     };
 
-                                    class_like_metadata.add_trait_visibility(*method_name, visibility);
+                                    class_like_metadata
+                                        .add_trait_visibility(context.interner.intern(method_name), visibility);
                                 }
                             }
                         }

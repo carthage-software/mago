@@ -87,7 +87,7 @@ impl LintRule for KanDefectRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let kind = match node.kind() {
             NodeKind::Class => "Class",
             NodeKind::Trait => "Trait",
@@ -118,7 +118,7 @@ impl LintRule for KanDefectRule {
 }
 
 #[inline]
-fn get_kan_defect_of_node(node: Node) -> f64 {
+fn get_kan_defect_of_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> f64 {
     let (select_count, while_count, if_count) = collect_defect_factors(node);
 
     calculate_kan_defect(select_count, while_count, if_count)
@@ -130,7 +130,7 @@ const fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64
 }
 
 #[inline]
-fn collect_defect_factors(node: Node) -> (usize, usize, usize) {
+fn collect_defect_factors<'ast, 'arena>(node: Node<'ast, 'arena>) -> (usize, usize, usize) {
     let mut select_count = 0;
     let mut while_count = 0;
     let mut if_count = 0;

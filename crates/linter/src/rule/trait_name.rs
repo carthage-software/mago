@@ -84,14 +84,14 @@ impl LintRule for TraitNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Trait(r#trait) = node else {
             return;
         };
 
         let mut issues = vec![];
 
-        let name = ctx.lookup(&r#trait.name.value);
+        let name = r#trait.name.value;
         let fqcn = ctx.lookup_name(&r#trait.name);
 
         if !is_class_case(name) {

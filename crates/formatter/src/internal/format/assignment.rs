@@ -1,3 +1,5 @@
+use bumpalo::vec;
+
 use mago_span::*;
 use mago_syntax::ast::*;
 
@@ -17,36 +19,36 @@ use crate::internal::utils::unwrap_parenthesized;
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum AssignmentLikeNode<'a> {
+pub(super) enum AssignmentLikeNode<'ast, 'arena> {
     /// Represents a standard assignment operation, such as `$a = $b`.
-    AssignmentOperation(&'a Assignment),
+    AssignmentOperation(&'ast Assignment<'arena>),
 
     /// Represents a class-like constant item.
     ///
     /// - `A = 1` in `class A { public const A = 1; }`.
-    ClassLikeConstantItem(&'a ClassLikeConstantItem),
+    ClassLikeConstantItem(&'ast ClassLikeConstantItem<'arena>),
 
     /// Represents a global constant item.
     ///
     /// - `A = 1` in `const A = 1;`.
-    ConstantItem(&'a ConstantItem),
+    ConstantItem(&'ast ConstantItem<'arena>),
 
     /// Represents a backed enum case item.
     ///
     /// - `A = 1` in `enum A: int { case A = 1; }`.
-    EnumCaseBackedItem(&'a EnumCaseBackedItem),
+    EnumCaseBackedItem(&'ast EnumCaseBackedItem<'arena>),
 
     /// Represents a property declaration with an initializer in a class.
     ///
     /// - `$foo = 1` in `class A { public int $foo = 1; }`.
-    PropertyConcreteItem(&'a PropertyConcreteItem),
+    PropertyConcreteItem(&'ast PropertyConcreteItem<'arena>),
 
     /// Represents a key-value pair in an array, list, or similar structure.
     ///
     /// - `$a => $b` in `[ $a => $b ]`
     /// - `$a => $b` in `array($a => $b)`
     /// - `$a => $b` in `list($a => $b)`
-    KeyValueArrayElement(&'a KeyValueArrayElement),
+    KeyValueArrayElement(&'ast KeyValueArrayElement<'arena>),
 }
 
 #[derive(Debug)]
@@ -60,13 +62,13 @@ enum Layout {
     Fluid,
 }
 
-pub(super) fn print_assignment<'a>(
-    f: &mut FormatterState<'a>,
-    assignment_node: AssignmentLikeNode<'a>,
-    lhs: Document<'a>,
-    operator: Document<'a>,
-    rhs_expression: &'a Expression,
-) -> Document<'a> {
+pub(super) fn print_assignment<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    assignment_node: AssignmentLikeNode<'ast, 'arena>,
+    lhs: Document<'arena>,
+    operator: Document<'arena>,
+    rhs_expression: &'ast Expression<'arena>,
+) -> Document<'arena> {
     let needs_spacing = if matches!(assignment_node, AssignmentLikeNode::AssignmentOperation(_)) {
         f.settings.space_around_assignment_operators
     } else {
@@ -78,76 +80,84 @@ pub(super) fn print_assignment<'a>(
 
     match layout {
         Layout::Chain => Document::Array(vec![
-            Document::Group(Group::new(vec![lhs])),
+            in f.arena;
+            Document::Group(Group::new(vec![in f.arena; lhs])),
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
             rhs,
         ]),
         Layout::ChainTailArrowChain => Document::Array(vec![
-            Document::Group(Group::new(vec![lhs])),
+            in f.arena;
+            Document::Group(Group::new(vec![in f.arena; lhs])),
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             rhs,
         ]),
         Layout::ChainTail => Document::Group(Group::new(vec![
+            in f.arena;
             lhs,
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
-            Document::Indent(vec![Document::Line(Line::hard()), rhs]),
+            Document::Indent(vec![in f.arena; Document::Line(Line::hard()), rhs]),
         ])),
         Layout::BreakAfterOperator => Document::Group(Group::new(vec![
-            Document::Group(Group::new(vec![lhs])),
+            in f.arena;
+            Document::Group(Group::new(vec![in f.arena; lhs])),
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
-            Document::Group(Group::new(vec![Document::IndentIfBreak(IndentIfBreak::new(vec![
+            Document::Group(Group::new(vec![in f.arena; Document::IndentIfBreak(IndentIfBreak::new(vec![
+                in f.arena;
                 if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
                 rhs,
             ]))])),
         ])),
         Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec![
-            Document::Group(Group::new(vec![lhs])),
+            in f.arena;
+            Document::Group(Group::new(vec![in f.arena; lhs])),
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             if needs_spacing { Document::space() } else { Document::empty() },
-            Document::Group(Group::new(vec![rhs])),
+            Document::Group(Group::new(vec![in f.arena; rhs])),
         ])),
         Layout::BreakLhs => Document::Group(Group::new(vec![
+            in f.arena;
             lhs,
             if needs_spacing { Document::space() } else { Document::empty() },
             operator,
             if needs_spacing { Document::space() } else { Document::empty() },
-            Document::Group(Group::new(vec![rhs])),
+            Document::Group(Group::new(vec![in f.arena; rhs])),
         ])),
         Layout::Fluid => {
             let assignment_id = f.next_id();
 
             Document::Group(Group::new(vec![
+                in f.arena;
                 lhs,
                 if needs_spacing { Document::space() } else { Document::empty() },
                 operator,
                 Document::Group(
-                    Group::new(vec![Document::Indent(vec![if needs_spacing {
+                    Group::new(vec![in f.arena; Document::Indent(vec![in f.arena; if needs_spacing {
                         Document::Line(Line::default())
                     } else {
                         Document::Line(Line::soft())
                     }])])
                     .with_id(assignment_id),
                 ),
-                Document::IndentIfBreak(IndentIfBreak::new(vec![rhs]).with_id(assignment_id)),
+                Document::IndentIfBreak(IndentIfBreak::new(vec![in f.arena; rhs]).with_id(assignment_id)),
             ]))
         }
     }
 }
 
-fn choose_layout<'a, 'b>(
-    f: &FormatterState<'a>,
-    lhs: &'b Document<'a>,
-    assignment_like_node: &'b AssignmentLikeNode<'a>,
-    rhs_expression: &'a Expression,
+fn choose_layout<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    lhs: &Document<'arena>,
+    assignment_like_node: &AssignmentLikeNode<'ast, 'arena>,
+    rhs_expression: &'ast Expression<'arena>,
 ) -> Layout {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
-        return choose_layout(f, lhs, assignment_like_node, &parenthesized.expression);
+        return choose_layout(f, lhs, assignment_like_node, parenthesized.expression);
     }
 
     let is_tail = !is_assignment(rhs_expression);
@@ -160,7 +170,7 @@ fn choose_layout<'a, 'b>(
         if !is_tail {
             return Layout::Chain;
         } else if let Expression::ArrowFunction(arrow_function) = rhs_expression
-            && let Expression::ArrowFunction(_) = arrow_function.expression.as_ref()
+            && let Expression::ArrowFunction(_) = arrow_function.expression
         {
             return Layout::ChainTailArrowChain;
         }
@@ -183,18 +193,18 @@ fn choose_layout<'a, 'b>(
     }
 
     if let Expression::Binary(binary) = rhs_expression {
-        if is_member_chain_or_single_arg_call(f, &binary.lhs) && is_simple_expression(&binary.rhs) {
+        if is_member_chain_or_single_arg_call(f, binary.lhs) && is_simple_expression(binary.rhs) {
             return Layout::NeverBreakAfterOperator;
         }
 
-        if is_breaking_expression(&binary.rhs, false) {
+        if is_breaking_expression(binary.rhs, false) {
             return Layout::NeverBreakAfterOperator;
         }
     }
 
     if let Expression::Binary(Binary { lhs, rhs, .. }) = rhs_expression
-        && is_member_chain_or_single_arg_call(f, lhs.as_ref())
-        && is_simple_expression(rhs.as_ref())
+        && is_member_chain_or_single_arg_call(f, lhs)
+        && is_simple_expression(rhs)
     {
         return Layout::NeverBreakAfterOperator;
     }
@@ -229,7 +239,10 @@ fn choose_layout<'a, 'b>(
 }
 
 #[inline]
-fn is_member_chain_or_single_arg_call<'a>(f: &FormatterState<'a>, expr: &'a Expression) -> bool {
+fn is_member_chain_or_single_arg_call<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    expr: &'ast Expression<'arena>,
+) -> bool {
     let is_chain = |e| collect_member_access_chain(e).is_some_and(|c| c.is_eligible_for_chaining(f));
 
     if is_chain(expr) {
@@ -266,10 +279,10 @@ const fn is_assignment(expression: &Expression) -> bool {
 /// A destruction assignment is considered complex if it has more than two elements
 ///  and at least one of them is a key-value pair.
 #[inline]
-fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
+fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
-            let elements = match assignment.lhs.as_ref() {
+            let elements = match assignment.lhs {
                 Expression::Array(array) => &array.elements,
                 Expression::List(list) => &list.elements,
                 Expression::LegacyArray(array) => &array.elements,
@@ -285,13 +298,10 @@ fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_>) -> bo
 }
 
 #[inline]
-fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
+fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
-            matches!(
-                (assignment.lhs.as_ref(), assignment.rhs.as_ref()),
-                (Expression::Variable(_), Expression::ArrowFunction(_))
-            )
+            matches!((assignment.lhs, assignment.rhs), (Expression::Variable(_), Expression::ArrowFunction(_)))
         }
         _ => false,
     }
@@ -300,16 +310,19 @@ fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNo
 const MIN_OVERLAP_FOR_BREAK: usize = 3;
 
 #[inline]
-fn is_property_like_with_short_key<'a>(f: &FormatterState<'a>, assignment_like_node: &AssignmentLikeNode<'a>) -> bool {
+fn is_property_like_with_short_key<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    assignment_like_node: &AssignmentLikeNode<'ast, 'arena>,
+) -> bool {
     let str = match assignment_like_node {
-        AssignmentLikeNode::ClassLikeConstantItem(constant_item) => f.lookup(&constant_item.name.value),
-        AssignmentLikeNode::ConstantItem(constant_item) => f.lookup(&constant_item.name.value),
-        AssignmentLikeNode::EnumCaseBackedItem(enum_case_backed_item) => f.lookup(&enum_case_backed_item.name.value),
-        AssignmentLikeNode::PropertyConcreteItem(property_item) => f.lookup(&property_item.variable.name),
-        AssignmentLikeNode::KeyValueArrayElement(element) => match element.key.as_ref() {
-            Expression::Variable(Variable::Direct(variable)) => f.lookup(&variable.name),
-            Expression::Identifier(Identifier::Local(local_identifier)) => f.lookup(&local_identifier.value),
-            Expression::Literal(Literal::String(string_literal)) => f.lookup(&string_literal.raw),
+        AssignmentLikeNode::ClassLikeConstantItem(constant_item) => &constant_item.name.value,
+        AssignmentLikeNode::ConstantItem(constant_item) => &constant_item.name.value,
+        AssignmentLikeNode::EnumCaseBackedItem(enum_case_backed_item) => &enum_case_backed_item.name.value,
+        AssignmentLikeNode::PropertyConcreteItem(property_item) => &property_item.variable.name,
+        AssignmentLikeNode::KeyValueArrayElement(element) => match element.key {
+            Expression::Variable(Variable::Direct(variable)) => &variable.name,
+            Expression::Identifier(Identifier::Local(local_identifier)) => &local_identifier.value,
+            Expression::Literal(Literal::String(string_literal)) => &string_literal.raw,
             _ => {
                 return false;
             }
@@ -328,37 +341,37 @@ fn is_property_like_with_short_key<'a>(f: &FormatterState<'a>, assignment_like_n
 }
 
 #[inline]
-fn should_break_after_operator<'a>(
-    f: &FormatterState<'a>,
-    rhs_expression: &'a Expression,
+fn should_break_after_operator<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    rhs_expression: &'ast Expression<'arena>,
     has_short_key: bool,
 ) -> bool {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
-        return should_break_after_operator(f, &parenthesized.expression, has_short_key);
+        return should_break_after_operator(f, parenthesized.expression, has_short_key);
     }
 
     match rhs_expression {
         Expression::Binary(Binary { lhs, operator: BinaryOperator::Elvis(_), .. }) => {
             return !should_inline_binary_expression(rhs_expression)
-                || (lhs.is_binary() && !should_inline_binary_expression(unwrap_parenthesized(lhs.as_ref())));
+                || (lhs.is_binary() && !should_inline_binary_expression(unwrap_parenthesized(lhs)));
         }
         Expression::Binary(Binary { lhs, operator: BinaryOperator::NullCoalesce(_), rhs }) => {
             if should_inline_binary_expression(rhs_expression) {
                 return false;
             }
 
-            if !matches!(unwrap_parenthesized(lhs.as_ref()), Expression::Access(_) | Expression::Call(_)) {
+            if !matches!(unwrap_parenthesized(lhs), Expression::Access(_) | Expression::Call(_)) {
                 return true;
             }
 
             return !collect_member_access_chain(rhs).is_some_and(|c| c.is_eligible_for_chaining(f))
-                && !matches!(unwrap_parenthesized(rhs.as_ref()), Expression::Instantiation(_));
+                && !matches!(unwrap_parenthesized(rhs), Expression::Instantiation(_));
         }
         Expression::Binary(_) if !should_inline_binary_expression(rhs_expression) => {
             return true;
         }
         Expression::Conditional(conditional) => {
-            let condition = unwrap_parenthesized(conditional.condition.as_ref());
+            let condition = unwrap_parenthesized(conditional.condition);
 
             if let binary @ Expression::Binary(Binary { lhs, rhs, .. }) = condition {
                 if !lhs.is_binary() || !rhs.is_binary() {
@@ -385,7 +398,7 @@ fn should_break_after_operator<'a>(
     let mut current_expression = rhs_expression;
     loop {
         current_expression = match current_expression {
-            Expression::UnaryPrefix(operation) => operation.operand.as_ref(),
+            Expression::UnaryPrefix(operation) => operation.operand,
             _ => {
                 break;
             }
@@ -400,14 +413,17 @@ fn should_break_after_operator<'a>(
 }
 
 #[inline]
-fn is_poorly_breakable_member_or_call_chain<'a>(f: &FormatterState<'a>, rhs_expression: &'a Expression) -> bool {
+fn is_poorly_breakable_member_or_call_chain<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    rhs_expression: &'ast Expression<'arena>,
+) -> bool {
     if collect_member_access_chain(rhs_expression).is_some_and(|c| c.is_eligible_for_chaining(f)) {
         return false;
     }
 
     let mut is_chain_expression = false;
     let mut is_identifier_or_variable = false;
-    let mut call_argument_lists = vec![];
+    let mut call_argument_lists = vec![in f.arena];
 
     let mut expression = Some(rhs_expression);
     while let Some(node) = expression.take() {
@@ -419,22 +435,22 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &FormatterState<'a>, rhs_expr
                     Call::Function(function_call) => {
                         call_argument_lists.push(&function_call.argument_list);
 
-                        function_call.function.as_ref()
+                        function_call.function
                     }
                     Call::Method(method_call) => {
                         call_argument_lists.push(&method_call.argument_list);
 
-                        method_call.object.as_ref()
+                        method_call.object
                     }
                     Call::NullSafeMethod(null_safe_method_call) => {
                         call_argument_lists.push(&null_safe_method_call.argument_list);
 
-                        null_safe_method_call.object.as_ref()
+                        null_safe_method_call.object
                     }
                     Call::StaticMethod(static_method_call) => {
                         call_argument_lists.push(&static_method_call.argument_list);
 
-                        static_method_call.class.as_ref()
+                        static_method_call.class
                     }
                 })
             }
@@ -442,10 +458,10 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &FormatterState<'a>, rhs_expr
                 is_chain_expression = true;
 
                 Some(match access {
-                    Access::Property(property_access) => &property_access.object,
-                    Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
-                    Access::StaticProperty(static_property_access) => &static_property_access.class,
-                    Access::ClassConstant(class_constant_access) => &class_constant_access.class,
+                    Access::Property(property_access) => property_access.object,
+                    Access::NullSafeProperty(null_safe_property_access) => null_safe_property_access.object,
+                    Access::StaticProperty(static_property_access) => static_property_access.class,
+                    Access::ClassConstant(class_constant_access) => class_constant_access.class,
                 })
             }
             Expression::Identifier(_)
@@ -476,7 +492,10 @@ fn is_poorly_breakable_member_or_call_chain<'a>(f: &FormatterState<'a>, rhs_expr
 }
 
 #[inline]
-fn is_lone_short_argument_list<'a>(f: &FormatterState<'a>, argument_list: &'a ArgumentList) -> bool {
+fn is_lone_short_argument_list<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_list: &'ast ArgumentList<'arena>,
+) -> bool {
     if let Some(first_argument) = argument_list.arguments.first() {
         if argument_list.arguments.len() == 1 {
             return is_lone_short_argument(f, first_argument.value());
@@ -491,7 +510,10 @@ fn is_lone_short_argument_list<'a>(f: &FormatterState<'a>, argument_list: &'a Ar
 const LONE_SHORT_ARGUMENT_THRESHOLD_RATE: f32 = 0.25;
 
 #[inline]
-fn is_lone_short_argument<'a>(f: &FormatterState<'a>, argument_value: &'a Expression) -> bool {
+fn is_lone_short_argument<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    argument_value: &'ast Expression<'arena>,
+) -> bool {
     let argument_span = argument_value.span();
     if f.has_comment(argument_span, CommentFlags::all()) {
         return false;
@@ -509,16 +531,16 @@ fn is_lone_short_argument<'a>(f: &FormatterState<'a>, argument_value: &'a Expres
         | Expression::Parent(_)
         | Expression::MagicConstant(_) => true,
         Expression::Variable(Variable::Direct(direct_variable)) => {
-            let name = f.lookup(&direct_variable.name);
+            let name = &direct_variable.name;
 
             string_width(name) <= threshold
         }
         Expression::Identifier(Identifier::Local(local_identifier)) => {
-            let name = f.lookup(&local_identifier.value);
+            let name = &local_identifier.value;
 
             string_width(name) <= threshold
         }
-        Expression::UnaryPrefix(unary) if !unary.operator.is_cast() => is_lone_short_argument(f, &unary.operand),
+        Expression::UnaryPrefix(unary) if !unary.operator.is_cast() => is_lone_short_argument(f, unary.operand),
         _ => false,
     }
 }

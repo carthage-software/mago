@@ -13,10 +13,10 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-mago-interner = { workspace = true }
 mago-span = { workspace = true }
 mago-database = { workspace = true }
 mago-fixer = { workspace = true }
 mago-reporting = { workspace = true }
 mago-syntax = { workspace = true }
 ahash = { workspace = true }
+bumpalo = { workspace = true }

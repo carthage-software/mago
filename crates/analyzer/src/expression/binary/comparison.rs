@@ -35,10 +35,10 @@ use crate::expression::binary::utils::is_always_less_than_or_equal;
 /// 5. Reports errors for invalid comparisons (e.g., involving `mixed`).
 /// 6. Reports hints for redundant comparisons where the outcome is statically known.
 /// 7. Establishes data flow from operands to the expression node.
-pub fn analyze_comparison_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_comparison_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let was_inside_general_use = block_context.inside_general_use;
@@ -51,8 +51,8 @@ pub fn analyze_comparison_operation<'a>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_comparison_operand(context, &binary.lhs, lhs_type, "Left", &binary.operator)?;
-    check_comparison_operand(context, &binary.rhs, rhs_type, "Right", &binary.operator)?;
+    check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator)?;
+    check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator)?;
 
     let mut reported_general_invalid_operand = false;
 
@@ -66,7 +66,7 @@ pub fn analyze_comparison_operation<'a>(
                 Issue::warning(format!(
                     "Comparing an `array` with a non-array type `{}` using `{}`.",
                     rhs_type.get_id(Some(context.interner)),
-                    binary.operator.as_str(context.interner)
+                    binary.operator.as_str()
                 ))
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
                 .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id(Some(context.interner)))))
@@ -80,7 +80,7 @@ pub fn analyze_comparison_operation<'a>(
                 Issue::warning(format!(
                     "Comparing a non-array type `{}` with an `array` using `{}`.",
                     lhs_type.get_id(Some(context.interner)),
-                    binary.operator.as_str(context.interner)
+                    binary.operator.as_str()
                 ))
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id(Some(context.interner)))))
                 .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
@@ -270,18 +270,18 @@ pub fn analyze_comparison_operation<'a>(
 }
 
 /// Checks a single operand of a comparison operation for problematic types.
-fn check_comparison_operand(
-    context: &mut Context<'_>,
-    operand: &Expression,
+fn check_comparison_operand<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    operand: &'ast Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
-    operator: &BinaryOperator,
+    operator: &'ast BinaryOperator<'arena>,
 ) -> Result<(), AnalysisError> {
     if operator.is_identity() {
         return Ok(());
     }
 
-    let op_str = operator.as_str(context.interner);
+    let op_str = operator.as_str();
 
     if operand_type.is_null() {
         context.collector.report_with_code(
@@ -341,10 +341,10 @@ fn check_comparison_operand(
 }
 
 /// Helper to report redundant comparison issues.
-fn report_redundant_comparison(
-    context: &mut Context<'_>,
+fn report_redundant_comparison<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
-    binary: &Binary,
+    binary: &'ast Binary<'arena>,
     comparison_description: &str,
     result_value_str: &str,
 ) {
@@ -358,7 +358,7 @@ fn report_redundant_comparison(
         IssueCode::RedundantComparison,
         Issue::help(format!(
             "Redundant `{}` comparison: left-hand side is {} right-hand side.",
-            binary.operator.as_str(context.interner),
+            binary.operator.as_str(),
             comparison_description
         ))
         .with_annotation(Annotation::primary(binary.lhs.span()).with_message(
@@ -375,7 +375,7 @@ fn report_redundant_comparison(
         ))
         .with_note(format!(
             "The `{}` operator will always return {} in this case.",
-            binary.operator.as_str(context.interner),
+            binary.operator.as_str(),
             result_value_str
         ))
         .with_help(format!(

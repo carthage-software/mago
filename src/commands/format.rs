@@ -3,13 +3,13 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use bumpalo::Bump;
 use clap::Parser;
 
 use mago_database::change::ChangeLog;
 use mago_database::error::DatabaseError;
 use mago_database::file::File;
 use mago_formatter::Formatter;
-use mago_interner::ThreadedInterner;
 
 use crate::config::Configuration;
 use crate::database;
@@ -81,13 +81,12 @@ pub struct FormatCommand {
 ///
 /// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
 pub fn execute(command: FormatCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
-    let interner = ThreadedInterner::new();
-
     configuration.source.excludes.extend(std::mem::take(&mut configuration.formatter.excludes));
 
     if command.stdin_input {
+        let arena = Bump::new();
         let file = create_file_from_stdin()?;
-        let formatter = Formatter::new(&interner, configuration.php_version, configuration.formatter.settings);
+        let formatter = Formatter::new(&arena, configuration.php_version, configuration.formatter.settings);
         return Ok(match formatter.format_file(&file) {
             Ok(formatted) => {
                 print!("{formatted}");
@@ -121,7 +120,7 @@ pub fn execute(command: FormatCommand, mut configuration: Configuration) -> Resu
         change_log: change_log.clone(),
     };
 
-    let changed_count = run_format_pipeline(&interner, database.read_only(), shared_context)?;
+    let changed_count = run_format_pipeline(database.read_only(), shared_context)?;
     if !command.dry_run {
         database.commit(change_log, true)?;
     }

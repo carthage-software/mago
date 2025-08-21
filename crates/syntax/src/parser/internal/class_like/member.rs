@@ -17,7 +17,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable;
 
-pub fn parse_classlike_member(stream: &mut TokenStream<'_, '_>) -> Result<ClassLikeMember, ParseError> {
+pub fn parse_classlike_member<'arena>(stream: &mut TokenStream<'arena>) -> Result<ClassLikeMember<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["#["] => {
             let attributes = parse_attribute_list_sequence(stream)?;
@@ -27,32 +27,34 @@ pub fn parse_classlike_member(stream: &mut TokenStream<'_, '_>) -> Result<ClassL
         k if k.is_modifier() => {
             let modifiers = parse_modifier_sequence(stream)?;
 
-            parse_classlike_member_with_attributes_and_modifiers(stream, Sequence::empty(), modifiers)?
+            parse_classlike_member_with_attributes_and_modifiers(stream, Sequence::empty(stream.arena()), modifiers)?
         }
         T!["const"] => ClassLikeMember::Constant(parse_class_like_constant_with_attributes_and_modifiers(
             stream,
-            Sequence::empty(),
-            Sequence::empty(),
+            Sequence::empty(stream.arena()),
+            Sequence::empty(stream.arena()),
         )?),
         T!["function"] => ClassLikeMember::Method(parse_method_with_attributes_and_modifiers(
             stream,
-            Sequence::empty(),
-            Sequence::empty(),
+            Sequence::empty(stream.arena()),
+            Sequence::empty(stream.arena()),
         )?),
-        T!["case"] => ClassLikeMember::EnumCase(parse_enum_case_with_attributes(stream, Sequence::empty())?),
+        T!["case"] => {
+            ClassLikeMember::EnumCase(parse_enum_case_with_attributes(stream, Sequence::empty(stream.arena()))?)
+        }
         T!["use"] => ClassLikeMember::TraitUse(parse_trait_use(stream)?),
         _ => ClassLikeMember::Property(parse_property_with_attributes_and_modifiers(
             stream,
-            Sequence::empty(),
-            Sequence::empty(),
+            Sequence::empty(stream.arena()),
+            Sequence::empty(stream.arena()),
         )?),
     })
 }
 
-pub fn parse_classlike_member_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-) -> Result<ClassLikeMember, ParseError> {
+pub fn parse_classlike_member_with_attributes<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+) -> Result<ClassLikeMember<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         k if k.is_modifier() => {
             let modifiers = parse_modifier_sequence(stream)?;
@@ -63,24 +65,26 @@ pub fn parse_classlike_member_with_attributes(
         T!["const"] => ClassLikeMember::Constant(parse_class_like_constant_with_attributes_and_modifiers(
             stream,
             attributes,
-            Sequence::empty(),
+            Sequence::empty(stream.arena()),
         )?),
-        T!["function"] => {
-            ClassLikeMember::Method(parse_method_with_attributes_and_modifiers(stream, attributes, Sequence::empty())?)
-        }
+        T!["function"] => ClassLikeMember::Method(parse_method_with_attributes_and_modifiers(
+            stream,
+            attributes,
+            Sequence::empty(stream.arena()),
+        )?),
         _ => ClassLikeMember::Property(parse_property_with_attributes_and_modifiers(
             stream,
             attributes,
-            Sequence::empty(),
+            Sequence::empty(stream.arena()),
         )?),
     })
 }
 
-pub fn parse_classlike_member_with_attributes_and_modifiers(
-    stream: &mut TokenStream<'_, '_>,
-    attributes: Sequence<AttributeList>,
-    modifiers: Sequence<Modifier>,
-) -> Result<ClassLikeMember, ParseError> {
+pub fn parse_classlike_member_with_attributes_and_modifiers<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attributes: Sequence<'arena, AttributeList<'arena>>,
+    modifiers: Sequence<'arena, Modifier<'arena>>,
+) -> Result<ClassLikeMember<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["const"] => ClassLikeMember::Constant(parse_class_like_constant_with_attributes_and_modifiers(
             stream, attributes, modifiers,
@@ -92,16 +96,20 @@ pub fn parse_classlike_member_with_attributes_and_modifiers(
     })
 }
 
-pub fn parse_classlike_member_selector(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<ClassLikeMemberSelector, ParseError> {
+pub fn parse_classlike_member_selector<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<ClassLikeMemberSelector<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
         T!["$"] | T!["${"] | T!["$variable"] => ClassLikeMemberSelector::Variable(variable::parse_variable(stream)?),
         T!["{"] => ClassLikeMemberSelector::Expression(ClassLikeMemberExpressionSelector {
             left_brace: utils::expect_span(stream, T!["{"])?,
-            expression: Box::new(expression::parse_expression(stream)?),
+            expression: {
+                let expression = expression::parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
             right_brace: utils::expect_span(stream, T!["}"])?,
         }),
         kind if kind.is_identifier_maybe_reserved() => {
@@ -111,16 +119,20 @@ pub fn parse_classlike_member_selector(
     })
 }
 
-pub fn parse_classlike_constant_selector_or_variable(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Either<ClassLikeConstantSelector, Variable>, ParseError> {
+pub fn parse_classlike_constant_selector_or_variable<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Either<ClassLikeConstantSelector<'arena>, Variable<'arena>>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
         T!["$"] | T!["${"] | T!["$variable"] => Either::Right(variable::parse_variable(stream)?),
         T!["{"] => Either::Left(ClassLikeConstantSelector::Expression(ClassLikeMemberExpressionSelector {
             left_brace: utils::expect_span(stream, T!["{"])?,
-            expression: Box::new(expression::parse_expression(stream)?),
+            expression: {
+                let expression = expression::parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
             right_brace: utils::expect_span(stream, T!["}"])?,
         })),
         kind if kind.is_identifier_maybe_reserved() => {

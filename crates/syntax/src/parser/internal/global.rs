@@ -7,12 +7,12 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable::parse_variable;
 
-pub fn parse_global(stream: &mut TokenStream<'_, '_>) -> Result<Global, ParseError> {
+pub fn parse_global<'arena>(stream: &mut TokenStream<'arena>) -> Result<Global<'arena>, ParseError> {
     Ok(Global {
         global: utils::expect_keyword(stream, T!["global"])?,
         variables: {
-            let mut variables = vec![];
-            let mut commas = vec![];
+            let mut variables = stream.new_vec();
+            let mut commas = stream.new_vec();
 
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {

@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -45,52 +44,52 @@ use super::IfBody;
 use super::NamespaceBody;
 use super::WhileBody;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ExpressionStatement {
-    pub expression: Box<Expression>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ExpressionStatement<'arena> {
+    pub expression: &'arena Expression<'arena>,
+    pub terminator: Terminator<'arena>,
 }
 
 /// Represents a PHP statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Statement {
-    OpeningTag(OpeningTag),
+#[repr(u8)]
+pub enum Statement<'arena> {
+    OpeningTag(OpeningTag<'arena>),
     ClosingTag(ClosingTag),
-    Inline(Inline),
-    Namespace(Namespace),
-    Use(Use),
-    Class(Class),
-    Interface(Interface),
-    Trait(Trait),
-    Enum(Enum),
-    Block(Block),
-    Constant(Constant),
-    Function(Function),
-    Declare(Declare),
-    Goto(Goto),
-    Label(Label),
-    Try(Try),
-    Foreach(Foreach),
-    For(For),
-    While(While),
-    DoWhile(DoWhile),
-    Continue(Continue),
-    Break(Break),
-    Switch(Switch),
-    If(If),
-    Return(Return),
-    Expression(ExpressionStatement),
-    Echo(Echo),
-    Global(Global),
-    Static(Static),
-    HaltCompiler(HaltCompiler),
-    Unset(Unset),
+    Inline(Inline<'arena>),
+    Namespace(Namespace<'arena>),
+    Use(Use<'arena>),
+    Class(Class<'arena>),
+    Interface(Interface<'arena>),
+    Trait(Trait<'arena>),
+    Enum(Enum<'arena>),
+    Block(Block<'arena>),
+    Constant(Constant<'arena>),
+    Function(Function<'arena>),
+    Declare(Declare<'arena>),
+    Goto(Goto<'arena>),
+    Label(Label<'arena>),
+    Try(Try<'arena>),
+    Foreach(Foreach<'arena>),
+    For(For<'arena>),
+    While(While<'arena>),
+    DoWhile(DoWhile<'arena>),
+    Continue(Continue<'arena>),
+    Break(Break<'arena>),
+    Switch(Switch<'arena>),
+    If(If<'arena>),
+    Return(Return<'arena>),
+    Expression(ExpressionStatement<'arena>),
+    Echo(Echo<'arena>),
+    Global(Global<'arena>),
+    Static(Static<'arena>),
+    HaltCompiler(HaltCompiler<'arena>),
+    Unset(Unset<'arena>),
     Noop(Span),
 }
 
-impl Statement {
+impl Statement<'_> {
     #[inline]
     #[must_use]
     pub const fn is_closing_tag(&self) -> bool {
@@ -178,13 +177,13 @@ impl Statement {
     }
 }
 
-impl HasSpan for ExpressionStatement {
+impl HasSpan for ExpressionStatement<'_> {
     fn span(&self) -> Span {
         self.expression.span().join(self.terminator.span())
     }
 }
 
-impl HasSpan for Statement {
+impl HasSpan for Statement<'_> {
     fn span(&self) -> Span {
         match self {
             Statement::OpeningTag(statement) => statement.span(),

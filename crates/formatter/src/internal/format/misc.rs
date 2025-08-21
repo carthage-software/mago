@@ -1,3 +1,6 @@
+use bumpalo::collections::Vec;
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -57,17 +60,17 @@ pub(super) fn has_new_line_in_range(text: &str, start: u32, end: u32) -> bool {
 /// # Performance
 ///
 /// O(1) for most checks, with potential O(n) recursion for nested expressions
-pub(super) fn should_hug_expression<'a>(
-    f: &FormatterState<'a>,
-    expression: &'a Expression,
+pub(super) fn should_hug_expression<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    expression: &'ast Expression<'arena>,
     arrow_function_recursion: bool,
 ) -> bool {
     if let Expression::Parenthesized(inner) = expression {
-        return should_hug_expression(f, &inner.expression, arrow_function_recursion);
+        return should_hug_expression(f, inner.expression, arrow_function_recursion);
     }
 
     if let Expression::UnaryPrefix(operation) = expression {
-        return should_hug_expression(f, &operation.operand, arrow_function_recursion);
+        return should_hug_expression(f, operation.operand, arrow_function_recursion);
     }
 
     // if the expression has leading or trailing comments, we can't hug it
@@ -81,12 +84,12 @@ pub(super) fn should_hug_expression<'a>(
     }
 
     if let Expression::ArrowFunction(arrow_function) = expression {
-        return !arrow_function_recursion && should_hug_expression(f, &arrow_function.expression, true);
+        return !arrow_function_recursion && should_hug_expression(f, arrow_function.expression, true);
     }
 
     if let Expression::Binary(binary) = expression {
-        let is_left_hand_side_simple = is_simple_expression(&binary.lhs);
-        let is_right_hand_side_simple = is_simple_expression(&binary.rhs);
+        let is_left_hand_side_simple = is_simple_expression(binary.lhs);
+        let is_right_hand_side_simple = is_simple_expression(binary.rhs);
 
         // Hug binary expressions if they are simple and not too complex
         if is_left_hand_side_simple && is_right_hand_side_simple {
@@ -94,8 +97,8 @@ pub(super) fn should_hug_expression<'a>(
         }
 
         if binary.operator.is_concatenation() {
-            return (is_left_hand_side_simple && should_hug_expression(f, &binary.rhs, arrow_function_recursion))
-                || (is_right_hand_side_simple && should_hug_expression(f, &binary.lhs, arrow_function_recursion));
+            return (is_left_hand_side_simple && should_hug_expression(f, binary.rhs, arrow_function_recursion))
+                || (is_right_hand_side_simple && should_hug_expression(f, binary.lhs, arrow_function_recursion));
         }
 
         return false;
@@ -106,7 +109,7 @@ pub(super) fn should_hug_expression<'a>(
     };
 
     // Hug instantiations if it is a simple class instantiation
-    let Expression::Identifier(_) = instantiation.class.as_ref() else {
+    let Expression::Identifier(_) = instantiation.class else {
         return false;
     };
 
@@ -141,17 +144,17 @@ pub(super) fn should_hug_expression<'a>(
     }
 }
 
-pub const fn is_breaking_expression(node: &Expression, arrow_function_recursion: bool) -> bool {
+pub fn is_breaking_expression<'ast, 'arena>(node: &'ast Expression<'arena>, arrow_function_recursion: bool) -> bool {
     if let Expression::Parenthesized(inner) = node {
-        return is_breaking_expression(&inner.expression, arrow_function_recursion);
+        return is_breaking_expression(inner.expression, arrow_function_recursion);
     }
 
     if let Expression::UnaryPrefix(operation) = node {
-        return is_breaking_expression(&operation.operand, arrow_function_recursion);
+        return is_breaking_expression(operation.operand, arrow_function_recursion);
     }
 
     if let Expression::ArrowFunction(arrow_function) = node {
-        return !arrow_function_recursion && is_breaking_expression(&arrow_function.expression, true);
+        return !arrow_function_recursion && is_breaking_expression(arrow_function.expression, true);
     }
 
     matches!(
@@ -166,17 +169,17 @@ pub const fn is_breaking_expression(node: &Expression, arrow_function_recursion:
     )
 }
 
-pub const fn is_simple_expression(node: &Expression) -> bool {
+pub fn is_simple_expression<'ast, 'arena>(node: &'ast Expression<'arena>) -> bool {
     if let Expression::Parenthesized(inner) = node {
-        return is_simple_expression(&inner.expression);
+        return is_simple_expression(inner.expression);
     }
 
     if let Expression::UnaryPrefix(operation) = node {
-        return is_simple_expression(&operation.operand);
+        return is_simple_expression(operation.operand);
     }
 
     if let Expression::Binary(operation) = node {
-        return is_simple_expression(&operation.lhs) && is_simple_expression(&operation.rhs);
+        return is_simple_expression(operation.lhs) && is_simple_expression(operation.rhs);
     }
 
     matches!(
@@ -193,18 +196,21 @@ pub const fn is_simple_expression(node: &Expression) -> bool {
     )
 }
 
-pub fn is_simple_single_line_expression(f: &FormatterState<'_>, node: &Expression) -> bool {
+pub fn is_simple_single_line_expression<'ast, 'arena>(
+    f: &FormatterState<'_, 'ast, 'arena>,
+    node: &'ast Expression<'arena>,
+) -> bool {
     if let Expression::Parenthesized(inner) = node {
-        return is_simple_single_line_expression(f, &inner.expression);
+        return is_simple_single_line_expression(f, inner.expression);
     }
 
     if let Expression::UnaryPrefix(operation) = node {
-        return is_simple_single_line_expression(f, &operation.operand);
+        return is_simple_single_line_expression(f, operation.operand);
     }
 
     if let Expression::Binary(operation) = node {
-        return is_simple_single_line_expression(f, &operation.lhs)
-            && is_simple_single_line_expression(f, &operation.rhs);
+        return is_simple_single_line_expression(f, operation.lhs)
+            && is_simple_single_line_expression(f, operation.rhs);
     }
 
     if let Expression::Literal(Literal::String(literal_string)) = node {
@@ -239,14 +245,14 @@ pub(super) const fn is_string_word_type(node: &Expression) -> bool {
     )
 }
 
-pub(super) fn print_colon_delimited_body<'a>(
-    f: &mut FormatterState<'a>,
-    colon: &'a Span,
-    statements: &'a Sequence<Statement>,
-    end_keyword: &'a Keyword,
-    terminator: &'a Terminator,
-) -> Document<'a> {
-    let mut parts = vec![Document::String(":")];
+pub(super) fn print_colon_delimited_body<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    colon: &Span,
+    statements: &'ast Sequence<'arena, Statement<'arena>>,
+    end_keyword: &'ast Keyword<'arena>,
+    terminator: &'ast Terminator<'arena>,
+) -> Document<'arena> {
+    let mut parts = vec![in f.arena;Document::String(":")];
 
     let mut printed_statements = print_statement_sequence(f, statements);
     if !printed_statements.is_empty() {
@@ -273,8 +279,11 @@ pub(super) fn print_colon_delimited_body<'a>(
     Document::Group(Group::new(parts).with_break(true))
 }
 
-pub(super) fn print_modifiers<'a>(f: &mut FormatterState<'a>, modifiers: &'a Sequence<Modifier>) -> Vec<Document<'a>> {
-    let mut printed_modifiers = vec![];
+pub(super) fn print_modifiers<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    modifiers: &'ast Sequence<'arena, Modifier<'arena>>,
+) -> Vec<'arena, Document<'arena>> {
+    let mut printed_modifiers = vec![in f.arena;];
 
     if let Some(modifier) = modifiers.get_final() {
         printed_modifiers.push(modifier.format(f));
@@ -300,18 +309,18 @@ pub(super) fn print_modifiers<'a>(f: &mut FormatterState<'a>, modifiers: &'a Seq
         printed_modifiers.push(modifier.format(f));
     }
 
-    Document::join(printed_modifiers, Separator::Space)
+    Document::join(f.arena, printed_modifiers, Separator::Space)
 }
 
-pub(super) fn print_attribute_list_sequence<'a>(
-    f: &mut FormatterState<'a>,
-    attribute_lists: &'a Sequence<AttributeList>,
-) -> Option<Document<'a>> {
+pub(super) fn print_attribute_list_sequence<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
+) -> Option<Document<'arena>> {
     if attribute_lists.is_empty() {
         return None;
     }
 
-    let mut lists = vec![];
+    let mut lists = vec![in f.arena;];
     let mut has_new_line = false;
     let mut has_potentially_long_attribute = false;
     for attribute_list in attribute_lists.iter() {
@@ -331,7 +340,7 @@ pub(super) fn print_attribute_list_sequence<'a>(
         has_new_line = has_new_line || f.is_next_line_empty(attribute_list.span());
     }
 
-    let mut contents = vec![];
+    let mut contents = vec![in f.arena;];
     let len = lists.len();
     for (i, attribute_list) in lists.into_iter().enumerate() {
         contents.push(attribute_list);
@@ -344,18 +353,22 @@ pub(super) fn print_attribute_list_sequence<'a>(
     Some(Document::Group(Group::new(contents)))
 }
 
-pub(super) fn print_clause<'a>(f: &mut FormatterState<'a>, node: &'a Statement, force_space: bool) -> Document<'a> {
+pub(super) fn print_clause<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    node: &'ast Statement<'arena>,
+    force_space: bool,
+) -> Document<'arena> {
     let clause = node.format(f);
 
     adjust_clause(f, node, clause, force_space)
 }
 
-pub(super) fn adjust_clause<'a>(
-    f: &mut FormatterState<'a>,
-    node: &'a Statement,
-    clause: Document<'a>,
+pub(super) fn adjust_clause<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    node: &'ast Statement<'arena>,
+    clause: Document<'arena>,
     mut force_space: bool,
-) -> Document<'a> {
+) -> Document<'arena> {
     let mut is_block = false;
 
     let has_trailing_segment = match f.current_node() {
@@ -386,21 +399,21 @@ pub(super) fn adjust_clause<'a>(
 
             let is_block_empty = block_is_empty(f, &block.left_brace, &block.right_brace);
             match f.settings.control_brace_style {
-                BraceStyle::SameLine => Document::Array(vec![Document::space(), clause]),
+                BraceStyle::SameLine => Document::Array(vec![in f.arena;Document::space(), clause]),
                 BraceStyle::NextLine => {
                     if f.settings.inline_empty_control_braces && is_block_empty {
-                        Document::Array(vec![Document::space(), clause])
+                        Document::Array(vec![in f.arena;Document::space(), clause])
                     } else {
-                        Document::Array(vec![Document::Line(Line::default()), clause])
+                        Document::Array(vec![in f.arena;Document::Line(Line::default()), clause])
                     }
                 }
             }
         }
         _ => {
             if force_space {
-                Document::Array(vec![Document::space(), clause])
+                Document::Array(vec![in f.arena;Document::space(), clause])
             } else {
-                Document::Indent(vec![Document::BreakParent, Document::Line(Line::hard()), clause])
+                Document::Indent(vec![in f.arena;Document::BreakParent, Document::Line(Line::hard()), clause])
             }
         }
     };
@@ -408,31 +421,33 @@ pub(super) fn adjust_clause<'a>(
     if has_trailing_segment {
         if is_block {
             if f.is_followed_by_comment_on_next_line(node.span()) {
-                Document::Array(vec![clause, Document::Line(Line::hard())])
+                Document::Array(vec![in f.arena;clause, Document::Line(Line::hard())])
             } else {
-                Document::Array(vec![clause, Document::space()])
+                Document::Array(vec![in f.arena;clause, Document::space()])
             }
         } else {
-            Document::Indent(vec![Document::BreakParent, clause, Document::Line(Line::hard())])
+            Document::Indent(vec![in f.arena;Document::BreakParent, clause, Document::Line(Line::hard())])
         }
     } else {
         clause
     }
 }
 
-pub(super) fn print_condition<'a>(
-    f: &mut FormatterState<'a>,
-    condition: &'a Expression,
+pub(super) fn print_condition<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    condition: &'ast Expression<'arena>,
     space_before: bool,
     space_within: bool,
-) -> Document<'a> {
+) -> Document<'arena> {
     let was_in_condition = f.in_condition;
     f.in_condition = true;
 
     let condition = Document::Group(Group::new(vec![
+        in f.arena;
         if space_before { Document::space() } else { Document::empty() },
         Document::String("("),
         Document::IndentIfBreak(IndentIfBreak::new(vec![
+            in f.arena;
             Document::Line(if space_within { Line::default() } else { Line::soft() }),
             condition.format(f),
         ])),

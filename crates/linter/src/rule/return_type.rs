@@ -87,14 +87,14 @@ impl LintRule for ReturnTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Function(function) => {
                 if function.return_type_hint.is_some() {
                     return;
                 }
 
-                let function_name = ctx.lookup(&function.name.value);
+                let function_name = function.name.value;
                 let function_fqn = ctx.lookup_name(&function.name);
 
                 ctx.collector.report(
@@ -152,20 +152,22 @@ impl LintRule for ReturnTypeRule {
                     return;
                 }
 
-                let method_name = ctx.lookup(&method.name.value);
-                if "__construct" == method_name || "__destruct" == method_name {
+                if "__construct" == method.name.value || "__destruct" == method.name.value {
                     return;
                 }
 
                 ctx.collector.report(
-                    Issue::new(self.cfg.level(), format!("Method `{}` is missing a return type hint.", method_name))
-                        .with_code(self.meta.code)
-                        .with_annotation(
-                            Annotation::primary(method.span())
-                                .with_message(format!("Method `{}` defined here", method_name)),
-                        )
-                        .with_note("Type hints improve code readability and help prevent type-related errors.")
-                        .with_help(format!("Consider adding a return type hint to method `{}`.", method_name)),
+                    Issue::new(
+                        self.cfg.level(),
+                        format!("Method `{}` is missing a return type hint.", method.name.value),
+                    )
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(method.span())
+                            .with_message(format!("Method `{}` defined here", method.name.value)),
+                    )
+                    .with_note("Type hints improve code readability and help prevent type-related errors.")
+                    .with_help(format!("Consider adding a return type hint to method `{}`.", method.name.value)),
                 );
             }
             _ => (),

@@ -17,23 +17,23 @@ use crate::expression::assignment::assign_to_expression;
 use crate::statement::r#loop;
 use crate::utils::expression::get_expression_id;
 
-impl Analyzable for Foreach {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut safe_variable_ids = HashSet::default();
         if let Some(key_expression) = self.target.key() {
-            safe_variable_ids.extend(r#loop::scrape_variables_from_expression(context, key_expression));
+            safe_variable_ids.extend(r#loop::scrape_variables_from_expression(key_expression));
         }
 
-        let value_safe_variables = r#loop::scrape_variables_from_expression(context, self.target.value());
+        let value_safe_variables = r#loop::scrape_variables_from_expression(self.target.value());
 
         safe_variable_ids.extend(value_safe_variables);
 
-        let iterator = self.expression.as_ref();
+        let iterator = self.expression;
         let is_by_reference = match &self.target {
             ForeachTarget::Value(v) => v.value.is_reference(),
             ForeachTarget::KeyValue(kv) => kv.value.is_reference(),
@@ -106,9 +106,7 @@ impl Analyzable for Foreach {
         value_type.by_reference = is_by_reference;
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            let variable_str = context.interner.lookup(&direct_variable.name);
-
-            loop_block_context.references_to_external_scope.remove(variable_str);
+            loop_block_context.references_to_external_scope.remove(direct_variable.name);
         };
 
         let assigned = assign_to_expression(
@@ -138,9 +136,7 @@ impl Analyzable for Foreach {
         }
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            let variable_str = context.interner.lookup(&direct_variable.name);
-
-            loop_block_context.references_to_external_scope.insert(variable_str.to_string());
+            loop_block_context.references_to_external_scope.insert(direct_variable.name.to_string());
         };
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);

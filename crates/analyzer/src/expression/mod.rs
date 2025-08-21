@@ -52,11 +52,11 @@ pub mod unary;
 pub mod variable;
 pub mod r#yield;
 
-impl Analyzable for Expression {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let result = match self {
@@ -152,7 +152,7 @@ impl Analyzable for Expression {
                 Ok(())
             }
             Expression::Self_(keyword) | Expression::Static(keyword) | Expression::Parent(keyword) => {
-                let keyword_str = context.interner.lookup(&keyword.value);
+                let keyword_str = keyword.value;
 
                 context.collector.report_with_code(
                     IssueCode::InvalidScopeKeywordContext,
@@ -183,10 +183,7 @@ impl Analyzable for Expression {
                     );
                 }
 
-                artifacts.set_expression_type(
-                    &self,
-                    get_literal_string(context.interner.lookup(identifier.value()).to_owned()),
-                );
+                artifacts.set_expression_type(&self, get_literal_string(identifier.value().to_owned()));
 
                 Ok(())
             }
@@ -198,11 +195,11 @@ impl Analyzable for Expression {
     }
 }
 
-impl Analyzable for Parenthesized {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Parenthesized<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         self.expression.analyze(context, block_context, artifacts)?;
@@ -214,10 +211,10 @@ impl Analyzable for Parenthesized {
     }
 }
 
-pub fn find_expression_logic_issues<'a>(
-    expression: &Expression,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn find_expression_logic_issues<'ctx, 'arena>(
+    expression: &Expression<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) {
     let mut if_block_context = block_context.clone();
@@ -309,10 +306,8 @@ pub fn find_expression_logic_issues<'a>(
         &mut cond_referenced_var_ids,
     );
 
-    let mut reconciliation_context = context.get_reconciliation_context();
-
     reconcile_keyed_types(
-        &mut reconciliation_context,
+        context,
         &reconcilable_if_types,
         active_if_types,
         &mut if_block_context,

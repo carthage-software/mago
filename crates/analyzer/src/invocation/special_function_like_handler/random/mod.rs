@@ -14,13 +14,13 @@ use crate::invocation::special_function_like_handler::utils::get_argument;
 pub struct RandomFunctionsHandler;
 
 impl SpecialFunctionLikeHandlerTrait for RandomFunctionsHandler {
-    fn get_return_type<'a>(
+    fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'a>,
-        _block_context: &BlockContext<'a>,
+        _context: &mut Context<'ctx, 'arena>,
+        _block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
-        invocation: &Invocation,
+        invocation: &Invocation<'ctx, 'ast, 'arena>,
     ) -> Option<TUnion> {
         match function_like_name {
             "rand" | "mt_rand" => {
@@ -29,11 +29,11 @@ impl SpecialFunctionLikeHandlerTrait for RandomFunctionsHandler {
                     return Some(get_int_range(Some(0), None));
                 }
 
-                let min_argument = get_argument(context, invocation.arguments_source, 0, vec!["min"])?;
+                let min_argument = get_argument(invocation.arguments_source, 0, vec!["min"])?;
                 let min_argument_type = artifacts.get_expression_type(min_argument)?;
                 let min_argument_integer = min_argument_type.get_single_int()?;
 
-                let max_argument = get_argument(context, invocation.arguments_source, 1, vec!["max"])?;
+                let max_argument = get_argument(invocation.arguments_source, 1, vec!["max"])?;
                 let max_argument_type = artifacts.get_expression_type(max_argument)?;
                 let max_argument_integer = max_argument_type.get_single_int()?;
 
@@ -43,11 +43,11 @@ impl SpecialFunctionLikeHandlerTrait for RandomFunctionsHandler {
                 Some(get_int_range(Some(minimum_value), maximum_value))
             }
             "random_int" => {
-                let min_argument = get_argument(context, invocation.arguments_source, 0, vec!["min"])?;
+                let min_argument = get_argument(invocation.arguments_source, 0, vec!["min"])?;
                 let min_argument_type = artifacts.get_expression_type(min_argument)?;
                 let min_argument_integer = min_argument_type.get_single_int()?;
 
-                let max_argument = get_argument(context, invocation.arguments_source, 1, vec!["max"])?;
+                let max_argument = get_argument(invocation.arguments_source, 1, vec!["max"])?;
                 let max_argument_type = artifacts.get_expression_type(max_argument)?;
                 let max_argument_integer = max_argument_type.get_single_int()?;
 
@@ -57,7 +57,7 @@ impl SpecialFunctionLikeHandlerTrait for RandomFunctionsHandler {
                 Some(get_int_range(Some(minimum_value), maximum_value))
             }
             "random_bytes" => {
-                let length_argument = get_argument(context, invocation.arguments_source, 0, vec!["length"])?;
+                let length_argument = get_argument(invocation.arguments_source, 0, vec!["length"])?;
                 let length_argument_type = artifacts.get_expression_type(length_argument)?;
                 let length_argument_integer = length_argument_type.get_single_int()?;
                 let minimum_value = length_argument_integer.get_minimum_value()?;

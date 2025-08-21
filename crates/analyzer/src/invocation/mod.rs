@@ -31,13 +31,13 @@ pub mod template_result;
 /// what is being called (`target`), the arguments passed (`arguments`), and the
 /// source span of the entire invocation.
 #[derive(Debug, Clone)]
-pub struct Invocation<'a> {
+pub struct Invocation<'ctx, 'ast, 'arena> {
     /// The resolved target of the call, which could be a named function/method
     /// or a dynamic callable expression (e.g., a closure, an invocable object).
-    pub target: InvocationTarget<'a>,
+    pub target: InvocationTarget<'ctx>,
     /// The arguments provided to the call, either as a standard argument list
     /// or as the input from a pipe operator.
-    pub arguments_source: InvocationArgumentsSource<'a>,
+    pub arguments_source: InvocationArgumentsSource<'ast, 'arena>,
     /// The source code span covering the entire invocation expression (e.g., `func(arg)` or `$val |> func`).
     pub span: Span,
 }
@@ -48,13 +48,13 @@ pub struct Invocation<'a> {
 /// this struct provides details about the class context in which the call occurs
 /// and how the method was resolved.
 #[derive(Debug, Clone)]
-pub struct MethodTargetContext<'a> {
+pub struct MethodTargetContext<'ctx> {
     /// The specific `MethodIdentifier` (class name + method name) of the method
     /// that will be invoked, if statically resolved. This points to the method's
     /// declaration, which might be in a parent class or trait.
     pub declaring_method_id: Option<MethodIdentifier>,
     /// Metadata for the class context (`self_fq_class_like_name`).
-    pub class_like_metadata: &'a ClassLikeMetadata,
+    pub class_like_metadata: &'ctx ClassLikeMetadata,
     /// The type of the class context, which is used to resolve `static::class` and
     pub class_type: StaticClassType,
 }
@@ -65,7 +65,7 @@ pub struct MethodTargetContext<'a> {
 /// This allows the analyzer to use specific metadata for known functions/methods
 /// or rely on the `TCallableSignature` for dynamic callables.
 #[derive(Debug, Clone)]
-pub enum InvocationTarget<'a> {
+pub enum InvocationTarget<'ctx> {
     /// The invocation target is a dynamic callable whose exact identity isn't known
     /// until runtime, but its signature (parameters, return type) is known.
     /// Examples include closures, invocable objects, or variables holding callables.
@@ -83,10 +83,10 @@ pub enum InvocationTarget<'a> {
         /// The unique identifier for the statically resolved function or method.
         identifier: FunctionLikeIdentifier,
         /// Metadata (parameters, return type, etc.) for the resolved function or method.
-        metadata: &'a FunctionLikeMetadata,
+        metadata: &'ctx FunctionLikeMetadata,
         /// If this is a method call, this provides context about the calling class
         /// (e.g., type of `$this`, resolved `static::class`). `None` for function calls.
-        method_context: Option<MethodTargetContext<'a>>,
+        method_context: Option<MethodTargetContext<'ctx>>,
         /// The span of the callable part of the invocation expression
         /// (e.g., `my_function` in `my_function(...)` or `$obj->myMethod` in `$obj->myMethod(...)`).
         span: Span,
@@ -99,11 +99,11 @@ pub enum InvocationTarget<'a> {
 /// This allows argument checking logic to treat both sources of parameter information
 /// uniformly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InvocationTargetParameter<'a> {
+pub enum InvocationTargetParameter<'ctx> {
     /// Parameter from a statically defined function or method.
-    FunctionLike(&'a FunctionLikeParameterMetadata),
+    FunctionLike(&'ctx FunctionLikeParameterMetadata),
     /// Parameter from a `TCallableSignature` (e.g., from a closure type or `callable` type hint).
-    Callable(&'a TCallableParameter),
+    Callable(&'ctx TCallableParameter),
 }
 
 /// Represents the source of arguments for an invocation.
@@ -111,14 +111,14 @@ pub enum InvocationTargetParameter<'a> {
 /// This distinguishes between standard argument lists `func(args)` and
 /// arguments provided via the pipe operator `$input |> func`.
 #[derive(Debug, Clone, Copy)]
-pub enum InvocationArgumentsSource<'a> {
+pub enum InvocationArgumentsSource<'ast, 'arena> {
     /// No arguments are present, e.g., calling `__construct` via `new Foo`,
     /// or `__toString` via `(string) $foo`.
     None(Span),
     /// Arguments are provided in a standard list, like `foo($a, $b)`.
-    ArgumentList(&'a ArgumentList),
+    ArgumentList(&'ast ArgumentList<'arena>),
     /// The single argument is the input from a pipe operator, like `$input` in `$input |> foo(...)`.
-    PipeInput(&'a Pipe),
+    PipeInput(&'ast Pipe<'arena>),
 }
 
 /// Represents a single argument passed during an invocation, abstracting whether
@@ -126,21 +126,20 @@ pub enum InvocationArgumentsSource<'a> {
 ///
 /// This allows iteration over "effective arguments" regardless of how they were supplied.
 #[derive(Debug, Clone, Copy)]
-pub enum InvocationArgument<'a> {
+pub enum InvocationArgument<'ast, 'arena> {
     /// A standard argument from an `ArgumentList`.
-    Argument(&'a Argument),
+    Argument(&'ast Argument<'arena>),
     /// The value provided as input via the pipe operator. This is treated as the first positional argument.
-    PipedValue(&'a Expression),
+    PipedValue(&'ast Expression<'arena>),
 }
 
-impl<'a> Invocation<'a> {
-    /// Creates a new `Invocation` instance.
-    pub fn new(target: InvocationTarget<'a>, arguments: InvocationArgumentsSource<'a>, span: Span) -> Self {
+impl<'ctx, 'ast, 'arena> Invocation<'ctx, 'ast, 'arena> {
+    pub fn new(target: InvocationTarget<'ctx>, arguments: InvocationArgumentsSource<'ast, 'arena>, span: Span) -> Self {
         Self { target, arguments_source: arguments, span }
     }
 }
 
-impl<'a> InvocationTarget<'a> {
+impl<'ctx> InvocationTarget<'ctx> {
     /// Attempts to guess a human-readable name for the callable target.
     ///
     /// Returns the name of a function/method if statically known,
@@ -185,7 +184,7 @@ impl<'a> InvocationTarget<'a> {
 
     /// Returns the metadata if this target is a statically known function or method.
     #[inline]
-    pub const fn get_function_like_metadata(&self) -> Option<&'a FunctionLikeMetadata> {
+    pub const fn get_function_like_metadata(&self) -> Option<&'ctx FunctionLikeMetadata> {
         match self {
             InvocationTarget::FunctionLike { metadata, .. } => Some(metadata),
             _ => None,
@@ -233,7 +232,7 @@ impl<'a> InvocationTarget<'a> {
 
     /// Returns the template type definitions if the target is a generic function or method.
     #[inline]
-    pub fn get_template_types(&self) -> Option<&'a [TemplateTuple]> {
+    pub fn get_template_types(&self) -> Option<&'ctx [TemplateTuple]> {
         match self {
             InvocationTarget::FunctionLike { metadata, .. } => Some(&metadata.template_types),
             _ => None,
@@ -251,7 +250,7 @@ impl<'a> InvocationTarget<'a> {
 
     /// Returns the `MethodTargetContext` if this invocation is a method call.
     #[inline]
-    pub const fn get_method_context(&self) -> Option<&MethodTargetContext<'a>> {
+    pub const fn get_method_context(&self) -> Option<&MethodTargetContext<'ctx>> {
         match self {
             InvocationTarget::FunctionLike { method_context, .. } => method_context.as_ref(),
             _ => None,
@@ -263,9 +262,9 @@ impl<'a> InvocationTarget<'a> {
     /// Parameters are wrapped in `InvocationTargetParameter` to abstract over
     /// `FunctionLikeParameterMetadata` and `TCallableParameter`.
     #[inline]
-    pub fn get_parameters<'c>(&'c self) -> Vec<InvocationTargetParameter<'c>>
+    pub fn get_parameters<'target>(&'target self) -> Vec<InvocationTargetParameter<'target>>
     where
-        'a: 'c, // Ensures that the lifetime 'c can't outlive 'a
+        'ctx: 'target,
     {
         match self {
             InvocationTarget::Callable { signature, .. } => {
@@ -363,17 +362,17 @@ impl<'a> InvocationTargetParameter<'a> {
     }
 }
 
-impl<'a> InvocationArgumentsSource<'a> {
+impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
     /// Returns a `Vec` of `InvocationArgument` which abstracts over standard arguments
     /// and piped input. For pipe input, it's a single `PipedValue`.
     #[inline]
-    pub fn get_arguments(&self) -> Vec<InvocationArgument<'a>> {
+    pub fn get_arguments(&self) -> Vec<InvocationArgument<'ast, 'arena>> {
         match self {
             InvocationArgumentsSource::ArgumentList(arg_list) => {
                 arg_list.arguments.iter().map(InvocationArgument::Argument).collect()
             }
             InvocationArgumentsSource::PipeInput(pipe) => {
-                vec![InvocationArgument::PipedValue(pipe.input.as_ref())]
+                vec![InvocationArgument::PipedValue(pipe.input)]
             }
             InvocationArgumentsSource::None(_) => {
                 vec![]
@@ -382,7 +381,7 @@ impl<'a> InvocationArgumentsSource<'a> {
     }
 }
 
-impl<'a> InvocationArgument<'a> {
+impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     /// Checks if this argument is positional (not named).
     /// Piped values are considered positional.
     #[inline]
@@ -405,7 +404,7 @@ impl<'a> InvocationArgument<'a> {
 
     /// Returns a reference to the underlying `Expression` of the argument's value.
     #[inline]
-    pub const fn value(&self) -> &'a Expression {
+    pub const fn value(&self) -> &'ast Expression<'arena> {
         match self {
             InvocationArgument::Argument(arg) => arg.value(),
             InvocationArgument::PipedValue(expr) => expr,
@@ -415,7 +414,7 @@ impl<'a> InvocationArgument<'a> {
     /// If this argument is a standard named argument, returns a reference to it.
     /// Returns `None` for positional arguments or piped values.
     #[inline]
-    pub const fn get_named_argument(&self) -> Option<&NamedArgument> {
+    pub const fn get_named_argument(&self) -> Option<&'ast NamedArgument<'arena>> {
         match self {
             InvocationArgument::Argument(arg) => match arg {
                 Argument::Named(named_arg) => Some(named_arg),
@@ -426,7 +425,7 @@ impl<'a> InvocationArgument<'a> {
     }
 }
 
-impl HasSpan for Invocation<'_> {
+impl HasSpan for Invocation<'_, '_, '_> {
     fn span(&self) -> Span {
         self.span
     }
@@ -441,7 +440,7 @@ impl HasSpan for InvocationTarget<'_> {
     }
 }
 
-impl HasSpan for InvocationArgumentsSource<'_> {
+impl HasSpan for InvocationArgumentsSource<'_, '_> {
     fn span(&self) -> Span {
         match self {
             InvocationArgumentsSource::ArgumentList(arg_list) => arg_list.span(),
@@ -451,7 +450,7 @@ impl HasSpan for InvocationArgumentsSource<'_> {
     }
 }
 
-impl HasSpan for InvocationArgument<'_> {
+impl HasSpan for InvocationArgument<'_, '_> {
     fn span(&self) -> Span {
         match self {
             InvocationArgument::Argument(arg) => arg.span(),

@@ -12,11 +12,11 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for IncludeConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_include(
@@ -25,18 +25,18 @@ impl Analyzable for IncludeConstruct {
             artifacts,
             self.span(),
             self.include.span,
-            &self.value,
+            self.value,
             true,  // is_include
             false, // is_once
         )
     }
 }
 
-impl Analyzable for IncludeOnceConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeOnceConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_include(
@@ -45,18 +45,18 @@ impl Analyzable for IncludeOnceConstruct {
             artifacts,
             self.span(),
             self.include_once.span,
-            &self.value,
+            self.value,
             true, // is_include
             true, // is_once
         )
     }
 }
 
-impl Analyzable for RequireConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_include(
@@ -65,18 +65,18 @@ impl Analyzable for RequireConstruct {
             artifacts,
             self.span(),
             self.require.span,
-            &self.value,
+            self.value,
             false, // is_include
             false, // is_once
         )
     }
 }
 
-impl Analyzable for RequireOnceConstruct {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireOnceConstruct<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_include(
@@ -85,20 +85,20 @@ impl Analyzable for RequireOnceConstruct {
             artifacts,
             self.span(),
             self.require_once.span,
-            &self.value,
+            self.value,
             false, // is_include
             true,  // is_once
         )
     }
 }
 
-fn analyze_include<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_include<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     construct_span: Span,
     keyword_span: Span,
-    included_file: &Expression,
+    included_file: &Expression<'arena>,
     is_include: bool,
     is_once: bool,
 ) -> Result<(), AnalysisError> {

@@ -11,11 +11,11 @@ mod avoid_catching_error;
 mod override_attribute;
 mod unused_parameter;
 
-pub fn check_function_like(
-    metadata: &FunctionLikeMetadata,
-    params: &[FunctionLikeParameter],
-    body: FunctionLikeBody,
-    ctx: &mut Context<'_>,
+pub fn check_function_like<'ctx, 'ast, 'arena>(
+    metadata: &'ctx FunctionLikeMetadata,
+    params: &'ast [FunctionLikeParameter<'arena>],
+    body: FunctionLikeBody<'ast, 'arena>,
+    ctx: &mut Context<'ctx, 'arena>,
 ) {
     if !ctx.settings.perform_heuristic_checks {
         return;
@@ -24,7 +24,11 @@ pub fn check_function_like(
     unused_parameter::check_unused_params(metadata, params, body, ctx);
 }
 
-pub fn check_class_like(metadata: &ClassLikeMetadata, members: &[ClassLikeMember], ctx: &mut Context<'_>) {
+pub fn check_class_like<'ctx, 'arena>(
+    metadata: &'ctx ClassLikeMetadata,
+    members: &[ClassLikeMember<'arena>],
+    ctx: &mut Context<'ctx, 'arena>,
+) {
     if !ctx.settings.perform_heuristic_checks {
         return;
     }
@@ -32,7 +36,7 @@ pub fn check_class_like(metadata: &ClassLikeMetadata, members: &[ClassLikeMember
     override_attribute::check_override_attribute(metadata, members, ctx);
 }
 
-pub fn check_statement(stmt: &Statement, ctx: &mut Context<'_>) {
+pub fn check_statement<'ctx, 'ast, 'arena>(stmt: &'ast Statement<'arena>, ctx: &mut Context<'ctx, 'arena>) {
     if !ctx.settings.perform_heuristic_checks {
         return;
     }

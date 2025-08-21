@@ -84,7 +84,7 @@ impl LintRule for NoRedundantContinueRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let r#continue = match node {
             Node::Foreach(foreach) => match &foreach.body {
                 ForeachBody::Statement(stmt) => get_continue_from_statement(stmt),
@@ -98,7 +98,7 @@ impl LintRule for NoRedundantContinueRule {
                 WhileBody::Statement(stmt) => get_continue_from_statement(stmt),
                 WhileBody::ColonDelimited(body) => get_continue_from_last_statement(body.statements.as_slice()),
             },
-            Node::DoWhile(do_while) => get_continue_from_statement(&do_while.statement),
+            Node::DoWhile(do_while) => get_continue_from_statement(do_while.statement),
             _ => None,
         };
 
@@ -119,14 +119,16 @@ impl LintRule for NoRedundantContinueRule {
 }
 
 #[inline]
-fn get_continue_from_last_statement(statements: &[Statement]) -> Option<&Continue> {
+fn get_continue_from_last_statement<'ast, 'arena>(
+    statements: &'ast [Statement<'arena>],
+) -> Option<&'ast Continue<'arena>> {
     let last = statements.last()?;
 
     get_continue_from_statement(last)
 }
 
 #[inline]
-fn get_continue_from_statement(statement: &Statement) -> Option<&Continue> {
+fn get_continue_from_statement<'ast, 'arena>(statement: &'ast Statement<'arena>) -> Option<&'ast Continue<'arena>> {
     match statement {
         Statement::Block(block) => get_continue_from_statement(block.statements.last()?),
         Statement::Continue(cont) => match cont.level {

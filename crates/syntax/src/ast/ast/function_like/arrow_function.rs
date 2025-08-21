@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -20,19 +19,19 @@ use crate::ast::sequence::Sequence;
 ///
 /// $fn = fn($x) => $x * 2;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ArrowFunction {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub r#static: Option<Keyword>,
-    pub r#fn: Keyword,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ArrowFunction<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub r#static: Option<Keyword<'arena>>,
+    pub r#fn: Keyword<'arena>,
     pub ampersand: Option<Span>,
-    pub parameter_list: FunctionLikeParameterList,
-    pub return_type_hint: Option<FunctionLikeReturnTypeHint>,
+    pub parameter_list: FunctionLikeParameterList<'arena>,
+    pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,
     pub arrow: Span,
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
 }
 
-impl HasSpan for ArrowFunction {
+impl HasSpan for ArrowFunction<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.expression.span());

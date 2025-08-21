@@ -2,7 +2,6 @@ mod class_template_type_collector;
 
 pub mod class_constant;
 pub mod class_name;
-pub mod function;
 pub mod method;
 pub mod property;
 pub mod selector;

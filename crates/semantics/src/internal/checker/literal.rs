@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_literal(literal: &Literal, context: &mut Context<'_>) {
+pub fn check_literal(literal: &Literal, context: &mut Context<'_, '_, '_>) {
     if context.version.is_supported(Feature::NumericLiteralSeparator) {
         return;
     }
@@ -17,7 +17,7 @@ pub fn check_literal(literal: &Literal, context: &mut Context<'_>) {
         _ => return,
     };
 
-    if !context.interner.lookup(value).contains('_') {
+    if !value.contains('_') {
         return;
     }
 

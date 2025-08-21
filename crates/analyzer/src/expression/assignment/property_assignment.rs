@@ -22,16 +22,16 @@ use crate::resolver::property::resolve_instance_properties;
 use crate::utils::expression::get_property_access_expression_id;
 
 #[inline]
-pub fn analyze<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    property_access: &PropertyAccess,
+    property_access: &PropertyAccess<'arena>,
     assigned_value_type: &TUnion,
     assigned_value_span: Option<Span>,
 ) -> Result<(), AnalysisError> {
     let property_access_id = get_property_access_expression_id(
-        &property_access.object,
+        property_access.object,
         &property_access.property,
         false,
         block_context.scope.get_class_like_name(),
@@ -46,7 +46,7 @@ pub fn analyze<'a>(
         context,
         block_context,
         artifacts,
-        &property_access.object,
+        property_access.object,
         &property_access.property,
         property_access.arrow.span(),
         false, // `null_safe`

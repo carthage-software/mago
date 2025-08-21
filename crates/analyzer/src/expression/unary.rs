@@ -37,16 +37,16 @@ use crate::utils::expression::get_expression_id;
 use crate::utils::php_emulation::str_increment;
 use crate::utils::php_emulation::str_is_numeric;
 
-impl Analyzable for UnaryPrefix {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let is_negation = matches!(self.operator, UnaryPrefixOperator::Not(_));
         let is_variable_reference = matches!(self.operator, UnaryPrefixOperator::Reference(_))
-            && matches!(self.operand.as_ref(), Expression::Variable(Variable::Direct(_)));
+            && matches!(self.operand, Expression::Variable(Variable::Direct(_)));
 
         let was_in_negation = block_context.inside_negation;
         let was_in_variable_reference = block_context.inside_variable_reference;
@@ -152,11 +152,11 @@ impl Analyzable for UnaryPrefix {
                 artifacts.set_expression_type(self, resulting_type);
             }
             UnaryPrefixOperator::PreIncrement(_) => {
-                let resulting_type = increment_operand(context, block_context, artifacts, &self.operand, self.span())?;
+                let resulting_type = increment_operand(context, block_context, artifacts, self.operand, self.span())?;
                 artifacts.set_expression_type(self, resulting_type);
             }
             UnaryPrefixOperator::PreDecrement(_) => {
-                let resulting_type = decrement_operand(context, block_context, artifacts, &self.operand, self.span())?;
+                let resulting_type = decrement_operand(context, block_context, artifacts, self.operand, self.span())?;
                 artifacts.set_expression_type(self, resulting_type);
             }
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
@@ -279,11 +279,11 @@ impl Analyzable for UnaryPrefix {
     }
 }
 
-impl Analyzable for UnaryPostfix {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let was_in_general_use = block_context.inside_general_use;
@@ -293,10 +293,10 @@ impl Analyzable for UnaryPostfix {
 
         match self.operator {
             UnaryPostfixOperator::PostIncrement(span) => {
-                increment_operand(context, block_context, artifacts, &self.operand, span)?;
+                increment_operand(context, block_context, artifacts, self.operand, span)?;
             }
             UnaryPostfixOperator::PostDecrement(span) => {
-                decrement_operand(context, block_context, artifacts, &self.operand, span)?;
+                decrement_operand(context, block_context, artifacts, self.operand, span)?;
             }
         };
 
@@ -325,11 +325,11 @@ impl Analyzable for UnaryPostfix {
 /// An `TUnion` representing the type of the operand *after* the increment operation.
 ///
 /// Returns `mixed|any` if the operand's type cannot be determined or if a fatal error occurs.
-fn increment_operand<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn increment_operand<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    operand: &Expression,
+    operand: &Expression<'arena>,
     operation_span: Span,
 ) -> Result<TUnion, AnalysisError> {
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
@@ -553,11 +553,11 @@ fn increment_operand<'a>(
 /// # Returns
 ///
 /// An `TUnion` representing the type of the operand *after* the decrement operation.
-fn decrement_operand<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn decrement_operand<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    operand: &Expression,
+    operand: &Expression<'arena>,
     operation_span: Span,
 ) -> Result<TUnion, AnalysisError> {
     // Changed return to Result for consistency
@@ -769,30 +769,29 @@ fn decrement_operand<'a>(
     Ok(resulting_type_union)
 }
 
-fn report_redundant_type_cast(
-    cast_operator: &UnaryPrefixOperator,
-    expression: &UnaryPrefix,
+fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
+    cast_operator: &'ast UnaryPrefixOperator,
+    expression: &'ast UnaryPrefix<'arena>,
     known_type: &TUnion,
-    context: &mut Context<'_>,
+    context: &mut Context<'ctx, 'arena>,
 ) {
     context.collector.report_with_code(
         IssueCode::RedundantCast,
-        Issue::help(format!(
-            "Redundant cast to `{}`: the expression already has this type.",
-            cast_operator.as_str(context.interner)
-        ))
-        .with_annotation(
-            Annotation::primary(expression.operand.span()).with_message(format!(
+        Issue::help(format!("Redundant cast to `{}`: the expression already has this type.", cast_operator.as_str()))
+            .with_annotation(Annotation::primary(expression.operand.span()).with_message(format!(
                 "This expression already has type `{}`.",
                 known_type.get_id(Some(context.interner))
-            )),
-        )
-        .with_note("Casting a value to a type it already possesses has no effect.")
-        .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str(context.interner))),
+            )))
+            .with_note("Casting a value to a type it already possesses has no effect.")
+            .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
     );
 }
 
-fn cast_type_to_array(operand_type: &TUnion, context: &mut Context<'_>, cast_expression: &UnaryPrefix) -> TUnion {
+fn cast_type_to_array<'ctx, 'ast, 'arena>(
+    operand_type: &TUnion,
+    context: &mut Context<'ctx, 'arena>,
+    cast_expression: &'ast UnaryPrefix<'arena>,
+) -> TUnion {
     if operand_type.is_never() {
         context.collector.report_with_code(
             IssueCode::InvalidTypeCast,
@@ -924,7 +923,11 @@ fn cast_type_to_array(operand_type: &TUnion, context: &mut Context<'_>, cast_exp
     TUnion::from_vec(combine(resulting_array_atomics, context.codebase, context.interner, false))
 }
 
-fn cast_type_to_bool(operand_type: &TUnion, context: &mut Context<'_>, cast_expression: &UnaryPrefix) -> TUnion {
+fn cast_type_to_bool<'ctx, 'ast, 'arena>(
+    operand_type: &TUnion,
+    context: &mut Context<'ctx, 'arena>,
+    cast_expression: &'ast UnaryPrefix<'arena>,
+) -> TUnion {
     if operand_type.is_never() {
         return get_never();
     }
@@ -972,7 +975,11 @@ fn cast_type_to_bool(operand_type: &TUnion, context: &mut Context<'_>, cast_expr
     get_bool()
 }
 
-fn cast_type_to_float(operand_type: &TUnion, context: &mut Context<'_>, cast_expression: &UnaryPrefix) -> TUnion {
+fn cast_type_to_float<'ctx, 'ast, 'arena>(
+    operand_type: &TUnion,
+    context: &mut Context<'ctx, 'arena>,
+    cast_expression: &'ast UnaryPrefix<'arena>,
+) -> TUnion {
     if operand_type.is_never() {
         return get_never();
     }
@@ -1123,7 +1130,7 @@ fn cast_type_to_float(operand_type: &TUnion, context: &mut Context<'_>, cast_exp
     TUnion::from_vec(combine(resulting_float_atomics, context.codebase, context.interner, false))
 }
 
-fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_>) -> TUnion {
+fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUnion {
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         let possible = match t {
@@ -1197,7 +1204,11 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_>) -> TUnion 
     TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
 }
 
-fn cast_type_to_object(operand_type: &TUnion, context: &mut Context<'_>, cast_expression: &UnaryPrefix) -> TUnion {
+fn cast_type_to_object<'ctx, 'ast, 'arena>(
+    operand_type: &TUnion,
+    context: &mut Context<'ctx, 'arena>,
+    cast_expression: &'ast UnaryPrefix<'arena>,
+) -> TUnion {
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         match t {
@@ -1236,10 +1247,10 @@ fn cast_type_to_object(operand_type: &TUnion, context: &mut Context<'_>, cast_ex
     TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
 }
 
-pub fn cast_type_to_string<'a>(
+pub fn cast_type_to_string<'ctx, 'arena>(
     operand_type: &TUnion,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
 ) -> Result<TUnion, AnalysisError> {

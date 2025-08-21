@@ -55,7 +55,7 @@ pub fn get_formula(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let expression = unwrap_expression(conditional);
@@ -64,8 +64,8 @@ pub fn get_formula(
         if let BinaryOperator::And(_) = binary.operator {
             return handle_binary_and_operation(
                 conditional_object_id,
-                &binary.lhs,
-                &binary.rhs,
+                binary.lhs,
+                binary.rhs,
                 assertion_context,
                 artifacts,
             );
@@ -74,8 +74,8 @@ pub fn get_formula(
         if let BinaryOperator::Or(_) = binary.operator {
             return handle_binary_or_operation(
                 conditional_object_id,
-                &binary.lhs,
-                &binary.rhs,
+                binary.lhs,
+                binary.rhs,
                 assertion_context,
                 artifacts,
             );
@@ -85,10 +85,10 @@ pub fn get_formula(
     if let Expression::UnaryPrefix(unary_prefix) = expression
         && unary_prefix.operator.is_not()
     {
-        if let Expression::Construct(Construct::Isset(isset_construct)) = unary_prefix.operand.as_ref()
+        if let Expression::Construct(Construct::Isset(isset_construct)) = unary_prefix.operand
             && isset_construct.values.len() > 1
         {
-            let scraped_assertions = scrape_assertions(unary_prefix.operand.as_ref(), artifacts, assertion_context);
+            let scraped_assertions = scrape_assertions(unary_prefix.operand, artifacts, assertion_context);
 
             let mut clauses = Vec::new();
 
@@ -128,17 +128,17 @@ pub fn get_formula(
             return negate_formula(clauses);
         }
 
-        if let Expression::Binary(binary_expression) = unwrap_expression(&unary_prefix.operand) {
+        if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand) {
             if let BinaryOperator::Or(_) = binary_expression.operator {
                 return handle_binary_and_operation(
                     conditional_object_id,
                     &Expression::UnaryPrefix(UnaryPrefix {
                         operator: unary_prefix.operator.clone(),
-                        operand: binary_expression.lhs.clone(),
+                        operand: assertion_context.arena.alloc(binary_expression.lhs.clone()),
                     }),
                     &Expression::UnaryPrefix(UnaryPrefix {
                         operator: unary_prefix.operator.clone(),
-                        operand: binary_expression.rhs.clone(),
+                        operand: assertion_context.arena.alloc(binary_expression.rhs.clone()),
                     }),
                     assertion_context,
                     artifacts,
@@ -150,11 +150,11 @@ pub fn get_formula(
                     conditional_object_id,
                     &Expression::UnaryPrefix(UnaryPrefix {
                         operator: unary_prefix.operator.clone(),
-                        operand: binary_expression.lhs.clone(),
+                        operand: assertion_context.arena.alloc(binary_expression.lhs.clone()),
                     }),
                     &Expression::UnaryPrefix(UnaryPrefix {
                         operator: unary_prefix.operator.clone(),
-                        operand: binary_expression.rhs.clone(),
+                        operand: assertion_context.arena.alloc(binary_expression.rhs.clone()),
                     }),
                     assertion_context,
                     artifacts,
@@ -166,7 +166,7 @@ pub fn get_formula(
         let negated = negate_formula(get_formula(
             conditional_object_id,
             unary_operand_span,
-            &unary_prefix.operand,
+            unary_prefix.operand,
             assertion_context,
             artifacts,
         )?)?;
@@ -209,7 +209,7 @@ pub fn get_formula(
 pub fn get_disjunctive_equality_formula(
     subject: &Expression,
     conditions: Vec<&Expression>,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
     is_identity: bool,
 ) -> Option<Vec<Clause>> {
@@ -294,7 +294,7 @@ fn get_formula_from_assertions(
 pub fn negate_or_synthesize(
     clauses: Vec<Clause>,
     conditional: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Vec<Clause> {
     match negate_formula(clauses) {
@@ -304,7 +304,7 @@ pub fn negate_or_synthesize(
             conditional.span(),
             &Expression::UnaryPrefix(UnaryPrefix {
                 operator: UnaryPrefixOperator::Not(conditional.span()),
-                operand: Box::new(conditional.clone()),
+                operand: assertion_context.arena.alloc(conditional.clone()),
             }),
             assertion_context,
             artifacts,
@@ -324,7 +324,7 @@ fn handle_binary_or_operation(
     conditional_object_id: Span,
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let left_clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
@@ -339,7 +339,7 @@ fn handle_binary_and_operation(
     conditional_object_id: Span,
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_>,
+    assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let mut clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;

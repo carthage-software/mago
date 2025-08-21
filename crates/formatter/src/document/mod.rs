@@ -1,22 +1,25 @@
-use std::fmt;
+use bumpalo::Bump;
+use bumpalo::boxed::Box;
+use bumpalo::collections::Vec;
+use bumpalo::vec;
 
 use crate::document::group::GroupIdentifier;
 
 pub mod group;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum Document<'a> {
-    String(&'a str),
-    Array(Vec<Document<'a>>),
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum Document<'arena> {
+    String(&'arena str),
+    Array(Vec<'arena, Document<'arena>>),
     /// Increase the level of indentation.
-    Indent(Vec<Document<'a>>),
-    IndentIfBreak(IndentIfBreak<'a>),
+    Indent(Vec<'arena, Document<'arena>>),
+    IndentIfBreak(IndentIfBreak<'arena>),
     /// Mark a group of items which the printer should try to fit on one line.
     /// This is the basic command to tell the printer when to break.
     /// Groups are usually nested, and the printer will try to fit everything on one line,
     /// but if it doesn't fit it will break the outermost group first and try again.
     /// It will continue breaking groups until everything fits (or there are no more groups to break).
-    Group(Group<'a>),
+    Group(Group<'arena>),
     /// Specify a line break.
     /// If an expression fits on one line, the line break will be replaced with a space.
     /// Line breaks always indent the next line with the current level of indentation.
@@ -24,17 +27,17 @@ pub enum Document<'a> {
     /// This is used to implement trailing comments.
     /// It's not practical to constantly check where the line ends to avoid accidentally printing some code at the end of a comment.
     /// `lineSuffix` buffers docs passed to it and flushes them before any new line.
-    LineSuffix(Vec<Document<'a>>),
+    LineSuffix(Vec<'arena, Document<'arena>>),
     LineSuffixBoundary,
     /// Print something if the current `group` or the current element of `fill` breaks and something else if it doesn't.
-    IfBreak(IfBreak<'a>),
+    IfBreak(IfBreak<'arena>),
     /// This is an alternative type of group which behaves like text layout:
     /// it's going to add a break whenever the next element doesn't fit in the line anymore.
     /// The difference with `group` is that it's not going to break all the separators, just the ones that are at the end of lines.
-    Fill(Fill<'a>),
+    Fill(Fill<'arena>),
     /// Include this anywhere to force all parent groups to break.
     BreakParent,
-    Align(Align<'a>),
+    Align(Align<'arena>),
     /// Trim all newlines from the end of the document.
     Trim(Trim),
     /// Do not perform any trimming before printing the next document.
@@ -42,13 +45,13 @@ pub enum Document<'a> {
     Space(Space),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Align<'a> {
-    pub alignment: &'a str,
-    pub contents: Vec<Document<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Align<'arena> {
+    pub alignment: &'arena str,
+    pub contents: Vec<'arena, Document<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Trim {
     /// Trims trailing whitespace characters (spaces and tabs) from the end of the document.
     Whitespace,
@@ -70,29 +73,29 @@ pub struct Space {
     pub soft: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Group<'a> {
-    pub contents: Vec<Document<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Group<'arena> {
+    pub contents: Vec<'arena, Document<'arena>>,
     pub should_break: bool,
-    pub expanded_states: Option<Vec<Document<'a>>>,
+    pub expanded_states: Option<Vec<'arena, Document<'arena>>>,
     pub id: Option<GroupIdentifier>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct IndentIfBreak<'a> {
-    pub contents: Vec<Document<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct IndentIfBreak<'arena> {
+    pub contents: Vec<'arena, Document<'arena>>,
     pub group_id: Option<GroupIdentifier>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Fill<'a> {
-    pub parts: Vec<Document<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Fill<'arena> {
+    pub parts: Vec<'arena, Document<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct IfBreak<'a> {
-    pub break_contents: Box<Document<'a>>,
-    pub flat_content: Box<Document<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct IfBreak<'arena> {
+    pub break_contents: Box<'arena, Document<'arena>>,
+    pub flat_content: Box<'arena, Document<'arena>>,
     pub group_id: Option<GroupIdentifier>,
 }
 
@@ -138,12 +141,15 @@ impl Space {
     }
 }
 
-impl<'a> Group<'a> {
-    pub fn new(contents: Vec<Document<'a>>) -> Self {
+impl<'arena> Group<'arena> {
+    pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
         Self { contents, should_break: false, id: None, expanded_states: None }
     }
 
-    pub fn conditional(contents: Vec<Document<'a>>, expanded_states: Vec<Document<'a>>) -> Self {
+    pub fn conditional(
+        contents: Vec<'arena, Document<'arena>>,
+        expanded_states: Vec<'arena, Document<'arena>>,
+    ) -> Self {
         Self { contents, should_break: false, id: None, expanded_states: Some(expanded_states) }
     }
 
@@ -158,8 +164,8 @@ impl<'a> Group<'a> {
     }
 }
 
-impl<'a> IndentIfBreak<'a> {
-    pub fn new(contents: Vec<Document<'a>>) -> Self {
+impl<'arena> IndentIfBreak<'arena> {
+    pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
         Self { contents, group_id: None }
     }
 
@@ -169,34 +175,42 @@ impl<'a> IndentIfBreak<'a> {
     }
 }
 
-impl<'a> Fill<'a> {
-    pub fn drain_out_pair(&mut self) -> (Option<Document<'a>>, Option<Document<'a>>) {
+impl<'arena> Fill<'arena> {
+    pub fn drain_out_pair(&mut self) -> (Option<Document<'arena>>, Option<Document<'arena>>) {
         let content = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
         let whitespace = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
 
         (content, whitespace)
     }
 
-    pub fn dequeue(&mut self) -> Option<Document<'a>> {
+    pub fn dequeue(&mut self) -> Option<Document<'arena>> {
         if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None }
     }
 
-    pub fn enqueue(&mut self, doc: Document<'a>) {
+    pub fn enqueue(&mut self, doc: Document<'arena>) {
         self.parts.insert(0, doc);
     }
 
-    pub fn parts(&self) -> &[Document<'a>] {
+    pub fn parts(&self) -> &[Document<'arena>] {
         &self.parts
     }
 }
 
-impl<'a> IfBreak<'a> {
-    pub fn new(break_contents: Document<'a>, flat_content: Document<'a>) -> Self {
-        Self { break_contents: Box::new(break_contents), flat_content: Box::new(flat_content), group_id: None }
+impl<'arena> IfBreak<'arena> {
+    pub fn new(arena: &'arena Bump, break_contents: Document<'arena>, flat_content: Document<'arena>) -> Self {
+        Self {
+            break_contents: Box::new_in(break_contents, arena),
+            flat_content: Box::new_in(flat_content, arena),
+            group_id: None,
+        }
     }
 
-    pub fn then(break_contents: Document<'a>) -> Self {
-        Self { break_contents: Box::new(break_contents), flat_content: Box::new(Document::empty()), group_id: None }
+    pub fn then(arena: &'arena Bump, break_contents: Document<'arena>) -> Self {
+        Self {
+            break_contents: Box::new_in(break_contents, arena),
+            flat_content: Box::new_in(Document::empty(), arena),
+            group_id: None,
+        }
     }
 
     pub fn with_id(mut self, id: GroupIdentifier) -> Self {
@@ -205,19 +219,19 @@ impl<'a> IfBreak<'a> {
     }
 }
 
-impl<'a> Document<'a> {
+impl<'arena> Document<'arena> {
     #[inline]
-    pub fn empty() -> Document<'a> {
+    pub fn empty() -> Document<'arena> {
         Document::String("")
     }
 
     #[inline]
-    pub fn space() -> Document<'a> {
+    pub fn space() -> Document<'arena> {
         Document::Space(Space { soft: false })
     }
 
     #[inline]
-    pub fn soft_space() -> Document<'a> {
+    pub fn soft_space() -> Document<'arena> {
         Document::Space(Space { soft: true })
     }
 
@@ -227,7 +241,7 @@ impl<'a> Document<'a> {
 
     pub fn any<F>(&self, predicate: F) -> bool
     where
-        F: Fn(&Document<'a>) -> bool,
+        F: Fn(&Document<'arena>) -> bool,
     {
         if predicate(self) {
             return true;
@@ -246,8 +260,12 @@ impl<'a> Document<'a> {
         }
     }
 
-    pub fn join(documents: Vec<Document<'a>>, separator: Separator) -> Vec<Document<'a>> {
-        let mut parts = vec![];
+    pub fn join(
+        arena: &'arena Bump,
+        documents: impl IntoIterator<Item = Document<'arena>>,
+        separator: Separator,
+    ) -> Vec<'arena, Document<'arena>> {
+        let mut parts = vec![in arena];
         for (i, document) in documents.into_iter().enumerate() {
             if i != 0 {
                 parts.push(match separator {
@@ -256,114 +274,228 @@ impl<'a> Document<'a> {
                     Separator::HardLine => Document::Line(Line::hard()),
                     Separator::CommaSpace => Document::String(", "),
                     Separator::LiteralLine => {
-                        Document::Array(vec![Document::Line(Line::literal()), Document::BreakParent])
+                        Document::Array(vec![in arena; Document::Line(Line::literal()), Document::BreakParent])
                     }
                     Separator::CommaLine => {
-                        Document::Array(vec![Document::String(","), Document::Line(Line::default())])
+                        Document::Array(vec![in arena; Document::String(","), Document::Line(Line::default())])
                     }
                 });
             }
 
             parts.push(document);
         }
+
         parts
     }
 }
 
-impl fmt::Display for Document<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Document::String(s) => write!(f, "{s:?}"),
-            Document::Array(docs) => {
-                let mut printed: Vec<String> = docs.iter().map(|d| d.to_string()).collect();
+/// Recursively clones a `Vec` of `Document`s into the given arena.
+pub fn clone_vec_in_arena<'arena>(
+    arena: &'arena Bump,
+    source_vec: &Vec<'arena, Document<'arena>>,
+) -> Vec<'arena, Document<'arena>> {
+    let mut new_vec = Vec::with_capacity_in(source_vec.len(), arena);
+    new_vec.extend(source_vec.iter().map(|d| clone_in_arena(arena, d)));
+    new_vec
+}
 
-                if printed.len() == 1 {
-                    write!(f, "{}", printed.pop().unwrap())
-                } else {
-                    write!(f, "[{}]", printed.join(", "))
-                }
-            }
-            Document::Indent(docs) => {
-                write!(f, "indent({})", Document::Array(docs.clone()))
-            }
-            Document::IndentIfBreak(IndentIfBreak { contents, group_id }) => {
-                let mut options = vec![];
-                if let Some(id) = group_id {
-                    options.push(format!("groupId: {id}"));
-                }
-                let options_str =
-                    if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
-                write!(f, "indentIfBreak({}{})", Document::Array(contents.clone()), options_str)
-            }
-            Document::Group(Group { contents, should_break, expanded_states, id }) => {
-                let mut options = vec![];
-                if *should_break {
-                    options.push("shouldBreak: true".to_string());
-                }
-                if let Some(id) = id {
-                    options.push(format!("id: {id}"));
-                }
-                let expanded_states_str = if let Some(states) = expanded_states {
-                    format!(
-                        "conditionalGroup([{}]",
-                        states.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
-                    )
-                } else {
-                    String::new()
-                };
-                let options_str =
-                    if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+/// Recursively creates a deep clone of a `Document` within the given arena.
+///
+/// This function is necessary because `bumpalo::Box` does not implement `Clone`.
+/// It manually reconstructs the entire `Document` tree, allocating new `Vec`s and
+/// `Box`es in the provided `arena` to create a fully independent copy.
+pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) -> Document<'arena> {
+    match document {
+        // Trivial `Copy` cases
+        Document::String(s) => Document::String(s),
+        Document::Line(line) => Document::Line(*line),
+        Document::Trim(trim) => Document::Trim(*trim),
+        Document::Space(space) => Document::Space(*space),
+        Document::LineSuffixBoundary => Document::LineSuffixBoundary,
+        Document::BreakParent => Document::BreakParent,
+        Document::DoNotTrim => Document::DoNotTrim,
 
-                if expanded_states_str.is_empty() {
-                    write!(f, "group({}{})", Document::Array(contents.clone()), options_str)
-                } else {
-                    write!(f, "{}, {}{})", expanded_states_str, Document::Array(contents.clone()), options_str,)
-                }
-            }
-            Document::Line(line) => {
-                if line.literal {
-                    write!(f, "literalLine")
-                } else if line.hard {
-                    write!(f, "hardline")
-                } else if line.soft {
-                    write!(f, "softline")
-                } else {
-                    write!(f, "line")
-                }
-            }
-            Document::LineSuffix(docs) => {
-                write!(f, "lineSuffix({})", Document::Array(docs.clone()))
-            }
-            Document::LineSuffixBoundary => write!(f, "lineSuffixBoundary"),
-            Document::IfBreak(IfBreak { break_contents, flat_content, group_id }) => {
-                let mut options = vec![];
-                if let Some(id) = group_id {
-                    options.push(format!("groupId: {id}"));
-                }
-                let options_str =
-                    if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+        // Variants containing a `Vec`
+        Document::Array(docs) => Document::Array(clone_vec_in_arena(arena, docs)),
+        Document::Indent(docs) => Document::Indent(clone_vec_in_arena(arena, docs)),
+        Document::LineSuffix(docs) => Document::LineSuffix(clone_vec_in_arena(arena, docs)),
 
-                write!(f, "ifBreak({break_contents}, {flat_content}{options_str})")
+        // Variants containing structs that hold collections
+        Document::IndentIfBreak(s) => Document::IndentIfBreak(IndentIfBreak {
+            contents: clone_vec_in_arena(arena, &s.contents),
+            group_id: s.group_id,
+        }),
+        Document::Group(g) => Document::Group(Group {
+            contents: clone_vec_in_arena(arena, &g.contents),
+            should_break: g.should_break,
+            expanded_states: g.expanded_states.as_ref().map(|v| clone_vec_in_arena(arena, v)),
+            id: g.id,
+        }),
+        Document::Fill(f) => Document::Fill(Fill { parts: clone_vec_in_arena(arena, &f.parts) }),
+        Document::Align(a) => {
+            Document::Align(Align { alignment: a.alignment, contents: clone_vec_in_arena(arena, &a.contents) })
+        }
+
+        // The special case for `Box`
+        Document::IfBreak(ib) => Document::IfBreak(IfBreak {
+            break_contents: Box::new_in(clone_in_arena(arena, &ib.break_contents), arena),
+            flat_content: Box::new_in(clone_in_arena(arena, &ib.flat_content), arena),
+            group_id: ib.group_id,
+        }),
+    }
+}
+
+#[allow(dead_code)]
+#[cfg(debug_assertions)]
+pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &Document<'arena>) -> String {
+    use bumpalo::collections::CollectIn;
+
+    fn write_documents_vec_to_buffer<'arena>(
+        buffer: &mut String,
+        arena: &'arena Bump,
+        docs: &Vec<'arena, Document<'arena>>,
+    ) {
+        let mut printed = docs.iter().map(|d| print_document_to_string(arena, d)).collect_in::<Vec<_>>(arena);
+
+        if printed.len() != 1 {
+            buffer.push('[');
+        }
+
+        for (i, doc) in printed.iter_mut().enumerate() {
+            if i != 0 {
+                buffer.push_str(", ");
             }
-            Document::Fill(Fill { parts }) => {
-                write!(f, "fill([{}])", parts.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "))
+
+            buffer.push_str(doc);
+        }
+
+        if printed.len() != 1 {
+            buffer.push(']');
+        }
+    }
+
+    let mut buffer = String::new();
+
+    match document {
+        Document::String(s) => {
+            buffer.push_str(&format!("{s:?}"));
+        }
+        Document::Array(docs) => {
+            write_documents_vec_to_buffer(&mut buffer, arena, docs);
+        }
+        Document::Indent(docs) => {
+            buffer.push_str("indent(");
+            write_documents_vec_to_buffer(&mut buffer, arena, docs);
+            buffer.push(')');
+        }
+        Document::IndentIfBreak(IndentIfBreak { contents, group_id }) => {
+            let mut options = Vec::new_in(arena);
+            if let Some(id) = group_id {
+                options.push(format!("groupId: {id}"));
             }
-            Document::BreakParent => write!(f, "breakParent"),
-            Document::Align(Align { alignment, contents }) => {
-                write!(f, "dedentToRoot(align({:?}, {}))", alignment, Document::Array(contents.clone()))
+
+            let options_str =
+                if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+
+            buffer.push_str("indentIfBreak(");
+            write_documents_vec_to_buffer(&mut buffer, arena, contents);
+            buffer.push_str(&options_str);
+            buffer.push(')');
+        }
+        Document::Group(Group { contents, should_break, expanded_states, id }) => {
+            let mut options = vec![in arena];
+            if *should_break {
+                options.push("shouldBreak: true".to_string());
             }
-            Document::Trim(trim) => match trim {
-                Trim::Whitespace => write!(f, "trim"),
-                Trim::Newlines => write!(f, "trimNewlines"),
-            },
-            Document::DoNotTrim => write!(f, "doNotTrim"),
-            Document::Space(space) => {
-                if space.soft {
-                    write!(f, "softSpace")
-                } else {
-                    write!(f, "hardSpace")
-                }
+            if let Some(id) = id {
+                options.push(format!("id: {id}"));
+            }
+
+            let expanded_states_str = if let Some(states) = expanded_states {
+                format!(
+                    "conditionalGroup([{}]",
+                    states.iter().map(|s| print_document_to_string(arena, s)).collect_in::<Vec<_>>(arena).join(", ")
+                )
+            } else {
+                String::new()
+            };
+
+            let options_str =
+                if options.is_empty() { String::new() } else { format!(", {{ {} }}", options.join(", ")) };
+
+            if expanded_states_str.is_empty() {
+                buffer.push_str("group(");
+                write_documents_vec_to_buffer(&mut buffer, arena, contents);
+                buffer.push_str(&options_str);
+                buffer.push(')');
+            } else {
+                buffer.push_str(&expanded_states_str);
+                buffer.push_str(", ");
+                write_documents_vec_to_buffer(&mut buffer, arena, contents);
+                buffer.push_str(&options_str);
+                buffer.push(')');
+            }
+        }
+        Document::Line(line) => {
+            if line.literal {
+                buffer.push_str("literalLine")
+            } else if line.hard {
+                buffer.push_str("hardline")
+            } else if line.soft {
+                buffer.push_str("softline")
+            } else {
+                buffer.push_str("line")
+            }
+        }
+        Document::LineSuffix(docs) => {
+            buffer.push_str("lineSuffix(");
+            write_documents_vec_to_buffer(&mut buffer, arena, docs);
+            buffer.push(')');
+        }
+        Document::LineSuffixBoundary => buffer.push_str("lineSuffixBoundary"),
+        Document::IfBreak(IfBreak { break_contents, flat_content, group_id }) => {
+            let mut options = vec![in arena];
+            if let Some(id) = group_id {
+                options.push(format!("groupId: {id}"));
+            }
+
+            buffer.push_str("ifBreak(");
+            buffer.push_str(&print_document_to_string(arena, break_contents));
+            buffer.push_str(", ");
+            buffer.push_str(&print_document_to_string(arena, flat_content));
+            if !options.is_empty() {
+                buffer.push_str(", ");
+                buffer.push_str(&options.join(", "));
+            }
+
+            buffer.push(')');
+        }
+        Document::Fill(Fill { parts }) => {
+            buffer.push_str("fill(");
+            write_documents_vec_to_buffer(&mut buffer, arena, parts);
+            buffer.push(')');
+        }
+        Document::BreakParent => buffer.push_str("breakParent"),
+        Document::Align(Align { alignment, contents }) => {
+            buffer.push_str("dedentToRoot(align(");
+            buffer.push_str(&format!("{:?}, ", alignment));
+            write_documents_vec_to_buffer(&mut buffer, arena, contents);
+            buffer.push(')');
+            buffer.push(')');
+        }
+        Document::Trim(trim) => match trim {
+            Trim::Whitespace => buffer.push_str("trim"),
+            Trim::Newlines => buffer.push_str("trimNewlines"),
+        },
+        Document::DoNotTrim => buffer.push_str("doNotTrim"),
+        Document::Space(space) => {
+            if space.soft {
+                buffer.push_str("softSpace")
+            } else {
+                buffer.push_str("hardSpace")
             }
         }
     }
+
+    buffer
 }

@@ -105,7 +105,7 @@ impl LintRule for TooManyEnumCasesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let r#enum = match node {
             Node::Enum(e) => e,
             _ => return,

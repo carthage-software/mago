@@ -30,10 +30,10 @@ use crate::expression::binary::utils::is_always_less_than;
 /// reports warnings for potentially problematic comparisons (e.g., array with int),
 /// and errors for invalid comparisons (e.g., involving `mixed`).
 /// Data flow is established from both operands.
-pub fn analyze_spaceship_operation<'a>(
-    binary: &Binary,
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn analyze_spaceship_operation<'ctx, 'arena>(
+    binary: &Binary<'arena>,
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     binary.lhs.analyze(context, block_context, artifacts)?;
@@ -43,8 +43,8 @@ pub fn analyze_spaceship_operation<'a>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_spaceship_operand(context, &binary.lhs, lhs_type, "Left")?;
-    check_spaceship_operand(context, &binary.rhs, rhs_type, "Right")?;
+    check_spaceship_operand(context, binary.lhs, lhs_type, "Left")?;
+    check_spaceship_operand(context, binary.rhs, rhs_type, "Right")?;
 
     let lhs_is_array = lhs_type.is_array();
     let rhs_is_array = rhs_type.is_array();
@@ -117,9 +117,9 @@ pub fn analyze_spaceship_operation<'a>(
     Ok(())
 }
 
-fn check_spaceship_operand(
-    context: &mut Context<'_>,
-    operand: &Expression,
+fn check_spaceship_operand<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    operand: &'ast Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
 ) -> Result<(), AnalysisError> {

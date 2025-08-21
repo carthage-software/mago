@@ -81,7 +81,7 @@ impl LintRule for CyclomaticComplexityRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Class(n) => self.check_class_like("Class", n.members.as_slice(), n.span(), ctx),
             Node::Trait(n) => self.check_class_like("Trait", n.members.as_slice(), n.span(), ctx),
@@ -96,16 +96,16 @@ impl LintRule for CyclomaticComplexityRule {
 }
 
 impl CyclomaticComplexityRule {
-    fn check_class_like(
+    fn check_class_like<'ast, 'arena>(
         &self,
         kind: &'static str,
-        members: &[ClassLikeMember],
+        members: &'ast [ClassLikeMember<'arena>],
         span: impl HasSpan,
-        ctx: &mut LintContext,
+        ctx: &mut LintContext<'_, 'ast, 'arena>,
     ) {
         let threshold = self.cfg.threshold;
 
-        let complexity = get_cyclomatic_complexity_of_class_like_members(members, ctx);
+        let complexity = get_cyclomatic_complexity_of_class_like_members(members);
         if complexity > threshold {
             let issue = Issue::new(self.cfg.level, format!("{kind} has high complexity."))
                 .with_code(self.meta.code)
@@ -117,10 +117,17 @@ impl CyclomaticComplexityRule {
         }
     }
 
-    fn check_function_like(&self, kind: &'static str, body: &Block, span: impl HasSpan, ctx: &mut LintContext) {
+    fn check_function_like<'ast, 'arena>(
+        &self,
+        kind: &'static str,
+        body: &'ast Block<'arena>,
+        span: impl HasSpan,
+        ctx: &mut LintContext<'_, 'ast, 'arena>,
+    ) {
         let threshold = self.cfg.threshold;
 
         let complexity = get_cyclomatic_complexity_of_node(Node::Block(body));
+
         if complexity > threshold {
             let issue = Issue::new(self.cfg.level, format!("{kind} has high complexity."))
                 .with_code(self.meta.code)
@@ -134,9 +141,8 @@ impl CyclomaticComplexityRule {
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_class_like_members(
-    class_like_members: &[ClassLikeMember],
-    context: &LintContext<'_>,
+fn get_cyclomatic_complexity_of_class_like_members<'ast, 'arena>(
+    class_like_members: &'ast [ClassLikeMember<'arena>],
 ) -> usize {
     let mut cyclomatic_complexity = 0;
     for member in class_like_members {
@@ -144,7 +150,7 @@ fn get_cyclomatic_complexity_of_class_like_members(
             continue;
         };
 
-        let Some(method_cyclomatic_complexity) = get_cyclomatic_complexity_of_method(method, context) else {
+        let Some(method_cyclomatic_complexity) = get_cyclomatic_complexity_of_method(method) else {
             continue;
         };
 
@@ -155,8 +161,8 @@ fn get_cyclomatic_complexity_of_class_like_members(
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_method(method: &Method, context: &LintContext<'_>) -> Option<usize> {
-    if is_method_setter_or_getter(method, context) {
+fn get_cyclomatic_complexity_of_method<'ast, 'arena>(method: &'ast Method<'arena>) -> Option<usize> {
+    if is_method_setter_or_getter(method) {
         return None;
     }
 
@@ -164,7 +170,7 @@ fn get_cyclomatic_complexity_of_method(method: &Method, context: &LintContext<'_
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_node(node: Node<'_>) -> usize {
+fn get_cyclomatic_complexity_of_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> usize {
     let mut number = 0;
 
     for child in node.children() {

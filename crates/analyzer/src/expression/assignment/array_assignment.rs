@@ -31,11 +31,11 @@ use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
 
-pub(crate) fn analyze<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(crate) fn analyze<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    array_target: ArrayTarget<'_>,
+    array_target: ArrayTarget<'ast, 'arena>,
     assign_value_type: TUnion,
 ) -> Result<(), AnalysisError> {
     let mut array_target_expressions = vec![array_target];
@@ -136,7 +136,7 @@ pub(crate) fn analyze<'a>(
 }
 
 pub(crate) fn update_type_with_key_values(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     mut new_type: TUnion,
     current_type: TUnion,
     key_values: &Vec<TAtomic>,
@@ -164,7 +164,7 @@ pub(crate) fn update_type_with_key_values(
 }
 
 fn update_atomic_given_key(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     mut atomic_type: TAtomic,
     key_values: &Vec<TAtomic>,
     key_type: Option<Rc<TUnion>>,
@@ -287,9 +287,9 @@ fn update_atomic_given_key(
     atomic_type
 }
 
-fn update_array_assignment_child_type(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+fn update_array_assignment_child_type<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     key_type: Option<Rc<TUnion>>,
     value_type: TUnion,
     root_type: TUnion,
@@ -407,16 +407,16 @@ fn update_array_assignment_child_type(
     add_union_type(root_type, &collection_type, context.codebase, context.interner, true)
 }
 
-pub(crate) fn analyze_nested_array_assignment<'a, 's>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    mut array_target_expressions: Vec<ArrayTarget<'s>>,
+    mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
     assign_value_type: TUnion,
     root_var_id: Option<String>,
     root_type: &mut TUnion,
     last_array_expr_type: &mut TUnion,
-) -> Result<Option<&'s Expression>, AnalysisError> {
+) -> Result<Option<&'ast Expression<'arena>>, AnalysisError> {
     let mut var_id_additions = Vec::new();
     let mut last_array_expression_index = None;
     let mut extended_var_id = None;

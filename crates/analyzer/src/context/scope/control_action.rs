@@ -39,7 +39,12 @@ impl ControlAction {
         if 1 == statements_len
             && let Some(Statement::Block(block)) = statements.first()
         {
-            return ControlAction::from_statements(block.statements.to_vec(), break_type, artifacts, return_is_exit);
+            return ControlAction::from_statements(
+                block.statements.iter().collect::<Vec<_>>(),
+                break_type,
+                artifacts,
+                return_is_exit,
+            );
         }
 
         let mut control_actions = HashSet::default();
@@ -71,33 +76,31 @@ impl ControlAction {
                     let (inner_statements, condition) = match statement {
                         Statement::For(for_loop) => (
                             match &for_loop.body {
-                                ForBody::Statement(statement) => vec![statement.as_ref()],
+                                ForBody::Statement(statement) => vec![*statement],
                                 ForBody::ColonDelimited(for_colon_delimited_body) => {
-                                    for_colon_delimited_body.statements.to_vec()
+                                    for_colon_delimited_body.statements.iter().collect::<Vec<_>>()
                                 }
                             },
                             None,
                         ),
                         Statement::Foreach(foreach_loop) => (
                             match &foreach_loop.body {
-                                ForeachBody::Statement(statement) => vec![statement.as_ref()],
+                                ForeachBody::Statement(statement) => vec![*statement],
                                 ForeachBody::ColonDelimited(foreach_colon_delimited_body) => {
-                                    foreach_colon_delimited_body.statements.to_vec()
+                                    foreach_colon_delimited_body.statements.iter().collect::<Vec<_>>()
                                 }
                             },
                             None,
                         ),
-                        Statement::DoWhile(do_while) => {
-                            (vec![do_while.statement.as_ref()], Some(do_while.condition.as_ref()))
-                        }
+                        Statement::DoWhile(do_while) => (vec![do_while.statement], Some(do_while.condition)),
                         Statement::While(while_loop) => (
                             match &while_loop.body {
-                                WhileBody::Statement(statement) => vec![statement.as_ref()],
+                                WhileBody::Statement(statement) => vec![*statement],
                                 WhileBody::ColonDelimited(while_colon_delimited_body) => {
-                                    while_colon_delimited_body.statements.to_vec()
+                                    while_colon_delimited_body.statements.iter().collect::<Vec<_>>()
                                 }
                             },
-                            Some(while_loop.condition.as_ref()),
+                            Some(while_loop.condition),
                         ),
                         _ => unreachable!(),
                     };
@@ -145,7 +148,7 @@ impl ControlAction {
                 }
                 Statement::Block(block) => {
                     let mut block_actions = ControlAction::from_statements(
-                        block.statements.to_vec(),
+                        block.statements.iter().collect::<Vec<_>>(),
                         break_type.clone(),
                         artifacts,
                         return_is_exit,
@@ -337,7 +340,7 @@ impl ControlAction {
                 }
                 Statement::Try(try_catch) => {
                     let try_statement_actions = ControlAction::from_statements(
-                        try_catch.block.statements.to_vec(),
+                        try_catch.block.statements.iter().collect::<Vec<_>>(),
                         break_type.clone(),
                         artifacts,
                         return_is_exit,
@@ -350,7 +353,7 @@ impl ControlAction {
                         let mut all_catches_leave = try_leaves;
                         for catch in try_catch.catch_clauses.iter() {
                             let catch_actions = ControlAction::from_statements(
-                                catch.block.statements.to_vec(),
+                                catch.block.statements.iter().collect::<Vec<_>>(),
                                 break_type.clone(),
                                 artifacts,
                                 return_is_exit,
@@ -381,7 +384,7 @@ impl ControlAction {
                         && !finally_clause.block.statements.is_empty()
                     {
                         let finally_statement_actions = ControlAction::from_statements(
-                            finally_clause.block.statements.to_vec(),
+                            finally_clause.block.statements.iter().collect::<Vec<_>>(),
                             break_type.clone(),
                             artifacts,
                             return_is_exit,

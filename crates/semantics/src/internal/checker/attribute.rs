@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Context<'_>) {
+pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::Attributes) {
         context.report(
             Issue::error("Attributes are only available in PHP 8.0 and above.")
@@ -16,7 +16,8 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
     }
 
     for attr in attribute_list.attributes.iter() {
-        let name = context.interner.lookup(attr.name.value());
+        let name = attr.name.value();
+
         if let Some(list) = &attr.argument_list {
             for argument in list.arguments.iter() {
                 let (ellipsis, value) = match &argument {
@@ -40,7 +41,7 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
                     );
                 }
 
-                if !value.is_constant(context.version, true) {
+                if !value.is_constant(&context.version, true) {
                     context.report(
                         Issue::error(format!("Attribute `{name}` argument contains a non-constant expression."))
                             .with_annotations([

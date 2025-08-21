@@ -67,14 +67,16 @@ impl SelectorKind {
 /// Resolves the selector part of a class member access (property or method).
 ///
 /// This handles selectors in expressions like `$object->member` or `$object->{$var}`.
-pub fn resolve_member_selector<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_member_selector<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    selector: &ClassLikeMemberSelector,
+    selector: &ClassLikeMemberSelector<'arena>,
 ) -> Result<Vec<ResolvedSelector>, AnalysisError> {
     match selector {
-        ClassLikeMemberSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(ident.value)]),
+        ClassLikeMemberSelector::Identifier(ident) => {
+            Ok(vec![ResolvedSelector::Identifier(context.interner.intern(ident.value))])
+        }
         ClassLikeMemberSelector::Expression(expr) => {
             let was_inside_general_use = block_context.inside_general_use;
             block_context.inside_general_use = true;
@@ -101,14 +103,16 @@ pub fn resolve_member_selector<'a>(
 /// Resolves the selector part of a class constant access.
 ///
 /// This handles selectors in expressions like `ClassName::CONSTANT` or `ClassName::{$var}`.
-pub fn resolve_constant_selector<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_constant_selector<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    selector: &ClassLikeConstantSelector,
+    selector: &ClassLikeConstantSelector<'arena>,
 ) -> Result<Vec<ResolvedSelector>, AnalysisError> {
     match selector {
-        ClassLikeConstantSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(ident.value)]),
+        ClassLikeConstantSelector::Identifier(ident) => {
+            Ok(vec![ResolvedSelector::Identifier(context.interner.intern(ident.value))])
+        }
         ClassLikeConstantSelector::Expression(expr) => {
             let was_inside_general_use = block_context.inside_general_use;
             block_context.inside_general_use = true;

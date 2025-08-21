@@ -61,12 +61,12 @@ pub struct PropertyResolutionResult {
 }
 
 /// Resolves all possible instance properties from an object expression and a member selector.
-pub fn resolve_instance_properties<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    object_expression: &Expression,
-    property_selector: &ClassLikeMemberSelector,
+    object_expression: &'ast Expression<'arena>,
+    property_selector: &'ast ClassLikeMemberSelector<'arena>,
     operator_span: Span,
     is_null_safe: bool,
     for_assignment: bool,
@@ -189,13 +189,13 @@ pub fn resolve_instance_properties<'a>(
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
-fn find_property_in_class<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+fn find_property_in_class<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     class_id: &StringIdentifier,
     prop_name: &StringIdentifier,
-    selector: &ClassLikeMemberSelector,
-    object_expr: &Expression,
+    selector: &'ast ClassLikeMemberSelector<'arena>,
+    object_expr: &'ast Expression<'arena>,
     object: &TObject,
     access_span: Span,
     for_assignment: bool,
@@ -294,7 +294,7 @@ fn find_property_in_class<'a>(
 }
 
 pub fn localize_property_type(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     class_property_type: &TUnion,
     object_type_parameters: &[TUnion],
     property_class_metadata: &ClassLikeMetadata,
@@ -326,7 +326,7 @@ pub fn localize_property_type(
 }
 
 fn update_template_types(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     template_types: &mut IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState>,
     property_class_metadata: &ClassLikeMetadata,
     lhs_type_params: &[TUnion],
@@ -393,9 +393,9 @@ fn update_template_types(
 }
 
 /// Reports an error for a property access on a `null` or `void` value.
-fn report_access_on_null(
-    context: &mut Context,
-    block_context: &BlockContext,
+fn report_access_on_null<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     object_span: Span,
     operator_span: Span,
     is_always_null: bool,
@@ -475,10 +475,10 @@ fn report_access_on_null(
     }
 }
 
-fn report_redundant_nullsafe<'a>(
-    context: &mut Context<'a>,
+fn report_redundant_nullsafe<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     operator_span: Span,
-    object_expr: &Expression,
+    object_expr: &'ast Expression<'arena>,
     object_type: &TUnion,
     in_coalescing: bool,
     in_isset: bool,

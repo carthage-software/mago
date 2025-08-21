@@ -6,11 +6,11 @@
 
 use std::borrow::Cow;
 
+use bumpalo::Bump;
 use wasm_bindgen::prelude::*;
 
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
-use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 
 mod analysis;
@@ -67,8 +67,8 @@ pub fn format_code(code: String, php_version: JsValue, settings: JsValue) -> Res
         FormatSettings::default()
     };
 
-    let interner = ThreadedInterner::new();
-    let formatter = Formatter::new(&interner, php_version, settings);
+    let arena = Bump::new();
+    let formatter = Formatter::new(&arena, php_version, settings);
 
     formatter
         .format_code(Cow::Borrowed("code.php"), Cow::Owned(code))

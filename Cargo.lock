@@ -240,6 +240,18 @@ name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "bumpalo-herd"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c51ab7ee02d3459317cc16fec045966c9120733a10229541acaf3cc81b137c95"
+dependencies = [
+ "bumpalo",
+]
 
 [[package]]
 name = "bytes"
@@ -1456,6 +1468,8 @@ version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
  "blake3",
+ "bumpalo",
+ "bumpalo-herd",
  "clap",
  "colored",
  "config",
@@ -1473,7 +1487,6 @@ dependencies = [
  "mago-linter",
  "mago-names",
  "mago-php-version",
- "mago-reference",
  "mago-reporting",
  "mago-semantics",
  "mago-syntax",
@@ -1511,6 +1524,7 @@ name = "mago-analyzer"
 version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
+ "bumpalo",
  "either",
  "indexmap",
  "indoc",
@@ -1545,6 +1559,7 @@ version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
  "bitflags",
+ "bumpalo",
  "derivative",
  "indexmap",
  "mago-database",
@@ -1566,9 +1581,9 @@ name = "mago-collector"
 version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
+ "bumpalo",
  "mago-database",
  "mago-fixer",
- "mago-interner",
  "mago-reporting",
  "mago-span",
  "mago-syntax",
@@ -1600,8 +1615,8 @@ dependencies = [
 name = "mago-docblock"
 version = "1.0.0-alpha.12"
 dependencies = [
+ "bumpalo",
  "mago-database",
- "mago-interner",
  "mago-span",
  "mago-syntax",
  "serde",
@@ -1623,9 +1638,9 @@ version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
  "bitflags",
+ "bumpalo",
  "indoc",
  "mago-database",
- "mago-interner",
  "mago-php-version",
  "mago-span",
  "mago-syntax",
@@ -1648,14 +1663,13 @@ name = "mago-linter"
 version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
+ "bumpalo",
  "indoc",
  "mago-casing",
- "mago-codex",
  "mago-collector",
  "mago-database",
  "mago-docblock",
  "mago-fixer",
- "mago-interner",
  "mago-names",
  "mago-php-version",
  "mago-reporting",
@@ -1663,8 +1677,6 @@ dependencies = [
  "mago-syntax",
  "regex",
  "serde",
- "toml",
- "tracing",
 ]
 
 [[package]]
@@ -1672,7 +1684,7 @@ name = "mago-names"
 version = "1.0.0-alpha.12"
 dependencies = [
  "ahash",
- "mago-interner",
+ "bumpalo",
  "mago-span",
  "mago-syntax",
  "serde",
@@ -1685,17 +1697,6 @@ version = "1.0.0-alpha.12"
 dependencies = [
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "mago-reference"
-version = "1.0.0-alpha.12"
-dependencies = [
- "mago-interner",
- "mago-names",
- "mago-span",
- "mago-syntax",
- "serde",
 ]
 
 [[package]]
@@ -1720,7 +1721,6 @@ name = "mago-semantics"
 version = "1.0.0-alpha.12"
 dependencies = [
  "mago-database",
- "mago-interner",
  "mago-names",
  "mago-php-version",
  "mago-reporting",
@@ -1740,9 +1740,9 @@ dependencies = [
 name = "mago-syntax"
 version = "1.0.0-alpha.12"
 dependencies = [
+ "bumpalo",
  "either",
  "mago-database",
- "mago-interner",
  "mago-php-version",
  "mago-reporting",
  "mago-span",
@@ -1758,6 +1758,7 @@ dependencies = [
 name = "mago-syntax-core"
 version = "1.0.0-alpha.12"
 dependencies = [
+ "bumpalo",
  "mago-database",
  "mago-span",
  "memchr",
@@ -1779,6 +1780,7 @@ dependencies = [
 name = "mago-wasm"
 version = "1.0.0-alpha.12"
 dependencies = [
+ "bumpalo",
  "mago-analyzer",
  "mago-codex",
  "mago-database",

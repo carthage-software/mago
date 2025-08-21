@@ -8,7 +8,7 @@ use crate::token::Token;
 use crate::token::TokenKind;
 
 #[inline]
-pub fn peek(stream: &mut TokenStream<'_, '_>) -> Result<Token, ParseError> {
+pub fn peek<'arena>(stream: &mut TokenStream<'arena>) -> Result<Token<'arena>, ParseError> {
     match stream.peek() {
         Some(Ok(token)) => Ok(token),
         Some(Err(error)) => Err(error.into()),
@@ -17,7 +17,7 @@ pub fn peek(stream: &mut TokenStream<'_, '_>) -> Result<Token, ParseError> {
 }
 
 #[inline]
-pub fn maybe_peek(stream: &mut TokenStream<'_, '_>) -> Result<Option<Token>, ParseError> {
+pub fn maybe_peek<'arena>(stream: &mut TokenStream<'arena>) -> Result<Option<Token<'arena>>, ParseError> {
     match stream.peek() {
         Some(Ok(token)) => Ok(Some(token)),
         Some(Err(error)) => Err(error.into()),
@@ -26,7 +26,7 @@ pub fn maybe_peek(stream: &mut TokenStream<'_, '_>) -> Result<Option<Token>, Par
 }
 
 #[inline]
-pub fn peek_nth(stream: &mut TokenStream<'_, '_>, n: usize) -> Result<Token, ParseError> {
+pub fn peek_nth<'arena>(stream: &mut TokenStream<'arena>, n: usize) -> Result<Token<'arena>, ParseError> {
     match stream.peek_nth(n) {
         Some(Ok(token)) => Ok(token),
         Some(Err(error)) => Err(error.into()),
@@ -35,7 +35,7 @@ pub fn peek_nth(stream: &mut TokenStream<'_, '_>, n: usize) -> Result<Token, Par
 }
 
 #[inline]
-pub fn maybe_peek_nth(stream: &mut TokenStream<'_, '_>, n: usize) -> Result<Option<Token>, ParseError> {
+pub fn maybe_peek_nth<'arena>(stream: &mut TokenStream<'arena>, n: usize) -> Result<Option<Token<'arena>>, ParseError> {
     match stream.peek_nth(n) {
         Some(Ok(token)) => Ok(Some(token)),
         Some(Err(error)) => Err(error.into()),
@@ -44,7 +44,7 @@ pub fn maybe_peek_nth(stream: &mut TokenStream<'_, '_>, n: usize) -> Result<Opti
 }
 
 #[inline]
-pub fn expect_any(stream: &mut TokenStream<'_, '_>) -> Result<Token, ParseError> {
+pub fn expect_any<'arena>(stream: &mut TokenStream<'arena>) -> Result<Token<'arena>, ParseError> {
     match stream.advance() {
         Some(Ok(token)) => Ok(token),
         Some(Err(error)) => Err(error.into()),
@@ -53,21 +53,27 @@ pub fn expect_any(stream: &mut TokenStream<'_, '_>) -> Result<Token, ParseError>
 }
 
 #[inline]
-pub fn expect(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Token, ParseError> {
+pub fn expect<'arena>(stream: &mut TokenStream<'arena>, kind: TokenKind) -> Result<Token<'arena>, ParseError> {
     let token = expect_any(stream)?;
 
     if kind == token.kind { Ok(token) } else { Err(unexpected(stream, Some(token), &[kind])) }
 }
 
 #[inline]
-pub fn expect_one_of(stream: &mut TokenStream<'_, '_>, one_of: &[TokenKind]) -> Result<Token, ParseError> {
+pub fn expect_one_of<'arena>(
+    stream: &mut TokenStream<'arena>,
+    one_of: &[TokenKind],
+) -> Result<Token<'arena>, ParseError> {
     let token = expect_any(stream)?;
 
     if one_of.contains(&token.kind) { Ok(token) } else { Err(unexpected(stream, Some(token), one_of)) }
 }
 
 #[inline]
-pub fn maybe_expect(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Option<Token>, ParseError> {
+pub fn maybe_expect<'arena>(
+    stream: &mut TokenStream<'arena>,
+    kind: TokenKind,
+) -> Result<Option<Token<'arena>>, ParseError> {
     let next = match stream.peek() {
         Some(Ok(token)) => token,
         Some(Err(error)) => return Err(error.into()),
@@ -87,27 +93,36 @@ pub fn maybe_expect(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result
 }
 
 #[inline]
-pub fn expect_span(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Span, ParseError> {
+pub fn expect_span<'arena>(stream: &mut TokenStream<'arena>, kind: TokenKind) -> Result<Span, ParseError> {
     expect(stream, kind).map(|token| token.span)
 }
 
 #[inline]
-pub fn expect_one_of_keyword(stream: &mut TokenStream<'_, '_>, one_of: &[TokenKind]) -> Result<Keyword, ParseError> {
+pub fn expect_one_of_keyword<'arena>(
+    stream: &mut TokenStream<'arena>,
+    one_of: &[TokenKind],
+) -> Result<Keyword<'arena>, ParseError> {
     expect_one_of(stream, one_of).map(to_keyword)
 }
 
 #[inline]
-pub fn maybe_expect_keyword(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Option<Keyword>, ParseError> {
+pub fn maybe_expect_keyword<'arena>(
+    stream: &mut TokenStream<'arena>,
+    kind: TokenKind,
+) -> Result<Option<Keyword<'arena>>, ParseError> {
     maybe_expect(stream, kind).map(|maybe_token| maybe_token.map(to_keyword))
 }
 
 #[inline]
-pub fn expect_keyword(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Keyword, ParseError> {
+pub fn expect_keyword<'arena>(
+    stream: &mut TokenStream<'arena>,
+    kind: TokenKind,
+) -> Result<Keyword<'arena>, ParseError> {
     expect(stream, kind).map(to_keyword)
 }
 
 #[inline]
-pub fn expect_any_keyword(stream: &mut TokenStream<'_, '_>) -> Result<Keyword, ParseError> {
+pub fn expect_any_keyword<'arena>(stream: &mut TokenStream<'arena>) -> Result<Keyword<'arena>, ParseError> {
     expect_any(stream).map(to_keyword)
 }
 
@@ -117,7 +132,7 @@ pub fn to_keyword(token: Token) -> Keyword {
 }
 
 #[inline]
-pub fn unexpected(stream: &mut TokenStream<'_, '_>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
+pub fn unexpected<'arena>(stream: &mut TokenStream<'arena>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
     if let Some(token) = token {
         ParseError::UnexpectedToken(one_of.to_vec(), token.kind, token.span)
     } else {

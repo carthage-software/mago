@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -24,20 +23,20 @@ use crate::ast::sequence::Sequence;
 ///    // ...
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Namespace {
-    pub namespace: Keyword,
-    pub name: Option<Identifier>,
-    pub body: NamespaceBody,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Namespace<'arena> {
+    pub namespace: Keyword<'arena>,
+    pub name: Option<Identifier<'arena>>,
+    pub body: NamespaceBody<'arena>,
 }
 
 /// Represents the body of a PHP `namespace` declaration.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum NamespaceBody {
-    Implicit(NamespaceImplicitBody),
-    BraceDelimited(Block),
+#[repr(u8)]
+pub enum NamespaceBody<'arena> {
+    Implicit(NamespaceImplicitBody<'arena>),
+    BraceDelimited(Block<'arena>),
 }
 
 /// Represents an implicit body of a PHP `namespace` declaration.
@@ -51,14 +50,14 @@ pub enum NamespaceBody {
 ///
 /// // ...
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct NamespaceImplicitBody {
-    pub terminator: Terminator,
-    pub statements: Sequence<Statement>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NamespaceImplicitBody<'arena> {
+    pub terminator: Terminator<'arena>,
+    pub statements: Sequence<'arena, Statement<'arena>>,
 }
 
-impl Namespace {
-    pub fn statements(&self) -> &Sequence<Statement> {
+impl<'arena> Namespace<'arena> {
+    pub fn statements(&self) -> &Sequence<'arena, Statement<'arena>> {
         match &self.body {
             NamespaceBody::Implicit(body) => &body.statements,
             NamespaceBody::BraceDelimited(body) => &body.statements,
@@ -66,13 +65,13 @@ impl Namespace {
     }
 }
 
-impl HasSpan for Namespace {
+impl HasSpan for Namespace<'_> {
     fn span(&self) -> Span {
         self.namespace.span().join(self.body.span())
     }
 }
 
-impl HasSpan for NamespaceBody {
+impl HasSpan for NamespaceBody<'_> {
     fn span(&self) -> Span {
         match self {
             NamespaceBody::Implicit(body) => body.span(),
@@ -81,7 +80,7 @@ impl HasSpan for NamespaceBody {
     }
 }
 
-impl HasSpan for NamespaceImplicitBody {
+impl HasSpan for NamespaceImplicitBody<'_> {
     fn span(&self) -> Span {
         let terminator_span = self.terminator.span();
 

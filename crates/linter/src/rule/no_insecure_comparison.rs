@@ -87,7 +87,7 @@ impl LintRule for NoInsecureComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -96,8 +96,8 @@ impl LintRule for NoInsecureComparisonRule {
             return;
         }
 
-        let lhs = get_password(ctx, &binary.lhs);
-        let rhs = get_password(ctx, &binary.rhs);
+        let lhs = get_password(binary.lhs);
+        let rhs = get_password(binary.rhs);
 
         let is_lhs_like_password = lhs.is_some();
         let is_rhs_like_password = rhs.is_some();
@@ -106,8 +106,8 @@ impl LintRule for NoInsecureComparisonRule {
             return;
         }
 
-        if (is_lhs_like_password && is_simple_literal(ctx, &binary.rhs))
-            || (is_rhs_like_password && is_simple_literal(ctx, &binary.lhs))
+        if (is_lhs_like_password && is_simple_literal(binary.rhs))
+            || (is_rhs_like_password && is_simple_literal(binary.lhs))
         {
             return;
         }
@@ -136,14 +136,12 @@ impl LintRule for NoInsecureComparisonRule {
 
 #[inline]
 #[must_use]
-fn is_simple_literal(context: &LintContext, expr: &Expression) -> bool {
+const fn is_simple_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> bool {
     match expr {
-        Expression::Parenthesized(parenthesized) => is_simple_literal(context, &parenthesized.expression),
+        Expression::Parenthesized(parenthesized) => is_simple_literal(parenthesized.expression),
         Expression::Literal(literal) => {
             if let Literal::String(literal_string) = literal {
-                let value = context.interner.lookup(&literal_string.raw);
-
-                value.len() == 2
+                literal_string.raw.len() == 2
             } else {
                 true
             }

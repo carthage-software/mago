@@ -86,7 +86,7 @@ impl LintRule for LoopDoesNotIterateRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let terminator = match node {
             Node::For(for_loop) => match &for_loop.body {
                 ForBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
@@ -100,7 +100,7 @@ impl LintRule for LoopDoesNotIterateRule {
                 WhileBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
                 WhileBody::ColonDelimited(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
             },
-            Node::DoWhile(do_while) => get_loop_terminator_from_statement(&do_while.statement),
+            Node::DoWhile(do_while) => get_loop_terminator_from_statement(do_while.statement),
             _ => None,
         };
 
@@ -110,9 +110,9 @@ impl LintRule for LoopDoesNotIterateRule {
     }
 }
 
-fn check_loop(
-    r#loop: Node,
-    terminator: LoopTerminator<'_>,
+fn check_loop<'ast, 'arena>(
+    r#loop: Node<'ast, 'arena>,
+    terminator: LoopTerminator<'ast, 'arena>,
     ctx: &mut LintContext,
     cfg: &LoopDoesNotIterateConfig,
     meta: &'static RuleMeta,
@@ -136,13 +136,15 @@ fn check_loop(
 }
 
 #[derive(Debug)]
-enum LoopTerminator<'a> {
-    Break(&'a Break),
-    Return(&'a Return),
+enum LoopTerminator<'ast, 'arena> {
+    Break(&'ast Break<'arena>),
+    Return(&'ast Return<'arena>),
 }
 
 #[inline]
-fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopTerminator<'_>> {
+fn get_loop_terminator_from_statements<'ast, 'arena>(
+    statements: &'ast [Statement<'arena>],
+) -> Option<LoopTerminator<'ast, 'arena>> {
     for statement in statements.iter() {
         if might_skip_terminator(statement) {
             return None;
@@ -157,7 +159,9 @@ fn get_loop_terminator_from_statements(statements: &[Statement]) -> Option<LoopT
 }
 
 #[inline]
-fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTerminator<'_>> {
+fn get_loop_terminator_from_statement<'ast, 'arena>(
+    statement: &'ast Statement<'arena>,
+) -> Option<LoopTerminator<'ast, 'arena>> {
     match statement {
         Statement::Block(block) => get_loop_terminator_from_statements(block.statements.as_slice()),
         Statement::Break(break_stmt) => match break_stmt.level {
@@ -172,21 +176,21 @@ fn get_loop_terminator_from_statement(statement: &Statement) -> Option<LoopTermi
 }
 
 #[inline]
-fn might_skip_terminator(statement: &Statement) -> bool {
+fn might_skip_terminator<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool {
     match statement {
         Statement::Continue(_) | Statement::Goto(_) => true,
         Statement::Block(block) => block.statements.iter().any(might_skip_terminator),
         Statement::If(if_stmt) => match &if_stmt.body {
             IfBody::Statement(body) => {
-                if might_skip_terminator(&body.statement) {
+                if might_skip_terminator(body.statement) {
                     return true;
                 }
 
-                if body.else_clause.as_ref().is_some_and(|clause| might_skip_terminator(&clause.statement)) {
+                if body.else_clause.as_ref().is_some_and(|clause| might_skip_terminator(clause.statement)) {
                     return true;
                 }
 
-                body.else_if_clauses.iter().any(|clause| might_skip_terminator(&clause.statement))
+                body.else_if_clauses.iter().any(|clause| might_skip_terminator(clause.statement))
             }
             IfBody::ColonDelimited(body) => {
                 if body.statements.iter().any(might_skip_terminator) {
@@ -201,21 +205,21 @@ fn might_skip_terminator(statement: &Statement) -> bool {
             }
         },
         Statement::While(while_stmt) => match &while_stmt.body {
-            WhileBody::Statement(body) => might_skip_terminator(body.as_ref()),
+            WhileBody::Statement(body) => might_skip_terminator(body),
             WhileBody::ColonDelimited(body) => body.statements.iter().any(might_skip_terminator),
         },
-        Statement::DoWhile(do_while_stmt) => might_skip_terminator(&do_while_stmt.statement),
+        Statement::DoWhile(do_while_stmt) => might_skip_terminator(do_while_stmt.statement),
         Statement::For(for_stmt) => match &for_stmt.body {
-            ForBody::Statement(body) => might_skip_terminator(body.as_ref()),
+            ForBody::Statement(body) => might_skip_terminator(body),
             ForBody::ColonDelimited(body) => body.statements.iter().any(might_skip_terminator),
         },
         Statement::Foreach(foreach_stmt) => match &foreach_stmt.body {
-            ForeachBody::Statement(body) => might_skip_terminator(body.as_ref()),
+            ForeachBody::Statement(body) => might_skip_terminator(body),
             ForeachBody::ColonDelimited(body) => body.statements.iter().any(might_skip_terminator),
         },
         Statement::Namespace(namespace) => namespace.statements().iter().any(might_skip_terminator),
         Statement::Declare(declare) => match &declare.body {
-            DeclareBody::Statement(body) => might_skip_terminator(body.as_ref()),
+            DeclareBody::Statement(body) => might_skip_terminator(body),
             DeclareBody::ColonDelimited(body) => body.statements.iter().any(might_skip_terminator),
         },
         Statement::Try(try_stmt) => {

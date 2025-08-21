@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -19,14 +18,14 @@ use crate::ast::ast::terminator::Terminator;
 ///     return 1;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Return {
-    pub r#return: Keyword,
-    pub value: Option<Expression>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Return<'arena> {
+    pub r#return: Keyword<'arena>,
+    pub value: Option<Expression<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl HasSpan for Return {
+impl HasSpan for Return<'_> {
     fn span(&self) -> Span {
         self.r#return.span().join(self.terminator.span())
     }

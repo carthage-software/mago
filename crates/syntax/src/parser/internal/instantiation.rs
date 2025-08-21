@@ -7,10 +7,14 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::token::Precedence;
 
-pub fn parse_instantiation(stream: &mut TokenStream<'_, '_>) -> Result<Instantiation, ParseError> {
+pub fn parse_instantiation<'arena>(stream: &mut TokenStream<'arena>) -> Result<Instantiation<'arena>, ParseError> {
     Ok(Instantiation {
         new: utils::expect_keyword(stream, T!["new"])?,
-        class: Box::new(parse_expression_with_precedence(stream, Precedence::New)?),
+        class: {
+            let expression = parse_expression_with_precedence(stream, Precedence::New)?;
+
+            stream.alloc(expression)
+        },
         argument_list: parse_optional_argument_list(stream)?,
     })
 }

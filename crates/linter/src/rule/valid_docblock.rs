@@ -91,14 +91,14 @@ impl LintRule for ValidDocblockRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
 
         for trivia in program.trivia.iter() {
             if let TriviaKind::DocBlockComment = trivia.kind {
-                let Err(parse_error) = mago_docblock::parse_trivia(ctx.interner, trivia) else {
+                let Err(parse_error) = mago_docblock::parse_trivia(ctx.arena, trivia) else {
                     continue;
                 };
 

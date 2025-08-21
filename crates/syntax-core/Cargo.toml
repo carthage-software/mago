@@ -16,3 +16,4 @@ workspace = true
 mago-database = { workspace = true }
 mago-span = { workspace = true }
 memchr = { workspace = true }
+bumpalo = { workspace = true }

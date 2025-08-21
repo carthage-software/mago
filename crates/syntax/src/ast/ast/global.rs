@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -9,14 +8,14 @@ use crate::ast::ast::terminator::Terminator;
 use crate::ast::ast::variable::Variable;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Global {
-    pub global: Keyword,
-    pub variables: TokenSeparatedSequence<Variable>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Global<'arena> {
+    pub global: Keyword<'arena>,
+    pub variables: TokenSeparatedSequence<'arena, Variable<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-impl HasSpan for Global {
+impl HasSpan for Global<'_> {
     fn span(&self) -> Span {
         self.global.span().join(self.terminator.span())
     }

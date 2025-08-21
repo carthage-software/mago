@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
+use bumpalo::Bump;
+
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
-use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 
 #[macro_export]
@@ -17,8 +18,8 @@ macro_rules! test_case {
             let expected = include_str!(concat!("cases/", stringify!($name), "/after.php"));
             let settings = include!(concat!("cases/", stringify!($name), "/settings.inc"));
 
-            let interner = ThreadedInterner::new();
-            let formatter = Formatter::new(&interner, $version, settings);
+            let arena = Bump::new();
+            let formatter = Formatter::new(&arena, $version, settings);
 
             let formatted_code = formatter.format_code(Cow::Borrowed("code.php"), Cow::Borrowed(code)).unwrap();
 

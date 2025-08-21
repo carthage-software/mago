@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-
 use crate::ast::*;
 
 pub mod docblock;
@@ -14,8 +12,8 @@ pub mod docblock;
 /// line from the start of the entire trivia text (including `/**`, `//`, etc.),
 /// and the `&str` is the cleaned line content.
 #[inline]
-pub fn comment_lines<'a>(trivia: &Trivia, interner: &'a ThreadedInterner) -> Vec<(u32, &'a str)> {
-    let full_text = interner.lookup(&trivia.value);
+pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena str)> {
+    let full_text = trivia.value;
     let (content_start_offset, content_end_offset) = match trivia.kind {
         TriviaKind::MultiLineComment => (2u32, full_text.len() as u32 - 2),
         TriviaKind::DocBlockComment => (3u32, full_text.len() as u32 - 2),

@@ -15,8 +15,8 @@ workspace = true
 [dependencies]
 mago-syntax = { workspace = true }
 mago-span = { workspace = true }
-mago-interner = { workspace = true }
 serde = { workspace = true }
+bumpalo = { workspace = true }
 
 [dev-dependencies]
 mago-database = { workspace = true }

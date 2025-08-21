@@ -1,23 +1,20 @@
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::Expression;
 
-use crate::context::Context;
 use crate::invocation::InvocationArgumentsSource;
 
 /// Retrieves an argument from the invocation arguments source based on the index or name.
 ///
 /// # Arguments
 ///
-/// * `context` - The current context containing interner and other data.
-/// * `call_arguments` - The source of invocation arguments, which can be an argument list, pipe input, slice, or none.
+/// * `call_arguments` - The source of invocation arguments, which can be an argument list, pipe input, or none.
 /// * `index` - The index of the positional argument to retrieve.
 /// * `names` - A vector of names to match against named arguments.
-pub(super) fn get_argument<'argument>(
-    context: &Context<'_>,
-    call_arguments: InvocationArgumentsSource<'argument>,
+pub(super) fn get_argument<'ast, 'arena>(
+    call_arguments: InvocationArgumentsSource<'ast, 'arena>,
     index: usize,
     names: Vec<&'static str>,
-) -> Option<&'argument Expression> {
+) -> Option<&'ast Expression<'arena>> {
     match call_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
             if let Some(Argument::Positional(argument)) = argument_list.arguments.get(index) {
@@ -29,8 +26,7 @@ pub(super) fn get_argument<'argument>(
                     continue;
                 };
 
-                let name = context.interner.lookup(&named_argument.name.value);
-                if names.contains(&name) {
+                if names.contains(&named_argument.name.value) {
                     return Some(&named_argument.value);
                 }
             }
@@ -39,7 +35,7 @@ pub(super) fn get_argument<'argument>(
         }
         InvocationArgumentsSource::PipeInput(pipe) => {
             if index == 0 {
-                Some(&pipe.input)
+                Some(pipe.input)
             } else {
                 None
             }

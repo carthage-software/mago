@@ -1,11 +1,12 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
+
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 use mago_span::Span;
 use mago_syntax::ast::Node;
@@ -35,13 +36,14 @@ pub struct ParameterState {
 }
 
 #[derive(Debug)]
-pub struct FormatterState<'a> {
-    interner: &'a ThreadedInterner,
-    file: &'a File,
+pub struct FormatterState<'input, 'ast, 'arena> {
+    arena: &'arena Bump,
+    source_text: &'arena str,
+    file: &'input File,
     php_version: PHPVersion,
     settings: FormatSettings,
-    stack: Vec<Node<'a>>,
-    comments: Peekable<IntoIter<Trivia>>,
+    stack: Vec<Node<'ast, 'arena>>,
+    comments: Peekable<IntoIter<Trivia<'arena>>>,
     scripting_mode: bool,
     id_builder: GroupIdentifierBuilder,
     argument_state: ArgumentState,
@@ -52,16 +54,18 @@ pub struct FormatterState<'a> {
     halted_compilation: bool,
 }
 
-impl<'a> FormatterState<'a> {
+impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     pub fn new(
-        interner: &'a ThreadedInterner,
-        file: &'a File,
+        arena: &'arena Bump,
+        source_text: &'arena str,
+        file: &'input File,
         php_version: PHPVersion,
         settings: FormatSettings,
     ) -> Self {
         Self {
-            interner,
+            arena,
             file,
+            source_text,
             php_version,
             settings,
             stack: vec![],
@@ -81,17 +85,13 @@ impl<'a> FormatterState<'a> {
         self.id_builder.next_id()
     }
 
-    fn lookup(&self, string: &StringIdentifier) -> &'a str {
-        self.interner.lookup(string)
+    #[inline]
+    fn as_str(&self, string: impl AsRef<str>) -> &'arena str {
+        self.arena.alloc_str(string.as_ref())
     }
 
     #[inline]
-    fn as_str(&self, string: impl AsRef<str>) -> &'a str {
-        self.interner.interned_str(string)
-    }
-
-    #[inline]
-    fn enter_node(&mut self, node: Node<'a>) {
+    fn enter_node(&mut self, node: Node<'ast, 'arena>) {
         self.stack.push(node);
     }
 
@@ -101,30 +101,30 @@ impl<'a> FormatterState<'a> {
     }
 
     #[inline]
-    fn current_node(&self) -> Node<'a> {
+    fn current_node(&self) -> Node<'ast, 'arena> {
         self.stack[self.stack.len() - 1]
     }
 
     #[inline]
-    fn parent_node(&self) -> Node<'a> {
+    fn parent_node(&self) -> Node<'ast, 'arena> {
         self.stack[self.stack.len() - 2]
     }
 
     #[inline]
-    fn grandparent_node(&self) -> Option<Node<'a>> {
+    fn grandparent_node(&self) -> Option<Node<'ast, 'arena>> {
         let len = self.stack.len();
 
         (len > 2).then(|| self.stack[len - 2 - 1])
     }
 
     #[inline]
-    fn great_grandparent_node(&self) -> Option<Node<'a>> {
+    fn great_grandparent_node(&self) -> Option<Node<'ast, 'arena>> {
         let len = self.stack.len();
         (len > 3).then(|| self.stack[len - 3 - 1])
     }
 
     #[inline]
-    fn nth_parent_kind(&self, n: u32) -> Option<Node<'a>> {
+    fn nth_parent_kind(&self, n: u32) -> Option<Node<'ast, 'arena>> {
         let n = n as usize;
         let len = self.stack.len();
 
@@ -338,8 +338,8 @@ impl<'a> FormatterState<'a> {
     }
 
     #[inline]
-    fn split_lines(slice: &'a str) -> Vec<&'a str> {
-        let mut lines = Vec::new();
+    fn split_lines(&self, slice: &'arena str) -> BumpVec<'arena, &'arena str> {
+        let mut lines = BumpVec::new_in(self.arena);
         let mut remaining = slice;
 
         while !remaining.is_empty() {
@@ -362,7 +362,7 @@ impl<'a> FormatterState<'a> {
     }
 
     #[inline]
-    fn skip_leading_whitespace_up_to(s: &'a str, indent: usize) -> &'a str {
+    fn skip_leading_whitespace_up_to(s: &'arena str, indent: usize) -> &'arena str {
         let mut position = 0;
         for (count, (i, b)) in s.bytes().enumerate().enumerate() {
             // Check if the current byte represents whitespace
@@ -377,7 +377,7 @@ impl<'a> FormatterState<'a> {
     }
 }
 
-impl HasFileId for FormatterState<'_> {
+impl HasFileId for FormatterState<'_, '_, '_> {
     fn file_id(&self) -> FileId {
         self.file.id
     }

@@ -1,4 +1,3 @@
-use mago_interner::StringIdentifier;
 use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::*;
@@ -18,8 +17,8 @@ mod method;
 mod property;
 
 #[inline]
-pub fn check_class(class: &Class, context: &mut Context<'_>) {
-    let class_name = context.interner.lookup(&class.name.value);
+pub fn check_class<'input, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    let class_name = class.name.value;
     let class_fqcn = context.get_name(&class.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
@@ -63,7 +62,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
             | Modifier::PublicSet(keyword)
             | Modifier::ProtectedSet(keyword)
             | Modifier::PrivateSet(keyword) => {
-                let visibility_name = context.interner.lookup(&keyword.value);
+                let visibility_name = keyword.value;
 
                 context.report(
                     Issue::error(format!(
@@ -203,7 +202,7 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name = context.interner.lookup(&method.name.value);
+                let method_name = &method.name.value;
 
                 if !class.modifiers.contains_abstract() && method.modifiers.contains_abstract() {
                     context.report(
@@ -237,8 +236,11 @@ pub fn check_class(class: &Class, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
-    let interface_name = context.interner.lookup(&interface.name.value);
+pub fn check_interface<'input, 'ast, 'arena>(
+    interface: &'ast Interface<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
+) {
+    let interface_name = interface.name.value;
     let interface_fqcn = context.get_name(&interface.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(interface_name))
@@ -294,7 +296,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
             }
             ClassLikeMember::Method(method) => {
                 let method_name_id = method.name.value;
-                let method_name = context.interner.lookup(&method_name_id);
+                let method_name = &method_name_id;
 
                 let mut visibilities = vec![];
                 for modifier in method.modifiers.iter() {
@@ -304,7 +306,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 }
 
                 for visibility in visibilities {
-                    let visibility_name = visibility.as_str(context.interner);
+                    let visibility_name = visibility.get_keyword().value;
 
                     context.report(
                         Issue::error(format!(
@@ -392,8 +394,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                                 );
                     }
                     Property::Hooked(hooked_property) => {
-                        let property_name_id = hooked_property.item.variable().name;
-                        let property_name = context.interner.lookup(&property_name_id);
+                        let property_name = hooked_property.item.variable().name;
 
                         let mut found_public = false;
                         let mut non_public_read_visibilities = vec![];
@@ -413,7 +414,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         }
 
                         for visibility in write_visibilities {
-                            let visibility_name = visibility.as_str(context.interner);
+                            let visibility_name = visibility.get_keyword().value;
 
                             context.report(
                                         Issue::error(format!(
@@ -434,7 +435,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                         }
 
                         for visibility in non_public_read_visibilities {
-                            let visibility_name = visibility.as_str(context.interner);
+                            let visibility_name = visibility.get_keyword().value;
 
                             context.report(
                                 Issue::error(format!(
@@ -551,7 +552,7 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
                 }
 
                 for visibility in non_public_read_visibility.iter() {
-                    let visibility_name = visibility.as_str(context.interner);
+                    let visibility_name = visibility.get_keyword().value;
 
                     context.report(
                         Issue::error(format!(
@@ -584,8 +585,8 @@ pub fn check_interface(interface: &Interface, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
-    let class_like_name = context.interner.lookup(&r#trait.name.value);
+pub fn check_trait<'input, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    let class_like_name = r#trait.name.value;
     let class_like_fqcn = context.get_name(&r#trait.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_like_name))
@@ -623,11 +624,9 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name = context.interner.lookup(&method.name.value);
-
                 check_method(
                     method,
-                    method_name,
+                    method.name.value,
                     r#trait.span(),
                     class_like_name,
                     class_like_fqcn,
@@ -669,7 +668,7 @@ pub fn check_trait(r#trait: &Trait, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
+pub fn check_enum<'input, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
     if !context.version.is_supported(Feature::Enums) {
         context.report(
             Issue::error("Enums are only available in PHP 8.1 and above.")
@@ -679,7 +678,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
         return;
     }
 
-    let enum_name = context.interner.lookup(&r#enum.name.value);
+    let enum_name = r#enum.name.value;
     let enum_fqcn = context.get_name(&r#enum.name.span.start);
     let enum_is_backed = r#enum.backing_type_hint.is_some();
 
@@ -727,8 +726,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
     for member in r#enum.members.iter() {
         match &member {
             ClassLikeMember::EnumCase(case) => {
-                let item_name_id = case.item.name().value;
-                let item_name = context.interner.lookup(&item_name_id);
+                let item_name = case.item.name().value;
 
                 match &case.item {
                     EnumCaseItem::Unit(_) => {
@@ -776,8 +774,7 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
                 }
             }
             ClassLikeMember::Method(method) => {
-                let method_name_id = method.name.value;
-                let method_name = context.interner.lookup(&method_name_id);
+                let method_name = method.name.value;
 
                 if let Some(magic_method) =
                     MAGIC_METHODS.iter().find(|magic_method| magic_method.eq_ignore_ascii_case(method_name))
@@ -839,7 +836,10 @@ pub fn check_enum(r#enum: &Enum, context: &mut Context<'_>) {
 }
 
 #[inline]
-pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Context<'_>) {
+pub fn check_anonymous_class<'input, 'ast, 'arena>(
+    anonymous_class: &'ast AnonymousClass<'arena>,
+    context: &mut Context<'input, 'ast, 'arena>,
+) {
     let mut last_final = None;
     let mut last_readonly = None;
 
@@ -853,7 +853,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
             | Modifier::Public(_)
             | Modifier::Protected(_)
             | Modifier::Private(_) => {
-                let modifier_name = modifier.as_str(context.interner);
+                let modifier_name = modifier.get_keyword().value;
 
                 context.report(
                     Issue::error(format!(
@@ -975,7 +975,7 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name = context.interner.lookup(&method.name.value);
+                let method_name = method.name.value;
 
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
                     context.report(
@@ -1032,28 +1032,27 @@ pub fn check_anonymous_class(anonymous_class: &AnonymousClass, context: &mut Con
 }
 
 #[inline]
-pub fn check_members(
-    members: &Sequence<ClassLikeMember>,
+pub fn check_members<'input, 'ast, 'arena>(
+    members: &'ast Sequence<ClassLikeMember<'arena>>,
     class_like_span: Span,
     class_like_kind: &str,
     class_like_name: &str,
     class_like_fqcn: &str,
-    context: &mut Context<'_>,
+    context: &mut Context<'input, 'ast, 'arena>,
 ) {
-    let mut method_names: Vec<(Span, StringIdentifier)> = vec![];
+    let mut method_names: Vec<(Span, String)> = vec![];
     let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];
-    let mut property_names: Vec<(bool, StringIdentifier, Span)> = vec![];
+    let mut property_names: Vec<(bool, &str, Span)> = vec![];
 
     for member in members.iter() {
         match &member {
             ClassLikeMember::Property(property) => match &property {
                 Property::Plain(plain_property) => {
                     for item in plain_property.items.iter() {
-                        let item_name_id = item.variable().name;
-                        let item_name = context.interner.lookup(&item_name_id);
+                        let item_name = item.variable().name;
 
                         if let Some((is_promoted, _, span)) =
-                            property_names.iter().find(|(_, name, _)| item_name_id.eq(name))
+                            property_names.iter().find(|(_, name, _)| item_name.eq(*name))
                         {
                             let message = if *is_promoted {
                                 format!(
@@ -1077,17 +1076,15 @@ pub fn check_members(
                                     .with_help("remove the duplicate property"),
                             );
                         } else {
-                            property_names.push((false, item_name_id, item.variable().span()));
+                            property_names.push((false, item_name, item.variable().span()));
                         }
                     }
                 }
                 Property::Hooked(hooked_property) => {
                     let item_variable = hooked_property.item.variable();
-                    let item_name_id = item_variable.name;
-                    let item_name = context.interner.lookup(&item_name_id);
+                    let item_name = item_variable.name;
 
-                    if let Some((is_promoted, _, span)) =
-                        property_names.iter().find(|(_, name, _)| item_name_id.eq(name))
+                    if let Some((is_promoted, _, span)) = property_names.iter().find(|(_, name, _)| item_name.eq(*name))
                     {
                         let message = if *is_promoted {
                             format!(
@@ -1110,17 +1107,16 @@ pub fn check_members(
                                 .with_help("remove the duplicate property"),
                         );
                     } else {
-                        property_names.push((false, item_name_id, item_variable.span()));
+                        property_names.push((false, item_name, item_variable.span()));
                     }
                 }
             },
             ClassLikeMember::Method(method) => {
-                let method_name_id = method.name.value;
-                let method_name = context.interner.lookup(&method_name_id);
-                let method_name_lowered_id = context.interner.intern(method_name.to_ascii_lowercase());
+                let method_name = method.name.value;
+                let lowercase_method_name = method_name.to_ascii_lowercase();
 
                 if let Some((previous, _)) =
-                    method_names.iter().find(|(_, previous_name)| method_name_lowered_id.eq(previous_name))
+                    method_names.iter().find(|(_, previous_name)| lowercase_method_name.eq(previous_name))
                 {
                     context.report(
                         Issue::error(format!(
@@ -1134,17 +1130,16 @@ pub fn check_members(
                         ]),
                     );
                 } else {
-                    method_names.push((method.name.span(), method_name_lowered_id));
+                    method_names.push((method.name.span(), lowercase_method_name));
                 }
 
                 if method_name.eq_ignore_ascii_case(CONSTRUCTOR_MAGIC_METHOD) {
                     for parameter in method.parameter_list.parameters.iter() {
                         if parameter.is_promoted_property() {
-                            let item_name_id = parameter.variable.name;
-                            let item_name = context.interner.lookup(&item_name_id);
+                            let item_name = parameter.variable.name;
 
                             if let Some((is_promoted, _, span)) =
-                                property_names.iter().find(|(_, name, _)| item_name_id.eq(name))
+                                property_names.iter().find(|(_, name, _)| item_name.eq(*name))
                             {
                                 let message = if !*is_promoted {
                                     format!(
@@ -1170,7 +1165,7 @@ pub fn check_members(
                                         .with_help("remove the duplicate property"),
                                 );
                             } else {
-                                property_names.push((true, item_name_id, parameter.variable.span()));
+                                property_names.push((true, item_name, parameter.variable.span()));
                             }
                         }
                     }
@@ -1178,7 +1173,7 @@ pub fn check_members(
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 for item in class_like_constant.items.iter() {
-                    let item_name = context.interner.lookup(&item.name.value);
+                    let item_name = item.name.value;
 
                     if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&item_name)) {
                         if *is_constant {
@@ -1216,7 +1211,7 @@ pub fn check_members(
                 }
             }
             ClassLikeMember::EnumCase(enum_case) => {
-                let case_name = context.interner.lookup(&enum_case.item.name().value);
+                let case_name = enum_case.item.name().value;
 
                 if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&case_name)) {
                     if *is_constant {

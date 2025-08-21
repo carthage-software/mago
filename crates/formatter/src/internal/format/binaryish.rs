@@ -1,3 +1,6 @@
+use bumpalo::collections::Vec;
+use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 use node::NodeKind;
@@ -15,12 +18,12 @@ use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
 use crate::internal::utils::unwrap_parenthesized;
 
-pub(super) fn print_binaryish_expression<'a>(
-    f: &mut FormatterState<'a>,
-    left: &'a Expression,
-    operator: &'a BinaryOperator,
-    right: &'a Expression,
-) -> Document<'a> {
+pub(super) fn print_binaryish_expression<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    left: &'ast Expression<'arena>,
+    operator: &'ast BinaryOperator<'arena>,
+    right: &'ast Expression<'arena>,
+) -> Document<'arena> {
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
 
@@ -65,7 +68,8 @@ pub(super) fn print_binaryish_expression<'a>(
     //   ).call()
     if is_at_callee(f) || matches!(f.grandparent_node(), Some(Node::UnaryPrefix(_) | Node::UnaryPostfix(_))) {
         return Document::Group(Group::new(vec![
-            Document::Indent(vec![Document::Line(Line::soft()), Document::Array(parts)]),
+            in f.arena;
+            Document::Indent(vec![in f.arena; Document::Line(Line::soft()), Document::Array(parts)]),
             Document::Line(Line::soft()),
         ]));
     }
@@ -96,8 +100,8 @@ pub(super) fn print_binaryish_expression<'a>(
 
     // Separate the leftmost expression, possibly with its leading comments.
     let split_index = first_group_index.unwrap_or(0);
-    let mut head_parts = parts[..split_index].to_vec();
-    let tail_parts = parts[split_index..].to_vec();
+    let mut head_parts = parts;
+    let tail_parts = head_parts.split_off(split_index);
 
     // Don't include the initial expression in the indentation
     // level. The first item is guaranteed to be the first
@@ -107,25 +111,25 @@ pub(super) fn print_binaryish_expression<'a>(
     Document::Group(Group::new(head_parts))
 }
 
-pub(super) fn print_binaryish_expressions<'a>(
-    f: &mut FormatterState<'a>,
-    left: &'a Expression,
-    operator: &BinaryOperator,
-    right: &'a Expression,
+pub(super) fn print_binaryish_expressions<'ast, 'arena>(
+    f: &mut FormatterState<'_, 'ast, 'arena>,
+    left: &'ast Expression<'arena>,
+    operator: &'ast BinaryOperator<'arena>,
+    right: &'ast Expression<'arena>,
     is_inside_parenthesis: bool,
     is_nested: bool,
-) -> Vec<Document<'a>> {
+) -> Vec<'arena, Document<'arena>> {
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
     let should_break =
         f.has_comment(operator.span(), CommentFlags::Trailing | CommentFlags::Leading | CommentFlags::Line);
 
-    let mut parts = vec![];
+    let mut parts = vec![in f.arena];
     if let Expression::Binary(binary) = left {
         if should_flatten(operator, &binary.operator) {
             // Flatten them out by recursively calling this function.
             parts =
-                print_binaryish_expressions(f, &binary.lhs, &binary.operator, &binary.rhs, is_inside_parenthesis, true);
+                print_binaryish_expressions(f, binary.lhs, &binary.operator, binary.rhs, is_inside_parenthesis, true);
         } else {
             parts.push(left.format(f));
         }
@@ -171,18 +175,19 @@ pub(super) fn print_binaryish_expressions<'a>(
     let line_before_operator = f.settings.line_before_binary_operator && !f.has_leading_own_line_comment(right.span());
 
     let right_document = vec![
+        in f.arena;
         if line_before_operator && !should_inline {
             Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         } else {
             Document::String(if has_space_around { " " } else { "" })
         },
-        format_token(f, operator.span(), operator.as_str(f.interner)),
+        format_token(f, operator.span(), operator.as_str()),
         if line_before_operator || should_inline {
             Document::String(if has_space_around { " " } else { "" })
         } else {
             Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         },
-        if should_inline { Document::Group(Group::new(vec![right.format(f)])) } else { right.format(f) },
+        if should_inline { Document::Group(Group::new(vec![in f.arena; right.format(f)])) } else { right.format(f) },
     ];
 
     // If there's only a single binary expression, we want to create a group
@@ -204,15 +209,15 @@ pub(super) fn print_binaryish_expressions<'a>(
     parts
 }
 
-pub(super) fn should_inline_binary_expression(expression: &Expression) -> bool {
+pub(super) fn should_inline_binary_expression<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
     match unwrap_parenthesized(expression) {
         Expression::Binary(operation) => {
-            if should_inline_binary_rhs_expression(&operation.rhs, &operation.operator) {
+            if should_inline_binary_rhs_expression(operation.rhs, &operation.operator) {
                 return true;
             }
 
-            match operation.lhs.as_ref() {
-                Expression::Binary(_) => should_inline_binary_expression(&operation.lhs),
+            match operation.lhs {
+                Expression::Binary(_) => should_inline_binary_expression(operation.lhs),
                 left => should_inline_binary_rhs_expression(left, &operation.operator),
             }
         }

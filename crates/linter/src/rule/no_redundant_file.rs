@@ -84,12 +84,12 @@ impl LintRule for NoRedundantFileRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
 
-        let has_useful_statements = program.statements.iter().any(|statement| is_statement_useful(statement, ctx));
+        let has_useful_statements = program.statements.iter().any(|statement| is_statement_useful(statement));
         if !has_useful_statements {
             let issue = Issue::new(self.cfg.level(), "Redundant file with no executable code or declarations.")
                 .with_code(self.meta.code)
@@ -105,43 +105,39 @@ impl LintRule for NoRedundantFileRule {
 }
 
 #[inline]
-fn is_statement_useful(statement: &Statement, ctx: &mut LintContext) -> bool {
+fn is_statement_useful<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool {
     match statement {
-        Statement::Inline(inline) => {
-            let content = ctx.interner.lookup(&inline.value);
-
-            !content.trim().is_empty()
-        }
+        Statement::Inline(inline) => !inline.value.trim().is_empty(),
         Statement::Namespace(namespace) => {
             let statements = namespace.statements().as_slice();
 
-            statements.iter().any(|statement| is_statement_useful(statement, ctx))
+            statements.iter().any(|statement| is_statement_useful(statement))
         }
         Statement::Block(block) => {
             let statements = block.statements.as_slice();
 
-            statements.iter().any(|statement| is_statement_useful(statement, ctx))
+            statements.iter().any(|statement| is_statement_useful(statement))
         }
         Statement::Declare(declare) => match &declare.body {
-            DeclareBody::Statement(statement) => is_statement_useful(statement.as_ref(), ctx),
+            DeclareBody::Statement(statement) => is_statement_useful(statement),
             DeclareBody::ColonDelimited(declare_colon_delimited_body) => {
                 let statements = declare_colon_delimited_body.statements.as_slice();
 
-                statements.iter().any(|statement| is_statement_useful(statement, ctx))
+                statements.iter().any(|statement| is_statement_useful(statement))
             }
         },
         Statement::Try(r#try) => {
-            r#try.block.statements.iter().any(|statement| is_statement_useful(statement, ctx))
+            r#try.block.statements.iter().any(|statement| is_statement_useful(statement))
                 || r#try
                     .catch_clauses
                     .iter()
-                    .any(|catch| catch.block.statements.iter().any(|statement| is_statement_useful(statement, ctx)))
+                    .any(|catch| catch.block.statements.iter().any(|statement| is_statement_useful(statement)))
                 || r#try
                     .finally_clause
                     .iter()
-                    .any(|finally| finally.block.statements.iter().any(|statement| is_statement_useful(statement, ctx)))
+                    .any(|finally| finally.block.statements.iter().any(|statement| is_statement_useful(statement)))
         }
-        Statement::Expression(expression_statement) => is_expression_useful(&expression_statement.expression),
+        Statement::Expression(expression_statement) => is_expression_useful(expression_statement.expression),
         Statement::Foreach(_)
         | Statement::For(_)
         | Statement::While(_)
@@ -161,29 +157,29 @@ fn is_statement_useful(statement: &Statement, ctx: &mut LintContext) -> bool {
 #[inline]
 fn is_expression_useful(expression: &Expression) -> bool {
     match expression {
-        Expression::Binary(binary) => is_expression_useful(&binary.lhs) || is_expression_useful(&binary.rhs),
-        Expression::UnaryPrefix(unary_prefix) => is_expression_useful(&unary_prefix.operand),
-        Expression::UnaryPostfix(unary_postfix) => is_expression_useful(&unary_postfix.operand),
-        Expression::Parenthesized(parenthesized) => is_expression_useful(&parenthesized.expression),
+        Expression::Binary(binary) => is_expression_useful(binary.lhs) || is_expression_useful(binary.rhs),
+        Expression::UnaryPrefix(unary_prefix) => is_expression_useful(unary_prefix.operand),
+        Expression::UnaryPostfix(unary_postfix) => is_expression_useful(unary_postfix.operand),
+        Expression::Parenthesized(parenthesized) => is_expression_useful(parenthesized.expression),
         Expression::Literal(_) => false,
         Expression::MagicConstant(_) => false,
         Expression::Variable(_) => false,
         Expression::Array(array) => array.elements.iter().any(|element| match element {
-            ArrayElement::KeyValue(el) => is_expression_useful(&el.key) || is_expression_useful(&el.value),
-            ArrayElement::Value(el) => is_expression_useful(&el.value),
-            ArrayElement::Variadic(el) => is_expression_useful(&el.value),
+            ArrayElement::KeyValue(el) => is_expression_useful(el.key) || is_expression_useful(el.value),
+            ArrayElement::Value(el) => is_expression_useful(el.value),
+            ArrayElement::Variadic(el) => is_expression_useful(el.value),
             ArrayElement::Missing(_) => false,
         }),
         Expression::List(list) => list.elements.iter().any(|element| match element {
-            ArrayElement::KeyValue(el) => is_expression_useful(&el.key) || is_expression_useful(&el.value),
-            ArrayElement::Value(el) => is_expression_useful(&el.value),
-            ArrayElement::Variadic(el) => is_expression_useful(&el.value),
+            ArrayElement::KeyValue(el) => is_expression_useful(el.key) || is_expression_useful(el.value),
+            ArrayElement::Value(el) => is_expression_useful(el.value),
+            ArrayElement::Variadic(el) => is_expression_useful(el.value),
             ArrayElement::Missing(_) => false,
         }),
         Expression::LegacyArray(array) => array.elements.iter().any(|element| match element {
-            ArrayElement::KeyValue(el) => is_expression_useful(&el.key) || is_expression_useful(&el.value),
-            ArrayElement::Value(el) => is_expression_useful(&el.value),
-            ArrayElement::Variadic(el) => is_expression_useful(&el.value),
+            ArrayElement::KeyValue(el) => is_expression_useful(el.key) || is_expression_useful(el.value),
+            ArrayElement::Value(el) => is_expression_useful(el.value),
+            ArrayElement::Variadic(el) => is_expression_useful(el.value),
             ArrayElement::Missing(_) => false,
         }),
         _ => true,

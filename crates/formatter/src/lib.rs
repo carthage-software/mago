@@ -6,8 +6,8 @@
 
 use std::borrow::Cow;
 
+use bumpalo::Bump;
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::Program;
 use mago_syntax::error::ParseError;
@@ -31,16 +31,16 @@ mod internal;
 /// string representation. It is configured with a specific PHP version, formatting
 /// settings, and a string interner.
 #[derive(Debug)]
-pub struct Formatter<'a> {
-    interner: &'a ThreadedInterner,
+pub struct Formatter<'arena> {
+    arena: &'arena Bump,
     php_version: PHPVersion,
     settings: FormatSettings,
 }
 
-impl<'a> Formatter<'a> {
+impl<'arena> Formatter<'arena> {
     /// Creates a new `Formatter` with the specified configuration.
-    pub fn new(interner: &'a ThreadedInterner, php_version: PHPVersion, settings: FormatSettings) -> Self {
-        Self { interner, php_version, settings }
+    pub fn new(arena: &'arena Bump, php_version: PHPVersion, settings: FormatSettings) -> Self {
+        Self { arena, php_version, settings }
     }
 
     /// Formats a string of PHP code.
@@ -67,11 +67,12 @@ impl<'a> Formatter<'a> {
     /// # Errors
     ///
     /// Returns a [`ParseError`] if the file's content contains syntax errors.
-    pub fn format_file(&self, file: &'a File) -> Result<String, ParseError> {
-        let (program, error) = parse_file(self.interner, file);
+    pub fn format_file(&self, file: &File) -> Result<String, ParseError> {
+        let (program, error) = parse_file(self.arena, file);
         if let Some(error) = error {
             return Err(error);
         }
+
         Ok(self.format(file, &program))
     }
 
@@ -80,8 +81,9 @@ impl<'a> Formatter<'a> {
     /// This is the lowest-level formatting method that operates directly on the AST.
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
-    pub fn format(&self, file: &'a File, program: &'a Program) -> String {
+    pub fn format<'input>(&self, file: &'input File, program: &Program<'arena>) -> String {
         let document = self.build(file, program);
+
         self.print(document, Some(file.size as usize))
     }
 
@@ -91,8 +93,8 @@ impl<'a> Formatter<'a> {
     /// layout of the code with elements like groups, indentation, and line breaks.
     /// This is a separate step from printing, allowing for potential inspection or
     /// manipulation of the layout before rendering.
-    pub fn build(&self, file: &'a File, program: &'a Program) -> Document<'a> {
-        program.format(&mut FormatterState::new(self.interner, file, self.php_version, self.settings))
+    pub fn build(&self, file: &File, program: &Program<'arena>) -> Document<'arena> {
+        program.format(&mut FormatterState::new(self.arena, program.source_text, file, self.php_version, self.settings))
     }
 
     /// Renders a [`Document`] model into a formatted string.
@@ -109,7 +111,7 @@ impl<'a> Formatter<'a> {
     /// # Returns
     ///
     /// A formatted string representation of the document.
-    pub fn print(&self, document: Document<'a>, capacity_hint: Option<usize>) -> String {
-        Printer::new(document, capacity_hint.unwrap_or(0), self.settings).build()
+    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> String {
+        Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
     }
 }

@@ -1,6 +1,7 @@
+use bumpalo::Bump;
+
 use mago_database::file::File;
 use mago_database::file::HasFileId;
-use mago_interner::ThreadedInterner;
 use mago_syntax_core::input::Input;
 
 use crate::ast::Program;
@@ -13,24 +14,16 @@ use crate::parser::internal::token_stream::TokenStream;
 
 mod internal;
 
-pub fn parse_file(interner: &ThreadedInterner, file: &File) -> (Program, Option<ParseError>) {
-    let lexer = Lexer::new(interner, Input::from_file(file));
+pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> (&'arena Program<'arena>, Option<ParseError>) {
+    let source_text = arena.alloc_str(file.contents.as_ref());
+    let input = Input::new(file.id, source_text.as_bytes());
+    let lexer = Lexer::new(arena, input);
 
-    construct(interner, lexer)
-}
-
-pub fn parse(interner: &ThreadedInterner, input: Input<'_>) -> (Program, Option<ParseError>) {
-    let lexer = Lexer::new(interner, input);
-
-    construct(interner, lexer)
-}
-
-fn construct<'i>(interner: &'i ThreadedInterner, lexer: Lexer<'_, 'i>) -> (Program, Option<ParseError>) {
-    let mut stream = TokenStream::new(interner, lexer);
+    let mut stream = TokenStream::new(arena, lexer);
 
     let mut error = None;
     let statements = {
-        let mut statements = Vec::new();
+        let mut statements = stream.new_vec();
 
         loop {
             match stream.has_reached_eof() {
@@ -58,5 +51,12 @@ fn construct<'i>(interner: &'i ThreadedInterner, lexer: Lexer<'_, 'i>) -> (Progr
         statements
     };
 
-    (Program { file_id: stream.file_id(), statements: Sequence::new(statements), trivia: stream.get_trivia() }, error)
+    let program = arena.alloc(Program {
+        file_id: stream.file_id(),
+        source_text,
+        statements: Sequence::new(statements),
+        trivia: stream.get_trivia(),
+    });
+
+    (program, error)
 }

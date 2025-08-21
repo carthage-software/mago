@@ -3,124 +3,164 @@
 use crate::ast::Program;
 use crate::ast::ast::*;
 
+/// Helper macro to generate trait methods for the mutable walker.
+macro_rules! gen_mut_trait_methods {
+    // This arm matches nodes that have an arena lifetime.
+    ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            fn [<walk_in_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+
+            #[inline]
+            fn [<walk_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, $context: &mut C) {
+                let $walker = self;
+                $walker.[<walk_in_ $var_name>]($var_name, $context);
+                $code
+                $walker.[<walk_out_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            fn [<walk_out_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+        }
+    };
+    // This arm matches simple/copy nodes that DO NOT have an arena lifetime.
+    (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            fn [<walk_in_ $var_name>](&mut self, $var_name: &$ast $node_type, context: &mut C) {}
+
+            #[inline]
+            fn [<walk_ $var_name>](&mut self, $var_name: &$ast $node_type, $context: &mut C) {
+                let $walker = self;
+                $walker.[<walk_in_ $var_name>]($var_name, $context);
+                $code
+                $walker.[<walk_out_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            fn [<walk_out_ $var_name>](&mut self, $var_name: &$ast $node_type, context: &mut C) {}
+        }
+    };
+}
+
+/// Helper macro to generate trait methods for the immutable walker.
+macro_rules! gen_const_trait_methods {
+    // This arm matches nodes that have an arena lifetime.
+    ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            fn [<walk_in_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+
+            #[inline]
+            fn [<walk_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, $context: &mut C) {
+                let $walker = self;
+                $walker.[<walk_in_ $var_name>]($var_name, $context);
+                $code
+                $walker.[<walk_out_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            fn [<walk_out_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+        }
+    };
+    // This arm matches simple/copy nodes that DO NOT have an arena lifetime.
+    (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            fn [<walk_in_ $var_name>](&self, $var_name: &$ast $node_type, context: &mut C) {}
+
+            #[inline]
+            fn [<walk_ $var_name>](&self, $var_name: &$ast $node_type, $context: &mut C) {
+                let $walker = self;
+                $walker.[<walk_in_ $var_name>]($var_name, $context);
+                $code
+                $walker.[<walk_out_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            fn [<walk_out_ $var_name>](&self, $var_name: &$ast $node_type, context: &mut C) {}
+        }
+    };
+}
+
+/// Helper macro to generate standalone walk functions.
+macro_rules! gen_standalone_funcs {
+    // This arm matches nodes that have an arena lifetime.
+    ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            pub fn [<walk_ $var_name _mut>]<'ast, 'arena, W, C>($walker: &mut W, $var_name: &$ast $node_type<$arena>, $context: &mut C)
+                where W: ?Sized + MutWalker<'ast, 'arena, C>, 'arena: 'ast
+            {
+                $walker.[<walk_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            pub fn [<walk_ $var_name>]<'ast, 'arena, W, C>($walker: &W, $var_name: &$ast $node_type<$arena>, $context: &mut C)
+                where W: ?Sized + Walker<'ast, 'arena, C>, 'arena: 'ast
+            {
+                $walker.[<walk_ $var_name>]($var_name, $context);
+            }
+        }
+    };
+    // This arm matches simple/copy nodes that DO NOT have an arena lifetime.
+    (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
+        paste::paste! {
+            #[inline]
+            pub fn [<walk_ $var_name _mut>]<'ast, 'arena, W, C>($walker: &mut W, $var_name: &$ast $node_type, $context: &mut C)
+                where W: ?Sized + MutWalker<'ast, 'arena, C>, 'arena: 'ast
+            {
+                $walker.[<walk_ $var_name>]($var_name, $context);
+            }
+
+            #[inline]
+            pub fn [<walk_ $var_name>]<'ast, 'arena, W, C>($walker: &W, $var_name: &$ast $node_type, $context: &mut C)
+                where W: ?Sized + Walker<'ast, 'arena, C>, 'arena: 'ast
+            {
+                $walker.[<walk_ $var_name>]($var_name, $context);
+            }
+        }
+    };
+}
+
 /// Macro for generating a walker trait and associated functions for traversing an AST.
-///
-/// For each node type provided to the macro, this trait generates three methods:
-///
-/// - `walk_in_<node>`: Called before walking the children of the node.
-///   Override this to perform actions before traversing the node's children.
-/// - `walk_<node>`: Orchestrates the traversal of the node by calling `walk_in_<node>`,
-///   then walking its children, and finally calling `walk_out_<node>`.
-///   **It is not recommended to override this method directly.**
-/// - `walk_out_<node>`: Called after walking the children of the node.
-///   Override this to perform actions after traversing the node's children.
-///
-/// Additionally, for each node type, a standalone `walk_<node>` function is generated.
-/// This function performs the default traversal behavior and can be used within an
-/// overridden `walk_<node>` method to retain the default traversal logic.
 macro_rules! generate_ast_walker {
     (
-        using($walker:ident, $context:ident):
-
+        using($walker:ident, $context:ident, $ast:lifetime, $arena:lifetime):
         $(
-            $node_type:ty as $var_name:ident => $code:block
+            $prefix:tt $node_type:ty as $var_name:ident => $code:block
         )*
     ) => {
         /// A trait that defines a mutable walker to traverse AST nodes.
-        ///
-        /// Each method can be overridden to customize how a node is entered, walked, and exited.
-        pub trait MutWalker<C>: Sync + Send
-        {
+        pub trait MutWalker<$ast, $arena, C>: Sync + Send {
             $(
-                paste::paste! {
-                    #[inline]
-                    fn [<walk_in_ $var_name>](&mut self, $var_name: &$node_type, context: &mut C) {
-                        // Do nothing by default
-                    }
-
-                    #[inline]
-                    fn [<walk_ $var_name>](&mut self, $var_name: &$node_type, $context: &mut C) {
-                        let $walker = self;
-
-                        $walker.[<walk_in_ $var_name>]($var_name, $context);
-                        $code
-                        $walker.[<walk_out_ $var_name>]($var_name, $context);
-                    }
-
-                    #[inline]
-                    fn [<walk_out_ $var_name>](&mut self, $var_name: &$node_type, context: &mut C) {
-                        // Do nothing by default
-                    }
-                }
+                gen_mut_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);
             )*
         }
 
-        /// A trait that defines a walker to traverse AST nodes.
-        ///
-        /// Each method can be overridden to customize how a node is entered, walked, and exited.
-        pub trait Walker<C>: Sync + Send
-        {
+        /// A trait that defines an immutable walker to traverse AST nodes.
+        pub trait Walker<$ast, $arena, C>: Sync + Send {
             $(
-                paste::paste! {
-                    #[inline]
-                    fn [<walk_in_ $var_name>](&self, $var_name: &$node_type, context: &mut C) {
-                        // Do nothing by default
-                    }
-
-                    #[inline]
-                    fn [<walk_ $var_name>](&self, $var_name: &$node_type, $context: &mut C) {
-                        let $walker = self;
-
-                        $walker.[<walk_in_ $var_name>]($var_name, $context);
-                        $code
-                        $walker.[<walk_out_ $var_name>]($var_name, $context);
-                    }
-
-                    #[inline]
-                    fn [<walk_out_ $var_name>](&self, $var_name: &$node_type, context: &mut C) {
-                        // Do nothing by default
-                    }
-                }
+                gen_const_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);
             )*
         }
 
         $(
-            paste::paste! {
-                #[inline]
-                pub fn [<walk_ $var_name _mut>]<W, C>($walker: &mut W, $var_name: &$node_type, $context: &mut C)
-                    where
-                        W: MutWalker<C>
-                {
-                    $walker.[<walk_in_ $var_name>]($var_name, $context);
-                    $code
-                    $walker.[<walk_out_ $var_name>]($var_name, $context);
-                }
-
-
-                #[inline]
-                pub fn [<walk_ $var_name>]<W, C>($walker: &W, $var_name: &$node_type, $context: &mut C)
-                    where
-                        W: Walker<C>
-                {
-                    $walker.[<walk_in_ $var_name>]($var_name, $context);
-                    $code
-                    $walker.[<walk_out_ $var_name>]($var_name, $context);
-                }
-            }
+            gen_standalone_funcs!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);
         )*
     }
 }
 
 generate_ast_walker! {
-    using(walker, context):
+    using(walker, context, 'ast, 'arena):
 
-    Program as program => {
+    'arena Program as program => {
         for statement in program.statements.iter() {
             walker.walk_statement(statement, context);
         }
     }
 
-    Statement as statement => {
+    'arena Statement as statement => {
         match &statement {
             Statement::OpeningTag(opening_tag) => walker.walk_opening_tag(opening_tag, context),
             Statement::ClosingTag(closing_tag) => walker.walk_closing_tag(closing_tag, context),
@@ -159,7 +199,7 @@ generate_ast_walker! {
         }
     }
 
-    OpeningTag as opening_tag => {
+    'arena OpeningTag as opening_tag => {
         match opening_tag {
             OpeningTag::Full(full_opening_tag) => walker.walk_full_opening_tag(full_opening_tag, context),
             OpeningTag::Short(short_opening_tag) => walker.walk_short_opening_tag(short_opening_tag, context),
@@ -167,27 +207,27 @@ generate_ast_walker! {
         }
     }
 
-    FullOpeningTag as full_opening_tag => {
+    'arena FullOpeningTag as full_opening_tag => {
         // Do nothing by default
     }
 
-    ShortOpeningTag as short_opening_tag => {
+    _ ShortOpeningTag as short_opening_tag => {
         // Do nothing by default
     }
 
-    EchoOpeningTag as echo_opening_tag => {
+    _ EchoOpeningTag as echo_opening_tag => {
         // Do nothing by default
     }
 
-    ClosingTag as closing_tag => {
+    _ ClosingTag as closing_tag => {
         // Do nothing by default
     }
 
-    Inline as inline => {
+    'arena Inline as inline => {
         // Do nothing by default
     }
 
-    Namespace as namespace => {
+    'arena Namespace as namespace => {
         walker.walk_keyword(&namespace.namespace, context);
         if let Some(name) = &namespace.name {
             walker.walk_identifier(name, context);
@@ -196,14 +236,14 @@ generate_ast_walker! {
         walker.walk_namespace_body(&namespace.body, context);
     }
 
-    NamespaceBody as namespace_body => {
+    'arena NamespaceBody as namespace_body => {
         match namespace_body {
             NamespaceBody::Implicit(namespace_implicit_body) => walker.walk_namespace_implicit_body(namespace_implicit_body, context),
             NamespaceBody::BraceDelimited(block) => walker.walk_block(block, context),
         }
     }
 
-    NamespaceImplicitBody as namespace_implicit_body => {
+    'arena NamespaceImplicitBody as namespace_implicit_body => {
         walker.walk_terminator(&namespace_implicit_body.terminator, context);
 
         for statement in namespace_implicit_body.statements.iter() {
@@ -211,7 +251,7 @@ generate_ast_walker! {
         }
     }
 
-    Terminator as terminator => {
+    'arena Terminator as terminator => {
         match terminator {
             Terminator::Semicolon(_) => {
                 // Do nothing by default
@@ -226,7 +266,7 @@ generate_ast_walker! {
         }
     }
 
-    Use as r#use => {
+    'arena Use as r#use => {
         walker.walk_keyword(&r#use.r#use, context);
 
         walker.walk_use_items(&r#use.items, context);
@@ -234,7 +274,7 @@ generate_ast_walker! {
         walker.walk_terminator(&r#use.terminator, context);
     }
 
-    UseItems as use_items => {
+    'arena UseItems as use_items => {
         match use_items {
             UseItems::Sequence(use_item_sequence) => {
                 walker.walk_use_item_sequence(use_item_sequence, context);
@@ -251,13 +291,13 @@ generate_ast_walker! {
         }
     }
 
-    UseItemSequence as use_item_sequence => {
+    'arena UseItemSequence as use_item_sequence => {
         for use_item in use_item_sequence.items.iter() {
             walker.walk_use_item(use_item, context);
         }
     }
 
-    UseItem as use_item => {
+    'arena UseItem as use_item => {
         walker.walk_identifier(&use_item.name, context);
 
         if let Some(alias) = &use_item.alias {
@@ -265,12 +305,12 @@ generate_ast_walker! {
         }
     }
 
-    UseItemAlias as use_item_alias => {
+    'arena UseItemAlias as use_item_alias => {
         walker.walk_keyword(&use_item_alias.r#as, context);
         walker.walk_local_identifier(&use_item_alias.identifier, context);
     }
 
-    TypedUseItemSequence as typed_use_item_sequence => {
+    'arena TypedUseItemSequence as typed_use_item_sequence => {
         walker.walk_use_type(&typed_use_item_sequence.r#type, context);
 
         for use_item in typed_use_item_sequence.items.iter() {
@@ -278,14 +318,14 @@ generate_ast_walker! {
         }
     }
 
-    UseType as use_type => {
+    'arena UseType as use_type => {
         match &use_type {
             UseType::Function(keyword) => walker.walk_keyword(keyword, context),
             UseType::Const(keyword) => walker.walk_keyword(keyword, context),
         }
     }
 
-    TypedUseItemList as typed_use_item_list => {
+    'arena TypedUseItemList as typed_use_item_list => {
         walker.walk_use_type(&typed_use_item_list.r#type, context);
         walker.walk_identifier(&typed_use_item_list.namespace, context);
 
@@ -294,7 +334,7 @@ generate_ast_walker! {
         }
     }
 
-    MixedUseItemList as mixed_use_item_list => {
+    'arena MixedUseItemList as mixed_use_item_list => {
         walker.walk_identifier(&mixed_use_item_list.namespace, context);
 
         for maybe_typed_use_item in mixed_use_item_list.items.iter() {
@@ -302,7 +342,7 @@ generate_ast_walker! {
         }
     }
 
-    MaybeTypedUseItem as maybe_typed_use_item => {
+    'arena MaybeTypedUseItem as maybe_typed_use_item => {
         if let Some(use_type) = &maybe_typed_use_item.r#type {
             walker.walk_use_type(use_type, context);
         }
@@ -310,13 +350,13 @@ generate_ast_walker! {
         walker.walk_use_item(&maybe_typed_use_item.item, context);
     }
 
-    AttributeList as attribute_list => {
+    'arena AttributeList as attribute_list => {
         for attribute in attribute_list.attributes.iter() {
             walker.walk_attribute(attribute, context);
         }
     }
 
-    Attribute as attribute => {
+    'arena Attribute as attribute => {
         walker.walk_identifier(&attribute.name, context);
 
         if let Some(argument_list) = &attribute.argument_list {
@@ -324,13 +364,13 @@ generate_ast_walker! {
         }
     }
 
-    ArgumentList as argument_list => {
+    'arena ArgumentList as argument_list => {
         for argument in argument_list.arguments.iter() {
             walker.walk_argument(argument, context);
         }
     }
 
-    Argument as argument => {
+    'arena Argument as argument => {
         match &argument {
             Argument::Positional(positional_argument) => {
                 walker.walk_positional_argument(positional_argument, context);
@@ -341,20 +381,20 @@ generate_ast_walker! {
         }
     }
 
-    PositionalArgument as positional_argument => {
+    'arena PositionalArgument as positional_argument => {
         walker.walk_expression(&positional_argument.value, context);
     }
 
-    NamedArgument as named_argument => {
+    'arena NamedArgument as named_argument => {
         walker.walk_local_identifier(&named_argument.name, context);
         walker.walk_expression(&named_argument.value, context);
     }
 
-    Modifier as modifier => {
+    'arena Modifier as modifier => {
         walker.walk_keyword(modifier.get_keyword(), context);
     }
 
-    Extends as extends => {
+    'arena Extends as extends => {
         walker.walk_keyword(&extends.extends, context);
 
         for ty in extends.types.iter() {
@@ -362,7 +402,7 @@ generate_ast_walker! {
         }
     }
 
-    Implements as implements => {
+    'arena Implements as implements => {
         walker.walk_keyword(&implements.implements, context);
 
         for ty in implements.types.iter() {
@@ -370,7 +410,7 @@ generate_ast_walker! {
         }
     }
 
-    Class as class => {
+    'arena Class as class => {
         for attribute_list in class.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -394,7 +434,7 @@ generate_ast_walker! {
         }
     }
 
-    Interface as interface => {
+    'arena Interface as interface => {
         for attribute_list in interface.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -411,7 +451,7 @@ generate_ast_walker! {
         }
     }
 
-    Trait as r#trait => {
+    'arena Trait as r#trait => {
         for attribute_list in r#trait.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -424,7 +464,7 @@ generate_ast_walker! {
         }
     }
 
-    Enum as r#enum => {
+    'arena Enum as r#enum => {
         for attribute_list in r#enum.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -445,11 +485,11 @@ generate_ast_walker! {
         }
     }
 
-    EnumBackingTypeHint as enum_backing_type_hint => {
+    'arena EnumBackingTypeHint as enum_backing_type_hint => {
         walker.walk_hint(&enum_backing_type_hint.hint, context);
     }
 
-    ClassLikeMember as class_like_member => {
+    'arena ClassLikeMember as class_like_member => {
         match class_like_member {
             ClassLikeMember::TraitUse(trait_use) => {
                 walker.walk_trait_use(trait_use, context);
@@ -469,7 +509,7 @@ generate_ast_walker! {
         }
     }
 
-    TraitUse as trait_use => {
+    'arena TraitUse as trait_use => {
         walker.walk_keyword(&trait_use.r#use, context);
 
         for trait_name in trait_use.trait_names.iter() {
@@ -479,7 +519,7 @@ generate_ast_walker! {
         walker.walk_trait_use_specification(&trait_use.specification, context);
     }
 
-    TraitUseSpecification as trait_use_specification => {
+    'arena TraitUseSpecification as trait_use_specification => {
         match trait_use_specification {
             TraitUseSpecification::Abstract(trait_use_abstract_specification) => {
                 walker.walk_trait_use_abstract_specification(trait_use_abstract_specification, context);
@@ -490,11 +530,11 @@ generate_ast_walker! {
         }
     }
 
-    TraitUseAbstractSpecification as trait_use_abstract_specification => {
+    'arena TraitUseAbstractSpecification as trait_use_abstract_specification => {
         walker.walk_terminator(&trait_use_abstract_specification.0, context);
     }
 
-    TraitUseConcreteSpecification as trait_use_concrete_specification => {
+    'arena TraitUseConcreteSpecification as trait_use_concrete_specification => {
         for adaptation in trait_use_concrete_specification.adaptations.iter() {
             walker.walk_trait_use_adaptation(
                 adaptation,
@@ -504,7 +544,7 @@ generate_ast_walker! {
         }
     }
 
-    TraitUseAdaptation as trait_use_adaptation => {
+    'arena TraitUseAdaptation as trait_use_adaptation => {
         match trait_use_adaptation {
             TraitUseAdaptation::Precedence(trait_use_precedence_adaptation) => {
                 walker.walk_trait_use_precedence_adaptation(trait_use_precedence_adaptation, context);
@@ -515,7 +555,7 @@ generate_ast_walker! {
         }
     }
 
-    TraitUsePrecedenceAdaptation as trait_use_precedence_adaptation => {
+    'arena TraitUsePrecedenceAdaptation as trait_use_precedence_adaptation => {
         walker.walk_trait_use_absolute_method_reference(
             &trait_use_precedence_adaptation.method_reference,
 
@@ -531,12 +571,12 @@ generate_ast_walker! {
         walker.walk_terminator(&trait_use_precedence_adaptation.terminator, context);
     }
 
-    TraitUseAbsoluteMethodReference as trait_use_absolute_method_reference => {
+    'arena TraitUseAbsoluteMethodReference as trait_use_absolute_method_reference => {
         walker.walk_identifier(&trait_use_absolute_method_reference.trait_name, context);
         walker.walk_local_identifier(&trait_use_absolute_method_reference.method_name, context);
     }
 
-    TraitUseAliasAdaptation as trait_use_alias_adaptation => {
+    'arena TraitUseAliasAdaptation as trait_use_alias_adaptation => {
         walker.walk_trait_use_method_reference(
             &trait_use_alias_adaptation.method_reference,
 
@@ -556,7 +596,7 @@ generate_ast_walker! {
         walker.walk_terminator(&trait_use_alias_adaptation.terminator, context);
     }
 
-    TraitUseMethodReference as trait_use_method_reference => {
+    'arena TraitUseMethodReference as trait_use_method_reference => {
         match trait_use_method_reference {
             TraitUseMethodReference::Identifier(local_identifier) => {
                 walker.walk_local_identifier(local_identifier, context);
@@ -567,7 +607,7 @@ generate_ast_walker! {
         }
     }
 
-    ClassLikeConstant as class_like_constant => {
+    'arena ClassLikeConstant as class_like_constant => {
         for attribute_list in class_like_constant.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -589,12 +629,12 @@ generate_ast_walker! {
         walker.walk_terminator(&class_like_constant.terminator, context);
     }
 
-    ClassLikeConstantItem as class_like_constant_item => {
+    'arena ClassLikeConstantItem as class_like_constant_item => {
         walker.walk_local_identifier(&class_like_constant_item.name, context);
         walker.walk_expression(&class_like_constant_item.value, context);
     }
 
-    Property as property => {
+    'arena Property as property => {
         match property {
             Property::Plain(plain_property) => {
                 walker.walk_plain_property(plain_property, context);
@@ -605,7 +645,7 @@ generate_ast_walker! {
         }
     }
 
-    PlainProperty as plain_property => {
+    'arena PlainProperty as plain_property => {
         for attribute_list in plain_property.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -629,7 +669,7 @@ generate_ast_walker! {
         walker.walk_terminator(&plain_property.terminator, context);
     }
 
-    PropertyItem as property_item => {
+    'arena PropertyItem as property_item => {
         match property_item {
             PropertyItem::Abstract(property_abstract_item) => {
                 walker.walk_property_abstract_item(property_abstract_item, context);
@@ -640,16 +680,16 @@ generate_ast_walker! {
         }
     }
 
-    PropertyAbstractItem as property_abstract_item => {
+    'arena PropertyAbstractItem as property_abstract_item => {
         walker.walk_direct_variable(&property_abstract_item.variable, context);
     }
 
-    PropertyConcreteItem as property_concrete_item => {
+    'arena PropertyConcreteItem as property_concrete_item => {
         walker.walk_direct_variable(&property_concrete_item.variable, context);
         walker.walk_expression(&property_concrete_item.value, context);
     }
 
-    HookedProperty as hooked_property => {
+    'arena HookedProperty as hooked_property => {
         for attribute_list in hooked_property.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -670,13 +710,13 @@ generate_ast_walker! {
         walker.walk_property_hook_list(&hooked_property.hook_list, context);
     }
 
-    PropertyHookList as property_hook_list => {
+    'arena PropertyHookList as property_hook_list => {
         for hook in property_hook_list.hooks.iter() {
             walker.walk_property_hook(hook, context);
         }
     }
 
-    PropertyHook as property_hook => {
+    'arena PropertyHook as property_hook => {
         for attribute_list in property_hook.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -693,7 +733,7 @@ generate_ast_walker! {
         walker.walk_property_hook_body(&property_hook.body, context);
     }
 
-    PropertyHookBody as property_hook_body => {
+    'arena PropertyHookBody as property_hook_body => {
         match property_hook_body {
             PropertyHookBody::Abstract(property_hook_abstract_body) => {
                 walker.walk_property_hook_abstract_body(property_hook_abstract_body, context);
@@ -704,11 +744,11 @@ generate_ast_walker! {
         }
     }
 
-    PropertyHookAbstractBody as property_hook_abstract_body => {
+    _ PropertyHookAbstractBody as property_hook_abstract_body => {
         // Do nothing by default
     }
 
-    PropertyHookConcreteBody as property_hook_concrete_body => {
+    'arena PropertyHookConcreteBody as property_hook_concrete_body => {
         match property_hook_concrete_body {
             PropertyHookConcreteBody::Block(block) => {
                 walker.walk_block(block, context);
@@ -719,17 +759,17 @@ generate_ast_walker! {
         }
     }
 
-    PropertyHookConcreteExpressionBody as property_hook_concrete_expression_body => {
+    'arena PropertyHookConcreteExpressionBody as property_hook_concrete_expression_body => {
         walker.walk_expression(&property_hook_concrete_expression_body.expression, context);
     }
 
-    FunctionLikeParameterList as function_like_parameter_list => {
+    'arena FunctionLikeParameterList as function_like_parameter_list => {
         for parameter in function_like_parameter_list.parameters.iter() {
             walker.walk_function_like_parameter(parameter, context);
         }
     }
 
-    FunctionLikeParameter as function_like_parameter => {
+    'arena FunctionLikeParameter as function_like_parameter => {
         for attribute_list in function_like_parameter.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -752,11 +792,11 @@ generate_ast_walker! {
         }
     }
 
-    FunctionLikeParameterDefaultValue as function_like_parameter_default_value => {
+    'arena FunctionLikeParameterDefaultValue as function_like_parameter_default_value => {
         walker.walk_expression(&function_like_parameter_default_value.value, context);
     }
 
-    EnumCase as enum_case => {
+    'arena EnumCase as enum_case => {
         for attribute_list in enum_case.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -766,7 +806,7 @@ generate_ast_walker! {
         walker.walk_terminator(&enum_case.terminator, context);
     }
 
-    EnumCaseItem as enum_case_item => {
+    'arena EnumCaseItem as enum_case_item => {
         match enum_case_item {
             EnumCaseItem::Unit(enum_case_unit_item) => {
                 walker.walk_enum_case_unit_item(enum_case_unit_item, context);
@@ -777,16 +817,16 @@ generate_ast_walker! {
         }
     }
 
-    EnumCaseUnitItem as enum_case_unit_item => {
+    'arena EnumCaseUnitItem as enum_case_unit_item => {
         walker.walk_local_identifier(&enum_case_unit_item.name, context);
     }
 
-    EnumCaseBackedItem as enum_case_backed_item => {
+    'arena EnumCaseBackedItem as enum_case_backed_item => {
         walker.walk_local_identifier(&enum_case_backed_item.name, context);
         walker.walk_expression(&enum_case_backed_item.value, context);
     }
 
-    Method as method => {
+    'arena Method as method => {
         for attribute_list in method.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -805,7 +845,7 @@ generate_ast_walker! {
         walker.walk_method_body(&method.body, context);
     }
 
-    MethodBody as method_body => {
+    'arena MethodBody as method_body => {
         match method_body {
             MethodBody::Abstract(method_abstract_body) => {
                 walker.walk_method_abstract_body(method_abstract_body, context);
@@ -816,21 +856,21 @@ generate_ast_walker! {
         }
     }
 
-    MethodAbstractBody as method_abstract_body => {
+    _ MethodAbstractBody as method_abstract_body => {
         // Do nothing by default
     }
 
-    FunctionLikeReturnTypeHint as function_like_return_type_hint => {
+    'arena FunctionLikeReturnTypeHint as function_like_return_type_hint => {
         walker.walk_hint(&function_like_return_type_hint.hint, context);
     }
 
-    Block as block => {
+    'arena Block as block => {
         for statement in block.statements.iter() {
             walker.walk_statement(statement, context);
         }
     }
 
-    Constant as constant => {
+    'arena Constant as constant => {
         for attribute_list in constant.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -843,12 +883,12 @@ generate_ast_walker! {
         walker.walk_terminator(&constant.terminator, context);
     }
 
-    ConstantItem as constant_item => {
+    'arena ConstantItem as constant_item => {
         walker.walk_local_identifier(&constant_item.name, context);
         walker.walk_expression(&constant_item.value, context);
     }
 
-    Function as function => {
+    'arena Function as function => {
         for attribute_list in function.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -863,7 +903,7 @@ generate_ast_walker! {
         walker.walk_block(&function.body, context);
     }
 
-    Declare as declare => {
+    'arena Declare as declare => {
         walker.walk_keyword(&declare.declare, context);
         for item in declare.items.iter() {
             walker.walk_declare_item(item, context);
@@ -872,12 +912,12 @@ generate_ast_walker! {
         walker.walk_declare_body(&declare.body, context);
     }
 
-    DeclareItem as declare_item => {
+    'arena DeclareItem as declare_item => {
         walker.walk_local_identifier(&declare_item.name, context);
         walker.walk_expression(&declare_item.value, context);
     }
 
-    DeclareBody as declare_body => {
+    'arena DeclareBody as declare_body => {
         match declare_body {
             DeclareBody::Statement(statement) => {
                 walker.walk_statement(statement, context);
@@ -888,7 +928,7 @@ generate_ast_walker! {
         }
     }
 
-    DeclareColonDelimitedBody as declare_colon_delimited_body => {
+    'arena DeclareColonDelimitedBody as declare_colon_delimited_body => {
         for statement in declare_colon_delimited_body.statements.iter() {
             walker.walk_statement(statement, context);
         }
@@ -896,17 +936,17 @@ generate_ast_walker! {
         walker.walk_terminator(&declare_colon_delimited_body.terminator, context);
     }
 
-    Goto as goto => {
+    'arena Goto as goto => {
         walker.walk_keyword(&goto.goto, context);
         walker.walk_local_identifier(&goto.label, context);
         walker.walk_terminator(&goto.terminator, context);
     }
 
-    Label as label => {
+    'arena Label as label => {
         walker.walk_local_identifier(&label.name, context);
     }
 
-    Try as r#try => {
+    'arena Try as r#try => {
         walker.walk_keyword(&r#try.r#try, context);
         walker.walk_block(&r#try.block, context);
         for catch in r#try.catch_clauses.iter() {
@@ -918,7 +958,7 @@ generate_ast_walker! {
         }
     }
 
-    TryCatchClause as try_catch_clause => {
+    'arena TryCatchClause as try_catch_clause => {
         walker.walk_keyword(&try_catch_clause.catch, context);
         walker.walk_hint(&try_catch_clause.hint, context);
         if let Some(variable) = &try_catch_clause.variable {
@@ -928,20 +968,20 @@ generate_ast_walker! {
         walker.walk_block(&try_catch_clause.block, context);
     }
 
-    TryFinallyClause as try_finally_clause => {
+    'arena TryFinallyClause as try_finally_clause => {
         walker.walk_keyword(&try_finally_clause.finally, context);
         walker.walk_block(&try_finally_clause.block, context);
     }
 
-    Foreach as foreach => {
+    'arena Foreach as foreach => {
         walker.walk_keyword(&foreach.foreach, context);
-        walker.walk_expression(&foreach.expression, context);
+        walker.walk_expression(foreach.expression, context);
         walker.walk_keyword(&foreach.r#as, context);
         walker.walk_foreach_target(&foreach.target, context);
         walker.walk_foreach_body(&foreach.body, context);
     }
 
-    ForeachTarget as foreach_target => {
+    'arena ForeachTarget as foreach_target => {
         match foreach_target {
             ForeachTarget::Value(foreach_value_target) => {
                 walker.walk_foreach_value_target(foreach_value_target, context);
@@ -952,16 +992,16 @@ generate_ast_walker! {
         }
     }
 
-    ForeachValueTarget as foreach_value_target => {
-        walker.walk_expression(&foreach_value_target.value, context);
+    'arena ForeachValueTarget as foreach_value_target => {
+        walker.walk_expression(foreach_value_target.value, context);
     }
 
-    ForeachKeyValueTarget as foreach_key_value_target => {
-        walker.walk_expression(&foreach_key_value_target.key, context);
-        walker.walk_expression(&foreach_key_value_target.value, context);
+    'arena ForeachKeyValueTarget as foreach_key_value_target => {
+        walker.walk_expression(foreach_key_value_target.key, context);
+        walker.walk_expression(foreach_key_value_target.value, context);
     }
 
-    ForeachBody as foreach_body => {
+    'arena ForeachBody as foreach_body => {
         match foreach_body {
             ForeachBody::Statement(statement) => {
                 walker.walk_statement(statement, context);
@@ -972,7 +1012,7 @@ generate_ast_walker! {
         }
     }
 
-    ForeachColonDelimitedBody as foreach_colon_delimited_body => {
+    'arena ForeachColonDelimitedBody as foreach_colon_delimited_body => {
         for statement in foreach_colon_delimited_body.statements.iter() {
             walker.walk_statement(statement, context);
         }
@@ -981,7 +1021,7 @@ generate_ast_walker! {
         walker.walk_terminator(&foreach_colon_delimited_body.terminator, context);
     }
 
-    For as r#for => {
+    'arena For as r#for => {
         walker.walk_keyword(&r#for.r#for, context);
 
         for initialization in r#for.initializations.iter() {
@@ -999,7 +1039,7 @@ generate_ast_walker! {
         walker.walk_for_body(&r#for.body, context);
     }
 
-    ForBody as for_body => {
+    'arena ForBody as for_body => {
         match for_body {
             ForBody::Statement(statement) => {
                 walker.walk_statement(statement, context);
@@ -1010,7 +1050,7 @@ generate_ast_walker! {
         }
     }
 
-    ForColonDelimitedBody as for_colon_delimited_body => {
+    'arena ForColonDelimitedBody as for_colon_delimited_body => {
         for statement in for_colon_delimited_body.statements.iter() {
             walker.walk_statement(statement, context);
         }
@@ -1019,13 +1059,13 @@ generate_ast_walker! {
         walker.walk_terminator(&for_colon_delimited_body.terminator, context);
     }
 
-    While as r#while => {
+    'arena While as r#while => {
         walker.walk_keyword(&r#while.r#while, context);
-        walker.walk_expression(&r#while.condition, context);
+        walker.walk_expression(r#while.condition, context);
         walker.walk_while_body(&r#while.body, context);
     }
 
-    WhileBody as while_body => {
+    'arena WhileBody as while_body => {
         match while_body {
             WhileBody::Statement(statement) => {
                 walker.walk_statement(statement, context);
@@ -1036,7 +1076,7 @@ generate_ast_walker! {
         }
     }
 
-    WhileColonDelimitedBody as while_colon_delimited_body => {
+    'arena WhileColonDelimitedBody as while_colon_delimited_body => {
         for statement in while_colon_delimited_body.statements.iter() {
             walker.walk_statement(statement, context);
         }
@@ -1045,15 +1085,15 @@ generate_ast_walker! {
         walker.walk_terminator(&while_colon_delimited_body.terminator, context);
     }
 
-    DoWhile as do_while => {
+    'arena DoWhile as do_while => {
         walker.walk_keyword(&do_while.r#do, context);
-        walker.walk_statement(&do_while.statement, context);
+        walker.walk_statement(do_while.statement, context);
         walker.walk_keyword(&do_while.r#while, context);
-        walker.walk_expression(&do_while.condition, context);
+        walker.walk_expression(do_while.condition, context);
         walker.walk_terminator(&do_while.terminator, context);
     }
 
-    Continue as r#continue => {
+    'arena Continue as r#continue => {
         walker.walk_keyword(&r#continue.r#continue, context);
         if let Some(level) = &r#continue.level {
             walker.walk_expression(level, context);
@@ -1062,7 +1102,7 @@ generate_ast_walker! {
         walker.walk_terminator(&r#continue.terminator, context);
     }
 
-    Break as r#break => {
+    'arena Break as r#break => {
         walker.walk_keyword(&r#break.r#break, context);
         if let Some(level) = &r#break.level {
             walker.walk_expression(level, context);
@@ -1071,13 +1111,13 @@ generate_ast_walker! {
         walker.walk_terminator(&r#break.terminator, context);
     }
 
-    Switch as switch => {
+    'arena Switch as switch => {
         walker.walk_keyword(&switch.r#switch, context);
-        walker.walk_expression(&switch.expression, context);
+        walker.walk_expression(switch.expression, context);
         walker.walk_switch_body(&switch.body, context);
     }
 
-    SwitchBody as switch_body => {
+    'arena SwitchBody as switch_body => {
         match switch_body {
             SwitchBody::BraceDelimited(switch_brace_delimited_body) => {
                 walker.walk_switch_brace_delimited_body(switch_brace_delimited_body, context);
@@ -1088,7 +1128,7 @@ generate_ast_walker! {
         }
     }
 
-    SwitchBraceDelimitedBody as switch_brace_delimited_body => {
+    'arena SwitchBraceDelimitedBody as switch_brace_delimited_body => {
         if let Some(terminator) = &switch_brace_delimited_body.optional_terminator {
             walker.walk_terminator(terminator, context);
         }
@@ -1098,7 +1138,7 @@ generate_ast_walker! {
         }
     }
 
-    SwitchColonDelimitedBody as switch_colon_delimited_body => {
+    'arena SwitchColonDelimitedBody as switch_colon_delimited_body => {
         if let Some(terminator) = &switch_colon_delimited_body.optional_terminator {
             walker.walk_terminator(terminator, context);
         }
@@ -1111,7 +1151,7 @@ generate_ast_walker! {
         walker.walk_terminator(&switch_colon_delimited_body.terminator, context);
     }
 
-    SwitchCase as switch_case => {
+    'arena SwitchCase as switch_case => {
         match switch_case {
             SwitchCase::Expression(switch_expression_case) => {
                 walker.walk_switch_expression_case(switch_expression_case, context);
@@ -1122,16 +1162,16 @@ generate_ast_walker! {
         }
     }
 
-    SwitchExpressionCase as switch_expression_case => {
+    'arena SwitchExpressionCase as switch_expression_case => {
         walker.walk_keyword(&switch_expression_case.r#case, context);
-        walker.walk_expression(&switch_expression_case.expression, context);
+        walker.walk_expression(switch_expression_case.expression, context);
         walker.walk_switch_case_separator(&switch_expression_case.separator, context);
         for statement in switch_expression_case.statements.iter() {
             walker.walk_statement(statement, context);
         }
     }
 
-    SwitchDefaultCase as switch_default_case => {
+    'arena SwitchDefaultCase as switch_default_case => {
         walker.walk_keyword(&switch_default_case.r#default, context);
         walker.walk_switch_case_separator(&switch_default_case.separator, context);
         for statement in switch_default_case.statements.iter() {
@@ -1139,17 +1179,17 @@ generate_ast_walker! {
         }
     }
 
-    SwitchCaseSeparator as switch_case_separator => {
+    _ SwitchCaseSeparator as switch_case_separator => {
         // Do nothing by default
     }
 
-    If as r#if => {
+    'arena If as r#if => {
         walker.walk_keyword(&r#if.r#if, context);
-        walker.walk_expression(&r#if.condition, context);
+        walker.walk_expression(r#if.condition, context);
         walker.walk_if_body(&r#if.body, context);
     }
 
-    IfBody as if_body => {
+    'arena IfBody as if_body => {
         match if_body {
             IfBody::Statement(statement) => {
                 walker.walk_if_statement_body(statement, context);
@@ -1160,8 +1200,8 @@ generate_ast_walker! {
         }
     }
 
-    IfStatementBody as if_statement_body => {
-        walker.walk_statement(&if_statement_body.statement, context);
+    'arena IfStatementBody as if_statement_body => {
+        walker.walk_statement(if_statement_body.statement, context);
 
         for else_if_clause in if_statement_body.else_if_clauses.iter() {
             walker.walk_if_statement_body_else_if_clause(else_if_clause, context);
@@ -1172,18 +1212,18 @@ generate_ast_walker! {
         }
     }
 
-    IfStatementBodyElseIfClause as if_statement_body_else_if_clause => {
+    'arena IfStatementBodyElseIfClause as if_statement_body_else_if_clause => {
         walker.walk_keyword(&if_statement_body_else_if_clause.r#elseif, context);
-        walker.walk_expression(&if_statement_body_else_if_clause.condition, context);
-        walker.walk_statement(&if_statement_body_else_if_clause.statement, context);
+        walker.walk_expression(if_statement_body_else_if_clause.condition, context);
+        walker.walk_statement(if_statement_body_else_if_clause.statement, context);
     }
 
-    IfStatementBodyElseClause as if_statement_body_else_clause => {
+    'arena IfStatementBodyElseClause as if_statement_body_else_clause => {
         walker.walk_keyword(&if_statement_body_else_clause.r#else, context);
-        walker.walk_statement(&if_statement_body_else_clause.statement, context);
+        walker.walk_statement(if_statement_body_else_clause.statement, context);
     }
 
-    IfColonDelimitedBody as if_colon_delimited_body => {
+    'arena IfColonDelimitedBody as if_colon_delimited_body => {
         for statement in if_colon_delimited_body.statements.iter() {
             walker.walk_statement(statement, context);
         }
@@ -1200,22 +1240,22 @@ generate_ast_walker! {
         walker.walk_terminator(&if_colon_delimited_body.terminator, context);
     }
 
-    IfColonDelimitedBodyElseIfClause as if_colon_delimited_body_else_if_clause => {
+    'arena IfColonDelimitedBodyElseIfClause as if_colon_delimited_body_else_if_clause => {
         walker.walk_keyword(&if_colon_delimited_body_else_if_clause.r#elseif, context);
-        walker.walk_expression(&if_colon_delimited_body_else_if_clause.condition, context);
+        walker.walk_expression(if_colon_delimited_body_else_if_clause.condition, context);
         for statement in if_colon_delimited_body_else_if_clause.statements.iter() {
             walker.walk_statement(statement, context);
         }
     }
 
-    IfColonDelimitedBodyElseClause as if_colon_delimited_body_else_clause => {
+    'arena IfColonDelimitedBodyElseClause as if_colon_delimited_body_else_clause => {
         walker.walk_keyword(&if_colon_delimited_body_else_clause.r#else, context);
         for statement in if_colon_delimited_body_else_clause.statements.iter() {
             walker.walk_statement(statement, context);
         }
     }
 
-    Return as r#return => {
+    'arena Return as r#return => {
         walker.walk_keyword(&r#return.r#return, context);
         if let Some(expression) = &r#return.value {
             walker.walk_expression(expression, context);
@@ -1224,12 +1264,12 @@ generate_ast_walker! {
         walker.walk_terminator(&r#return.terminator, context);
     }
 
-    ExpressionStatement as statement_expression => {
-        walker.walk_expression(&statement_expression.expression, context);
+    'arena ExpressionStatement as statement_expression => {
+        walker.walk_expression(statement_expression.expression, context);
         walker.walk_terminator(&statement_expression.terminator, context);
     }
 
-    Echo as echo => {
+    'arena Echo as echo => {
         walker.walk_keyword(&echo.echo, context);
         for expression in echo.values.iter() {
             walker.walk_expression(expression, context);
@@ -1238,7 +1278,7 @@ generate_ast_walker! {
         walker.walk_terminator(&echo.terminator, context);
     }
 
-    Global as global => {
+    'arena Global as global => {
         walker.walk_keyword(&global.global, context);
         for variable in global.variables.iter() {
             walker.walk_variable(variable, context);
@@ -1247,7 +1287,7 @@ generate_ast_walker! {
         walker.walk_terminator(&global.terminator, context);
     }
 
-    Static as r#static => {
+    'arena Static as r#static => {
         walker.walk_keyword(&r#static.r#static, context);
         for item in r#static.items.iter() {
             walker.walk_static_item(item, context);
@@ -1256,7 +1296,7 @@ generate_ast_walker! {
         walker.walk_terminator(&r#static.terminator, context);
     }
 
-    StaticItem as static_item => {
+    'arena StaticItem as static_item => {
         match static_item {
             StaticItem::Abstract(static_abstract_item) => {
                 walker.walk_static_abstract_item(static_abstract_item, context);
@@ -1267,20 +1307,20 @@ generate_ast_walker! {
         }
     }
 
-    StaticAbstractItem as static_abstract_item => {
+    'arena StaticAbstractItem as static_abstract_item => {
         walker.walk_direct_variable(&static_abstract_item.variable, context);
     }
 
-    StaticConcreteItem as static_concrete_item => {
+    'arena StaticConcreteItem as static_concrete_item => {
         walker.walk_direct_variable(&static_concrete_item.variable, context);
         walker.walk_expression(&static_concrete_item.value, context);
     }
 
-    HaltCompiler as halt_compiler => {
+    'arena HaltCompiler as halt_compiler => {
         walker.walk_keyword(&halt_compiler.halt_compiler, context);
     }
 
-    Unset as unset => {
+    'arena Unset as unset => {
         walker.walk_keyword(&unset.unset, context);
         for value in unset.values.iter() {
             walker.walk_expression(value, context);
@@ -1289,7 +1329,7 @@ generate_ast_walker! {
         walker.walk_terminator(&unset.terminator, context);
     }
 
-    Expression as expression => {
+    'arena Expression as expression => {
         match &expression {
             Expression::Parenthesized(parenthesized) => walker.walk_parenthesized(parenthesized, context),
             Expression::Binary(expr) => walker.walk_binary(expr, context),
@@ -1335,13 +1375,13 @@ generate_ast_walker! {
         }
     }
 
-    Binary as binary => {
-        walker.walk_expression(&binary.lhs, context);
+    'arena Binary as binary => {
+        walker.walk_expression(binary.lhs, context);
         walker.walk_binary_operator(&binary.operator, context);
-        walker.walk_expression(&binary.rhs, context);
+        walker.walk_expression(binary.rhs, context);
     }
 
-    BinaryOperator as binary_operator => {
+    'arena BinaryOperator as binary_operator => {
         match binary_operator {
             BinaryOperator::Instanceof(keyword)
             | BinaryOperator::LowAnd(keyword)
@@ -1353,29 +1393,29 @@ generate_ast_walker! {
         }
     }
 
-    UnaryPrefix as unary_prefix => {
+    'arena UnaryPrefix as unary_prefix => {
         walker.walk_unary_prefix_operator(&unary_prefix.operator, context);
-        walker.walk_expression(&unary_prefix.operand, context);
+        walker.walk_expression(unary_prefix.operand, context);
     }
 
-    UnaryPrefixOperator as unary_prefix_operator => {
+    'arena UnaryPrefixOperator as unary_prefix_operator => {
         // Do nothing
     }
 
-    UnaryPostfix as unary_postfix => {
-        walker.walk_expression(&unary_postfix.operand, context);
+    'arena UnaryPostfix as unary_postfix => {
+        walker.walk_expression(unary_postfix.operand, context);
         walker.walk_unary_postfix_operator(&unary_postfix.operator, context);
     }
 
-    UnaryPostfixOperator as unary_postfix_operator => {
+    _ UnaryPostfixOperator as unary_postfix_operator => {
         // Do nothing
     }
 
-    Parenthesized as parenthesized => {
-        walker.walk_expression(&parenthesized.expression, context)
+    'arena Parenthesized as parenthesized => {
+        walker.walk_expression(parenthesized.expression, context)
     }
 
-    Literal as literal_expression => {
+    'arena Literal as literal_expression => {
         match literal_expression {
             Literal::String(string) => walker.walk_literal_string(string, context),
             Literal::Integer(integer) => walker.walk_literal_integer(integer, context),
@@ -1386,31 +1426,31 @@ generate_ast_walker! {
         }
     }
 
-    LiteralString as literal_string => {
+    'arena LiteralString as literal_string => {
         // Do nothing by default
     }
 
-    LiteralInteger as literal_integer => {
+    'arena LiteralInteger as literal_integer => {
         // Do nothing by default
     }
 
-    LiteralFloat as literal_float => {
+    'arena LiteralFloat as literal_float => {
         // Do nothing by default
     }
 
-    Keyword as true_keyword => {
+    'arena Keyword as true_keyword => {
         // Do nothing by default
     }
 
-    Keyword as false_keyword => {
+    'arena Keyword as false_keyword => {
         // Do nothing by default
     }
 
-    Keyword as null_keyword => {
+    'arena Keyword as null_keyword => {
         // Do nothing by default
     }
 
-    CompositeString as composite_string => {
+    'arena CompositeString as composite_string => {
         match composite_string {
             CompositeString::ShellExecute(str) => walker.walk_shell_execute_string(str, context),
             CompositeString::Interpolated(str) => walker.walk_interpolated_string(str, context),
@@ -1418,25 +1458,25 @@ generate_ast_walker! {
         }
     }
 
-    ShellExecuteString as shell_execute_string => {
+    'arena ShellExecuteString as shell_execute_string => {
         for part in shell_execute_string.parts.iter() {
             walker.walk_string_part(part, context);
         }
     }
 
-    InterpolatedString as interpolated_string => {
+    'arena InterpolatedString as interpolated_string => {
         for part in interpolated_string.parts.iter() {
             walker.walk_string_part(part, context);
         }
     }
 
-    DocumentString as document_string => {
+    'arena DocumentString as document_string => {
         for part in document_string.parts.iter() {
             walker.walk_string_part(part, context);
         }
     }
 
-    StringPart as string_part => {
+    'arena StringPart as string_part => {
         match string_part {
             StringPart::Literal(literal) => walker.walk_literal_string_part(literal, context),
             StringPart::Expression(expression) => walker.walk_expression(expression, context),
@@ -1446,40 +1486,40 @@ generate_ast_walker! {
         };
     }
 
-    LiteralStringPart as literal_string_part => {
+    'arena LiteralStringPart as literal_string_part => {
         // Do nothing
     }
 
-    BracedExpressionStringPart as braced_expression_string_part => {
-        walker.walk_expression(&braced_expression_string_part.expression, context);
+    'arena BracedExpressionStringPart as braced_expression_string_part => {
+        walker.walk_expression(braced_expression_string_part.expression, context);
     }
 
-    Assignment as assignment => {
-        walker.walk_expression(&assignment.lhs, context);
+    'arena Assignment as assignment => {
+        walker.walk_expression(assignment.lhs, context);
         walker.walk_assignment_operator(&assignment.operator, context);
-        walker.walk_expression(&assignment.rhs, context);
+        walker.walk_expression(assignment.rhs, context);
     }
 
-    AssignmentOperator as assignment_operator => {
+    _ AssignmentOperator as assignment_operator => {
         // Do nothing
     }
 
-    Conditional as conditional => {
-        walker.walk_expression(&conditional.condition, context);
+    'arena Conditional as conditional => {
+        walker.walk_expression(conditional.condition, context);
         if let Some(then) = &conditional.then {
             walker.walk_expression(then, context);
         }
 
-        walker.walk_expression(&conditional.r#else, context);
+        walker.walk_expression(conditional.r#else, context);
     }
 
-    Array as array => {
+    'arena Array as array => {
         for element in array.elements.iter() {
             walker.walk_array_element(element, context);
         }
     }
 
-    ArrayElement as array_element => {
+    'arena ArrayElement as array_element => {
         match array_element {
             ArrayElement::KeyValue(key_value_array_element) => {
                 walker.walk_key_value_array_element(key_value_array_element, context);
@@ -1496,31 +1536,31 @@ generate_ast_walker! {
         }
     }
 
-    KeyValueArrayElement as key_value_array_element => {
-        walker.walk_expression(&key_value_array_element.key, context);
-        walker.walk_expression(&key_value_array_element.value, context);
+    'arena KeyValueArrayElement as key_value_array_element => {
+        walker.walk_expression(key_value_array_element.key, context);
+        walker.walk_expression(key_value_array_element.value, context);
     }
 
-    ValueArrayElement as value_array_element => {
-        walker.walk_expression(&value_array_element.value, context);
+    'arena ValueArrayElement as value_array_element => {
+        walker.walk_expression(value_array_element.value, context);
     }
 
-    VariadicArrayElement as variadic_array_element => {
-        walker.walk_expression(&variadic_array_element.value, context);
+    'arena VariadicArrayElement as variadic_array_element => {
+        walker.walk_expression(variadic_array_element.value, context);
     }
 
-    MissingArrayElement as missing_array_element => {
+    _ MissingArrayElement as missing_array_element => {
         // Do nothing
     }
 
-    LegacyArray as legacy_array => {
+    'arena LegacyArray as legacy_array => {
         walker.walk_keyword(&legacy_array.array, context);
         for element in legacy_array.elements.iter() {
             walker.walk_array_element(element, context);
         }
     }
 
-    List as list => {
+    'arena List as list => {
         walker.walk_keyword(&list.list, context);
 
         for element in list.elements.iter() {
@@ -1528,16 +1568,16 @@ generate_ast_walker! {
         }
     }
 
-    ArrayAccess as array_access => {
-        walker.walk_expression(&array_access.array, context);
-        walker.walk_expression(&array_access.index, context);
+    'arena ArrayAccess as array_access => {
+        walker.walk_expression(array_access.array, context);
+        walker.walk_expression(array_access.index, context);
     }
 
-    ArrayAppend as array_append => {
-        walker.walk_expression(&array_append.array, context);
+    'arena ArrayAppend as array_append => {
+        walker.walk_expression(array_append.array, context);
     }
 
-    AnonymousClass as anonymous_class => {
+    'arena AnonymousClass as anonymous_class => {
         for attribute_list in anonymous_class.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -1565,7 +1605,7 @@ generate_ast_walker! {
         }
     }
 
-    Closure as closure => {
+    'arena Closure as closure => {
         for attribute_list in closure.attribute_lists.iter() {
                 walker.walk_attribute_list(attribute_list, context);
             }
@@ -1587,17 +1627,17 @@ generate_ast_walker! {
         walker.walk_block(&closure.body, context);
     }
 
-    ClosureUseClause as closure_use_clause => {
+    'arena ClosureUseClause as closure_use_clause => {
         for variable in closure_use_clause.variables.iter() {
             walker.walk_closure_use_clause_variable(variable, context);
         }
     }
 
-    ClosureUseClauseVariable as closure_use_clause_variable => {
+    'arena ClosureUseClauseVariable as closure_use_clause_variable => {
         walker.walk_direct_variable(&closure_use_clause_variable.variable, context);
     }
 
-    ArrowFunction as arrow_function => {
+    'arena ArrowFunction as arrow_function => {
         for attribute_list in arrow_function.attribute_lists.iter() {
             walker.walk_attribute_list(attribute_list, context);
         }
@@ -1613,10 +1653,10 @@ generate_ast_walker! {
             walker.walk_function_like_return_type_hint(return_type_hint, context);
         }
 
-        walker.walk_expression(&arrow_function.expression, context);
+        walker.walk_expression(arrow_function.expression, context);
     }
 
-    Variable as variable => {
+    'arena Variable as variable => {
         match variable {
             Variable::Direct(direct_variable) => {
                 walker.walk_direct_variable(direct_variable, context);
@@ -1630,19 +1670,19 @@ generate_ast_walker! {
         }
     }
 
-    DirectVariable as direct_variable => {
+    'arena DirectVariable as direct_variable => {
         // Do nothing by default
     }
 
-    IndirectVariable as indirect_variable => {
-        walker.walk_expression(&indirect_variable.expression, context);
+    'arena IndirectVariable as indirect_variable => {
+        walker.walk_expression(indirect_variable.expression, context);
     }
 
-    NestedVariable as nested_variable => {
-        walker.walk_variable(nested_variable.variable.as_ref(), context);
+    'arena NestedVariable as nested_variable => {
+        walker.walk_variable(nested_variable.variable, context);
     }
 
-    Identifier as identifier => {
+    'arena Identifier as identifier => {
         match identifier {
             Identifier::Local(local_identifier) => walker.walk_local_identifier(local_identifier, context),
             Identifier::Qualified(qualified_identifier) => walker.walk_qualified_identifier(qualified_identifier, context),
@@ -1650,27 +1690,27 @@ generate_ast_walker! {
         };
     }
 
-    LocalIdentifier as local_identifier => {
+    'arena LocalIdentifier as local_identifier => {
         // Do nothing by default
     }
 
-    QualifiedIdentifier as qualified_identifier => {
+    'arena QualifiedIdentifier as qualified_identifier => {
         // Do nothing by default
     }
 
-    FullyQualifiedIdentifier as fully_qualified_identifier => {
+    'arena FullyQualifiedIdentifier as fully_qualified_identifier => {
         // Do nothing by default
     }
 
-    Match as r#match => {
+    'arena Match as r#match => {
         walker.walk_keyword(&r#match.r#match, context);
-        walker.walk_expression(&r#match.expression, context);
+        walker.walk_expression(r#match.expression, context);
         for arm in r#match.arms.iter() {
             walker.walk_match_arm(arm, context);
         }
     }
 
-    MatchArm as match_arm => {
+    'arena MatchArm as match_arm => {
         match match_arm {
             MatchArm::Expression(expression_match_arm) => {
                 walker.walk_match_expression_arm(expression_match_arm, context);
@@ -1681,20 +1721,20 @@ generate_ast_walker! {
         }
     }
 
-    MatchExpressionArm as match_expression_arm => {
+    'arena MatchExpressionArm as match_expression_arm => {
         for condition in match_expression_arm.conditions.iter() {
             walker.walk_expression(condition, context);
         }
 
-        walker.walk_expression(&match_expression_arm.expression, context);
+        walker.walk_expression(match_expression_arm.expression, context);
     }
 
-    MatchDefaultArm as match_default_arm => {
+    'arena MatchDefaultArm as match_default_arm => {
         walker.walk_keyword(&match_default_arm.r#default, context);
-        walker.walk_expression(&match_default_arm.expression, context);
+        walker.walk_expression(match_default_arm.expression, context);
     }
 
-    Yield as r#yield => {
+    'arena Yield as r#yield => {
         match r#yield {
             Yield::Value(yield_value) => {
                 walker.walk_yield_value(yield_value, context);
@@ -1708,7 +1748,7 @@ generate_ast_walker! {
         }
     }
 
-    YieldValue as yield_value => {
+    'arena YieldValue as yield_value => {
         walker.walk_keyword(&yield_value.r#yield, context);
 
         if let Some(value) = &yield_value.value {
@@ -1716,19 +1756,19 @@ generate_ast_walker! {
         }
     }
 
-    YieldPair as yield_pair => {
+    'arena YieldPair as yield_pair => {
         walker.walk_keyword(&yield_pair.r#yield, context);
-        walker.walk_expression(&yield_pair.key, context);
-        walker.walk_expression(&yield_pair.value, context);
+        walker.walk_expression(yield_pair.key, context);
+        walker.walk_expression(yield_pair.value, context);
     }
 
-    YieldFrom as yield_from => {
+    'arena YieldFrom as yield_from => {
         walker.walk_keyword(&yield_from.r#yield, context);
         walker.walk_keyword(&yield_from.from, context);
-        walker.walk_expression(&yield_from.iterator, context);
+        walker.walk_expression(yield_from.iterator, context);
     }
 
-    Construct as construct => {
+    'arena Construct as construct => {
         match construct {
             Construct::Isset(isset_construct) => {
                 walker.walk_isset_construct(isset_construct, context);
@@ -1763,73 +1803,73 @@ generate_ast_walker! {
         }
     }
 
-    IssetConstruct as isset_construct => {
+    'arena IssetConstruct as isset_construct => {
         walker.walk_keyword(&isset_construct.isset, context);
         for value in isset_construct.values.iter() {
             walker.walk_expression(value, context);
         }
     }
 
-    EmptyConstruct as empty_construct => {
+    'arena EmptyConstruct as empty_construct => {
         walker.walk_keyword(&empty_construct.empty, context);
-        walker.walk_expression(&empty_construct.value, context);
+        walker.walk_expression(empty_construct.value, context);
     }
 
-    EvalConstruct as eval_construct => {
+    'arena EvalConstruct as eval_construct => {
         walker.walk_keyword(&eval_construct.eval, context);
-        walker.walk_expression(&eval_construct.value, context);
+        walker.walk_expression(eval_construct.value, context);
     }
 
-    IncludeConstruct as include_construct => {
+    'arena IncludeConstruct as include_construct => {
         walker.walk_keyword(&include_construct.include, context);
-        walker.walk_expression(&include_construct.value, context);
+        walker.walk_expression(include_construct.value, context);
     }
 
-    IncludeOnceConstruct as include_once_construct => {
+    'arena IncludeOnceConstruct as include_once_construct => {
         walker.walk_keyword(&include_once_construct.include_once, context);
-        walker.walk_expression(&include_once_construct.value, context);
+        walker.walk_expression(include_once_construct.value, context);
     }
 
-    RequireConstruct as require_construct => {
+    'arena RequireConstruct as require_construct => {
         walker.walk_keyword(&require_construct.require, context);
-        walker.walk_expression(&require_construct.value, context);
+        walker.walk_expression(require_construct.value, context);
     }
 
-    RequireOnceConstruct as require_once_construct => {
+    'arena RequireOnceConstruct as require_once_construct => {
         walker.walk_keyword(&require_once_construct.require_once, context);
-        walker.walk_expression(&require_once_construct.value, context);
+        walker.walk_expression(require_once_construct.value, context);
     }
 
-    PrintConstruct as print_construct => {
+    'arena PrintConstruct as print_construct => {
         walker.walk_keyword(&print_construct.print, context);
-        walker.walk_expression(&print_construct.value, context);
+        walker.walk_expression(print_construct.value, context);
     }
 
-    ExitConstruct as exit_construct => {
+    'arena ExitConstruct as exit_construct => {
         walker.walk_keyword(&exit_construct.exit, context);
         if let Some(arguments) = &exit_construct.arguments {
             walker.walk_argument_list(arguments, context);
         }
     }
 
-    DieConstruct as die_construct => {
+    'arena DieConstruct as die_construct => {
         walker.walk_keyword(&die_construct.die, context);
         if let Some(arguments) = &die_construct.arguments {
             walker.walk_argument_list(arguments, context);
         }
     }
 
-    Throw as r#throw => {
+    'arena Throw as r#throw => {
         walker.walk_keyword(&r#throw.r#throw, context);
-        walker.walk_expression(&r#throw.exception, context);
+        walker.walk_expression(r#throw.exception, context);
     }
 
-    Clone as clone => {
+    'arena Clone as clone => {
         walker.walk_keyword(&clone.clone, context);
-        walker.walk_expression(&clone.object, context);
+        walker.walk_expression(clone.object, context);
     }
 
-    Call as call => {
+    'arena Call as call => {
         match call {
             Call::Function(function_call) => {
                 walker.walk_function_call(function_call, context);
@@ -1846,30 +1886,30 @@ generate_ast_walker! {
         }
     }
 
-    FunctionCall as function_call => {
-        walker.walk_expression(&function_call.function, context);
+    'arena FunctionCall as function_call => {
+        walker.walk_expression(function_call.function, context);
         walker.walk_argument_list(&function_call.argument_list, context);
     }
 
-    MethodCall as method_call => {
-        walker.walk_expression(&method_call.object, context);
+    'arena MethodCall as method_call => {
+        walker.walk_expression(method_call.object, context);
         walker.walk_class_like_member_selector(&method_call.method, context);
         walker.walk_argument_list(&method_call.argument_list, context);
     }
 
-    NullSafeMethodCall as null_safe_method_call => {
-        walker.walk_expression(&null_safe_method_call.object, context);
+    'arena NullSafeMethodCall as null_safe_method_call => {
+        walker.walk_expression(null_safe_method_call.object, context);
         walker.walk_class_like_member_selector(&null_safe_method_call.method, context);
         walker.walk_argument_list(&null_safe_method_call.argument_list, context);
     }
 
-    StaticMethodCall as static_method_call => {
-        walker.walk_expression(&static_method_call.class, context);
+    'arena StaticMethodCall as static_method_call => {
+        walker.walk_expression(static_method_call.class, context);
         walker.walk_class_like_member_selector(&static_method_call.method, context);
         walker.walk_argument_list(&static_method_call.argument_list, context);
     }
 
-    ClassLikeMemberSelector as class_like_member_selector => {
+    'arena ClassLikeMemberSelector as class_like_member_selector => {
         match class_like_member_selector {
             ClassLikeMemberSelector::Identifier(local_identifier) => {
                 walker.walk_local_identifier(local_identifier, context);
@@ -1887,15 +1927,15 @@ generate_ast_walker! {
         }
     }
 
-    ClassLikeMemberExpressionSelector as class_like_member_expression_selector => {
-        walker.walk_expression(&class_like_member_expression_selector.expression, context);
+    'arena ClassLikeMemberExpressionSelector as class_like_member_expression_selector => {
+        walker.walk_expression(class_like_member_expression_selector.expression, context);
     }
 
-    ConstantAccess as constant_access => {
+    'arena ConstantAccess as constant_access => {
         walker.walk_identifier(&constant_access.name, context);
     }
 
-    Access as access => {
+    'arena Access as access => {
         match access {
             Access::Property(property_access) => {
                 walker.walk_property_access(property_access, context);
@@ -1912,27 +1952,27 @@ generate_ast_walker! {
         }
     }
 
-    PropertyAccess as property_access => {
-        walker.walk_expression(&property_access.object, context);
+    'arena PropertyAccess as property_access => {
+        walker.walk_expression(property_access.object, context);
         walker.walk_class_like_member_selector(&property_access.property, context);
     }
 
-    NullSafePropertyAccess as null_safe_property_access => {
-        walker.walk_expression(&null_safe_property_access.object, context);
+    'arena NullSafePropertyAccess as null_safe_property_access => {
+        walker.walk_expression(null_safe_property_access.object, context);
         walker.walk_class_like_member_selector(&null_safe_property_access.property, context);
     }
 
-    StaticPropertyAccess as static_property_access => {
-        walker.walk_expression(&static_property_access.class, context);
+    'arena StaticPropertyAccess as static_property_access => {
+        walker.walk_expression(static_property_access.class, context);
         walker.walk_variable(&static_property_access.property, context);
     }
 
-    ClassConstantAccess as class_constant_access => {
-        walker.walk_expression(&class_constant_access.class, context);
+    'arena ClassConstantAccess as class_constant_access => {
+        walker.walk_expression(class_constant_access.class, context);
         walker.walk_class_like_constant_selector(&class_constant_access.constant, context);
     }
 
-    ClassLikeConstantSelector as class_like_constant_selector => {
+    'arena ClassLikeConstantSelector as class_like_constant_selector => {
         match class_like_constant_selector {
             ClassLikeConstantSelector::Identifier(local_identifier) => {
                 walker.walk_local_identifier(local_identifier, context);
@@ -1947,7 +1987,7 @@ generate_ast_walker! {
         }
     }
 
-    ClosureCreation as closure_creation => {
+    'arena ClosureCreation as closure_creation => {
         match closure_creation {
             ClosureCreation::Function(function_closure_creation) => {
                 walker.walk_function_closure_creation(function_closure_creation, context);
@@ -1961,50 +2001,50 @@ generate_ast_walker! {
         }
     }
 
-    FunctionClosureCreation as function_closure_creation => {
-        walker.walk_expression(&function_closure_creation.function, context);
+    'arena FunctionClosureCreation as function_closure_creation => {
+        walker.walk_expression(function_closure_creation.function, context);
     }
 
-    MethodClosureCreation as method_closure_creation => {
-        walker.walk_expression(&method_closure_creation.object, context);
+    'arena MethodClosureCreation as method_closure_creation => {
+        walker.walk_expression(method_closure_creation.object, context);
         walker.walk_class_like_member_selector(&method_closure_creation.method, context);
     }
 
-    StaticMethodClosureCreation as static_method_closure_creation => {
-        walker.walk_expression(&static_method_closure_creation.class, context);
+    'arena StaticMethodClosureCreation as static_method_closure_creation => {
+        walker.walk_expression(static_method_closure_creation.class, context);
         walker.walk_class_like_member_selector(&static_method_closure_creation.method, context);
     }
 
-    Keyword as parent_keyword => {
+    'arena Keyword as parent_keyword => {
         // Do nothing by default
     }
 
-    Keyword as static_keyword => {
+    'arena Keyword as static_keyword => {
         // Do nothing by default
     }
 
-    Keyword as self_keyword => {
+    'arena Keyword as self_keyword => {
         // Do nothing by default
     }
 
-    Instantiation as instantiation => {
+    'arena Instantiation as instantiation => {
         walker.walk_keyword(&instantiation.new, context);
-        walker.walk_expression(&instantiation.class, context);
+        walker.walk_expression(instantiation.class, context);
         if let Some(argument_list) = &instantiation.argument_list {
             walker.walk_argument_list(argument_list, context);
         }
     }
 
-    MagicConstant as magic_constant => {
+    'arena MagicConstant as magic_constant => {
         walker.walk_local_identifier(magic_constant.value(), context);
     }
 
-    Pipe as pipe => {
-        walker.walk_expression(&pipe.input, context);
-        walker.walk_expression(&pipe.callable, context);
+    'arena Pipe as pipe => {
+        walker.walk_expression(pipe.input, context);
+        walker.walk_expression(pipe.callable, context);
     }
 
-    Hint as hint => {
+    'arena Hint as hint => {
         match hint {
             Hint::Identifier(identifier) => {
                 walker.walk_identifier(identifier, context);
@@ -2045,25 +2085,25 @@ generate_ast_walker! {
         }
     }
 
-    ParenthesizedHint as parenthesized_hint => {
-        walker.walk_hint(&parenthesized_hint.hint, context);
+    'arena ParenthesizedHint as parenthesized_hint => {
+        walker.walk_hint(parenthesized_hint.hint, context);
     }
 
-    NullableHint as nullable_hint => {
-        walker.walk_hint(&nullable_hint.hint, context);
+    'arena NullableHint as nullable_hint => {
+        walker.walk_hint(nullable_hint.hint, context);
     }
 
-    UnionHint as union_hint => {
-        walker.walk_hint(&union_hint.left, context);
-        walker.walk_hint(&union_hint.right, context);
+    'arena UnionHint as union_hint => {
+        walker.walk_hint(union_hint.left, context);
+        walker.walk_hint(union_hint.right, context);
     }
 
-    IntersectionHint as intersection_hint => {
-        walker.walk_hint(&intersection_hint.left, context);
-        walker.walk_hint(&intersection_hint.right, context);
+    'arena IntersectionHint as intersection_hint => {
+        walker.walk_hint(intersection_hint.left, context);
+        walker.walk_hint(intersection_hint.right, context);
     }
 
-    Keyword as keyword => {
+    'arena Keyword as keyword => {
         // Do nothing by default
     }
 }

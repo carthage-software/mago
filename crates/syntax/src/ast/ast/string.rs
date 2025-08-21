@@ -1,47 +1,45 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::ast::expression::Expression;
 use crate::ast::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum CompositeString {
-    ShellExecute(ShellExecuteString),
-    Interpolated(InterpolatedString),
-    Document(DocumentString),
+#[repr(u8)]
+pub enum CompositeString<'arena> {
+    ShellExecute(ShellExecuteString<'arena>),
+    Interpolated(InterpolatedString<'arena>),
+    Document(DocumentString<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ShellExecuteString {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ShellExecuteString<'arena> {
     pub left_backtick: Span,
-    pub parts: Sequence<StringPart>,
+    pub parts: Sequence<'arena, StringPart<'arena>>,
     pub right_backtick: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct InterpolatedString {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct InterpolatedString<'arena> {
     pub left_double_quote: Span,
-    pub parts: Sequence<StringPart>,
+    pub parts: Sequence<'arena, StringPart<'arena>>,
     pub right_double_quote: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum DocumentKind {
     Heredoc,
     Nowdoc,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
+#[repr(u8)]
 pub enum DocumentIndentation {
     None,
     Whitespace(usize),
@@ -49,40 +47,40 @@ pub enum DocumentIndentation {
     Mixed(usize, usize),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct DocumentString {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct DocumentString<'arena> {
     pub open: Span,
     pub kind: DocumentKind,
     pub indentation: DocumentIndentation,
-    pub label: StringIdentifier,
-    pub parts: Sequence<StringPart>,
+    pub label: &'arena str,
+    pub parts: Sequence<'arena, StringPart<'arena>>,
     pub close: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum StringPart {
-    Literal(LiteralStringPart),
-    Expression(Box<Expression>),
-    BracedExpression(BracedExpressionStringPart),
+#[repr(u8)]
+pub enum StringPart<'arena> {
+    Literal(LiteralStringPart<'arena>),
+    Expression(&'arena Expression<'arena>),
+    BracedExpression(BracedExpressionStringPart<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct LiteralStringPart {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct LiteralStringPart<'arena> {
     pub span: Span,
-    pub value: StringIdentifier,
+    pub value: &'arena str,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct BracedExpressionStringPart {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct BracedExpressionStringPart<'arena> {
     pub left_brace: Span,
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     pub right_brace: Span,
 }
 
-impl CompositeString {
-    pub fn parts(&self) -> &Sequence<StringPart> {
+impl<'arena> CompositeString<'arena> {
+    pub fn parts(&self) -> &Sequence<'arena, StringPart<'arena>> {
         match self {
             CompositeString::ShellExecute(s) => &s.parts,
             CompositeString::Interpolated(i) => &i.parts,
@@ -91,7 +89,7 @@ impl CompositeString {
     }
 }
 
-impl HasSpan for CompositeString {
+impl HasSpan for CompositeString<'_> {
     fn span(&self) -> Span {
         match self {
             CompositeString::ShellExecute(s) => s.span(),
@@ -101,25 +99,25 @@ impl HasSpan for CompositeString {
     }
 }
 
-impl HasSpan for ShellExecuteString {
+impl HasSpan for ShellExecuteString<'_> {
     fn span(&self) -> Span {
         self.left_backtick.join(self.right_backtick)
     }
 }
 
-impl HasSpan for InterpolatedString {
+impl HasSpan for InterpolatedString<'_> {
     fn span(&self) -> Span {
         self.left_double_quote.join(self.right_double_quote)
     }
 }
 
-impl HasSpan for DocumentString {
+impl HasSpan for DocumentString<'_> {
     fn span(&self) -> Span {
         self.open
     }
 }
 
-impl HasSpan for StringPart {
+impl HasSpan for StringPart<'_> {
     fn span(&self) -> Span {
         match self {
             StringPart::Literal(l) => l.span(),
@@ -129,13 +127,13 @@ impl HasSpan for StringPart {
     }
 }
 
-impl HasSpan for LiteralStringPart {
+impl HasSpan for LiteralStringPart<'_> {
     fn span(&self) -> Span {
         self.span
     }
 }
 
-impl HasSpan for BracedExpressionStringPart {
+impl HasSpan for BracedExpressionStringPart<'_> {
     fn span(&self) -> Span {
         self.left_brace.join(self.right_brace)
     }

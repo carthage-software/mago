@@ -15,11 +15,11 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for Throw {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let was_inside_throw = block_context.inside_throw;
@@ -53,7 +53,7 @@ impl Analyzable for Throw {
             }
         }
 
-        if let Some(exception_type) = artifacts.get_expression_type(self.exception.as_ref()) {
+        if let Some(exception_type) = artifacts.get_expression_type(self.exception) {
             let throwable = context.interner.intern("Throwable");
 
             for exception_atomic in exception_type.types.as_ref() {

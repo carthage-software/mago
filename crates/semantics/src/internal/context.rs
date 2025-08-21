@@ -1,5 +1,4 @@
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::Issue;
@@ -12,28 +11,25 @@ use mago_syntax::ast::Program;
 const ISSUE_CODE: &str = "semantics";
 
 #[derive(Debug)]
-pub struct Context<'a> {
-    pub interner: &'a ThreadedInterner,
-    pub version: &'a PHPVersion,
-    pub program: &'a Program,
-    pub names: &'a ResolvedNames,
-    pub source_file: &'a File,
+pub struct Context<'input, 'ast, 'arena> {
+    pub version: PHPVersion,
+    pub program: &'ast Program<'arena>,
+    pub names: &'ast ResolvedNames<'arena>,
+    pub source_file: &'input File,
     pub ancestors: Vec<Span>,
     pub hint_depth: usize,
 
     issues: IssueCollection,
 }
 
-impl<'a> Context<'a> {
+impl<'input, 'ast, 'arena> Context<'input, 'ast, 'arena> {
     pub fn new(
-        interner: &'a ThreadedInterner,
-        version: &'a PHPVersion,
-        program: &'a Program,
-        names: &'a ResolvedNames,
-        source_file: &'a File,
+        version: PHPVersion,
+        program: &'ast Program<'arena>,
+        names: &'ast ResolvedNames<'arena>,
+        source_file: &'input File,
     ) -> Self {
         Self {
-            interner,
             version,
             program,
             names,
@@ -45,12 +41,12 @@ impl<'a> Context<'a> {
     }
 
     #[inline]
-    pub fn get_name(&self, position: &Position) -> &'a str {
-        self.interner.lookup(self.names.get(position))
+    pub fn get_name(&self, position: &Position) -> &'arena str {
+        self.names.get(position)
     }
 
     #[inline]
-    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'a str {
+    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'input str {
         let s = span.span();
 
         &self.source_file.contents[s.start.offset as usize..s.end.offset as usize]

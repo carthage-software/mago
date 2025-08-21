@@ -22,14 +22,14 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::reconciler::reconcile_keyed_types;
 
-pub(crate) fn analyze<'a>(
-    context: &mut Context<'a>,
-    mut outer_context: BlockContext<'a>,
+pub(crate) fn analyze<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    mut outer_context: BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     if_scope: &mut IfScope,
-    condition: &Expression,
+    condition: &Expression<'arena>,
     check_for_paradoxes: bool,
-) -> Result<(IfConditionalScope<'a>, BlockContext<'a>), AnalysisError> {
+) -> Result<(IfConditionalScope<'ctx>, BlockContext<'ctx>), AnalysisError> {
     let mut entry_clauses = vec![];
 
     let old_outer_context = outer_context.clone();
@@ -43,10 +43,8 @@ pub(crate) fn analyze<'a>(
         if !if_scope.negated_types.is_empty() {
             let mut tmp_context = outer_context.clone();
 
-            let mut reconciliation_context = context.get_reconciliation_context();
-
             reconcile_keyed_types(
-                &mut reconciliation_context,
+                context,
                 &if_scope.negated_types,
                 IndexMap::new(),
                 &mut tmp_context,
@@ -159,24 +157,25 @@ pub(crate) fn analyze<'a>(
     ))
 }
 
-fn get_definitely_evaluated_expression_after_if(condition: &Expression) -> &Expression {
+fn get_definitely_evaluated_expression_after_if<'ast, 'arena>(
+    condition: &'ast Expression<'arena>,
+) -> &'ast Expression<'arena> {
     match &condition {
         Expression::Parenthesized(p) => {
-            return get_definitely_evaluated_expression_after_if(&p.expression);
+            return get_definitely_evaluated_expression_after_if(p.expression);
         }
         Expression::Binary(binary) => {
             if let BinaryOperator::Or(_) | BinaryOperator::LowOr(_) = binary.operator {
-                return get_definitely_evaluated_expression_after_if(&binary.lhs);
+                return get_definitely_evaluated_expression_after_if(binary.lhs);
             }
 
             return condition;
         }
         Expression::UnaryPrefix(unary) => {
             if let UnaryPrefixOperator::Not(_) = unary.operator {
-                let operand = unary.operand.as_ref();
-                let inner_expression = get_definitely_evaluated_expression_inside_if(operand);
+                let inner_expression = get_definitely_evaluated_expression_inside_if(unary.operand);
 
-                if inner_expression != operand {
+                if inner_expression != unary.operand {
                     return inner_expression;
                 }
             }
@@ -187,24 +186,25 @@ fn get_definitely_evaluated_expression_after_if(condition: &Expression) -> &Expr
     condition
 }
 
-fn get_definitely_evaluated_expression_inside_if(condition: &Expression) -> &Expression {
+fn get_definitely_evaluated_expression_inside_if<'ast, 'arena>(
+    condition: &'ast Expression<'arena>,
+) -> &'ast Expression<'arena> {
     match &condition {
         Expression::Parenthesized(p) => {
-            return get_definitely_evaluated_expression_inside_if(&p.expression);
+            return get_definitely_evaluated_expression_inside_if(p.expression);
         }
         Expression::Binary(binary) => {
             if let BinaryOperator::Or(_) | BinaryOperator::LowOr(_) = binary.operator {
-                return get_definitely_evaluated_expression_inside_if(&binary.lhs);
+                return get_definitely_evaluated_expression_inside_if(binary.lhs);
             }
 
             return condition;
         }
         Expression::UnaryPrefix(unary) => {
             if let UnaryPrefixOperator::Not(_) = unary.operator {
-                let operand = unary.operand.as_ref();
-                let inner_expression = get_definitely_evaluated_expression_inside_if(operand);
+                let inner_expression = get_definitely_evaluated_expression_inside_if(unary.operand);
 
-                if inner_expression != operand {
+                if inner_expression != unary.operand {
                     return inner_expression;
                 }
             }
@@ -215,7 +215,11 @@ fn get_definitely_evaluated_expression_inside_if(condition: &Expression) -> &Exp
     condition
 }
 
-pub fn handle_paradoxical_condition<T: HasSpan>(context: &mut Context<'_>, expression: &T, expression_type: &TUnion) {
+pub fn handle_paradoxical_condition<'ctx, 'ast, 'arena, T: HasSpan>(
+    context: &mut Context<'ctx, 'arena>,
+    expression: &'ast T,
+    expression_type: &TUnion,
+) {
     let type_id = expression_type.get_id(Some(context.interner));
 
     if expression_type.is_always_falsy() {

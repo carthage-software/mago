@@ -93,14 +93,14 @@ impl LintRule for NoLiteralPasswordRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Assignment(assignment) => {
-                let Some(password) = get_password(ctx, &assignment.lhs) else {
+                let Some(password) = get_password(assignment.lhs) else {
                     return;
                 };
 
-                check(password, &assignment.rhs, ctx, self)
+                check(password, assignment.rhs, ctx, self)
             }
             Node::ArrayElement(array_element) => {
                 let ArrayElement::KeyValue(kv) = array_element else {
@@ -108,35 +108,32 @@ impl LintRule for NoLiteralPasswordRule {
                 };
 
                 let is_key_a_password = matches!(
-                    kv.key.as_ref(),
-                    Expression::Literal(Literal::String(literal_string)) if is_password_literal(ctx, literal_string),
+                    kv.key,
+                    Expression::Literal(Literal::String(literal_string)) if is_password_literal( literal_string),
                 );
 
                 if !is_key_a_password {
                     return;
                 }
 
-                check(kv.key.span(), kv.value.as_ref(), ctx, self)
+                check(kv.key.span(), kv.value, ctx, self)
             }
             Node::ConstantItem(constant_item) => {
-                let constant_name = ctx.interner.lookup(&constant_item.name.value);
-                if !is_password(constant_name) {
+                if !is_password(constant_item.name.value) {
                     return;
                 }
 
                 check(constant_item.name.span, &constant_item.value, ctx, self)
             }
             Node::ClassLikeConstantItem(class_like_constant_item) => {
-                let constant_name = ctx.interner.lookup(&class_like_constant_item.name.value);
-                if !is_password(constant_name) {
+                if !is_password(class_like_constant_item.name.value) {
                     return;
                 }
 
                 check(class_like_constant_item.name.span, &class_like_constant_item.value, ctx, self)
             }
             Node::PropertyConcreteItem(property_concrete_item) => {
-                let variable_name = ctx.interner.lookup(&property_concrete_item.variable.name);
-                if !is_password(&variable_name[1..]) {
+                if !is_password(&property_concrete_item.variable.name[1..]) {
                     return;
                 }
 
@@ -147,16 +144,14 @@ impl LintRule for NoLiteralPasswordRule {
                     return;
                 };
 
-                let parameter_name = ctx.interner.lookup(&function_like_parameter.variable.name);
-                if !is_password(&parameter_name[1..]) {
+                if !is_password(&function_like_parameter.variable.name[1..]) {
                     return;
                 }
 
                 check(function_like_parameter.variable.span, &default_value.value, ctx, self)
             }
             Node::NamedArgument(named_argument) => {
-                let argument_name = ctx.interner.lookup(&named_argument.name.value);
-                if !is_password(argument_name) {
+                if !is_password(named_argument.name.value) {
                     return;
                 }
 
@@ -168,13 +163,14 @@ impl LintRule for NoLiteralPasswordRule {
 }
 
 #[inline]
-fn check(name: Span, value: &Expression, ctx: &mut LintContext, rule: &NoLiteralPasswordRule) {
+fn check<'ast, 'arena>(
+    name: Span,
+    value: &'ast Expression<'arena>,
+    ctx: &mut LintContext<'_, 'ast, 'arena>,
+    rule: &NoLiteralPasswordRule,
+) {
     let is_literal_password = match value {
-        Expression::Literal(Literal::String(literal_string)) => {
-            let value = ctx.interner.lookup(&literal_string.raw);
-
-            value.len() > 2
-        }
+        Expression::Literal(Literal::String(literal_string)) => literal_string.raw.len() > 2,
         Expression::Literal(Literal::Integer(_)) => true,
         _ => false,
     };

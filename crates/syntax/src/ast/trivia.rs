@@ -1,15 +1,13 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Sequence;
 
 /// Represents the kind of trivia.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum TriviaKind {
     WhiteSpace,
@@ -23,11 +21,11 @@ pub enum TriviaKind {
 ///
 /// A trivia is a piece of information that is not part of the syntax tree,
 /// such as comments and white spaces.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Trivia {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct Trivia<'arena> {
     pub kind: TriviaKind,
     pub span: Span,
-    pub value: StringIdentifier,
+    pub value: &'arena str,
 }
 
 impl TriviaKind {
@@ -59,15 +57,15 @@ impl TriviaKind {
     }
 }
 
-impl HasSpan for Trivia {
+impl HasSpan for Trivia<'_> {
     fn span(&self) -> Span {
         self.span
     }
 }
 
-impl Sequence<Trivia> {
+impl<'arena> Sequence<'arena, Trivia<'arena>> {
     /// Returns an iterator over the comments in the sequence.
-    pub fn comments(&self) -> impl Iterator<Item = &Trivia> {
+    pub fn comments(&self) -> impl Iterator<Item = &Trivia<'arena>> {
         self.iter().filter(|trivia| trivia.kind.is_comment())
     }
 }

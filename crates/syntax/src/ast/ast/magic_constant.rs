@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -7,23 +6,23 @@ use mago_span::Span;
 
 use crate::ast::ast::identifier::LocalIdentifier;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum MagicConstant {
-    Line(LocalIdentifier),
-    File(LocalIdentifier),
-    Directory(LocalIdentifier),
-    Trait(LocalIdentifier),
-    Method(LocalIdentifier),
-    Function(LocalIdentifier),
-    Property(LocalIdentifier),
-    Namespace(LocalIdentifier),
-    Class(LocalIdentifier),
+#[repr(u8)]
+pub enum MagicConstant<'arena> {
+    Line(LocalIdentifier<'arena>),
+    File(LocalIdentifier<'arena>),
+    Directory(LocalIdentifier<'arena>),
+    Trait(LocalIdentifier<'arena>),
+    Method(LocalIdentifier<'arena>),
+    Function(LocalIdentifier<'arena>),
+    Property(LocalIdentifier<'arena>),
+    Namespace(LocalIdentifier<'arena>),
+    Class(LocalIdentifier<'arena>),
 }
 
-impl MagicConstant {
-    pub fn value(&self) -> &LocalIdentifier {
+impl<'arena> MagicConstant<'arena> {
+    pub fn value(&self) -> &LocalIdentifier<'arena> {
         match self {
             MagicConstant::Line(value) => value,
             MagicConstant::File(value) => value,
@@ -38,7 +37,7 @@ impl MagicConstant {
     }
 }
 
-impl HasSpan for MagicConstant {
+impl HasSpan for MagicConstant<'_> {
     fn span(&self) -> Span {
         match self {
             MagicConstant::Line(value) => value.span(),

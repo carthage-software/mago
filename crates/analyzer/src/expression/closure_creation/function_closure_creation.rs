@@ -20,14 +20,14 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl Analyzable for FunctionClosureCreation {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionClosureCreation<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let callables = resolve_function_callable_types(context, block_context, artifacts, &self.function)?;
+        let callables = resolve_function_callable_types(context, block_context, artifacts, self.function)?;
         if callables.is_empty() {
             return Ok(());
         }
@@ -52,46 +52,45 @@ impl Analyzable for FunctionClosureCreation {
     }
 }
 
-fn resolve_function_callable_types<'a, 'b>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
-    artifacts: &'b mut AnalysisArtifacts,
-    expression: &Expression,
-) -> Result<Vec<Cow<'b, TCallable>>, AnalysisError> {
+fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &'artifacts mut AnalysisArtifacts,
+    expression: &Expression<'arena>,
+) -> Result<Vec<Cow<'artifacts, TCallable>>, AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
         let name = context.resolved_names.get(function_name);
+        let name_id = context.interner.intern(name);
         let unqualified_name = function_name.value();
+        let unqualified_name_id = context.interner.intern(unqualified_name);
 
-        let identifier = if function_exists(context.codebase, context.interner, name) {
-            FunctionLikeIdentifier::Function(*name)
+        let identifier = if function_exists(context.codebase, context.interner, &name_id) {
+            FunctionLikeIdentifier::Function(name_id)
         } else if !function_name.is_fully_qualified()
             && unqualified_name != name
-            && function_exists(context.codebase, context.interner, unqualified_name)
+            && function_exists(context.codebase, context.interner, &unqualified_name_id)
         {
-            FunctionLikeIdentifier::Function(*unqualified_name)
+            FunctionLikeIdentifier::Function(unqualified_name_id)
         } else {
-            let name_str = context.interner.lookup(name);
-            let alternative_name_str = context.interner.lookup(unqualified_name);
-
-            let issue = if alternative_name_str != name_str {
+            let issue = if unqualified_name != name {
                 Issue::error(format!(
-                    "Could not find definition for function `{name_str}` (also tried as `{alternative_name_str}` in a broader scope)."
+                    "Could not find definition for function `{name}` (also tried as `{unqualified_name}` in a broader scope)."
                 )).with_annotation(
-                    Annotation::primary(expression.span()).with_message(format!("Attempted to use function `{name_str}` which is undefined")),
+                    Annotation::primary(expression.span()).with_message(format!("Attempted to use function `{name}` which is undefined")),
                 ).with_note(
-                    format!("Neither `{name_str}` (e.g., in current namespace) nor `{alternative_name_str}` (e.g., global fallback) could be resolved."),
+                    format!("Neither `{name}` (e.g., in current namespace) nor `{unqualified_name}` (e.g., global fallback) could be resolved."),
                 )
             } else {
-                Issue::error(format!("Function `{name_str}` could not be found.")).with_annotation(
+                Issue::error(format!("Function `{name}` could not be found.")).with_annotation(
                     Annotation::primary(expression.span())
-                        .with_message(format!("Undefined function `{name_str}` called here")),
+                        .with_message(format!("Undefined function `{name}` called here")),
                 )
             };
 
             context.collector.report_with_code(
                 IssueCode::NonExistentFunction,
                 issue.with_note("This often means the function is misspelled, not imported correctly (e.g., missing `use` statement for namespaced functions), or not defined/autoloaded.")
-                    .with_help(format!("Check for typos in `{name_str}`. Verify namespace imports if applicable, and ensure the function is defined and accessible."))
+                    .with_help(format!("Check for typos in `{name}`. Verify namespace imports if applicable, and ensure the function is defined and accessible."))
             );
 
             return Ok(vec![]);

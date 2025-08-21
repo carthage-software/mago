@@ -87,10 +87,10 @@ impl LintRule for PslDatetimeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let identifier = match node {
             Node::FunctionCall(function_call) => {
-                let Expression::Identifier(identifier) = function_call.function.as_ref() else {
+                let Expression::Identifier(identifier) = function_call.function else {
                     return;
                 };
 
@@ -117,14 +117,14 @@ impl LintRule for PslDatetimeRule {
                 return;
             }
             Node::Instantiation(instantiation) => {
-                let Expression::Identifier(identifier) = instantiation.class.as_ref() else {
+                let Expression::Identifier(identifier) = instantiation.class else {
                     return;
                 };
 
                 identifier
             }
             Node::StaticMethodCall(static_method_call) => {
-                let Expression::Identifier(identifier) = static_method_call.class.as_ref() else {
+                let Expression::Identifier(identifier) = static_method_call.class else {
                     return;
                 };
 

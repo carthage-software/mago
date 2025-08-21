@@ -38,11 +38,11 @@ pub mod enum_case;
 pub mod method;
 pub mod property;
 
-impl Analyzable for Class {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -53,9 +53,9 @@ impl Analyzable for Class {
             AttributeTarget::ClassLike,
         )?;
 
-        let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, name) else {
-            let name_str = context.interner.lookup(name);
+        let name_str = context.resolved_names.get(&self.name);
+        let name = context.interner.intern(name_str);
+        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, &name) else {
             tracing::warn!("Class {} not found in codebase", name_str);
 
             return Ok(());
@@ -78,11 +78,11 @@ impl Analyzable for Class {
     }
 }
 
-impl Analyzable for Interface {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -93,10 +93,10 @@ impl Analyzable for Interface {
             AttributeTarget::ClassLike,
         )?;
 
-        let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, name) else {
-            let name_str = context.interner.lookup(name);
-            tracing::warn!("Interface {} not found in codebase", name_str);
+        let name_str = context.resolved_names.get(&self.name);
+        let name = context.interner.intern(name_str);
+        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, &name) else {
+            tracing::warn!("Interface {name_str} not found in codebase");
 
             return Ok(());
         };
@@ -118,11 +118,11 @@ impl Analyzable for Interface {
     }
 }
 
-impl Analyzable for Trait {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -133,9 +133,9 @@ impl Analyzable for Trait {
             AttributeTarget::ClassLike,
         )?;
 
-        let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, name) else {
-            let name_str = context.interner.lookup(name);
+        let name_str = context.resolved_names.get(&self.name);
+        let name = context.interner.intern(name_str);
+        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, &name) else {
             tracing::warn!("Trait {} not found in codebase", name_str);
 
             return Ok(());
@@ -158,11 +158,11 @@ impl Analyzable for Trait {
     }
 }
 
-impl Analyzable for Enum {
-    fn analyze(
-        &self,
-        context: &mut Context<'_>,
-        block_context: &mut BlockContext<'_>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         analyze_attributes(
@@ -173,9 +173,9 @@ impl Analyzable for Enum {
             AttributeTarget::ClassLike,
         )?;
 
-        let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, name) else {
-            let name_str = context.interner.lookup(name);
+        let name_str = context.resolved_names.get(&self.name);
+        let name = context.interner.intern(name_str);
+        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, &name) else {
             tracing::warn!("Enum {} not found in codebase", name_str);
 
             return Ok(());
@@ -198,15 +198,15 @@ impl Analyzable for Enum {
     }
 }
 
-pub(crate) fn analyze_class_like<'a>(
-    context: &mut Context<'a>,
+pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
     name_span: Option<Span>,
     declaration_span: Span,
-    extends_ast: Option<&Extends>,
-    implements_ast: Option<&Implements>,
-    class_like_metadata: &'a ClassLikeMetadata,
-    members: &[ClassLikeMember],
+    extends_ast: Option<&'ast Extends<'arena>>,
+    implements_ast: Option<&'ast Implements<'arena>>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &'ast [ClassLikeMember<'arena>],
 ) -> Result<(), AnalysisError> {
     if context.settings.diff && context.codebase.safe_symbols.contains(&class_like_metadata.name) {
         return Ok(());
@@ -367,10 +367,10 @@ pub(crate) fn analyze_class_like<'a>(
     Ok(())
 }
 
-fn check_class_like_extends(
-    context: &mut Context<'_>,
-    class_like_metadata: &ClassLikeMetadata,
-    extends_ast: Option<&Extends>,
+fn check_class_like_extends<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    extends_ast: Option<&Extends<'arena>>,
 ) {
     // This check only applies to classes and interfaces, which can use `extends`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_interface() {
@@ -388,12 +388,14 @@ fn check_class_like_extends(
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
     for extended_type in extends.types.iter() {
-        let extended_type_id = context.resolved_names.get(&extended_type);
-        let extended_class_metadata = get_class_like(context.codebase, context.interner, extended_type_id);
+        let extended_type_str = context.resolved_names.get(&extended_type);
+        let extended_type_id = context.interner.intern(extended_type_str);
+        let extended_class_metadata = get_class_like(context.codebase, context.interner, &extended_type_id);
 
         // Case: The extended type does not exist.
         let Some(extended_class_metadata) = extended_class_metadata else {
-            let extended_name = context.interner.lookup(extended_type.value());
+            let extended_name = extended_type.value();
+
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
                 Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot extend unknown type `{extended_name}`"))
@@ -534,10 +536,10 @@ fn check_class_like_extends(
     }
 }
 
-fn check_class_like_implements(
-    context: &mut Context<'_>,
-    class_like_metadata: &ClassLikeMetadata,
-    implements_ast: Option<&Implements>,
+fn check_class_like_implements<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    implements_ast: Option<&Implements<'arena>>,
 ) {
     // This check only applies to classes and enums, which can use `implements`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
@@ -556,8 +558,9 @@ fn check_class_like_implements(
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
     for implemented_type in implements.types.iter() {
-        let implemented_type_id = context.resolved_names.get(&implemented_type);
-        let implemented_interface_metadata = get_class_like(context.codebase, context.interner, implemented_type_id);
+        let implemented_type_str = context.resolved_names.get(&implemented_type);
+        let implemented_type_id = context.interner.intern(implemented_type_str);
+        let implemented_interface_metadata = get_class_like(context.codebase, context.interner, &implemented_type_id);
 
         match implemented_interface_metadata {
             Some(implemented_metadata) => {
@@ -625,7 +628,7 @@ fn check_class_like_implements(
                 );
             }
             None => {
-                let implemented_name = context.interner.lookup(implemented_type.value());
+                let implemented_name = implemented_type.value();
 
                 context.collector.report_with_code(
                     IssueCode::NonExistentClassLike,
@@ -639,7 +642,11 @@ fn check_class_like_implements(
     }
 }
 
-fn check_class_like_use(context: &mut Context<'_>, class_like_metadata: &ClassLikeMetadata, trait_use: &TraitUse) {
+fn check_class_like_use<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    trait_use: &TraitUse<'arena>,
+) {
     let using_kind_str = class_like_metadata.kind.as_str();
     let using_kind_capitalized =
         format!("{}{}", using_kind_str.chars().next().unwrap().to_uppercase(), &using_kind_str[1..]);
@@ -647,11 +654,13 @@ fn check_class_like_use(context: &mut Context<'_>, class_like_metadata: &ClassLi
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
     for used_type in trait_use.trait_names.iter() {
-        let used_type_id = context.resolved_names.get(&used_type);
-        let used_trait_metadata = get_class_like(context.codebase, context.interner, used_type_id);
+        let used_type_str = context.resolved_names.get(&used_type);
+        let used_type_id = context.interner.intern(used_type_str);
+        let used_trait_metadata = get_class_like(context.codebase, context.interner, &used_type_id);
 
         let Some(used_trait_metadata) = used_trait_metadata else {
-            let used_name = context.interner.lookup(used_type.value());
+            let used_name = used_type.value();
+
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
                 Issue::error(format!("{using_kind_capitalized} `{using_name_str}` cannot use unknown type `{used_name}`"))
@@ -767,10 +776,10 @@ impl HasSpan for InheritanceKind {
     }
 }
 
-fn check_template_parameters(
-    context: &mut Context<'_>,
-    class_like_metadata: &ClassLikeMetadata,
-    parent_metadata: &ClassLikeMetadata,
+fn check_template_parameters<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    parent_metadata: &'ctx ClassLikeMetadata,
     actual_parameters_count: usize,
     inheritance: InheritanceKind,
 ) {
@@ -977,7 +986,10 @@ fn check_template_parameters(
     }
 }
 
-fn check_class_like_properties(context: &mut Context<'_>, class_like_metadata: &ClassLikeMetadata) {
+fn check_class_like_properties<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) {
     if class_like_metadata.kind.is_enum() {
         return;
     }

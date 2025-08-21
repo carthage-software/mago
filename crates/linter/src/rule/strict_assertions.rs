@@ -105,34 +105,34 @@ impl LintRule for StrictAssertionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };
 
-        let name = ctx.lookup(&method.name.value);
-        if !name.starts_with("test") || name.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase()) {
+        if !method.name.value.starts_with("test")
+            || method.name.value.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase())
+        {
             return;
         }
 
-        for reference in find_all_assertion_references_in_method(method, ctx) {
+        for reference in find_all_assertion_references_in_method(method) {
             let ClassLikeMemberSelector::Identifier(identifier) = reference.get_selector() else {
                 continue;
             };
 
-            let name = ctx.lookup(&identifier.value);
-            if NON_STRICT_ASSERTIONS.contains(&name) {
-                let strict_name = name.replacen("Equals", "Same", 1);
+            if NON_STRICT_ASSERTIONS.contains(&identifier.value) {
+                let strict_name = identifier.value.replacen("Equals", "Same", 1);
 
                 let issue = Issue::new(self.cfg.level(), "Use strict assertions in PHPUnit tests.")
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(reference.span())
-                            .with_message(format!("Non-strict assertion `{}` is used here.", name)),
+                            .with_message(format!("Non-strict assertion `{}` is used here.", identifier.value)),
                     )
                     .with_help(format!(
                         "Replace `{}` with `{}` to enforce strict comparisons in your tests.",
-                        name, strict_name
+                        identifier.value, strict_name
                     ));
 
                 ctx.collector.propose(issue, |plan| {

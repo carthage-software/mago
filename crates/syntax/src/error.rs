@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_database::file::FileId;
@@ -15,14 +14,14 @@ use crate::token::TokenKind;
 const SYNTAX_ERROR_CODE: &str = "syntax";
 const PARSE_ERROR_CODE: &str = "parse";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
     UnexpectedEndOfFile(FileId, Position),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(Vec<TokenKind>, FileId, Position),

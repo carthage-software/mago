@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_assignment(assignment: &Assignment, context: &mut Context<'_>) {
+pub fn check_assignment(assignment: &Assignment, context: &mut Context<'_, '_, '_>) {
     if context.version.is_supported(Feature::NullCoalesceAssign) {
         return;
     }

@@ -22,17 +22,17 @@ use crate::invocation::special_function_like_handler::utils::get_argument;
 pub struct TypeComponentFunctionsHandler;
 
 impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
-    fn get_return_type<'a>(
+    fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'a>,
-        _block_context: &BlockContext<'a>,
+        context: &mut Context<'ctx, 'arena>,
+        _block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
-        invocation: &Invocation,
+        invocation: &Invocation<'ctx, 'ast, 'arena>,
     ) -> Option<TUnion> {
         match function_like_name {
             "psl\\type\\shape" => {
-                let elements = get_argument(context, invocation.arguments_source, 0, vec!["elements"])?;
+                let elements = get_argument(invocation.arguments_source, 0, vec!["elements"])?;
                 let elements_type = artifacts.get_expression_type(elements)?;
 
                 let argument_array = if let Some(argument_array) = elements_type.get_single_array()
@@ -44,7 +44,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                 };
 
                 let allows_unknown_elements = if let Some(argument) =
-                    get_argument(context, invocation.arguments_source, 1, vec!["allow_unknown_fields"])
+                    get_argument(invocation.arguments_source, 1, vec!["allow_unknown_fields"])
                 {
                     artifacts
                         .get_expression_type(argument)

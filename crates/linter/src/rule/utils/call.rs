@@ -14,12 +14,12 @@ use crate::context::LintContext;
 ///
 /// Returns `Some(name)` with the **first matching name from the input slice** if a
 /// potential resolution matches, or `None` if no match is found.
-pub fn function_call_matches_any<'a>(
-    context: &LintContext<'_>,
-    call: &FunctionCall,
-    names: &[&'a str],
-) -> Option<&'a str> {
-    function_name_matches_any(context, &call.function, names)
+pub fn function_call_matches_any<'input, 'ast, 'arena, 'name>(
+    context: &LintContext<'input, 'ast, 'arena>,
+    call: &'ast FunctionCall<'arena>,
+    names: &[&'name str],
+) -> Option<&'name str> {
+    function_name_matches_any(context, call.function, names)
 }
 
 /// Checks if a `FunctionCall` could possibly refer to a specific function name.
@@ -27,17 +27,21 @@ pub fn function_call_matches_any<'a>(
 /// This is a convenience wrapper around `function_call_matches_any` for checking
 /// against a single function name.
 #[inline]
-pub fn function_call_matches(context: &LintContext<'_>, call: &FunctionCall, name: &str) -> bool {
+pub fn function_call_matches<'input, 'ast, 'arena, 'name>(
+    context: &LintContext<'input, 'ast, 'arena>,
+    call: &'ast FunctionCall<'arena>,
+    name: &'name str,
+) -> bool {
     function_call_matches_any(context, call, std::slice::from_ref(&name)).is_some()
 }
 
 /// The internal implementation that checks if a function name `Expression`
 /// could resolve to one of the provided names.
-fn function_name_matches_any<'a>(
-    context: &LintContext<'_>,
-    function: &Expression,
-    names: &[&'a str],
-) -> Option<&'a str> {
+fn function_name_matches_any<'input, 'ast, 'arena, 'name>(
+    context: &LintContext<'input, 'ast, 'arena>,
+    function: &'ast Expression<'arena>,
+    names: &[&'name str],
+) -> Option<&'name str> {
     let Expression::Identifier(function_identifier) = function else {
         return None;
     };
@@ -52,7 +56,7 @@ fn function_name_matches_any<'a>(
 
     // Case 2: Unqualified name. This matches calls in the global namespace
     // or provides a match for the global fallback.
-    let unqualified_name = context.interner.lookup(function_identifier.value());
+    let unqualified_name = function_identifier.value();
     if let Some(matched) = names.iter().find(|&name| unqualified_name.eq_ignore_ascii_case(name)) {
         return Some(matched);
     }
@@ -61,6 +65,7 @@ fn function_name_matches_any<'a>(
     // namespaced name (e.g., `App\foo`).
     if !context.scope.get_namespace().is_empty() {
         let fqn_in_namespace = context.lookup_name(function_identifier);
+
         return names.iter().find(|&name| fqn_in_namespace.eq_ignore_ascii_case(name)).copied();
     }
 

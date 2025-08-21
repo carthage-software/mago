@@ -7,12 +7,12 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_echo(stream: &mut TokenStream<'_, '_>) -> Result<Echo, ParseError> {
+pub fn parse_echo<'arena>(stream: &mut TokenStream<'arena>) -> Result<Echo<'arena>, ParseError> {
     Ok(Echo {
         echo: utils::expect_keyword(stream, T!["echo"])?,
         values: {
-            let mut values = vec![];
-            let mut commas = vec![];
+            let mut values = stream.new_vec();
+            let mut commas = stream.new_vec();
 
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {

@@ -43,14 +43,14 @@ use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::utils::template::get_generic_parameter_for_offset;
 use crate::visibility::check_method_visibility;
 
-impl Analyzable for Instantiation {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let classnames = resolve_classnames_from_expression(context, block_context, artifacts, &self.class, false)?;
+        let classnames = resolve_classnames_from_expression(context, block_context, artifacts, self.class, false)?;
         if classnames.is_empty() {
             return Ok(());
         }
@@ -122,14 +122,14 @@ impl Analyzable for Instantiation {
     }
 }
 
-fn analyze_class_instantiation<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+fn analyze_class_instantiation<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     classname: ResolvedClassname,
     instantiation_span: Span,
     class_expression_span: Span,
-    argument_list: Option<&ArgumentList>,
+    argument_list: Option<&ArgumentList<'arena>>,
 ) -> Result<TUnion, AnalysisError> {
     if classname.is_invalid() {
         argument_list.analyze(context, block_context, artifacts)?;

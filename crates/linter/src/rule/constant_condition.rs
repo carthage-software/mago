@@ -95,12 +95,12 @@ impl LintRule for ConstantConditionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::If(r#if) = node else {
             return;
         };
 
-        if is_truthy(&r#if.condition) {
+        if is_truthy(r#if.condition) {
             let issue = Issue::new(self.cfg.level, "Redundant `if` statement.")
                 .with_code(self.meta.code)
                 .with_annotation(
@@ -142,13 +142,13 @@ impl LintRule for ConstantConditionRule {
             return;
         }
 
-        if is_falsy(&r#if.condition) {
+        if is_falsy(r#if.condition) {
             // Exclude `if (false)` blocks used for IDE stubs.
             match &r#if.body {
                 IfBody::Statement(body)
                     if body.else_if_clauses.is_empty()
                         && body.else_clause.is_none()
-                        && statement_contains_only_definitions(&body.statement) =>
+                        && statement_contains_only_definitions(body.statement) =>
                 {
                     return;
                 }

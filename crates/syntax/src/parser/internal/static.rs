@@ -8,11 +8,11 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable::parse_direct_variable;
 
-pub fn parse_static(stream: &mut TokenStream<'_, '_>) -> Result<Static, ParseError> {
+pub fn parse_static<'arena>(stream: &mut TokenStream<'arena>) -> Result<Static<'arena>, ParseError> {
     let r#static = utils::expect_keyword(stream, T!["static"])?;
     let items = {
-        let mut items = vec![];
-        let mut commas = vec![];
+        let mut items = stream.new_vec();
+        let mut commas = stream.new_vec();
 
         loop {
             if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {
@@ -38,7 +38,7 @@ pub fn parse_static(stream: &mut TokenStream<'_, '_>) -> Result<Static, ParseErr
     Ok(Static { r#static, items, terminator })
 }
 
-pub fn parse_static_item(stream: &mut TokenStream<'_, '_>) -> Result<StaticItem, ParseError> {
+pub fn parse_static_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<StaticItem<'arena>, ParseError> {
     let variable = parse_direct_variable(stream)?;
 
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {

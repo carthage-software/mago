@@ -38,30 +38,30 @@ use crate::context::block::BlockContext;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum ArrayTarget<'a> {
-    Access(&'a ArrayAccess),
-    Append(&'a ArrayAppend),
+pub enum ArrayTarget<'ast, 'arena> {
+    Access(&'ast ArrayAccess<'arena>),
+    Append(&'ast ArrayAppend<'arena>),
 }
 
-impl<'a> ArrayTarget<'a> {
+impl<'ast, 'arena> ArrayTarget<'ast, 'arena> {
     #[inline]
-    pub const fn get_array(&self) -> &'a Expression {
+    pub const fn get_array(&self) -> &'ast Expression<'arena> {
         match self {
-            ArrayTarget::Access(array_access) => &array_access.array,
-            ArrayTarget::Append(array_append) => &array_append.array,
+            ArrayTarget::Access(array_access) => array_access.array,
+            ArrayTarget::Append(array_append) => array_append.array,
         }
     }
 
     #[inline]
-    pub const fn get_index(&self) -> Option<&'a Expression> {
+    pub const fn get_index(&self) -> Option<&'ast Expression<'arena>> {
         match self {
-            ArrayTarget::Access(array_access) => Some(&array_access.index),
+            ArrayTarget::Access(array_access) => Some(array_access.index),
             ArrayTarget::Append(_) => None,
         }
     }
 }
 
-impl HasSpan for ArrayTarget<'_> {
+impl HasSpan for ArrayTarget<'_, '_> {
     fn span(&self) -> Span {
         match self {
             ArrayTarget::Access(array_access) => array_access.span(),
@@ -70,21 +70,21 @@ impl HasSpan for ArrayTarget<'_> {
     }
 }
 
-impl<'a> From<&'a ArrayAccess> for ArrayTarget<'a> {
-    fn from(array_access: &'a ArrayAccess) -> Self {
+impl<'ast, 'arena> From<&'ast ArrayAccess<'arena>> for ArrayTarget<'ast, 'arena> {
+    fn from(array_access: &'ast ArrayAccess<'arena>) -> Self {
         ArrayTarget::Access(array_access)
     }
 }
 
-impl<'a> From<&'a ArrayAppend> for ArrayTarget<'a> {
-    fn from(array_append: &'a ArrayAppend) -> Self {
+impl<'ast, 'arena> From<&'ast ArrayAppend<'arena>> for ArrayTarget<'ast, 'arena> {
+    fn from(array_append: &'ast ArrayAppend<'arena>) -> Self {
         ArrayTarget::Append(array_append)
     }
 }
 
-pub(crate) fn get_array_target_type_given_index<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     access_span: Span,
     access_array_span: Span,
     access_index_span: Option<Span>,
@@ -388,9 +388,9 @@ pub(crate) fn get_array_target_type_given_index<'a>(
     }
 }
 
-pub(crate) fn handle_array_access_on_list(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     span: Option<Span>,
     list: &TAtomic,
     dim_type: &TUnion,
@@ -542,9 +542,9 @@ pub(crate) fn handle_array_access_on_list(
     get_mixed()
 }
 
-pub(crate) fn handle_array_access_on_keyed_array(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     span: Span,
     keyed_array: &TAtomic,
     index_type: &TUnion,
@@ -769,18 +769,18 @@ pub(crate) fn handle_array_access_on_keyed_array(
     }
 }
 
-pub(crate) fn handle_array_access_on_named_object<'a>(
-    context: &mut Context<'a>,
+pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     span: Span,
     named_object: &TAtomic,
     index_type: &TUnion,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
-    fn get_array_access_classes<'a>(
-        context: &mut Context<'a>,
+    fn get_array_access_classes<'ctx, 'arena>(
+        context: &mut Context<'ctx, 'arena>,
         atomic: &TAtomic,
-    ) -> Option<(Vec<&'a ClassLikeMetadata>, TUnion, TUnion)> {
+    ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)> {
         let mut parameters = vec![];
         let metadata = 'metadata: {
             let TAtomic::Object(TObject::Named(named_object)) = atomic else {
@@ -915,8 +915,8 @@ pub(crate) fn handle_array_access_on_named_object<'a>(
     resulting_value_type
 }
 
-pub(crate) fn handle_array_access_on_string(
-    context: &mut Context<'_>,
+pub(crate) fn handle_array_access_on_string<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     string: TAtomic,
     index_type: TUnion,
     has_valid_expected_index: &mut bool,
@@ -958,9 +958,9 @@ pub(crate) fn handle_array_access_on_string(
     if non_empty { get_non_empty_string() } else { get_string() }
 }
 
-pub(crate) fn handle_array_access_on_mixed(
-    context: &mut Context<'_>,
-    block_context: &mut BlockContext,
+pub(crate) fn handle_array_access_on_mixed<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     span: Span,
     mixed: &TAtomic,
 ) -> TUnion {

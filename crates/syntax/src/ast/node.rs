@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
@@ -10,7 +9,7 @@ use mago_span::Span;
 use crate::ast::Program;
 use crate::ast::ast::*;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(u8)]
 pub enum NodeKind {
@@ -236,241 +235,241 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Node<'a> {
-    Program(&'a Program),
-    Access(&'a Access),
-    ConstantAccess(&'a ConstantAccess),
-    ClassConstantAccess(&'a ClassConstantAccess),
-    NullSafePropertyAccess(&'a NullSafePropertyAccess),
-    PropertyAccess(&'a PropertyAccess),
-    StaticPropertyAccess(&'a StaticPropertyAccess),
-    Argument(&'a Argument),
-    ArgumentList(&'a ArgumentList),
-    NamedArgument(&'a NamedArgument),
-    PositionalArgument(&'a PositionalArgument),
-    Array(&'a Array),
-    ArrayAccess(&'a ArrayAccess),
-    ArrayAppend(&'a ArrayAppend),
-    ArrayElement(&'a ArrayElement),
-    KeyValueArrayElement(&'a KeyValueArrayElement),
-    LegacyArray(&'a LegacyArray),
-    List(&'a List),
-    MissingArrayElement(&'a MissingArrayElement),
-    ValueArrayElement(&'a ValueArrayElement),
-    VariadicArrayElement(&'a VariadicArrayElement),
-    Attribute(&'a Attribute),
-    AttributeList(&'a AttributeList),
-    Block(&'a Block),
-    Call(&'a Call),
-    FunctionCall(&'a FunctionCall),
-    MethodCall(&'a MethodCall),
-    NullSafeMethodCall(&'a NullSafeMethodCall),
-    StaticMethodCall(&'a StaticMethodCall),
-    ClassLikeConstant(&'a ClassLikeConstant),
-    ClassLikeConstantItem(&'a ClassLikeConstantItem),
-    EnumCase(&'a EnumCase),
-    EnumCaseBackedItem(&'a EnumCaseBackedItem),
-    EnumCaseItem(&'a EnumCaseItem),
-    EnumCaseUnitItem(&'a EnumCaseUnitItem),
-    Extends(&'a Extends),
-    Implements(&'a Implements),
-    ClassLikeConstantSelector(&'a ClassLikeConstantSelector),
-    ClassLikeMember(&'a ClassLikeMember),
-    ClassLikeMemberExpressionSelector(&'a ClassLikeMemberExpressionSelector),
-    ClassLikeMemberSelector(&'a ClassLikeMemberSelector),
-    Method(&'a Method),
-    MethodAbstractBody(&'a MethodAbstractBody),
-    MethodBody(&'a MethodBody),
-    HookedProperty(&'a HookedProperty),
-    PlainProperty(&'a PlainProperty),
-    Property(&'a Property),
-    PropertyAbstractItem(&'a PropertyAbstractItem),
-    PropertyConcreteItem(&'a PropertyConcreteItem),
-    PropertyHook(&'a PropertyHook),
-    PropertyHookAbstractBody(&'a PropertyHookAbstractBody),
-    PropertyHookBody(&'a PropertyHookBody),
-    PropertyHookConcreteBody(&'a PropertyHookConcreteBody),
-    PropertyHookConcreteExpressionBody(&'a PropertyHookConcreteExpressionBody),
-    PropertyHookList(&'a PropertyHookList),
-    PropertyItem(&'a PropertyItem),
-    TraitUse(&'a TraitUse),
-    TraitUseAbsoluteMethodReference(&'a TraitUseAbsoluteMethodReference),
-    TraitUseAbstractSpecification(&'a TraitUseAbstractSpecification),
-    TraitUseAdaptation(&'a TraitUseAdaptation),
-    TraitUseAliasAdaptation(&'a TraitUseAliasAdaptation),
-    TraitUseConcreteSpecification(&'a TraitUseConcreteSpecification),
-    TraitUseMethodReference(&'a TraitUseMethodReference),
-    TraitUsePrecedenceAdaptation(&'a TraitUsePrecedenceAdaptation),
-    TraitUseSpecification(&'a TraitUseSpecification),
-    AnonymousClass(&'a AnonymousClass),
-    Class(&'a Class),
-    Enum(&'a Enum),
-    EnumBackingTypeHint(&'a EnumBackingTypeHint),
-    Interface(&'a Interface),
-    Trait(&'a Trait),
-    Clone(&'a Clone),
-    ClosureCreation(&'a ClosureCreation),
-    FunctionClosureCreation(&'a FunctionClosureCreation),
-    MethodClosureCreation(&'a MethodClosureCreation),
-    StaticMethodClosureCreation(&'a StaticMethodClosureCreation),
-    Constant(&'a Constant),
-    ConstantItem(&'a ConstantItem),
-    Construct(&'a Construct),
-    DieConstruct(&'a DieConstruct),
-    EmptyConstruct(&'a EmptyConstruct),
-    EvalConstruct(&'a EvalConstruct),
-    ExitConstruct(&'a ExitConstruct),
-    IncludeConstruct(&'a IncludeConstruct),
-    IncludeOnceConstruct(&'a IncludeOnceConstruct),
-    IssetConstruct(&'a IssetConstruct),
-    PrintConstruct(&'a PrintConstruct),
-    RequireConstruct(&'a RequireConstruct),
-    RequireOnceConstruct(&'a RequireOnceConstruct),
-    If(&'a If),
-    IfBody(&'a IfBody),
-    IfColonDelimitedBody(&'a IfColonDelimitedBody),
-    IfColonDelimitedBodyElseClause(&'a IfColonDelimitedBodyElseClause),
-    IfColonDelimitedBodyElseIfClause(&'a IfColonDelimitedBodyElseIfClause),
-    IfStatementBody(&'a IfStatementBody),
-    IfStatementBodyElseClause(&'a IfStatementBodyElseClause),
-    IfStatementBodyElseIfClause(&'a IfStatementBodyElseIfClause),
-    Match(&'a Match),
-    MatchArm(&'a MatchArm),
-    MatchDefaultArm(&'a MatchDefaultArm),
-    MatchExpressionArm(&'a MatchExpressionArm),
-    Switch(&'a Switch),
-    SwitchBody(&'a SwitchBody),
-    SwitchBraceDelimitedBody(&'a SwitchBraceDelimitedBody),
-    SwitchCase(&'a SwitchCase),
-    SwitchCaseSeparator(&'a SwitchCaseSeparator),
-    SwitchColonDelimitedBody(&'a SwitchColonDelimitedBody),
-    SwitchDefaultCase(&'a SwitchDefaultCase),
-    SwitchExpressionCase(&'a SwitchExpressionCase),
-    Declare(&'a Declare),
-    DeclareBody(&'a DeclareBody),
-    DeclareColonDelimitedBody(&'a DeclareColonDelimitedBody),
-    DeclareItem(&'a DeclareItem),
-    Echo(&'a Echo),
-    Expression(&'a Expression),
-    Binary(&'a Binary),
-    BinaryOperator(&'a BinaryOperator),
-    UnaryPrefix(&'a UnaryPrefix),
-    UnaryPrefixOperator(&'a UnaryPrefixOperator),
-    UnaryPostfix(&'a UnaryPostfix),
-    UnaryPostfixOperator(&'a UnaryPostfixOperator),
-    Parenthesized(&'a Parenthesized),
-    ArrowFunction(&'a ArrowFunction),
-    Closure(&'a Closure),
-    ClosureUseClause(&'a ClosureUseClause),
-    ClosureUseClauseVariable(&'a ClosureUseClauseVariable),
-    Function(&'a Function),
-    FunctionLikeParameter(&'a FunctionLikeParameter),
-    FunctionLikeParameterDefaultValue(&'a FunctionLikeParameterDefaultValue),
-    FunctionLikeParameterList(&'a FunctionLikeParameterList),
-    FunctionLikeReturnTypeHint(&'a FunctionLikeReturnTypeHint),
-    Global(&'a Global),
-    Goto(&'a Goto),
-    Label(&'a Label),
-    HaltCompiler(&'a HaltCompiler),
-    FullyQualifiedIdentifier(&'a FullyQualifiedIdentifier),
-    Identifier(&'a Identifier),
-    LocalIdentifier(&'a LocalIdentifier),
-    QualifiedIdentifier(&'a QualifiedIdentifier),
-    Inline(&'a Inline),
-    Instantiation(&'a Instantiation),
-    Keyword(&'a Keyword),
-    Literal(&'a Literal),
-    LiteralFloat(&'a LiteralFloat),
-    LiteralInteger(&'a LiteralInteger),
-    LiteralString(&'a LiteralString),
-    MagicConstant(&'a MagicConstant),
-    Modifier(&'a Modifier),
-    Namespace(&'a Namespace),
-    NamespaceBody(&'a NamespaceBody),
-    NamespaceImplicitBody(&'a NamespaceImplicitBody),
-    Assignment(&'a Assignment),
-    AssignmentOperator(&'a AssignmentOperator),
-    Conditional(&'a Conditional),
-    DoWhile(&'a DoWhile),
-    Foreach(&'a Foreach),
-    ForeachBody(&'a ForeachBody),
-    ForeachColonDelimitedBody(&'a ForeachColonDelimitedBody),
-    ForeachKeyValueTarget(&'a ForeachKeyValueTarget),
-    ForeachTarget(&'a ForeachTarget),
-    ForeachValueTarget(&'a ForeachValueTarget),
-    For(&'a For),
-    ForBody(&'a ForBody),
-    ForColonDelimitedBody(&'a ForColonDelimitedBody),
-    While(&'a While),
-    WhileBody(&'a WhileBody),
-    WhileColonDelimitedBody(&'a WhileColonDelimitedBody),
-    Break(&'a Break),
-    Continue(&'a Continue),
-    Return(&'a Return),
-    Static(&'a Static),
-    StaticAbstractItem(&'a StaticAbstractItem),
-    StaticConcreteItem(&'a StaticConcreteItem),
-    StaticItem(&'a StaticItem),
-    Try(&'a Try),
-    TryCatchClause(&'a TryCatchClause),
-    TryFinallyClause(&'a TryFinallyClause),
-    MaybeTypedUseItem(&'a MaybeTypedUseItem),
-    MixedUseItemList(&'a MixedUseItemList),
-    TypedUseItemList(&'a TypedUseItemList),
-    TypedUseItemSequence(&'a TypedUseItemSequence),
-    Use(&'a Use),
-    UseItem(&'a UseItem),
-    UseItemAlias(&'a UseItemAlias),
-    UseItemSequence(&'a UseItemSequence),
-    UseItems(&'a UseItems),
-    UseType(&'a UseType),
-    Yield(&'a Yield),
-    YieldFrom(&'a YieldFrom),
-    YieldPair(&'a YieldPair),
-    YieldValue(&'a YieldValue),
-    Statement(&'a Statement),
-    ExpressionStatement(&'a ExpressionStatement),
-    BracedExpressionStringPart(&'a BracedExpressionStringPart),
-    DocumentString(&'a DocumentString),
-    InterpolatedString(&'a InterpolatedString),
-    LiteralStringPart(&'a LiteralStringPart),
-    ShellExecuteString(&'a ShellExecuteString),
-    CompositeString(&'a CompositeString),
-    StringPart(&'a StringPart),
-    ClosingTag(&'a ClosingTag),
-    EchoOpeningTag(&'a EchoOpeningTag),
-    FullOpeningTag(&'a FullOpeningTag),
-    OpeningTag(&'a OpeningTag),
-    ShortOpeningTag(&'a ShortOpeningTag),
-    Terminator(&'a Terminator),
-    Throw(&'a Throw),
-    Hint(&'a Hint),
-    IntersectionHint(&'a IntersectionHint),
-    NullableHint(&'a NullableHint),
-    ParenthesizedHint(&'a ParenthesizedHint),
-    UnionHint(&'a UnionHint),
-    Unset(&'a Unset),
-    DirectVariable(&'a DirectVariable),
-    IndirectVariable(&'a IndirectVariable),
-    NestedVariable(&'a NestedVariable),
-    Variable(&'a Variable),
-    Pipe(&'a Pipe),
+#[repr(u8)]
+pub enum Node<'ast, 'arena> {
+    Program(&'ast Program<'arena>),
+    Access(&'ast Access<'arena>),
+    ConstantAccess(&'ast ConstantAccess<'arena>),
+    ClassConstantAccess(&'ast ClassConstantAccess<'arena>),
+    NullSafePropertyAccess(&'ast NullSafePropertyAccess<'arena>),
+    PropertyAccess(&'ast PropertyAccess<'arena>),
+    StaticPropertyAccess(&'ast StaticPropertyAccess<'arena>),
+    Argument(&'ast Argument<'arena>),
+    ArgumentList(&'ast ArgumentList<'arena>),
+    NamedArgument(&'ast NamedArgument<'arena>),
+    PositionalArgument(&'ast PositionalArgument<'arena>),
+    Array(&'ast Array<'arena>),
+    ArrayAccess(&'ast ArrayAccess<'arena>),
+    ArrayAppend(&'ast ArrayAppend<'arena>),
+    ArrayElement(&'ast ArrayElement<'arena>),
+    KeyValueArrayElement(&'ast KeyValueArrayElement<'arena>),
+    LegacyArray(&'ast LegacyArray<'arena>),
+    List(&'ast List<'arena>),
+    MissingArrayElement(&'ast MissingArrayElement),
+    ValueArrayElement(&'ast ValueArrayElement<'arena>),
+    VariadicArrayElement(&'ast VariadicArrayElement<'arena>),
+    Attribute(&'ast Attribute<'arena>),
+    AttributeList(&'ast AttributeList<'arena>),
+    Block(&'ast Block<'arena>),
+    Call(&'ast Call<'arena>),
+    FunctionCall(&'ast FunctionCall<'arena>),
+    MethodCall(&'ast MethodCall<'arena>),
+    NullSafeMethodCall(&'ast NullSafeMethodCall<'arena>),
+    StaticMethodCall(&'ast StaticMethodCall<'arena>),
+    ClassLikeConstant(&'ast ClassLikeConstant<'arena>),
+    ClassLikeConstantItem(&'ast ClassLikeConstantItem<'arena>),
+    EnumCase(&'ast EnumCase<'arena>),
+    EnumCaseBackedItem(&'ast EnumCaseBackedItem<'arena>),
+    EnumCaseItem(&'ast EnumCaseItem<'arena>),
+    EnumCaseUnitItem(&'ast EnumCaseUnitItem<'arena>),
+    Extends(&'ast Extends<'arena>),
+    Implements(&'ast Implements<'arena>),
+    ClassLikeConstantSelector(&'ast ClassLikeConstantSelector<'arena>),
+    ClassLikeMember(&'ast ClassLikeMember<'arena>),
+    ClassLikeMemberExpressionSelector(&'ast ClassLikeMemberExpressionSelector<'arena>),
+    ClassLikeMemberSelector(&'ast ClassLikeMemberSelector<'arena>),
+    Method(&'ast Method<'arena>),
+    MethodAbstractBody(&'ast MethodAbstractBody),
+    MethodBody(&'ast MethodBody<'arena>),
+    HookedProperty(&'ast HookedProperty<'arena>),
+    PlainProperty(&'ast PlainProperty<'arena>),
+    Property(&'ast Property<'arena>),
+    PropertyAbstractItem(&'ast PropertyAbstractItem<'arena>),
+    PropertyConcreteItem(&'ast PropertyConcreteItem<'arena>),
+    PropertyHook(&'ast PropertyHook<'arena>),
+    PropertyHookAbstractBody(&'ast PropertyHookAbstractBody),
+    PropertyHookBody(&'ast PropertyHookBody<'arena>),
+    PropertyHookConcreteBody(&'ast PropertyHookConcreteBody<'arena>),
+    PropertyHookConcreteExpressionBody(&'ast PropertyHookConcreteExpressionBody<'arena>),
+    PropertyHookList(&'ast PropertyHookList<'arena>),
+    PropertyItem(&'ast PropertyItem<'arena>),
+    TraitUse(&'ast TraitUse<'arena>),
+    TraitUseAbsoluteMethodReference(&'ast TraitUseAbsoluteMethodReference<'arena>),
+    TraitUseAbstractSpecification(&'ast TraitUseAbstractSpecification<'arena>),
+    TraitUseAdaptation(&'ast TraitUseAdaptation<'arena>),
+    TraitUseAliasAdaptation(&'ast TraitUseAliasAdaptation<'arena>),
+    TraitUseConcreteSpecification(&'ast TraitUseConcreteSpecification<'arena>),
+    TraitUseMethodReference(&'ast TraitUseMethodReference<'arena>),
+    TraitUsePrecedenceAdaptation(&'ast TraitUsePrecedenceAdaptation<'arena>),
+    TraitUseSpecification(&'ast TraitUseSpecification<'arena>),
+    AnonymousClass(&'ast AnonymousClass<'arena>),
+    Class(&'ast Class<'arena>),
+    Enum(&'ast Enum<'arena>),
+    EnumBackingTypeHint(&'ast EnumBackingTypeHint<'arena>),
+    Interface(&'ast Interface<'arena>),
+    Trait(&'ast Trait<'arena>),
+    Clone(&'ast Clone<'arena>),
+    ClosureCreation(&'ast ClosureCreation<'arena>),
+    FunctionClosureCreation(&'ast FunctionClosureCreation<'arena>),
+    MethodClosureCreation(&'ast MethodClosureCreation<'arena>),
+    StaticMethodClosureCreation(&'ast StaticMethodClosureCreation<'arena>),
+    Constant(&'ast Constant<'arena>),
+    ConstantItem(&'ast ConstantItem<'arena>),
+    Construct(&'ast Construct<'arena>),
+    DieConstruct(&'ast DieConstruct<'arena>),
+    EmptyConstruct(&'ast EmptyConstruct<'arena>),
+    EvalConstruct(&'ast EvalConstruct<'arena>),
+    ExitConstruct(&'ast ExitConstruct<'arena>),
+    IncludeConstruct(&'ast IncludeConstruct<'arena>),
+    IncludeOnceConstruct(&'ast IncludeOnceConstruct<'arena>),
+    IssetConstruct(&'ast IssetConstruct<'arena>),
+    PrintConstruct(&'ast PrintConstruct<'arena>),
+    RequireConstruct(&'ast RequireConstruct<'arena>),
+    RequireOnceConstruct(&'ast RequireOnceConstruct<'arena>),
+    If(&'ast If<'arena>),
+    IfBody(&'ast IfBody<'arena>),
+    IfColonDelimitedBody(&'ast IfColonDelimitedBody<'arena>),
+    IfColonDelimitedBodyElseClause(&'ast IfColonDelimitedBodyElseClause<'arena>),
+    IfColonDelimitedBodyElseIfClause(&'ast IfColonDelimitedBodyElseIfClause<'arena>),
+    IfStatementBody(&'ast IfStatementBody<'arena>),
+    IfStatementBodyElseClause(&'ast IfStatementBodyElseClause<'arena>),
+    IfStatementBodyElseIfClause(&'ast IfStatementBodyElseIfClause<'arena>),
+    Match(&'ast Match<'arena>),
+    MatchArm(&'ast MatchArm<'arena>),
+    MatchDefaultArm(&'ast MatchDefaultArm<'arena>),
+    MatchExpressionArm(&'ast MatchExpressionArm<'arena>),
+    Switch(&'ast Switch<'arena>),
+    SwitchBody(&'ast SwitchBody<'arena>),
+    SwitchBraceDelimitedBody(&'ast SwitchBraceDelimitedBody<'arena>),
+    SwitchCase(&'ast SwitchCase<'arena>),
+    SwitchCaseSeparator(&'ast SwitchCaseSeparator),
+    SwitchColonDelimitedBody(&'ast SwitchColonDelimitedBody<'arena>),
+    SwitchDefaultCase(&'ast SwitchDefaultCase<'arena>),
+    SwitchExpressionCase(&'ast SwitchExpressionCase<'arena>),
+    Declare(&'ast Declare<'arena>),
+    DeclareBody(&'ast DeclareBody<'arena>),
+    DeclareColonDelimitedBody(&'ast DeclareColonDelimitedBody<'arena>),
+    DeclareItem(&'ast DeclareItem<'arena>),
+    Echo(&'ast Echo<'arena>),
+    Expression(&'ast Expression<'arena>),
+    Binary(&'ast Binary<'arena>),
+    BinaryOperator(&'ast BinaryOperator<'arena>),
+    UnaryPrefix(&'ast UnaryPrefix<'arena>),
+    UnaryPrefixOperator(&'ast UnaryPrefixOperator<'arena>),
+    UnaryPostfix(&'ast UnaryPostfix<'arena>),
+    UnaryPostfixOperator(&'ast UnaryPostfixOperator),
+    Parenthesized(&'ast Parenthesized<'arena>),
+    ArrowFunction(&'ast ArrowFunction<'arena>),
+    Closure(&'ast Closure<'arena>),
+    ClosureUseClause(&'ast ClosureUseClause<'arena>),
+    ClosureUseClauseVariable(&'ast ClosureUseClauseVariable<'arena>),
+    Function(&'ast Function<'arena>),
+    FunctionLikeParameter(&'ast FunctionLikeParameter<'arena>),
+    FunctionLikeParameterDefaultValue(&'ast FunctionLikeParameterDefaultValue<'arena>),
+    FunctionLikeParameterList(&'ast FunctionLikeParameterList<'arena>),
+    FunctionLikeReturnTypeHint(&'ast FunctionLikeReturnTypeHint<'arena>),
+    Global(&'ast Global<'arena>),
+    Goto(&'ast Goto<'arena>),
+    Label(&'ast Label<'arena>),
+    HaltCompiler(&'ast HaltCompiler<'arena>),
+    FullyQualifiedIdentifier(&'ast FullyQualifiedIdentifier<'arena>),
+    Identifier(&'ast Identifier<'arena>),
+    LocalIdentifier(&'ast LocalIdentifier<'arena>),
+    QualifiedIdentifier(&'ast QualifiedIdentifier<'arena>),
+    Inline(&'ast Inline<'arena>),
+    Instantiation(&'ast Instantiation<'arena>),
+    Keyword(&'ast Keyword<'arena>),
+    Literal(&'ast Literal<'arena>),
+    LiteralFloat(&'ast LiteralFloat<'arena>),
+    LiteralInteger(&'ast LiteralInteger<'arena>),
+    LiteralString(&'ast LiteralString<'arena>),
+    MagicConstant(&'ast MagicConstant<'arena>),
+    Modifier(&'ast Modifier<'arena>),
+    Namespace(&'ast Namespace<'arena>),
+    NamespaceBody(&'ast NamespaceBody<'arena>),
+    NamespaceImplicitBody(&'ast NamespaceImplicitBody<'arena>),
+    Assignment(&'ast Assignment<'arena>),
+    AssignmentOperator(&'ast AssignmentOperator),
+    Conditional(&'ast Conditional<'arena>),
+    DoWhile(&'ast DoWhile<'arena>),
+    Foreach(&'ast Foreach<'arena>),
+    ForeachBody(&'ast ForeachBody<'arena>),
+    ForeachColonDelimitedBody(&'ast ForeachColonDelimitedBody<'arena>),
+    ForeachKeyValueTarget(&'ast ForeachKeyValueTarget<'arena>),
+    ForeachTarget(&'ast ForeachTarget<'arena>),
+    ForeachValueTarget(&'ast ForeachValueTarget<'arena>),
+    For(&'ast For<'arena>),
+    ForBody(&'ast ForBody<'arena>),
+    ForColonDelimitedBody(&'ast ForColonDelimitedBody<'arena>),
+    While(&'ast While<'arena>),
+    WhileBody(&'ast WhileBody<'arena>),
+    WhileColonDelimitedBody(&'ast WhileColonDelimitedBody<'arena>),
+    Break(&'ast Break<'arena>),
+    Continue(&'ast Continue<'arena>),
+    Return(&'ast Return<'arena>),
+    Static(&'ast Static<'arena>),
+    StaticAbstractItem(&'ast StaticAbstractItem<'arena>),
+    StaticConcreteItem(&'ast StaticConcreteItem<'arena>),
+    StaticItem(&'ast StaticItem<'arena>),
+    Try(&'ast Try<'arena>),
+    TryCatchClause(&'ast TryCatchClause<'arena>),
+    TryFinallyClause(&'ast TryFinallyClause<'arena>),
+    MaybeTypedUseItem(&'ast MaybeTypedUseItem<'arena>),
+    MixedUseItemList(&'ast MixedUseItemList<'arena>),
+    TypedUseItemList(&'ast TypedUseItemList<'arena>),
+    TypedUseItemSequence(&'ast TypedUseItemSequence<'arena>),
+    Use(&'ast Use<'arena>),
+    UseItem(&'ast UseItem<'arena>),
+    UseItemAlias(&'ast UseItemAlias<'arena>),
+    UseItemSequence(&'ast UseItemSequence<'arena>),
+    UseItems(&'ast UseItems<'arena>),
+    UseType(&'ast UseType<'arena>),
+    Yield(&'ast Yield<'arena>),
+    YieldFrom(&'ast YieldFrom<'arena>),
+    YieldPair(&'ast YieldPair<'arena>),
+    YieldValue(&'ast YieldValue<'arena>),
+    Statement(&'ast Statement<'arena>),
+    ExpressionStatement(&'ast ExpressionStatement<'arena>),
+    BracedExpressionStringPart(&'ast BracedExpressionStringPart<'arena>),
+    DocumentString(&'ast DocumentString<'arena>),
+    InterpolatedString(&'ast InterpolatedString<'arena>),
+    LiteralStringPart(&'ast LiteralStringPart<'arena>),
+    ShellExecuteString(&'ast ShellExecuteString<'arena>),
+    CompositeString(&'ast CompositeString<'arena>),
+    StringPart(&'ast StringPart<'arena>),
+    ClosingTag(&'ast ClosingTag),
+    EchoOpeningTag(&'ast EchoOpeningTag),
+    FullOpeningTag(&'ast FullOpeningTag<'arena>),
+    OpeningTag(&'ast OpeningTag<'arena>),
+    ShortOpeningTag(&'ast ShortOpeningTag),
+    Terminator(&'ast Terminator<'arena>),
+    Throw(&'ast Throw<'arena>),
+    Hint(&'ast Hint<'arena>),
+    IntersectionHint(&'ast IntersectionHint<'arena>),
+    NullableHint(&'ast NullableHint<'arena>),
+    ParenthesizedHint(&'ast ParenthesizedHint<'arena>),
+    UnionHint(&'ast UnionHint<'arena>),
+    Unset(&'ast Unset<'arena>),
+    DirectVariable(&'ast DirectVariable<'arena>),
+    IndirectVariable(&'ast IndirectVariable<'arena>),
+    NestedVariable(&'ast NestedVariable<'arena>),
+    Variable(&'ast Variable<'arena>),
+    Pipe(&'ast Pipe<'arena>),
 }
 
-impl<'a> Node<'a> {
+impl<'ast, 'arena> Node<'ast, 'arena> {
     #[inline]
-    pub fn filter_map<F, T>(&self, f: F) -> Vec<T>
+    pub fn filter_map<F, T: 'ast>(&self, f: F) -> Vec<T>
     where
-        F: Fn(&Node<'a>) -> Option<T>,
+        F: Fn(&Node<'ast, 'arena>) -> Option<T>,
     {
         self.filter_map_internal(&f)
     }
 
     #[inline]
-    fn filter_map_internal<F, T>(&self, f: &F) -> Vec<T>
+    fn filter_map_internal<F, T: 'ast>(&self, f: &F) -> Vec<T>
     where
-        F: Fn(&Node<'a>) -> Option<T>,
+        F: Fn(&Node<'ast, 'arena>) -> Option<T>,
     {
         let mut result = vec![];
         for child in self.children() {
@@ -759,9 +758,16 @@ impl<'a> Node<'a> {
     }
 
     #[inline]
-    pub fn children(&self) -> Vec<Node<'a>> {
+    pub fn children(&self) -> Vec<Node<'ast, 'arena>> {
         match &self {
-            Node::Program(node) => node.statements.iter().map(Node::Statement).collect(),
+            Node::Program(node) => {
+                let mut children = vec![];
+                for node in node.statements.as_slice() {
+                    children.push(Node::Statement(node));
+                }
+
+                children
+            }
             Node::Access(node) => match &node {
                 Access::Property(node) => vec![Node::PropertyAccess(node)],
                 Access::NullSafeProperty(node) => vec![Node::NullSafePropertyAccess(node)],
@@ -772,32 +778,46 @@ impl<'a> Node<'a> {
                 vec![Node::Identifier(&node.name)]
             }
             Node::ClassConstantAccess(node) => {
-                vec![Node::Expression(&node.class), Node::ClassLikeConstantSelector(&node.constant)]
+                vec![Node::Expression(node.class), Node::ClassLikeConstantSelector(&node.constant)]
             }
             Node::NullSafePropertyAccess(node) => {
-                vec![Node::Expression(&node.object), Node::ClassLikeMemberSelector(&node.property)]
+                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.property)]
             }
             Node::PropertyAccess(node) => {
-                vec![Node::Expression(&node.object), Node::ClassLikeMemberSelector(&node.property)]
+                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.property)]
             }
             Node::StaticPropertyAccess(node) => {
-                vec![Node::Expression(&node.class), Node::Variable(&node.property)]
+                vec![Node::Expression(node.class), Node::Variable(&node.property)]
             }
             Node::Argument(node) => match &node {
                 Argument::Named(node) => vec![Node::NamedArgument(node)],
                 Argument::Positional(node) => vec![Node::PositionalArgument(node)],
             },
-            Node::ArgumentList(node) => node.arguments.iter().map(Node::Argument).collect(),
+            Node::ArgumentList(node) => {
+                let mut children = vec![];
+                for node in node.arguments.as_slice() {
+                    children.push(Node::Argument(node));
+                }
+
+                children
+            }
             Node::NamedArgument(node) => {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
             Node::PositionalArgument(node) => vec![Node::Expression(&node.value)],
-            Node::Array(node) => node.elements.iter().map(Node::ArrayElement).collect(),
+            Node::Array(node) => {
+                let mut children = vec![];
+                for node in node.elements.as_slice() {
+                    children.push(Node::ArrayElement(node));
+                }
+
+                children
+            }
             Node::ArrayAccess(node) => {
-                vec![Node::Expression(&node.array), Node::Expression(&node.index)]
+                vec![Node::Expression(node.array), Node::Expression(node.index)]
             }
             Node::ArrayAppend(node) => {
-                vec![Node::Expression(&node.array)]
+                vec![Node::Expression(node.array)]
             }
             Node::ArrayElement(node) => match &node {
                 ArrayElement::KeyValue(node) => vec![Node::KeyValueArrayElement(node)],
@@ -806,13 +826,13 @@ impl<'a> Node<'a> {
                 ArrayElement::Variadic(node) => vec![Node::VariadicArrayElement(node)],
             },
             Node::KeyValueArrayElement(node) => {
-                vec![Node::Expression(&node.key), Node::Expression(&node.value)]
+                vec![Node::Expression(node.key), Node::Expression(node.value)]
             }
-            Node::LegacyArray(node) => node.elements.iter().map(Node::ArrayElement).collect(),
-            Node::List(node) => node.elements.iter().map(Node::ArrayElement).collect(),
+            Node::LegacyArray(node) => Vec::from_iter(node.elements.iter().map(Node::ArrayElement)),
+            Node::List(node) => Vec::from_iter(node.elements.iter().map(Node::ArrayElement)),
             Node::MissingArrayElement(_) => vec![],
-            Node::ValueArrayElement(node) => vec![Node::Expression(&node.value)],
-            Node::VariadicArrayElement(node) => vec![Node::Expression(&node.value)],
+            Node::ValueArrayElement(node) => vec![Node::Expression(node.value)],
+            Node::VariadicArrayElement(node) => vec![Node::Expression(node.value)],
             Node::Attribute(node) => {
                 let mut children = vec![Node::Identifier(&node.name)];
                 if let Some(arguments) = &node.argument_list {
@@ -821,8 +841,8 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::AttributeList(node) => node.attributes.iter().map(Node::Attribute).collect(),
-            Node::Block(node) => node.statements.iter().map(Node::Statement).collect(),
+            Node::AttributeList(node) => Vec::from_iter(node.attributes.iter().map(Node::Attribute)),
+            Node::Block(node) => Vec::from_iter(node.statements.iter().map(Node::Statement)),
             Node::Call(node) => match node {
                 Call::Function(node) => vec![Node::FunctionCall(node)],
                 Call::Method(node) => vec![Node::MethodCall(node)],
@@ -830,31 +850,34 @@ impl<'a> Node<'a> {
                 Call::StaticMethod(node) => vec![Node::StaticMethodCall(node)],
             },
             Node::FunctionCall(node) => {
-                vec![Node::Expression(&node.function), Node::ArgumentList(&node.argument_list)]
+                vec![Node::Expression(node.function), Node::ArgumentList(&node.argument_list)]
             }
             Node::MethodCall(node) => {
                 vec![
-                    Node::Expression(&node.object),
+                    Node::Expression(node.object),
                     Node::ClassLikeMemberSelector(&node.method),
                     Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::NullSafeMethodCall(node) => {
                 vec![
-                    Node::Expression(&node.object),
+                    Node::Expression(node.object),
                     Node::ClassLikeMemberSelector(&node.method),
                     Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::StaticMethodCall(node) => {
                 vec![
-                    Node::Expression(&node.class),
+                    Node::Expression(node.class),
                     Node::ClassLikeMemberSelector(&node.method),
                     Node::ArgumentList(&node.argument_list),
                 ]
             }
             Node::ClassLikeConstant(node) => {
-                let mut children: Vec<_> = node.attribute_lists.iter().map(Node::AttributeList).collect();
+                let mut children = vec![];
+                for attr in node.attribute_lists.iter() {
+                    children.push(Node::AttributeList(attr));
+                }
 
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::Keyword(&node.r#const));
@@ -871,7 +894,10 @@ impl<'a> Node<'a> {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
             Node::EnumCase(node) => {
-                let mut children: Vec<_> = node.attribute_lists.iter().map(Node::AttributeList).collect();
+                let mut children = vec![];
+                for attr in node.attribute_lists.iter() {
+                    children.push(Node::AttributeList(attr));
+                }
 
                 children.push(Node::Keyword(&node.case));
                 children.push(Node::EnumCaseItem(&node.item));
@@ -916,11 +942,13 @@ impl<'a> Node<'a> {
                 ClassLikeMember::EnumCase(node) => vec![Node::EnumCase(node)],
                 ClassLikeMember::Method(node) => vec![Node::Method(node)],
             },
-            Node::ClassLikeMemberExpressionSelector(node) => vec![Node::Expression(&node.expression)],
+            Node::ClassLikeMemberExpressionSelector(node) => vec![Node::Expression(node.expression)],
             Node::ClassLikeMemberSelector(node) => match node {
                 ClassLikeMemberSelector::Identifier(node) => vec![Node::LocalIdentifier(node)],
                 ClassLikeMemberSelector::Variable(node) => vec![Node::Variable(node)],
-                ClassLikeMemberSelector::Expression(node) => vec![Node::ClassLikeMemberExpressionSelector(node)],
+                ClassLikeMemberSelector::Expression(node) => {
+                    vec![Node::ClassLikeMemberExpressionSelector(node)]
+                }
             },
             Node::Method(node) => {
                 let mut children: Vec<Node> = vec![];
@@ -996,7 +1024,7 @@ impl<'a> Node<'a> {
                 PropertyHookConcreteBody::Block(node) => Node::Block(node),
             }],
             Node::PropertyHookConcreteExpressionBody(node) => vec![Node::Expression(&node.expression)],
-            Node::PropertyHookList(node) => node.hooks.iter().map(Node::PropertyHook).collect(),
+            Node::PropertyHookList(node) => Vec::from_iter(node.hooks.iter().map(Node::PropertyHook)),
             Node::PropertyItem(node) => match node {
                 PropertyItem::Abstract(node) => vec![Node::PropertyAbstractItem(node)],
                 PropertyItem::Concrete(node) => vec![Node::PropertyConcreteItem(node)],
@@ -1060,7 +1088,12 @@ impl<'a> Node<'a> {
                 children
             }
             Node::TraitUseConcreteSpecification(node) => {
-                node.adaptations.iter().map(Node::TraitUseAdaptation).collect()
+                let mut children = vec![];
+                for adaptation in node.adaptations.as_slice() {
+                    children.push(Node::TraitUseAdaptation(adaptation));
+                }
+
+                children
             }
             Node::TraitUseMethodReference(node) => match node {
                 TraitUseMethodReference::Identifier(identifier) => {
@@ -1147,19 +1180,19 @@ impl<'a> Node<'a> {
                 children
             }
             Node::Clone(node) => {
-                vec![Node::Keyword(&node.clone), Node::Expression(&node.object)]
+                vec![Node::Keyword(&node.clone), Node::Expression(node.object)]
             }
             Node::ClosureCreation(node) => vec![match node {
                 ClosureCreation::Function(node) => Node::FunctionClosureCreation(node),
                 ClosureCreation::Method(node) => Node::MethodClosureCreation(node),
                 ClosureCreation::StaticMethod(node) => Node::StaticMethodClosureCreation(node),
             }],
-            Node::FunctionClosureCreation(node) => vec![Node::Expression(&node.function)],
+            Node::FunctionClosureCreation(node) => vec![Node::Expression(node.function)],
             Node::MethodClosureCreation(node) => {
-                vec![Node::Expression(&node.object), Node::ClassLikeMemberSelector(&node.method)]
+                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.method)]
             }
             Node::StaticMethodClosureCreation(node) => {
-                vec![Node::Expression(&node.class), Node::ClassLikeMemberSelector(&node.method)]
+                vec![Node::Expression(node.class), Node::ClassLikeMemberSelector(&node.method)]
             }
             Node::Constant(node) => {
                 let mut children = vec![];
@@ -1192,21 +1225,25 @@ impl<'a> Node<'a> {
                 children
             }
             Node::EmptyConstruct(node) => {
-                vec![Node::Keyword(&node.empty), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.empty), Node::Expression(node.value)]
             }
             Node::EvalConstruct(node) => {
-                vec![Node::Keyword(&node.eval), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.eval), Node::Expression(node.value)]
             }
             Node::IncludeConstruct(node) => {
-                vec![Node::Keyword(&node.include), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.include), Node::Expression(node.value)]
             }
-            Node::IncludeOnceConstruct(node) => vec![Node::Keyword(&node.include_once), Node::Expression(&node.value)],
+            Node::IncludeOnceConstruct(node) => {
+                vec![Node::Keyword(&node.include_once), Node::Expression(node.value)]
+            }
             Node::RequireConstruct(node) => {
-                vec![Node::Keyword(&node.require), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.require), Node::Expression(node.value)]
             }
-            Node::RequireOnceConstruct(node) => vec![Node::Keyword(&node.require_once), Node::Expression(&node.value)],
+            Node::RequireOnceConstruct(node) => {
+                vec![Node::Keyword(&node.require_once), Node::Expression(node.value)]
+            }
             Node::PrintConstruct(node) => {
-                vec![Node::Keyword(&node.print), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.print), Node::Expression(node.value)]
             }
             Node::ExitConstruct(node) => {
                 let mut children = vec![Node::Keyword(&node.exit)];
@@ -1223,14 +1260,14 @@ impl<'a> Node<'a> {
                 children
             }
             Node::If(node) => {
-                vec![Node::Keyword(&node.r#if), Node::Expression(&node.condition), Node::IfBody(&node.body)]
+                vec![Node::Keyword(&node.r#if), Node::Expression(node.condition), Node::IfBody(&node.body)]
             }
             Node::IfBody(node) => match node {
                 IfBody::Statement(statement_body) => vec![Node::IfStatementBody(statement_body)],
                 IfBody::ColonDelimited(colon_body) => vec![Node::IfColonDelimitedBody(colon_body)],
             },
             Node::IfStatementBody(node) => {
-                let mut children = vec![Node::Statement(&node.statement)];
+                let mut children = vec![Node::Statement(node.statement)];
 
                 children.extend(node.else_if_clauses.iter().map(Node::IfStatementBodyElseIfClause));
                 if let Some(else_clause) = &node.else_clause {
@@ -1240,13 +1277,16 @@ impl<'a> Node<'a> {
                 children
             }
             Node::IfStatementBodyElseIfClause(node) => {
-                vec![Node::Keyword(&node.elseif), Node::Expression(&node.condition), Node::Statement(&node.statement)]
+                vec![Node::Keyword(&node.elseif), Node::Expression(node.condition), Node::Statement(node.statement)]
             }
             Node::IfStatementBodyElseClause(node) => {
-                vec![Node::Keyword(&node.r#else), Node::Statement(&node.statement)]
+                vec![Node::Keyword(&node.r#else), Node::Statement(node.statement)]
             }
             Node::IfColonDelimitedBody(node) => {
-                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
+                let mut children = vec![];
+                for stmt in node.statements.as_slice() {
+                    children.push(Node::Statement(stmt));
+                }
 
                 children.extend(node.else_if_clauses.iter().map(Node::IfColonDelimitedBodyElseIfClause));
 
@@ -1260,7 +1300,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::IfColonDelimitedBodyElseIfClause(node) => {
-                let mut children = vec![Node::Keyword(&node.elseif), Node::Expression(&node.condition)];
+                let mut children = vec![Node::Keyword(&node.elseif), Node::Expression(node.condition)];
                 children.extend(node.statements.iter().map(Node::Statement));
 
                 children
@@ -1273,7 +1313,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::Match(node) => {
-                let mut children = vec![Node::Keyword(&node.r#match), Node::Expression(&node.expression)];
+                let mut children = vec![Node::Keyword(&node.r#match), Node::Expression(node.expression)];
                 children.extend(node.arms.iter().map(Node::MatchArm));
 
                 children
@@ -1286,15 +1326,15 @@ impl<'a> Node<'a> {
                 let mut children = vec![];
 
                 children.extend(node.conditions.iter().map(Node::Expression));
-                children.push(Node::Expression(&node.expression));
+                children.push(Node::Expression(node.expression));
 
                 children
             }
             Node::MatchDefaultArm(node) => {
-                vec![Node::Keyword(&node.default), Node::Expression(&node.expression)]
+                vec![Node::Keyword(&node.default), Node::Expression(node.expression)]
             }
             Node::Switch(node) => {
-                vec![Node::Keyword(&node.switch), Node::Expression(&node.expression), Node::SwitchBody(&node.body)]
+                vec![Node::Keyword(&node.switch), Node::Expression(node.expression), Node::SwitchBody(&node.body)]
             }
             Node::SwitchBody(node) => match node {
                 SwitchBody::BraceDelimited(body) => vec![Node::SwitchBraceDelimitedBody(body)],
@@ -1325,13 +1365,15 @@ impl<'a> Node<'a> {
                 children
             }
             Node::SwitchCase(node) => match node {
-                SwitchCase::Expression(expression_case) => vec![Node::SwitchExpressionCase(expression_case)],
+                SwitchCase::Expression(expression_case) => {
+                    vec![Node::SwitchExpressionCase(expression_case)]
+                }
                 SwitchCase::Default(default_case) => vec![Node::SwitchDefaultCase(default_case)],
             },
             Node::SwitchExpressionCase(node) => {
                 let mut children = vec![
                     Node::Keyword(&node.case),
-                    Node::Expression(&node.expression),
+                    Node::Expression(node.expression),
                     Node::SwitchCaseSeparator(&node.separator),
                 ];
 
@@ -1359,7 +1401,7 @@ impl<'a> Node<'a> {
                 DeclareBody::ColonDelimited(body) => vec![Node::DeclareColonDelimitedBody(body)],
             },
             Node::DeclareColonDelimitedBody(node) => {
-                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
+                let mut children = Vec::from_iter(node.statements.iter().map(Node::Statement));
 
                 children.push(Node::Keyword(&node.end_declare));
                 children.push(Node::Terminator(&node.terminator));
@@ -1376,7 +1418,7 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::Parenthesized(node) => vec![Node::Expression(&node.expression)],
+            Node::Parenthesized(node) => vec![Node::Expression(node.expression)],
             Node::Expression(node) => vec![match node {
                 Expression::Binary(node) => Node::Binary(node),
                 Expression::UnaryPrefix(node) => Node::UnaryPrefix(node),
@@ -1413,7 +1455,7 @@ impl<'a> Node<'a> {
                 Expression::Pipe(node) => Node::Pipe(node),
             }],
             Node::Binary(node) => {
-                vec![Node::Expression(&node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(&node.rhs)]
+                vec![Node::Expression(node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(node.rhs)]
             }
             Node::BinaryOperator(operator) => match operator {
                 BinaryOperator::Addition(_) => vec![],
@@ -1448,10 +1490,10 @@ impl<'a> Node<'a> {
                 BinaryOperator::LowXor(keyword) => vec![Node::Keyword(keyword)],
             },
             Node::UnaryPrefix(node) => {
-                vec![Node::UnaryPrefixOperator(&node.operator), Node::Expression(&node.operand)]
+                vec![Node::UnaryPrefixOperator(&node.operator), Node::Expression(node.operand)]
             }
             Node::UnaryPostfix(node) => {
-                vec![Node::Expression(&node.operand), Node::UnaryPostfixOperator(&node.operator)]
+                vec![Node::Expression(node.operand), Node::UnaryPostfixOperator(&node.operator)]
             }
             Node::UnaryPrefixOperator(_) | Node::UnaryPostfixOperator(_) => vec![],
             Node::ArrowFunction(node) => {
@@ -1466,7 +1508,7 @@ impl<'a> Node<'a> {
                 if let Some(return_type_hint) = &node.return_type_hint {
                     children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
-                children.push(Node::Expression(&node.expression));
+                children.push(Node::Expression(node.expression));
 
                 children
             }
@@ -1508,7 +1550,9 @@ impl<'a> Node<'a> {
 
                 children
             }
-            Node::FunctionLikeParameterList(node) => node.parameters.iter().map(Node::FunctionLikeParameter).collect(),
+            Node::FunctionLikeParameterList(node) => {
+                Vec::from_iter(node.parameters.iter().map(Node::FunctionLikeParameter))
+            }
             Node::FunctionLikeParameter(node) => {
                 let mut children = vec![];
 
@@ -1557,7 +1601,7 @@ impl<'a> Node<'a> {
             Node::QualifiedIdentifier(_) => vec![],
             Node::Inline(_) => vec![],
             Node::Instantiation(node) => {
-                let mut children = vec![Node::Keyword(&node.new), Node::Expression(&node.class)];
+                let mut children = vec![Node::Keyword(&node.new), Node::Expression(node.class)];
 
                 if let Some(argument_list) = &node.argument_list {
                     children.push(Node::ArgumentList(argument_list));
@@ -1625,30 +1669,30 @@ impl<'a> Node<'a> {
                 children
             }
             Node::Assignment(node) => {
-                vec![Node::Expression(&node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(&node.rhs)]
+                vec![Node::Expression(node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(node.rhs)]
             }
             Node::AssignmentOperator(_) => vec![],
             Node::Conditional(node) => {
-                let mut children = vec![Node::Expression(&node.condition)];
+                let mut children = vec![Node::Expression(node.condition)];
 
                 if let Some(then) = &node.then {
                     children.push(Node::Expression(then));
                 }
 
-                children.push(Node::Expression(&node.r#else));
+                children.push(Node::Expression(node.r#else));
 
                 children
             }
             Node::DoWhile(node) => vec![
                 Node::Keyword(&node.r#do),
-                Node::Statement(&node.statement),
+                Node::Statement(node.statement),
                 Node::Keyword(&node.r#while),
-                Node::Expression(&node.condition),
+                Node::Expression(node.condition),
                 Node::Terminator(&node.terminator),
             ],
             Node::Foreach(node) => vec![
                 Node::Keyword(&node.r#foreach),
-                Node::Expression(&node.expression),
+                Node::Expression(node.expression),
                 Node::Keyword(&node.r#as),
                 Node::ForeachTarget(&node.target),
                 Node::ForeachBody(&node.body),
@@ -1658,7 +1702,7 @@ impl<'a> Node<'a> {
                 ForeachBody::ColonDelimited(node) => Node::ForeachColonDelimitedBody(node),
             }],
             Node::ForeachColonDelimitedBody(node) => {
-                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
+                let mut children = Vec::from_iter(node.statements.iter().map(Node::Statement));
 
                 children.push(Node::Keyword(&node.end_foreach));
                 children.push(Node::Terminator(&node.terminator));
@@ -1666,13 +1710,13 @@ impl<'a> Node<'a> {
                 children
             }
             Node::ForeachKeyValueTarget(node) => {
-                vec![Node::Expression(&node.key), Node::Expression(&node.value)]
+                vec![Node::Expression(node.key), Node::Expression(node.value)]
             }
             Node::ForeachTarget(node) => vec![match node {
                 ForeachTarget::KeyValue(node) => Node::ForeachKeyValueTarget(node),
                 ForeachTarget::Value(node) => Node::ForeachValueTarget(node),
             }],
-            Node::ForeachValueTarget(node) => vec![Node::Expression(&node.value)],
+            Node::ForeachValueTarget(node) => vec![Node::Expression(node.value)],
             Node::For(node) => {
                 let mut children = vec![Node::Keyword(&node.r#for)];
 
@@ -1697,7 +1741,7 @@ impl<'a> Node<'a> {
                 children
             }
             Node::While(node) => {
-                vec![Node::Keyword(&node.r#while), Node::Expression(&node.condition), Node::WhileBody(&node.body)]
+                vec![Node::Keyword(&node.r#while), Node::Expression(node.condition), Node::WhileBody(&node.body)]
             }
             Node::WhileBody(node) => match node {
                 WhileBody::Statement(statement) => vec![Node::Statement(statement)],
@@ -1832,7 +1876,14 @@ impl<'a> Node<'a> {
             Node::UseItemAlias(node) => {
                 vec![Node::Keyword(&node.r#as), Node::LocalIdentifier(&node.identifier)]
             }
-            Node::UseItemSequence(node) => node.items.iter().map(Node::UseItem).collect(),
+            Node::UseItemSequence(node) => {
+                let mut children = vec![];
+                for item in node.items.iter() {
+                    children.push(Node::UseItem(item));
+                }
+
+                children
+            }
             Node::UseItems(node) => vec![match node {
                 UseItems::Sequence(node) => Node::UseItemSequence(node),
                 UseItems::TypedList(node) => Node::TypedUseItemList(node),
@@ -1849,10 +1900,10 @@ impl<'a> Node<'a> {
                 Yield::From(node) => Node::YieldFrom(node),
             }],
             Node::YieldFrom(node) => {
-                vec![Node::Keyword(&node.r#yield), Node::Keyword(&node.from), Node::Expression(&node.iterator)]
+                vec![Node::Keyword(&node.r#yield), Node::Keyword(&node.from), Node::Expression(node.iterator)]
             }
             Node::YieldPair(node) => {
-                vec![Node::Keyword(&node.r#yield), Node::Expression(&node.key), Node::Expression(&node.value)]
+                vec![Node::Keyword(&node.r#yield), Node::Expression(node.key), Node::Expression(node.value)]
             }
             Node::YieldValue(node) => match &node.value {
                 Some(value) => vec![Node::Keyword(&node.r#yield), Node::Expression(value)],
@@ -1893,13 +1944,34 @@ impl<'a> Node<'a> {
                 Statement::Noop(_) => vec![],
             },
             Node::ExpressionStatement(node) => {
-                vec![Node::Expression(&node.expression), Node::Terminator(&node.terminator)]
+                vec![Node::Expression(node.expression), Node::Terminator(&node.terminator)]
             }
-            Node::BracedExpressionStringPart(node) => vec![Node::Expression(&node.expression)],
-            Node::DocumentString(node) => node.parts.iter().map(Node::StringPart).collect(),
-            Node::InterpolatedString(node) => node.parts.iter().map(Node::StringPart).collect(),
+            Node::BracedExpressionStringPart(node) => vec![Node::Expression(node.expression)],
+            Node::DocumentString(node) => {
+                let mut children = vec![];
+                for part in node.parts.as_slice() {
+                    children.push(Node::StringPart(part));
+                }
+
+                children
+            }
+            Node::InterpolatedString(node) => {
+                let mut children = vec![];
+                for part in node.parts.as_slice() {
+                    children.push(Node::StringPart(part));
+                }
+
+                children
+            }
             Node::LiteralStringPart(_) => vec![],
-            Node::ShellExecuteString(node) => node.parts.iter().map(Node::StringPart).collect(),
+            Node::ShellExecuteString(node) => {
+                let mut children = vec![];
+                for part in node.parts.as_slice() {
+                    children.push(Node::StringPart(part));
+                }
+
+                children
+            }
             Node::CompositeString(node) => vec![match node {
                 CompositeString::ShellExecute(node) => Node::ShellExecuteString(node),
                 CompositeString::Interpolated(node) => Node::InterpolatedString(node),
@@ -1926,10 +1998,12 @@ impl<'a> Node<'a> {
                     vec![Node::ClosingTag(closing_tag), Node::OpeningTag(opening_tag)]
                 }
             },
-            Node::Throw(node) => vec![Node::Keyword(&node.throw), Node::Expression(&node.exception)],
+            Node::Throw(node) => vec![Node::Keyword(&node.throw), Node::Expression(node.exception)],
             Node::Hint(node) => match &node {
                 Hint::Identifier(identifier) => vec![Node::Identifier(identifier)],
-                Hint::Parenthesized(parenthesized_hint) => vec![Node::ParenthesizedHint(parenthesized_hint)],
+                Hint::Parenthesized(parenthesized_hint) => {
+                    vec![Node::ParenthesizedHint(parenthesized_hint)]
+                }
                 Hint::Nullable(nullable_hint) => vec![Node::NullableHint(nullable_hint)],
                 Hint::Union(union_hint) => vec![Node::UnionHint(union_hint)],
                 Hint::Intersection(intersection_hint) => vec![Node::IntersectionHint(intersection_hint)],
@@ -1951,10 +2025,10 @@ impl<'a> Node<'a> {
                 | Hint::Mixed(local_identifier)
                 | Hint::Iterable(local_identifier) => vec![Node::LocalIdentifier(local_identifier)],
             },
-            Node::IntersectionHint(node) => vec![Node::Hint(&node.left), Node::Hint(&node.right)],
-            Node::NullableHint(node) => vec![Node::Hint(&node.hint)],
-            Node::ParenthesizedHint(node) => vec![Node::Hint(&node.hint)],
-            Node::UnionHint(node) => vec![Node::Hint(&node.left), Node::Hint(&node.right)],
+            Node::IntersectionHint(node) => vec![Node::Hint(node.left), Node::Hint(node.right)],
+            Node::NullableHint(node) => vec![Node::Hint(node.hint)],
+            Node::ParenthesizedHint(node) => vec![Node::Hint(node.hint)],
+            Node::UnionHint(node) => vec![Node::Hint(node.left), Node::Hint(node.right)],
             Node::Unset(node) => {
                 let mut children = vec![Node::Keyword(&node.unset)];
                 children.extend(node.values.iter().map(Node::Expression));
@@ -1963,9 +2037,9 @@ impl<'a> Node<'a> {
                 children
             }
             Node::DirectVariable(_) => vec![],
-            Node::IndirectVariable(node) => vec![Node::Expression(&node.expression)],
+            Node::IndirectVariable(node) => vec![Node::Expression(node.expression)],
             Node::NestedVariable(node) => {
-                vec![Node::Variable(&node.variable)]
+                vec![Node::Variable(node.variable)]
             }
             Node::Variable(node) => match node {
                 Variable::Direct(node) => vec![Node::DirectVariable(node)],
@@ -1973,13 +2047,13 @@ impl<'a> Node<'a> {
                 Variable::Nested(node) => vec![Node::NestedVariable(node)],
             },
             Node::Pipe(pipe) => {
-                vec![Node::Expression(&pipe.input), Node::Expression(&pipe.callable)]
+                vec![Node::Expression(pipe.input), Node::Expression(pipe.callable)]
             }
         }
     }
 }
 
-impl HasSpan for Node<'_> {
+impl HasSpan for Node<'_, '_> {
     fn span(&self) -> Span {
         match self {
             Self::Program(node) => node.span(),

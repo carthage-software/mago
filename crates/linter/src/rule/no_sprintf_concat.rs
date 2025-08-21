@@ -87,7 +87,7 @@ impl LintRule for NoSprintfConcatRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -96,9 +96,9 @@ impl LintRule for NoSprintfConcatRule {
             return;
         }
 
-        let (sprintf_call_expr, other_expr) = if is_sprintf_call(&binary.lhs, ctx) {
+        let (sprintf_call_expr, other_expr) = if is_sprintf_call(binary.lhs, ctx) {
             (&binary.lhs, &binary.rhs)
-        } else if is_sprintf_call(&binary.rhs, ctx) {
+        } else if is_sprintf_call(binary.rhs, ctx) {
             (&binary.rhs, &binary.lhs)
         } else {
             return;
@@ -124,7 +124,10 @@ impl LintRule for NoSprintfConcatRule {
     }
 }
 
-fn is_sprintf_call(expression: &Expression, context: &LintContext<'_>) -> bool {
+fn is_sprintf_call<'ast, 'arena>(
+    expression: &'ast Expression<'arena>,
+    context: &LintContext<'_, 'ast, 'arena>,
+) -> bool {
     let Expression::Call(Call::Function(call)) = expression else {
         return false;
     };

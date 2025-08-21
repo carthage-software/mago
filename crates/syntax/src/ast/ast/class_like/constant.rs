@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -14,34 +13,32 @@ use crate::ast::ast::type_hint::Hint;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-/// Represents a class-like constant in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ClassLikeConstant {
-    pub attribute_lists: Sequence<AttributeList>,
-    pub modifiers: Sequence<Modifier>,
-    pub r#const: Keyword,
-    pub hint: Option<Hint>,
-    pub items: TokenSeparatedSequence<ClassLikeConstantItem>,
-    pub terminator: Terminator,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClassLikeConstant<'arena> {
+    pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+    pub modifiers: Sequence<'arena, Modifier<'arena>>,
+    pub r#const: Keyword<'arena>,
+    pub hint: Option<Hint<'arena>>,
+    pub items: TokenSeparatedSequence<'arena, ClassLikeConstantItem<'arena>>,
+    pub terminator: Terminator<'arena>,
 }
 
-/// Represents a single name-value pair within a constant statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct ClassLikeConstantItem {
-    pub name: LocalIdentifier,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClassLikeConstantItem<'arena> {
+    pub name: LocalIdentifier<'arena>,
     pub equals: Span,
-    pub value: Expression,
+    pub value: Expression<'arena>,
 }
 
-impl ClassLikeConstant {
-    pub fn first_item(&self) -> &ClassLikeConstantItem {
+impl<'arena> ClassLikeConstant<'arena> {
+    pub fn first_item(&self) -> &ClassLikeConstantItem<'arena> {
         self.items
             .first()
             .expect("expected class-like constant to have at least 1 item. this is a bug in mago. please report it.")
     }
 }
 
-impl HasSpan for ClassLikeConstant {
+impl HasSpan for ClassLikeConstant<'_> {
     fn span(&self) -> Span {
         if let Some(modifier) = self.modifiers.first() {
             modifier.span().join(self.terminator.span())
@@ -51,7 +48,7 @@ impl HasSpan for ClassLikeConstant {
     }
 }
 
-impl HasSpan for ClassLikeConstantItem {
+impl HasSpan for ClassLikeConstantItem<'_> {
     fn span(&self) -> Span {
         self.name.span().join(self.value.span())
     }

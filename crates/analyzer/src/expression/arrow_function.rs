@@ -22,11 +22,11 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
 
-impl Analyzable for ArrowFunction {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let s = self.span();
@@ -48,7 +48,7 @@ impl Analyzable for ArrowFunction {
 
         let mut inner_block_context = BlockContext::new(scope);
 
-        let variables = get_variables_referenced_in_expression(self.expression.as_ref(), true);
+        let variables = get_variables_referenced_in_expression(self.expression, true);
         let params = self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();
 
         for (variable, _) in variables {
@@ -56,18 +56,17 @@ impl Analyzable for ArrowFunction {
                 continue;
             }
 
-            let imported_variable = context.interner.lookup(&variable);
-            if inner_block_context.variables_possibly_in_scope.contains(imported_variable) {
+            if inner_block_context.variables_possibly_in_scope.contains(variable) {
                 continue;
             }
 
-            block_context.add_conditionally_referenced_variable(imported_variable);
+            block_context.add_conditionally_referenced_variable(variable);
 
-            if let Some(existing_type) = block_context.locals.get(imported_variable).cloned() {
-                inner_block_context.locals.insert(imported_variable.to_string(), existing_type);
+            if let Some(existing_type) = block_context.locals.get(variable).cloned() {
+                inner_block_context.locals.insert(variable.to_string(), existing_type);
             }
 
-            inner_block_context.variables_possibly_in_scope.insert(imported_variable.to_string());
+            inner_block_context.variables_possibly_in_scope.insert(variable.to_string());
         }
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
@@ -77,7 +76,7 @@ impl Analyzable for ArrowFunction {
             &mut inner_block_context,
             function_metadata,
             &self.parameter_list,
-            FunctionLikeBody::Expression(&self.expression),
+            FunctionLikeBody::Expression(self.expression),
             inferred_parameter_types,
         )?;
 
@@ -116,7 +115,7 @@ impl Analyzable for ArrowFunction {
         heuristic::check_function_like(
             function_metadata,
             self.parameter_list.parameters.as_slice(),
-            FunctionLikeBody::Expression(&self.expression),
+            FunctionLikeBody::Expression(self.expression),
             context,
         );
 

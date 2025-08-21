@@ -88,7 +88,7 @@ impl LintRule for NoGlobalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Global(global) => {
                 let mut issue = Issue::new(self.cfg.level(), "Unsafe use of `global` keyword.")
@@ -109,8 +109,7 @@ impl LintRule for NoGlobalRule {
                 ctx.collector.report(issue);
             }
             Node::DirectVariable(direct_variable) => {
-                let name = ctx.interner.lookup(&direct_variable.name);
-                if !GLOBALS_VARIABLE.eq(name) {
+                if !GLOBALS_VARIABLE.eq(direct_variable.name) {
                     return;
                 }
 

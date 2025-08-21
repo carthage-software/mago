@@ -5,7 +5,7 @@ use crate::parser::internal::expression;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_variable(stream: &mut TokenStream<'_, '_>) -> Result<Variable, ParseError> {
+pub fn parse_variable<'arena>(stream: &mut TokenStream<'arena>) -> Result<Variable<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match &token.kind {
@@ -16,13 +16,15 @@ pub fn parse_variable(stream: &mut TokenStream<'_, '_>) -> Result<Variable, Pars
     })
 }
 
-pub fn parse_direct_variable(stream: &mut TokenStream<'_, '_>) -> Result<DirectVariable, ParseError> {
+pub fn parse_direct_variable<'arena>(stream: &mut TokenStream<'arena>) -> Result<DirectVariable<'arena>, ParseError> {
     let token = utils::expect(stream, T!["$variable"])?;
 
     Ok(DirectVariable { span: token.span, name: token.value })
 }
 
-pub fn parse_indirect_variable(stream: &mut TokenStream<'_, '_>) -> Result<IndirectVariable, ParseError> {
+pub fn parse_indirect_variable<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IndirectVariable<'arena>, ParseError> {
     let within_indirect_variable = stream.state.within_indirect_variable;
 
     let dollar_left_brace = utils::expect_span(stream, T!["${"])?;
@@ -31,9 +33,12 @@ pub fn parse_indirect_variable(stream: &mut TokenStream<'_, '_>) -> Result<Indir
     stream.state.within_indirect_variable = within_indirect_variable;
     let right_brace = utils::expect_span(stream, T!["}"])?;
 
-    Ok(IndirectVariable { dollar_left_brace, expression: Box::new(expression), right_brace })
+    Ok(IndirectVariable { dollar_left_brace, expression: stream.alloc(expression), right_brace })
 }
 
-pub fn parse_nested_variable(stream: &mut TokenStream<'_, '_>) -> Result<NestedVariable, ParseError> {
-    Ok(NestedVariable { dollar: utils::expect_span(stream, T!["$"])?, variable: Box::new(parse_variable(stream)?) })
+pub fn parse_nested_variable<'arena>(stream: &mut TokenStream<'arena>) -> Result<NestedVariable<'arena>, ParseError> {
+    let dollar = utils::expect_span(stream, T!["$"])?;
+    let variable = parse_variable(stream)?;
+
+    Ok(NestedVariable { dollar, variable: stream.alloc(variable) })
 }

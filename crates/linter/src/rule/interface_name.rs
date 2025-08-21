@@ -85,13 +85,13 @@ impl LintRule for InterfaceNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Interface(interface) = node else {
             return;
         };
 
         let mut issues = vec![];
-        let name = ctx.lookup(&interface.name.value);
+        let name = interface.name.value;
         let fqcn = ctx.lookup_name(&interface.name);
 
         if !is_class_case(name) {

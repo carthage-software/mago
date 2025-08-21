@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_constant(constant: &Constant, context: &mut Context<'_>) {
+pub fn check_constant(constant: &Constant, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::ConstantAttributes) {
         for attribute_list in constant.attribute_lists.iter() {
             context.report(
@@ -20,7 +20,7 @@ pub fn check_constant(constant: &Constant, context: &mut Context<'_>) {
     }
 
     for item in constant.items.iter() {
-        if !item.value.is_constant(context.version, true) {
+        if !item.value.is_constant(&context.version, true) {
             context.report(
                 Issue::error("Constant value must be a constant expression.")
                     .with_annotation(

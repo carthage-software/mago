@@ -15,7 +15,6 @@ workspace = true
 [dependencies]
 mago-syntax-core = { workspace = true }
 mago-span = { workspace = true }
-mago-interner = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-php-version = { workspace = true }
@@ -24,6 +23,7 @@ strum = { workspace = true }
 either = { workspace = true }
 paste = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
+bumpalo = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

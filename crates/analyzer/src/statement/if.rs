@@ -39,17 +39,17 @@ use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
 use crate::utils::misc::check_for_paradox;
 
-impl Analyzable for If {
-    fn analyze<'a>(
-        &self,
-        context: &mut Context<'a>,
-        block_context: &mut BlockContext<'a>,
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut if_scope = IfScope::new();
 
         // We need to clone the original context for later use if we're exiting in this if conditional
-        if is_obvious_boolean_condition(&self.condition) {
+        if is_obvious_boolean_condition(self.condition) {
             let final_actions =
                 ControlAction::from_statements(self.body.statements().iter().collect(), vec![], Some(artifacts), true);
 
@@ -62,7 +62,7 @@ impl Analyzable for If {
         }
 
         let (mut if_conditional_scope, applied_block_context) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, &self.condition, true)?;
+            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, self.condition, true)?;
         *block_context = applied_block_context;
 
         let mut if_block_context = if_conditional_scope.if_body_context.clone();
@@ -79,7 +79,7 @@ impl Analyzable for If {
         let mut if_clauses = formula::get_formula(
             self.condition.span(),
             self.condition.span(),
-            &self.condition,
+            self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
         ).unwrap_or_else(|| {
@@ -162,7 +162,7 @@ impl Analyzable for If {
         if_scope.reasonable_clauses = if_block_context.clauses.to_vec();
         if_scope.negated_clauses = negate_or_synthesize(
             if_clauses,
-            &self.condition,
+            self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
         );
@@ -177,10 +177,8 @@ impl Analyzable for If {
         let mut changed_variable_ids: HashSet<String> = HashSet::default();
 
         if !if_scope.negated_types.is_empty() {
-            let mut reconciliation_context = context.get_reconciliation_context();
-
             reconcile_keyed_types(
-                &mut reconciliation_context,
+                context,
                 &if_scope.negated_types,
                 IndexMap::new(),
                 &mut temporary_else_context,
@@ -267,9 +265,7 @@ impl Analyzable for If {
 
                 if !if_scope.reasonable_clauses.is_empty() {
                     if_scope.reasonable_clauses = BlockContext::filter_clauses(
-                        context.interner,
-                        context.codebase,
-                        &mut context.collector,
+                        context,
                         &variable_id,
                         if_scope.reasonable_clauses,
                         block_context.locals.get(&variable_id).map(|rc| rc.as_ref()),
@@ -306,14 +302,7 @@ impl Analyzable for If {
                 combine_union_types(&existing_type, &variable_type, context.codebase, context.interner, false);
 
             if !new_type.eq(&existing_type) {
-                block_context.remove_descendants(
-                    context.interner,
-                    context.codebase,
-                    &mut context.collector,
-                    &variable_id,
-                    &existing_type,
-                    Some(&new_type),
-                );
+                block_context.remove_descendants(context, &variable_id, &existing_type, Some(&new_type));
             }
 
             block_context.locals.insert(variable_id.clone(), Rc::new(new_type));
@@ -338,15 +327,15 @@ const fn is_obvious_boolean_condition(condition: &Expression) -> bool {
     }
 }
 
-fn analyze_if_statement_block<'a>(
-    context: &mut Context<'a>,
-    if_scope: &mut IfScope<'a>,
-    if_conditional_scope: &mut IfConditionalScope<'a>,
-    mut if_block_context: BlockContext<'a>,
-    outer_block_context: &mut BlockContext<'a>,
+fn analyze_if_statement_block<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    if_scope: &mut IfScope<'ctx>,
+    if_conditional_scope: &mut IfConditionalScope<'ctx>,
+    mut if_block_context: BlockContext<'ctx>,
+    outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     pre_assignment_else_redefined_locals: &HashMap<String, TUnion>,
-    if_statement: &If,
+    if_statement: &If<'arena>,
 ) -> Result<(), AnalysisError> {
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
     let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
@@ -373,10 +362,9 @@ fn analyze_if_statement_block<'a>(
 
     if !reconcilable_if_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconciliation_context = context.get_reconciliation_context();
 
         reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &reconcilable_if_types,
             active_if_types,
             &mut if_block_context,
@@ -431,17 +419,15 @@ fn analyze_if_statement_block<'a>(
     analyze_statements(if_statement.body.statements(), context, &mut if_block_context, artifacts)?;
 
     for variable_id in &if_block_context.parent_conflicting_clause_variables {
-        outer_block_context.remove_variable_from_conflicting_clauses(
-            context.interner,
-            context.codebase,
-            &mut context.collector,
-            variable_id,
-            None,
-        );
+        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
     }
 
-    let final_actions =
-        ControlAction::from_statements(if_statement.body.statements_vec(), vec![], Some(artifacts), true);
+    let final_actions = ControlAction::from_statements(
+        if_statement.body.statements().iter().collect::<Vec<_>>(),
+        vec![],
+        Some(artifacts),
+        true,
+    );
 
     let has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
     let has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
@@ -478,9 +464,7 @@ fn analyze_if_statement_block<'a>(
             for variable_id in new_assigned_variable_ids_keys {
                 let previous_clauses = std::mem::take(&mut if_scope.reasonable_clauses);
                 if_scope.reasonable_clauses = BlockContext::filter_clauses(
-                    context.interner,
-                    context.codebase,
-                    &mut context.collector,
+                    context,
                     &variable_id,
                     previous_clauses,
                     if_block_context.locals.get(&variable_id).map(|rc| rc.as_ref()),
@@ -498,7 +482,7 @@ fn analyze_if_statement_block<'a>(
                 artifacts,
                 post_leaving_if_context,
                 outer_block_context,
-                &if_statement.condition,
+                if_statement.condition,
                 &if_conditional_scope.assigned_in_conditional_variable_ids,
             )?;
         }
@@ -546,13 +530,13 @@ fn analyze_if_statement_block<'a>(
     Ok(())
 }
 
-fn analyze_else_if_clause<'a>(
-    context: &mut Context<'a>,
-    if_scope: &mut IfScope,
-    else_block_context: &mut BlockContext<'a>,
-    outer_block_context: &mut BlockContext<'a>,
+fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    if_scope: &mut IfScope<'ctx>,
+    else_block_context: &mut BlockContext<'ctx>,
+    outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    else_if_clause: (&Expression, &[Statement]),
+    else_if_clause: (&'ast Expression<'arena>, &'ast [Statement<'arena>]),
 ) -> Result<(), AnalysisError> {
     let (if_conditional_scope, applied_else_block_context) =
         conditional::analyze(context, else_block_context.clone(), artifacts, if_scope, else_if_clause.0, true)?;
@@ -738,10 +722,8 @@ fn analyze_else_if_clause<'a>(
 
     let mut newly_reconciled_variable_ids = HashSet::default();
     if !reconcilable_else_if_types.is_empty() {
-        let mut reconciliation_context = context.get_reconciliation_context();
-
         reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &reconcilable_else_if_types,
             active_else_if_types,
             &mut else_if_block_context,
@@ -786,13 +768,7 @@ fn analyze_else_if_clause<'a>(
     analyze_statements(else_if_clause.1, context, &mut else_if_block_context, artifacts)?;
 
     for variable_id in else_if_block_context.parent_conflicting_clause_variables.iter() {
-        outer_block_context.remove_variable_from_conflicting_clauses(
-            context.interner,
-            context.codebase,
-            &mut context.collector,
-            variable_id,
-            None,
-        );
+        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
     }
 
     let new_assigned_variable_ids = else_if_block_context.assigned_variable_ids.clone();
@@ -858,7 +834,7 @@ fn analyze_else_if_clause<'a>(
             let mut implied_outer_context = else_if_block_context.clone();
 
             reconcile_keyed_types(
-                &mut context.get_reconciliation_context(),
+                context,
                 &negated_else_if_types,
                 IndexMap::new(),
                 &mut implied_outer_context,
@@ -906,13 +882,13 @@ fn analyze_else_if_clause<'a>(
     Ok(())
 }
 
-fn analyze_else_statements<'a>(
-    context: &mut Context<'a>,
-    if_scope: &mut IfScope,
-    else_block_context: &mut BlockContext<'a>,
-    outer_block_context: &mut BlockContext<'a>,
+fn analyze_else_statements<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    if_scope: &mut IfScope<'ctx>,
+    else_block_context: &mut BlockContext<'ctx>,
+    outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    else_statements: Option<&[Statement]>,
+    else_statements: Option<&[Statement<'arena>]>,
     if_span: Span,
 ) -> Result<(), AnalysisError> {
     if else_statements.is_none() && if_scope.negated_clauses.is_empty() && else_block_context.clauses.is_empty() {
@@ -949,10 +925,9 @@ fn analyze_else_statements<'a>(
 
     if !else_types.is_empty() {
         let mut changed_variable_ids = HashSet::default();
-        let mut reconciliation_context = context.get_reconciliation_context();
 
         reconcile_keyed_types(
-            &mut reconciliation_context,
+            context,
             &else_types,
             IndexMap::new(),
             else_block_context,
@@ -1001,13 +976,7 @@ fn analyze_else_statements<'a>(
     }
 
     for variable_id in &else_block_context.parent_conflicting_clause_variables {
-        outer_block_context.remove_variable_from_conflicting_clauses(
-            context.interner,
-            context.codebase,
-            &mut context.collector,
-            variable_id,
-            None,
-        );
+        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
     }
 
     let new_assigned_variable_ids = else_block_context.assigned_variable_ids.clone();
@@ -1101,12 +1070,12 @@ fn analyze_else_statements<'a>(
     Ok(())
 }
 
-fn add_conditionally_assigned_variables_to_context<'a>(
-    context: &mut Context<'a>,
+fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
-    post_leaving_if_block_context: &mut BlockContext<'a>,
-    post_if_block_context: &mut BlockContext<'a>,
-    condition: &Expression,
+    post_leaving_if_block_context: &mut BlockContext<'ctx>,
+    post_if_block_context: &mut BlockContext<'ctx>,
+    condition: &Expression<'arena>,
     assigned_in_conditional_variable_ids: &HashMap<String, u32>,
 ) -> Result<(), AnalysisError> {
     if assigned_in_conditional_variable_ids.is_empty() {
@@ -1118,8 +1087,8 @@ fn add_conditionally_assigned_variables_to_context<'a>(
 
     let (result, _) = context.record(|context| {
         for expression in expressions {
-            let negated_expression = new_synthetic_negation(expression);
-            let assertion = new_synthetic_call(context.interner, "assert", negated_expression);
+            let negated_expression = new_synthetic_negation(context.arena, expression);
+            let assertion = new_synthetic_call(context.arena, "assert", negated_expression);
 
             let was_inside_negation = post_leaving_if_block_context.inside_negation;
             post_leaving_if_block_context.inside_negation = true;
@@ -1145,11 +1114,11 @@ fn add_conditionally_assigned_variables_to_context<'a>(
     Ok(())
 }
 
-fn update_if_scope<'a>(
-    context: &mut Context<'a>,
-    if_scope: &mut IfScope,
-    if_block_context: &mut BlockContext<'a>,
-    outer_block_context: &mut BlockContext<'a>,
+fn update_if_scope<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    if_scope: &mut IfScope<'ctx>,
+    if_block_context: &mut BlockContext<'ctx>,
+    outer_block_context: &mut BlockContext<'ctx>,
     new_assigned_variable_ids: HashMap<String, u32>,
     new_possibly_assigned_variable_ids: HashSet<String>,
     newly_reconciled_variable_ids: HashSet<String>,
@@ -1250,7 +1219,9 @@ fn update_if_scope<'a>(
     }
 }
 
-fn get_definitely_evaluated_ored_expressions(expression: &Expression) -> Vec<&Expression> {
+fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(
+    expression: &'ast Expression<'arena>,
+) -> Vec<&'ast Expression<'arena>> {
     if let Expression::Binary(Binary {
         lhs,
         operator: BinaryOperator::Or(_) | BinaryOperator::LowOr(_) | BinaryOperator::LowXor(_),

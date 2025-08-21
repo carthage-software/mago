@@ -52,7 +52,7 @@ const MAGIC_METHOD_SEMANTICS: &[(&str, Option<usize>, bool, bool, bool)] = &[
 ];
 
 #[inline]
-fn returns_generator<'ast>(context: &mut Context<'_>, block: &'ast Block, hint: &'ast Hint) -> bool {
+fn returns_generator<'ast>(context: &mut Context<'_, '_, '_>, block: &'ast Block, hint: &'ast Hint) -> bool {
     if hint_contains_generator(context, hint) {
         return true;
     }
@@ -61,21 +61,21 @@ fn returns_generator<'ast>(context: &mut Context<'_>, block: &'ast Block, hint: 
 }
 
 #[inline]
-fn hint_contains_generator(context: &mut Context<'_>, hint: &Hint) -> bool {
+fn hint_contains_generator(context: &mut Context<'_, '_, '_>, hint: &Hint) -> bool {
     match hint {
         Hint::Identifier(identifier) => {
             let symbol = context.get_name(&identifier.span().start);
 
             "generator".eq_ignore_ascii_case(symbol)
         }
-        Hint::Parenthesized(parenthesized_hint) => hint_contains_generator(context, &parenthesized_hint.hint),
-        Hint::Nullable(nullable_hint) => hint_contains_generator(context, &nullable_hint.hint),
+        Hint::Parenthesized(parenthesized_hint) => hint_contains_generator(context, parenthesized_hint.hint),
+        Hint::Nullable(nullable_hint) => hint_contains_generator(context, nullable_hint.hint),
         Hint::Union(union_hint) => {
-            hint_contains_generator(context, &union_hint.left) || hint_contains_generator(context, &union_hint.right)
+            hint_contains_generator(context, union_hint.left) || hint_contains_generator(context, union_hint.right)
         }
         Hint::Intersection(intersection_hint) => {
-            hint_contains_generator(context, &intersection_hint.left)
-                || hint_contains_generator(context, &intersection_hint.right)
+            hint_contains_generator(context, intersection_hint.left)
+                || hint_contains_generator(context, intersection_hint.right)
         }
         _ => false,
     }

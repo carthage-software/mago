@@ -1,8 +1,6 @@
-use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
-use mago_interner::StringIdentifier;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -17,13 +15,13 @@ use crate::ast::ast::expression::Expression;
 /// ${foo}
 /// $$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(C, u8)]
-pub enum Variable {
-    Direct(DirectVariable),
-    Indirect(IndirectVariable),
-    Nested(NestedVariable),
+#[repr(u8)]
+pub enum Variable<'arena> {
+    Direct(DirectVariable<'arena>),
+    Indirect(IndirectVariable<'arena>),
+    Nested(NestedVariable<'arena>),
 }
 
 /// Represents a direct variable.
@@ -35,10 +33,10 @@ pub enum Variable {
 /// ```php
 /// $foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct DirectVariable {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct DirectVariable<'arena> {
     pub span: Span,
-    pub name: StringIdentifier,
+    pub name: &'arena str,
 }
 
 /// Represents an indirect variable.
@@ -52,10 +50,10 @@ pub struct DirectVariable {
 /// ```php
 /// ${foo}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct IndirectVariable {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct IndirectVariable<'arena> {
     pub dollar_left_brace: Span,
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     pub right_brace: Span,
 }
 
@@ -70,13 +68,13 @@ pub struct IndirectVariable {
 /// $${foo}
 /// $$$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct NestedVariable {
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NestedVariable<'arena> {
     pub dollar: Span,
-    pub variable: Box<Variable>,
+    pub variable: &'arena Variable<'arena>,
 }
 
-impl HasSpan for Variable {
+impl HasSpan for Variable<'_> {
     fn span(&self) -> Span {
         match self {
             Variable::Direct(node) => node.span(),
@@ -86,19 +84,19 @@ impl HasSpan for Variable {
     }
 }
 
-impl HasSpan for DirectVariable {
+impl HasSpan for DirectVariable<'_> {
     fn span(&self) -> Span {
         self.span
     }
 }
 
-impl HasSpan for IndirectVariable {
+impl HasSpan for IndirectVariable<'_> {
     fn span(&self) -> Span {
         Span::between(self.dollar_left_brace, self.right_brace)
     }
 }
 
-impl HasSpan for NestedVariable {
+impl HasSpan for NestedVariable<'_> {
     fn span(&self) -> Span {
         Span::between(self.dollar, self.variable.span())
     }

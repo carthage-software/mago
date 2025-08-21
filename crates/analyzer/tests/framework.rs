@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 
 use ahash::HashSet;
 
+use bumpalo::Bump;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::settings::Settings;
@@ -32,23 +33,25 @@ impl<'a> TestCase<'a> {
 }
 
 fn run_test_case_inner(config: TestCase) {
+    let arena = Bump::new();
     let interner = ThreadedInterner::new();
     let source_file = File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string()));
 
-    let (program, parse_issues) = parse_file(&interner, &source_file);
+    let (program, parse_issues) = parse_file(&arena, &source_file);
     if parse_issues.is_some() {
         panic!("Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
     }
 
-    let resolver = NameResolver::new(&interner);
+    let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(&program);
-    let mut codebase = scan_program(&interner, &source_file, &program, &resolved_names);
+    let mut codebase = scan_program(&interner, &arena, &source_file, &program, &resolved_names);
     let mut symbol_references = SymbolReferences::new();
 
     populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(
+        &arena,
         &source_file,
         &resolved_names,
         &codebase,

@@ -9,16 +9,16 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_constant_with_attributes(
-    stream: &mut TokenStream<'_, '_>,
-    attribute_lists: Sequence<AttributeList>,
-) -> Result<Constant, ParseError> {
+pub fn parse_constant_with_attributes<'arena>(
+    stream: &mut TokenStream<'arena>,
+    attribute_lists: Sequence<'arena, AttributeList<'arena>>,
+) -> Result<Constant<'arena>, ParseError> {
     Ok(Constant {
         attribute_lists,
         r#const: utils::expect_keyword(stream, T!["const"])?,
         items: {
-            let mut items = vec![];
-            let mut commas = vec![];
+            let mut items = stream.new_vec();
+            let mut commas = stream.new_vec();
             loop {
                 if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T![";" | "?>"])) {
                     break;
@@ -40,7 +40,7 @@ pub fn parse_constant_with_attributes(
     })
 }
 
-pub fn parse_constant_item(stream: &mut TokenStream<'_, '_>) -> Result<ConstantItem, ParseError> {
+pub fn parse_constant_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<ConstantItem<'arena>, ParseError> {
     Ok(ConstantItem {
         name: parse_local_identifier(stream)?,
         equals: utils::expect_span(stream, T!["="])?,

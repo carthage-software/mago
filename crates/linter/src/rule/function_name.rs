@@ -89,10 +89,10 @@ impl LintRule for FunctionNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Function(function) = node else { return };
 
-        let name = ctx.lookup(&function.name.value);
+        let name = function.name.value;
         let fqfn = ctx.lookup_name(&function.name);
 
         if self.cfg.either {

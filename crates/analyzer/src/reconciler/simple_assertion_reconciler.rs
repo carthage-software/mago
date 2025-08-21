@@ -48,7 +48,7 @@ use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
 
 use crate::intersect_simple;
-use crate::reconciler::ReconciliationContext;
+use crate::reconciler::Context;
 use crate::reconciler::map_concrete_generic_constraint;
 use crate::reconciler::map_generic_constraint_or_else;
 use crate::reconciler::refine_array_key;
@@ -57,7 +57,7 @@ use crate::reconciler::trigger_issue_for_impossible;
 
 // This performs type intersections and more general reconciliations
 pub(crate) fn reconcile(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     possibly_undefined: bool,
@@ -361,7 +361,7 @@ pub(crate) fn reconcile(
 }
 
 pub(crate) fn intersect_null(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -425,7 +425,7 @@ pub(crate) fn intersect_null(
 }
 
 pub(crate) fn intersect_resource(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -490,7 +490,7 @@ pub(crate) fn intersect_resource(
 }
 
 fn intersect_object(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -538,7 +538,7 @@ fn intersect_object(
 }
 
 fn intersect_iterable(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -605,7 +605,7 @@ fn intersect_iterable(
 }
 
 fn intersect_array_list(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -712,7 +712,7 @@ fn intersect_array_list(
 }
 
 fn intersect_keyed_array(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -805,7 +805,7 @@ fn intersect_keyed_array(
 }
 
 fn intersect_arraykey(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -885,7 +885,7 @@ fn intersect_arraykey(
 }
 
 fn intersect_numeric(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -962,7 +962,7 @@ fn intersect_numeric(
 }
 
 fn intersect_string(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1068,7 +1068,7 @@ fn intersect_string(
 }
 
 fn intersect_int(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1143,7 +1143,7 @@ fn intersect_int(
 }
 
 fn reconcile_truthy_or_non_empty(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1222,7 +1222,7 @@ fn reconcile_truthy_or_non_empty(
 }
 
 fn reconcile_isset(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     possibly_undefined: bool,
@@ -1283,7 +1283,7 @@ fn reconcile_isset(
 }
 
 fn reconcile_non_empty_countable(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1345,7 +1345,7 @@ fn reconcile_non_empty_countable(
 }
 
 fn reconcile_exactly_countable(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1427,7 +1427,7 @@ fn reconcile_exactly_countable(
 }
 
 fn reconcile_countable(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1500,7 +1500,7 @@ fn reconcile_countable(
 
 #[inline]
 fn reconcile_less_than(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1523,7 +1523,7 @@ fn reconcile_less_than(
 
 #[inline]
 fn reconcile_less_than_or_equal(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1546,7 +1546,7 @@ fn reconcile_less_than_or_equal(
 
 #[inline]
 fn reconcile_greater_than(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1569,7 +1569,7 @@ fn reconcile_greater_than(
 
 #[inline]
 fn reconcile_greater_than_or_equal(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1591,7 +1591,7 @@ fn reconcile_greater_than_or_equal(
 }
 
 fn reconcile_integer_comparison(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1675,7 +1675,7 @@ fn reconcile_integer_comparison(
 }
 
 fn reconcile_array_access(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1713,7 +1713,7 @@ fn reconcile_array_access(
 }
 
 fn reconcile_in_array(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1745,7 +1745,7 @@ fn reconcile_in_array(
 }
 
 fn reconcile_has_array_key(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -1888,7 +1888,7 @@ fn reconcile_has_array_key(
 }
 
 fn reconcile_has_nonnull_entry_for_key(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
@@ -2043,7 +2043,7 @@ fn reconcile_has_nonnull_entry_for_key(
 }
 
 pub(crate) fn get_acceptable_type(
-    context: &mut ReconciliationContext<'_, '_>,
+    context: &mut Context<'_, '_>,
     acceptable_types: Vec<TAtomic>,
     did_remove_type: bool,
     key: Option<&String>,

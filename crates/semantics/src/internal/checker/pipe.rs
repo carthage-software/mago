@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_pipe(pipe: &Pipe, context: &mut Context<'_>) {
+pub fn check_pipe(pipe: &Pipe, context: &mut Context<'_, '_, '_>) {
     if context.version.is_supported(Feature::PipeOperator) {
         return;
     }

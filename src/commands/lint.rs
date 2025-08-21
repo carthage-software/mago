@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::Parser;
-
 use colored::Colorize;
+
 use mago_database::DatabaseReader;
-use mago_interner::ThreadedInterner;
-use mago_linter::Linter;
+use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
 use mago_linter::settings::Settings;
 use mago_reporting::Level;
@@ -83,16 +83,13 @@ pub struct LintCommand {
 }
 
 pub fn execute(command: LintCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    let interner = ThreadedInterner::new();
-
     let database = if !command.path.is_empty() {
         database::from_paths(&configuration.source, command.path, !command.semantics_only)?
     } else {
         database::load(&configuration.source, !command.semantics_only, !command.semantics_only)?
     };
 
-    let linter = Linter::new(
-        interner.clone(),
+    let registry = RuleRegistry::build(
         Settings {
             php_version: configuration.php_version,
             integrations: configuration.linter.integrations.clone(),
@@ -102,11 +99,11 @@ pub fn execute(command: LintCommand, configuration: Configuration) -> Result<Exi
     );
 
     if let Some(explain_code) = command.explain {
-        return explain_rule(&linter, &explain_code);
+        return explain_rule(&registry, &explain_code);
     }
 
     if command.list_rules {
-        return list_rules(linter.rules());
+        return list_rules(registry.rules());
     }
 
     if database.is_empty() {
@@ -116,18 +113,18 @@ pub fn execute(command: LintCommand, configuration: Configuration) -> Result<Exi
     }
 
     let shared_context = LintContext {
-        linter,
+        registry: Arc::new(registry),
         php_version: configuration.php_version,
         mode: if command.semantics_only { LintMode::SemanticsOnly } else { LintMode::Full },
     };
 
-    let issues = run_lint_pipeline(&interner, database.read_only(), shared_context)?;
+    let issues = run_lint_pipeline(database.read_only(), shared_context)?;
 
-    command.reporting.process_issues(issues, configuration, interner, database)
+    command.reporting.process_issues(issues, configuration, database)
 }
 
-pub fn explain_rule(linter: &Linter, code: &str) -> Result<ExitCode, Error> {
-    let Some(rule) = linter.rules().iter().find(|r| r.meta().code == code) else {
+pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Error> {
+    let Some(rule) = registry.rules().iter().find(|r| r.meta().code == code) else {
         println!();
         println!("  {}", "Error: Rule not found".red().bold());
         println!("  {}", format!("Could not find a rule with the code '{}'.", code).bright_black());

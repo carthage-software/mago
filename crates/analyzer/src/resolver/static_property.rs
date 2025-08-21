@@ -23,12 +23,12 @@ use crate::resolver::property::ResolvedProperty;
 use crate::visibility::check_property_read_visibility;
 
 /// Resolves all possible static properties from a class expression and a member selector.
-pub fn resolve_static_properties<'a>(
-    context: &mut Context<'a>,
-    block_context: &mut BlockContext<'a>,
+pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    class_expression: &Expression,
-    property_variable: &Variable,
+    class_expression: &'ast Expression<'arena>,
+    property_variable: &'ast Variable<'arena>,
 ) -> Result<PropertyResolutionResult, AnalysisError> {
     let mut result = PropertyResolutionResult::default();
 
@@ -39,7 +39,7 @@ pub fn resolve_static_properties<'a>(
     'resolve_names: {
         let variable_type = match property_variable {
             Variable::Direct(direct_variable) => {
-                property_names.push(direct_variable.name);
+                property_names.push(context.interner.intern(direct_variable.name));
 
                 break 'resolve_names;
             }
@@ -49,7 +49,7 @@ pub fn resolve_static_properties<'a>(
                 indirect_variable.expression.analyze(context, block_context, artifacts)?;
                 block_context.inside_general_use = was_inside_general_use;
 
-                artifacts.get_rc_expression_type(indirect_variable.expression.as_ref())
+                artifacts.get_rc_expression_type(indirect_variable.expression)
             }
             Variable::Nested(nested_variable) => {
                 let was_inside_general_use = block_context.inside_general_use;
@@ -57,7 +57,7 @@ pub fn resolve_static_properties<'a>(
                 nested_variable.variable.analyze(context, block_context, artifacts)?;
                 block_context.inside_general_use = was_inside_general_use;
 
-                artifacts.get_rc_expression_type(nested_variable.variable.as_ref())
+                artifacts.get_rc_expression_type(nested_variable.variable)
             }
         };
 
@@ -119,13 +119,13 @@ pub fn resolve_static_properties<'a>(
 }
 
 /// Finds a static property in a class, gets its type, and handles template localization.
-fn find_static_property_in_class<'a>(
-    context: &mut Context<'a>,
-    block_context: &BlockContext<'a>,
+fn find_static_property_in_class<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     class_id: &StringIdentifier,
     prop_name: &StringIdentifier,
-    variable: &Variable,
-    class_expr: &Expression,
+    variable: &'ast Variable<'arena>,
+    class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
     let Some(class_metadata) = get_class_like(context.codebase, context.interner, class_id) else {
@@ -207,8 +207,8 @@ fn find_static_property_in_class<'a>(
     }))
 }
 
-fn report_non_existent_property(
-    context: &mut Context,
+fn report_non_existent_property<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
     classname: &StringIdentifier,
     prop_name: &StringIdentifier,
     selector_span: Span,

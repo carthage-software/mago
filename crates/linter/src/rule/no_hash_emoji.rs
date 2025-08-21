@@ -92,17 +92,16 @@ impl LintRule for NoHashEmojiRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
 
         for trivia in &program.trivia.nodes {
-            let Trivia { kind: TriviaKind::HashComment, value, .. } = trivia else {
+            let Trivia { kind: TriviaKind::HashComment, value: comment, .. } = trivia else {
                 continue;
             };
 
-            let comment = ctx.interner.lookup(value);
             if !comment.starts_with("#️⃣") {
                 continue;
             }

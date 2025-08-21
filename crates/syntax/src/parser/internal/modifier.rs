@@ -5,8 +5,10 @@ use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_modifier_sequence(stream: &mut TokenStream<'_, '_>) -> Result<Sequence<Modifier>, ParseError> {
-    let mut modifiers = Vec::new();
+pub fn parse_modifier_sequence<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Sequence<'arena, Modifier<'arena>>, ParseError> {
+    let mut modifiers = stream.new_vec();
     while let Some(modifier) = parse_optional_modifier(stream)? {
         modifiers.push(modifier);
     }
@@ -14,9 +16,9 @@ pub fn parse_modifier_sequence(stream: &mut TokenStream<'_, '_>) -> Result<Seque
     Ok(Sequence::new(modifiers))
 }
 
-pub fn parse_optional_read_visibility_modifier(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<Modifier>, ParseError> {
+pub fn parse_optional_read_visibility_modifier<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<Modifier<'arena>>, ParseError> {
     Ok(Some(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["public"]) => Modifier::Public(utils::expect_any_keyword(stream)?),
         Some(T!["protected"]) => Modifier::Protected(utils::expect_any_keyword(stream)?),
@@ -25,7 +27,9 @@ pub fn parse_optional_read_visibility_modifier(
     }))
 }
 
-pub fn parse_optional_modifier(stream: &mut TokenStream<'_, '_>) -> Result<Option<Modifier>, ParseError> {
+pub fn parse_optional_modifier<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<Modifier<'arena>>, ParseError> {
     Ok(Some(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["public"]) => Modifier::Public(utils::expect_any_keyword(stream)?),
         Some(T!["protected"]) => Modifier::Protected(utils::expect_any_keyword(stream)?),

@@ -85,7 +85,7 @@ impl LintRule for LowercaseTypeHintRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Hint(hint) = node else {
             return;
         };
@@ -101,19 +101,21 @@ impl LintRule for LowercaseTypeHintRule {
             | Hint::Mixed(identifier)
             | Hint::Iterable(identifier) => identifier,
             _ => {
-                return if hint.is_complex() {};
+                return;
             }
         };
 
-        let name = ctx.lookup(&identifier.value);
-        let lowered = name.to_ascii_lowercase();
-        if !lowered.eq(&name) {
-            let issue = Issue::new(self.cfg.level(), format!("Type hint `{}` should be in lowercase.", name))
-                .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(identifier.span()))
-                .with_help(format!("Consider using `{}` instead of `{}`.", lowered, name));
-
-            ctx.collector.report(issue);
+        if identifier.value.chars().all(|c| c.is_ascii_lowercase()) {
+            return; // Already in lowercase, no issue to report
         }
+
+        let lowercase = identifier.value.to_ascii_lowercase();
+
+        let issue = Issue::new(self.cfg.level(), format!("Type hint `{}` should be in lowercase.", identifier.value))
+            .with_code(self.meta.code)
+            .with_annotation(Annotation::primary(identifier.span()))
+            .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, identifier.value));
+
+        ctx.collector.report(issue);
     }
 }

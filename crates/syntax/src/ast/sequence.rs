@@ -1,8 +1,10 @@
 use std::slice::Iter;
-use std::vec::IntoIter;
 
+use bumpalo::Bump;
+use bumpalo::collections::Vec;
+use bumpalo::collections::vec::IntoIter;
+use bumpalo::vec;
 use mago_database::file::FileId;
-use serde::Deserialize;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -16,10 +18,10 @@ use crate::token::Token;
 /// An example of this is modifiers in a method declaration.
 ///
 /// i.e. `public` and `static` in `public static function foo() {}`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Sequence<T> {
-    pub nodes: Vec<T>,
+pub struct Sequence<'arena, T> {
+    pub nodes: Vec<'arena, T>,
 }
 
 /// Represents a sequence of nodes separated by a token.
@@ -27,21 +29,21 @@ pub struct Sequence<T> {
 /// An example of this is arguments in a function call, where the tokens are commas.
 ///
 /// i.e. `1`, `2` and `3` in `foo(1, 2, 3)`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct TokenSeparatedSequence<T> {
-    pub nodes: Vec<T>,
-    pub tokens: Vec<Token>,
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct TokenSeparatedSequence<'arena, T> {
+    pub nodes: Vec<'arena, T>,
+    pub tokens: Vec<'arena, Token<'arena>>,
 }
 
-impl<T: HasSpan> Sequence<T> {
+impl<'arena, T: HasSpan> Sequence<'arena, T> {
     #[inline]
-    pub const fn new(inner: Vec<T>) -> Self {
+    pub const fn new(inner: Vec<'arena, T>) -> Self {
         Self { nodes: inner }
     }
 
     #[inline]
-    pub const fn empty() -> Self {
-        Self { nodes: vec![] }
+    pub fn empty(arena: &'arena Bump) -> Self {
+        Self { nodes: vec![in arena] }
     }
 
     #[inline]
@@ -100,24 +102,19 @@ impl<T: HasSpan> Sequence<T> {
     pub fn as_slice(&self) -> &[T] {
         self.nodes.as_slice()
     }
-
-    #[inline]
-    pub fn to_vec(&self) -> Vec<&T> {
-        self.nodes.iter().collect()
-    }
 }
 
-impl<T: HasSpan> TokenSeparatedSequence<T> {
+impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     #[inline]
     #[must_use]
-    pub const fn new(inner: Vec<T>, tokens: Vec<Token>) -> Self {
+    pub const fn new(inner: Vec<'arena, T>, tokens: Vec<'arena, Token>) -> Self {
         Self { nodes: inner, tokens }
     }
 
     #[inline]
     #[must_use]
-    pub const fn empty() -> Self {
-        Self { nodes: vec![], tokens: vec![] }
+    pub fn empty(arena: &'arena Bump) -> Self {
+        Self { nodes: vec![in arena], tokens: vec![in arena] }
     }
 
     #[inline]
@@ -188,7 +185,7 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
     }
 
     #[inline]
-    pub fn get_trailing_token(&self) -> Option<&Token> {
+    pub fn get_trailing_token(&self) -> Option<&Token<'arena>> {
         self.tokens
             .last()
             .filter(|token| token.span.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
@@ -203,7 +200,7 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
     /// the index of the element, the element and the token following it.
     /// The token is `None` only for the last element if it has no trailing token.
     #[inline]
-    pub fn iter_with_tokens(&self) -> impl Iterator<Item = (usize, &T, Option<&Token>)> {
+    pub fn iter_with_tokens(&self) -> impl Iterator<Item = (usize, &T, Option<&Token<'arena>>)> {
         self.nodes.iter().enumerate().map(move |(i, item)| {
             let token = self.tokens.get(i);
 
@@ -215,45 +212,22 @@ impl<T: HasSpan> TokenSeparatedSequence<T> {
     pub fn as_slice(&self) -> &[T] {
         self.nodes.as_slice()
     }
-
-    #[inline]
-    pub fn to_vec(&self) -> Vec<&T> {
-        self.nodes.iter().collect()
-    }
 }
 
-impl<T: HasSpan> FromIterator<T> for Sequence<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self { nodes: iter.into_iter().collect() }
-    }
-}
-
-impl<T: HasSpan> IntoIterator for Sequence<T> {
+impl<'arena, T: HasSpan> IntoIterator for Sequence<'arena, T> {
     type Item = T;
-    type IntoIter = IntoIter<Self::Item>;
+    type IntoIter = IntoIter<'arena, Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.nodes.into_iter()
     }
 }
 
-impl<T: HasSpan> IntoIterator for TokenSeparatedSequence<T> {
+impl<'arena, T: HasSpan> IntoIterator for TokenSeparatedSequence<'arena, T> {
     type Item = T;
-    type IntoIter = IntoIter<Self::Item>;
+    type IntoIter = IntoIter<'arena, Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.nodes.into_iter()
-    }
-}
-
-impl<T: HasSpan> std::default::Default for Sequence<T> {
-    fn default() -> Self {
-        Sequence::new(Default::default())
-    }
-}
-
-impl<T: HasSpan> std::default::Default for TokenSeparatedSequence<T> {
-    fn default() -> Self {
-        TokenSeparatedSequence::new(Default::default(), Default::default())
     }
 }

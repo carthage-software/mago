@@ -9,7 +9,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::token::Precedence;
 
-pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, ParseError> {
+pub fn parse_construct<'arena>(stream: &mut TokenStream<'arena>) -> Result<Construct<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
@@ -17,8 +17,8 @@ pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, Pa
             isset: utils::expect_keyword(stream, T!["isset"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
             values: {
-                let mut values = vec![];
-                let mut commas = vec![];
+                let mut values = stream.new_vec();
+                let mut commas = stream.new_vec();
                 loop {
                     if matches!(utils::peek(stream)?.kind, T![")"]) {
                         break;
@@ -43,34 +43,62 @@ pub fn parse_construct(stream: &mut TokenStream<'_, '_>) -> Result<Construct, Pa
         T!["empty"] => Construct::Empty(EmptyConstruct {
             empty: utils::expect_keyword(stream, T!["empty"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
         T!["eval"] => Construct::Eval(EvalConstruct {
             eval: utils::expect_keyword(stream, T!["eval"])?,
             left_parenthesis: utils::expect_span(stream, T!["("])?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
             right_parenthesis: utils::expect_span(stream, T![")"])?,
         }),
         T!["print"] => Construct::Print(PrintConstruct {
             print: utils::expect_keyword(stream, T!["print"])?,
-            value: Box::new(parse_expression_with_precedence(stream, Precedence::Print)?),
+            value: {
+                let expression = parse_expression_with_precedence(stream, Precedence::Print)?;
+
+                stream.alloc(expression)
+            },
         }),
         T!["require"] => Construct::Require(RequireConstruct {
             require: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
         }),
         T!["require_once"] => Construct::RequireOnce(RequireOnceConstruct {
             require_once: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
         }),
         T!["include"] => Construct::Include(IncludeConstruct {
             include: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
         }),
         T!["include_once"] => Construct::IncludeOnce(IncludeOnceConstruct {
             include_once: utils::expect_any_keyword(stream)?,
-            value: Box::new(parse_expression(stream)?),
+            value: {
+                let expression = parse_expression(stream)?;
+
+                stream.alloc(expression)
+            },
         }),
         T!["exit"] => Construct::Exit(ExitConstruct {
             exit: utils::expect_any_keyword(stream)?,

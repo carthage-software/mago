@@ -1,5 +1,4 @@
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
@@ -17,20 +16,19 @@ mod internal;
 /// and validating the code against a set of semantic rules, such as type correctness,
 /// variable usage, and adherence to language features for a specific PHP version.
 #[derive(Debug, Clone, Copy)]
-pub struct SemanticsChecker<'a> {
-    version: &'a PHPVersion,
-    interner: &'a ThreadedInterner,
+pub struct SemanticsChecker {
+    version: PHPVersion,
 }
 
-impl<'a> SemanticsChecker<'a> {
+impl SemanticsChecker {
     /// Creates a new `SemanticsChecker`.
     ///
     /// # Arguments
     ///
-    /// - `version`: The target PHP version to check against.
-    /// - `interner`: A reference to the string interner for efficient string handling.
-    pub fn new(version: &'a PHPVersion, interner: &'a ThreadedInterner) -> Self {
-        Self { version, interner }
+    /// - `php_version`: The target PHP version to check against.
+    ///
+    pub fn new(php_version: PHPVersion) -> Self {
+        Self { version: php_version }
     }
 
     /// Analyzes the given program AST for semantic issues.
@@ -47,8 +45,13 @@ impl<'a> SemanticsChecker<'a> {
     /// # Returns
     ///
     /// An `IssueCollection` containing all semantic issues discovered during the check.
-    pub fn check(&self, file: &File, program: &Program, names: &ResolvedNames) -> IssueCollection {
-        let mut context = Context::new(self.interner, self.version, program, names, file);
+    pub fn check<'ast, 'arena>(
+        &self,
+        file: &File,
+        program: &'ast Program<'arena>,
+        names: &'ast ResolvedNames<'arena>,
+    ) -> IssueCollection {
+        let mut context = Context::new(self.version, program, names, file);
 
         CheckingWalker.walk_program(program, &mut context);
 

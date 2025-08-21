@@ -44,7 +44,7 @@ use crate::context::Context;
 /// `HashMap`s mapping the defining entity (`GenericParent` - class or function) to the
 /// fully resolved and expanded `TUnion` for that template parameter in this specific context.
 pub fn get_template_types_for_class_member(
-    context: &Context<'_>,
+    context: &Context<'_, '_>,
     declaring_class_meta: Option<&ClassLikeMetadata>,
     appearing_class_name: Option<&StringIdentifier>,
     calling_class_meta: Option<&ClassLikeMetadata>,

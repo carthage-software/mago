@@ -14,7 +14,7 @@ pub fn check_extends(
     class_like_name: &str,
     class_like_fqcn: &str,
     extension_limit: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_, '_>,
 ) {
     if extension_limit && extends.types.len() > 1 {
         context.report(
@@ -53,7 +53,7 @@ pub fn check_extends(
     }
 
     for extended_type in extends.types.iter() {
-        let extended_name = context.interner.lookup(extended_type.value());
+        let extended_name = extended_type.value();
 
         if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(extended_name))
             || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
@@ -87,7 +87,7 @@ pub fn check_implements(
     class_like_name: &str,
     class_like_fqcn: &str,
     check_for_self_implement: bool,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_, '_>,
 ) {
     if check_for_self_implement {
         for implemented_type in implements.types.iter() {
@@ -111,7 +111,7 @@ pub fn check_implements(
     }
 
     for implemented_type in implements.types.iter() {
-        let implemented_name = context.interner.lookup(implemented_type.value());
+        let implemented_name = implemented_type.value();
 
         if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(implemented_name))
             || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED

@@ -88,21 +88,23 @@ impl LintRule for LowercaseKeywordRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check(&self, ctx: &mut LintContext, node: Node) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Keyword(keyword) = node else {
             return;
         };
 
-        let name = ctx.lookup(&keyword.value);
-        let lowered = name.to_ascii_lowercase();
-        if !lowered.eq(&name) {
-            let issue = Issue::new(self.cfg.level(), format!("Keyword `{}` should be in lowercase.", name))
-                .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(keyword.span()))
-                .with_note(format!("The keyword `{}` does not follow lowercase convention.", name))
-                .with_help(format!("Consider using `{}` instead of `{}`.", lowered, name));
-
-            ctx.collector.report(issue);
+        if keyword.value.chars().all(|c| c.is_ascii_lowercase()) {
+            return; // Already in lowercase, no issue to report
         }
+
+        let lowercase = keyword.value.to_ascii_lowercase();
+
+        let issue = Issue::new(self.cfg.level(), format!("Keyword `{}` should be in lowercase.", keyword.value))
+            .with_code(self.meta.code)
+            .with_annotation(Annotation::primary(keyword.span()))
+            .with_note(format!("The keyword `{}` does not follow lowercase convention.", keyword.value))
+            .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, keyword.value));
+
+        ctx.collector.report(issue);
     }
 }

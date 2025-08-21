@@ -8,28 +8,38 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_if(stream: &mut TokenStream<'_, '_>) -> Result<If, ParseError> {
+pub fn parse_if<'arena>(stream: &mut TokenStream<'arena>) -> Result<If<'arena>, ParseError> {
     Ok(If {
         r#if: utils::expect_keyword(stream, T!["if"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: Box::new(parse_expression(stream)?),
+        condition: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         body: parse_if_body(stream)?,
     })
 }
 
-pub fn parse_if_body(stream: &mut TokenStream<'_, '_>) -> Result<IfBody, ParseError> {
+pub fn parse_if_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<IfBody<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => IfBody::ColonDelimited(parse_if_colon_delimited_body(stream)?),
         _ => IfBody::Statement(parse_if_statement_body(stream)?),
     })
 }
 
-pub fn parse_if_statement_body(stream: &mut TokenStream<'_, '_>) -> Result<IfStatementBody, ParseError> {
+pub fn parse_if_statement_body<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfStatementBody<'arena>, ParseError> {
     Ok(IfStatementBody {
-        statement: Box::new(parse_statement(stream)?),
+        statement: {
+            let statement = parse_statement(stream)?;
+
+            stream.alloc(statement)
+        },
         else_if_clauses: {
-            let mut else_if_clauses = vec![];
+            let mut else_if_clauses = stream.new_vec();
             while let Some(else_if_clause) = parse_optional_if_statement_body_else_if_clause(stream)? {
                 else_if_clauses.push(else_if_clause);
             }
@@ -40,50 +50,64 @@ pub fn parse_if_statement_body(stream: &mut TokenStream<'_, '_>) -> Result<IfSta
     })
 }
 
-pub fn parse_optional_if_statement_body_else_if_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<IfStatementBodyElseIfClause>, ParseError> {
+pub fn parse_optional_if_statement_body_else_if_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<IfStatementBodyElseIfClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["elseif"]) => Some(parse_if_statement_body_else_if_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_if_statement_body_else_if_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<IfStatementBodyElseIfClause, ParseError> {
+pub fn parse_if_statement_body_else_if_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfStatementBodyElseIfClause<'arena>, ParseError> {
     Ok(IfStatementBodyElseIfClause {
         elseif: utils::expect_keyword(stream, T!["elseif"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: Box::new(parse_expression(stream)?),
+        condition: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
         right_parenthesis: utils::expect_span(stream, T![")"])?,
-        statement: Box::new(parse_statement(stream)?),
+        statement: {
+            let statement = parse_statement(stream)?;
+
+            stream.alloc(statement)
+        },
     })
 }
 
-pub fn parse_optional_if_statement_body_else_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<IfStatementBodyElseClause>, ParseError> {
+pub fn parse_optional_if_statement_body_else_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<IfStatementBodyElseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["else"]) => Some(parse_if_statement_body_else_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_if_statement_body_else_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<IfStatementBodyElseClause, ParseError> {
+pub fn parse_if_statement_body_else_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfStatementBodyElseClause<'arena>, ParseError> {
     Ok(IfStatementBodyElseClause {
         r#else: utils::expect_keyword(stream, T!["else"])?,
-        statement: Box::new(parse_statement(stream)?),
+        statement: {
+            let statement = parse_statement(stream)?;
+
+            stream.alloc(statement)
+        },
     })
 }
 
-pub fn parse_if_colon_delimited_body(stream: &mut TokenStream<'_, '_>) -> Result<IfColonDelimitedBody, ParseError> {
+pub fn parse_if_colon_delimited_body<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfColonDelimitedBody<'arena>, ParseError> {
     Ok(IfColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.new_vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["elseif" | "else" | "endif"]) {
                     break;
@@ -95,7 +119,7 @@ pub fn parse_if_colon_delimited_body(stream: &mut TokenStream<'_, '_>) -> Result
             Sequence::new(statements)
         },
         else_if_clauses: {
-            let mut else_if_clauses = Vec::new();
+            let mut else_if_clauses = stream.new_vec();
             while let Some(else_if_clause) = parse_optional_if_colon_delimited_body_else_if_clause(stream)? {
                 else_if_clauses.push(else_if_clause);
             }
@@ -108,26 +132,30 @@ pub fn parse_if_colon_delimited_body(stream: &mut TokenStream<'_, '_>) -> Result
     })
 }
 
-pub fn parse_optional_if_colon_delimited_body_else_if_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<IfColonDelimitedBodyElseIfClause>, ParseError> {
+pub fn parse_optional_if_colon_delimited_body_else_if_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<IfColonDelimitedBodyElseIfClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["elseif"]) => Some(parse_if_colon_delimited_body_else_if_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_if_colon_delimited_body_else_if_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<IfColonDelimitedBodyElseIfClause, ParseError> {
+pub fn parse_if_colon_delimited_body_else_if_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfColonDelimitedBodyElseIfClause<'arena>, ParseError> {
     Ok(IfColonDelimitedBodyElseIfClause {
         r#elseif: utils::expect_keyword(stream, T!["elseif"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: Box::new(parse_expression(stream)?),
+        condition: {
+            let expression = parse_expression(stream)?;
+
+            stream.alloc(expression)
+        },
         right_parenthesis: utils::expect_span(stream, T![")"])?,
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.new_vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["elseif" | "else" | "endif"]) {
                     break;
@@ -141,23 +169,23 @@ pub fn parse_if_colon_delimited_body_else_if_clause(
     })
 }
 
-pub fn parse_optional_if_colon_delimited_body_else_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<Option<IfColonDelimitedBodyElseClause>, ParseError> {
+pub fn parse_optional_if_colon_delimited_body_else_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<Option<IfColonDelimitedBodyElseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["else"]) => Some(parse_if_colon_delimited_body_else_clause(stream)?),
         _ => None,
     })
 }
 
-pub fn parse_if_colon_delimited_body_else_clause(
-    stream: &mut TokenStream<'_, '_>,
-) -> Result<IfColonDelimitedBodyElseClause, ParseError> {
+pub fn parse_if_colon_delimited_body_else_clause<'arena>(
+    stream: &mut TokenStream<'arena>,
+) -> Result<IfColonDelimitedBodyElseClause<'arena>, ParseError> {
     Ok(IfColonDelimitedBodyElseClause {
         r#else: utils::expect_keyword(stream, T!["else"])?,
         colon: utils::expect_span(stream, T![":"])?,
         statements: {
-            let mut statements = Vec::new();
+            let mut statements = stream.new_vec();
             loop {
                 if matches!(utils::peek(stream)?.kind, T!["endif"]) {
                     break;

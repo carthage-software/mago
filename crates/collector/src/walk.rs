@@ -10,7 +10,7 @@ use crate::Collector;
 /// This function initializes and runs the `ScopeAttachmentWalker` over the entire program.
 /// The walker traverses the AST to identify the precise AST node (e.g., a function or class)
 /// that each pragma applies to.
-pub fn attach_pragma_scopes(collector: &mut Collector<'_>, program: &Program) {
+pub fn attach_pragma_scopes<'arena>(collector: &mut Collector<'_, 'arena>, program: &Program<'arena>) {
     ScopeAttachmentWalker.walk_program(program, collector);
 }
 
@@ -26,7 +26,7 @@ impl ScopeAttachmentWalker {
     /// A pragma is considered applicable to a node if it immediately precedes
     /// the node's span with only whitespace in between. This method iterates through all
     /// unscoped pragmas and updates the first one that meets this criterion.
-    fn assign_scope_for_node(&self, node_span: &Span, collector: &mut Collector<'_>) {
+    fn assign_scope_for_node(&self, node_span: &Span, collector: &mut Collector<'_, '_>) {
         for pragma in collector.pragmas.iter_mut() {
             // Skip pragmas that already have a scope.
             if pragma.scope_span.is_some() {
@@ -49,9 +49,9 @@ impl ScopeAttachmentWalker {
     }
 }
 
-impl Walker<Collector<'_>> for ScopeAttachmentWalker {
+impl<'ast, 'arena> Walker<'ast, 'arena, Collector<'_, 'arena>> for ScopeAttachmentWalker {
     /// Visits a statement and attaches scopes for any applicable pragmas.
-    fn walk_statement(&self, statement: &Statement, collector: &mut Collector<'_>) {
+    fn walk_statement(&self, statement: &Statement<'arena>, collector: &mut Collector<'_, 'arena>) {
         let span = statement.span();
 
         if statement.is_declaration() {
@@ -64,7 +64,7 @@ impl Walker<Collector<'_>> for ScopeAttachmentWalker {
     }
 
     /// Visits a class-like member and attaches scopes for any applicable pragmas.
-    fn walk_class_like_member(&self, member: &ClassLikeMember, collector: &mut Collector<'_>) {
+    fn walk_class_like_member(&self, member: &ClassLikeMember<'arena>, collector: &mut Collector<'_, 'arena>) {
         let span = member.span();
 
         self.assign_scope_for_node(&span, collector);

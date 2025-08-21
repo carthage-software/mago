@@ -6,9 +6,9 @@ use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::reference::ReferenceSource;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ScopeContext<'a> {
-    pub(crate) function_like: Option<&'a FunctionLikeMetadata>,
-    pub(crate) class_like: Option<&'a ClassLikeMetadata>,
+pub struct ScopeContext<'ctx> {
+    pub(crate) function_like: Option<&'ctx FunctionLikeMetadata>,
+    pub(crate) class_like: Option<&'ctx ClassLikeMetadata>,
     pub(crate) is_static: bool,
 }
 
@@ -18,7 +18,7 @@ impl Default for ScopeContext<'_> {
     }
 }
 
-impl<'a> ScopeContext<'a> {
+impl<'ctx> ScopeContext<'ctx> {
     /// Creates a new `ScopeContext` representing a default global, static scope.
     #[inline]
     pub fn new() -> Self {
@@ -45,19 +45,19 @@ impl<'a> ScopeContext<'a> {
 
     /// Returns the calling class-like context, if available.
     #[inline]
-    pub fn get_class_like(&self) -> Option<&'a ClassLikeMetadata> {
+    pub fn get_class_like(&self) -> Option<&'ctx ClassLikeMetadata> {
         self.class_like
     }
 
     /// Returns the calling class FQCN, if inside a class scope.
     #[inline]
-    pub fn get_class_like_name(&self) -> Option<&'a StringIdentifier> {
+    pub fn get_class_like_name(&self) -> Option<&'ctx StringIdentifier> {
         self.class_like.map(|class| &class.original_name)
     }
 
     /// Returns the calling function-like context, if available.
     #[inline]
-    pub fn get_function_like(&self) -> Option<&'a FunctionLikeMetadata> {
+    pub fn get_function_like(&self) -> Option<&'ctx FunctionLikeMetadata> {
         self.function_like
     }
 
@@ -98,13 +98,13 @@ impl<'a> ScopeContext<'a> {
 
     /// Sets the function-like metadata for the current scope.
     #[inline]
-    pub fn set_function_like(&mut self, function_like: Option<&'a FunctionLikeMetadata>) {
+    pub fn set_function_like(&mut self, function_like: Option<&'ctx FunctionLikeMetadata>) {
         self.function_like = function_like;
     }
 
     /// Sets the class-like metadata for the current scope.
     #[inline]
-    pub fn set_class_like(&mut self, class_like: Option<&'a ClassLikeMetadata>) {
+    pub fn set_class_like(&mut self, class_like: Option<&'ctx ClassLikeMetadata>) {
         self.class_like = class_like;
     }
 

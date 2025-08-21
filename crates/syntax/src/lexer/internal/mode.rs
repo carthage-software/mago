@@ -1,5 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
 use strum::Display;
 
 use crate::token::DocumentKind;
@@ -9,8 +7,7 @@ use crate::token::DocumentKind;
 /// The `halt_compiler` keyword is followed by `"("`, `")"`, and `";"` or `"?>"`.
 ///
 /// This enum is used to track the current stage of the `halt_compiler` keyword
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
 pub enum HaltStage {
     LookingForLeftParenthesis,
     LookingForRightParenthesis,
@@ -18,8 +15,7 @@ pub enum HaltStage {
     End,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
 pub enum Interpolation {
     None,
     Until(u32),
@@ -33,8 +29,7 @@ pub enum Interpolation {
 ///
 /// The lifetime `'a` is associated with the `DocumentString` variant to tie the label's lifetime
 /// to the input being lexed.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
 pub enum LexerMode<'a> {
     /// **Inline Mode**
     ///
