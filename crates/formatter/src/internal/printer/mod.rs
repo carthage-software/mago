@@ -462,7 +462,7 @@ impl<'arena> Printer<'arena> {
 
     fn fits(&self, next: &Command<'arena>, width: isize) -> bool {
         let mut remaining_width = width;
-        let mut queue: VecDeque<(Mode, &Document)> = VecDeque::new();
+        let mut queue: VecDeque<(Mode, &Document)> = VecDeque::with_capacity(128);
         let mut cmds = self.commands.iter().rev();
 
         queue.push_front((next.mode, &next.document));

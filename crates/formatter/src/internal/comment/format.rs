@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
@@ -400,18 +398,25 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
 
     #[must_use]
     fn print_comment(&self, comment: Comment) -> Document<'arena> {
-        let mut content = &self.source_text[comment.start as usize..comment.end as usize];
+        let content = &self.source_text[comment.start as usize..comment.end as usize];
 
         if comment.is_inline_comment() {
             if !comment.is_single_line {
                 return Document::String(content);
             }
 
-            if comment.is_shell_comment {
-                content = self.as_str(format!("// {}", content[1..].trim()));
-            }
+            let new_content = if comment.is_shell_comment {
+                let mut buf = Vec::with_capacity_in(content.len() + 2, self.arena);
+                buf.extend_from_slice(b"// ");
+                buf.extend_from_slice(content[1..].trim().as_bytes());
 
-            return Document::String(content);
+                // SAFETY: We are constructing the string from valid UTF-8 parts.
+                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+            } else {
+                content
+            };
+
+            return Document::String(new_content);
         }
 
         if !content.contains('\n') && !content.contains('\r') {
@@ -419,8 +424,9 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         }
 
         let lines = content.lines().collect_in::<Vec<_>>(self.arena);
+        let mut contents = Vec::with_capacity_in(lines.len() * 2, self.arena);
 
-        let should_add_astricks = if content.starts_with("/**") {
+        let should_add_asterisks = if content.starts_with("/**") {
             true
         } else {
             let content_lines = &lines[1..lines.len() - 1];
@@ -444,37 +450,32 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
             }
         };
 
-        let mut contents = vec![in self.arena];
-
-        // Process each line according to the specified rules
-        let mut processed_lines = Vec::with_capacity_in(lines.len(), self.arena);
         for (i, line) in lines.iter().enumerate() {
             let trimmed_line = line.trim_start();
+
             let processed_line = if i == 0 {
-                // First line stays as is
-                Cow::Borrowed(*line)
-            } else if !should_add_astricks {
-                // If the line does not start with an asterisk, add it.
-                // Replace leading whitespace with a single space
-                Cow::Owned(format!(" {}", trimmed_line.trim_end()))
+                *line
+            } else if !should_add_asterisks {
+                let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
+                buf.push(b' ');
+                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             } else if trimmed_line.is_empty() {
-                // If the line is empty, format it as " *"
-                Cow::Borrowed(" *")
+                " *"
             } else if trimmed_line.starts_with('*') {
-                // Replace leading whitespace with a single space
-                Cow::Owned(format!(" {}", trimmed_line.trim_end()))
+                let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
+                buf.push(b' ');
+                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             } else {
-                // Line does not have '*' after whitespaces, add it.
-                Cow::Owned(format!(" * {}", trimmed_line.trim_end()))
+                let mut buf = Vec::with_capacity_in(trimmed_line.len() + 3, self.arena);
+                buf.extend_from_slice(b" * ");
+                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             };
 
-            processed_lines.push(processed_line);
-        }
-
-        // Assemble contents with hardlines between lines
-        for (i, processed_line) in processed_lines.iter().enumerate() {
-            contents.push(Document::String(self.as_str(processed_line)));
-            if i < processed_lines.len() - 1 {
+            contents.push(Document::String(processed_line));
+            if i < lines.len() - 1 {
                 contents.push(Document::Line(Line::hard()));
             }
         }
