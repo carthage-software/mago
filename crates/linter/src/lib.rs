@@ -63,9 +63,9 @@ impl<'arena> Linter<'arena> {
         self.registry.rules()
     }
 
-    pub fn lint<'input, 'ast>(
+    pub fn lint<'ctx, 'ast>(
         &self,
-        source_file: &'input File,
+        source_file: &'ctx File,
         program: &'ast Program<'arena>,
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> IssueCollection {
@@ -82,11 +82,7 @@ impl<'arena> Linter<'arena> {
     }
 }
 
-fn walk<'input, 'ast, 'arena>(
-    node: Node<'ast, 'arena>,
-    ctx: &mut LintContext<'input, 'ast, 'arena>,
-    reg: &RuleRegistry,
-) {
+fn walk<'ctx, 'ast, 'arena>(node: Node<'ast, 'arena>, ctx: &mut LintContext<'ctx, 'arena>, reg: &RuleRegistry) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);

@@ -18,11 +18,11 @@ use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
 use crate::internal::utils::unwrap_parenthesized;
 
-pub(super) fn print_binaryish_expression<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    left: &'ast Expression<'arena>,
-    operator: &'ast BinaryOperator<'arena>,
-    right: &'ast Expression<'arena>,
+pub(super) fn print_binaryish_expression<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    left: &'arena Expression<'arena>,
+    operator: &'arena BinaryOperator<'arena>,
+    right: &'arena Expression<'arena>,
 ) -> Document<'arena> {
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
@@ -111,11 +111,11 @@ pub(super) fn print_binaryish_expression<'ast, 'arena>(
     Document::Group(Group::new(head_parts))
 }
 
-pub(super) fn print_binaryish_expressions<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    left: &'ast Expression<'arena>,
-    operator: &'ast BinaryOperator<'arena>,
-    right: &'ast Expression<'arena>,
+pub(super) fn print_binaryish_expressions<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    left: &'arena Expression<'arena>,
+    operator: &'arena BinaryOperator<'arena>,
+    right: &'arena Expression<'arena>,
     is_inside_parenthesis: bool,
     is_nested: bool,
 ) -> Vec<'arena, Document<'arena>> {
@@ -209,7 +209,7 @@ pub(super) fn print_binaryish_expressions<'ast, 'arena>(
     parts
 }
 
-pub(super) fn should_inline_binary_expression<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+pub(super) fn should_inline_binary_expression<'arena>(expression: &'arena Expression<'arena>) -> bool {
     match unwrap_parenthesized(expression) {
         Expression::Binary(operation) => {
             if should_inline_binary_rhs_expression(operation.rhs, &operation.operator) {

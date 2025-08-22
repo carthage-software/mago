@@ -24,11 +24,11 @@ enum ClassLikeMemberKind {
     Method,
 }
 
-pub fn print_class_like_body<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    left_brace: &'ast Span,
-    class_like_members: &'ast Sequence<'arena, ClassLikeMember<'arena>>,
-    right_brace: &'ast Span,
+pub fn print_class_like_body<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    left_brace: &'arena Span,
+    class_like_members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
+    right_brace: &'arena Span,
     anonymous_class_signature_id: Option<GroupIdentifier>,
 ) -> Document<'arena> {
     let is_body_empty = block_is_empty(f, left_brace, right_brace);
@@ -132,7 +132,7 @@ pub fn print_class_like_body<'ast, 'arena>(
 
 #[inline]
 fn should_add_empty_line_before(
-    f: &mut FormatterState<'_, '_, '_>,
+    f: &mut FormatterState<'_, '_>,
     class_like_member_kind: ClassLikeMemberKind,
     last_class_like_member_kind: Option<ClassLikeMemberKind>,
 ) -> bool {
@@ -148,7 +148,7 @@ fn should_add_empty_line_before(
 
 #[inline]
 const fn should_add_empty_line_after(
-    f: &mut FormatterState<'_, '_, '_>,
+    f: &mut FormatterState<'_, '_>,
     class_like_member_kind: ClassLikeMemberKind,
 ) -> bool {
     match class_like_member_kind {

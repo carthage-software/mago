@@ -15,8 +15,8 @@ use crate::internal::format::statement::print_statement_sequence;
 use crate::settings::*;
 use crate::wrap;
 
-impl<'ast, 'arena> Format<'ast, 'arena> for If<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for If<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, If, {
             Document::Group(Group::new(vec![
                 in f.arena;
@@ -33,8 +33,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for If<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfBody, {
             match &self {
                 IfBody::Statement(b) => b.format(f),
@@ -44,8 +44,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfStatementBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfStatementBody, {
             let mut parts = vec![in f.arena; misc::print_clause(f, self.statement, false)];
 
@@ -62,8 +62,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBodyElseClause<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfStatementBodyElseClause<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfStatementBodyElseClause, {
             Document::Group(Group::new(
                 vec![in f.arena; self.r#else.format(f), misc::print_clause(f, self.statement, false)],
@@ -72,8 +72,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBodyElseClause<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBodyElseIfClause<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfStatementBodyElseIfClause<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfStatementBodyElseIfClause, {
             Document::Group(Group::new(vec![
                 in f.arena;
@@ -90,8 +90,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfStatementBodyElseIfClause<'arena> 
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfColonDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfColonDelimitedBody, {
             let mut parts = vec![in f.arena; Document::String(":")];
 
@@ -138,8 +138,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfColonDelimitedBodyElseIfClause, {
             let mut parts = vec![in f.arena; self.elseif.format(f)];
 
@@ -173,8 +173,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBodyElseIfClause<'ar
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBodyElseClause<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for IfColonDelimitedBodyElseClause<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfColonDelimitedBodyElseClause, {
             let mut parts = vec![in f.arena; self.r#else.format(f), Document::String(":")];
 
@@ -194,8 +194,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for IfColonDelimitedBodyElseClause<'aren
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for DoWhile<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for DoWhile<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, DoWhile, {
             Document::Group(Group::new(vec![
                 in f.arena;
@@ -214,8 +214,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for DoWhile<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for For<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for For<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, For, {
             let mut contents = vec![
                 in f.arena;
@@ -225,7 +225,7 @@ impl<'ast, 'arena> Format<'ast, 'arena> for For<'arena> {
                 if f.settings.space_within_for_parenthesis { Document::space() } else { Document::empty() },
             ];
 
-            let format_expressions = |f: &mut FormatterState<'_, 'ast, 'arena>, exprs: &'ast [Expression<'arena>]| {
+            let format_expressions = |f: &mut FormatterState<'_, 'arena>, exprs: &'arena [Expression<'arena>]| {
                 let Some(first) = exprs.first() else {
                     return Document::empty();
                 };
@@ -277,16 +277,16 @@ impl<'ast, 'arena> Format<'ast, 'arena> for For<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForColonDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForColonDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForColonDelimitedBody, {
             print_colon_delimited_body(f, &self.colon, &self.statements, &self.end_for, &self.terminator)
         })
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForBody, {
             match self {
                 ForBody::Statement(s) => {
@@ -300,8 +300,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for ForBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for Switch<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for Switch<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Switch, {
             Document::Array(vec![
                 in f.arena;
@@ -318,8 +318,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for Switch<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchBody, {
             match self {
                 SwitchBody::BraceDelimited(b) => Document::Array(vec![
@@ -342,8 +342,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchColonDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchColonDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchColonDelimitedBody, {
             let mut contents = vec![in f.arena; Document::String(":")];
             for case in self.cases.iter() {
@@ -364,8 +364,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchColonDelimitedBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchBraceDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchBraceDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchBraceDelimitedBody, {
             print_block_of_nodes(
                 f,
@@ -378,8 +378,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchBraceDelimitedBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchCase<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchCase<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchCase, {
             match self {
                 SwitchCase::Expression(c) => c.format(f),
@@ -389,8 +389,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchCase<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchExpressionCase<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchExpressionCase<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchExpressionCase, {
             let mut parts = vec![in f.arena; self.case.format(f), Document::space(), self.expression.format(f), self.separator.format(f)];
 
@@ -406,8 +406,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchExpressionCase<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchDefaultCase<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchDefaultCase<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchDefaultCase, {
             let mut parts = vec![in f.arena; self.default.format(f), self.separator.format(f)];
             let mut statements = print_statement_sequence(f, &self.statements);
@@ -422,8 +422,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchDefaultCase<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for SwitchCaseSeparator {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for SwitchCaseSeparator {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchCaseSeparator, {
             match self {
                 SwitchCaseSeparator::Colon(_) => Document::String(":"),
@@ -433,8 +433,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for SwitchCaseSeparator {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for While<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for While<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, While, {
             Document::Array(vec![
                 in f.arena;
@@ -451,8 +451,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for While<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for WhileBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for WhileBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, WhileBody, {
             match self {
                 WhileBody::Statement(s) => misc::print_clause(f, s, false),
@@ -462,16 +462,16 @@ impl<'ast, 'arena> Format<'ast, 'arena> for WhileBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for WhileColonDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for WhileColonDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, WhileColonDelimitedBody, {
             print_colon_delimited_body(f, &self.colon, &self.statements, &self.end_while, &self.terminator)
         })
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for Foreach<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for Foreach<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Foreach, {
             Document::Array(vec![
                 in f.arena;
@@ -492,8 +492,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for Foreach<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForeachTarget<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForeachTarget<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForeachTarget, {
             match self {
                 ForeachTarget::Value(t) => t.format(f),
@@ -503,14 +503,14 @@ impl<'ast, 'arena> Format<'ast, 'arena> for ForeachTarget<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForeachValueTarget<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForeachValueTarget<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForeachValueTarget, { self.value.format(f) })
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForeachKeyValueTarget<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForeachKeyValueTarget<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForeachKeyValueTarget, {
             Document::Group(Group::new(vec![
                 in f.arena;
@@ -524,8 +524,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for ForeachKeyValueTarget<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForeachBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForeachBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForeachBody, {
             match self {
                 ForeachBody::Statement(s) => misc::print_clause(f, s, false),
@@ -535,16 +535,16 @@ impl<'ast, 'arena> Format<'ast, 'arena> for ForeachBody<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for ForeachColonDelimitedBody<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for ForeachColonDelimitedBody<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ForeachColonDelimitedBody, {
             print_colon_delimited_body(f, &self.colon, &self.statements, &self.end_foreach, &self.terminator)
         })
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for Continue<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for Continue<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Continue, {
             Document::Group(Group::new(vec![
                 in f.arena;
@@ -560,8 +560,8 @@ impl<'ast, 'arena> Format<'ast, 'arena> for Continue<'arena> {
     }
 }
 
-impl<'ast, 'arena> Format<'ast, 'arena> for Break<'arena> {
-    fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
+impl<'arena> Format<'arena> for Break<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Break, {
             Document::Group(Group::new(vec![
                 in f.arena;

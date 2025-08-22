@@ -96,7 +96,7 @@ impl LintRule for StrContainsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Binary(binary) = node else { return };
 
         if !matches!(

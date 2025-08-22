@@ -84,7 +84,7 @@ impl LintRule for NoRedundantContinueRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let r#continue = match node {
             Node::Foreach(foreach) => match &foreach.body {
                 ForeachBody::Statement(stmt) => get_continue_from_statement(stmt),

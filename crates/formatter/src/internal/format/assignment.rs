@@ -19,36 +19,36 @@ use crate::internal::utils::unwrap_parenthesized;
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum AssignmentLikeNode<'ast, 'arena> {
+pub(super) enum AssignmentLikeNode<'arena> {
     /// Represents a standard assignment operation, such as `$a = $b`.
-    AssignmentOperation(&'ast Assignment<'arena>),
+    AssignmentOperation(&'arena Assignment<'arena>),
 
     /// Represents a class-like constant item.
     ///
     /// - `A = 1` in `class A { public const A = 1; }`.
-    ClassLikeConstantItem(&'ast ClassLikeConstantItem<'arena>),
+    ClassLikeConstantItem(&'arena ClassLikeConstantItem<'arena>),
 
     /// Represents a global constant item.
     ///
     /// - `A = 1` in `const A = 1;`.
-    ConstantItem(&'ast ConstantItem<'arena>),
+    ConstantItem(&'arena ConstantItem<'arena>),
 
     /// Represents a backed enum case item.
     ///
     /// - `A = 1` in `enum A: int { case A = 1; }`.
-    EnumCaseBackedItem(&'ast EnumCaseBackedItem<'arena>),
+    EnumCaseBackedItem(&'arena EnumCaseBackedItem<'arena>),
 
     /// Represents a property declaration with an initializer in a class.
     ///
     /// - `$foo = 1` in `class A { public int $foo = 1; }`.
-    PropertyConcreteItem(&'ast PropertyConcreteItem<'arena>),
+    PropertyConcreteItem(&'arena PropertyConcreteItem<'arena>),
 
     /// Represents a key-value pair in an array, list, or similar structure.
     ///
     /// - `$a => $b` in `[ $a => $b ]`
     /// - `$a => $b` in `array($a => $b)`
     /// - `$a => $b` in `list($a => $b)`
-    KeyValueArrayElement(&'ast KeyValueArrayElement<'arena>),
+    KeyValueArrayElement(&'arena KeyValueArrayElement<'arena>),
 }
 
 #[derive(Debug)]
@@ -62,12 +62,12 @@ enum Layout {
     Fluid,
 }
 
-pub(super) fn print_assignment<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    assignment_node: AssignmentLikeNode<'ast, 'arena>,
+pub(super) fn print_assignment<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    assignment_node: AssignmentLikeNode<'arena>,
     lhs: Document<'arena>,
     operator: Document<'arena>,
-    rhs_expression: &'ast Expression<'arena>,
+    rhs_expression: &'arena Expression<'arena>,
 ) -> Document<'arena> {
     let needs_spacing = if matches!(assignment_node, AssignmentLikeNode::AssignmentOperation(_)) {
         f.settings.space_around_assignment_operators
@@ -150,11 +150,11 @@ pub(super) fn print_assignment<'ast, 'arena>(
     }
 }
 
-fn choose_layout<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
+fn choose_layout<'arena>(
+    f: &FormatterState<'_, 'arena>,
     lhs: &Document<'arena>,
-    assignment_like_node: &AssignmentLikeNode<'ast, 'arena>,
-    rhs_expression: &'ast Expression<'arena>,
+    assignment_like_node: &AssignmentLikeNode<'arena>,
+    rhs_expression: &'arena Expression<'arena>,
 ) -> Layout {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
         return choose_layout(f, lhs, assignment_like_node, parenthesized.expression);
@@ -239,13 +239,13 @@ fn choose_layout<'ast, 'arena>(
 }
 
 #[inline]
-fn is_member_chain_or_single_arg_call<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    expr: &'ast Expression<'arena>,
+fn is_member_chain_or_single_arg_call<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    expr: &'arena Expression<'arena>,
 ) -> bool {
-    let is_chain = |e| collect_member_access_chain(e).is_some_and(|c| c.is_eligible_for_chaining(f));
+    let is_chain = |arena, e| collect_member_access_chain(arena, e).is_some_and(|c| c.is_eligible_for_chaining(f));
 
-    if is_chain(expr) {
+    if is_chain(f.arena, expr) {
         return true;
     }
 
@@ -253,14 +253,14 @@ fn is_member_chain_or_single_arg_call<'ast, 'arena>(
         if let Call::Function(function_call) = call
             && function_call.argument_list.arguments.len() == 1
             && let Some(arg) = function_call.argument_list.arguments.first()
-            && is_chain(arg.value())
+            && is_chain(f.arena, arg.value())
         {
             return true;
         }
         if let Call::Method(method_call) = call
             && method_call.argument_list.arguments.len() == 1
             && let Some(arg) = method_call.argument_list.arguments.first()
-            && is_chain(arg.value())
+            && is_chain(f.arena, arg.value())
         {
             return true;
         }
@@ -279,7 +279,7 @@ const fn is_assignment(expression: &Expression) -> bool {
 /// A destruction assignment is considered complex if it has more than two elements
 ///  and at least one of them is a key-value pair.
 #[inline]
-fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
+fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
             let elements = match assignment.lhs {
@@ -298,7 +298,7 @@ fn is_complex_destructuring(assignment_like_node: &AssignmentLikeNode<'_, '_>) -
 }
 
 #[inline]
-fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_, '_>) -> bool {
+fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNode<'_>) -> bool {
     match assignment_like_node {
         AssignmentLikeNode::AssignmentOperation(assignment) => {
             matches!((assignment.lhs, assignment.rhs), (Expression::Variable(_), Expression::ArrowFunction(_)))
@@ -310,9 +310,9 @@ fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNo
 const MIN_OVERLAP_FOR_BREAK: usize = 3;
 
 #[inline]
-fn is_property_like_with_short_key<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    assignment_like_node: &AssignmentLikeNode<'ast, 'arena>,
+fn is_property_like_with_short_key<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    assignment_like_node: &AssignmentLikeNode<'arena>,
 ) -> bool {
     let str = match assignment_like_node {
         AssignmentLikeNode::ClassLikeConstantItem(constant_item) => &constant_item.name.value,
@@ -341,9 +341,9 @@ fn is_property_like_with_short_key<'ast, 'arena>(
 }
 
 #[inline]
-fn should_break_after_operator<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    rhs_expression: &'ast Expression<'arena>,
+fn should_break_after_operator<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    rhs_expression: &'arena Expression<'arena>,
     has_short_key: bool,
 ) -> bool {
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
@@ -364,7 +364,7 @@ fn should_break_after_operator<'ast, 'arena>(
                 return true;
             }
 
-            return !collect_member_access_chain(rhs).is_some_and(|c| c.is_eligible_for_chaining(f))
+            return !collect_member_access_chain(f.arena, rhs).is_some_and(|c| c.is_eligible_for_chaining(f))
                 && !matches!(unwrap_parenthesized(rhs), Expression::Instantiation(_));
         }
         Expression::Binary(_) if !should_inline_binary_expression(rhs_expression) => {
@@ -413,11 +413,11 @@ fn should_break_after_operator<'ast, 'arena>(
 }
 
 #[inline]
-fn is_poorly_breakable_member_or_call_chain<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    rhs_expression: &'ast Expression<'arena>,
+fn is_poorly_breakable_member_or_call_chain<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    rhs_expression: &'arena Expression<'arena>,
 ) -> bool {
-    if collect_member_access_chain(rhs_expression).is_some_and(|c| c.is_eligible_for_chaining(f)) {
+    if collect_member_access_chain(f.arena, rhs_expression).is_some_and(|c| c.is_eligible_for_chaining(f)) {
         return false;
     }
 
@@ -492,9 +492,9 @@ fn is_poorly_breakable_member_or_call_chain<'ast, 'arena>(
 }
 
 #[inline]
-fn is_lone_short_argument_list<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+fn is_lone_short_argument_list<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
 ) -> bool {
     if let Some(first_argument) = argument_list.arguments.first() {
         if argument_list.arguments.len() == 1 {
@@ -510,10 +510,7 @@ fn is_lone_short_argument_list<'ast, 'arena>(
 const LONE_SHORT_ARGUMENT_THRESHOLD_RATE: f32 = 0.25;
 
 #[inline]
-fn is_lone_short_argument<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_value: &'ast Expression<'arena>,
-) -> bool {
+fn is_lone_short_argument<'arena>(f: &FormatterState<'_, 'arena>, argument_value: &'arena Expression<'arena>) -> bool {
     let argument_span = argument_value.span();
     if f.has_comment(argument_span, CommentFlags::all()) {
         return false;

@@ -16,7 +16,7 @@ use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
 use crate::internal::utils::unwrap_parenthesized;
 
-impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
+impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     #[must_use]
     pub(crate) fn print_comments(
         &mut self,

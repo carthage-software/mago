@@ -85,7 +85,7 @@ impl LintRule for InterfaceNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Interface(interface) = node else {
             return;
         };

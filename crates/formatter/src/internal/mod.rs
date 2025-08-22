@@ -35,13 +35,13 @@ pub struct ParameterState {
 }
 
 #[derive(Debug)]
-pub struct FormatterState<'ctx, 'ast, 'arena> {
+pub struct FormatterState<'ctx, 'arena> {
     arena: &'arena Bump,
     source_text: &'arena str,
     file: &'ctx File,
     php_version: PHPVersion,
     settings: FormatSettings,
-    stack: Vec<Node<'ast, 'arena>>,
+    stack: BumpVec<'arena, Node<'arena, 'arena>>,
     all_comments: &'arena [Trivia<'arena>],
     next_comment_index: usize,
     scripting_mode: bool,
@@ -54,10 +54,10 @@ pub struct FormatterState<'ctx, 'ast, 'arena> {
     halted_compilation: bool,
 }
 
-impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
+impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     pub fn new(
         arena: &'arena Bump,
-        program: &'ast Program<'arena>,
+        program: &'arena Program<'arena>,
         file: &'ctx File,
         php_version: PHPVersion,
         settings: FormatSettings,
@@ -76,7 +76,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
             source_text: program.source_text,
             php_version,
             settings,
-            stack: vec![],
+            stack: BumpVec::new_in(arena),
             all_comments,
             next_comment_index: 0,
             scripting_mode: false,
@@ -100,7 +100,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     }
 
     #[inline]
-    fn enter_node(&mut self, node: Node<'ast, 'arena>) {
+    fn enter_node(&mut self, node: Node<'arena, 'arena>) {
         self.stack.push(node);
     }
 
@@ -110,30 +110,30 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     }
 
     #[inline]
-    fn current_node(&self) -> Node<'ast, 'arena> {
+    fn current_node(&self) -> Node<'arena, 'arena> {
         self.stack[self.stack.len() - 1]
     }
 
     #[inline]
-    fn parent_node(&self) -> Node<'ast, 'arena> {
+    fn parent_node(&self) -> Node<'arena, 'arena> {
         self.stack[self.stack.len() - 2]
     }
 
     #[inline]
-    fn grandparent_node(&self) -> Option<Node<'ast, 'arena>> {
+    fn grandparent_node(&self) -> Option<Node<'arena, 'arena>> {
         let len = self.stack.len();
 
         (len > 2).then(|| self.stack[len - 2 - 1])
     }
 
     #[inline]
-    fn great_grandparent_node(&self) -> Option<Node<'ast, 'arena>> {
+    fn great_grandparent_node(&self) -> Option<Node<'arena, 'arena>> {
         let len = self.stack.len();
         (len > 3).then(|| self.stack[len - 3 - 1])
     }
 
     #[inline]
-    fn nth_parent_kind(&self, n: u32) -> Option<Node<'ast, 'arena>> {
+    fn nth_parent_kind(&self, n: u32) -> Option<Node<'arena, 'arena>> {
         let n = n as usize;
         let len = self.stack.len();
 
@@ -162,7 +162,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         let line_index = self.file.line_number(span.start.offset);
         let line_start_offset = self.file.lines[line_index as usize] as usize;
         let span_start_offset = span.start.offset as usize;
-        let prefix = &self.file.contents[line_start_offset..span_start_offset];
+        let prefix = &self.source_text[line_start_offset..span_start_offset];
 
         prefix.trim().is_empty()
     }
@@ -191,24 +191,24 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     fn skip_inline_comments(&self, start_index: Option<u32>) -> Option<u32> {
         let start_index = start_index?;
         let start_index_usize = start_index as usize;
-        if start_index_usize + 1 >= self.file.contents.len() {
+        if start_index_usize + 1 >= self.source_text.len() {
             return Some(start_index); // Not enough characters to check for comment
         }
 
-        if self.file.contents[start_index_usize..].starts_with("//")
-            || (self.file.contents[start_index_usize..].starts_with('#')
-                && !self.file.contents[start_index_usize + 1..].starts_with('['))
+        if self.source_text[start_index_usize..].starts_with("//")
+            || (self.source_text[start_index_usize..].starts_with('#')
+                && !self.source_text[start_index_usize + 1..].starts_with('['))
         {
             return self.skip_to_line_end_or_closing_tag(Some(start_index));
         }
 
-        if self.file.contents[start_index_usize..].starts_with("/*") {
+        if self.source_text[start_index_usize..].starts_with("/*") {
             // Find the closing */
-            if let Some(end_pos) = self.file.contents[start_index_usize + 2..].find("*/") {
+            if let Some(end_pos) = self.source_text[start_index_usize + 2..].find("*/") {
                 let end_index = start_index_usize + 2 + end_pos + 2; // +2 for the "*/" itself
 
                 // Check if there's a newline between /* and */
-                let comment_text = &self.file.contents[start_index_usize..end_index];
+                let comment_text = &self.source_text[start_index_usize..end_index];
                 if !comment_text.contains('\n') && !comment_text.contains('\r') {
                     return Some(end_index as u32);
                 }
@@ -226,11 +226,11 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         let start_index = start_index as usize;
         let end_index = end_index as usize;
 
-        if start_index >= end_index || end_index > self.file.contents.len() {
+        if start_index >= end_index || end_index > self.source_text.len() {
             return false;
         }
 
-        self.file.contents[start_index..end_index].bytes().all(is_insignificant)
+        self.source_text[start_index..end_index].bytes().all(is_insignificant)
     }
 
     #[inline]
@@ -258,14 +258,14 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         let start_index = start_index? as usize;
         let mut index = start_index;
         if backwards {
-            for c in self.file.contents[..=start_index].bytes().rev() {
+            for c in self.source_text[..=start_index].bytes().rev() {
                 if !f(c) {
                     return Some(index as u32);
                 }
                 index -= 1;
             }
         } else {
-            let source_bytes = self.file.contents.as_bytes();
+            let source_bytes = self.source_text.as_bytes();
             let text_len = source_bytes.len();
             while index < text_len {
                 if !f(source_bytes[index]) {
@@ -283,7 +283,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     #[inline]
     fn skip_to_line_end_or_closing_tag(&self, start_index: Option<u32>) -> Option<u32> {
         let mut index = start_index? as usize;
-        let source_bytes = self.file.contents.as_bytes();
+        let source_bytes = self.source_text.as_bytes();
         let text_len = source_bytes.len();
 
         while index < text_len {
@@ -310,9 +310,9 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         let start_index = start_index?;
         let start_index_usize = start_index as usize;
         let c = if backwards {
-            self.file.contents[..=start_index_usize].bytes().next_back()
+            self.source_text[..=start_index_usize].bytes().next_back()
         } else {
-            self.file.contents[start_index_usize..].bytes().next()
+            self.source_text[start_index_usize..].bytes().next()
         }?;
 
         if matches!(c, b'\n') {
@@ -322,9 +322,9 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
         if matches!(c, b'\r') {
             let next_index = if backwards { start_index_usize - 1 } else { start_index_usize + 1 };
             let next_c = if backwards {
-                self.file.contents[..=next_index].bytes().next_back()
+                self.source_text[..=next_index].bytes().next_back()
             } else {
-                self.file.contents[next_index..].bytes().next()
+                self.source_text[next_index..].bytes().next()
             }?;
 
             if matches!(next_c, b'\n') {
@@ -337,7 +337,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
 
     #[inline]
     fn has_newline(&self, start_index: u32, backwards: bool) -> bool {
-        if (backwards && start_index == 0) || (!backwards && (start_index as usize) == self.file.contents.len()) {
+        if (backwards && start_index == 0) || (!backwards && (start_index as usize) == self.source_text.len()) {
             return false;
         }
         let start_index = if backwards { start_index - 1 } else { start_index };
@@ -386,7 +386,7 @@ impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     }
 }
 
-impl HasFileId for FormatterState<'_, '_, '_> {
+impl HasFileId for FormatterState<'_, '_> {
     fn file_id(&self) -> FileId {
         self.file.id
     }

@@ -39,10 +39,10 @@ mod property;
 mod ttype;
 
 #[inline]
-pub fn scan_program<'input, 'ast, 'arena>(
-    interner: &'input ThreadedInterner,
+pub fn scan_program<'ctx, 'ast, 'arena>(
+    interner: &'ctx ThreadedInterner,
     arena: &'arena Bump,
-    file: &'input File,
+    file: &'ctx File,
     program: &'ast Program<'arena>,
     resolved_names: &'ast ResolvedNames<'arena>,
 ) -> CodebaseMetadata {
@@ -54,19 +54,19 @@ pub fn scan_program<'input, 'ast, 'arena>(
 }
 
 #[derive(Clone, Debug)]
-struct Context<'input, 'ast, 'arena> {
-    pub interner: &'input ThreadedInterner,
+struct Context<'ctx, 'ast, 'arena> {
+    pub interner: &'ctx ThreadedInterner,
     pub arena: &'arena Bump,
-    pub file: &'input File,
+    pub file: &'ctx File,
     pub program: &'ast Program<'arena>,
     pub resolved_names: &'ast ResolvedNames<'arena>,
 }
 
-impl<'input, 'ast, 'arena> Context<'input, 'ast, 'arena> {
+impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     pub fn new(
-        interner: &'input ThreadedInterner,
+        interner: &'ctx ThreadedInterner,
         arena: &'arena Bump,
-        file: &'input File,
+        file: &'ctx File,
         program: &'ast Program<'arena>,
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> Self {
@@ -109,9 +109,9 @@ impl Scanner {
     }
 }
 
-impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>> for Scanner {
+impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> for Scanner {
     #[inline]
-    fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, _context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.scope = match &namespace.name {
             Some(name) => NamespaceScope::for_namespace(name.value()),
             None => NamespaceScope::global(),
@@ -119,21 +119,17 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_out_namespace(
-        &mut self,
-        _namespace: &'ast Namespace<'arena>,
-        _context: &mut Context<'input, 'ast, 'arena>,
-    ) {
+    fn walk_out_namespace(&mut self, _namespace: &'ast Namespace<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.scope = NamespaceScope::global();
     }
 
     #[inline]
-    fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, _context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.scope.populate_from_use(r#use);
     }
 
     #[inline]
-    fn walk_in_function(&mut self, function: &'ast Function<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_function(&mut self, function: &'ast Function<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         let type_context = self.get_current_type_resolution_context();
 
         let name = context.interner.intern(context.resolved_names.get(&function.name).to_lowercase());
@@ -153,12 +149,12 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_out_function(&mut self, _function: &'ast Function<'arena>, _context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_function(&mut self, _function: &'ast Function<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
     #[inline]
-    fn walk_in_closure(&mut self, closure: &'ast Closure<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_closure(&mut self, closure: &'ast Closure<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         let span = closure.span();
 
         let file_ref = context.interner.intern(span.file_id.to_string());
@@ -182,7 +178,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_out_closure(&mut self, _closure: &'ast Closure<'arena>, _context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_closure(&mut self, _closure: &'ast Closure<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
@@ -190,7 +186,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     fn walk_in_arrow_function(
         &mut self,
         arrow_function: &'ast ArrowFunction<'arena>,
-        context: &mut Context<'input, 'ast, 'arena>,
+        context: &mut Context<'ctx, 'ast, 'arena>,
     ) {
         let span = arrow_function.span();
 
@@ -224,13 +220,13 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     fn walk_out_arrow_function(
         &mut self,
         _arrow_function: &'ast ArrowFunction<'arena>,
-        _context: &mut Context<'input, 'ast, 'arena>,
+        _context: &mut Context<'ctx, 'ast, 'arena>,
     ) {
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
     #[inline]
-    fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         for metadata in scan_constant(constant, context) {
             self.codebase.constants.insert(metadata.name, metadata);
         }
@@ -240,7 +236,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     fn walk_in_function_call(
         &mut self,
         function_call: &'ast FunctionCall<'arena>,
-        context: &mut Context<'input, 'ast, 'arena>,
+        context: &mut Context<'ctx, 'ast, 'arena>,
     ) {
         if let Some(metadata) = scan_defined_constant(function_call, context) {
             self.codebase.constants.insert(metadata.name, metadata);
@@ -251,7 +247,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     fn walk_anonymous_class(
         &mut self,
         anonymous_class: &'ast AnonymousClass<'arena>,
-        context: &mut Context<'input, 'ast, 'arena>,
+        context: &mut Context<'ctx, 'ast, 'arena>,
     ) {
         if let Some((id, template_definition)) =
             register_anonymous_class(&mut self.codebase, anonymous_class, context, &mut self.scope)
@@ -266,7 +262,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_class(&mut self, class: &'ast Class<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_class(&mut self, class: &'ast Class<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         if let Some((id, templates)) = register_class(&mut self.codebase, class, context, &mut self.scope) {
             self.stack.push(id);
             self.template_constraints.push(templates);
@@ -278,7 +274,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_trait(&mut self, r#trait: &'ast Trait<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_trait(&mut self, r#trait: &'ast Trait<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         if let Some((id, templates)) = register_trait(&mut self.codebase, r#trait, context, &mut self.scope) {
             self.stack.push(id);
             self.template_constraints.push(templates);
@@ -290,7 +286,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_enum(&mut self, r#enum: &'ast Enum<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_enum(&mut self, r#enum: &'ast Enum<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         if let Some((id, templates)) = register_enum(&mut self.codebase, r#enum, context, &mut self.scope) {
             self.stack.push(id);
             self.template_constraints.push(templates);
@@ -302,7 +298,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_interface(&mut self, interface: &'ast Interface<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_interface(&mut self, interface: &'ast Interface<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         if let Some((id, templates)) = register_interface(&mut self.codebase, interface, context, &mut self.scope) {
             self.stack.push(id);
             self.template_constraints.push(templates);
@@ -312,7 +308,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_in_method(&mut self, method: &'ast Method<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_in_method(&mut self, method: &'ast Method<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         let current_class = self.stack.last().expect("Expected class-like stack to be non-empty");
         let mut class_like_metadata =
             self.codebase.class_likes.remove(current_class).expect("Expected class-like metadata to be present");
@@ -382,7 +378,7 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     }
 
     #[inline]
-    fn walk_out_method(&mut self, _method: &'ast Method<'arena>, _context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_method(&mut self, _method: &'ast Method<'arena>, _context: &mut Context<'ctx, 'ast, 'arena>) {
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
@@ -390,34 +386,34 @@ impl<'input, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'input, 'ast, 'arena>
     fn walk_out_anonymous_class(
         &mut self,
         _anonymous_class: &'ast AnonymousClass<'arena>,
-        _context: &mut Context<'input, 'ast, 'arena>,
+        _context: &mut Context<'ctx, 'ast, 'arena>,
     ) {
         self.stack.pop().expect("Expected class stack to be non-empty");
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
     #[inline]
-    fn walk_out_class(&mut self, _class: &'ast Class<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_class(&mut self, _class: &'ast Class<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_trait(&mut self, _trait: &'ast Trait<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_trait(&mut self, _trait: &'ast Trait<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_enum(&mut self, _enum: &'ast Enum<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_enum(&mut self, _enum: &'ast Enum<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         finalize_class_like(self, context);
     }
 
     #[inline]
-    fn walk_out_interface(&mut self, _interface: &'ast Interface<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+    fn walk_out_interface(&mut self, _interface: &'ast Interface<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         finalize_class_like(self, context);
     }
 }
 
-fn finalize_class_like<'input, 'ast, 'arena>(scanner: &mut Scanner, context: &mut Context<'input, 'ast, 'arena>) {
+fn finalize_class_like<'ctx, 'ast, 'arena>(scanner: &mut Scanner, context: &mut Context<'ctx, 'ast, 'arena>) {
     let has_constructor = scanner.has_constructor;
     scanner.has_constructor = false;
 

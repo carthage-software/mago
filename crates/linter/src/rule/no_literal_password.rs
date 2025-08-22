@@ -93,7 +93,7 @@ impl LintRule for NoLiteralPasswordRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Assignment(assignment) => {
                 let Some(password) = get_password(assignment.lhs) else {
@@ -163,10 +163,10 @@ impl LintRule for NoLiteralPasswordRule {
 }
 
 #[inline]
-fn check<'ast, 'arena>(
+fn check<'arena>(
     name: Span,
-    value: &'ast Expression<'arena>,
-    ctx: &mut LintContext<'_, 'ast, 'arena>,
+    value: &Expression<'arena>,
+    ctx: &mut LintContext<'_, 'arena>,
     rule: &NoLiteralPasswordRule,
 ) {
     let is_literal_password = match value {

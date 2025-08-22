@@ -91,7 +91,7 @@ impl LintRule for ArrayStyleRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::LegacyArray(arr) if ArrayStyleOption::Short == self.cfg.style => {
                 ctx.collector.report(

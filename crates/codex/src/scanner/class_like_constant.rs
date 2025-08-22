@@ -19,12 +19,12 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_class_like_constants<'input, 'ast, 'arena>(
+pub fn scan_class_like_constants<'ctx, 'ast, 'arena>(
     class_like_metadata: &mut ClassLikeMetadata,
     constant: &'ast ClassLikeConstant<'arena>,
     classname: Option<&StringIdentifier>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &NamespaceScope,
 ) -> Vec<ClassLikeConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);

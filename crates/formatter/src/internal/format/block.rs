@@ -11,10 +11,10 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::statement;
 
-pub(super) fn print_block_of_nodes<'ast, 'arena, T: Format<'ast, 'arena> + HasSpan>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+pub(super) fn print_block_of_nodes<'ast, 'arena, T: Format<'arena> + HasSpan>(
+    f: &mut FormatterState<'_, 'arena>,
     left_brace: &Span,
-    nodes: &'ast Sequence<'arena, T>,
+    nodes: &'arena Sequence<'arena, T>,
     right_brace: &Span,
     inline_empty: bool,
 ) -> Document<'arena> {
@@ -58,11 +58,11 @@ pub(super) fn print_block_of_nodes<'ast, 'arena, T: Format<'ast, 'arena> + HasSp
     Document::Group(Group::new(contents))
 }
 
-pub(super) fn print_block<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    left_brace: &'ast Span,
-    stmts: &'ast Sequence<'arena, Statement<'arena>>,
-    right_brace: &'ast Span,
+pub(super) fn print_block<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    left_brace: &'arena Span,
+    stmts: &'arena Sequence<'arena, Statement<'arena>>,
+    right_brace: &'arena Span,
 ) -> Document<'arena> {
     let mut contents = vec![in f.arena];
     contents.push(Document::String("{"));
@@ -154,16 +154,16 @@ pub(super) fn print_block<'ast, 'arena>(
     Document::Group(Group::new(contents).with_break(should_break))
 }
 
-pub(super) fn print_block_body<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    stmts: &'ast Sequence<'arena, Statement<'arena>>,
+pub(super) fn print_block_body<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    stmts: &'arena Sequence<'arena, Statement<'arena>>,
 ) -> Option<Document<'arena>> {
     let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
 
     if has_body { Some(Document::Array(statement::print_statement_sequence(f, stmts))) } else { None }
 }
 
-pub fn block_is_empty(f: &mut FormatterState<'_, '_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
+pub fn block_is_empty(f: &mut FormatterState<'_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
     let content = &f.source_text[left_brace.end.offset as usize..right_brace.start.offset as usize];
 
     for c in content.chars() {

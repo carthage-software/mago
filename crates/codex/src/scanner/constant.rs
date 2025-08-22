@@ -13,9 +13,9 @@ use crate::scanner::docblock::ConstantDocblockComment;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_constant<'input, 'ast, 'arena>(
+pub fn scan_constant<'ctx, 'ast, 'arena>(
     constant: &'ast Constant<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
 ) -> Vec<ConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let docblock = ConstantDocblockComment::create(context, constant);
@@ -69,9 +69,9 @@ pub fn scan_constant<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn scan_defined_constant<'input, 'ast, 'arena>(
+pub fn scan_defined_constant<'ctx, 'ast, 'arena>(
     define: &'ast FunctionCall<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
 ) -> Option<ConstantMetadata> {
     let Expression::Identifier(identifier) = define.function else {
         return None;

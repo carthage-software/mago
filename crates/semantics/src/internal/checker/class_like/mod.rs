@@ -17,7 +17,7 @@ mod method;
 mod property;
 
 #[inline]
-pub fn check_class<'input, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+pub fn check_class<'ctx, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
     let class_name = class.name.value;
     let class_fqcn = context.get_name(&class.name.span.start);
 
@@ -236,9 +236,9 @@ pub fn check_class<'input, 'ast, 'arena>(class: &'ast Class<'arena>, context: &m
 }
 
 #[inline]
-pub fn check_interface<'input, 'ast, 'arena>(
+pub fn check_interface<'ctx, 'ast, 'arena>(
     interface: &'ast Interface<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
 ) {
     let interface_name = interface.name.value;
     let interface_fqcn = context.get_name(&interface.name.span.start);
@@ -585,7 +585,7 @@ pub fn check_interface<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn check_trait<'input, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+pub fn check_trait<'ctx, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
     let class_like_name = r#trait.name.value;
     let class_like_fqcn = context.get_name(&r#trait.name.span.start);
 
@@ -668,7 +668,7 @@ pub fn check_trait<'input, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: 
 }
 
 #[inline]
-pub fn check_enum<'input, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Context<'input, 'ast, 'arena>) {
+pub fn check_enum<'ctx, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
     if !context.version.is_supported(Feature::Enums) {
         context.report(
             Issue::error("Enums are only available in PHP 8.1 and above.")
@@ -836,9 +836,9 @@ pub fn check_enum<'input, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mu
 }
 
 #[inline]
-pub fn check_anonymous_class<'input, 'ast, 'arena>(
+pub fn check_anonymous_class<'ctx, 'ast, 'arena>(
     anonymous_class: &'ast AnonymousClass<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
 ) {
     let mut last_final = None;
     let mut last_readonly = None;
@@ -1032,13 +1032,13 @@ pub fn check_anonymous_class<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn check_members<'input, 'ast, 'arena>(
+pub fn check_members<'ctx, 'ast, 'arena>(
     members: &'ast Sequence<ClassLikeMember<'arena>>,
     class_like_span: Span,
     class_like_kind: &str,
     class_like_name: &str,
     class_like_fqcn: &str,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
 ) {
     let mut method_names: Vec<(Span, String)> = vec![];
     let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];

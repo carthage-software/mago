@@ -108,7 +108,7 @@ impl LintRule for TooManyMethodsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let members = match node {
             Node::Class(class) => class.members.as_slice(),
             Node::Trait(r#trait) => r#trait.members.as_slice(),

@@ -87,7 +87,7 @@ impl LintRule for NoRedundantFinalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let (members, is_enum) = match node {
             Node::Class(class) => {
                 if !class.modifiers.contains_final() {

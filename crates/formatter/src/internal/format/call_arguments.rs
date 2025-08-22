@@ -1,3 +1,4 @@
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::*;
@@ -18,9 +19,9 @@ use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::will_break;
 
-pub(super) fn print_call_arguments<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    expression: CallLikeNode<'ast, 'arena>,
+pub(super) fn print_call_arguments<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    expression: CallLikeNode<'arena>,
 ) -> Document<'arena> {
     let Some(argument_list) = expression.arguments() else {
         return if (expression.is_instantiation() && f.settings.parentheses_in_new_expression)
@@ -67,9 +68,9 @@ pub(super) fn print_call_arguments<'ast, 'arena>(
     print_argument_list(f, argument_list, expression.is_attribute())
 }
 
-pub(super) fn print_argument_list<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+pub(super) fn print_argument_list<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
     for_attribute: bool,
 ) -> Document<'arena> {
     let mut should_break = false;
@@ -103,34 +104,32 @@ pub(super) fn print_argument_list<'ast, 'arena>(
     let is_single_late_breaking_argument = !should_break && is_single_late_breaking_argument(f, argument_list);
 
     let arguments_count = argument_list.arguments.len();
-    let mut formatted_arguments: Vec<Document<'arena>> = argument_list
-        .arguments
-        .iter()
-        .enumerate()
-        .map(|(i, arg)| {
-            if !should_break_all && !should_inline {
-                if should_expand_first && (i == 0) {
-                    let previous = f.argument_state.expand_first_argument;
-                    f.argument_state.expand_first_argument = true;
-                    let document = arg.format(f);
-                    f.argument_state.expand_first_argument = previous;
+    let mut formatted_arguments: Vec<'arena, Document<'arena>> = Vec::with_capacity_in(arguments_count, f.arena);
+    for (i, arg) in argument_list.arguments.iter().enumerate() {
+        if !should_break_all && !should_inline {
+            if should_expand_first && (i == 0) {
+                let previous = f.argument_state.expand_first_argument;
+                f.argument_state.expand_first_argument = true;
+                let document = arg.format(f);
+                f.argument_state.expand_first_argument = previous;
 
-                    return document;
-                }
-
-                if should_expand_last && (i == arguments_count - 1) {
-                    let previous = f.argument_state.expand_last_argument;
-                    f.argument_state.expand_last_argument = true;
-                    let document = arg.format(f);
-                    f.argument_state.expand_last_argument = previous;
-
-                    return document;
-                }
+                formatted_arguments.push(document);
+                continue;
             }
 
-            arg.format(f)
-        })
-        .collect();
+            if should_expand_last && (i == arguments_count - 1) {
+                let previous = f.argument_state.expand_last_argument;
+                f.argument_state.expand_last_argument = true;
+                let document = arg.format(f);
+                f.argument_state.expand_last_argument = previous;
+
+                formatted_arguments.push(document);
+                continue;
+            }
+        }
+
+        formatted_arguments.push(arg.format(f));
+    }
 
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
     let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
@@ -141,22 +140,22 @@ pub(super) fn print_argument_list<'ast, 'arena>(
         return Document::Array(contents);
     }
 
-    let get_printed_arguments = |f: &mut FormatterState<'_, 'ast, 'arena>, should_break: bool, skip_index: isize| {
+    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena>, should_break: bool, skip_index: isize| {
         let mut printed_arguments = vec![in f.arena];
         let mut length = arguments_count;
-        let arguments_range: Box<dyn Iterator<Item = (usize, usize)>> = match skip_index {
+        let (arguments_start, arguments_end) = match skip_index {
             _ if skip_index > 0 => {
                 length -= skip_index as usize;
-                Box::new((skip_index as usize..arguments_count).enumerate())
+                (skip_index as usize, arguments_count)
             }
             _ if skip_index < 0 => {
                 length -= (-skip_index) as usize;
-                Box::new((0..arguments_count - (-skip_index) as usize).enumerate())
+                (0, arguments_count - (-skip_index) as usize)
             }
-            _ => Box::new((0..arguments_count).enumerate()),
+            _ => (0, arguments_count),
         };
 
-        for (i, arg_idx) in arguments_range {
+        for (i, arg_idx) in (arguments_start..arguments_end).enumerate() {
             let element = &argument_list.arguments.as_slice()[arg_idx];
             let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (length - 1) {
@@ -179,7 +178,7 @@ pub(super) fn print_argument_list<'ast, 'arena>(
         printed_arguments
     };
 
-    let all_arguments_broken_out = |f: &mut FormatterState<'_, 'ast, 'arena>| {
+    let all_arguments_broken_out = |f: &mut FormatterState<'_, 'arena>| {
         let mut parts = vec![in f.arena];
         parts.push(clone_in_arena(f.arena, &left_parenthesis));
         parts.push(Document::Indent(vec![
@@ -229,9 +228,9 @@ pub(super) fn print_argument_list<'ast, 'arena>(
     }
 
     if should_expand_first {
-        let mut first_doc = clone_in_arena(f.arena, &formatted_arguments[0]);
+        let first_doc = clone_in_arena(f.arena, &formatted_arguments[0]);
 
-        if will_break(&mut first_doc) {
+        if will_break(&first_doc) {
             let last_doc = get_printed_arguments(f, false, 1).pop().unwrap();
 
             return Document::Array(vec![
@@ -255,7 +254,7 @@ pub(super) fn print_argument_list<'ast, 'arena>(
     if should_expand_last {
         let mut printed_arguments = get_printed_arguments(f, false, -1);
         let original_printed_arguments = clone_vec_in_arena(f.arena, &printed_arguments);
-        if printed_arguments.iter_mut().any(will_break) {
+        if printed_arguments.iter().any(will_break) {
             return all_arguments_broken_out(f);
         }
 
@@ -265,9 +264,9 @@ pub(super) fn print_argument_list<'ast, 'arena>(
         }
 
         let last_doc = clone_in_arena(f.arena, formatted_arguments.last().unwrap());
-        let mut last_doc_clone = clone_in_arena(f.arena, &last_doc);
+        let last_doc_clone = clone_in_arena(f.arena, &last_doc);
 
-        if will_break(&mut last_doc_clone) {
+        if will_break(&last_doc_clone) {
             return Document::Array(vec![
                 in f.arena;
                 Document::BreakParent,
@@ -327,8 +326,8 @@ pub(super) fn print_argument_list<'ast, 'arena>(
     Document::Group(Group::new(contents))
 }
 
-fn print_right_parenthesis<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+fn print_right_parenthesis<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     dangling_comments: Option<&Document<'arena>>,
     right_parenthesis: &Document<'arena>,
     breaking: Option<bool>,
@@ -381,7 +380,7 @@ fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, 
     if f.settings.preserve_breaking_argument_list
         && !argument_list.arguments.is_empty()
         && misc::has_new_line_in_range(
-            &f.file.contents,
+            f.source_text,
             argument_list.left_parenthesis.start.offset,
             argument_list.arguments.as_slice()[0].span().start.offset,
         )
@@ -393,9 +392,9 @@ fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, 
 }
 
 #[inline]
-fn is_single_late_breaking_argument<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+fn is_single_late_breaking_argument<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
 ) -> bool {
     let arguments = argument_list.arguments.as_slice();
     if arguments.len() != 1 {
@@ -423,9 +422,9 @@ fn is_single_late_breaking_argument<'ast, 'arena>(
 }
 
 #[inline]
-fn should_inline_breaking_arguments<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+fn should_inline_breaking_arguments<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
 ) -> bool {
     let arguments = argument_list.arguments.as_slice();
 
@@ -471,9 +470,9 @@ fn should_inline_breaking_arguments<'ast, 'arena>(
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>
-pub fn should_expand_first_arg<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+pub fn should_expand_first_arg<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
     nested_args: bool,
 ) -> bool {
     if argument_list.arguments.len() != 2 {
@@ -496,9 +495,9 @@ pub fn should_expand_first_arg<'ast, 'arena>(
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/52829385bcc4d785e58ae2602c0b098a643523c9/src/language-js/print/call-arguments.js#L234-L258>
-pub fn should_expand_last_arg<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    argument_list: &'ast ArgumentList<'arena>,
+pub fn should_expand_last_arg<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
     nested_args: bool,
 ) -> bool {
     let Some(last_argument) = argument_list.arguments.last() else { return false };
@@ -564,8 +563,8 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
     }
 }
 
-fn is_simple_call_argument<'ast, 'arena>(node: &'ast Expression<'arena>, depth: usize) -> bool {
-    let is_child_simple = |node: &'ast Expression<'arena>| {
+fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usize) -> bool {
+    let is_child_simple = |node: &'arena Expression<'arena>| {
         if depth <= 1 {
             return false;
         }
@@ -573,7 +572,7 @@ fn is_simple_call_argument<'ast, 'arena>(node: &'ast Expression<'arena>, depth: 
         is_simple_call_argument(node, depth - 1)
     };
 
-    let is_simple_element = |node: &'ast ArrayElement<'arena>| match node {
+    let is_simple_element = |node: &'arena ArrayElement<'arena>| match node {
         ArrayElement::KeyValue(element) => is_child_simple(element.key) && is_child_simple(element.value),
         ArrayElement::Value(element) => is_child_simple(element.value),
         ArrayElement::Variadic(element) => is_child_simple(element.value),

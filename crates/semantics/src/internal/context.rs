@@ -11,23 +11,23 @@ use mago_syntax::ast::Program;
 const ISSUE_CODE: &str = "semantics";
 
 #[derive(Debug)]
-pub struct Context<'input, 'ast, 'arena> {
+pub struct Context<'ctx, 'ast, 'arena> {
     pub version: PHPVersion,
     pub program: &'ast Program<'arena>,
     pub names: &'ast ResolvedNames<'arena>,
-    pub source_file: &'input File,
+    pub source_file: &'ctx File,
     pub ancestors: Vec<Span>,
     pub hint_depth: usize,
 
     issues: IssueCollection,
 }
 
-impl<'input, 'ast, 'arena> Context<'input, 'ast, 'arena> {
+impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     pub fn new(
         version: PHPVersion,
         program: &'ast Program<'arena>,
         names: &'ast ResolvedNames<'arena>,
-        source_file: &'input File,
+        source_file: &'ctx File,
     ) -> Self {
         Self {
             version,
@@ -46,7 +46,7 @@ impl<'input, 'ast, 'arena> Context<'input, 'ast, 'arena> {
     }
 
     #[inline]
-    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'input str {
+    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'ctx str {
         let s = span.span();
 
         &self.source_file.contents[s.start.offset as usize..s.end.offset as usize]

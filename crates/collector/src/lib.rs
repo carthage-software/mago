@@ -27,11 +27,11 @@ mod walk;
 /// - Filtering issues based on configuration or suppression pragmas (`@mago-ignore`, `@mago-expect`).
 /// - Reporting unused or unfulfilled pragmas.
 #[derive(Debug)]
-pub struct Collector<'input, 'arena> {
+pub struct Collector<'ctx, 'arena> {
     /// The arena used for allocation of issues and pragmas.
     arena: &'arena Bump,
     /// The source file from which this collector was created.
-    file: &'input File,
+    file: &'ctx File,
     /// All pragmas that have not yet been applied to a node.
     pragmas: Vec<'arena, Pragma<'arena>>,
     /// The collection of issues that have been reported and not suppressed.
@@ -46,7 +46,7 @@ pub struct Collector<'input, 'arena> {
     link_template: Option<&'static str>,
 }
 
-impl<'input, 'arena> Collector<'input, 'arena> {
+impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// Creates a new `Collector` from a slice of trivia.
     ///
     /// This is the primary constructor. It pre-parses the given trivia to find pragmas
@@ -54,7 +54,7 @@ impl<'input, 'arena> Collector<'input, 'arena> {
     /// needed or available.
     pub fn new<'ast>(
         arena: &'arena Bump,
-        file: &'input File,
+        file: &'ctx File,
         program: &'ast Program<'arena>,
         category: &'static str,
     ) -> Self {

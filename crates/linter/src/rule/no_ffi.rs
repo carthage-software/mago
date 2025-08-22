@@ -90,7 +90,7 @@ impl LintRule for NoFfiRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let identifier = match node {
             Node::StaticMethodCall(static_method_call) => {
                 if let Expression::Identifier(identifier) = static_method_call.class {

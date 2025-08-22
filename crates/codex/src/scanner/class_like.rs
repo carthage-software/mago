@@ -39,10 +39,10 @@ use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn register_anonymous_class<'input, 'ast, 'arena>(
+pub fn register_anonymous_class<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     class: &'ast AnonymousClass<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let span = class.span();
@@ -76,10 +76,10 @@ pub fn register_anonymous_class<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn register_class<'input, 'ast, 'arena>(
+pub fn register_class<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     class: &'ast Class<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
@@ -112,10 +112,10 @@ pub fn register_class<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn register_interface<'input, 'ast, 'arena>(
+pub fn register_interface<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     interface: &'ast Interface<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
@@ -148,10 +148,10 @@ pub fn register_interface<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn register_trait<'input, 'ast, 'arena>(
+pub fn register_trait<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     r#trait: &'ast Trait<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
@@ -184,10 +184,10 @@ pub fn register_trait<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn register_enum<'input, 'ast, 'arena>(
+pub fn register_enum<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     r#enum: &'ast Enum<'arena>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<(StringIdentifier, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
@@ -221,7 +221,7 @@ pub fn register_enum<'input, 'ast, 'arena>(
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn scan_class_like<'input, 'ast, 'arena>(
+fn scan_class_like<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
     name: StringIdentifier,
     kind: SymbolKind,
@@ -233,7 +233,7 @@ fn scan_class_like<'input, 'ast, 'arena>(
     extends: Option<&'ast Extends<'arena>>,
     implements: Option<&'ast Implements<'arena>>,
     enum_type: Option<&'ast EnumBackingTypeHint<'arena>>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<ClassLikeMetadata> {
     let original_name = name;

@@ -90,7 +90,7 @@ impl LintRule for TaintedDataToSinkRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Echo(echo) => {
                 for value in echo.values.iter() {
@@ -116,11 +116,11 @@ impl LintRule for TaintedDataToSinkRule {
 }
 
 impl TaintedDataToSinkRule {
-    fn check_tainted_data_to_sink<'ast, 'arena>(
+    fn check_tainted_data_to_sink<'arena>(
         &self,
-        ctx: &mut LintContext<'_, 'ast, 'arena>,
+        ctx: &mut LintContext<'_, 'arena>,
         used_in: Span,
-        value: &'ast Expression<'arena>,
+        value: &Expression<'arena>,
     ) {
         if !is_user_input(value) {
             return;

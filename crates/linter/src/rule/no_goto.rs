@@ -95,7 +95,7 @@ impl LintRule for NoGotoRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Goto(goto) => {
                 let issue = Issue::new(self.cfg.level, "Avoid using `goto`.")

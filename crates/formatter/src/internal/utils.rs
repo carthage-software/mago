@@ -31,7 +31,7 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
 }
 
 #[inline]
-pub fn get_left_side<'ast, 'a>(expression: &'ast Expression<'a>) -> Option<&'ast Expression<'a>> {
+pub fn get_left_side<'arena>(expression: &'arena Expression<'arena>) -> Option<&'arena Expression<'arena>> {
     match expression {
         Expression::Binary(binary) => Some(binary.lhs),
         Expression::UnaryPostfix(unary) => Some(unary.operand),
@@ -61,7 +61,7 @@ pub fn get_left_side<'ast, 'a>(expression: &'ast Expression<'a>) -> Option<&'ast
 }
 
 #[inline]
-pub fn is_at_call_like_expression(f: &FormatterState<'_, '_, '_>) -> bool {
+pub fn is_at_call_like_expression(f: &FormatterState<'_, '_>) -> bool {
     let Some(grant_parent) = f.grandparent_node() else {
         return false;
     };
@@ -79,7 +79,7 @@ pub fn is_at_call_like_expression(f: &FormatterState<'_, '_, '_>) -> bool {
 }
 
 #[inline]
-pub fn unwrap_parenthesized<'ast, 'a>(mut expression: &'ast Expression<'a>) -> &'ast Expression<'a> {
+pub fn unwrap_parenthesized<'arena>(mut expression: &'arena Expression<'arena>) -> &'arena Expression<'arena> {
     while let Expression::Parenthesized(parenthesized) = expression {
         expression = parenthesized.expression;
     }
@@ -88,7 +88,7 @@ pub fn unwrap_parenthesized<'ast, 'a>(mut expression: &'ast Expression<'a>) -> &
 }
 
 #[inline]
-pub fn is_at_callee(f: &FormatterState<'_, '_, '_>) -> bool {
+pub fn is_at_callee(f: &FormatterState<'_, '_>) -> bool {
     let Node::Expression(expression) = f.parent_node() else {
         return false;
     };
@@ -110,37 +110,37 @@ pub fn is_at_callee(f: &FormatterState<'_, '_, '_>) -> bool {
 }
 
 #[inline]
-pub fn will_break(document: &mut Document<'_>) -> bool {
-    let check_array = |array: &mut Vec<'_, Document<'_>>| array.iter_mut().rev().any(|doc| will_break(doc));
+pub fn will_break<'arena>(document: &'arena Document<'arena>) -> bool {
+    let check_array = |array: &Vec<'arena, Document<'arena>>| array.iter().rev().any(|doc| will_break(doc));
 
     match document {
         Document::BreakParent => true,
         Document::Group(group) => {
-            if group.should_break {
+            if *group.should_break.borrow() {
                 return true;
             }
-            if let Some(expanded_states) = &mut group.expanded_states
-                && expanded_states.iter_mut().rev().any(will_break)
+            if let Some(expanded_states) = &group.expanded_states
+                && expanded_states.iter().rev().any(will_break)
             {
                 return true;
             }
-            check_array(&mut group.contents)
+            check_array(&group.contents)
         }
-        Document::IfBreak(d) => will_break(&mut d.break_contents),
+        Document::IfBreak(d) => will_break(d.break_contents),
         Document::Array(contents)
         | Document::Indent(contents)
         | Document::LineSuffix(contents)
         | Document::IndentIfBreak(IndentIfBreak { contents, .. })
         | Document::Align(Align { contents, .. }) => check_array(contents),
-        Document::Fill(doc) => check_array(&mut doc.parts),
+        Document::Fill(doc) => check_array(&doc.parts),
         Document::Line(doc) => doc.hard,
         _ => false,
     }
 }
 
 #[inline]
-pub fn replace_end_of_line<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
+pub fn replace_end_of_line<'arena>(
+    f: &FormatterState<'_, 'arena>,
     document: Document<'arena>,
     replacement: Separator,
     halted_compilation: bool,
@@ -162,9 +162,9 @@ pub fn replace_end_of_line<'ast, 'arena>(
 }
 
 #[inline]
-pub fn could_expand_value<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    value: &'ast Expression<'arena>,
+pub fn could_expand_value<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    value: &'arena Expression<'arena>,
     nested_args: bool,
 ) -> bool {
     match value {

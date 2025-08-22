@@ -1,5 +1,6 @@
+use std::cell::RefCell;
+
 use bumpalo::Bump;
-use bumpalo::boxed::Box;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
@@ -7,7 +8,7 @@ use crate::document::group::GroupIdentifier;
 
 pub mod group;
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Document<'arena> {
     String(&'arena str),
     Array(Vec<'arena, Document<'arena>>),
@@ -45,7 +46,7 @@ pub enum Document<'arena> {
     Space(Space),
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Align<'arena> {
     pub alignment: &'arena str,
     pub contents: Vec<'arena, Document<'arena>>,
@@ -66,36 +67,36 @@ pub struct Line {
     pub literal: bool,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Space {
     /// If `true`, the space is "soft" and will only be printed if the preceding
     /// character is not whitespace. If `false`, the space is "hard" and will always be printed.
     pub soft: bool,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Group<'arena> {
     pub contents: Vec<'arena, Document<'arena>>,
-    pub should_break: bool,
+    pub should_break: RefCell<bool>,
     pub expanded_states: Option<Vec<'arena, Document<'arena>>>,
     pub id: Option<GroupIdentifier>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct IndentIfBreak<'arena> {
     pub contents: Vec<'arena, Document<'arena>>,
     pub group_id: Option<GroupIdentifier>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Fill<'arena> {
     pub parts: Vec<'arena, Document<'arena>>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct IfBreak<'arena> {
-    pub break_contents: Box<'arena, Document<'arena>>,
-    pub flat_content: Box<'arena, Document<'arena>>,
+    pub break_contents: &'arena Document<'arena>,
+    pub flat_content: &'arena Document<'arena>,
     pub group_id: Option<GroupIdentifier>,
 }
 
@@ -143,18 +144,18 @@ impl Space {
 
 impl<'arena> Group<'arena> {
     pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
-        Self { contents, should_break: false, id: None, expanded_states: None }
+        Self { contents, should_break: RefCell::new(false), id: None, expanded_states: None }
     }
 
     pub fn conditional(
         contents: Vec<'arena, Document<'arena>>,
         expanded_states: Vec<'arena, Document<'arena>>,
     ) -> Self {
-        Self { contents, should_break: false, id: None, expanded_states: Some(expanded_states) }
+        Self { contents, should_break: RefCell::new(false), id: None, expanded_states: Some(expanded_states) }
     }
 
     pub fn with_break(mut self, yes: bool) -> Self {
-        self.should_break = yes;
+        self.should_break = RefCell::new(yes);
         self
     }
 
@@ -198,17 +199,13 @@ impl<'arena> Fill<'arena> {
 
 impl<'arena> IfBreak<'arena> {
     pub fn new(arena: &'arena Bump, break_contents: Document<'arena>, flat_content: Document<'arena>) -> Self {
-        Self {
-            break_contents: Box::new_in(break_contents, arena),
-            flat_content: Box::new_in(flat_content, arena),
-            group_id: None,
-        }
+        Self { break_contents: arena.alloc(break_contents), flat_content: arena.alloc(flat_content), group_id: None }
     }
 
     pub fn then(arena: &'arena Bump, break_contents: Document<'arena>) -> Self {
         Self {
-            break_contents: Box::new_in(break_contents, arena),
-            flat_content: Box::new_in(Document::empty(), arena),
+            break_contents: arena.alloc(break_contents),
+            flat_content: arena.alloc(Document::empty()),
             group_id: None,
         }
     }
@@ -327,7 +324,7 @@ pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) 
         }),
         Document::Group(g) => Document::Group(Group {
             contents: clone_vec_in_arena(arena, &g.contents),
-            should_break: g.should_break,
+            should_break: g.should_break.clone(),
             expanded_states: g.expanded_states.as_ref().map(|v| clone_vec_in_arena(arena, v)),
             id: g.id,
         }),
@@ -338,8 +335,8 @@ pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) 
 
         // The special case for `Box`
         Document::IfBreak(ib) => Document::IfBreak(IfBreak {
-            break_contents: Box::new_in(clone_in_arena(arena, &ib.break_contents), arena),
-            flat_content: Box::new_in(clone_in_arena(arena, &ib.flat_content), arena),
+            break_contents: arena.alloc(clone_in_arena(arena, ib.break_contents)),
+            flat_content: arena.alloc(clone_in_arena(arena, ib.flat_content)),
             group_id: ib.group_id,
         }),
     }
@@ -404,7 +401,7 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
         }
         Document::Group(Group { contents, should_break, expanded_states, id }) => {
             let mut options = vec![in arena];
-            if *should_break {
+            if *should_break.borrow() {
                 options.push("shouldBreak: true".to_string());
             }
             if let Some(id) = id {

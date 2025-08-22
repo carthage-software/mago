@@ -60,9 +60,9 @@ pub(super) fn has_new_line_in_range(text: &str, start: u32, end: u32) -> bool {
 /// # Performance
 ///
 /// O(1) for most checks, with potential O(n) recursion for nested expressions
-pub(super) fn should_hug_expression<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    expression: &'ast Expression<'arena>,
+pub(super) fn should_hug_expression<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    expression: &'arena Expression<'arena>,
     arrow_function_recursion: bool,
 ) -> bool {
     if let Expression::Parenthesized(inner) = expression {
@@ -80,7 +80,7 @@ pub(super) fn should_hug_expression<'ast, 'arena>(
 
     if let Expression::Call(_) | Expression::Access(_) = expression {
         // Don't hug calls/accesses if they are part of a member access chain
-        return collect_member_access_chain(expression).is_none_or(|chain| !chain.is_eligible_for_chaining(f));
+        return collect_member_access_chain(f.arena, expression).is_none_or(|chain| !chain.is_eligible_for_chaining(f));
     }
 
     if let Expression::ArrowFunction(arrow_function) = expression {
@@ -144,7 +144,7 @@ pub(super) fn should_hug_expression<'ast, 'arena>(
     }
 }
 
-pub fn is_breaking_expression<'ast, 'arena>(node: &'ast Expression<'arena>, arrow_function_recursion: bool) -> bool {
+pub fn is_breaking_expression<'arena>(node: &'arena Expression<'arena>, arrow_function_recursion: bool) -> bool {
     if let Expression::Parenthesized(inner) = node {
         return is_breaking_expression(inner.expression, arrow_function_recursion);
     }
@@ -169,7 +169,7 @@ pub fn is_breaking_expression<'ast, 'arena>(node: &'ast Expression<'arena>, arro
     )
 }
 
-pub fn is_simple_expression<'ast, 'arena>(node: &'ast Expression<'arena>) -> bool {
+pub fn is_simple_expression<'arena>(node: &'arena Expression<'arena>) -> bool {
     if let Expression::Parenthesized(inner) = node {
         return is_simple_expression(inner.expression);
     }
@@ -196,9 +196,9 @@ pub fn is_simple_expression<'ast, 'arena>(node: &'ast Expression<'arena>) -> boo
     )
 }
 
-pub fn is_simple_single_line_expression<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    node: &'ast Expression<'arena>,
+pub fn is_simple_single_line_expression<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    node: &'arena Expression<'arena>,
 ) -> bool {
     if let Expression::Parenthesized(inner) = node {
         return is_simple_single_line_expression(f, inner.expression);
@@ -245,12 +245,12 @@ pub(super) const fn is_string_word_type(node: &Expression) -> bool {
     )
 }
 
-pub(super) fn print_colon_delimited_body<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+pub(super) fn print_colon_delimited_body<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     colon: &Span,
-    statements: &'ast Sequence<'arena, Statement<'arena>>,
-    end_keyword: &'ast Keyword<'arena>,
-    terminator: &'ast Terminator<'arena>,
+    statements: &'arena Sequence<'arena, Statement<'arena>>,
+    end_keyword: &'arena Keyword<'arena>,
+    terminator: &'arena Terminator<'arena>,
 ) -> Document<'arena> {
     let mut parts = vec![in f.arena;Document::String(":")];
 
@@ -279,9 +279,9 @@ pub(super) fn print_colon_delimited_body<'ast, 'arena>(
     Document::Group(Group::new(parts).with_break(true))
 }
 
-pub(super) fn print_modifiers<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    modifiers: &'ast Sequence<'arena, Modifier<'arena>>,
+pub(super) fn print_modifiers<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    modifiers: &'arena Sequence<'arena, Modifier<'arena>>,
 ) -> Vec<'arena, Document<'arena>> {
     let mut printed_modifiers = vec![in f.arena;];
 
@@ -312,9 +312,9 @@ pub(super) fn print_modifiers<'ast, 'arena>(
     Document::join(f.arena, printed_modifiers, Separator::Space)
 }
 
-pub(super) fn print_attribute_list_sequence<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
+pub(super) fn print_attribute_list_sequence<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
 ) -> Option<Document<'arena>> {
     if attribute_lists.is_empty() {
         return None;
@@ -353,9 +353,9 @@ pub(super) fn print_attribute_list_sequence<'ast, 'arena>(
     Some(Document::Group(Group::new(contents)))
 }
 
-pub(super) fn print_clause<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    node: &'ast Statement<'arena>,
+pub(super) fn print_clause<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    node: &'arena Statement<'arena>,
     force_space: bool,
 ) -> Document<'arena> {
     let clause = node.format(f);
@@ -363,9 +363,9 @@ pub(super) fn print_clause<'ast, 'arena>(
     adjust_clause(f, node, clause, force_space)
 }
 
-pub(super) fn adjust_clause<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    node: &'ast Statement<'arena>,
+pub(super) fn adjust_clause<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    node: &'arena Statement<'arena>,
     clause: Document<'arena>,
     mut force_space: bool,
 ) -> Document<'arena> {
@@ -433,9 +433,9 @@ pub(super) fn adjust_clause<'ast, 'arena>(
     }
 }
 
-pub(super) fn print_condition<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    condition: &'ast Expression<'arena>,
+pub(super) fn print_condition<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    condition: &'arena Expression<'arena>,
     space_before: bool,
     space_within: bool,
 ) -> Document<'arena> {

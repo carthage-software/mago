@@ -88,7 +88,7 @@ impl LintRule for NoGlobalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Global(global) => {
                 let mut issue = Issue::new(self.cfg.level(), "Unsafe use of `global` keyword.")

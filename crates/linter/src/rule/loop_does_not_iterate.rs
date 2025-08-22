@@ -86,7 +86,7 @@ impl LintRule for LoopDoesNotIterateRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let terminator = match node {
             Node::For(for_loop) => match &for_loop.body {
                 ForBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),

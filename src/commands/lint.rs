@@ -84,9 +84,9 @@ pub struct LintCommand {
 
 pub fn execute(command: LintCommand, configuration: Configuration) -> Result<ExitCode, Error> {
     let database = if !command.path.is_empty() {
-        database::from_paths(&configuration.source, command.path, !command.semantics_only)?
+        database::from_paths(&configuration.source, command.path, false)?
     } else {
-        database::load(&configuration.source, !command.semantics_only, !command.semantics_only)?
+        database::load(&configuration.source, false, false)?
     };
 
     let registry = RuleRegistry::build(

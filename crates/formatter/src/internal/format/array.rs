@@ -1,3 +1,4 @@
+use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 use unicode_width::UnicodeWidthStr;
@@ -18,20 +19,23 @@ use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
-pub enum ArrayLike<'ast, 'arena> {
-    Array(&'ast Array<'arena>),
-    List(&'ast List<'arena>),
-    LegacyArray(&'ast LegacyArray<'arena>),
+pub enum ArrayLike<'arena> {
+    Array(&'arena Array<'arena>),
+    List(&'arena List<'arena>),
+    LegacyArray(&'arena LegacyArray<'arena>),
 }
 
-impl<'ast, 'arena> ArrayLike<'ast, 'arena> {
+impl<'arena> ArrayLike<'arena> {
     #[inline]
-    fn elements(&self) -> std::vec::Vec<&'ast ArrayElement<'arena>> {
-        let mut elements: std::vec::Vec<&'ast ArrayElement<'arena>> = match self {
-            Self::Array(array) => array.elements.as_slice().iter().collect::<std::vec::Vec<_>>(),
-            Self::LegacyArray(array) => array.elements.as_slice().iter().collect::<std::vec::Vec<_>>(),
-            Self::List(list) => list.elements.as_slice().iter().collect::<std::vec::Vec<_>>(),
+    fn elements(&self) -> Vec<'arena, &'arena ArrayElement<'arena>> {
+        let (elements_sequence, arena) = match self {
+            Self::Array(array) => (&array.elements, array.elements.nodes.bump()),
+            Self::LegacyArray(array) => (&array.elements, array.elements.nodes.bump()),
+            Self::List(list) => (&list.elements, list.elements.nodes.bump()),
         };
+
+        let mut elements: Vec<'arena, &'arena ArrayElement<'arena>> =
+            elements_sequence.iter().collect_in::<Vec<_>>(arena);
 
         while let Some(ArrayElement::Missing(_)) = elements.last() {
             elements.pop();
@@ -50,7 +54,7 @@ impl<'ast, 'arena> ArrayLike<'ast, 'arena> {
     }
 
     #[inline]
-    pub const fn has_space_within_delimiters(&self, f: &FormatterState<'_, 'ast, 'arena>) -> bool {
+    pub const fn has_space_within_delimiters(&self, f: &FormatterState<'_, 'arena>) -> bool {
         match self {
             Self::Array(_) => f.settings.space_within_array_brackets,
             Self::List(_) => f.settings.space_within_list_parenthesis,
@@ -77,7 +81,7 @@ impl<'ast, 'arena> ArrayLike<'ast, 'arena> {
         if matches!(self, Self::List(_) | Self::LegacyArray(_)) { ")" } else { "]" }
     }
 
-    fn prefix(&self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Option<Document<'arena>> {
+    fn prefix(&self, f: &mut FormatterState<'_, 'arena>) -> Option<Document<'arena>> {
         match self {
             Self::List(list) => Some(Document::Array(vec![
                 in f.arena;
@@ -94,7 +98,7 @@ impl<'ast, 'arena> ArrayLike<'ast, 'arena> {
     }
 }
 
-impl HasSpan for ArrayLike<'_, '_> {
+impl HasSpan for ArrayLike<'_> {
     fn span(&self) -> Span {
         match self {
             Self::Array(array) => array.span(),
@@ -104,9 +108,9 @@ impl HasSpan for ArrayLike<'_, '_> {
     }
 }
 
-pub(super) fn print_array_like<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    array_like: ArrayLike<'ast, 'arena>,
+pub(super) fn print_array_like<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    array_like: ArrayLike<'arena>,
 ) -> Document<'arena> {
     let left_delimiter = {
         let mut left_delimiter_content = vec![in f.arena;];
@@ -122,7 +126,7 @@ pub(super) fn print_array_like<'ast, 'arena>(
         Document::Array(left_delimiter_content)
     };
 
-    let get_right_delimiter = |f: &mut FormatterState<'_, 'ast, 'arena>, array_like: &ArrayLike<'ast, 'arena>| {
+    let get_right_delimiter = |f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>| {
         let mut right_delimiter_content = vec![in f.arena;];
         right_delimiter_content.push(Document::String(array_like.get_right_delimiter()));
         if let Some(s) = f.print_trailing_comments(array_like.get_right_delimiter_span()) {
@@ -152,11 +156,7 @@ pub(super) fn print_array_like<'ast, 'arena>(
     }
 
     let must_break = (f.settings.preserve_breaking_array_like
-        && misc::has_new_line_in_range(
-            &f.file.contents,
-            array_like.span().start.offset,
-            elements[0].span().start.offset,
-        ))
+        && misc::has_new_line_in_range(f.source_text, array_like.span().start.offset, elements[0].span().start.offset))
         || has_floating_comments(f, &array_like);
 
     if !must_break && let Some(element) = inline_single_element(f, &array_like) {
@@ -227,10 +227,7 @@ pub(super) fn print_array_like<'ast, 'arena>(
 }
 
 #[inline]
-fn has_floating_comments<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    array_like: &ArrayLike<'ast, 'arena>,
-) -> bool {
+fn has_floating_comments<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
     let has_comments = |prev: &ArrayElement, next: &ArrayElement| {
         f.has_inner_comment(Span::new(prev.span().file_id, prev.end_position(), next.start_position()))
     };
@@ -245,9 +242,9 @@ fn has_floating_comments<'ast, 'arena>(
 }
 
 #[inline]
-fn inline_single_element<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    array_like: &ArrayLike<'ast, 'arena>,
+fn inline_single_element<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    array_like: &ArrayLike<'arena>,
 ) -> Option<Document<'arena>> {
     let elements = array_like.elements();
     if elements.len() != 1 {
@@ -283,8 +280,8 @@ fn inline_single_element<'ast, 'arena>(
 }
 
 #[inline]
-fn format_row_with_alignment<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+fn format_row_with_alignment<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     document: Document<'arena>,
     column_widths: &[usize],
 ) -> Document<'arena> {
@@ -321,8 +318,8 @@ fn format_row_with_alignment<'ast, 'arena>(
 }
 
 #[inline]
-fn extract_array_elements<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+fn extract_array_elements<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     contents: &[Document<'arena>],
 ) -> Option<(Document<'arena>, Vec<'arena, Document<'arena>>, Document<'arena>)> {
     let mut opening_delimiter = None;
@@ -384,8 +381,8 @@ fn extract_array_elements<'ast, 'arena>(
     }
 }
 
-fn format_elements_with_alignment<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+fn format_elements_with_alignment<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     elements: Vec<Document<'arena>>,
     column_widths: &[usize],
 ) -> Vec<'arena, Document<'arena>> {
@@ -400,10 +397,17 @@ fn format_elements_with_alignment<'ast, 'arena>(
 
             if padding > 0 {
                 // Create a padded document
-                Document::Array(vec![in f.arena;
+                Document::Array(vec![
+                    in f.arena;
                     element,
                     Document::String(","),
-                    Document::String(f.as_str(" ".repeat(padding + 1))), // +1 for standard space after comma
+                    Document::String({
+                        let mut spaces = Vec::with_capacity_in(padding + 1, f.arena);
+                        spaces.resize(padding + 1, b' ');
+
+                        // Safety: We only insert spaces (ASCII 0x20), which are valid UTF-8
+                        unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) }
+                    })
                 ])
             } else {
                 // No padding needed
@@ -420,10 +424,7 @@ fn format_elements_with_alignment<'ast, 'arena>(
     formatted_elements
 }
 
-fn is_table_style<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    array_like: &ArrayLike<'ast, 'arena>,
-) -> bool {
+fn is_table_style<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
     // Arbitrary limit to prevent excessive column width
     const WIGGLE_ROOM: usize = 20;
 
@@ -496,9 +497,9 @@ fn is_table_style<'ast, 'arena>(
     (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6
 }
 
-fn calculate_column_widths<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    array_like: &ArrayLike<'ast, 'arena>,
+fn calculate_column_widths<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    array_like: &ArrayLike<'arena>,
 ) -> Option<Vec<'arena, usize>> {
     let mut row_size = 0;
     let elements = array_like.elements();
@@ -625,7 +626,7 @@ fn get_document_width(doc: &Document<'_>) -> usize {
         Document::Indent(docs) => docs.iter().map(get_document_width).sum(),
         Document::Line(_) => 1,
         Document::IfBreak(if_break) => {
-            get_document_width(&if_break.break_contents).max(get_document_width(&if_break.flat_content))
+            get_document_width(if_break.break_contents).max(get_document_width(if_break.flat_content))
         }
         Document::IndentIfBreak(indent_if_break) => indent_if_break.contents.iter().map(get_document_width).sum(),
         _ => 0,

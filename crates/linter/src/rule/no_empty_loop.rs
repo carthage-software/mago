@@ -85,7 +85,7 @@ impl LintRule for NoEmptyLoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let is_empty = match node {
             Node::For(for_loop) => match &for_loop.body {
                 ForBody::Statement(stmt) => is_statement_empty(stmt),

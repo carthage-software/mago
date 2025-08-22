@@ -1,8 +1,5 @@
-use std::collections::VecDeque;
-
 use ahash::HashMap;
 use bumpalo::Bump;
-use bumpalo::boxed::Box;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
@@ -14,6 +11,7 @@ use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::document::Space;
 use crate::document::Trim;
+use crate::document::clone_in_arena;
 use crate::document::group::GroupIdentifier;
 use crate::internal::is_line_terminator_or_space;
 use crate::internal::is_space;
@@ -75,8 +73,8 @@ impl<'arena> Printer<'arena> {
     /// Turn Doc into a string
     fn print_doc_to_string(&mut self) {
         let mut should_remeasure = false;
-        while let Some(Command { indentation, mut document, mode }) = self.commands.pop() {
-            Self::propagate_breaks(&mut document);
+        while let Some(Command { indentation, document, mode }) = self.commands.pop() {
+            Self::propagate_breaks(&document);
 
             match document {
                 Document::String(s) => self.handle_str(s),
@@ -188,7 +186,7 @@ impl<'arena> Printer<'arena> {
             unreachable!();
         };
 
-        let should_break = group.should_break;
+        let should_break = *group.should_break.borrow();
         let group_id = group.id;
 
         if mode.is_flat() && !should_remeasure {
@@ -345,10 +343,14 @@ impl<'arena> Printer<'arena> {
 
         match group_mode {
             Mode::Flat => {
-                self.commands.push(Command::new(indentation, Mode::Flat, Box::into_inner(flat_content)));
+                let flat_content = clone_in_arena(self.arena, flat_content);
+
+                self.commands.push(Command::new(indentation, Mode::Flat, flat_content));
             }
             Mode::Break => {
-                self.commands.push(Command::new(indentation, Mode::Break, Box::into_inner(break_contents)));
+                let break_contents = clone_in_arena(self.arena, break_contents);
+
+                self.commands.push(Command::new(indentation, Mode::Break, break_contents));
             }
         }
     }
@@ -462,65 +464,68 @@ impl<'arena> Printer<'arena> {
 
     fn fits(&self, next: &Command<'arena>, width: isize) -> bool {
         let mut remaining_width = width;
-        let mut queue: VecDeque<(Mode, &Document)> = VecDeque::with_capacity(128);
+        // Use a Vec as a stack. Pre-allocating avoids reallocation churn.
+        let mut stack: Vec<(Mode, &Document<'arena>)> = Vec::with_capacity_in(128, self.arena);
         let mut cmds = self.commands.iter().rev();
 
-        queue.push_front((next.mode, &next.document));
-        while let Some((mode, doc)) = queue.pop_front() {
+        stack.push((next.mode, &next.document));
+
+        while let Some((mode, doc)) = stack.pop() {
+            // Pop from the end (fast)
             match doc {
                 Document::String(string) => {
                     remaining_width -= string_width(string) as isize;
                 }
                 Document::Space(space) => {
-                    if space.soft {
-                        // If the previous character is a space or a tab, we don't need to add another one.
-                        if let Some(&last) = self.out.last()
-                            && (is_space(last))
-                        {
-                            continue;
-                        }
+                    if !space.soft {
+                        remaining_width -= 1;
+                    // Note: The check against `self.out` is an intentional simplification
+                    // for `fits`, as the exact output isn't known. A soft space
+                    // is assumed to have a width of 1 unless it's a line break.
+                    } else if self.out.last().map_or(true, |&b| !is_space(b)) {
+                        remaining_width -= 1;
                     }
-
-                    remaining_width -= 1_isize;
                 }
                 Document::IndentIfBreak(IndentIfBreak { contents, .. })
                 | Document::Indent(contents)
                 | Document::Align(Align { contents, .. })
                 | Document::Array(contents) => {
+                    // Extend the stack with the children. Iterating normally and then
+                    // pushing onto the stack achieves the same as `iter().rev()` and `push_front()`.
                     for d in contents.iter().rev() {
-                        queue.push_front((mode, d));
+                        stack.push((mode, d));
                     }
                 }
                 Document::Group(group) => {
-                    let mode = if group.should_break { Mode::Break } else { mode };
-                    if group.expanded_states.is_some() && mode.is_break() {
-                        queue.push_front((mode, group.expanded_states.as_ref().unwrap().last().unwrap()));
+                    let group_mode = if *group.should_break.borrow() { Mode::Break } else { mode };
+                    if group.expanded_states.is_some() && group_mode.is_break() {
+                        if let Some(last_state) = group.expanded_states.as_ref().unwrap().last() {
+                            stack.push((group_mode, last_state));
+                        }
                     } else {
                         for d in group.contents.iter().rev() {
-                            queue.push_front((mode, d));
+                            stack.push((group_mode, d));
                         }
                     };
                 }
                 Document::IfBreak(if_break_doc) => {
                     let group_mode =
                         if_break_doc.group_id.map_or(mode, |id| *self.group_mode_map.get(&id).unwrap_or(&Mode::Flat));
-
                     let contents =
-                        if group_mode.is_break() { &if_break_doc.break_contents } else { &if_break_doc.flat_content };
-
-                    queue.push_front((mode, contents));
+                        if group_mode.is_break() { if_break_doc.break_contents } else { if_break_doc.flat_content };
+                    stack.push((mode, contents));
                 }
                 Document::Line(line) => {
                     if mode.is_break() || line.hard {
                         return true;
                     }
                     if !line.soft {
-                        remaining_width -= 1_isize;
+                        remaining_width -= 1;
                     }
                 }
                 Document::Fill(fill) => {
-                    for part in fill.parts().iter().rev() {
-                        queue.push_front((mode, part));
+                    for part in fill.parts.iter().rev() {
+                        stack.push((mode, part));
                     }
                 }
                 Document::LineSuffix(_) => {
@@ -530,47 +535,46 @@ impl<'arena> Printer<'arena> {
                     if !self.line_suffix.is_empty() {
                         return false;
                     }
-
                     break;
                 }
-                Document::BreakParent => {}
-                Document::Trim(_) => {}
-                Document::DoNotTrim => {}
+                Document::BreakParent | Document::Trim(_) | Document::DoNotTrim => {}
             }
 
             if remaining_width < 0 {
                 return false;
             }
 
-            if queue.is_empty()
-                && let Some(cmd) = cmds.next()
-            {
-                queue.push_back((cmd.mode, &cmd.document));
+            if stack.is_empty() {
+                if let Some(cmd) = cmds.next() {
+                    stack.push((cmd.mode, &cmd.document));
+                }
             }
         }
 
         true
     }
 
-    fn propagate_breaks(doc: &mut Document<'_>) -> bool {
-        let check_array = |arr: &mut Vec<Document<'_>>| arr.iter_mut().rev().any(|doc| Self::propagate_breaks(doc));
+    fn propagate_breaks(doc: &Document<'_>) -> bool {
+        let check_array = |arr: &Vec<'_, Document<'_>>| arr.iter().rev().any(|doc| Self::propagate_breaks(doc));
 
         match doc {
             Document::BreakParent => true,
             Document::Group(group) => {
                 let mut should_break = false;
-                if let Some(expanded_states) = &mut group.expanded_states {
-                    should_break = expanded_states.iter_mut().rev().any(Self::propagate_breaks);
+                if let Some(expanded_states) = &group.expanded_states {
+                    should_break = expanded_states.iter().rev().any(Self::propagate_breaks);
                 }
                 if !should_break {
-                    should_break = check_array(&mut group.contents);
+                    should_break = check_array(&group.contents);
                 }
+
                 if group.expanded_states.is_none() && should_break {
-                    group.should_break = should_break;
+                    group.should_break.replace(should_break);
                 }
-                group.should_break
+
+                *group.should_break.borrow()
             }
-            Document::IfBreak(d) => Self::propagate_breaks(&mut d.break_contents),
+            Document::IfBreak(d) => Self::propagate_breaks(d.break_contents),
             Document::Array(arr)
             | Document::Indent(arr)
             | Document::Align(Align { contents: arr, .. })

@@ -3,42 +3,45 @@
 use crate::ast::Program;
 use crate::ast::ast::*;
 
+/// Helper macro to generate the core walk logic.
+macro_rules! define_walk_body {
+    ($walker:ident, $context:ident, $var_name:ident, $code:block) => {
+        paste::paste! {
+            $walker.[<walk_in_ $var_name>]($var_name, $context);
+            $code
+            $walker.[<walk_out_ $var_name>]($var_name, $context);
+        }
+    };
+}
+
 /// Helper macro to generate trait methods for the mutable walker.
 macro_rules! gen_mut_trait_methods {
     // This arm matches nodes that have an arena lifetime.
     ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            fn [<walk_in_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
-
+            fn [<walk_in_ $var_name>](&mut self, $var_name: & $ast $node_type<$arena>, context: &mut C) {}
             #[inline]
-            fn [<walk_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, $context: &mut C) {
+            fn [<walk_ $var_name>](&mut self, $var_name: & $ast $node_type<$arena>, $context: &mut C) {
                 let $walker = self;
-                $walker.[<walk_in_ $var_name>]($var_name, $context);
-                $code
-                $walker.[<walk_out_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
-
             #[inline]
-            fn [<walk_out_ $var_name>](&mut self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+            fn [<walk_out_ $var_name>](&mut self, $var_name: & $ast $node_type<$arena>, context: &mut C) {}
         }
     };
     // This arm matches simple/copy nodes that DO NOT have an arena lifetime.
     (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            fn [<walk_in_ $var_name>](&mut self, $var_name: &$ast $node_type, context: &mut C) {}
-
+            fn [<walk_in_ $var_name>](&mut self, $var_name: & $ast $node_type, context: &mut C) {}
             #[inline]
-            fn [<walk_ $var_name>](&mut self, $var_name: &$ast $node_type, $context: &mut C) {
+            fn [<walk_ $var_name>](&mut self, $var_name: & $ast $node_type, $context: &mut C) {
                 let $walker = self;
-                $walker.[<walk_in_ $var_name>]($var_name, $context);
-                $code
-                $walker.[<walk_out_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
-
             #[inline]
-            fn [<walk_out_ $var_name>](&mut self, $var_name: &$ast $node_type, context: &mut C) {}
+            fn [<walk_out_ $var_name>](&mut self, $var_name: & $ast $node_type, context: &mut C) {}
         }
     };
 }
@@ -49,36 +52,28 @@ macro_rules! gen_const_trait_methods {
     ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            fn [<walk_in_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
-
+            fn [<walk_in_ $var_name>](&self, $var_name: & $ast $node_type<$arena>, context: &mut C) {}
             #[inline]
-            fn [<walk_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, $context: &mut C) {
+            fn [<walk_ $var_name>](&self, $var_name: & $ast $node_type<$arena>, $context: &mut C) {
                 let $walker = self;
-                $walker.[<walk_in_ $var_name>]($var_name, $context);
-                $code
-                $walker.[<walk_out_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
-
             #[inline]
-            fn [<walk_out_ $var_name>](&self, $var_name: &$ast $node_type<$arena>, context: &mut C) {}
+            fn [<walk_out_ $var_name>](&self, $var_name: & $ast $node_type<$arena>, context: &mut C) {}
         }
     };
     // This arm matches simple/copy nodes that DO NOT have an arena lifetime.
     (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            fn [<walk_in_ $var_name>](&self, $var_name: &$ast $node_type, context: &mut C) {}
-
+            fn [<walk_in_ $var_name>](&self, $var_name: & $ast $node_type, context: &mut C) {}
             #[inline]
-            fn [<walk_ $var_name>](&self, $var_name: &$ast $node_type, $context: &mut C) {
+            fn [<walk_ $var_name>](&self, $var_name: & $ast $node_type, $context: &mut C) {
                 let $walker = self;
-                $walker.[<walk_in_ $var_name>]($var_name, $context);
-                $code
-                $walker.[<walk_out_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
-
             #[inline]
-            fn [<walk_out_ $var_name>](&self, $var_name: &$ast $node_type, context: &mut C) {}
+            fn [<walk_out_ $var_name>](&self, $var_name: & $ast $node_type, context: &mut C) {}
         }
     };
 }
@@ -89,17 +84,17 @@ macro_rules! gen_standalone_funcs {
     ('arena, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            pub fn [<walk_ $var_name _mut>]<'ast, 'arena, W, C>($walker: &mut W, $var_name: &$ast $node_type<$arena>, $context: &mut C)
-                where W: ?Sized + MutWalker<'ast, 'arena, C>, 'arena: 'ast
+            pub fn [<walk_ $var_name _mut>]<$ast, $arena, W, C>($walker: &mut W, $var_name: & $ast $node_type<$arena>, $context: &mut C)
+                where W: ?Sized + MutWalker<$ast, $arena, C>
             {
-                $walker.[<walk_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
 
             #[inline]
-            pub fn [<walk_ $var_name>]<'ast, 'arena, W, C>($walker: &W, $var_name: &$ast $node_type<$arena>, $context: &mut C)
-                where W: ?Sized + Walker<'ast, 'arena, C>, 'arena: 'ast
+            pub fn [<walk_ $var_name>]<$ast, $arena, W, C>($walker: &W, $var_name: & $ast $node_type<$arena>, $context: &mut C)
+                where W: ?Sized + Walker<$ast, $arena, C>
             {
-                $walker.[<walk_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
         }
     };
@@ -107,17 +102,17 @@ macro_rules! gen_standalone_funcs {
     (_, $node_type:ty, $var_name:ident, $walker:ident, $context:ident, $ast:lifetime, $arena:lifetime, $code:block) => {
         paste::paste! {
             #[inline]
-            pub fn [<walk_ $var_name _mut>]<'ast, 'arena, W, C>($walker: &mut W, $var_name: &$ast $node_type, $context: &mut C)
-                where W: ?Sized + MutWalker<'ast, 'arena, C>, 'arena: 'ast
+            pub fn [<walk_ $var_name _mut>]<$ast, $arena, W, C>($walker: &mut W, $var_name: & $ast $node_type, $context: &mut C)
+                where W: ?Sized + MutWalker<$ast, $arena, C>
             {
-                $walker.[<walk_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
 
             #[inline]
-            pub fn [<walk_ $var_name>]<'ast, 'arena, W, C>($walker: &W, $var_name: &$ast $node_type, $context: &mut C)
-                where W: ?Sized + Walker<'ast, 'arena, C>, 'arena: 'ast
+            pub fn [<walk_ $var_name>]<$ast, $arena, W, C>($walker: &W, $var_name: & $ast $node_type, $context: &mut C)
+                where W: ?Sized + Walker<$ast, $arena, C>
             {
-                $walker.[<walk_ $var_name>]($var_name, $context);
+                define_walk_body!($walker, $context, $var_name, $code);
             }
         }
     };

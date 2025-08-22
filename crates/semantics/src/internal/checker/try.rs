@@ -6,7 +6,7 @@ use mago_syntax::ast::*;
 use crate::internal::context::Context;
 
 #[inline]
-pub fn check_try<'input, 'arena>(r#try: &Try<'arena>, context: &mut Context<'input, '_, 'arena>) {
+pub fn check_try<'ctx, 'arena>(r#try: &Try<'arena>, context: &mut Context<'ctx, '_, 'arena>) {
     for catch in r#try.catch_clauses.iter() {
         if catch.variable.is_none() && !context.version.is_supported(Feature::CatchOptionalVariable) {
             context.report(

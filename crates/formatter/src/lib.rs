@@ -67,7 +67,7 @@ impl<'arena> Formatter<'arena> {
     /// # Errors
     ///
     /// Returns a [`ParseError`] if the file's content contains syntax errors.
-    pub fn format_file(&self, file: &File) -> Result<&'arena str, ParseError> {
+    pub fn format_file<'ctx>(&self, file: &'ctx File) -> Result<&'arena str, ParseError> {
         let (program, error) = parse_file(self.arena, file);
         if let Some(error) = error {
             return Err(error);
@@ -81,7 +81,7 @@ impl<'arena> Formatter<'arena> {
     /// This is the lowest-level formatting method that operates directly on the AST.
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
-    pub fn format<'input>(&self, file: &'input File, program: &Program<'arena>) -> &'arena str {
+    pub fn format<'ctx>(&self, file: &'ctx File, program: &'arena Program<'arena>) -> &'arena str {
         let document = self.build(file, program);
 
         self.print(document, Some(file.size as usize))
@@ -93,7 +93,7 @@ impl<'arena> Formatter<'arena> {
     /// layout of the code with elements like groups, indentation, and line breaks.
     /// This is a separate step from printing, allowing for potential inspection or
     /// manipulation of the layout before rendering.
-    pub fn build(&self, file: &File, program: &Program<'arena>) -> Document<'arena> {
+    pub fn build(&self, file: &File, program: &'arena Program<'arena>) -> Document<'arena> {
         program.format(&mut FormatterState::new(self.arena, program, file, self.php_version, self.settings))
     }
 

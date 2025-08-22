@@ -192,7 +192,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter<'ast>(&'ast self) -> Iter<'ast, T> {
         self.nodes.iter()
     }
 

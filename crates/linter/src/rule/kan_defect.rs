@@ -87,7 +87,7 @@ impl LintRule for KanDefectRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let kind = match node.kind() {
             NodeKind::Class => "Class",
             NodeKind::Trait => "Trait",

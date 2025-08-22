@@ -91,7 +91,7 @@ impl LintRule for NoAssignInConditionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let (condition, assignment) = match node {
             Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(r#if.condition)),
             Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(r#while.condition)),

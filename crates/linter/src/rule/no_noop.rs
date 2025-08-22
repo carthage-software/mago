@@ -91,7 +91,7 @@ impl LintRule for NoNoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let statements = match node {
             Node::Program(program) => program.statements.as_slice(),
             Node::Block(block) => block.statements.as_slice(),

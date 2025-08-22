@@ -14,8 +14,8 @@ use crate::context::LintContext;
 ///
 /// Returns `Some(name)` with the **first matching name from the input slice** if a
 /// potential resolution matches, or `None` if no match is found.
-pub fn function_call_matches_any<'input, 'ast, 'arena, 'name>(
-    context: &LintContext<'input, 'ast, 'arena>,
+pub fn function_call_matches_any<'ctx, 'ast, 'arena, 'name>(
+    context: &LintContext<'ctx, 'arena>,
     call: &'ast FunctionCall<'arena>,
     names: &[&'name str],
 ) -> Option<&'name str> {
@@ -27,8 +27,8 @@ pub fn function_call_matches_any<'input, 'ast, 'arena, 'name>(
 /// This is a convenience wrapper around `function_call_matches_any` for checking
 /// against a single function name.
 #[inline]
-pub fn function_call_matches<'input, 'ast, 'arena, 'name>(
-    context: &LintContext<'input, 'ast, 'arena>,
+pub fn function_call_matches<'ctx, 'ast, 'arena, 'name>(
+    context: &LintContext<'ctx, 'arena>,
     call: &'ast FunctionCall<'arena>,
     name: &'name str,
 ) -> bool {
@@ -37,8 +37,8 @@ pub fn function_call_matches<'input, 'ast, 'arena, 'name>(
 
 /// The internal implementation that checks if a function name `Expression`
 /// could resolve to one of the provided names.
-fn function_name_matches_any<'input, 'ast, 'arena, 'name>(
-    context: &LintContext<'input, 'ast, 'arena>,
+fn function_name_matches_any<'ctx, 'ast, 'arena, 'name>(
+    context: &LintContext<'ctx, 'arena>,
     function: &'ast Expression<'arena>,
     names: &[&'name str],
 ) -> Option<&'name str> {

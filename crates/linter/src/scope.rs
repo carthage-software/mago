@@ -57,7 +57,7 @@ impl<'arena> Scope<'arena> {
     /// Creates a `Scope` from an AST `Node` if that node defines a new scope.
     ///
     /// Returns `None` if the node does not define a scope.
-    pub fn for_node<'ast>(ctx: &LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) -> Option<Self> {
+    pub fn for_node<'ast>(ctx: &LintContext<'_, 'arena>, node: Node<'ast, 'arena>) -> Option<Self> {
         Some(match node {
             Node::Namespace(namespace) => {
                 let namespace_name = namespace

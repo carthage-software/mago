@@ -81,7 +81,7 @@ impl LintRule for CyclomaticComplexityRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Class(n) => self.check_class_like("Class", n.members.as_slice(), n.span(), ctx),
             Node::Trait(n) => self.check_class_like("Trait", n.members.as_slice(), n.span(), ctx),
@@ -96,12 +96,12 @@ impl LintRule for CyclomaticComplexityRule {
 }
 
 impl CyclomaticComplexityRule {
-    fn check_class_like<'ast, 'arena>(
+    fn check_class_like<'arena>(
         &self,
         kind: &'static str,
-        members: &'ast [ClassLikeMember<'arena>],
+        members: &[ClassLikeMember<'arena>],
         span: impl HasSpan,
-        ctx: &mut LintContext<'_, 'ast, 'arena>,
+        ctx: &mut LintContext<'_, 'arena>,
     ) {
         let threshold = self.cfg.threshold;
 
@@ -117,12 +117,12 @@ impl CyclomaticComplexityRule {
         }
     }
 
-    fn check_function_like<'ast, 'arena>(
+    fn check_function_like<'arena>(
         &self,
         kind: &'static str,
-        body: &'ast Block<'arena>,
+        body: &Block<'arena>,
         span: impl HasSpan,
-        ctx: &mut LintContext<'_, 'ast, 'arena>,
+        ctx: &mut LintContext<'_, 'arena>,
     ) {
         let threshold = self.cfg.threshold;
 

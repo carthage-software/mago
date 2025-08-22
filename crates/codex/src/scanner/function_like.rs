@@ -28,11 +28,11 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_method<'input, 'ast, 'arena>(
+pub fn scan_method<'ctx, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
     method: &'ast Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
 ) -> FunctionLikeMetadata {
@@ -106,11 +106,11 @@ pub fn scan_method<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn scan_function<'input, 'ast, 'arena>(
+pub fn scan_function<'ctx, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
     function: &'ast Function<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -165,11 +165,11 @@ pub fn scan_function<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn scan_closure<'input, 'ast, 'arena>(
+pub fn scan_closure<'ctx, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
     closure: &'ast Closure<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -216,11 +216,11 @@ pub fn scan_closure<'input, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn scan_arrow_function<'input, 'ast, 'arena>(
+pub fn scan_arrow_function<'ctx, 'ast, 'arena>(
     functionlike_id: (StringIdentifier, StringIdentifier),
     arrow_function: &'ast ArrowFunction<'arena>,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -266,12 +266,12 @@ pub fn scan_arrow_function<'input, 'ast, 'arena>(
     metadata
 }
 
-fn scan_function_like_docblock<'input, 'ast, 'arena>(
+fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     span: Span,
     functionlike_id: (StringIdentifier, StringIdentifier),
     metadata: &mut FunctionLikeMetadata,
     classname: Option<&StringIdentifier>,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) {
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
@@ -628,11 +628,11 @@ fn scan_function_like_docblock<'input, 'ast, 'arena>(
     }
 }
 
-fn parse_assertion_string<'input, 'ast, 'arena>(
+fn parse_assertion_string<'ctx, 'ast, 'arena>(
     mut type_string: TypeString,
     classname: Option<&StringIdentifier>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'input, 'ast, 'arena>,
+    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
 ) -> Vec<Assertion> {

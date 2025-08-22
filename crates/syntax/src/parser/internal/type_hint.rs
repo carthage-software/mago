@@ -47,16 +47,16 @@ pub fn parse_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<Hint<
         T!["enum" | "from" | QualifiedIdentifier | FullyQualifiedIdentifier] => {
             Hint::Identifier(identifier::parse_identifier(stream)?)
         }
-        T![Identifier] => match token.value.to_ascii_lowercase().as_str() {
-            "void" => Hint::Void(identifier::parse_local_identifier(stream)?),
-            "never" => Hint::Never(identifier::parse_local_identifier(stream)?),
-            "float" => Hint::Float(identifier::parse_local_identifier(stream)?),
-            "bool" => Hint::Bool(identifier::parse_local_identifier(stream)?),
-            "int" => Hint::Integer(identifier::parse_local_identifier(stream)?),
-            "string" => Hint::String(identifier::parse_local_identifier(stream)?),
-            "object" => Hint::Object(identifier::parse_local_identifier(stream)?),
-            "mixed" => Hint::Mixed(identifier::parse_local_identifier(stream)?),
-            "iterable" => Hint::Iterable(identifier::parse_local_identifier(stream)?),
+        T![Identifier] => match token.value {
+            val if val.eq_ignore_ascii_case("void") => Hint::Void(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("never") => Hint::Never(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("float") => Hint::Float(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("bool") => Hint::Bool(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("int") => Hint::Integer(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("string") => Hint::String(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("object") => Hint::Object(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("mixed") => Hint::Mixed(identifier::parse_local_identifier(stream)?),
+            val if val.eq_ignore_ascii_case("iterable") => Hint::Iterable(identifier::parse_local_identifier(stream)?),
             _ => Hint::Identifier(identifier::parse_identifier(stream)?),
         },
         _ => {

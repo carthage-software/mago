@@ -88,7 +88,7 @@ impl LintRule for ClassNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Class(class) = node else { return };
         let mut issues = vec![];
         let name = class.name.value;

@@ -1,5 +1,7 @@
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
+use bumpalo::Bump;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -20,21 +22,21 @@ use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
 #[derive(Debug)]
-pub(super) struct MemberAccessChain<'ast, 'arena> {
-    pub base: &'ast Expression<'arena>,
-    pub accesses: Vec<MemberAccess<'ast, 'arena>>,
+pub(super) struct MemberAccessChain<'arena> {
+    pub base: &'arena Expression<'arena>,
+    pub accesses: Vec<'arena, MemberAccess<'arena>>,
 }
 
 #[derive(Debug)]
-pub(super) enum MemberAccess<'ast, 'arena> {
-    PropertyAccess(&'ast PropertyAccess<'arena>),
-    NullSafePropertyAccess(&'ast NullSafePropertyAccess<'arena>),
-    StaticMethodCall(&'ast StaticMethodCall<'arena>),
-    MethodCall(&'ast MethodCall<'arena>),
-    NullSafeMethodCall(&'ast NullSafeMethodCall<'arena>),
+pub(super) enum MemberAccess<'arena> {
+    PropertyAccess(&'arena PropertyAccess<'arena>),
+    NullSafePropertyAccess(&'arena NullSafePropertyAccess<'arena>),
+    StaticMethodCall(&'arena StaticMethodCall<'arena>),
+    MethodCall(&'arena MethodCall<'arena>),
+    NullSafeMethodCall(&'arena NullSafeMethodCall<'arena>),
 }
 
-impl<'ast, 'arena> MemberAccess<'ast, 'arena> {
+impl<'arena> MemberAccess<'arena> {
     #[inline]
     const fn is_property_access(&self) -> bool {
         matches!(self, MemberAccess::PropertyAccess(_) | MemberAccess::NullSafePropertyAccess(_))
@@ -61,7 +63,7 @@ impl<'ast, 'arena> MemberAccess<'ast, 'arena> {
     }
 
     #[inline]
-    const fn get_selector(&self) -> &'ast ClassLikeMemberSelector<'arena> {
+    const fn get_selector(&self) -> &'arena ClassLikeMemberSelector<'arena> {
         match self {
             MemberAccess::PropertyAccess(c) => &c.property,
             MemberAccess::NullSafePropertyAccess(c) => &c.property,
@@ -72,7 +74,7 @@ impl<'ast, 'arena> MemberAccess<'ast, 'arena> {
     }
 
     #[inline]
-    fn get_arguments_list(&self) -> Option<&'ast ArgumentList<'arena>> {
+    fn get_arguments_list(&self) -> Option<&'arena ArgumentList<'arena>> {
         match self {
             MemberAccess::MethodCall(call) => Some(&call.argument_list),
             MemberAccess::NullSafeMethodCall(call) => Some(&call.argument_list),
@@ -82,9 +84,9 @@ impl<'ast, 'arena> MemberAccess<'ast, 'arena> {
     }
 }
 
-impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
+impl<'arena> MemberAccessChain<'arena> {
     #[inline]
-    fn get_eligibility_score(&self, f: &FormatterState<'_, 'ast, 'arena>) -> usize {
+    fn get_eligibility_score(&self, f: &FormatterState<'_, 'arena>) -> usize {
         let mut score: i32 = 0;
         let mut account_for_simple_calls = true;
         let mut always_account_for_simple_calls = false;
@@ -156,7 +158,7 @@ impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
     }
 
     #[inline]
-    pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'ast, 'arena>) -> bool {
+    pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'arena>) -> bool {
         if f.settings.preserve_breaking_member_access_chain && self.is_already_broken(f) {
             return true;
         }
@@ -227,7 +229,7 @@ impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
             let base_end = self.base.span().end;
             let first_op_start = first_access.get_operator_span().start;
 
-            if misc::has_new_line_in_range(&f.file.contents, base_end.offset, first_op_start.offset) {
+            if misc::has_new_line_in_range(f.source_text, base_end.offset, first_op_start.offset) {
                 return true;
             }
         }
@@ -246,7 +248,7 @@ impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
 
             let current_op_span = access.get_operator_span();
 
-            if misc::has_new_line_in_range(&f.file.contents, prev_selector_end.offset, current_op_span.start.offset) {
+            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start.offset) {
                 return true;
             }
         }
@@ -386,12 +388,13 @@ impl<'ast, 'arena> MemberAccessChain<'ast, 'arena> {
     }
 }
 
-pub(super) fn collect_member_access_chain<'ast, 'arena>(
-    expr: &'ast Expression<'arena>,
-) -> Option<MemberAccessChain<'ast, 'arena>> {
+pub(super) fn collect_member_access_chain<'arena>(
+    arena: &'arena Bump,
+    expr: &'arena Expression<'arena>,
+) -> Option<MemberAccessChain<'arena>> {
     let expr = unwrap_parenthesized(expr);
 
-    let mut member_access = Vec::new();
+    let mut member_access: Vec<'arena, MemberAccess<'arena>> = Vec::new_in(arena);
     let mut current_expr = expr;
 
     loop {
@@ -438,9 +441,9 @@ pub(super) fn collect_member_access_chain<'ast, 'arena>(
     }
 }
 
-pub(super) fn print_member_access_chain<'ast, 'arena>(
-    member_access_chain: &MemberAccessChain<'ast, 'arena>,
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+pub(super) fn print_member_access_chain<'arena>(
+    member_access_chain: &MemberAccessChain<'arena>,
+    f: &mut FormatterState<'_, 'arena>,
 ) -> Document<'arena> {
     let base_document = member_access_chain.base.format(f);
     let mut parts = if base_needs_parerns(f, member_access_chain.base) {
@@ -539,7 +542,7 @@ pub(super) fn print_member_access_chain<'ast, 'arena>(
     Document::Group(Group::new(parts).with_id(group_id))
 }
 
-fn base_needs_parerns<'ast, 'arena>(f: &FormatterState<'_, 'ast, 'arena>, base: &'ast Expression<'arena>) -> bool {
+fn base_needs_parerns<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expression<'arena>) -> bool {
     if let Expression::Parenthesized(parenthesized) = base {
         return base_needs_parerns(f, parenthesized.expression);
     }
@@ -561,8 +564,8 @@ fn base_needs_parerns<'ast, 'arena>(f: &FormatterState<'_, 'ast, 'arena>, base: 
     }
 }
 
-pub(super) fn format_access_operator<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
+pub(super) fn format_access_operator<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     span: Span,
     operator: &'arena str,
 ) -> Document<'arena> {

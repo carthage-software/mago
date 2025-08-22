@@ -9,9 +9,9 @@ use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::misc;
 
-pub(super) fn print_function_like_parameters<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    parameter_list: &'ast FunctionLikeParameterList<'arena>,
+pub(super) fn print_function_like_parameters<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> Document<'arena> {
     if parameter_list.parameters.is_empty() {
         let mut contents = vec![in f.arena; Document::String("(")];
@@ -37,7 +37,7 @@ pub(super) fn print_function_like_parameters<'ast, 'arena>(
 
         if f.settings.preserve_breaking_parameter_list
             && misc::has_new_line_in_range(
-                &f.file.contents,
+                f.source_text,
                 parameter_list.left_parenthesis.start.offset,
                 parameter_list.parameters.as_slice()[0].span().start.offset,
             )
@@ -115,9 +115,9 @@ pub(super) fn print_function_like_parameters<'ast, 'arena>(
     Document::Group(Group::new(parts).with_break(should_break))
 }
 
-fn should_hug_the_only_parameter<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    parameter_list: &'ast FunctionLikeParameterList<'arena>,
+fn should_hug_the_only_parameter<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> bool {
     if parameter_list.parameters.len() != 1 {
         return false;

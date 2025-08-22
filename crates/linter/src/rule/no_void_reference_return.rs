@@ -86,7 +86,7 @@ impl LintRule for NoVoidReferenceReturnRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
             Node::Function(function) => {
                 let Some(amperstand) = function.ampersand.as_ref() else {

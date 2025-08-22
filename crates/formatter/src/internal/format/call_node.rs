@@ -13,15 +13,15 @@ use crate::internal::format::call_arguments::print_call_arguments;
 use super::member_access::format_access_operator;
 use super::misc;
 
-pub(super) enum CallLikeNode<'ast, 'arena> {
-    Call(&'ast Call<'arena>),
-    Instantiation(&'ast Instantiation<'arena>),
-    Attribute(&'ast Attribute<'arena>),
-    DieConstruct(&'ast DieConstruct<'arena>),
-    ExitConstruct(&'ast ExitConstruct<'arena>),
+pub(super) enum CallLikeNode<'arena> {
+    Call(&'arena Call<'arena>),
+    Instantiation(&'arena Instantiation<'arena>),
+    Attribute(&'arena Attribute<'arena>),
+    DieConstruct(&'arena DieConstruct<'arena>),
+    ExitConstruct(&'arena ExitConstruct<'arena>),
 }
 
-impl<'ast, 'arena> CallLikeNode<'ast, 'arena> {
+impl<'arena> CallLikeNode<'arena> {
     #[inline]
     pub const fn is_instantiation(&self) -> bool {
         matches!(self, CallLikeNode::Instantiation(_))
@@ -37,7 +37,7 @@ impl<'ast, 'arena> CallLikeNode<'ast, 'arena> {
         matches!(self, CallLikeNode::Attribute(_))
     }
 
-    pub fn arguments(&self) -> Option<&'ast ArgumentList<'arena>> {
+    pub fn arguments(&self) -> Option<&'arena ArgumentList<'arena>> {
         match self {
             CallLikeNode::Call(call) => Some(match call {
                 Call::Function(c) => &c.argument_list,
@@ -53,7 +53,7 @@ impl<'ast, 'arena> CallLikeNode<'ast, 'arena> {
     }
 }
 
-impl HasSpan for CallLikeNode<'_, '_> {
+impl HasSpan for CallLikeNode<'_> {
     fn span(&self) -> Span {
         match self {
             CallLikeNode::Call(call) => call.span(),
@@ -65,9 +65,9 @@ impl HasSpan for CallLikeNode<'_, '_> {
     }
 }
 
-pub(super) fn print_call_like_node<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    node: CallLikeNode<'ast, 'arena>,
+pub(super) fn print_call_like_node<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    node: CallLikeNode<'arena>,
 ) -> Document<'arena> {
     // format the callee-like expression
     let mut parts = match node {
@@ -89,10 +89,7 @@ pub(super) fn print_call_like_node<'ast, 'arena>(
     Document::Group(Group::new(parts))
 }
 
-fn print_access_call_node<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    node: &'ast Call<'arena>,
-) -> Document<'arena> {
+fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'arena Call<'arena>) -> Document<'arena> {
     let (base, operator, operator_str, selector) = match node {
         Call::Method(method_call) => (&method_call.object, method_call.arrow, "->", &method_call.method),
         Call::NullSafeMethod(null_safe_method_call) => (
@@ -107,7 +104,7 @@ fn print_access_call_node<'ast, 'arena>(
     let base_span = base.span();
     let should_break = f.has_inner_comment(Span::new(base_span.file_id, base_span.end, operator.start))
         || (f.settings.preserve_breaking_member_access_chain
-            && misc::has_new_line_in_range(&f.file.contents, base_span.end.offset, operator.start.offset));
+            && misc::has_new_line_in_range(f.source_text, base_span.end.offset, operator.start.offset));
 
     if should_break {
         Document::Group(Group::new(vec![

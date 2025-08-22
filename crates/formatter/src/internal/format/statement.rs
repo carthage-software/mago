@@ -1,7 +1,10 @@
+use std::cmp::Ordering;
+
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
+use bumpalo::Bump;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -14,20 +17,20 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 
-pub fn print_statement_sequence<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    stmts: &'ast Sequence<'arena, Statement<'arena>>,
+pub fn print_statement_sequence<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    stmts: &'arena Sequence<'arena, Statement<'arena>>,
 ) -> Vec<'arena, Document<'arena>> {
     let statements = stmts.nodes.iter().collect_in::<Vec<_>>(f.arena);
 
     print_statement_slice(f, statements.as_slice())
 }
 
-fn print_statement_slice<'input, 'ast, 'arena>(
-    f: &mut FormatterState<'input, 'ast, 'arena>,
-    stmts: &[&'ast Statement<'arena>],
+fn print_statement_slice<'ctx, 'arena>(
+    f: &mut FormatterState<'ctx, 'arena>,
+    stmts: &[&'arena Statement<'arena>],
 ) -> Vec<'arena, Document<'arena>> {
-    let mut use_statements: std::vec::Vec<&'ast Use<'arena>> = std::vec::Vec::new();
+    let mut use_statements: std::vec::Vec<&'arena Use<'arena>> = std::vec::Vec::new();
     let mut parts = vec![in f.arena;];
 
     let last_statement_index = if stmts.is_empty() { None } else { stmts.len().checked_sub(1) };
@@ -65,7 +68,7 @@ fn print_statement_slice<'input, 'ast, 'arena>(
             let line = f.file.line_number(offset);
 
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
-                let c = &f.file.contents[line_start_offset as usize..offset as usize];
+                let c = &f.source_text[line_start_offset as usize..offset as usize];
                 let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
                 if !ws.is_empty() {
                     let mut j = i + 1;
@@ -109,11 +112,11 @@ fn print_statement_slice<'input, 'ast, 'arena>(
 }
 
 // New function to format statements with spacing and newlines
-fn format_statement_with_spacing<'input, 'ast, 'arena>(
-    f: &mut FormatterState<'input, 'ast, 'arena>,
+fn format_statement_with_spacing<'ctx, 'arena>(
+    f: &mut FormatterState<'ctx, 'arena>,
     i: usize,
-    stmt: &'ast Statement<'arena>,
-    stmts: &[&'ast Statement<'arena>],
+    stmt: &'arena Statement<'arena>,
+    stmts: &[&'arena Statement<'arena>],
     last_statement_index: Option<usize>,
     is_first_statement: bool,
 ) -> Vec<'arena, Document<'arena>> {
@@ -153,10 +156,7 @@ fn format_statement_with_spacing<'input, 'ast, 'arena>(
 }
 
 #[inline]
-const fn should_add_empty_line_after<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    stmt: &'ast Statement<'arena>,
-) -> bool {
+const fn should_add_empty_line_after<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'arena Statement<'arena>) -> bool {
     match stmt {
         Statement::OpeningTag(_) => f.settings.empty_line_after_opening_tag,
         Statement::Namespace(_) => f.settings.empty_line_after_namespace,
@@ -180,21 +180,18 @@ const fn should_add_empty_line_after<'ast, 'arena>(
 }
 
 #[inline]
-fn should_add_empty_line_before<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    stmt: &'ast Statement<'arena>,
-) -> bool {
+fn should_add_empty_line_before<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'arena Statement<'arena>) -> bool {
     match stmt {
         Statement::Return(_) => f.settings.empty_line_before_return,
         _ => false,
     }
 }
 
-fn should_add_new_line_or_space_after_stmt<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    stmts: &[&'ast Statement<'arena>],
+fn should_add_new_line_or_space_after_stmt<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    stmts: &[&'arena Statement<'arena>],
     i: usize,
-    stmt: &'ast Statement<'arena>,
+    stmt: &'arena Statement<'arena>,
 ) -> (bool, bool) {
     if stmt.terminates_scripting() {
         return (false, false);
@@ -243,11 +240,11 @@ fn should_add_new_line_or_space_after_stmt<'ast, 'arena>(
     (should_add_line, should_add_space)
 }
 
-fn should_add_new_line_after_use<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    stmts: &[&'ast Statement<'arena>],
+fn should_add_new_line_after_use<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    stmts: &[&'arena Statement<'arena>],
     i: usize,
-    last_use: &'ast Use<'arena>,
+    last_use: &'arena Use<'arena>,
 ) -> (bool, bool) {
     let mut should_add_space = false;
     let should_add_line = if last_use.terminator.is_closing_tag() {
@@ -265,19 +262,41 @@ fn should_add_new_line_after_use<'ast, 'arena>(
     (should_add_line, should_add_space)
 }
 
-fn print_use_statements<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    stmts: &[&'ast Use<'arena>],
+fn print_use_statements<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    stmts: &[&'arena Use<'arena>],
 ) -> Vec<'arena, Document<'arena>> {
     use std::vec::Vec;
 
     use bumpalo::collections::Vec as BumpVec;
 
+    fn join_item_name<'arena>(arena: &'arena Bump, namespace: &[&'arena str], name: &'arena str) -> &'arena str {
+        if namespace.is_empty() {
+            return name;
+        }
+
+        let total_len = namespace.iter().map(|s| s.len()).sum::<usize>() + namespace.len();
+        let mut bytes = BumpVec::with_capacity_in(total_len, arena);
+
+        for (i, part) in namespace.iter().enumerate() {
+            bytes.extend_from_slice(part.as_bytes());
+            if i < namespace.len() {
+                // Add a separator after every part
+                bytes.push(b'\\');
+            }
+        }
+
+        bytes.extend_from_slice(name.as_bytes());
+
+        // SAFETY: We are joining valid UTF-8 slices with an ASCII separator.
+        unsafe { std::str::from_utf8_unchecked(bytes.into_bump_slice()) }
+    }
+
     let should_sort = f.settings.sort_uses;
     let should_separate = f.settings.separate_use_types;
     let should_expand = f.settings.expand_use_groups;
 
-    let mut all_expanded_items: Vec<ExpandedUseItem<'ast, 'arena>> = Vec::new();
+    let mut all_expanded_items: Vec<ExpandedUseItem<'arena>> = Vec::new();
     for use_stmt in stmts {
         all_expanded_items.extend(expand_use(f, use_stmt, should_expand));
     }
@@ -294,6 +313,7 @@ fn print_use_statements<'ast, 'arena>(
                     }
                 }
             };
+
             let b_type_order = match b.use_type {
                 None => 0,
                 Some(ty) => {
@@ -309,23 +329,27 @@ fn print_use_statements<'ast, 'arena>(
                 return a_type_order.cmp(&b_type_order);
             }
 
-            let mut a_full_name = a.namespace.join("\\");
-            if !a_full_name.is_empty() {
-                a_full_name.push('\\');
-            }
-            a_full_name.push_str(a.name);
+            let a_full_name = join_item_name(f.arena, &a.namespace, a.name);
+            let b_full_name = join_item_name(f.arena, &b.namespace, b.name);
 
-            let mut b_full_name = b.namespace.join("\\");
-            if !b_full_name.is_empty() {
-                b_full_name.push('\\');
-            }
-            b_full_name.push_str(b.name);
+            let mut a_chars = a_full_name.chars().flat_map(|c| c.to_lowercase());
+            let mut b_chars = b_full_name.chars().flat_map(|c| c.to_lowercase());
 
-            a_full_name.to_lowercase().cmp(&b_full_name.to_lowercase())
+            loop {
+                match (a_chars.next(), b_chars.next()) {
+                    (Some(ac), Some(bc)) => match ac.cmp(&bc) {
+                        Ordering::Equal => continue,
+                        other => return other,
+                    },
+                    (None, Some(_)) => return Ordering::Less,
+                    (Some(_), None) => return Ordering::Greater,
+                    (None, None) => return Ordering::Equal,
+                }
+            }
         });
     }
 
-    let mut grouped_items: Vec<Vec<ExpandedUseItem<'ast, 'arena>>> = Vec::new();
+    let mut grouped_items: Vec<Vec<ExpandedUseItem<'arena>>> = Vec::new();
     if should_separate {
         #[derive(PartialEq, Eq)]
         enum UseTypeDiscriminant {
@@ -333,7 +357,7 @@ fn print_use_statements<'ast, 'arena>(
             Const,
         }
 
-        let mut current_group: Vec<ExpandedUseItem<'ast, 'arena>> = Vec::new();
+        let mut current_group: Vec<ExpandedUseItem<'arena>> = Vec::new();
         let mut current_type: Option<UseTypeDiscriminant> = None;
 
         for item in all_expanded_items {
@@ -376,14 +400,7 @@ fn print_use_statements<'ast, 'arena>(
                     parts.push(Document::space());
                 }
 
-                let joined_namespace = item.namespace.join("\\");
-
-                if !joined_namespace.is_empty() {
-                    parts.push(Document::String(f.as_str(joined_namespace)));
-                    parts.push(Document::String("\\"));
-                }
-
-                parts.push(Document::String(item.name));
+                parts.push(Document::String(join_item_name(f.arena, &item.namespace, item.name)));
 
                 if let Some(alias) = item.alias {
                     parts.push(Document::space());
@@ -411,28 +428,28 @@ fn print_use_statements<'ast, 'arena>(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct ExpandedUseItem<'ast, 'arena> {
-    use_type: Option<&'ast UseType<'arena>>,
+struct ExpandedUseItem<'arena> {
+    use_type: Option<&'arena UseType<'arena>>,
     namespace: Vec<'arena, &'arena str>,
     name: &'arena str,
     alias: Option<&'arena str>,
-    original_node: &'ast Use<'arena>,
+    original_node: &'arena Use<'arena>,
 }
 
-fn expand_use<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    use_stmt: &'ast Use<'arena>,
+fn expand_use<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    use_stmt: &'arena Use<'arena>,
     should_expand: bool,
-) -> std::vec::Vec<ExpandedUseItem<'ast, 'arena>> {
+) -> std::vec::Vec<ExpandedUseItem<'arena>> {
     let mut expanded_items = std::vec::Vec::new();
 
-    fn expand_items<'ast, 'arena>(
-        f: &mut FormatterState<'_, 'ast, 'arena>,
-        items: &'ast UseItems<'arena>,
+    fn expand_items<'arena>(
+        f: &mut FormatterState<'_, 'arena>,
+        items: &'arena UseItems<'arena>,
         current_namespace: Vec<'arena, &'arena str>,
-        use_type: Option<&'ast UseType<'arena>>,
-        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'ast, 'arena>>,
-        original_node: &'ast Use<'arena>,
+        use_type: Option<&'arena UseType<'arena>>,
+        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
+        original_node: &'arena Use<'arena>,
         should_expand: bool,
     ) {
         match items {
@@ -525,13 +542,13 @@ fn expand_use<'ast, 'arena>(
         }
     }
 
-    fn expand_single_item<'ast, 'arena>(
-        f: &mut FormatterState<'_, 'ast, 'arena>,
-        item: &'ast UseItem<'arena>,
+    fn expand_single_item<'arena>(
+        f: &mut FormatterState<'_, 'arena>,
+        item: &'arena UseItem<'arena>,
         mut current_namespace: Vec<'arena, &'arena str>,
-        use_type: Option<&'ast UseType<'arena>>,
-        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'ast, 'arena>>,
-        original_node: &'ast Use<'arena>,
+        use_type: Option<&'arena UseType<'arena>>,
+        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
+        original_node: &'arena Use<'arena>,
     ) {
         let mut parts = item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
         // SAFETY: split always returns at least one element
@@ -552,17 +569,17 @@ fn expand_use<'ast, 'arena>(
     expanded_items
 }
 
-pub fn sort_use_items<'ast, 'arena>(
-    items: impl Iterator<Item = &'ast UseItem<'arena>>,
-) -> std::vec::Vec<&'ast UseItem<'arena>> {
+pub fn sort_use_items<'arena>(
+    items: impl Iterator<Item = &'arena UseItem<'arena>>,
+) -> std::vec::Vec<&'arena UseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
     items.sort_by(|a, b| a.name.value().to_lowercase().cmp(&b.name.value().to_lowercase()));
     items
 }
 
-pub fn sort_maybe_typed_use_items<'ast, 'arena>(
-    items: impl Iterator<Item = &'ast MaybeTypedUseItem<'arena>>,
-) -> std::vec::Vec<&'ast MaybeTypedUseItem<'arena>> {
+pub fn sort_maybe_typed_use_items<'arena>(
+    items: impl Iterator<Item = &'arena MaybeTypedUseItem<'arena>>,
+) -> std::vec::Vec<&'arena MaybeTypedUseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
     items.sort_by(|a, b| {
         let a_type_order = match &a.r#type {

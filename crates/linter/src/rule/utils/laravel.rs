@@ -3,7 +3,7 @@ use mago_syntax::ast::*;
 use crate::context::LintContext;
 use crate::scope::ClassLikeScope;
 
-pub fn is_within_controller<'input, 'ast, 'arena>(context: &LintContext<'input, 'ast, 'arena>) -> bool {
+pub fn is_within_controller<'ctx, 'arena>(context: &LintContext<'ctx, 'arena>) -> bool {
     let Some(ClassLikeScope::Class(classname)) = context.scope.get_class_like_scope() else {
         return false;
     };

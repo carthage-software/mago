@@ -11,8 +11,8 @@ use crate::document::Group;
 use crate::document::Line;
 use crate::internal::FormatterState;
 
-impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
-    pub(crate) fn wrap_parens(&mut self, document: Document<'arena>, node: Node<'ast, 'arena>) -> Document<'arena> {
+impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
+    pub(crate) fn wrap_parens(&mut self, document: Document<'arena>, node: Node<'arena, 'arena>) -> Document<'arena> {
         if self.need_parens(node) {
             if self.should_indent(node) {
                 Document::Group(Group::new(vec![
@@ -49,7 +49,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         }
     }
 
-    fn should_indent(&self, node: Node<'ast, 'arena>) -> bool {
+    fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
         if matches!(node, Node::Program(_)) || node.is_statement() {
             return false;
         }
@@ -57,7 +57,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         self.is_unary_or_binary_or_ternary(node)
     }
 
-    fn need_parens(&mut self, node: Node<'ast, 'arena>) -> bool {
+    fn need_parens(&mut self, node: Node<'arena, 'arena>) -> bool {
         if matches!(node, Node::Program(_)) || node.is_statement() {
             return false;
         }
@@ -70,7 +70,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
             || self.pipe_node_needs_parens(node)
     }
 
-    fn literal_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
+    fn literal_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
         let Node::Literal(Literal::Integer(_) | Literal::Float(_)) = node else {
             return false;
         };
@@ -84,7 +84,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         false
     }
 
-    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'ast, 'arena>) -> bool {
+    fn conditional_or_assignment_needs_parenthesis(&self, node: Node<'arena, 'arena>) -> bool {
         if !matches!(node, Node::Assignment(_) | Node::Conditional(_)) {
             return false;
         }
@@ -100,7 +100,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         self.is_unary_or_binary_or_ternary(parent_node) || matches!(parent_node, Node::VariadicArrayElement(_))
     }
 
-    fn pipe_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
+    fn pipe_node_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
         let Node::Pipe(_) = node else {
             return false;
         };
@@ -124,7 +124,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         }
     }
 
-    fn binary_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
+    fn binary_node_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
         let operator = match node {
             Node::Binary(e) => &e.operator,
             _ => return false,
@@ -194,7 +194,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         precedence < parent_precedence
     }
 
-    fn unary_node_needs_parens(&self, node: Node<'ast, 'arena>) -> bool {
+    fn unary_node_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
         let unary_span = node.span();
         let precedence = match node {
             Node::UnaryPrefix(e) => {
@@ -253,7 +253,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         precedence < parent_precedence
     }
 
-    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'ast, 'arena>) -> bool {
+    fn called_or_accessed_node_needs_parenthesis(&self, node: Node<'arena, 'arena>) -> bool {
         let Node::Expression(expression) = node else {
             return false;
         };
@@ -312,7 +312,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
 
     const fn callee_expression_need_parenthesis(
         &self,
-        expression: &'ast Expression<'arena>,
+        expression: &'arena Expression<'arena>,
         instantiation: bool,
     ) -> bool {
         if instantiation && matches!(expression, Expression::Call(_)) {
@@ -341,7 +341,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         )
     }
 
-    const fn function_callee_expression_need_parenthesis(&self, expression: &'ast Expression<'arena>) -> bool {
+    const fn function_callee_expression_need_parenthesis(&self, expression: &'arena Expression<'arena>) -> bool {
         !matches!(
             expression,
             Expression::Literal(_)
@@ -359,11 +359,11 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         )
     }
 
-    const fn is_unary_or_binary_or_ternary(&self, node: Node<'ast, 'arena>) -> bool {
+    const fn is_unary_or_binary_or_ternary(&self, node: Node<'arena, 'arena>) -> bool {
         self.is_unary(node) || self.is_binaryish(node) || self.is_conditional(node)
     }
 
-    const fn is_binaryish(&self, node: Node<'ast, 'arena>) -> bool {
+    const fn is_binaryish(&self, node: Node<'arena, 'arena>) -> bool {
         match node {
             Node::Binary(_) => true,
             Node::Conditional(conditional) => conditional.then.is_none(),
@@ -372,18 +372,18 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         }
     }
 
-    const fn is_unary(&self, node: Node<'ast, 'arena>) -> bool {
+    const fn is_unary(&self, node: Node<'arena, 'arena>) -> bool {
         matches!(node, Node::UnaryPrefix(_) | Node::UnaryPostfix(_))
     }
 
-    const fn is_conditional(&self, node: Node<'ast, 'arena>) -> bool {
+    const fn is_conditional(&self, node: Node<'arena, 'arena>) -> bool {
         if let Node::Conditional(op) = node { op.then.is_some() } else { false }
     }
 }
 
-pub(crate) fn instantiation_needs_parens<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    i: &'ast Instantiation<'arena>,
+pub(crate) fn instantiation_needs_parens<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    i: &'arena Instantiation<'arena>,
 ) -> bool {
     if f.php_version.is_supported(Feature::NewWithoutParentheses) {
         if i.argument_list.as_ref().is_none_or(|list| list.arguments.is_empty()) {

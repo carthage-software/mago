@@ -5,10 +5,7 @@ use mago_syntax::ast::LiteralStringKind;
 
 use crate::internal::FormatterState;
 
-pub(super) fn print_lowercase_keyword<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
-    keyword: &'arena str,
-) -> &'arena str {
+pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena str) -> &'arena str {
     if keyword.chars().all(|c| c.is_ascii_lowercase()) {
         return keyword;
     }
@@ -24,8 +21,8 @@ pub(super) fn print_lowercase_keyword<'ast, 'arena>(
     (unsafe { std::str::from_utf8_unchecked(lowercase_bytes.into_bump_slice()) }) as _
 }
 
-pub(super) fn print_string<'ast, 'arena>(
-    f: &FormatterState<'_, 'ast, 'arena>,
+pub(super) fn print_string<'arena>(
+    f: &FormatterState<'_, 'arena>,
     kind: Option<LiteralStringKind>,
     text: &'arena str,
 ) -> &'arena str {

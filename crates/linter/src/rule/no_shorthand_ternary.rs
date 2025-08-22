@@ -82,7 +82,7 @@ impl LintRule for NoShorthandTernaryRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let issue = match node {
             Node::BinaryOperator(BinaryOperator::Elvis(_)) => {
                 Issue::new(self.cfg.level(), "Use of the elvis operator.").with_code(self.meta.code).with_annotation(

@@ -17,9 +17,9 @@ use crate::internal::utils::get_left_side;
 use crate::internal::utils::has_naked_left_side;
 use crate::internal::utils::unwrap_parenthesized;
 
-pub fn format_return_value<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    value: &'ast Expression<'arena>,
+pub fn format_return_value<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    value: &'arena Expression<'arena>,
 ) -> Document<'arena> {
     let mut value = unwrap_parenthesized(value);
     if f.in_pipe_chain_arrow_segment {
@@ -72,9 +72,9 @@ pub fn format_return_value<'ast, 'arena>(
     }
 }
 
-fn return_argument_has_leading_comment<'ast, 'arena>(
-    f: &mut FormatterState<'_, 'ast, 'arena>,
-    argument: &'ast Expression<'arena>,
+fn return_argument_has_leading_comment<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    argument: &'arena Expression<'arena>,
 ) -> bool {
     if f.has_leading_own_line_comment(argument.span())
         || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {

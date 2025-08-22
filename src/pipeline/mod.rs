@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use ahash::HashSet;
 use bumpalo::Bump;
-use bumpalo_herd::Herd;
 use rayon::prelude::*;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -118,20 +117,16 @@ where
             return self.reducer.reduce(CodebaseMetadata::new(), SymbolReferences::new(), Vec::new());
         }
 
-        let herd = Herd::new();
         let compiling_bar = create_progress_bar(all_files.len(), "Compiling", ProgressBarTheme::Magenta);
 
         let partial_codebases: Vec<CodebaseMetadata> = all_files
             .into_par_iter()
-            .map_init(
-                || herd.get(),
-                |arena, file| {
-                    let interner = self.interner.clone();
-                    let metadata = scan_file_for_metadata(&file, arena.as_bump(), &interner);
-                    compiling_bar.inc(1);
-                    metadata
-                },
-            )
+            .map_init(Bump::new, |arena, file| {
+                let interner = self.interner.clone();
+                let metadata = scan_file_for_metadata(&file, arena, &interner);
+                compiling_bar.inc(1);
+                metadata
+            })
             .collect();
 
         let mut merged_codex = CodebaseMetadata::new();
@@ -167,17 +162,14 @@ where
 
         let results: Vec<I> = host_files
             .into_par_iter()
-            .map_init(
-                || herd.get(),
-                |arena, file| {
-                    let context = self.shared_context.clone();
-                    let interner = self.interner.clone();
-                    let codebase = Arc::clone(&final_codebase);
-                    let result = map_function(context, arena.as_bump(), interner, file, codebase)?;
-                    main_task_bar.inc(1);
-                    Ok(result)
-                },
-            )
+            .map_init(Bump::new, |arena, file| {
+                let context = self.shared_context.clone();
+                let interner = self.interner.clone();
+                let codebase = Arc::clone(&final_codebase);
+                let result = map_function(context, arena, interner, file, codebase)?;
+                main_task_bar.inc(1);
+                Ok(result)
+            })
             .collect::<Result<Vec<I>, Error>>()?;
 
         remove_progress_bar(main_task_bar);
@@ -206,7 +198,6 @@ where
     I: Send + 'static,
     R: Send + 'static,
 {
-    /// Creates a new `StatelessParallelPipeline`.
     pub fn new(
         task_name: &'static str,
         database: ReadDatabase,
@@ -219,7 +210,7 @@ where
     /// Executes the pipeline with a given map function on all `Host` files.
     pub fn run<F>(&self, map_function: F) -> Result<R, Error>
     where
-        F: Fn(T, &Bump, Arc<File>) -> Result<I, Error> + Send + Sync,
+        F: Fn(T, &mut Bump, Arc<File>) -> Result<I, Error> + Send + Sync,
     {
         let host_files = self
             .database
@@ -232,20 +223,16 @@ where
             return self.reducer.reduce(Vec::new());
         }
 
-        let herd = Herd::new();
         let progress_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Yellow);
 
         let results: Vec<I> = host_files
             .into_par_iter()
-            .map_init(
-                || herd.get(),
-                |arena, file| {
-                    let context = self.shared_context.clone();
-                    let result = map_function(context, arena.as_bump(), file)?;
-                    progress_bar.inc(1);
-                    Ok(result)
-                },
-            )
+            .map_init(Bump::new, |arena, file| {
+                let context = self.shared_context.clone();
+                let result = map_function(context, arena, file)?;
+                progress_bar.inc(1);
+                Ok(result)
+            })
             .collect::<Result<Vec<I>, Error>>()?;
 
         remove_progress_bar(progress_bar);

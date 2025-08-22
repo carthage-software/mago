@@ -122,7 +122,7 @@ impl LintRule for NoRequestAllRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'ast, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Block(block) = node else { return };
 
         let request_all_references = find_method_references_in_block(block, &|reference| {
