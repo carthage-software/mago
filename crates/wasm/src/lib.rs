@@ -72,5 +72,6 @@ pub fn format_code(code: String, php_version: JsValue, settings: JsValue) -> Res
 
     formatter
         .format_code(Cow::Borrowed("code.php"), Cow::Owned(code))
+        .map(|s| s.to_string())
         .map_err(|err| JsValue::from_str(&err.to_string()))
 }

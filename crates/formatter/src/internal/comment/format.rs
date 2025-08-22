@@ -237,7 +237,7 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
 
     fn print_trailing_comment(
         &mut self,
-        parts: &mut Vec<Document<'arena>>,
+        parts: &mut Vec<'arena, Document<'arena>>,
         comment: Comment,
         previous: Option<Comment>,
     ) -> Comment {

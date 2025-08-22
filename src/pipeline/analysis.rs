@@ -68,7 +68,7 @@ pub fn run_analysis_pipeline(
     ParallelPipeline::new("🕵️ Analyzing", database, interner, analyzer_settings, Box::new(AnalysisResultReducer)).run(
         |settings, arena, interner, source_file, codebase| {
             let (program, parsing_error) = parse_file(arena, &source_file);
-            let resolved_names = NameResolver::new(arena).resolve(&program);
+            let resolved_names = NameResolver::new(arena).resolve(program);
 
             let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
             if let Some(parsing_error) = parsing_error {
@@ -78,8 +78,8 @@ pub fn run_analysis_pipeline(
             let semantics_checker = SemanticsChecker::new(settings.version);
             let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, &interner, settings);
 
-            analysis_result.issues.extend(semantics_checker.check(&source_file, &program, &resolved_names));
-            analyzer.analyze(&program, &mut analysis_result)?;
+            analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
+            analyzer.analyze(program, &mut analysis_result)?;
 
             if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
                 tracing::warn!(

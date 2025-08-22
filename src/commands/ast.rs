@@ -98,13 +98,13 @@ pub fn execute(command: AstCommand, configuration: Configuration) -> Result<Exit
         println!("{}", serde_json::to_string_pretty(&result)?);
     } else {
         // Display the AST as a tree.
-        let tree = node_to_tree(Node::Program(&ast));
+        let tree = node_to_tree(Node::Program(ast));
 
         println!("{tree}");
 
         if command.include_names {
             let resolver = NameResolver::new(&bump);
-            let names = resolver.resolve(&ast);
+            let names = resolver.resolve(ast);
 
             for (position, (name, is_imported)) in names.all() {
                 println!("{}: {}{}", position, name, if *is_imported { " (imported)" } else { "" });

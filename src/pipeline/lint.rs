@@ -73,7 +73,7 @@ fn run_full_pipeline(database: ReadDatabase, context: LintContext) -> Result<Iss
     StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, context, Box::new(LintResultReducer)).run(
         |context, arena, file| {
             let (program, parsing_error) = parse_file(arena, &file);
-            let resolved_names = NameResolver::new(arena).resolve(&program);
+            let resolved_names = NameResolver::new(arena).resolve(program);
 
             let mut issues = IssueCollection::new();
             if let Some(error) = parsing_error {
@@ -83,8 +83,8 @@ fn run_full_pipeline(database: ReadDatabase, context: LintContext) -> Result<Iss
             let semantics_checker = SemanticsChecker::new(context.php_version);
             let linter = Linter::from_registry(arena, context.registry, context.php_version);
 
-            issues.extend(semantics_checker.check(&file, &program, &resolved_names));
-            issues.extend(linter.lint(&file, &program, &resolved_names));
+            issues.extend(semantics_checker.check(&file, program, &resolved_names));
+            issues.extend(linter.lint(&file, program, &resolved_names));
 
             Ok(issues)
         },
@@ -99,7 +99,7 @@ fn run_semantics_pipeline(database: ReadDatabase, context: LintContext) -> Resul
     StatelessParallelPipeline::new(PROGRESS_BAR_THEME, database, context, Box::new(LintResultReducer)).run(
         |context, arena, file| {
             let (program, parsing_error) = parse_file(arena, &file);
-            let resolved_names = NameResolver::new(arena).resolve(&program);
+            let resolved_names = NameResolver::new(arena).resolve(program);
 
             let mut issues = IssueCollection::new();
             if let Some(error) = parsing_error {
@@ -108,7 +108,7 @@ fn run_semantics_pipeline(database: ReadDatabase, context: LintContext) -> Resul
 
             let semantics_checker = SemanticsChecker::new(context.php_version);
 
-            issues.extend(semantics_checker.check(&file, &program, &resolved_names));
+            issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
             Ok(issues)
         },

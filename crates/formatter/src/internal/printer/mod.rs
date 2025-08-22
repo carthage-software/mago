@@ -63,11 +63,13 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    pub fn build(mut self) -> String {
+    pub fn build(mut self) -> &'arena str {
         self.print_doc_to_string();
 
-        // SAFETY: We should have constructed valid UTF8 strings
-        unsafe { String::from_utf8_unchecked(self.out.to_vec()) }
+        let output_slice = self.out.into_bump_slice();
+
+        // SAFETY: The printer logic is assumed to always produce valid UTF-8.
+        unsafe { std::str::from_utf8_unchecked(output_slice) }
     }
 
     /// Turn Doc into a string
@@ -112,7 +114,7 @@ impl<'arena> Printer<'arena> {
         (self.settings.print_width as isize) - (self.position as isize)
     }
 
-    fn handle_str(&mut self, s: &str) {
+    fn handle_str(&mut self, s: &'arena str) {
         self.out.extend(s.as_bytes());
         self.position += string_width(s);
     }
@@ -440,9 +442,9 @@ impl<'arena> Printer<'arena> {
         };
     }
 
-    fn add_indentation(&mut self, indentation: Indentation) -> usize {
-        let value = indentation.get_value(self.settings.use_tabs, self.settings.tab_width);
-        self.out.extend(value.as_bytes());
+    fn add_indentation(&mut self, indentation: Indentation<'arena>) -> usize {
+        let value = indentation.get_value_in(self.arena, self.settings.use_tabs, self.settings.tab_width);
+        self.out.extend(value);
         value.len()
     }
 

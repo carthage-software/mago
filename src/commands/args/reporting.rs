@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use bumpalo_herd::Herd;
 use clap::Parser;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -259,24 +259,36 @@ impl ReportingArgs {
 
         let progress_bar = create_progress_bar(fix_plans.len(), "✨ Fixing", ProgressBarTheme::Cyan);
 
+        let herd = Herd::new();
         let changed_results: Vec<bool> = fix_plans
             .into_par_iter()
-            .map(|(file_id, plan)| {
-                let file = read_database.get_ref(&file_id)?;
-                let mut fixed_content = plan.execute(&file.contents).get_fixed();
+            .map_init(
+                || herd.get(),
+                |arena, (file_id, plan)| {
+                    let file = read_database.get_ref(&file_id)?;
+                    let fixed_content = plan.execute(&file.contents).get_fixed();
+                    let final_content = if self.format_after_fix {
+                        let formatter = Formatter::new(
+                            arena.as_bump(),
+                            configuration.php_version,
+                            configuration.formatter.settings,
+                        );
 
-                if self.format_after_fix {
-                    let arena = Bump::new();
-                    let formatter = Formatter::new(&arena, configuration.php_version, configuration.formatter.settings);
-                    if let Ok(content) = formatter.format_code(file.name.clone(), Cow::Owned(fixed_content.clone())) {
-                        fixed_content = content;
-                    }
-                }
+                        if let Ok(content) = formatter.format_code(file.name.clone(), Cow::Owned(fixed_content.clone()))
+                        {
+                            Cow::Borrowed(content)
+                        } else {
+                            Cow::Owned(fixed_content)
+                        }
+                    } else {
+                        Cow::Owned(fixed_content)
+                    };
 
-                let changed = utils::apply_update(&change_log, file, fixed_content, self.dry_run, false)?;
-                progress_bar.inc(1);
-                Ok(changed)
-            })
+                    let changed = utils::apply_update(&change_log, file, final_content.as_ref(), self.dry_run, false)?;
+                    progress_bar.inc(1);
+                    Ok(changed)
+                },
+            )
             .collect::<Result<Vec<bool>, Error>>()?;
 
         remove_progress_bar(progress_bar);

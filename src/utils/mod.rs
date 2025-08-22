@@ -31,7 +31,7 @@ pub mod version;
 pub fn apply_update(
     change_log: &ChangeLog,
     file: &File,
-    modified_contents: String,
+    modified_contents: &str,
     dry_run: bool,
     check: bool,
 ) -> Result<bool, Error> {
@@ -44,7 +44,7 @@ pub fn apply_update(
     }
 
     if dry_run {
-        let patch = diffy::create_patch(&file.contents, modified_contents.as_str());
+        let patch = diffy::create_patch(&file.contents, modified_contents);
 
         progress::GLOBAL_PROGRESS_MANAGER.suspend(|| {
             let formatter = PatchFormatter::new().with_color();
@@ -53,7 +53,7 @@ pub fn apply_update(
             println!("{}", formatter.fmt_patch(&patch));
         });
     } else {
-        change_log.update(file.id, Cow::Owned(modified_contents))?;
+        change_log.update(file.id, Cow::Owned(modified_contents.to_owned()))?;
     }
 
     Ok(true)

@@ -20,6 +20,7 @@ use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::parameters::print_function_like_parameters;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
+use crate::internal::format::string::print_lowercase_keyword;
 use crate::internal::utils;
 use crate::settings::*;
 use crate::wrap;
@@ -994,11 +995,7 @@ impl<'ast, 'arena> Format<'ast, 'arena> for MethodAbstractBody {
 
 impl<'ast, 'arena> Format<'ast, 'arena> for Keyword<'arena> {
     fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
-        wrap!(f, self, Keyword, {
-            let value = self.value;
-
-            Document::String(f.as_str(value.to_ascii_lowercase()))
-        })
+        wrap!(f, self, Keyword, { Document::String(print_lowercase_keyword(f, self.value)) })
     }
 }
 

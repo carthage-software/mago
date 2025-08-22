@@ -97,6 +97,7 @@ globset = "0.4"
 rayon = "1.10.0"
 bumpalo = { version = "3", features = ["collections", "boxed", "serde"] }
 bumpalo-herd = { version = "0.1.2" }
+dhat = "0.3"
 
 [dependencies]
 mago-syntax = { workspace = true }
@@ -134,6 +135,7 @@ rayon = { workspace = true }
 indoc = { workspace = true }
 bumpalo = { workspace = true }
 bumpalo-herd = { workspace = true }
+dhat = { workspace = true, optional = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"
@@ -144,6 +146,9 @@ openssl = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_env = "musl"))'.dependencies]
 mimalloc = { version = "0.1.47" }
+
+[features]
+dhat-heap = ["dhat"]
 
 [profile.release]
 opt-level = 3

@@ -31,6 +31,7 @@ use crate::internal::format::misc;
 use crate::internal::format::misc::print_attribute_list_sequence;
 use crate::internal::format::misc::print_condition;
 use crate::internal::format::misc::print_modifiers;
+use crate::internal::format::print_lowercase_keyword;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
 use crate::internal::utils;
@@ -206,13 +207,9 @@ impl<'ast, 'arena> Format<'ast, 'arena> for UnaryPrefixOperator<'arena> {
                 | UnaryPrefixOperator::VoidCast(_, _) => f.settings.space_after_cast_unary_prefix_operators,
             };
 
-            let value = self.as_str();
+            let operator = Document::String(print_lowercase_keyword(f, self.as_str()));
 
-            if space_after {
-                Document::Array(vec![in f.arena; Document::String(f.as_str(value.to_lowercase())), Document::space()])
-            } else {
-                Document::String(f.as_str(value.to_lowercase()))
-            }
+            if space_after { Document::Array(vec![in f.arena; operator, Document::space()]) } else { operator }
         })
     }
 }

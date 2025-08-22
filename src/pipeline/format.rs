@@ -71,7 +71,7 @@ pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext) -> Re
             }
 
             let formatter = Formatter::new(arena, context.php_version, context.settings);
-            let formatted_content = formatter.format(&file, &program);
+            let formatted_content = formatter.format(&file, program);
 
             utils::apply_update(
                 &context.change_log,

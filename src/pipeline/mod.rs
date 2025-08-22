@@ -195,9 +195,9 @@ fn scan_file_for_metadata(source_file: &File, arena: &Bump, interner: &ThreadedI
     }
 
     let resolver = NameResolver::new(arena);
-    let resolved_names = resolver.resolve(&program);
+    let resolved_names = resolver.resolve(program);
 
-    scan_program(interner, arena, source_file, &program, &resolved_names)
+    scan_program(interner, arena, source_file, program, &resolved_names)
 }
 
 impl<T, I, R> StatelessParallelPipeline<T, I, R>

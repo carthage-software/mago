@@ -25,8 +25,10 @@ macro_rules! test_case {
 
             pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected");
 
-            let reformatted_code =
-                formatter.format_code(Cow::Borrowed("formatted_code.php"), Cow::Owned(formatted_code)).unwrap();
+            let reformatted_code = formatter
+                .format_code(Cow::Borrowed("formatted_code.php"), Cow::Owned(formatted_code.to_owned()))
+                .unwrap();
+
             pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected");
         }
     };

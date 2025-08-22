@@ -52,7 +52,7 @@ impl<'arena> Formatter<'arena> {
     /// # Errors
     ///
     /// Returns a [`ParseError`] if the input code contains syntax errors.
-    pub fn format_code(&self, name: Cow<'static, str>, code: Cow<'static, str>) -> Result<String, ParseError> {
+    pub fn format_code(&self, name: Cow<'static, str>, code: Cow<'static, str>) -> Result<&'arena str, ParseError> {
         let file = File::ephemeral(name, code);
 
         self.format_file(&file)
@@ -67,13 +67,13 @@ impl<'arena> Formatter<'arena> {
     /// # Errors
     ///
     /// Returns a [`ParseError`] if the file's content contains syntax errors.
-    pub fn format_file(&self, file: &File) -> Result<String, ParseError> {
+    pub fn format_file(&self, file: &File) -> Result<&'arena str, ParseError> {
         let (program, error) = parse_file(self.arena, file);
         if let Some(error) = error {
             return Err(error);
         }
 
-        Ok(self.format(file, &program))
+        Ok(self.format(file, program))
     }
 
     /// Formats a pre-parsed [`Program`] (AST).
@@ -81,7 +81,7 @@ impl<'arena> Formatter<'arena> {
     /// This is the lowest-level formatting method that operates directly on the AST.
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
-    pub fn format<'input>(&self, file: &'input File, program: &Program<'arena>) -> String {
+    pub fn format<'input>(&self, file: &'input File, program: &Program<'arena>) -> &'arena str {
         let document = self.build(file, program);
 
         self.print(document, Some(file.size as usize))
@@ -111,7 +111,7 @@ impl<'arena> Formatter<'arena> {
     /// # Returns
     ///
     /// A formatted string representation of the document.
-    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> String {
+    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> &'arena str {
         Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
     }
 }

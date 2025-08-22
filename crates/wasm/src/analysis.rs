@@ -45,11 +45,11 @@ pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults
     let source_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
 
     let (program, parse_error) = parse_file(&arena, &source_file);
-    let resolved_names = NameResolver::new(&arena).resolve(&program);
+    let resolved_names = NameResolver::new(&arena).resolve(program);
 
-    let semantic_issues = SemanticsChecker::new(settings.php_version).check(&source_file, &program, &resolved_names);
+    let semantic_issues = SemanticsChecker::new(settings.php_version).check(&source_file, program, &resolved_names);
 
-    let mut codebase = mago_codex::scanner::scan_program(&interner, &arena, &source_file, &program, &resolved_names);
+    let mut codebase = mago_codex::scanner::scan_program(&interner, &arena, &source_file, program, &resolved_names);
     let mut symbol_references = SymbolReferences::new();
 
     mago_codex::populator::populate_codebase(
@@ -63,18 +63,19 @@ pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults
     let analyzer_settings = settings.analyzer.to_analyzer_settings(settings.php_version);
     let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, &interner, analyzer_settings);
     let mut analyzer_analysis_result = mago_analyzer::analysis_result::AnalysisResult::new(Default::default());
-    analyzer.analyze(&program, &mut analyzer_analysis_result).unwrap();
+    analyzer.analyze(program, &mut analyzer_analysis_result).unwrap();
     let analyzer_issues = analyzer_analysis_result.issues;
 
     symbol_references.extend(analyzer_analysis_result.symbol_references);
 
     let linter_settings = settings.linter.to_linter_settings(settings.php_version);
     let linter = Linter::new(&arena, linter_settings, None);
-    let linter_issues = linter.lint(&source_file, &program, &resolved_names);
+    let linter_issues = linter.lint(&source_file, program, &resolved_names);
 
     let formatted_code = if parse_error.is_none() {
         let formatter = Formatter::new(&arena, settings.php_version, settings.formatter);
-        Some(formatter.format(&source_file, &program))
+
+        Some(formatter.format(&source_file, program).to_string())
     } else {
         None
     };

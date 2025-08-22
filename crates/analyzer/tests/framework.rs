@@ -43,8 +43,8 @@ fn run_test_case_inner(config: TestCase) {
     }
 
     let resolver = NameResolver::new(&arena);
-    let resolved_names = resolver.resolve(&program);
-    let mut codebase = scan_program(&interner, &arena, &source_file, &program, &resolved_names);
+    let resolved_names = resolver.resolve(program);
+    let mut codebase = scan_program(&interner, &arena, &source_file, program, &resolved_names);
     let mut symbol_references = SymbolReferences::new();
 
     populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
@@ -59,7 +59,7 @@ fn run_test_case_inner(config: TestCase) {
         Settings { find_unused_expressions: true, check_throws: true, ..Default::default() },
     );
 
-    let analysis_run_result = analyzer.analyze(&program, &mut analysis_result);
+    let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
 
     if let Err(err) = analysis_run_result {
         panic!("Test '{}': Expected analysis to succeed, but it failed with an error: {}", config.name, err);
