@@ -66,7 +66,6 @@ where
 
 impl<'ast, 'arena> Format<'ast, 'arena> for Program<'arena> {
     fn format(&'ast self, f: &mut FormatterState<'_, 'ast, 'arena>) -> Document<'arena> {
-        f.comments = self.trivia.comments().copied().collect::<std::vec::Vec<_>>().into_iter().peekable();
         f.enter_node(Node::Program(self));
         let mut parts = vec![in f.arena];
         if let Some(doc) = block::print_block_body(f, &self.statements) {

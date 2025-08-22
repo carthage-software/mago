@@ -1,7 +1,5 @@
-use std::iter::Peekable;
-use std::vec::IntoIter;
-
 use bumpalo::Bump;
+use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec as BumpVec;
 
 use mago_database::file::File;
@@ -10,6 +8,7 @@ use mago_database::file::HasFileId;
 use mago_php_version::PHPVersion;
 use mago_span::Span;
 use mago_syntax::ast::Node;
+use mago_syntax::ast::Program;
 use mago_syntax::ast::Trivia;
 
 use crate::document::group::GroupIdentifier;
@@ -36,14 +35,15 @@ pub struct ParameterState {
 }
 
 #[derive(Debug)]
-pub struct FormatterState<'input, 'ast, 'arena> {
+pub struct FormatterState<'ctx, 'ast, 'arena> {
     arena: &'arena Bump,
     source_text: &'arena str,
-    file: &'input File,
+    file: &'ctx File,
     php_version: PHPVersion,
     settings: FormatSettings,
     stack: Vec<Node<'ast, 'arena>>,
-    comments: Peekable<IntoIter<Trivia<'arena>>>,
+    all_comments: &'arena [Trivia<'arena>],
+    next_comment_index: usize,
     scripting_mode: bool,
     id_builder: GroupIdentifierBuilder,
     argument_state: ArgumentState,
@@ -54,22 +54,31 @@ pub struct FormatterState<'input, 'ast, 'arena> {
     halted_compilation: bool,
 }
 
-impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
+impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     pub fn new(
         arena: &'arena Bump,
-        source_text: &'arena str,
-        file: &'input File,
+        program: &'ast Program<'arena>,
+        file: &'ctx File,
         php_version: PHPVersion,
         settings: FormatSettings,
     ) -> Self {
+        let all_comments = program
+            .trivia
+            .iter()
+            .filter(|t| t.kind.is_comment())
+            .copied()
+            .collect_in::<BumpVec<_>>(arena)
+            .into_bump_slice();
+
         Self {
             arena,
             file,
-            source_text,
+            source_text: program.source_text,
             php_version,
             settings,
             stack: vec![],
-            comments: vec![].into_iter().peekable(),
+            all_comments,
+            next_comment_index: 0,
             scripting_mode: false,
             id_builder: GroupIdentifierBuilder::new(),
             argument_state: ArgumentState::default(),

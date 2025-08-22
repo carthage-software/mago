@@ -18,7 +18,7 @@ use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
 use crate::internal::utils::unwrap_parenthesized;
 
-impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
+impl<'ctx, 'ast, 'arena> FormatterState<'ctx, 'ast, 'arena> {
     #[must_use]
     pub(crate) fn print_comments(
         &mut self,
@@ -32,6 +32,11 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
             (None, Some(after)) => Document::Array(vec![in self.arena; document, after]),
             (None, None) => document,
         }
+    }
+
+    /// Returns an iterator over the remaining, unconsumed comments.
+    fn remaining_comments(&self) -> impl Iterator<Item = Comment> {
+        self.all_comments[self.next_comment_index..].iter().map(|trivia| Comment::from_trivia(self.file, trivia))
     }
 
     /// Checks if a node is followed by a comment on its own line.
@@ -86,39 +91,26 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     where
         F: Fn(&Comment) -> bool,
     {
-        let mut peekable_trivias = self.comments.clone();
-
-        while let Some(comment) = peekable_trivias.peek() {
-            let mut should_break = true;
-            let comment = Comment::from_trivia(self.file, comment);
-
-            if filter(&comment) {
-                if comment.end <= range.start.offset {
-                    if flags.contains(CommentFlags::Leading) && comment.matches_flags(flags) {
-                        return true;
-                    }
-
-                    should_break = false;
-                } else if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
-                    if flags.contains(CommentFlags::Trailing) && comment.matches_flags(flags) {
-                        return true;
-                    }
-
-                    should_break = false;
-                } else if comment.end <= range.end.offset {
-                    if flags.contains(CommentFlags::Dangling) && comment.matches_flags(flags) {
-                        return true;
-                    }
-
-                    should_break = false;
-                }
-            }
-
-            if should_break {
+        for comment in self.remaining_comments() {
+            if !filter(&comment) {
                 break;
             }
 
-            peekable_trivias.next();
+            if comment.end <= range.start.offset {
+                if flags.contains(CommentFlags::Leading) && comment.matches_flags(flags) {
+                    return true;
+                }
+            } else if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
+                if flags.contains(CommentFlags::Trailing) && comment.matches_flags(flags) {
+                    return true;
+                }
+            } else if comment.end <= range.end.offset {
+                if flags.contains(CommentFlags::Dangling) && comment.matches_flags(flags) {
+                    return true;
+                }
+            } else {
+                break;
+            }
         }
 
         false
@@ -127,10 +119,11 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     #[must_use]
     #[inline]
     pub fn has_inner_comment(&self, range: Span) -> bool {
-        let peekable_trivias = self.comments.clone();
+        for comment in self.remaining_comments() {
+            if comment.start > range.end.offset {
+                break;
+            }
 
-        for comment in peekable_trivias {
-            let comment = Comment::from_trivia(self.file, &comment);
             if comment.start >= range.start.offset && comment.end <= range.end.offset {
                 return true;
             }
@@ -140,24 +133,58 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     }
 
     #[must_use]
+    pub(crate) fn print_trailing_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena>> {
+        let range = match node {
+            Node::ArrowFunction(arrow_function) if self.in_pipe_chain_arrow_segment => {
+                let mut value = unwrap_parenthesized(arrow_function.expression);
+                while let Expression::Pipe(pipe) = value {
+                    value = unwrap_parenthesized(pipe.input);
+                }
+
+                value.span()
+            }
+            _ => node.span(),
+        };
+
+        self.print_trailing_comments(range)
+    }
+
+    #[must_use]
     pub(crate) fn print_leading_comments(&mut self, range: Span) -> Option<Document<'arena>> {
         let mut parts = vec![in self.arena];
-        while let Some(comment) = self.comments.peek() {
-            let comment = Comment::from_trivia(self.file, comment);
-            // Comment before the span
+
+        while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
+            let comment = Comment::from_trivia(self.file, trivia);
+
             if comment.end <= range.start.offset {
-                self.comments.next();
                 self.print_leading_comment(&mut parts, comment);
+                self.next_comment_index += 1;
             } else {
                 break;
             }
         }
 
-        if parts.is_empty() {
-            return None;
+        if parts.is_empty() { None } else { Some(Document::Array(parts)) }
+    }
+
+    #[must_use]
+    pub(crate) fn print_trailing_comments(&mut self, range: Span) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
+        let mut previous_comment: Option<Comment> = None;
+
+        while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
+            let comment = Comment::from_trivia(self.file, trivia);
+
+            if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
+                let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
+                previous_comment = Some(previous);
+                self.next_comment_index += 1;
+            } else {
+                break;
+            }
         }
 
-        Some(Document::Array(parts))
+        if parts.is_empty() { None } else { Some(Document::Array(parts)) }
     }
 
     fn print_leading_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
@@ -192,47 +219,6 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
             parts.push(Document::BreakParent);
             parts.push(Document::Line(Line::hard()));
         }
-    }
-
-    #[must_use]
-    pub(crate) fn print_trailing_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena>> {
-        let range = match node {
-            Node::ArrowFunction(arrow_function) if self.in_pipe_chain_arrow_segment => {
-                let mut value = unwrap_parenthesized(arrow_function.expression);
-                while let Expression::Pipe(pipe) = value {
-                    value = unwrap_parenthesized(pipe.input);
-                }
-
-                value.span()
-            }
-            _ => node.span(),
-        };
-
-        self.print_trailing_comments(range)
-    }
-
-    #[must_use]
-    pub(crate) fn print_trailing_comments(&mut self, range: Span) -> Option<Document<'arena>> {
-        let mut parts = vec![in self.arena];
-        let mut previous_comment: Option<Comment> = None;
-
-        while let Some(comment) = self.comments.peek() {
-            let comment = Comment::from_trivia(self.file, comment);
-            // Trailing comment if there is nothing in between.
-            if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
-                self.comments.next();
-                let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
-                previous_comment = Some(previous);
-            } else {
-                break;
-            }
-        }
-
-        if parts.is_empty() {
-            return None;
-        }
-
-        Some(Document::Array(parts))
     }
 
     fn print_trailing_comment(
@@ -272,18 +258,18 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
 
         comment.with_line_suffix(false)
     }
-
     #[must_use]
     pub(crate) fn print_inner_comment(&mut self, range: Span, should_indent: bool) -> Option<Document<'arena>> {
         let mut parts = vec![in self.arena];
         let mut must_break = false;
-        while let Some(comment) = self.comments.peek() {
-            let span = comment.span;
-            let comment = Comment::from_trivia(self.file, comment);
-            // Comment within the span
+        let mut consumed_count = 0;
+
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            let comment = Comment::from_trivia(self.file, trivia);
+
             if comment.start >= range.start.offset && comment.end <= range.end.offset {
                 must_break = must_break || !comment.is_block;
-                if !should_indent && self.is_next_line_empty(span) {
+                if !should_indent && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
                         vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
                     ));
@@ -291,11 +277,14 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
                 } else {
                     parts.push(self.print_comment(comment));
                 }
-
-                self.comments.next();
+                consumed_count += 1;
             } else {
                 break;
             }
+        }
+
+        if consumed_count > 0 {
+            self.next_comment_index += consumed_count;
         }
 
         if parts.is_empty() {
@@ -328,23 +317,28 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
     #[must_use]
     pub(crate) fn print_dangling_comments(&mut self, range: Span, indented: bool) -> Option<Document<'arena>> {
         let mut parts = vec![in self.arena];
-        while let Some(comment) = self.comments.peek() {
-            let span = comment.span;
-            let comment = Comment::from_trivia(self.file, comment);
-            // Comment within the span
+        let mut consumed_count = 0;
+
+        // Iterate over the remaining comment slice.
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            let comment = Comment::from_trivia(self.file, trivia);
+
             if comment.end <= range.end.offset {
-                if !indented && self.is_next_line_empty(span) {
+                if !indented && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
                         vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
                     ));
                 } else {
                     parts.push(self.print_comment(comment));
                 }
-
-                self.comments.next();
+                consumed_count += 1;
             } else {
                 break;
             }
+        }
+
+        if consumed_count > 0 {
+            self.next_comment_index += consumed_count;
         }
 
         if parts.is_empty() {
@@ -371,20 +365,25 @@ impl<'input, 'ast, 'arena> FormatterState<'input, 'ast, 'arena> {
         before: Span,
     ) -> Option<Document<'arena>> {
         let mut parts = vec![in self.arena];
+        let mut consumed_count = 0;
 
-        while let Some(comment) = self.comments.peek() {
-            let comment = Comment::from_trivia(self.file, comment);
+        // Iterate over the remaining comment slice.
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.start >= after.end.offset
                 && comment.end <= before.start.offset
                 && self.is_insignificant(after.end.offset, comment.start)
             {
                 parts.push(self.print_comment(comment));
-
-                self.comments.next();
+                consumed_count += 1;
             } else {
                 break;
             }
+        }
+
+        if consumed_count > 0 {
+            self.next_comment_index += consumed_count;
         }
 
         if parts.is_empty() {

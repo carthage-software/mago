@@ -34,7 +34,7 @@ impl Comment {
         Self { start, end, is_block, is_shell_comment, is_single_line, has_line_suffix: false }
     }
 
-    pub fn from_trivia(file: &File, trivia: &Trivia) -> Self {
+    pub fn from_trivia<'arena>(file: &File, trivia: &'arena Trivia<'arena>) -> Self {
         debug_assert!(trivia.kind.is_comment());
 
         let is_block = trivia.kind.is_block_comment();

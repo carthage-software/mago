@@ -94,7 +94,7 @@ impl<'arena> Formatter<'arena> {
     /// This is a separate step from printing, allowing for potential inspection or
     /// manipulation of the layout before rendering.
     pub fn build(&self, file: &File, program: &Program<'arena>) -> Document<'arena> {
-        program.format(&mut FormatterState::new(self.arena, program.source_text, file, self.php_version, self.settings))
+        program.format(&mut FormatterState::new(self.arena, program, file, self.php_version, self.settings))
     }
 
     /// Renders a [`Document`] model into a formatted string.
