@@ -10,7 +10,7 @@ use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_literal<'arena>(stream: &mut TokenStream<'arena>) -> Result<Literal<'arena>, ParseError> {
+pub fn parse_literal<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Literal<'arena>, ParseError> {
     let token = utils::expect_any(stream)?;
 
     Ok(match &token.kind {

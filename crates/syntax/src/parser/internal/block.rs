@@ -6,7 +6,7 @@ use crate::parser::internal::statement::parse_statement;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_block<'arena>(stream: &mut TokenStream<'arena>) -> Result<Block<'arena>, ParseError> {
+pub fn parse_block<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Block<'arena>, ParseError> {
     Ok(Block {
         left_brace: utils::expect_span(stream, T!["{"])?,
         statements: {

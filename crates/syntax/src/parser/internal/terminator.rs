@@ -6,7 +6,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_optional_terminator<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<Terminator<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T![";" | "?>"]) => Some(parse_terminator(stream)?),
@@ -14,7 +14,7 @@ pub fn parse_optional_terminator<'arena>(
     })
 }
 
-pub fn parse_terminator<'arena>(stream: &mut TokenStream<'arena>) -> Result<Terminator<'arena>, ParseError> {
+pub fn parse_terminator<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Terminator<'arena>, ParseError> {
     let token = utils::expect_one_of(stream, T![";", "?>"])?;
 
     match token.kind {

@@ -6,7 +6,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_goto<'arena>(stream: &mut TokenStream<'arena>) -> Result<Goto<'arena>, ParseError> {
+pub fn parse_goto<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Goto<'arena>, ParseError> {
     Ok(Goto {
         goto: utils::expect_keyword(stream, T!["goto"])?,
         label: parse_local_identifier(stream)?,
@@ -14,6 +14,6 @@ pub fn parse_goto<'arena>(stream: &mut TokenStream<'arena>) -> Result<Goto<'aren
     })
 }
 
-pub fn parse_label<'arena>(stream: &mut TokenStream<'arena>) -> Result<Label<'arena>, ParseError> {
+pub fn parse_label<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Label<'arena>, ParseError> {
     Ok(Label { name: parse_local_identifier(stream)?, colon: utils::expect_span(stream, T![":"])? })
 }

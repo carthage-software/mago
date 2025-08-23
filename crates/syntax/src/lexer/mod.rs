@@ -36,15 +36,15 @@ mod internal;
 /// and produces tokens incrementally. This allows for efficient processing of large source files and
 /// minimizes memory usage.
 #[derive(Debug)]
-pub struct Lexer<'arena> {
+pub struct Lexer<'input, 'arena> {
     arena: &'arena Bump,
-    input: Input<'arena>,
+    input: Input<'input>,
     mode: LexerMode<'arena>,
     interpolating: bool,
     buffer: VecDeque<Token<'arena>>,
 }
 
-impl<'arena> Lexer<'arena> {
+impl<'input, 'arena> Lexer<'input, 'arena> {
     /// Creates a new `Lexer` instance.
     ///
     /// # Parameters
@@ -55,7 +55,7 @@ impl<'arena> Lexer<'arena> {
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    pub fn new(arena: &'arena Bump, input: Input<'arena>) -> Lexer<'arena> {
+    pub fn new(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
         Lexer { arena, input, mode: LexerMode::Inline, interpolating: false, buffer: VecDeque::new() }
     }
 
@@ -69,7 +69,7 @@ impl<'arena> Lexer<'arena> {
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    pub fn scripting(arena: &'arena Bump, input: Input<'arena>) -> Lexer<'arena> {
+    pub fn scripting(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
         Lexer { arena, input, mode: LexerMode::Script, interpolating: false, buffer: VecDeque::new() }
     }
 
@@ -580,9 +580,11 @@ impl<'arena> Lexer<'arena> {
                     TokenKind::Backtick => LexerMode::ShellExecuteString(Interpolation::None),
                     TokenKind::CloseTag => LexerMode::Inline,
                     TokenKind::HaltCompiler => LexerMode::Halt(HaltStage::LookingForLeftParenthesis),
-                    TokenKind::DocumentStart(document_kind) => {
-                        LexerMode::DocumentString(document_kind, document_label, Interpolation::None)
-                    }
+                    TokenKind::DocumentStart(document_kind) => LexerMode::DocumentString(
+                        document_kind,
+                        self.arena.alloc_slice_copy(document_label),
+                        Interpolation::None,
+                    ),
                     _ => LexerMode::Script,
                 };
 
@@ -985,7 +987,7 @@ impl<'arena> Lexer<'arena> {
     }
 }
 
-impl HasFileId for Lexer<'_> {
+impl HasFileId for Lexer<'_, '_> {
     #[inline]
     fn file_id(&self) -> FileId {
         self.input.file_id()

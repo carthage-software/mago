@@ -9,7 +9,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_enum_case_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<EnumCase<'arena>, ParseError> {
     Ok(EnumCase {
@@ -20,7 +20,7 @@ pub fn parse_enum_case_with_attributes<'arena>(
     })
 }
 
-pub fn parse_enum_case_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<EnumCaseItem<'arena>, ParseError> {
+pub fn parse_enum_case_item<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<EnumCaseItem<'arena>, ParseError> {
     let name = parse_local_identifier(stream)?;
 
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {

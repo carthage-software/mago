@@ -9,7 +9,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_arrow_function_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<ArrowFunction<'arena>, ParseError> {
     Ok(ArrowFunction {

@@ -5,7 +5,7 @@ use crate::parser::internal::identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn is_at_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<bool, ParseError> {
+pub fn is_at_type_hint<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<bool, ParseError> {
     Ok(matches!(
         utils::peek(stream)?.kind,
         T!["?"
@@ -26,11 +26,13 @@ pub fn is_at_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<bool,
     ))
 }
 
-pub fn parse_optional_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<Option<Hint<'arena>>, ParseError> {
+pub fn parse_optional_type_hint<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<Option<Hint<'arena>>, ParseError> {
     if is_at_type_hint(stream)? { Ok(Some(parse_type_hint(stream)?)) } else { Ok(None) }
 }
 
-pub fn parse_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<Hint<'arena>, ParseError> {
+pub fn parse_type_hint<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Hint<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     let hint = match &token.kind {
@@ -108,7 +110,9 @@ pub fn parse_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<Hint<
     })
 }
 
-pub fn parse_nullable_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Result<NullableHint<'arena>, ParseError> {
+pub fn parse_nullable_type_hint<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<NullableHint<'arena>, ParseError> {
     let question_mark = utils::expect(stream, T!["?"])?.span;
     let hint = parse_type_hint(stream)?;
 
@@ -116,7 +120,7 @@ pub fn parse_nullable_type_hint<'arena>(stream: &mut TokenStream<'arena>) -> Res
 }
 
 pub fn parse_parenthesized_type_hint<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ParenthesizedHint<'arena>, ParseError> {
     let left_parenthesis = utils::expect(stream, T!["("])?.span;
     let hint = parse_type_hint(stream)?;

@@ -482,7 +482,7 @@ impl<'arena> Printer<'arena> {
                     // Note: The check against `self.out` is an intentional simplification
                     // for `fits`, as the exact output isn't known. A soft space
                     // is assumed to have a width of 1 unless it's a line break.
-                    } else if self.out.last().map_or(true, |&b| !is_space(b)) {
+                    } else if self.out.last().is_none_or(|&b| !is_space(b)) {
                         remaining_width -= 1;
                     }
                 }
@@ -544,10 +544,10 @@ impl<'arena> Printer<'arena> {
                 return false;
             }
 
-            if stack.is_empty() {
-                if let Some(cmd) = cmds.next() {
-                    stack.push((cmd.mode, &cmd.document));
-                }
+            if stack.is_empty()
+                && let Some(cmd) = cmds.next()
+            {
+                stack.push((cmd.mode, &cmd.document));
             }
         }
 

@@ -9,7 +9,7 @@ use crate::parser::internal::utils;
 use crate::token::DocumentKind;
 use crate::token::TokenKind;
 
-pub fn parse_string<'arena>(stream: &mut TokenStream<'arena>) -> Result<CompositeString<'arena>, ParseError> {
+pub fn parse_string<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<CompositeString<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
@@ -32,7 +32,7 @@ pub fn parse_string<'arena>(stream: &mut TokenStream<'arena>) -> Result<Composit
 }
 
 pub fn parse_interpolated_string<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<InterpolatedString<'arena>, ParseError> {
     let left_double_quote = utils::expect_span(stream, T!["\""])?;
     let mut parts = stream.new_vec();
@@ -46,7 +46,7 @@ pub fn parse_interpolated_string<'arena>(
 }
 
 pub fn parse_shell_execute_string<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ShellExecuteString<'arena>, ParseError> {
     let left_backtick = utils::expect_span(stream, T!["`"])?;
     let mut parts = stream.new_vec();
@@ -59,7 +59,9 @@ pub fn parse_shell_execute_string<'arena>(
     Ok(ShellExecuteString { left_backtick, parts: Sequence::new(parts), right_backtick })
 }
 
-pub fn parse_document_string<'arena>(stream: &mut TokenStream<'arena>) -> Result<DocumentString<'arena>, ParseError> {
+pub fn parse_document_string<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<DocumentString<'arena>, ParseError> {
     let current = utils::expect_any(stream)?;
     let (open, kind) = match current.kind {
         TokenKind::DocumentStart(DocumentKind::Heredoc) => (current.span, AstDocumentKind::Heredoc),
@@ -118,7 +120,7 @@ pub fn parse_document_string<'arena>(stream: &mut TokenStream<'arena>) -> Result
 }
 
 pub fn parse_optional_string_part<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     closing_kind: TokenKind,
 ) -> Result<Option<StringPart<'arena>>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
@@ -138,7 +140,7 @@ pub fn parse_optional_string_part<'arena>(
 }
 
 pub fn parse_braced_expression_string_part<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<BracedExpressionStringPart<'arena>, ParseError> {
     let left_brace = utils::expect_span(stream, T!["{"])?;
     let expression = parse_expression(stream)?;
@@ -147,7 +149,9 @@ pub fn parse_braced_expression_string_part<'arena>(
     Ok(BracedExpressionStringPart { left_brace, expression: stream.alloc(expression), right_brace })
 }
 
-fn parse_string_part_expression<'arena>(stream: &mut TokenStream<'arena>) -> Result<Expression<'arena>, ParseError> {
+fn parse_string_part_expression<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<Expression<'arena>, ParseError> {
     let expression = parse_expression(stream)?;
 
     let Expression::ArrayAccess(ArrayAccess { array, left_bracket, index, right_bracket }) = expression else {

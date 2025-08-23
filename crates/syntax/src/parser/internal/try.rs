@@ -8,7 +8,7 @@ use crate::parser::internal::type_hint::parse_type_hint;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable::parse_direct_variable;
 
-pub fn parse_try<'arena>(stream: &mut TokenStream<'arena>) -> Result<Try<'arena>, ParseError> {
+pub fn parse_try<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Try<'arena>, ParseError> {
     Ok(Try {
         r#try: utils::expect_keyword(stream, T!["try"])?,
         block: parse_block(stream)?,
@@ -25,7 +25,7 @@ pub fn parse_try<'arena>(stream: &mut TokenStream<'arena>) -> Result<Try<'arena>
 }
 
 pub fn parse_optional_try_catch_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<TryCatchClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["catch"]) => {
@@ -46,7 +46,7 @@ pub fn parse_optional_try_catch_clause<'arena>(
 }
 
 pub fn parse_optional_try_finally_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<TryFinallyClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["finally"]) => {

@@ -10,7 +10,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_constant_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attribute_lists: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Constant<'arena>, ParseError> {
     Ok(Constant {
@@ -40,7 +40,7 @@ pub fn parse_constant_with_attributes<'arena>(
     })
 }
 
-pub fn parse_constant_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<ConstantItem<'arena>, ParseError> {
+pub fn parse_constant_item<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ConstantItem<'arena>, ParseError> {
     Ok(ConstantItem {
         name: parse_local_identifier(stream)?,
         equals: utils::expect_span(stream, T!["="])?,

@@ -10,7 +10,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_trait_use<'arena>(stream: &mut TokenStream<'arena>) -> Result<TraitUse<'arena>, ParseError> {
+pub fn parse_trait_use<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<TraitUse<'arena>, ParseError> {
     Ok(TraitUse {
         r#use: utils::expect_keyword(stream, T!["use"])?,
         trait_names: {
@@ -41,7 +41,7 @@ pub fn parse_trait_use<'arena>(stream: &mut TokenStream<'arena>) -> Result<Trait
 }
 
 pub fn parse_trait_use_specification<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<TraitUseSpecification<'arena>, ParseError> {
     let next = utils::peek(stream)?;
     Ok(match next.kind {
@@ -66,7 +66,7 @@ pub fn parse_trait_use_specification<'arena>(
 }
 
 pub fn parse_trait_use_adaptation<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<TraitUseAdaptation<'arena>, ParseError> {
     Ok(match parse_trait_use_method_reference(stream)? {
         TraitUseMethodReference::Absolute(reference) => {
@@ -128,7 +128,7 @@ pub fn parse_trait_use_adaptation<'arena>(
 }
 
 pub fn parse_trait_use_method_reference<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<TraitUseMethodReference<'arena>, ParseError> {
     Ok(match utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind) {
         Some(T!["::"]) => TraitUseMethodReference::Absolute(parse_trait_use_absolute_method_reference(stream)?),
@@ -137,7 +137,7 @@ pub fn parse_trait_use_method_reference<'arena>(
 }
 
 pub fn parse_trait_use_absolute_method_reference<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<TraitUseAbsoluteMethodReference<'arena>, ParseError> {
     Ok(TraitUseAbsoluteMethodReference {
         trait_name: parse_identifier(stream)?,

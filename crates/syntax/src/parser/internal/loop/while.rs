@@ -8,7 +8,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_while<'arena>(stream: &mut TokenStream<'arena>) -> Result<While<'arena>, ParseError> {
+pub fn parse_while<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<While<'arena>, ParseError> {
     Ok(While {
         r#while: utils::expect_keyword(stream, T!["while"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
@@ -22,7 +22,7 @@ pub fn parse_while<'arena>(stream: &mut TokenStream<'arena>) -> Result<While<'ar
     })
 }
 
-pub fn parse_while_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<WhileBody<'arena>, ParseError> {
+pub fn parse_while_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<WhileBody<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => WhileBody::ColonDelimited(parse_while_colon_delimited_body(stream)?),
         _ => WhileBody::Statement({
@@ -34,7 +34,7 @@ pub fn parse_while_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<Whil
 }
 
 pub fn parse_while_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<WhileColonDelimitedBody<'arena>, ParseError> {
     Ok(WhileColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,

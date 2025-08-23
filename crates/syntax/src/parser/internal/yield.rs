@@ -6,7 +6,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::token::Precedence;
 
-pub fn parse_yield<'arena>(stream: &mut TokenStream<'arena>) -> Result<Yield<'arena>, ParseError> {
+pub fn parse_yield<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Yield<'arena>, ParseError> {
     let r#yield = utils::expect_keyword(stream, T!["yield"])?;
 
     Ok(match utils::peek(stream)?.kind {

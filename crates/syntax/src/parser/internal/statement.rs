@@ -40,7 +40,7 @@ use crate::parser::internal::unset::parse_unset;
 use crate::parser::internal::r#use::parse_use;
 use crate::parser::internal::utils;
 
-pub fn parse_statement<'arena>(stream: &mut TokenStream<'arena>) -> Result<Statement<'arena>, ParseError> {
+pub fn parse_statement<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Statement<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![InlineText | InlineShebang] => Statement::Inline(parse_inline(stream)?),
         T!["<?php"] | T!["<?="] | T!["<?"] => Statement::OpeningTag(parse_opening_tag(stream)?),
@@ -161,7 +161,7 @@ pub fn parse_statement<'arena>(stream: &mut TokenStream<'arena>) -> Result<State
 }
 
 fn parse_closure_or_function<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Statement<'arena>, ParseError> {
     Ok(match (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)) {

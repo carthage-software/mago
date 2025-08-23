@@ -124,7 +124,10 @@ where
             .map_init(Bump::new, |arena, file| {
                 let interner = self.interner.clone();
                 let metadata = scan_file_for_metadata(&file, arena, &interner);
+
+                arena.reset();
                 compiling_bar.inc(1);
+
                 metadata
             })
             .collect();
@@ -167,7 +170,10 @@ where
                 let interner = self.interner.clone();
                 let codebase = Arc::clone(&final_codebase);
                 let result = map_function(context, arena, interner, file, codebase)?;
+
+                arena.reset();
                 main_task_bar.inc(1);
+
                 Ok(result)
             })
             .collect::<Result<Vec<I>, Error>>()?;
@@ -210,7 +216,7 @@ where
     /// Executes the pipeline with a given map function on all `Host` files.
     pub fn run<F>(&self, map_function: F) -> Result<R, Error>
     where
-        F: Fn(T, &mut Bump, Arc<File>) -> Result<I, Error> + Send + Sync,
+        F: Fn(T, &Bump, Arc<File>) -> Result<I, Error> + Send + Sync,
     {
         let host_files = self
             .database
@@ -230,7 +236,10 @@ where
             .map_init(Bump::new, |arena, file| {
                 let context = self.shared_context.clone();
                 let result = map_function(context, arena, file)?;
+
+                arena.reset();
                 progress_bar.inc(1);
+
                 Ok(result)
             })
             .collect::<Result<Vec<I>, Error>>()?;

@@ -29,12 +29,12 @@ use crate::parser::internal::r#yield::parse_yield;
 use crate::token::Associativity;
 use crate::token::Precedence;
 
-pub fn parse_expression<'arena>(stream: &mut TokenStream<'arena>) -> Result<Expression<'arena>, ParseError> {
+pub fn parse_expression<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Expression<'arena>, ParseError> {
     parse_expression_with_precedence(stream, Precedence::Lowest)
 }
 
 pub fn parse_expression_with_precedence<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     precedence: Precedence,
 ) -> Result<Expression<'arena>, ParseError> {
     let mut left = parse_lhs_expression(stream, precedence)?;
@@ -84,7 +84,7 @@ pub fn parse_expression_with_precedence<'arena>(
 
 #[inline]
 fn parse_lhs_expression<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     precedence: Precedence,
 ) -> Result<Expression<'arena>, ParseError> {
     let token = utils::peek(stream)?;
@@ -159,7 +159,7 @@ fn parse_lhs_expression<'arena>(
 }
 
 fn parse_arrow_function_or_closure<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Either<ArrowFunction<'arena>, Closure<'arena>>, ParseError> {
     let attributes = attribute::parse_attribute_list_sequence(stream)?;
 
@@ -178,7 +178,7 @@ fn parse_arrow_function_or_closure<'arena>(
 }
 
 fn parse_postfix_expression<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     lhs: Expression<'arena>,
     precedence: Precedence,
 ) -> Result<Expression<'arena>, ParseError> {
@@ -347,7 +347,7 @@ fn parse_postfix_expression<'arena>(
 }
 
 fn parse_infix_expression<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     lhs: Expression<'arena>,
 ) -> Result<Expression<'arena>, ParseError> {
     let operator = utils::peek(stream)?;
@@ -783,7 +783,7 @@ fn parse_infix_expression<'arena>(
 ///  * `($x + $y) = $z` is transformed to `$x + ($y = $z)`
 ///  * `((string) $bar) = $foo` is transformed to `(string) ($bar = $foo)`
 fn create_assignment_expression<'arena>(
-    stream: &TokenStream<'arena>,
+    stream: &TokenStream<'_, 'arena>,
     lhs: Expression<'arena>,
     operator: AssignmentOperator,
     rhs: Expression<'arena>,

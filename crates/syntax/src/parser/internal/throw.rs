@@ -5,7 +5,7 @@ use crate::parser::internal::expression::parse_expression;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_throw<'arena>(stream: &mut TokenStream<'arena>) -> Result<Throw<'arena>, ParseError> {
+pub fn parse_throw<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Throw<'arena>, ParseError> {
     Ok(Throw {
         throw: utils::expect_keyword(stream, T!["throw"])?,
         exception: {

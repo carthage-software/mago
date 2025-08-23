@@ -23,17 +23,17 @@ pub struct State {
 }
 
 #[derive(Debug)]
-pub struct TokenStream<'arena> {
+pub struct TokenStream<'input, 'arena> {
     arena: &'arena Bump,
-    lexer: Lexer<'arena>,
+    lexer: Lexer<'input, 'arena>,
     buffer: VecDeque<Token<'arena>>,
     trivia: Vec<'arena, Token<'arena>>,
     position: Position,
     pub(crate) state: State,
 }
 
-impl<'arena> TokenStream<'arena> {
-    pub fn new(arena: &'arena Bump, lexer: Lexer<'arena>) -> TokenStream<'arena> {
+impl<'input, 'arena> TokenStream<'input, 'arena> {
+    pub fn new(arena: &'arena Bump, lexer: Lexer<'input, 'arena>) -> TokenStream<'input, 'arena> {
         let position = lexer.get_position();
 
         TokenStream {
@@ -185,7 +185,7 @@ impl<'arena> TokenStream<'arena> {
     }
 }
 
-impl HasFileId for TokenStream<'_> {
+impl HasFileId for TokenStream<'_, '_> {
     fn file_id(&self) -> mago_database::file::FileId {
         self.lexer.file_id()
     }

@@ -9,7 +9,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_attribute_list_sequence<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Sequence<'arena, AttributeList<'arena>>, ParseError> {
     let mut inner = stream.new_vec();
     loop {
@@ -24,7 +24,7 @@ pub fn parse_attribute_list_sequence<'arena>(
     Ok(Sequence::new(inner))
 }
 
-pub fn parse_attribute_list<'arena>(stream: &mut TokenStream<'arena>) -> Result<AttributeList<'arena>, ParseError> {
+pub fn parse_attribute_list<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<AttributeList<'arena>, ParseError> {
     Ok(AttributeList {
         hash_left_bracket: utils::expect_span(stream, T!["#["])?,
         attributes: {
@@ -52,7 +52,7 @@ pub fn parse_attribute_list<'arena>(stream: &mut TokenStream<'arena>) -> Result<
     })
 }
 
-pub fn parse_attribute<'arena>(stream: &mut TokenStream<'arena>) -> Result<Attribute<'arena>, ParseError> {
+pub fn parse_attribute<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Attribute<'arena>, ParseError> {
     Ok(Attribute {
         name: identifier::parse_identifier(stream)?,
         argument_list: argument::parse_optional_argument_list(stream)?,

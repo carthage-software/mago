@@ -22,7 +22,7 @@ pub mod property;
 pub mod trait_use;
 
 pub fn parse_interface_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Interface<'arena>, ParseError> {
     Ok(Interface {
@@ -48,7 +48,7 @@ pub fn parse_interface_with_attributes<'arena>(
 }
 
 pub fn parse_class_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Class<'arena>, ParseError> {
     let modifiers = parse_modifier_sequence(stream)?;
@@ -57,7 +57,7 @@ pub fn parse_class_with_attributes<'arena>(
 }
 
 pub fn parse_class_with_attributes_and_modifiers<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
     modifiers: Sequence<'arena, Modifier<'arena>>,
 ) -> Result<Class<'arena>, ParseError> {
@@ -85,7 +85,9 @@ pub fn parse_class_with_attributes_and_modifiers<'arena>(
     })
 }
 
-pub fn parse_anonymous_class<'arena>(stream: &mut TokenStream<'arena>) -> Result<AnonymousClass<'arena>, ParseError> {
+pub fn parse_anonymous_class<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<AnonymousClass<'arena>, ParseError> {
     Ok(AnonymousClass {
         new: utils::expect_keyword(stream, T!["new"])?,
         attribute_lists: parse_attribute_list_sequence(stream)?,
@@ -112,7 +114,7 @@ pub fn parse_anonymous_class<'arena>(stream: &mut TokenStream<'arena>) -> Result
 }
 
 pub fn parse_trait_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Trait<'arena>, ParseError> {
     Ok(Trait {
@@ -136,7 +138,7 @@ pub fn parse_trait_with_attributes<'arena>(
 }
 
 pub fn parse_enum_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Enum<'arena>, ParseError> {
     Ok(Enum {
@@ -162,7 +164,7 @@ pub fn parse_enum_with_attributes<'arena>(
 }
 
 pub fn parse_optional_enum_backing_type_hint<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<EnumBackingTypeHint<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T![":"]) => {

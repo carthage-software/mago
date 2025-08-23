@@ -4,7 +4,7 @@ use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_identifier<'arena>(stream: &mut TokenStream<'arena>) -> Result<Identifier<'arena>, ParseError> {
+pub fn parse_identifier<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Identifier<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match &token.kind {
@@ -14,7 +14,9 @@ pub fn parse_identifier<'arena>(stream: &mut TokenStream<'arena>) -> Result<Iden
     })
 }
 
-pub fn parse_local_identifier<'arena>(stream: &mut TokenStream<'arena>) -> Result<LocalIdentifier<'arena>, ParseError> {
+pub fn parse_local_identifier<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<LocalIdentifier<'arena>, ParseError> {
     let token = utils::expect_any(stream)?;
 
     if !token.kind.is_identifier_maybe_reserved() {
@@ -25,7 +27,7 @@ pub fn parse_local_identifier<'arena>(stream: &mut TokenStream<'arena>) -> Resul
 }
 
 pub fn parse_qualified_identifier<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<QualifiedIdentifier<'arena>, ParseError> {
     let token = utils::expect(stream, T![QualifiedIdentifier])?;
 
@@ -33,7 +35,7 @@ pub fn parse_qualified_identifier<'arena>(
 }
 
 pub fn parse_fully_qualified_identifier<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<FullyQualifiedIdentifier<'arena>, ParseError> {
     let token = utils::expect(stream, T![FullyQualifiedIdentifier])?;
 

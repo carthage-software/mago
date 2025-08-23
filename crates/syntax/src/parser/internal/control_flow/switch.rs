@@ -9,7 +9,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_switch<'arena>(stream: &mut TokenStream<'arena>) -> Result<Switch<'arena>, ParseError> {
+pub fn parse_switch<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Switch<'arena>, ParseError> {
     Ok(Switch {
         switch: utils::expect_keyword(stream, T!["switch"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
@@ -23,7 +23,7 @@ pub fn parse_switch<'arena>(stream: &mut TokenStream<'arena>) -> Result<Switch<'
     })
 }
 
-pub fn parse_switch_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<SwitchBody<'arena>, ParseError> {
+pub fn parse_switch_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<SwitchBody<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {
@@ -36,7 +36,7 @@ pub fn parse_switch_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<Swi
 }
 
 pub fn parse_switch_brace_delimited_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<SwitchBraceDelimitedBody<'arena>, ParseError> {
     let left_brace = utils::expect_span(stream, T!["{"])?;
     let optional_terminator = parse_optional_terminator(stream)?;
@@ -47,7 +47,7 @@ pub fn parse_switch_brace_delimited_body<'arena>(
 }
 
 pub fn parse_switch_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<SwitchColonDelimitedBody<'arena>, ParseError> {
     Ok(SwitchColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
@@ -59,7 +59,7 @@ pub fn parse_switch_colon_delimited_body<'arena>(
 }
 
 pub fn parse_switch_cases<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Sequence<'arena, SwitchCase<'arena>>, ParseError> {
     let mut cases = stream.new_vec();
     loop {
@@ -73,7 +73,7 @@ pub fn parse_switch_cases<'arena>(
     Ok(Sequence::new(cases))
 }
 
-pub fn parse_switch_case<'arena>(stream: &mut TokenStream<'arena>) -> Result<SwitchCase<'arena>, ParseError> {
+pub fn parse_switch_case<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<SwitchCase<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["default"] => SwitchCase::Default(parse_switch_default_case(stream)?),
         _ => SwitchCase::Expression(parse_switch_expression_case(stream)?),
@@ -81,7 +81,7 @@ pub fn parse_switch_case<'arena>(stream: &mut TokenStream<'arena>) -> Result<Swi
 }
 
 pub fn parse_switch_expression_case<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<SwitchExpressionCase<'arena>, ParseError> {
     Ok(SwitchExpressionCase {
         case: utils::expect_keyword(stream, T!["case"])?,
@@ -96,7 +96,7 @@ pub fn parse_switch_expression_case<'arena>(
 }
 
 pub fn parse_switch_default_case<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<SwitchDefaultCase<'arena>, ParseError> {
     Ok(SwitchDefaultCase {
         default: utils::expect_keyword(stream, T!["default"])?,
@@ -106,7 +106,7 @@ pub fn parse_switch_default_case<'arena>(
 }
 
 pub fn parse_switch_statements<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError> {
     let mut statements = stream.new_vec();
     loop {
@@ -121,7 +121,7 @@ pub fn parse_switch_statements<'arena>(
 }
 
 pub fn parse_switch_case_separator<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<SwitchCaseSeparator, ParseError> {
     let token = utils::expect_one_of(stream, T![":", ";"])?;
 

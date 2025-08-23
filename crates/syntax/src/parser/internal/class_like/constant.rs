@@ -11,7 +11,7 @@ use crate::parser::internal::type_hint::parse_type_hint;
 use crate::parser::internal::utils;
 
 pub fn parse_class_like_constant_with_attributes_and_modifiers<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
     modifiers: Sequence<'arena, Modifier<'arena>>,
 ) -> Result<ClassLikeConstant<'arena>, ParseError> {
@@ -48,7 +48,7 @@ pub fn parse_class_like_constant_with_attributes_and_modifiers<'arena>(
 }
 
 pub fn parse_constant_item<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ClassLikeConstantItem<'arena>, ParseError> {
     Ok(ClassLikeConstantItem {
         name: parse_local_identifier(stream)?,

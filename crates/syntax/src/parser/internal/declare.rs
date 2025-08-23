@@ -10,7 +10,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_declare<'arena>(stream: &mut TokenStream<'arena>) -> Result<Declare<'arena>, ParseError> {
+pub fn parse_declare<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Declare<'arena>, ParseError> {
     Ok(Declare {
         declare: utils::expect_keyword(stream, T!["declare"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
@@ -40,7 +40,7 @@ pub fn parse_declare<'arena>(stream: &mut TokenStream<'arena>) -> Result<Declare
     })
 }
 
-pub fn parse_declare_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<DeclareItem<'arena>, ParseError> {
+pub fn parse_declare_item<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<DeclareItem<'arena>, ParseError> {
     Ok(DeclareItem {
         name: parse_local_identifier(stream)?,
         equal: utils::expect_span(stream, T!["="])?,
@@ -48,7 +48,7 @@ pub fn parse_declare_item<'arena>(stream: &mut TokenStream<'arena>) -> Result<De
     })
 }
 
-pub fn parse_declare_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<DeclareBody<'arena>, ParseError> {
+pub fn parse_declare_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<DeclareBody<'arena>, ParseError> {
     let next = utils::peek(stream)?;
 
     Ok(match next.kind {
@@ -62,7 +62,7 @@ pub fn parse_declare_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<De
 }
 
 pub fn parse_declare_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<DeclareColonDelimitedBody<'arena>, ParseError> {
     Ok(DeclareColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,

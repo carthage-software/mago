@@ -17,7 +17,9 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::parser::internal::variable;
 
-pub fn parse_classlike_member<'arena>(stream: &mut TokenStream<'arena>) -> Result<ClassLikeMember<'arena>, ParseError> {
+pub fn parse_classlike_member<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<ClassLikeMember<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["#["] => {
             let attributes = parse_attribute_list_sequence(stream)?;
@@ -52,7 +54,7 @@ pub fn parse_classlike_member<'arena>(stream: &mut TokenStream<'arena>) -> Resul
 }
 
 pub fn parse_classlike_member_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<ClassLikeMember<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
@@ -81,7 +83,7 @@ pub fn parse_classlike_member_with_attributes<'arena>(
 }
 
 pub fn parse_classlike_member_with_attributes_and_modifiers<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
     modifiers: Sequence<'arena, Modifier<'arena>>,
 ) -> Result<ClassLikeMember<'arena>, ParseError> {
@@ -97,7 +99,7 @@ pub fn parse_classlike_member_with_attributes_and_modifiers<'arena>(
 }
 
 pub fn parse_classlike_member_selector<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ClassLikeMemberSelector<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
@@ -120,7 +122,7 @@ pub fn parse_classlike_member_selector<'arena>(
 }
 
 pub fn parse_classlike_constant_selector_or_variable<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Either<ClassLikeConstantSelector<'arena>, Variable<'arena>>, ParseError> {
     let token = utils::peek(stream)?;
 

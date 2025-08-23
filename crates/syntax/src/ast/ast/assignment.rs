@@ -56,6 +56,27 @@ impl AssignmentOperator {
             Self::BitwiseAnd(_) | Self::BitwiseOr(_) | Self::BitwiseXor(_) | Self::LeftShift(_) | Self::RightShift(_)
         )
     }
+
+    /// Returns the string representation of the assignment operator.
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Assign(_) => "=",
+            Self::Addition(_) => "+=",
+            Self::Subtraction(_) => "-=",
+            Self::Multiplication(_) => "*=",
+            Self::Division(_) => "/=",
+            Self::Modulo(_) => "%=",
+            Self::Exponentiation(_) => "**=",
+            Self::Concat(_) => ".=",
+            Self::BitwiseAnd(_) => "&=",
+            Self::BitwiseOr(_) => "|=",
+            Self::BitwiseXor(_) => "^=",
+            Self::LeftShift(_) => "<<=",
+            Self::RightShift(_) => ">>=",
+            Self::Coalesce(_) => "??=",
+        }
+    }
 }
 
 impl HasSpan for AssignmentOperator {

@@ -9,7 +9,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 use crate::token::Precedence;
 
-pub fn parse_construct<'arena>(stream: &mut TokenStream<'arena>) -> Result<Construct<'arena>, ParseError> {
+pub fn parse_construct<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Construct<'arena>, ParseError> {
     let token = utils::peek(stream)?;
 
     Ok(match token.kind {

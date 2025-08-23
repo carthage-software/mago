@@ -6,7 +6,7 @@ use crate::parser::internal::expression::parse_expression;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_match<'arena>(stream: &mut TokenStream<'arena>) -> Result<Match<'arena>, ParseError> {
+pub fn parse_match<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Match<'arena>, ParseError> {
     Ok(Match {
         r#match: utils::expect_keyword(stream, T!["match"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
@@ -43,7 +43,7 @@ pub fn parse_match<'arena>(stream: &mut TokenStream<'arena>) -> Result<Match<'ar
     })
 }
 
-pub fn parse_match_arm<'arena>(stream: &mut TokenStream<'arena>) -> Result<MatchArm<'arena>, ParseError> {
+pub fn parse_match_arm<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<MatchArm<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T!["default"] => MatchArm::Default(parse_match_default_arm(stream)?),
         _ => MatchArm::Expression(parse_match_expression_arm(stream)?),
@@ -51,7 +51,7 @@ pub fn parse_match_arm<'arena>(stream: &mut TokenStream<'arena>) -> Result<Match
 }
 
 pub fn parse_match_expression_arm<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<MatchExpressionArm<'arena>, ParseError> {
     Ok(MatchExpressionArm {
         conditions: {
@@ -86,7 +86,7 @@ pub fn parse_match_expression_arm<'arena>(
 }
 
 pub fn parse_match_default_arm<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<MatchDefaultArm<'arena>, ParseError> {
     Ok(MatchDefaultArm {
         default: utils::expect_keyword(stream, T!["default"])?,

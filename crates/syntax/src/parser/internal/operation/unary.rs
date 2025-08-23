@@ -7,7 +7,7 @@ use crate::parser::internal::utils;
 use crate::token::Precedence;
 
 pub fn parse_unary_prefix_operation<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<UnaryPrefix<'arena>, ParseError> {
     let token = utils::expect_any(stream)?;
     let mut precedence = Precedence::Prefix;

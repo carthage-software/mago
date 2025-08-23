@@ -11,7 +11,7 @@ pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-pub fn parse_continue<'arena>(stream: &mut TokenStream<'arena>) -> Result<Continue<'arena>, ParseError> {
+pub fn parse_continue<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Continue<'arena>, ParseError> {
     Ok(Continue {
         r#continue: utils::expect_keyword(stream, T!["continue"])?,
         level: if !matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {
@@ -23,7 +23,7 @@ pub fn parse_continue<'arena>(stream: &mut TokenStream<'arena>) -> Result<Contin
     })
 }
 
-pub fn parse_break<'arena>(stream: &mut TokenStream<'arena>) -> Result<Break<'arena>, ParseError> {
+pub fn parse_break<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Break<'arena>, ParseError> {
     Ok(Break {
         r#break: utils::expect_keyword(stream, T!["break"])?,
         level: if !matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {

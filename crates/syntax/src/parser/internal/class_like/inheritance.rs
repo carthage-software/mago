@@ -7,7 +7,7 @@ use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
 pub fn parse_optional_implements<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<Implements<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["implements"]) => Some(Implements {
@@ -33,7 +33,9 @@ pub fn parse_optional_implements<'arena>(
     })
 }
 
-pub fn parse_optional_extends<'arena>(stream: &mut TokenStream<'arena>) -> Result<Option<Extends<'arena>>, ParseError> {
+pub fn parse_optional_extends<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<Option<Extends<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["extends"]) => Some(Extends {
             extends: utils::expect_any_keyword(stream)?,

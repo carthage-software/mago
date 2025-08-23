@@ -20,7 +20,7 @@ use crate::token::TokenKind;
 /// the legacy `clone (expr)` structure. Otherwise, it parses the expression as a
 /// standard function call.
 pub fn parse_ambiguous_clone_expression<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Expression<'arena>, ParseError> {
     let clone = utils::expect_keyword(stream, T!["clone"])?;
     if utils::peek(stream)?.kind != TokenKind::LeftParenthesis {

@@ -8,7 +8,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_if<'arena>(stream: &mut TokenStream<'arena>) -> Result<If<'arena>, ParseError> {
+pub fn parse_if<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<If<'arena>, ParseError> {
     Ok(If {
         r#if: utils::expect_keyword(stream, T!["if"])?,
         left_parenthesis: utils::expect_span(stream, T!["("])?,
@@ -22,7 +22,7 @@ pub fn parse_if<'arena>(stream: &mut TokenStream<'arena>) -> Result<If<'arena>, 
     })
 }
 
-pub fn parse_if_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<IfBody<'arena>, ParseError> {
+pub fn parse_if_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<IfBody<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![":"] => IfBody::ColonDelimited(parse_if_colon_delimited_body(stream)?),
         _ => IfBody::Statement(parse_if_statement_body(stream)?),
@@ -30,7 +30,7 @@ pub fn parse_if_body<'arena>(stream: &mut TokenStream<'arena>) -> Result<IfBody<
 }
 
 pub fn parse_if_statement_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfStatementBody<'arena>, ParseError> {
     Ok(IfStatementBody {
         statement: {
@@ -51,7 +51,7 @@ pub fn parse_if_statement_body<'arena>(
 }
 
 pub fn parse_optional_if_statement_body_else_if_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<IfStatementBodyElseIfClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["elseif"]) => Some(parse_if_statement_body_else_if_clause(stream)?),
@@ -60,7 +60,7 @@ pub fn parse_optional_if_statement_body_else_if_clause<'arena>(
 }
 
 pub fn parse_if_statement_body_else_if_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfStatementBodyElseIfClause<'arena>, ParseError> {
     Ok(IfStatementBodyElseIfClause {
         elseif: utils::expect_keyword(stream, T!["elseif"])?,
@@ -80,7 +80,7 @@ pub fn parse_if_statement_body_else_if_clause<'arena>(
 }
 
 pub fn parse_optional_if_statement_body_else_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<IfStatementBodyElseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["else"]) => Some(parse_if_statement_body_else_clause(stream)?),
@@ -89,7 +89,7 @@ pub fn parse_optional_if_statement_body_else_clause<'arena>(
 }
 
 pub fn parse_if_statement_body_else_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfStatementBodyElseClause<'arena>, ParseError> {
     Ok(IfStatementBodyElseClause {
         r#else: utils::expect_keyword(stream, T!["else"])?,
@@ -102,7 +102,7 @@ pub fn parse_if_statement_body_else_clause<'arena>(
 }
 
 pub fn parse_if_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfColonDelimitedBody<'arena>, ParseError> {
     Ok(IfColonDelimitedBody {
         colon: utils::expect_span(stream, T![":"])?,
@@ -133,7 +133,7 @@ pub fn parse_if_colon_delimited_body<'arena>(
 }
 
 pub fn parse_optional_if_colon_delimited_body_else_if_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<IfColonDelimitedBodyElseIfClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["elseif"]) => Some(parse_if_colon_delimited_body_else_if_clause(stream)?),
@@ -142,7 +142,7 @@ pub fn parse_optional_if_colon_delimited_body_else_if_clause<'arena>(
 }
 
 pub fn parse_if_colon_delimited_body_else_if_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfColonDelimitedBodyElseIfClause<'arena>, ParseError> {
     Ok(IfColonDelimitedBodyElseIfClause {
         r#elseif: utils::expect_keyword(stream, T!["elseif"])?,
@@ -170,7 +170,7 @@ pub fn parse_if_colon_delimited_body_else_if_clause<'arena>(
 }
 
 pub fn parse_optional_if_colon_delimited_body_else_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<IfColonDelimitedBodyElseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["else"]) => Some(parse_if_colon_delimited_body_else_clause(stream)?),
@@ -179,7 +179,7 @@ pub fn parse_optional_if_colon_delimited_body_else_clause<'arena>(
 }
 
 pub fn parse_if_colon_delimited_body_else_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<IfColonDelimitedBodyElseClause<'arena>, ParseError> {
     Ok(IfColonDelimitedBodyElseClause {
         r#else: utils::expect_keyword(stream, T!["else"])?,

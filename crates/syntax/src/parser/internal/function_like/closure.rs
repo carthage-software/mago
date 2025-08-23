@@ -11,7 +11,7 @@ use crate::parser::internal::utils;
 use crate::parser::internal::variable::parse_direct_variable;
 
 pub fn parse_closure_with_attributes<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
     attributes: Sequence<'arena, AttributeList<'arena>>,
 ) -> Result<Closure<'arena>, ParseError> {
     Ok(Closure {
@@ -27,7 +27,7 @@ pub fn parse_closure_with_attributes<'arena>(
 }
 
 pub fn parse_optional_closure_use_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Option<ClosureUseClause<'arena>>, ParseError> {
     Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
         Some(T!["use"]) => Some(parse_closure_use_clause(stream)?),
@@ -36,7 +36,7 @@ pub fn parse_optional_closure_use_clause<'arena>(
 }
 
 pub fn parse_closure_use_clause<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ClosureUseClause<'arena>, ParseError> {
     Ok(ClosureUseClause {
         r#use: utils::expect_keyword(stream, T!["use"])?,
@@ -67,7 +67,7 @@ pub fn parse_closure_use_clause<'arena>(
 }
 
 pub fn parse_closure_use_clause_variable<'arena>(
-    stream: &mut TokenStream<'arena>,
+    stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<ClosureUseClauseVariable<'arena>, ParseError> {
     Ok(ClosureUseClauseVariable {
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),

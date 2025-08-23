@@ -1497,6 +1497,7 @@ dependencies = [
  "mago-reporting",
  "mago-semantics",
  "mago-syntax",
+ "mago-syntax-core",
  "mimalloc",
  "num_cpus",
  "openssl",

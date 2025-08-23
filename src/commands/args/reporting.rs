@@ -262,6 +262,8 @@ impl ReportingArgs {
         let changed_results: Vec<bool> = fix_plans
             .into_par_iter()
             .map_init(Bump::new, |arena, (file_id, plan)| {
+                arena.reset();
+
                 let file = read_database.get_ref(&file_id)?;
                 let fixed_content = plan.execute(&file.contents).get_fixed();
                 let final_content = if self.format_after_fix {

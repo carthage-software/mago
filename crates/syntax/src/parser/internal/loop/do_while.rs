@@ -7,7 +7,7 @@ use crate::parser::internal::terminator::parse_terminator;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn parse_do_while<'arena>(stream: &mut TokenStream<'arena>) -> Result<DoWhile<'arena>, ParseError> {
+pub fn parse_do_while<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<DoWhile<'arena>, ParseError> {
     Ok(DoWhile {
         r#do: utils::expect_keyword(stream, T!["do"])?,
         statement: {

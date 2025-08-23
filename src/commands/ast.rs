@@ -3,140 +3,205 @@ use std::process::ExitCode;
 
 use bumpalo::Bump;
 use clap::Parser;
+use colored::Colorize;
 use mago_database::ReadDatabase;
-use mago_database::file::File;
-use mago_database::file::FileType;
-use mago_names::resolver::NameResolver;
 use serde_json::json;
 use termtree::Tree;
 
+use mago_database::file::File;
+use mago_database::file::FileType;
+use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::node::NodeKind;
+use mago_syntax::ast::*;
+use mago_syntax::error::ParseError;
+use mago_syntax::lexer::Lexer;
 use mago_syntax::parser::parse_file;
+use mago_syntax_core::input::Input;
 
 use crate::config::Configuration;
-use crate::enum_variants;
 use crate::error::Error;
 
-/// Represents the `ast` command, which parses a PHP file and prints its abstract syntax tree (AST).
+/// A powerful tool for inspecting the lexical and syntactical structure of PHP code.
+///
+/// This command can tokenize a file, parse it into an Abstract Syntax Tree (AST),
+/// and display the results in various formats. It's an essential utility for
+/// debugging the parser, understanding code structure, or for integration with other tools.
 #[derive(Parser, Debug)]
-#[command(
-    name = "ast",
-    about = "Parse and visualize the abstract syntax tree (AST) of a PHP file",
-    long_about = r#"
-The `ast` command parses a PHP file and outputs its abstract syntax tree (AST).
-
-This command helps you understand the structure of your PHP code and debug parsing issues.
-"#
-)]
+#[command(name = "ast", about = "Inspect the lexical and syntactical structure of a PHP file.", long_about)]
 pub struct AstCommand {
-    /// Path to the PHP file to be parsed.
-    #[arg(long, short = 'f', help = "Specify the PHP file to parse", required = true)]
+    /// The PHP file to inspect.
+    #[arg(required = true)]
     pub file: PathBuf,
 
-    /// Include resolved names in the output.
-    #[arg(long, help = "Include resolved names in the output to show symbol resolution")]
-    pub include_names: bool,
+    /// Display the stream of lexer tokens. Combine with --json for JSON output.
+    #[arg(long, help = "Display the stream of lexer tokens instead of the AST")]
+    pub tokens: bool,
 
-    /// Output the AST in JSON format for integration with other tools.
-    #[arg(long, help = "Output the AST in JSON format")]
+    /// Display the output in a machine-readable JSON format.
+    #[arg(long, help = "Display the output in a machine-readable JSON format")]
     pub json: bool,
 
-    /// Specify where the results should be reported.
+    /// Display the list of resolved symbol names.
     #[arg(
         long,
-        default_value_t,
-        help = "Specify where the results should be reported",
-        ignore_case = true,
-        value_parser = enum_variants!(ReportingTarget)
+        help = "Display the list of resolved symbol names",
+        // Tokens and Names are fundamentally different views
+        conflicts_with = "tokens"
     )]
-    pub reporting_target: ReportingTarget,
-
-    /// Choose the format for reporting issues.
-    #[arg(
-        long,
-        default_value_t,
-        help = "Choose the format for reporting issues",
-        ignore_case = true,
-        value_parser = enum_variants!(ReportingFormat)
-    )]
-    pub reporting_format: ReportingFormat,
+    pub names: bool,
 }
 
-/// Executes the AST command with the provided options.
-///
-/// # Arguments
-///
-/// * `command` - The `AstCommand` structure containing user-specified options.
-///
-/// # Returns
-///
-/// An `ExitCode` indicating the success or failure of the command.
-///
-/// # Errors
-///
-/// An error is returned if the file does not exist or is not readable.
+/// Executes the AST inspection command.
 pub fn execute(command: AstCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    let bump = Bump::new();
+    let arena = Bump::new();
     let file = File::read(&configuration.source.workspace, &command.file, FileType::Host)?;
 
-    // Parse the source file into an AST.
-    let (ast, error) = parse_file(&bump, &file);
+    if command.tokens {
+        return print_tokens(&arena, file, command.json);
+    }
 
-    let has_error = error.is_some();
+    let (program, error) = parse_file(&arena, &file);
+
     if command.json {
-        // Prepare and display JSON output.
-        let result = json!({
-            "program": ast,
-            "error": error.map(|e| Into::<Issue>::into(&e)),
-        });
-
-        println!("{}", serde_json::to_string_pretty(&result)?);
+        print_ast_json(program, error.as_ref())?;
+    } else if command.names {
+        print_names(&arena, program)?;
     } else {
-        // Display the AST as a tree.
-        let tree = node_to_tree(Node::Program(ast));
+        print_ast_tree(program);
+    }
 
-        println!("{tree}");
+    if let Some(error) = error {
+        let issue = Into::<Issue>::into(&error);
+        let database = ReadDatabase::single(file);
+        Reporter::new(database, ReportingTarget::Stdout).report([issue], ReportingFormat::Rich)?;
+        return Ok(ExitCode::FAILURE);
+    }
 
-        if command.include_names {
-            let resolver = NameResolver::new(&bump);
-            let names = resolver.resolve(ast);
+    Ok(ExitCode::SUCCESS)
+}
 
-            for (position, (name, is_imported)) in names.all() {
-                println!("{}: {}{}", position, name, if *is_imported { " (imported)" } else { "" });
+/// Prints the list of tokens from a file, either as a table or as JSON.
+fn print_tokens(arena: &Bump, file: File, as_json: bool) -> Result<ExitCode, Error> {
+    let mut lexer = Lexer::new(arena, Input::from_file(&file));
+    let mut tokens = Vec::new();
+    loop {
+        match lexer.advance() {
+            Some(Ok(token)) => tokens.push(token),
+            Some(Err(err)) => {
+                let issue = Into::<Issue>::into(&err);
+                let database = ReadDatabase::single(file);
+                Reporter::new(database, ReportingTarget::Stdout).report([issue], ReportingFormat::Rich)?;
+                return Ok(ExitCode::FAILURE);
             }
-        }
-
-        // Report errors if any exist.
-        if let Some(error) = &error {
-            let issue = Into::<Issue>::into(error);
-            let database = ReadDatabase::single(file);
-
-            Reporter::new(database, command.reporting_target).report([issue], command.reporting_format)?;
+            None => break,
         }
     }
 
-    Ok(if has_error { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+    if as_json {
+        println!("{}", serde_json::to_string_pretty(&tokens)?);
+    } else {
+        println!();
+        println!("  {}", "Tokens".bold().underline());
+        println!();
+        println!("  {: <25} {: <50} {}", "Kind".bold(), "Value".bold(), "Span".bold());
+        println!("  {0:─<25} {0:─<50} {0:─<20}", "");
+        for token in tokens {
+            let value_str = format!("{:?}", token.value).bright_black();
+            let kind_str = format!("{:?}", token.kind).cyan();
+            println!(
+                "  {: <25} {: <50} {}",
+                kind_str,
+                &value_str[..value_str.len().min(48)],
+                format!("[{}..{}]", token.span.start, token.span.end).dimmed()
+            );
+        }
+        println!();
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
-/// Converts an AST node into a tree structure for visualization.
-///
-/// # Arguments
-///
-/// * `node` - The AST node to be converted into a tree.
-///
-/// # Returns
-///
-/// A `Tree` representation of the AST node and its children.
-fn node_to_tree(node: Node<'_, '_>) -> Tree<NodeKind> {
-    let mut tree = Tree::new(node.kind());
+/// Prints the AST as a rich, human-readable tree.
+fn print_ast_tree(program: &Program) {
+    let tree = node_to_tree(Node::Program(program));
+    println!();
+    println!("{}", tree);
+    println!();
+}
+
+/// Prints the AST in a machine-readable, pretty-printed JSON format.
+fn print_ast_json(program: &Program, error: Option<&ParseError>) -> Result<(), Error> {
+    let result = json!({
+        "program": program,
+        "error": error.map(Into::<Issue>::into),
+    });
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    Ok(())
+}
+
+/// Prints the list of resolved symbol names from the AST.
+fn print_names<'arena>(arena: &'arena Bump, program: &Program<'arena>) -> Result<(), Error> {
+    let resolver = NameResolver::new(arena);
+    let names = resolver.resolve(program);
+
+    println!();
+    println!("  {}", "Resolved Names".bold().underline());
+    println!();
+    println!("  {: <10} {: <50} {}", "Offset".bold(), "Name".bold(), "Imported".bold());
+    println!("  {0:─<10} {0:─<50} {0:─<10}", "");
+
+    for (position, (name, is_imported)) in names.all() {
+        let imported_str = if *is_imported { "✅".green() } else { "❌".red() };
+        println!("  {: <10} {: <50} {}", format!("@{}", position).dimmed(), name.cyan(), imported_str);
+    }
+    println!();
+    Ok(())
+}
+
+/// Recursively converts an AST `Node` into a rich `termtree::Tree`.
+fn node_to_tree(node: Node) -> Tree<String> {
+    let label = match node {
+        // Semicolons!
+        Node::Statement(Statement::Noop(_)) => {
+            format!("{} {}", "Statement".bold().underline(), ";".red().bold())
+        }
+        Node::Terminator(Terminator::Semicolon(_)) => {
+            format!("{} {}", "Terminator".dimmed(), ";".red().bold())
+        }
+        // Structural nodes
+        Node::Program(_) => "Program".bold().underline().to_string(),
+        Node::Statement(_) => "Statement".bold().underline().to_string(),
+        Node::Expression(_) => "Expression".bold().underline().to_string(),
+        // Literals
+        Node::LiteralString(s) => {
+            format!("{} {}", "LiteralString".green(), format!("{:?}", s.value.unwrap_or("")).yellow())
+        }
+        Node::LiteralInteger(i) => {
+            format!("{} {}", "LiteralInteger".green(), i.value.map_or("?".to_string(), |v| v.to_string()).yellow())
+        }
+        Node::LiteralFloat(f) => format!("{} {}", "LiteralFloat".green(), f.value.to_string().yellow()),
+        // Identifiers
+        Node::LocalIdentifier(id) => format!("{} {}", "LocalIdentifier".cyan(), id.value.bright_black()),
+        Node::QualifiedIdentifier(id) => format!("{} {}", "QualifiedIdentifier".cyan(), id.value.bright_black()),
+        Node::FullyQualifiedIdentifier(id) => {
+            format!("{} {}", "FullyQualifiedIdentifier".cyan(), id.value.bright_black())
+        }
+        // Variables
+        Node::DirectVariable(var) => format!("{} {}", "DirectVariable".cyan(), var.name.yellow()),
+        // Operators
+        Node::BinaryOperator(op) => format!("{} {}", "BinaryOperator".magenta(), op.as_str().bold()),
+        Node::UnaryPrefixOperator(op) => format!("{} {}", "UnaryPrefixOperator".magenta(), op.as_str().bold()),
+        Node::UnaryPostfixOperator(op) => format!("{} {}", "UnaryPostfixOperator".magenta(), op.as_str().bold()),
+        Node::AssignmentOperator(op) => format!("{} {}", "AssignmentOperator".magenta(), op.as_str().bold()),
+        // Everything else -> Dimmed
+        _ => format!("{}", node.kind().to_string().dimmed()),
+    };
+
+    let mut tree = Tree::new(label);
     for child in node.children() {
         tree.push(node_to_tree(child));
     }
-
     tree
 }
