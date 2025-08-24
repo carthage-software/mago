@@ -104,12 +104,12 @@ pub trait TType {
 
     fn is_expandable(&self) -> bool;
 
-    /// Return a human-readable identifier for this type, which is
+    /// Return a human-readable atom for this type, which is
     /// suitable for use in error messages or debugging.
     ///
     /// The resulting identifier must be unique for the type,
     /// but it does not have to be globally unique.
-    fn get_id(&self) -> String;
+    fn get_id(&self) -> Atom;
 }
 
 /// Implements the `TType` trait for `TypeRef`.
@@ -156,7 +156,7 @@ impl<'a> TType for TypeRef<'a> {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
             TypeRef::Union(ttype) => ttype.get_id(),
             TypeRef::Atomic(ttype) => ttype.get_id(),

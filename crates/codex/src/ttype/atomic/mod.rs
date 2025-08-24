@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
@@ -891,7 +892,7 @@ impl TType for TAtomic {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_id(),
             TAtomic::Array(array) => array.get_id(),
@@ -904,11 +905,11 @@ impl TType for TAtomic {
             TAtomic::GenericParameter(parameter) => parameter.get_id(),
             TAtomic::Conditional(conditional) => conditional.get_id(),
             TAtomic::Derived(derived) => derived.get_id(),
-            TAtomic::Variable(name) => name.to_string(),
-            TAtomic::Never => "never".to_string(),
-            TAtomic::Null => "null".to_string(),
-            TAtomic::Void => "void".to_string(),
-            TAtomic::Placeholder => "_".to_string(),
+            TAtomic::Variable(name) => *name,
+            TAtomic::Never => atom("never"),
+            TAtomic::Null => atom("null"),
+            TAtomic::Void => atom("void"),
+            TAtomic::Placeholder => atom("_"),
         }
     }
 }

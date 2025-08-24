@@ -5,6 +5,7 @@ use ahash::HashSet;
 use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 
 use crate::get_class_like;
 use crate::inherits_class;
@@ -70,29 +71,29 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     }
 
     if combination.is_simple() {
-        if combination.value_types.contains_key("false") {
+        if combination.value_types.contains_key(&atom("false")) {
             return vec![TAtomic::Scalar(TScalar::r#false())];
         }
 
-        if combination.value_types.contains_key("true") {
+        if combination.value_types.contains_key(&atom("true")) {
             return vec![TAtomic::Scalar(TScalar::r#true())];
         }
 
         return combination.value_types.into_values().collect();
     }
 
-    if combination.value_types.contains_key("void") {
-        combination.value_types.remove("void");
+    if combination.value_types.contains_key(&atom("void")) {
+        combination.value_types.remove(&atom("void"));
 
-        if combination.value_types.contains_key("null") {
-            combination.value_types.insert("null".to_string(), TAtomic::Null);
+        if combination.value_types.contains_key(&atom("null")) {
+            combination.value_types.insert(atom("null"), TAtomic::Null);
         }
     }
 
-    if combination.value_types.contains_key("false") && combination.value_types.contains_key("true") {
-        combination.value_types.remove("false");
-        combination.value_types.remove("true");
-        combination.value_types.insert("bool".to_string(), TAtomic::Scalar(TScalar::bool()));
+    if combination.value_types.contains_key(&atom("false")) && combination.value_types.contains_key(&atom("true")) {
+        combination.value_types.remove(&atom("false"));
+        combination.value_types.remove(&atom("true"));
+        combination.value_types.insert(atom("bool"), TAtomic::Scalar(TScalar::bool()));
     }
 
     let mut new_types = Vec::new();
@@ -179,15 +180,15 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
             .collect::<Vec<_>>(),
     );
 
-    if combination.value_types.contains_key("string")
-        && combination.value_types.contains_key("float")
-        && combination.value_types.contains_key("bool")
+    if combination.value_types.contains_key(&atom("string"))
+        && combination.value_types.contains_key(&atom("float"))
+        && combination.value_types.contains_key(&atom("bool"))
         && combination.integers.iter().any(|integer| integer.is_unspecified())
     {
         combination.integers.clear();
-        combination.value_types.remove("string");
-        combination.value_types.remove("float");
-        combination.value_types.remove("bool");
+        combination.value_types.remove(&atom("string"));
+        combination.value_types.remove(&atom("float"));
+        combination.value_types.remove(&atom("bool"));
 
         new_types.push(TAtomic::Scalar(TScalar::Generic));
     }
@@ -203,7 +204,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     );
 
     for (enum_name, enum_case) in combination.enum_names {
-        if combination.value_types.contains_key(&enum_name.to_string()) {
+        if combination.value_types.contains_key(&enum_name) {
             continue;
         }
 
@@ -215,7 +216,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         combination.value_types.insert(enum_object.get_id(), enum_object);
     }
 
-    let mut has_never = combination.value_types.contains_key("never");
+    let mut has_never = combination.value_types.contains_key(&atom("never"));
 
     let combination_value_type_count = combination.value_types.len();
 
@@ -267,7 +268,7 @@ fn scrape_type_properties(
                 combination.mixed_from_loop_isset = Some(true);
             }
 
-            combination.value_types.insert("mixed".to_string(), atomic);
+            combination.value_types.insert(atom("mixed"), atomic);
 
             return;
         }
@@ -348,7 +349,7 @@ fn scrape_type_properties(
 
             combination.mixed_from_loop_isset = Some(false);
 
-            if combination.value_types.contains_key("null") {
+            if combination.value_types.contains_key(&atom("null")) {
                 combination.generic_mixed = true;
                 return;
             }
@@ -399,7 +400,7 @@ fn scrape_type_properties(
 
     // bool|false = bool
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if !bool.is_general())
-        && combination.value_types.contains_key("bool")
+        && combination.value_types.contains_key(&atom("bool"))
     {
         return;
     }
@@ -424,8 +425,8 @@ fn scrape_type_properties(
 
     // false|bool = bool
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general()) {
-        combination.value_types.remove("false");
-        combination.value_types.remove("true");
+        combination.value_types.remove(&atom("false"));
+        combination.value_types.remove(&atom("true"));
     }
 
     if let TAtomic::Array(array) = atomic {
@@ -577,7 +578,7 @@ fn scrape_type_properties(
                                     (has_existing_entries || cu, new_type)
                                 };
 
-                            combination.keyed_array_entries.insert(candidate_item_name.clone(), new_item_value_type);
+                            combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
                         };
 
                         possibly_undefined_entries.remove(&candidate_item_name);
@@ -719,7 +720,7 @@ fn scrape_type_properties(
         let is_class = matches!(symbol_type, SymbolKind::Class);
         let is_interface = matches!(symbol_type, SymbolKind::Interface);
 
-        let mut types_to_remove = Vec::new();
+        let mut types_to_remove: Vec<Atom> = Vec::new();
 
         for (key, existing_type) in &combination.value_types {
             if let TAtomic::Object(TObject::Named(existing_object)) = &existing_type {
@@ -733,7 +734,7 @@ fn scrape_type_properties(
                         false,
                         &mut ComparisonResult::new(),
                     ) {
-                        types_to_remove.push(existing_name.to_string());
+                        types_to_remove.push(existing_name);
                         continue;
                     }
 
@@ -757,7 +758,7 @@ fn scrape_type_properties(
                 if matches!(existing_symbol_kind, SymbolKind::Class) {
                     // remove subclasses
                     if is_instance_of(codebase, &existing_name, &fq_class_name) {
-                        types_to_remove.push(key.clone());
+                        types_to_remove.push(*key);
                         continue;
                     }
 
@@ -774,7 +775,7 @@ fn scrape_type_properties(
                     }
                 } else if matches!(existing_symbol_kind, SymbolKind::Interface) {
                     if inherits_interface(codebase, &existing_name, &fq_class_name) {
-                        types_to_remove.push(existing_name.to_string());
+                        types_to_remove.push(existing_name);
                         continue;
                     }
 
@@ -804,8 +805,8 @@ fn scrape_type_properties(
                 && k != "false"
                 && k != "true"
                 && k != "float"
-                && k != "array-key"
                 && k != "numeric"
+                && k != "array-key"
         });
 
         combination.value_types.insert(atomic.get_id(), atomic);
@@ -813,7 +814,7 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
-        if combination.value_types.contains_key("scalar") {
+        if combination.value_types.contains_key(&atom("scalar")) {
             return;
         }
 
@@ -826,19 +827,21 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::String(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key("array-key") || combination.value_types.contains_key("scalar"))
+        && (combination.value_types.contains_key(&atom("scalar"))
+            || combination.value_types.contains_key(&atom("array-key")))
     {
         return;
     }
 
     if let TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key("numeric") || combination.value_types.contains_key("scalar"))
+        && (combination.value_types.contains_key(&atom("numeric"))
+            || combination.value_types.contains_key(&atom("scalar")))
     {
         return;
     }
 
     if let TAtomic::Scalar(TScalar::String(mut string_scalar)) = atomic {
-        if let Some(existing_string_type) = combination.value_types.get_mut("string") {
+        if let Some(existing_string_type) = combination.value_types.get_mut(&atom("string")) {
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
                 *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
             };
@@ -862,7 +865,7 @@ fn scrape_type_properties(
                 }
             }
 
-            combination.value_types.insert("string".to_string(), TAtomic::Scalar(TScalar::String(string_scalar)));
+            combination.value_types.insert(atom("string"), TAtomic::Scalar(TScalar::String(string_scalar)));
             combination.literal_strings = AtomSet::default();
         }
 
@@ -876,7 +879,7 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Float(float_scalar)) = &atomic {
-        if combination.value_types.contains_key("float") {
+        if combination.value_types.contains_key(&atom("float")) {
             return;
         }
 
@@ -886,7 +889,7 @@ fn scrape_type_properties(
             }
             _ => {
                 combination.literal_floats = HashSet::default();
-                combination.value_types.insert("float".to_owned(), atomic);
+                combination.value_types.insert(atom("float"), atomic);
             }
         }
 
@@ -909,29 +912,27 @@ fn adjust_keyed_array_parameters(
     *existing_key_param = combine_union_types(existing_key_param, &new_key_type, codebase, overwrite_empty_array);
 }
 
-fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> String {
+fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
     let covariants = if let Some(class_like_metadata) = get_class_like(codebase, name) {
         &class_like_metadata.template_variance
     } else {
-        return name.to_string();
+        return *name;
     };
 
-    let mut str = String::new();
-    str += name.as_ref();
-    str += "<";
-    str += type_params
-        .iter()
-        .enumerate()
-        .map(
-            |(i, tunion)| {
-                if let Some(Variance::Covariant) = covariants.get(&i) { "*".to_string() } else { tunion.get_id() }
-            },
-        )
-        .collect::<Vec<_>>()
-        .join(", ")
-        .as_str();
-    str += ">";
-    str
+    concat_atom!(
+        name.as_ref(),
+        "<",
+        type_params
+            .iter()
+            .enumerate()
+            .map(|(i, tunion)| {
+                if let Some(Variance::Covariant) = covariants.get(&i) { "*" } else { tunion.get_id().as_str() }
+            },)
+            .collect::<Vec<_>>()
+            .join(", ")
+            .as_str(),
+        ">",
+    )
 }
 
 fn combine_string_scalars(s1: &TString, s2: TString) -> TString {

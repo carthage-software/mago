@@ -1,4 +1,6 @@
+use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -139,11 +141,7 @@ impl TType for TValueOf {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut id = String::new();
-        id += "value-of<";
-        id += &self.0.get_id();
-        id += ">";
-        id
+    fn get_id(&self) -> Atom {
+        concat_atom!("value-of<", self.0.get_id().as_str(), ">")
     }
 }

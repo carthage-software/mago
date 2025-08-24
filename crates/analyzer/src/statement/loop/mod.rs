@@ -1094,7 +1094,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
             }
             _ => {
                 let iterator_atomic_id = iterator_atomic.get_id();
-                invalid_atomic_ids.push(iterator_atomic_id);
+                invalid_atomic_ids.push(iterator_atomic_id.as_str());
             }
         }
     }

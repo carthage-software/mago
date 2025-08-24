@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -537,16 +538,16 @@ impl TType for TScalar {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
             TScalar::Bool(t) => t.get_id(),
             TScalar::Float(t) => t.get_id(),
             TScalar::String(t) => t.get_id(),
             TScalar::ClassLikeString(t) => t.get_id(),
             TScalar::Integer(t) => t.get_id(),
-            TScalar::Generic => "scalar".to_string(),
-            TScalar::ArrayKey => "array-key".to_string(),
-            TScalar::Numeric => "numeric".to_string(),
+            TScalar::Generic => atom("scalar"),
+            TScalar::ArrayKey => atom("array-key"),
+            TScalar::Numeric => atom("numeric"),
         }
     }
 }

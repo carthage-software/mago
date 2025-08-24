@@ -3,6 +3,10 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
@@ -136,51 +140,54 @@ impl TType for TList {
         self.element_type.is_expandable()
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         if let Some(elements) = &self.known_elements {
             // Format as list{...} shape
-            let mut str = String::new();
-            str += "list{";
+            let mut string = String::new();
+            string += "list{";
             let has_optional = self.has_known_optional_elements();
             let mut first = true;
             let mut include_index = false;
             for (i, (optional, element_type)) in elements {
                 if !first {
-                    str += ", ";
+                    string += ", ";
                 } else {
                     first = false;
                     include_index = *i != 0;
                 }
 
                 if has_optional || include_index {
-                    str += &i.to_string();
+                    string += &i.to_string();
                     if *optional {
-                        str += "?";
+                        string += "?";
                     }
 
-                    str += ": ";
+                    string += ": ";
                 }
 
-                str += &element_type.get_id();
+                string += &element_type.get_id();
             }
 
             if !self.element_type.is_never() {
                 if !first {
-                    str += ", ";
+                    string += ", ";
                 }
 
-                str += "...<";
-                str += &self.element_type.get_id();
-                str += ">";
+                string += "...<";
+                string += &self.element_type.get_id();
+                string += ">";
             }
 
-            str += "}";
-            str
-        } else {
-            let prefix = if self.is_non_empty() { "non-empty-list<" } else { "list<" };
-            let element_id = self.element_type.get_id();
+            string += "}";
 
-            format!("{prefix}{element_id}>")
+            atom(&string)
+        } else {
+            concat_atom!(
+                if self.is_non_empty() { "non-empty-list" } else { "list" },
+                "<",
+                self.element_type.get_id().as_str(),
+                ">"
+            )
         }
     }
 }

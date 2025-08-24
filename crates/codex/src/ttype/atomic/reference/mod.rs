@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::concat_atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -168,34 +169,25 @@ impl TType for TReference {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut str = String::new();
-        str += "unknown-ref(";
-
+    fn get_id(&self) -> Atom {
         match self {
             TReference::Symbol { name, .. } => {
-                str += name.as_str();
+                concat_atom!("unknown-ref(", name, ")")
             }
-            TReference::Member { class_like_name, member_selector } => {
-                str += class_like_name.as_str();
-                str += "::";
-
-                match member_selector {
-                    TReferenceMemberSelector::Wildcard => str += "*",
-                    TReferenceMemberSelector::Identifier(member_name) => {
-                        str += member_name.as_str();
-                    }
-                    TReferenceMemberSelector::StartsWith(member_name) => {
-                        str += &format!("{member_name}*");
-                    }
-                    TReferenceMemberSelector::EndsWith(member_name) => {
-                        str += &format!("*{member_name}");
-                    }
+            TReference::Member { class_like_name, member_selector } => match member_selector {
+                TReferenceMemberSelector::Wildcard => {
+                    concat_atom!("unknown-ref(", class_like_name, "::*)")
                 }
-            }
+                TReferenceMemberSelector::Identifier(member_name) => {
+                    concat_atom!("unknown-ref(", class_like_name, "::", member_name, ")")
+                }
+                TReferenceMemberSelector::StartsWith(member_name) => {
+                    concat_atom!("unknown-ref(", class_like_name, "::", member_name, "*)")
+                }
+                TReferenceMemberSelector::EndsWith(member_name) => {
+                    concat_atom!("unknown-ref(", class_like_name, "::*", member_name, ")")
+                }
+            },
         }
-
-        str += ")";
-        str
     }
 }

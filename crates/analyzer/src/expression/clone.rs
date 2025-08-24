@@ -94,7 +94,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
         }
 
         if !invalid_clone_atomics.is_empty() {
-            let invalid_types_str = invalid_clone_atomics.iter().map(|t| t.get_id()).collect::<Vec<_>>().join("|");
+            let invalid_types_str =
+                invalid_clone_atomics.iter().map(|t| t.get_id().as_str()).collect::<Vec<_>>().join("|");
 
             if has_cloneable_object || has_mixed_type {
                 context.collector.report_with_code(

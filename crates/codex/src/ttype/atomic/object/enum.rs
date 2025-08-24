@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::concat_atom;
 
 use crate::ttype::TType;
 
@@ -64,17 +65,10 @@ impl TType for TEnum {
         false
     }
 
-    fn get_id(&self) -> String {
-        let mut id = String::new();
-        id += "enum(";
-        id += self.name.as_str();
-
-        if let Some(case) = &self.case {
-            id += "::";
-            id += case.as_str();
+    fn get_id(&self) -> Atom {
+        match self.case {
+            Some(case) => concat_atom!("enum(", self.name, "::", case, ")"),
+            None => concat_atom!("enum(", self.name, ")"),
         }
-
-        id += ")";
-        id
     }
 }

@@ -311,7 +311,7 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
                             known_items: keyed_array.get_known_items().map(|known_items| {
                                 known_items
                                     .iter()
-                                    .map(|(k, v)| (k.clone(), (v.0, value_type.clone())))
+                                    .map(|(k, v)| (*k, (v.0, value_type.clone())))
                                     .collect::<BTreeMap<_, _>>()
                             }),
                             non_empty: true,

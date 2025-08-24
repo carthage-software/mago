@@ -912,18 +912,18 @@ fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_
 
 pub(crate) fn trigger_issue_for_impossible(
     context: &mut Context<'_, '_>,
-    old_var_type_string: &String,
+    old_var_type_string: Atom,
     key: &String,
     assertion: &Assertion,
     redundant: bool,
     negated: bool,
     span: &Span,
 ) {
-    let mut assertion_string = assertion.as_string();
-    let mut not_operator = assertion_string.starts_with('!');
+    let mut assertion_atom = assertion.to_atom();
+    let mut not_operator = assertion_atom.starts_with('!');
 
     if not_operator {
-        assertion_string = assertion_string[1..].to_string();
+        assertion_atom = atom(&assertion_atom[1..]);
     }
 
     let mut redundant = redundant;
@@ -934,34 +934,34 @@ pub(crate) fn trigger_issue_for_impossible(
 
     if redundant {
         if not_operator {
-            if assertion_string == "falsy" {
+            if assertion_atom == "falsy" {
                 not_operator = false;
-                assertion_string = "truthy".to_string();
-            } else if assertion_string == "truthy" {
+                assertion_atom = atom("truthy");
+            } else if assertion_atom == "truthy" {
                 not_operator = false;
-                assertion_string = "falsy".to_string();
+                assertion_atom = atom("falsy");
             }
         }
 
         if not_operator {
-            report_impossible_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
+            report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
         } else {
-            report_redundant_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
+            report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
         }
     } else if not_operator {
-        report_redundant_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
+        report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
     } else {
-        report_impossible_issue(context, assertion, &assertion_string, key, span, old_var_type_string)
+        report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
     }
 }
 
 fn report_impossible_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_string: &String,
+    assertion_atom: Atom,
     key: &String,
     span: &Span,
-    old_var_type_string: &String,
+    old_var_type_string: Atom,
 ) {
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")
@@ -1016,8 +1016,8 @@ fn report_impossible_issue(
         ),
         _ => (
             IssueCode::ImpossibleTypeComparison,
-            format!("can never be `{assertion_string}`"),
-            format!("The type of variable {subject_desc} is incompatible with the assertion that it is `{assertion_string}`."),
+            format!("can never be `{assertion_atom}`"),
+            format!("The type of variable {subject_desc} is incompatible with the assertion that it is `{assertion_atom}`."),
             "This condition is impossible and the associated code block will never execute. Review the types and condition logic.".to_owned(),
         ),
     };
@@ -1036,10 +1036,10 @@ fn report_impossible_issue(
 fn report_redundant_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_string: &String,
+    assertion_atom: Atom,
     key: &String,
     span: &Span,
-    old_var_type_string: &String,
+    old_var_type_string: Atom,
 ) {
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")
@@ -1098,8 +1098,8 @@ fn report_redundant_issue(
         ),
         _ => (
             IssueCode::RedundantTypeComparison,
-            format!("is already known to be `{assertion_string}`"),
-            format!("The type of variable {subject_desc} already satisfies the condition that it is `{assertion_string}`. This check is redundant."),
+            format!("is already known to be `{assertion_atom}`"),
+            format!("The type of variable {subject_desc} already satisfies the condition that it is `{assertion_atom}`. This check is redundant."),
             "This condition is always true and the associated code block will always execute if reached. Consider simplifying.".to_owned()
         ),
     };

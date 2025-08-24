@@ -34,7 +34,7 @@ macro_rules! intersect_simple {
                     if let Some(span) = $span {
                         trigger_issue_for_impossible(
                             $context,
-                            &$existing_var_type.get_id(),
+                            $existing_var_type.get_id(),
                             &k,
                             $assertion,
                             !did_remove_type,

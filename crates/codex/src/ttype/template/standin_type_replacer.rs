@@ -168,7 +168,7 @@ fn handle_atomic_standin(
     had_template: &mut bool,
 ) -> Vec<TAtomic> {
     let normalized_key = if let TAtomic::Object(TObject::Named(named_object)) = parameter_atomic {
-        named_object.name.to_string()
+        named_object.name
     } else {
         parameter_atomic.get_id()
     };
@@ -179,7 +179,7 @@ fn handle_atomic_standin(
     {
         return handle_template_param_standin(
             parameter_atomic,
-            &normalized_key,
+            normalized_key,
             template_type,
             template_result,
             codebase,
@@ -216,7 +216,7 @@ fn handle_atomic_standin(
         if !argument_type.is_mixed() {
             matching_input_types = find_matching_atomic_types_for_template(
                 parameter_atomic,
-                &normalized_key,
+                normalized_key,
                 codebase,
                 argument_type,
                 &mut new_appearance_depth,
@@ -495,7 +495,7 @@ fn replace_atomic(
 #[allow(clippy::too_many_arguments)]
 fn handle_template_param_standin(
     atomic_type: &TAtomic,
-    normalized_key: &String,
+    normalized_key: Atom,
     template_type: &TUnion,
     template_result: &mut TemplateResult,
     codebase: &CodebaseMetadata,
@@ -525,7 +525,7 @@ fn handle_template_param_standin(
         return vec![atomic_type.clone()];
     }
 
-    if &template_type.get_id() == normalized_key {
+    if template_type.get_id() == normalized_key {
         return template_type.types.clone().into_owned();
     }
 
@@ -627,7 +627,7 @@ fn handle_template_param_standin(
         }
     }
 
-    let mut matching_input_keys = Vec::new();
+    let mut matching_input_keys: Vec<Atom> = Vec::new();
 
     let mut as_type = constraint.clone();
 
@@ -977,7 +977,7 @@ fn template_types_contains<'a>(
 
 fn find_matching_atomic_types_for_template(
     base_type: &TAtomic,
-    normalized_key: &String,
+    normalized_key: Atom,
     codebase: &CodebaseMetadata,
     input_type: &TUnion,
     depth: &mut usize,
@@ -1105,12 +1105,12 @@ fn find_matching_atomic_types_for_template(
             }
             _ => {
                 let input_key = &if let TAtomic::Object(TObject::Named(o)) = atomic_input_type {
-                    o.name.to_string()
+                    o.name
                 } else {
                     atomic_input_type.get_id()
                 };
 
-                if input_key == normalized_key {
+                if *input_key == normalized_key {
                     matching_atomic_types.push(atomic_input_type.clone());
                     continue;
                 }

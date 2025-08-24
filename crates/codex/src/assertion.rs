@@ -3,6 +3,11 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use ahash::AHasher;
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::i64_atom;
+use mago_atom::usize_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -55,58 +60,58 @@ pub enum Assertion {
 }
 
 impl Assertion {
-    pub fn as_string(&self) -> String {
+    pub fn to_atom(&self) -> Atom {
         match self {
-            Assertion::Any => "any".to_string(),
-            Assertion::Falsy => "falsy".to_string(),
-            Assertion::Truthy => "truthy".to_string(),
+            Assertion::Any => atom("any"),
+            Assertion::Falsy => atom("falsy"),
+            Assertion::Truthy => atom("truthy"),
+            Assertion::IsEqualIsset => atom("=isset"),
+            Assertion::IsIsset => atom("isset"),
+            Assertion::IsNotIsset => atom("!isset"),
+            Assertion::HasStringArrayAccess => atom("=string-array-access"),
+            Assertion::HasIntOrStringArrayAccess => atom("=int-or-string-array-access"),
+            Assertion::ArrayKeyExists => atom("array-key-exists"),
+            Assertion::ArrayKeyDoesNotExist => atom("!array-key-exists"),
+            Assertion::EmptyCountable => atom("empty-countable"),
+            Assertion::Empty => atom("empty"),
+            Assertion::NonEmpty => atom("non-empty"),
+            Assertion::Countable => atom("countable"),
+            Assertion::NotCountable(_) => atom("!countable"),
             Assertion::IsType(atomic) => atomic.get_id(),
-            Assertion::IsNotType(atomic) => "!".to_string() + &atomic.get_id(),
-            Assertion::IsIdentical(atomic) => "=".to_string() + &atomic.get_id(),
-            Assertion::IsNotIdentical(atomic) => "!=".to_string() + &atomic.get_id(),
-            Assertion::IsEqual(atomic) => "~".to_string() + &atomic.get_id(),
-            Assertion::IsNotEqual(atomic) => "!~".to_string() + &atomic.get_id(),
-            Assertion::IsEqualIsset => "=isset".to_string(),
-            Assertion::IsIsset => "isset".to_string(),
-            Assertion::IsNotIsset => "!isset".to_string(),
-            Assertion::HasStringArrayAccess => "=string-array-access".to_string(),
-            Assertion::HasIntOrStringArrayAccess => "=int-or-string-array-access".to_string(),
-            Assertion::ArrayKeyExists => "array-key-exists".to_string(),
-            Assertion::ArrayKeyDoesNotExist => "!array-key-exists".to_string(),
-            Assertion::HasArrayKey(key) => "=has-array-key-".to_string() + key.to_string().as_str(),
-            Assertion::DoesNotHaveArrayKey(key) => "!=has-array-key-".to_string() + key.to_string().as_str(),
-            Assertion::HasNonnullEntryForKey(key) => "=has-nonnull-entry-for-".to_string() + key.to_string().as_str(),
+            Assertion::IsNotType(atomic) => concat_atom!("!", atomic.get_id()),
+            Assertion::IsIdentical(atomic) => concat_atom!("=", atomic.get_id()),
+            Assertion::IsNotIdentical(atomic) => concat_atom!("!=", atomic.get_id()),
+            Assertion::IsEqual(atomic) => concat_atom!("~", atomic.get_id()),
+            Assertion::IsNotEqual(atomic) => concat_atom!("!~", atomic.get_id()),
+            Assertion::InArray(union) => concat_atom!("=in-array-", union.get_id()),
+            Assertion::NotInArray(union) => concat_atom!("!=in-array-", union.get_id()),
+            Assertion::HasArrayKey(key) => concat_atom!("=has-array-key-", key.to_atom()),
+            Assertion::DoesNotHaveArrayKey(key) => concat_atom!("!=has-array-key-", key.to_atom()),
+            Assertion::HasNonnullEntryForKey(key) => concat_atom!("=has-nonnull-entry-for-", key.to_atom()),
             Assertion::DoesNotHaveNonnullEntryForKey(key) => {
-                "!=has-nonnull-entry-for-".to_string() + key.to_string().as_str()
+                concat_atom!("!=has-nonnull-entry-for-", key.to_atom())
             }
-            Assertion::InArray(union) => "=in-array-".to_string() + &union.get_id(),
-            Assertion::NotInArray(union) => "!=in-array-".to_string() + &union.get_id(),
+            Assertion::HasExactCount(number) => concat_atom!("has-exactly-", usize_atom(*number)),
+            Assertion::HasAtLeastCount(number) => concat_atom!("has-at-least-", usize_atom(*number)),
+            Assertion::DoesNotHaveExactCount(number) => concat_atom!("!has-exactly-", usize_atom(*number)),
+            Assertion::HasAtMostCount(number) => concat_atom!("has-at-most-", usize_atom(*number)),
+            Assertion::IsLessThan(number) => concat_atom!("is-less-than-", i64_atom(*number)),
+            Assertion::IsLessThanOrEqual(number) => concat_atom!("is-less-than-or-equal-", i64_atom(*number)),
+            Assertion::IsGreaterThan(number) => concat_atom!("is-greater-than-", i64_atom(*number)),
+            Assertion::IsGreaterThanOrEqual(number) => concat_atom!("is-greater-than-or-equal-", i64_atom(*number)),
             Assertion::NonEmptyCountable(negatable) => {
                 if *negatable {
-                    "non-empty-countable".to_string()
+                    atom("non-empty-countable")
                 } else {
-                    "=non-empty-countable".to_string()
+                    atom("=non-empty-countable")
                 }
             }
-            Assertion::EmptyCountable => "empty-countable".to_string(),
-            Assertion::HasExactCount(number) => "has-exactly-".to_string() + &number.to_string(),
-            Assertion::HasAtLeastCount(number) => "has-at-least-".to_string() + &number.to_string(),
-            Assertion::DoesNotHaveExactCount(number) => "!has-exactly-".to_string() + &number.to_string(),
-            Assertion::HasAtMostCount(number) => "has-at-most-".to_string() + &number.to_string(),
-            Assertion::IsLessThan(number) => "is-less-than-".to_string() + &number.to_string(),
-            Assertion::IsLessThanOrEqual(number) => "is-less-than-or-equal-".to_string() + &number.to_string(),
-            Assertion::IsGreaterThan(number) => "is-greater-than-".to_string() + &number.to_string(),
-            Assertion::IsGreaterThanOrEqual(number) => "is-greater-than-or-equal-".to_string() + &number.to_string(),
-            Assertion::Empty => "empty".to_string(),
-            Assertion::NonEmpty => "non-empty".to_string(),
-            Assertion::Countable => "countable".to_string(),
-            Assertion::NotCountable(_) => "!countable".to_string(),
         }
     }
 
     pub fn to_hash(&self) -> u64 {
         let mut state = AHasher::default();
-        self.as_string().hash(&mut state);
+        self.to_atom().hash(&mut state);
         state.finish()
     }
 
@@ -453,10 +458,10 @@ impl Assertion {
             Assertion::DoesNotHaveExactCount(size) => Assertion::HasExactCount(*size),
             Assertion::HasAtLeastCount(size) => Assertion::HasAtMostCount(*size),
             Assertion::HasAtMostCount(size) => Assertion::HasAtLeastCount(*size),
-            Assertion::HasArrayKey(str) => Assertion::DoesNotHaveArrayKey(str.clone()),
-            Assertion::DoesNotHaveArrayKey(str) => Assertion::HasArrayKey(str.clone()),
-            Assertion::HasNonnullEntryForKey(str) => Assertion::DoesNotHaveNonnullEntryForKey(str.clone()),
-            Assertion::DoesNotHaveNonnullEntryForKey(str) => Assertion::HasNonnullEntryForKey(str.clone()),
+            Assertion::HasArrayKey(str) => Assertion::DoesNotHaveArrayKey(*str),
+            Assertion::DoesNotHaveArrayKey(str) => Assertion::HasArrayKey(*str),
+            Assertion::HasNonnullEntryForKey(str) => Assertion::DoesNotHaveNonnullEntryForKey(*str),
+            Assertion::DoesNotHaveNonnullEntryForKey(str) => Assertion::HasNonnullEntryForKey(*str),
             Assertion::HasStringArrayAccess => Assertion::Any,
             Assertion::HasIntOrStringArrayAccess => Assertion::Any,
             Assertion::IsEqualIsset => Assertion::Any,

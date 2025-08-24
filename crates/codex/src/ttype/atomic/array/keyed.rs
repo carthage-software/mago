@@ -3,6 +3,10 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -142,56 +146,56 @@ impl TType for TKeyedArray {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         if let Some(items) = &self.known_items {
-            let mut str = String::new();
-            str += "array{";
+            let mut string = String::new();
+            string += "array{";
             let mut first = true;
             for (key, (indefinite, item_type)) in items {
                 if !first {
-                    str += ", ";
+                    string += ", ";
                 } else {
                     first = false;
                 }
 
-                str += &key.to_string();
+                string += &key.to_string();
                 if *indefinite {
-                    str += "?";
+                    string += "?";
                 }
 
-                str += ": ";
-                str += &item_type.get_id();
+                string += ": ";
+                string += &item_type.get_id();
             }
 
             if let Some((key_type, value_type)) = &self.parameters {
                 if !first {
-                    str += ", ";
+                    string += ", ";
                 }
 
-                str += "...";
+                string += "...";
                 if !key_type.is_array_key() || !value_type.is_mixed() {
-                    str += "<";
-                    str += &key_type.get_id();
-                    str += ", ";
-                    str += &value_type.get_id();
-                    str += ">";
+                    string += "<";
+                    string += &key_type.get_id();
+                    string += ", ";
+                    string += &value_type.get_id();
+                    string += ">";
                 }
             }
 
-            str += "}";
-            str
-        } else if let Some((key_type, value_type)) = &self.parameters {
-            let mut str = String::new();
-            str += if self.is_non_empty() { "non-empty-array" } else { "array" };
-            str += "<";
-            str += &key_type.get_id();
-            str += ", ";
-            str += &value_type.get_id();
-            str += ">";
+            string += "}";
 
-            str.to_string()
+            atom(&string)
+        } else if let Some((key_type, value_type)) = &self.parameters {
+            concat_atom!(
+                if self.is_non_empty() { "non-empty-array" } else { "array" },
+                "<",
+                key_type.get_id().as_str(),
+                ", ",
+                value_type.get_id().as_str(),
+                ">",
+            )
         } else {
-            String::from("array{}")
+            atom("array{}")
         }
     }
 }

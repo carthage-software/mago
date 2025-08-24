@@ -43,8 +43,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map(|union| union.get_id())
-                                    .unwrap_or_else(|| "unknown".to_string())
+                                    .map(|union| union.get_id().as_str())
+                                    .unwrap_or_else(|| "unknown")
                             )),
                         ),
                     );

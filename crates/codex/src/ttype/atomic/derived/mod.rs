@@ -1,3 +1,4 @@
+use mago_atom::Atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -76,7 +77,7 @@ impl TType for TDerived {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
             TDerived::KeyOf(key_of) => key_of.get_id(),
             TDerived::ValueOf(value_of) => value_of.get_id(),

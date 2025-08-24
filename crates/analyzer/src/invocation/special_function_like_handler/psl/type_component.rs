@@ -100,7 +100,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
 
                             let possibly_undefined = *possibly_undefined || item.possibly_undefined;
 
-                            known_items.insert(key.clone(), (possibly_undefined, inner_type));
+                            known_items.insert(*key, (possibly_undefined, inner_type));
                         }
 
                         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(

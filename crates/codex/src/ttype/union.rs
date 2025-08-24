@@ -3,6 +3,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use derivative::Derivative;
+use mago_atom::concat_atom;
+use mago_atom::empty_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -1080,21 +1082,30 @@ impl TType for TUnion {
         self.types.iter().any(|t| t.is_expandable())
     }
 
-    fn get_id(&self) -> String {
-        let types = self.types.clone();
-        let len = types.len();
+    fn get_id(&self) -> Atom {
+        let len = self.types.len();
 
-        let mut atomic_ids = types
+        let mut atomic_ids: Vec<Atom> = self
+            .types
+            .as_ref()
             .iter()
             .map(|atomic| {
                 let id = atomic.get_id();
-
-                if atomic.has_intersection_types() && len > 1 { format!("({id})") } else { id }
+                if atomic.has_intersection_types() && len > 1 { concat_atom!("(", id.as_str(), ")") } else { id }
             })
-            .collect::<Vec<_>>();
+            .collect();
+
+        if len <= 1 {
+            return atomic_ids.pop().unwrap_or_else(empty_atom);
+        }
 
         atomic_ids.sort_unstable();
-        atomic_ids.join("|")
+        let mut result = atomic_ids[0];
+        for id in &atomic_ids[1..] {
+            result = concat_atom!(result.as_str(), "|", id.as_str());
+        }
+
+        result
     }
 }
 

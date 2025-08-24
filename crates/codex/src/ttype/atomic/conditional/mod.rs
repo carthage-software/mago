@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
+
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
@@ -83,22 +86,17 @@ impl TType for TConditional {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut id = "(".to_string();
-
-        id += &self.subject.get_id();
-        id += " is ";
-        if self.negated {
-            id += "not ";
-        }
-
-        id += &self.target.get_id();
-        id += " ? ";
-        id += &self.then.get_id();
-        id += " : ";
-        id += &self.otherwise.get_id();
-        id += ")";
-
-        id
+    fn get_id(&self) -> Atom {
+        concat_atom!(
+            "(",
+            self.subject.get_id().as_str(),
+            if self.negated { " is not " } else { " is " },
+            self.target.get_id().as_str(),
+            " ? ",
+            self.then.get_id().as_str(),
+            " : ",
+            self.otherwise.get_id().as_str(),
+            ")"
+        )
     }
 }

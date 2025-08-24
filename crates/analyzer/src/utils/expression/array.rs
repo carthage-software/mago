@@ -275,8 +275,11 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     if !has_valid_expected_index {
         let index_type_str = index_type.get_id();
         let array_like_type_str = array_like_type.get_id();
-        let expected_index_types_str =
-            expected_index_types.iter().flat_map(|union| union.types.as_ref()).map(|t| t.get_id()).collect::<Vec<_>>();
+        let expected_index_types_str = expected_index_types
+            .iter()
+            .flat_map(|union| union.types.as_ref())
+            .map(|t| t.get_id().as_str())
+            .collect::<Vec<_>>();
 
         let expected_types_list = if let Some(last_index_str) = expected_index_types_str.last() {
             if expected_index_types_str.len() == 1 {

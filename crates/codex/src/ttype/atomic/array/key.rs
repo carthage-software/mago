@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::Atom;
+use mago_atom::i64_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -19,7 +20,7 @@ use crate::ttype::union::TUnion;
 /// PHP automatically casts other scalar types (float, bool, null) and resources to int or string
 /// when used as array keys. Objects used as keys usually result in errors or use spl_object_hash.
 /// This enum focuses on the valid resulting key types after potential casting.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ArrayKey {
     /// An integer array key.
     Integer(i64),
@@ -58,6 +59,16 @@ impl ArrayKey {
     #[inline]
     pub const fn is_string(&self) -> bool {
         matches!(self, ArrayKey::String(_))
+    }
+
+    /// Converts the array key into an `Atom` representing the key *value*.
+    /// Preserves the literal value (e.g., `10`, `"abc"`).
+    #[inline]
+    pub fn to_atom(&self) -> Atom {
+        match self {
+            ArrayKey::Integer(i) => i64_atom(*i),
+            ArrayKey::String(s) => *s,
+        }
     }
 
     /// Converts the array key into a specific literal atomic type representing the key *value*.

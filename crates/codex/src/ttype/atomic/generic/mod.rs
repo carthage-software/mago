@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::concat_atom;
 
 use crate::misc::GenericParent;
 use crate::ttype::TType;
@@ -131,28 +132,31 @@ impl TType for TGenericParameter {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut str = String::from("'");
-        str += self.parameter_name.as_str();
-        str += ".";
-        str += &self.defining_entity.to_string();
-        str += " extends ";
-        str += &self.constraint.get_id();
+    fn get_id(&self) -> Atom {
+        let base_id = concat_atom!(
+            "'",
+            self.parameter_name.as_str(),
+            ".",
+            self.defining_entity.to_string().as_str(),
+            " extends ",
+            self.constraint.get_id().as_str()
+        );
 
-        if let Some(intersection_types) = &self.intersection_types {
-            str = format!("({str})");
-            for atomic in intersection_types {
-                str += "&";
-                if atomic.has_intersection_types() {
-                    str += "(";
-                }
-                str += &atomic.get_id();
-                if atomic.has_intersection_types() {
-                    str += ")";
-                }
+        let Some(intersection_types) = &self.intersection_types else {
+            return base_id;
+        };
+
+        let mut result = concat_atom!("(", base_id.as_str(), ")");
+
+        for atomic in intersection_types {
+            let atomic_id = atomic.get_id();
+            if atomic.has_intersection_types() {
+                result = concat_atom!(result.as_str(), "&(", atomic_id.as_str(), ")");
+            } else {
+                result = concat_atom!(result.as_str(), "&", atomic_id.as_str());
             }
         }
 
-        str
+        result
     }
 }

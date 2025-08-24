@@ -63,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
                 .join(", ");
 
             let class_expression_type_str =
-                artifacts.get_expression_type(&self.class).map_or("<unknown>".to_string(), |u| u.get_id());
+                artifacts.get_expression_type(&self.class).map_or("<unknown>", |u| u.get_id().as_str());
 
             context.collector.report_with_code(
                 IssueCode::AmbiguousInstantiationTarget,

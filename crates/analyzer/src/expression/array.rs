@@ -273,7 +273,7 @@ fn analyze_array_elements<'ctx, 'arena>(
         array_creation_info.can_be_empty = false;
         array_creation_info.is_list &= item_is_list_item;
 
-        if let Some(item_key_value) = item_key_value.clone() {
+        if let Some(item_key_value) = item_key_value {
             if array_creation_info.array_keys.contains(&item_key_value) {
                 context.collector.report_with_code(
                     IssueCode::DuplicateArrayKey,
@@ -468,7 +468,7 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
                                 }
                             };
 
-                            array_creation_info.array_keys.insert(new_offset_key.clone());
+                            array_creation_info.array_keys.insert(new_offset_key);
                             array_creation_info.property_types.insert(new_offset_key, (false, value_type.clone()));
                         }
                     }
@@ -522,7 +522,7 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
 
                             array_creation_info.int_offset += 1;
                             let new_key = ArrayKey::Integer(array_creation_info.int_offset);
-                            array_creation_info.array_keys.insert(new_key.clone());
+                            array_creation_info.array_keys.insert(new_key);
                             array_creation_info
                                 .item_key_atomic_types
                                 .push(TAtomic::Scalar(TScalar::literal_int(array_creation_info.int_offset)));

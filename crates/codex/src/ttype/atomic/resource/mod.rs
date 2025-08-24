@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+
 use crate::ttype::TType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
@@ -45,11 +48,11 @@ impl TType for TResource {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self.closed {
-            Some(true) => "closed-resource".to_string(),
-            Some(false) => "open-resource".to_string(),
-            None => "resource".to_string(),
+            Some(true) => atom("closed-resource"),
+            Some(false) => atom("open-resource"),
+            None => atom("resource"),
         }
     }
 }

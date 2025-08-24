@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+
 use crate::ttype::TType;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 
@@ -174,15 +177,22 @@ impl TType for TMixed {
         false
     }
 
-    fn get_id(&self) -> String {
-        let id = match self.truthiness {
-            TMixedTruthiness::Truthy => "truthy-mixed",
-            TMixedTruthiness::Falsy => "falsy-mixed",
-            TMixedTruthiness::Undetermined if self.is_non_null => "nonnull",
-            TMixedTruthiness::Undetermined => "mixed",
-        };
-
-        if self.is_empty { format!("empty-{id}") } else { id.to_string() }
+    fn get_id(&self) -> Atom {
+        if self.is_empty {
+            atom(match self.truthiness {
+                TMixedTruthiness::Truthy => "empty-truthy-mixed",
+                TMixedTruthiness::Falsy => "empty-falsy-mixed",
+                TMixedTruthiness::Undetermined if self.is_non_null => "empty-nonnull",
+                TMixedTruthiness::Undetermined => "empty-mixed",
+            })
+        } else {
+            atom(match self.truthiness {
+                TMixedTruthiness::Truthy => "truthy-mixed",
+                TMixedTruthiness::Falsy => "falsy-mixed",
+                TMixedTruthiness::Undetermined if self.is_non_null => "nonnull",
+                TMixedTruthiness::Undetermined => "mixed",
+            })
+        }
     }
 }
 

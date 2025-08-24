@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -191,9 +192,9 @@ impl TType for TObject {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
-            TObject::Any => "object".to_string(),
+            TObject::Any => atom("object"),
             TObject::Enum(enum_object) => enum_object.get_id(),
             TObject::Named(named_object) => named_object.get_id(),
         }

@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
+
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -75,11 +78,7 @@ impl TType for TKeyOf {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut id = String::new();
-        id += "key-of<";
-        id += &self.0.get_id();
-        id += ">";
-        id
+    fn get_id(&self) -> Atom {
+        concat_atom!("key-of<", self.0.get_id().as_str(), ">")
     }
 }

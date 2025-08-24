@@ -1402,6 +1402,7 @@ dependencies = [
  "ahash",
  "indexmap",
  "itertools",
+ "mago-atom",
  "mago-codex",
  "mago-span",
 ]

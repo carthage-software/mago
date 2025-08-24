@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
+
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
@@ -117,32 +120,18 @@ impl TType for TIterable {
         self.key_type.is_expandable() || self.value_type.is_expandable()
     }
 
-    fn get_id(&self) -> String {
-        let intersection_types = self.intersection_types.as_deref();
+    fn get_id(&self) -> Atom {
+        let base_id = concat_atom!("iterable<", self.key_type.get_id(), ", ", self.value_type.get_id(), ">");
 
-        let mut id = String::new();
-        if intersection_types.is_some() {
-            id += "(";
+        let Some(intersection_types) = self.intersection_types.as_deref() else {
+            return base_id;
+        };
+
+        let mut result = concat_atom!("(", base_id, ")");
+        for atomic in intersection_types {
+            result = concat_atom!(result, "&", atomic.get_id());
         }
 
-        id += "iterable<";
-        id += &self.key_type.get_id();
-        id += ", ";
-        id += &self.value_type.get_id();
-        id += ">";
-        if let Some(intersection_types) = intersection_types {
-            id += "&";
-            for (i, atomic) in intersection_types.iter().enumerate() {
-                if i > 0 {
-                    id += "&";
-                }
-
-                id += &atomic.get_id();
-            }
-
-            id += ")";
-        }
-
-        id
+        result
     }
 }

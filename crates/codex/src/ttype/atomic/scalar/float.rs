@@ -2,6 +2,11 @@ use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::f64_atom;
+
 use crate::ttype::TType;
 
 /// Represents PHP float types: general `float` or a specific literal like `12.3`.
@@ -73,10 +78,10 @@ impl TType for TFloat {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self.value {
-            Some(value) => format!("float({value})"),
-            None => "float".to_string(),
+            Some(value) => concat_atom!("float(", f64_atom(*value), ")"),
+            None => atom("float"),
         }
     }
 }

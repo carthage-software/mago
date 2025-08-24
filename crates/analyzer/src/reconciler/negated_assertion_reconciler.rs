@@ -35,7 +35,7 @@ pub(crate) fn reconcile(
     existing_var_type: &TUnion,
     possibly_undefined: bool,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -50,7 +50,7 @@ pub(crate) fn reconcile(
             assertion,
             existing_var_type,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             span,
             negated,
         );
@@ -84,7 +84,7 @@ pub(crate) fn reconcile(
                 {
                     trigger_issue_for_impossible(
                         context,
-                        &old_var_type_string,
+                        old_var_type_atom,
                         key,
                         assertion,
                         !has_changes,
@@ -103,7 +103,7 @@ pub(crate) fn reconcile(
                 false,
             )
         {
-            trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, true, negated, pos);
+            trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, pos);
         }
     }
 
@@ -111,7 +111,7 @@ pub(crate) fn reconcile(
         if let Some(key) = &key
             && let Some(pos) = span
         {
-            trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, false, negated, pos);
+            trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, pos);
         }
 
         return get_never();
@@ -283,7 +283,7 @@ fn handle_literal_negated_equality(
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -388,7 +388,7 @@ fn handle_literal_negated_equality(
         && let Some(pos) = span
         && (!did_remove_type || acceptable_types.is_empty())
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, pos);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
     if acceptable_types.is_empty() {

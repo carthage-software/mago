@@ -253,7 +253,7 @@ fn inspect_arguments<'ctx, 'ast, 'arena>(
         let argument_expression = argument.value();
         let argument_span = argument_expression.span();
         let argument_type_string =
-            artifacts.get_expression_type(argument_expression).map_or("<unknown type>".to_string(), |t| t.get_id());
+            artifacts.get_expression_type(argument_expression).map_or("<unknown type>", |t| t.get_id().as_str());
 
         argument_annotations.push(
             Annotation::secondary(argument_span)

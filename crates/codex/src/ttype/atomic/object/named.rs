@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::concat_atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -156,37 +157,33 @@ impl TType for TNamedObject {
         true
     }
 
-    fn get_id(&self) -> String {
-        let mut id = self.name.to_string();
-
+    fn get_id(&self) -> Atom {
+        let mut result = self.name;
         if let Some(parameters) = self.get_type_parameters() {
-            id += "<";
+            result = concat_atom!(result, "<");
             for (i, atomic) in parameters.iter().enumerate() {
                 if i > 0 {
-                    id += ", ";
+                    result = concat_atom!(result, ", ");
                 }
 
-                id += &atomic.get_id();
+                result = concat_atom!(result, atomic.get_id());
             }
 
-            id += ">";
+            result = concat_atom!(result, ">");
         }
 
         if let Some(intersection_types) = self.get_intersection_types() {
-            id += "&";
-            for (i, atomic) in intersection_types.iter().enumerate() {
-                if i > 0 {
-                    id += "&";
-                }
+            for atomic in intersection_types {
+                let atomic_id = atomic.get_id();
 
-                id += &atomic.get_id();
+                result = if atomic.has_intersection_types() {
+                    concat_atom!(result, "&(", atomic_id, ")")
+                } else {
+                    concat_atom!(result, "&", atomic_id)
+                };
             }
         }
 
-        if self.is_this {
-            id += "&static";
-        }
-
-        id
+        if self.is_this { concat_atom!(result, "&static") } else { result }
     }
 }

@@ -1,3 +1,5 @@
+use mago_atom::Atom;
+
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -273,7 +275,7 @@ pub(crate) fn can_be_contained_by(
     container_type: &TUnion,
     ignore_null: bool,
     ignore_false: bool,
-    matching_input_keys: &mut Vec<String>,
+    matching_input_keys: &mut Vec<Atom>,
 ) -> bool {
     if container_type.is_mixed() {
         return true;

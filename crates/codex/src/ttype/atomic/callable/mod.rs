@@ -1,6 +1,11 @@
+use mago_atom::u32_atom;
+use mago_atom::u64_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_database::file::FileId;
 use mago_span::Position;
 
@@ -241,70 +246,64 @@ impl TType for TCallable {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
             TCallable::Signature(signature) => {
-                let mut str = String::new();
-                str += "(";
+                let mut string = String::new();
+                string += "(";
                 if signature.is_pure() {
-                    str += "pure-";
+                    string += "pure-";
                 }
 
-                str += if signature.is_closure() { "closure(" } else { "callable(" };
+                string += if signature.is_closure() { "closure(" } else { "callable(" };
                 for (i, parameter) in signature.get_parameters().iter().enumerate() {
                     if i > 0 {
-                        str += ", ";
+                        string += ", ";
                     }
 
                     if parameter.is_variadic() {
-                        str += "...";
+                        string += "...";
                     }
 
                     if let Some(parameter_type) = parameter.get_type_signature() {
-                        str += parameter_type.get_id().as_str();
+                        string += parameter_type.get_id().as_str();
                     } else {
-                        str += "mixed";
+                        string += "mixed";
                     }
 
                     if parameter.has_default() {
-                        str += "=";
+                        string += "=";
                     }
                 }
 
-                str += "): ";
+                string += "): ";
                 if let Some(return_type) = signature.get_return_type() {
-                    str += return_type.get_id().as_str();
+                    string += return_type.get_id().as_str();
                 } else {
-                    str += "mixed";
+                    string += "mixed";
                 }
 
-                str += ")";
+                string += ")";
 
-                str
+                atom(&string)
             }
-            TCallable::Alias(id) => {
-                let mut str = String::from("Closure<");
-
-                match id {
-                    FunctionLikeIdentifier::Function(fn_name) => {
-                        str += fn_name.as_str();
-                    }
-                    FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
-                        str += fq_classlike_name.as_str();
-                        str += "::";
-                        str += method_name.as_str();
-                    }
-                    FunctionLikeIdentifier::Closure(file_id, position) => {
-                        str += "anonymous@";
-                        str += &file_id.to_string();
-                        str += ":";
-                        str += &position.offset.to_string();
-                    }
+            TCallable::Alias(id) => match id {
+                FunctionLikeIdentifier::Function(fn_name) => {
+                    concat_atom!("Closure<", fn_name.as_str(), ">(...)")
                 }
-
-                str += ">(...)";
-                str
-            }
+                FunctionLikeIdentifier::Method(fqcn, method_name) => {
+                    concat_atom!("Closure<", fqcn.as_str(), "::", method_name.as_str(), ">(...)")
+                }
+                FunctionLikeIdentifier::Closure(file_id, position) => {
+                    concat_atom!(
+                        "Closure<anonymous@",
+                        u64_atom(file_id.as_u64()).as_str(),
+                        "::",
+                        u32_atom(position.offset).as_str(),
+                        ">(...)"
+                    )
+                }
+            },
         }
     }
 }

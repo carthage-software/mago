@@ -6,6 +6,10 @@ use std::num::Wrapping;
 use ahash::AHasher;
 use indexmap::IndexMap;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::empty_atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_span::Span;
@@ -111,58 +115,55 @@ impl Clause {
             .collect()
     }
 
-    pub fn as_string(&self) -> String {
-        let mut clause_strings = vec![];
-
+    pub fn to_atom(&self) -> Atom {
         if self.possibilities.is_empty() {
-            return "<empty>".to_string();
+            return atom("<empty>");
         }
 
-        for (var_id, values) in self.possibilities.iter() {
-            let mut var_id = var_id.clone();
+        let mut final_result = empty_atom();
+        let mut is_first_clause = true;
 
-            if var_id[0..1] == *"*" {
-                var_id = "<expr>".to_string()
+        for (var_id, values) in &self.possibilities {
+            if !is_first_clause {
+                final_result = concat_atom!(final_result, " && ");
             }
 
-            let mut clause_string_parts = vec![];
+            is_first_clause = false;
 
+            let var_name = if var_id.starts_with('*') { atom("<expr>") } else { atom(var_id) };
+
+            let mut clause_result = empty_atom();
+            let mut is_first_part_in_clause = true;
             for (_, value) in values {
-                match value {
-                    Assertion::Any => {
-                        clause_string_parts.push(var_id.to_string() + " is any");
-                    }
-                    Assertion::Falsy => {
-                        clause_string_parts.push("!".to_string() + &var_id);
-                        continue;
-                    }
-                    Assertion::Truthy => {
-                        clause_string_parts.push(var_id.clone());
-                        continue;
-                    }
-                    Assertion::IsType(value) | Assertion::IsIdentical(value) => {
-                        clause_string_parts.push(var_id.to_string() + " is " + value.get_id().as_str());
-                    }
-                    Assertion::IsNotType(value) | Assertion::IsNotIdentical(value) => {
-                        clause_string_parts.push(var_id.to_string() + " is not " + value.get_id().as_str());
-                    }
-                    _ => {
-                        clause_string_parts.push(value.as_string());
-                    }
+                if !is_first_part_in_clause {
+                    clause_result = concat_atom!(clause_result, " || ");
                 }
+                is_first_part_in_clause = false;
+
+                let part_atom = match value {
+                    Assertion::Any => concat_atom!(var_name, " is any"),
+                    Assertion::Falsy => concat_atom!("!", var_name),
+                    Assertion::Truthy => var_name,
+                    Assertion::IsType(v) | Assertion::IsIdentical(v) => {
+                        concat_atom!(var_name, " is ", v.get_id())
+                    }
+                    Assertion::IsNotType(v) | Assertion::IsNotIdentical(v) => {
+                        concat_atom!(var_name, " is not ", v.get_id())
+                    }
+                    _ => value.to_atom(),
+                };
+
+                clause_result = concat_atom!(clause_result, part_atom);
             }
 
-            if clause_string_parts.len() > 1 {
-                let bracketed = "(".to_string() + &clause_string_parts.join(") || (") + ")";
-                clause_strings.push(bracketed)
-            } else {
-                clause_strings.push(clause_string_parts[0].clone());
+            if values.len() > 1 {
+                clause_result = concat_atom!("(", clause_result, ")");
             }
+
+            final_result = concat_atom!(final_result, clause_result);
         }
 
-        let joined_clause = clause_strings.join(") || (");
-
-        if clause_strings.len() > 1 { format!("({joined_clause})") } else { joined_clause }
+        final_result
     }
 }
 
@@ -196,6 +197,6 @@ fn get_hash(
 
 impl std::fmt::Display for Clause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_string())
+        write!(f, "{}", self.to_atom())
     }
 }

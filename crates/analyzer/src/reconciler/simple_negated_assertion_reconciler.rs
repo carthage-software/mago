@@ -657,7 +657,7 @@ fn subtract_arraykey(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id();
+    let old_var_type_atom = existing_var_type.get_id();
     let mut did_remove_type = false;
     let existing_var_types = existing_var_type.types.as_ref();
     let mut existing_var_type = existing_var_type.clone();
@@ -696,7 +696,7 @@ fn subtract_arraykey(
         && let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, pos);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
     if existing_var_type.types.is_empty() {
@@ -719,7 +719,7 @@ fn subtract_bool(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id();
+    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -758,7 +758,7 @@ fn subtract_bool(
         && let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, pos);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
     if existing_var_type.types.is_empty() {
@@ -899,7 +899,7 @@ fn subtract_false(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id();
+    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -943,7 +943,7 @@ fn subtract_false(
         && let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, pos);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
     if existing_var_type.types.is_empty() {
@@ -966,7 +966,7 @@ fn subtract_true(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id();
+    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -1011,7 +1011,7 @@ fn subtract_true(
         && let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, pos);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
     if existing_var_type.types.is_empty() {
@@ -1243,7 +1243,7 @@ fn reconcile_not_in_array(
     if let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(context, &existing_var_type.get_id(), key, assertion, true, negated, pos);
+        trigger_issue_for_impossible(context, existing_var_type.get_id(), key, assertion, true, negated, pos);
     }
 
     get_mixed()

@@ -5,6 +5,8 @@ use serde::Serialize;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
 
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -52,6 +54,17 @@ pub enum TClassLikeString {
         kind: TClassLikeStringKind,
         constraint: Box<TAtomic>,
     },
+}
+
+impl TClassLikeStringKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TClassLikeStringKind::Class => "class-string",
+            TClassLikeStringKind::Interface => "interface-string",
+            TClassLikeStringKind::Enum => "enum-string",
+            TClassLikeStringKind::Trait => "trait-string",
+        }
+    }
 }
 
 impl TClassLikeString {
@@ -297,15 +310,26 @@ impl TType for TClassLikeString {
         }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
-            TClassLikeString::Any { kind } => kind.to_string(),
+            TClassLikeString::Any { kind } => atom(kind.as_str()),
             TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint, .. } => {
-                format!("{kind}<'{}.{} extends {}>", parameter_name, defining_entity, constraint.get_id())
+                concat_atom!(
+                    kind.as_str(),
+                    "<'",
+                    parameter_name,
+                    ".",
+                    defining_entity.to_string(),
+                    " extends ",
+                    constraint.get_id(),
+                    ">"
+                )
             }
-            TClassLikeString::Literal { value } => format!("class-string<{value}>"),
+            TClassLikeString::Literal { value } => {
+                concat_atom!("class-string<", value, ">")
+            }
             TClassLikeString::OfType { kind, constraint } => {
-                format!("{kind}<{}>", constraint.get_id())
+                concat_atom!(kind.as_str(), "<", constraint.get_id(), ">")
             }
         }
     }
@@ -313,11 +337,6 @@ impl TType for TClassLikeString {
 
 impl std::fmt::Display for TClassLikeStringKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TClassLikeStringKind::Class => write!(f, "class-string"),
-            TClassLikeStringKind::Interface => write!(f, "interface-string"),
-            TClassLikeStringKind::Enum => write!(f, "enum-string"),
-            TClassLikeStringKind::Trait => write!(f, "trait-string"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }

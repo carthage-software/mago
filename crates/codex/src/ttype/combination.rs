@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 
-use ahash::HashMap;
 use ahash::HashSet;
-use mago_atom::AtomSet;
 use ordered_float::OrderedFloat;
 
 use mago_atom::Atom;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -16,10 +15,10 @@ use crate::ttype::union::TUnion;
 
 #[derive(Debug)]
 pub struct TypeCombination {
-    pub value_types: HashMap<String, TAtomic>,
+    pub value_types: AtomMap<TAtomic>,
     pub has_object_top_type: bool,
     pub enum_names: HashSet<(Atom, Option<Atom>)>,
-    pub object_type_params: HashMap<String, (Atom, Vec<TUnion>)>,
+    pub object_type_params: AtomMap<(Atom, Vec<TUnion>)>,
     pub object_static: AtomMap<bool>,
     pub list_array_counts: Option<HashSet<usize>>,
     pub list_array_sometimes_filled: bool,
@@ -57,9 +56,9 @@ impl Default for TypeCombination {
 impl TypeCombination {
     pub fn new() -> Self {
         Self {
-            value_types: HashMap::default(),
+            value_types: AtomMap::default(),
             has_object_top_type: false,
-            object_type_params: HashMap::default(),
+            object_type_params: AtomMap::default(),
             object_static: AtomMap::default(),
             list_array_counts: Some(HashSet::default()),
             list_array_sometimes_filled: false,

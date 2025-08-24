@@ -288,8 +288,8 @@ pub(super) fn check_template_result<'ctx, 'arena>(
                 lower_bounds.iter().filter(|bound| bound.equality_bound_classlike.is_some()).collect();
 
             if !bounds_with_equality.is_empty() {
-                let equality_types: Vec<String> =
-                    unique_vec(bounds_with_equality.iter().map(|bound| bound.bound_type.get_id()));
+                let equality_types: Vec<_> =
+                    unique_vec(bounds_with_equality.iter().map(|bound| bound.bound_type.get_id().as_str()));
 
                 if equality_types.len() > 1 {
                     context.collector.report_with_code(

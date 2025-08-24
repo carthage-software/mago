@@ -15,6 +15,11 @@ use std::ops::Sub;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::i64_atom;
+
 use crate::ttype::TType;
 
 /// Represents an integer type in a static analysis context, which can be either a
@@ -742,29 +747,31 @@ impl TType for TInteger {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self {
-            TInteger::Literal(value) => format!("int({value})"),
+            TInteger::Literal(value) => {
+                concat_atom!("int(", i64_atom(*value), ")")
+            }
             TInteger::From(value) => {
                 if *value == 1 {
-                    "positive-int".to_string()
+                    atom("positive-int")
                 } else if *value == 0 {
-                    "non-negative-int".to_string()
+                    atom("non-negative-int")
                 } else {
-                    format!("int<{value}, max>")
+                    concat_atom!("int<", i64_atom(*value), ", max>")
                 }
             }
             TInteger::To(value) => {
                 if *value == -1 {
-                    "negative-int".to_string()
+                    atom("negative-int")
                 } else if *value == 0 {
-                    "non-positive-int".to_string()
+                    atom("non-positive-int")
                 } else {
-                    format!("int<min, {value}>")
+                    concat_atom!("int<min, ", i64_atom(*value), ">")
                 }
             }
-            TInteger::Range(from, to) => format!("int<{from}, {to}>"),
-            TInteger::Unspecified => "int".to_string(),
+            TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), i64_atom(*to), ">"),
+            TInteger::Unspecified => atom("int"),
         }
     }
 }

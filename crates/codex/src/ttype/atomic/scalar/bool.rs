@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::atom;
+
 use crate::ttype::TType;
 
 /// Represents PHP's boolean type system, including the general `bool` type
@@ -63,11 +66,11 @@ impl TType for TBool {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         match self.value {
-            Some(true) => "true".to_string(),
-            Some(false) => "false".to_string(),
-            None => "bool".to_string(),
+            Some(true) => atom("true"),
+            Some(false) => atom("false"),
+            None => atom("bool"),
         }
     }
 }

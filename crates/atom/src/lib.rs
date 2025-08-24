@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 //! A high-performance, globally-interned string library for the Mago ecosystem.
 //!
 //! This crate provides `Atom`, a canonical string type that guarantees any given
@@ -76,7 +78,7 @@ pub fn empty_atom() -> Atom {
     atom("")
 }
 
-/// A macro to concatenate between 2 and 6 string slices into a single `Atom`.
+/// A macro to concatenate between 2 and 12 string slices into a single `Atom`.
 ///
 /// This macro dispatches to a specialized, zero-heap-allocation function based on the
 /// number of arguments provided, making it highly performant for a known number of inputs.
@@ -88,19 +90,40 @@ pub fn empty_atom() -> Atom {
 #[macro_export]
 macro_rules! concat_atom {
     ($s1:expr, $s2:expr $(,)?) => {
-        $crate::concat_atom2($s1, $s2)
+        $crate::concat_atom2(&$s1, &$s2)
     };
     ($s1:expr, $s2:expr, $s3:expr $(,)?) => {
-        $crate::concat_atom3($s1, $s2, $s3)
+        $crate::concat_atom3(&$s1, &$s2, &$s3)
     };
     ($s1:expr, $s2:expr, $s3:expr, $s4:expr $(,)?) => {
-        $crate::concat_atom4($s1, $s2, $s3, $s4)
+        $crate::concat_atom4(&$s1, &$s2, &$s3, &$s4)
     };
     ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr $(,)?) => {
-        $crate::concat_atom5($s1, $s2, $s3, $s4, $s5)
+        $crate::concat_atom5(&$s1, &$s2, &$s3, &$s4, &$s5)
     };
     ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr $(,)?) => {
-        $crate::concat_atom6($s1, $s2, $s3, $s4, $s5, $s6)
+        $crate::concat_atom6(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr $(,)?) => {
+        $crate::concat_atom7(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr, $s8:expr $(,)?) => {
+        $crate::concat_atom8(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7, &$s8)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr, $s8:expr, $s9:expr $(,)?) => {
+        $crate::concat_atom9(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7, &$s8, &$s9)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr, $s8:expr, $s9:expr, $s10:expr $(,)?) => {
+        $crate::concat_atom10(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7, &$s8, &$s9, &$s10)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr, $s8:expr, $s9:expr, $s10:expr, $s11:expr $(,)?) => {
+        $crate::concat_atom11(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7, &$s8, &$s9, &$s10, &$s11)
+    };
+    ($s1:expr, $s2:expr, $s3:expr, $s4:expr, $s5:expr, $s6:expr, $s7:expr, $s8:expr, $s9:expr, $s10:expr, $s11:expr, $s12:expr $(,)?) => {
+        $crate::concat_atom12(&$s1, &$s2, &$s3, &$s4, &$s5, &$s6, &$s7, &$s8, &$s9, &$s10, &$s11, &$s12)
+    };
+    ($($arg:expr),+ $(,)?) => {
+        compile_error!("concat_atom! macro supports between 2 and 12 arguments only")
     };
 }
 
@@ -255,6 +278,12 @@ concat_fns!(
     concat_atom4(4, s1, s2, s3, s4),
     concat_atom5(5, s1, s2, s3, s4, s5),
     concat_atom6(6, s1, s2, s3, s4, s5, s6),
+    concat_atom7(7, s1, s2, s3, s4, s5, s6, s7),
+    concat_atom8(8, s1, s2, s3, s4, s5, s6, s7, s8),
+    concat_atom9(9, s1, s2, s3, s4, s5, s6, s7, s8, s9),
+    concat_atom10(10, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10),
+    concat_atom11(11, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11),
+    concat_atom12(12, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12),
 );
 
 number_to_atom_fns!(

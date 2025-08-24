@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::interface_exists;
@@ -56,7 +57,7 @@ pub fn reconcile<'ctx, 'arena>(
         return get_missing_type(assertion, inside_loop);
     };
 
-    let old_var_type_string = existing_var_type.get_id();
+    let old_var_type_atom = existing_var_type.get_id();
 
     if is_negation {
         return negated_assertion_reconciler::reconcile(
@@ -65,7 +66,7 @@ pub fn reconcile<'ctx, 'arena>(
             existing_var_type,
             possibly_undefined,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             if can_report_issues { span } else { None },
             negated,
         );
@@ -80,7 +81,7 @@ pub fn reconcile<'ctx, 'arena>(
             assertion_type,
             existing_var_type,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             if can_report_issues { span } else { None },
             negated,
         );
@@ -107,10 +108,10 @@ pub fn reconcile<'ctx, 'arena>(
         if can_report_issues && let (Some(key), Some(span)) = (key, span) {
             if existing_var_type.types == refined_type.types {
                 if !assertion.has_equality() && !assertion_type.is_mixed() {
-                    trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, true, negated, span);
+                    trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
                 }
             } else if refined_type.is_never() {
-                trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, false, negated, span);
+                trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
             }
         }
 
@@ -397,7 +398,7 @@ fn intersect_keyed_arrays(
             for (second_key, second_value) in second_known_items {
                 if let Some(first_value) = first_known_items.get(second_key) {
                     intersected_items.insert(
-                        second_key.clone(),
+                        *second_key,
                         (
                             second_value.0 && first_value.0,
                             intersect_union_with_union(context, &first_value.1, &second_value.1)?,
@@ -405,7 +406,7 @@ fn intersect_keyed_arrays(
                     );
                 } else if let Some(first_parameters) = &first_keyed_array.parameters {
                     intersected_items.insert(
-                        second_key.clone(),
+                        *second_key,
                         (second_value.0, intersect_union_with_union(context, &first_parameters.1, &second_value.1)?),
                     );
                 } else if !second_value.0 {
@@ -568,7 +569,7 @@ fn handle_literal_equality(
     assertion_type: &TAtomic,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -579,7 +580,7 @@ fn handle_literal_equality(
             *i,
             existing_var_type,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             span,
             negated,
         ),
@@ -590,7 +591,7 @@ fn handle_literal_equality(
                 assertion_str.as_ref(),
                 existing_var_type,
                 key,
-                old_var_type_string,
+                old_var_type_atom,
                 span,
                 negated,
             )
@@ -601,7 +602,7 @@ fn handle_literal_equality(
             (*assertion_float).into(),
             existing_var_type,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             span,
             negated,
         ),
@@ -611,7 +612,7 @@ fn handle_literal_equality(
             *assertion_bool,
             existing_var_type,
             key,
-            old_var_type_string,
+            old_var_type_atom,
             span,
             negated,
         ),
@@ -627,7 +628,7 @@ fn handle_literal_equality_with_int(
     assertion_integer: i64,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -651,7 +652,7 @@ fn handle_literal_equality_with_int(
                     && let Some(key) = &key
                     && let Some(span) = span
                 {
-                    trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, true, negated, span);
+                    trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
                 }
 
                 return TUnion::from_atomic(literal_asserted_type);
@@ -701,7 +702,7 @@ fn handle_literal_equality_with_int(
     if let Some(key) = &key
         && let Some(span) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, false, negated, span);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
     }
 
     get_never()
@@ -713,7 +714,7 @@ fn handle_literal_equality_with_str(
     assertion_str_val: &str,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -736,7 +737,7 @@ fn handle_literal_equality_with_str(
                     && let Some(key) = &key
                     && let Some(span) = span
                 {
-                    trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, true, negated, span);
+                    trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
                 }
 
                 return TUnion::from_atomic(literal_asserted_type);
@@ -782,7 +783,7 @@ fn handle_literal_equality_with_str(
     if let Some(key) = &key
         && let Some(span) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, false, negated, span);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
     }
 
     get_never()
@@ -794,7 +795,7 @@ fn handle_literal_equality_with_float(
     assertion_float_val: f64,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -818,7 +819,7 @@ fn handle_literal_equality_with_float(
                     {
                         trigger_issue_for_impossible(
                             context,
-                            &old_var_type_string,
+                            old_var_type_atom,
                             k_str,
                             assertion,
                             true,
@@ -872,7 +873,7 @@ fn handle_literal_equality_with_float(
     if let Some(k_str) = &key
         && let Some(s_ref) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, k_str, assertion, false, negated, s_ref);
+        trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, false, negated, s_ref);
     }
 
     get_never()
@@ -884,7 +885,7 @@ fn handle_literal_equality_with_bool(
     assertion_bool_val: bool,
     existing_var_type: &TUnion,
     key: Option<&String>,
-    old_var_type_string: String,
+    old_var_type_atom: Atom,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -908,7 +909,7 @@ fn handle_literal_equality_with_bool(
                     {
                         trigger_issue_for_impossible(
                             context,
-                            &old_var_type_string,
+                            old_var_type_atom,
                             k_str,
                             assertion,
                             true,
@@ -967,7 +968,7 @@ fn handle_literal_equality_with_bool(
     if let Some(k_str) = &key
         && let Some(s_ref) = span
     {
-        trigger_issue_for_impossible(context, &old_var_type_string, k_str, assertion, false, negated, s_ref);
+        trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, false, negated, s_ref);
     }
 
     get_never()

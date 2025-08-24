@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 
 use crate::ttype::TType;
 use crate::utils::str_is_numeric;
@@ -281,9 +282,9 @@ impl TType for TString {
         false
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Atom {
         let s = match &self.literal {
-            Some(TStringLiteral::Value(s)) => return format!("string('{}')", s.replace('\'', "\\'")),
+            Some(TStringLiteral::Value(s)) => return concat_atom!("string('", s, "')"),
             Some(_) => {
                 if self.is_truthy {
                     if self.is_numeric {
@@ -324,7 +325,7 @@ impl TType for TString {
             }
         };
 
-        s.to_string()
+        atom(s)
     }
 }
 
