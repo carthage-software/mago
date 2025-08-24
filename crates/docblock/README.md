@@ -207,7 +207,7 @@ To use the parser, include the crate in your project and utilize the public API 
 
 ```rust,ignore
 use mago_database::File::FileId;
-use mago_interner::ThreadedInterner;
+use mago_atom::ThreadedInterner;
 use mago_span::Span;
 use mago_docblock::parse_phpdoc_with_span;
 

@@ -2,6 +2,8 @@ use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_class_for_property;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -19,7 +21,6 @@ use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_fixer::FixPlan;
 use mago_fixer::SafetyClassification;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -42,8 +43,8 @@ use crate::visibility::check_property_write_visibility;
 /// Represents a successfully resolved instance property.
 #[derive(Debug)]
 pub struct ResolvedProperty {
-    pub property_name: StringIdentifier,
-    pub declaring_class_id: StringIdentifier,
+    pub property_name: Atom,
+    pub declaring_class_id: Atom,
     pub property_span: Option<Span>,
     pub property_type: TUnion,
 }
@@ -104,9 +105,9 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         if selector.is_dynamic() {
             result.has_ambiguous_path = true;
         }
+
         if let Some(name) = selector.name() {
-            let name_str = context.interner.lookup(&name);
-            property_names.push(context.interner.intern(format!("${name_str}")));
+            property_names.push(concat_atom!("$", &name));
         } else {
             result.has_invalid_path = true;
         }
@@ -192,8 +193,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 fn find_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    class_id: &StringIdentifier,
-    prop_name: &StringIdentifier,
+    class_id: &Atom,
+    prop_name: &Atom,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_expr: &'ast Expression<'arena>,
     object: &TObject,
@@ -202,9 +203,9 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     result: &mut PropertyResolutionResult,
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
     let declaring_class_id =
-        get_declaring_class_for_property(context.codebase, context.interner, class_id, prop_name).unwrap_or(*class_id);
+        get_declaring_class_for_property(context.codebase, class_id, prop_name).unwrap_or(*class_id);
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, context.interner, &declaring_class_id) else {
+    let Some(declaring_class_metadata) = get_class_like(context.codebase, &declaring_class_id) else {
         report_non_existent_class_like(context, object_expr.span(), &declaring_class_id);
 
         return Ok(None);
@@ -233,12 +234,11 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
 
     expander::expand_union(
         context.codebase,
-        context.interner,
         &mut property_type,
         &TypeExpansionOptions {
-            self_class: Some(&declaring_class_id),
+            self_class: Some(declaring_class_id),
             static_class_type: StaticClassType::Object(object.clone()),
-            parent_class: declaring_class_metadata.direct_parent_class.as_ref(),
+            parent_class: declaring_class_metadata.direct_parent_class,
             ..Default::default()
         },
     );
@@ -250,10 +250,10 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             context,
             &property_type,
             named_object.get_type_parameters().unwrap_or_default(),
-            if context.interner.lowered(class_id) == context.interner.lowered(&declaring_class_id) {
+            if class_id.eq_ignore_ascii_case(&declaring_class_id) {
                 declaring_class_metadata
             } else {
-                get_class_like(context.codebase, context.interner, class_id).unwrap_or(declaring_class_metadata)
+                get_class_like(context.codebase, class_id).unwrap_or(declaring_class_metadata)
             },
             declaring_class_metadata,
         );
@@ -303,7 +303,7 @@ pub fn localize_property_type(
     let mut template_types = get_template_types_for_class_member(
         context,
         Some(property_declaring_class_metadata),
-        Some(&property_declaring_class_metadata.name),
+        Some(property_declaring_class_metadata.name),
         Some(property_class_metadata),
         &property_class_metadata.template_types,
         &IndexMap::default(),
@@ -321,13 +321,12 @@ pub fn localize_property_type(
         class_property_type,
         &TemplateResult::new(IndexMap::default(), template_types),
         context.codebase,
-        context.interner,
     )
 }
 
 fn update_template_types(
     context: &Context<'_, '_>,
-    template_types: &mut IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState>,
+    template_types: &mut IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
     property_class_metadata: &ClassLikeMetadata,
     lhs_type_params: &[TUnion],
     property_declaring_class_metadata: &ClassLikeMetadata,
@@ -347,7 +346,6 @@ fn update_template_types(
 
                             expander::expand_union(
                                 context.codebase,
-                                context.interner,
                                 &mut lhs_param_type,
                                 &TypeExpansionOptions { parent_class: None, ..Default::default() },
                             );
@@ -483,7 +481,7 @@ fn report_redundant_nullsafe<'ctx, 'ast, 'arena>(
     in_coalescing: bool,
     in_isset: bool,
 ) {
-    let object_type_str = object_type.get_id(Some(context.interner));
+    let object_type_str = object_type.get_id();
 
     let (note, help) = if in_isset {
         (
@@ -523,7 +521,7 @@ fn report_access_on_non_object(
     selector: &ClassLikeMemberSelector,
     object_span: Span,
 ) {
-    let type_str = atomic_type.get_id(Some(context.interner));
+    let type_str = atomic_type.get_id();
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedPropertyAccess } else { IssueCode::InvalidPropertyAccess },
         Issue::error(format!("Attempting to access a property on a non-object type (`{type_str}`)."))
@@ -548,22 +546,17 @@ fn report_ambiguous_access(context: &mut Context, selector: &ClassLikeMemberSele
 
 fn report_non_existent_property(
     context: &mut Context,
-    classname: &StringIdentifier,
-    prop_name: &StringIdentifier,
+    classname: &Atom,
+    prop_name: &Atom,
     selector_span: Span,
     object_span: Span,
 ) {
-    let class_name_str = context.interner.lookup(classname);
-    let property_name_str = context.interner.lookup(prop_name).replace('$', "");
-    let class_kind_str =
-        get_class_like(context.codebase, context.interner, classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = get_class_like(context.codebase, classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
-        Issue::error(format!("Property `${property_name_str}` does not exist on {class_kind_str} `{class_name_str}`."))
+        Issue::error(format!("Property `{prop_name}` does not exist on {class_kind_str} `{classname}`."))
             .with_annotation(Annotation::primary(selector_span).with_message("Property not found here"))
-            .with_annotation(
-                Annotation::secondary(object_span).with_message(format!("On instance of `{class_name_str}`")),
-            ),
+            .with_annotation(Annotation::secondary(object_span).with_message(format!("On instance of `{classname}`"))),
     );
 }

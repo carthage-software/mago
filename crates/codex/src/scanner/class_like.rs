@@ -1,4 +1,6 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -44,9 +46,9 @@ pub fn register_anonymous_class<'ctx, 'ast, 'arena>(
     class: &'ast AnonymousClass<'arena>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(StringIdentifier, TemplateConstraintList)> {
+) -> Option<(Atom, TemplateConstraintList)> {
     let span = class.span();
-    let name = get_anonymous_class_name(context.interner, span);
+    let name = get_anonymous_class_name(span);
 
     let class_like_metadata = scan_class_like(
         codebase,
@@ -67,7 +69,7 @@ pub fn register_anonymous_class<'ctx, 'ast, 'arena>(
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
-        .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
+        .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
     codebase.class_likes.insert(name, class_like_metadata);
@@ -81,10 +83,10 @@ pub fn register_class<'ctx, 'ast, 'arena>(
     class: &'ast Class<'arena>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(StringIdentifier, TemplateConstraintList)> {
+) -> Option<(Atom, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        context.interner.intern(context.resolved_names.get(&class.name)),
+        atom(context.resolved_names.get(&class.name)),
         SymbolKind::Class,
         Some(class.name.span),
         class.span(),
@@ -101,7 +103,7 @@ pub fn register_class<'ctx, 'ast, 'arena>(
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
-        .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
+        .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
@@ -117,10 +119,10 @@ pub fn register_interface<'ctx, 'ast, 'arena>(
     interface: &'ast Interface<'arena>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(StringIdentifier, TemplateConstraintList)> {
+) -> Option<(Atom, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        context.interner.intern(context.resolved_names.get(&interface.name)),
+        atom(context.resolved_names.get(&interface.name)),
         SymbolKind::Interface,
         Some(interface.name.span),
         interface.span(),
@@ -137,7 +139,7 @@ pub fn register_interface<'ctx, 'ast, 'arena>(
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
-        .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
+        .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
@@ -153,10 +155,10 @@ pub fn register_trait<'ctx, 'ast, 'arena>(
     r#trait: &'ast Trait<'arena>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(StringIdentifier, TemplateConstraintList)> {
+) -> Option<(Atom, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        context.interner.intern(context.resolved_names.get(&r#trait.name)),
+        atom(context.resolved_names.get(&r#trait.name)),
         SymbolKind::Trait,
         Some(r#trait.name.span),
         r#trait.span(),
@@ -173,7 +175,7 @@ pub fn register_trait<'ctx, 'ast, 'arena>(
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
-        .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
+        .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
@@ -189,10 +191,10 @@ pub fn register_enum<'ctx, 'ast, 'arena>(
     r#enum: &'ast Enum<'arena>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(StringIdentifier, TemplateConstraintList)> {
+) -> Option<(Atom, TemplateConstraintList)> {
     let class_like_metadata = scan_class_like(
         codebase,
-        context.interner.intern(context.resolved_names.get(&r#enum.name)),
+        atom(context.resolved_names.get(&r#enum.name)),
         SymbolKind::Enum,
         Some(r#enum.name.span),
         r#enum.span(),
@@ -209,7 +211,7 @@ pub fn register_enum<'ctx, 'ast, 'arena>(
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
-        .map(|(name, definition)| (context.interner.lookup(name).to_string(), definition.clone()))
+        .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
@@ -223,7 +225,7 @@ pub fn register_enum<'ctx, 'ast, 'arena>(
 #[allow(clippy::too_many_arguments)]
 fn scan_class_like<'ctx, 'ast, 'arena>(
     codebase: &mut CodebaseMetadata,
-    name: StringIdentifier,
+    name: Atom,
     kind: SymbolKind,
     name_span: Option<Span>,
     span: Span,
@@ -237,7 +239,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
     scope: &mut NamespaceScope,
 ) -> Option<ClassLikeMetadata> {
     let original_name = name;
-    let name = context.interner.lowered(&original_name);
+    let name = ascii_lowercase_atom(&original_name);
 
     if codebase.class_likes.contains_key(&name) {
         return None;
@@ -283,7 +285,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
 
             if let Some(extended_class) = extends.and_then(|e| e.types.first()) {
                 let parent_name = context.resolved_names.get(extended_class);
-                let parent_name = context.interner.intern(parent_name.to_lowercase());
+                let parent_name = ascii_lowercase_atom(parent_name);
 
                 class_like_metadata.direct_parent_class = Some(parent_name);
                 class_like_metadata.all_parent_classes.insert(parent_name);
@@ -293,23 +295,25 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
             class_like_metadata.flags |= MetadataFlags::FINAL;
 
             if enum_type.is_some() {
-                let backed_enum_interface = context.interner.intern("backedenum");
-                let from_method = context.interner.intern("from");
-                let try_from_method = context.interner.intern("tryfrom");
+                let backed_enum_interface = atom("backedenum");
+                let from_method = atom("from");
+                let try_from_method = atom("tryfrom");
 
                 class_like_metadata.all_parent_interfaces.insert(backed_enum_interface);
                 class_like_metadata.direct_parent_interfaces.insert(backed_enum_interface);
+
                 class_like_metadata.appearing_method_ids.insert(from_method, backed_enum_interface);
                 class_like_metadata.declaring_method_ids.insert(from_method, backed_enum_interface);
                 class_like_metadata.appearing_method_ids.insert(try_from_method, backed_enum_interface);
                 class_like_metadata.declaring_method_ids.insert(try_from_method, backed_enum_interface);
             }
 
-            let unit_enum_interface = context.interner.intern("unitenum");
-            let cases_method = context.interner.intern("cases");
+            let unit_enum_interface = atom("unitenum");
+            let cases_method = atom("cases");
 
             class_like_metadata.all_parent_interfaces.insert(unit_enum_interface);
             class_like_metadata.direct_parent_interfaces.insert(unit_enum_interface);
+
             class_like_metadata.appearing_method_ids.insert(cases_method, unit_enum_interface);
             class_like_metadata.declaring_method_ids.insert(cases_method, unit_enum_interface);
 
@@ -326,7 +330,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
             if let Some(extends) = extends {
                 for extended_interface in extends.types.iter() {
                     let parent_name = context.resolved_names.get(extended_interface);
-                    let parent_name = context.interner.intern(parent_name.to_lowercase());
+                    let parent_name = ascii_lowercase_atom(parent_name);
 
                     class_like_metadata.add_direct_parent_interface(parent_name);
                 }
@@ -339,7 +343,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
     {
         for interface_name in implemented_interfaces.types.iter() {
             let interface_name = context.resolved_names.get(interface_name);
-            let interface_name = context.interner.intern(interface_name.to_lowercase());
+            let interface_name = ascii_lowercase_atom(interface_name);
 
             class_like_metadata.add_direct_parent_interface(interface_name);
         }
@@ -390,15 +394,14 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
         class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
 
         for (i, template) in docblock.templates.iter().enumerate() {
-            let template_name = context.interner.intern(&template.name);
+            let template_name = atom(&template.name);
             let template_as_type = if let Some(type_string) = &template.type_string {
                 match builder::get_type_from_string(
                     &type_string.value,
                     type_string.span,
                     scope,
                     &type_context,
-                    Some(&name),
-                    context.interner,
+                    Some(name),
                 ) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
@@ -422,7 +425,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
             let definition = vec![(GenericParent::ClassLike(name), template_as_type)];
 
             class_like_metadata.add_template_type((template_name, definition.clone()));
-            type_context = type_context.with_template_definition(template.name.clone(), definition);
+            type_context = type_context.with_template_definition(template_name, definition);
 
             let variance = if template.covariant {
                 Variance::Covariant
@@ -445,8 +448,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 extended_type.span,
                 scope,
                 &type_context,
-                Some(&name),
-                context.interner,
+                Some(name),
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
@@ -500,13 +502,12 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 }
             };
 
-            let parent_name_str = context.interner.lookup(&parent_name);
-            let parent_name = context.interner.lowered(&parent_name);
+            let lowercase_parent_name = ascii_lowercase_atom(&parent_name);
 
             let has_parent = if class_like_metadata.kind.is_interface() {
-                class_like_metadata.all_parent_interfaces.contains(&parent_name)
+                class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name)
             } else {
-                class_like_metadata.all_parent_classes.contains(&parent_name)
+                class_like_metadata.all_parent_classes.contains(&lowercase_parent_name)
             };
 
             if !has_parent {
@@ -514,18 +515,20 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                     Issue::error("`@extends` tag must refer to a direct parent class or interface.")
                         .with_code(ScanningIssueKind::InvalidExtendsTag)
                         .with_annotation(Annotation::primary(extended_type.span).with_message(format!(
-                            "The class `{parent_name_str}` is not a direct parent."
+                            "The class `{parent_name}` is not a direct parent."
                         )))
                         .with_note("The `@extends` tag is used to provide type information for the class or interface that is directly extended.")
-                        .with_help(format!("Ensure this type's definition includes `extends {parent_name_str}`.")),
+                        .with_help(format!("Ensure this type's definition includes `extends {parent_name}`.")),
                 );
 
                 continue;
             }
 
             if let Some(extended_parent_parameters) = parent_parameters {
-                class_like_metadata.template_type_extends_count.insert(parent_name, extended_parent_parameters.len());
-                class_like_metadata.add_template_extended_offset(parent_name, extended_parent_parameters);
+                class_like_metadata
+                    .template_type_extends_count
+                    .insert(lowercase_parent_name, extended_parent_parameters.len());
+                class_like_metadata.add_template_extended_offset(lowercase_parent_name, extended_parent_parameters);
             }
         }
 
@@ -535,8 +538,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 implemented_type.span,
                 scope,
                 &type_context,
-                Some(&name),
-                context.interner,
+                Some(name),
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
@@ -573,7 +575,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                     (name, parameters)
                 }
                 atomic => {
-                    let atomic_str = atomic.get_id(Some(context.interner));
+                    let atomic_str = atomic.get_id();
 
                     class_like_metadata.issues.push(
                         Issue::error("The `@implements` tag expects a single interface type.")
@@ -590,26 +592,27 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 }
             };
 
-            let parent_name_str = context.interner.lookup(&parent_name);
-            let parent_name = context.interner.lowered(&parent_name);
+            let lowercase_parent_name = ascii_lowercase_atom(&parent_name);
 
-            if !class_like_metadata.all_parent_interfaces.contains(&context.interner.lowered(&parent_name)) {
+            if !class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name) {
                 class_like_metadata.issues.push(
                     Issue::error("The `@implements` tag must refer to a direct parent interface.")
                         .with_code(ScanningIssueKind::InvalidImplementsTag)
                         .with_annotation(Annotation::primary(implemented_type.span).with_message(format!(
-                            "The interface `{parent_name_str}` is not a direct parent."
+                            "The interface `{parent_name}` is not a direct parent."
                         )))
                         .with_note("The `@implements` tag is used to provide type information for the interface that is directly implemented.")
-                        .with_help(format!("Ensure this type's definition includes `implements {parent_name_str}`.")),
+                        .with_help(format!("Ensure this type's definition includes `implements {parent_name}`.")),
                 );
 
                 continue;
             }
 
             if let Some(impl_parent_parameters) = parent_parameters {
-                class_like_metadata.template_type_implements_count.insert(parent_name, impl_parent_parameters.len());
-                class_like_metadata.add_template_extended_offset(parent_name, impl_parent_parameters);
+                class_like_metadata
+                    .template_type_implements_count
+                    .insert(lowercase_parent_name, impl_parent_parameters.len());
+                class_like_metadata.add_template_extended_offset(lowercase_parent_name, impl_parent_parameters);
             }
         }
 
@@ -619,8 +622,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 require_extend.span,
                 scope,
                 &type_context,
-                Some(&name),
-                context.interner,
+                Some(name),
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
@@ -688,7 +690,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 }
             };
 
-            class_like_metadata.require_extends.insert(context.interner.lowered(&required_name));
+            class_like_metadata.require_extends.insert(ascii_lowercase_atom(&required_name));
             if let Some(required_params) = required_params {
                 class_like_metadata.add_template_extended_offset(required_name, required_params);
             }
@@ -700,8 +702,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 require_implements.span,
                 scope,
                 &type_context,
-                Some(&name),
-                context.interner,
+                Some(name),
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
@@ -769,21 +770,14 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 }
             };
 
-            class_like_metadata.require_implements.insert(context.interner.lowered(&required_name));
+            class_like_metadata.require_implements.insert(ascii_lowercase_atom(&required_name));
             if let Some(required_parameters) = required_parameters {
                 class_like_metadata.add_template_extended_offset(required_name, required_parameters);
             }
         }
 
         if let Some(inheritors) = docblock.inheritors {
-            match builder::get_type_from_string(
-                &inheritors.value,
-                inheritors.span,
-                scope,
-                &type_context,
-                Some(&name),
-                context.interner,
-            ) {
+            match builder::get_type_from_string(&inheritors.value, inheritors.span, scope, &type_context, Some(name)) {
                 Ok(inheritors_union) => {
                     for inheritor in inheritors_union.types.as_ref() {
                         match inheritor {
@@ -795,7 +789,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                                 class_like_metadata
                                     .permitted_inheritors
                                     .get_or_insert_default()
-                                    .insert(context.interner.lowered(name));
+                                    .insert(ascii_lowercase_atom(name));
                             }
                             _ => {
                                 class_like_metadata.issues.push(
@@ -831,7 +825,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 for constant_metadata in scan_class_like_constants(
                     &mut class_like_metadata,
                     constant,
-                    Some(&name),
+                    Some(name),
                     &type_context,
                     context,
                     scope,
@@ -865,8 +859,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
 
         if class_like_metadata.enum_cases.len() <= MAX_ENUM_CASES_FOR_ANALYSIS {
             for (case_name, case_info) in &class_like_metadata.enum_cases {
-                name_types
-                    .push(TAtomic::Scalar(TScalar::literal_string(context.interner.lookup(case_name).to_string())));
+                name_types.push(TAtomic::Scalar(TScalar::literal_string(*case_name)));
 
                 if let Some(enum_backing_type) = &backing_type {
                     if let Some(t) = case_info.value_type.as_ref() {
@@ -886,7 +879,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
             value_types.push(enum_backing_type.clone());
         }
 
-        let name = context.interner.intern("$name");
+        let name = atom("$name");
         let flags = MetadataFlags::READONLY | MetadataFlags::HAS_DEFAULT;
         let mut property_metadata = PropertyMetadata::new(VariableIdentifier(name), flags);
         property_metadata.type_declaration_metadata = Some(TypeMetadata::new(get_string(), enum_name_span));
@@ -895,7 +888,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
         class_like_metadata.add_property_metadata(property_metadata);
 
         if let Some(enum_backing_type) = backing_type {
-            let value = context.interner.intern("$value");
+            let value = atom("$value");
 
             let flags = MetadataFlags::READONLY | MetadataFlags::HAS_DEFAULT;
             let mut property_metadata = PropertyMetadata::new(VariableIdentifier(value), flags);
@@ -920,7 +913,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                 for trait_use in trait_use.trait_names.iter() {
                     let trait_name = context.resolved_names.get(trait_use);
 
-                    class_like_metadata.add_used_trait(context.interner.intern(trait_name.to_lowercase()));
+                    class_like_metadata.add_used_trait(ascii_lowercase_atom(trait_name));
                 }
 
                 if let TraitUseSpecification::Concrete(specification) = &trait_use.specification {
@@ -938,10 +931,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                                 };
 
                                 if let Some(alias) = &adaptation.alias {
-                                    class_like_metadata.add_trait_alias(
-                                        context.interner.intern(method_name),
-                                        context.interner.intern(alias.value),
-                                    );
+                                    class_like_metadata.add_trait_alias(atom(method_name), atom(alias.value));
                                 }
 
                                 if let Some(visibility) = &adaptation.visibility {
@@ -950,9 +940,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                                         Modifier::Protected(_) => Visibility::Protected,
                                         Modifier::Private(_) => Visibility::Private,
                                         Modifier::Final(_) => {
-                                            class_like_metadata
-                                                .trait_final_map
-                                                .insert(context.interner.intern(method_name));
+                                            class_like_metadata.trait_final_map.insert(atom(method_name));
 
                                             continue;
                                         }
@@ -961,8 +949,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                                         }
                                     };
 
-                                    class_like_metadata
-                                        .add_trait_visibility(context.interner.intern(method_name), visibility);
+                                    class_like_metadata.add_trait_visibility(atom(method_name), visibility);
                                 }
                             }
                         }
@@ -996,8 +983,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                         template_use.span,
                         scope,
                         &type_context,
-                        Some(&name),
-                        context.interner,
+                        Some(name),
                     ) {
                         Ok(template_use_type) => template_use_type,
                         Err(typing_error) => {
@@ -1049,21 +1035,19 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                         }
                     };
 
-                    let lowered_trait_name = context.interner.lowered(&trait_name);
-                    if !class_like_metadata.used_traits.contains(&lowered_trait_name) {
-                        let trait_name_str = context.interner.lookup(&trait_name);
-
+                    let lowercase_trait_name = ascii_lowercase_atom(&trait_name);
+                    if !class_like_metadata.used_traits.contains(&lowercase_trait_name) {
                         class_like_metadata.issues.push(
                             Issue::error("The `@use` tag must refer to a trait that is used.")
                                 .with_code(ScanningIssueKind::InvalidUseTag)
                                 .with_annotation(
                                     Annotation::primary(template_use.span).with_message(format!(
-                                        "The trait `{trait_name_str}` is not used in this class.",
+                                        "The trait `{trait_name}` is not used in this class.",
                                     )),
                                 )
                                 .with_note("The `@use` tag is used to provide type information for the trait that is used in this class.")
                                 .with_help(format!(
-                                    "Ensure this class's definition includes `use {trait_name_str};`.",
+                                    "Ensure this class's definition includes `use {trait_name};`.",
                                 )),
                         );
 
@@ -1074,8 +1058,10 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
                         Some(trait_parameters) => {
                             let parameters_count = trait_parameters.len();
 
-                            class_like_metadata.template_type_uses_count.insert(lowered_trait_name, parameters_count);
-                            class_like_metadata.template_extended_offsets.insert(lowered_trait_name, trait_parameters);
+                            class_like_metadata.template_type_uses_count.insert(lowercase_trait_name, parameters_count);
+                            class_like_metadata
+                                .template_extended_offsets
+                                .insert(lowercase_trait_name, trait_parameters);
                         }
                         // The `@use` tag is redundant if no parameters are provided.
                         None => {
@@ -1124,7 +1110,7 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
             }
             ClassLikeMember::Property(property) => {
                 let properties =
-                    scan_properties(property, &mut class_like_metadata, Some(&name), &type_context, context, scope);
+                    scan_properties(property, &mut class_like_metadata, Some(name), &type_context, context, scope);
 
                 for property_metadata in properties {
                     class_like_metadata.add_property_metadata(property_metadata);
@@ -1137,9 +1123,9 @@ fn scan_class_like<'ctx, 'ast, 'arena>(
     }
 
     if !class_like_metadata.kind.is_trait() {
-        let to_string_method = context.interner.intern("__tostring");
+        let to_string_method = atom("__tostring");
         if class_like_metadata.methods.contains(&to_string_method) {
-            class_like_metadata.add_direct_parent_interface(context.interner.intern("stringable"));
+            class_like_metadata.add_direct_parent_interface(atom("stringable"));
         }
     }
 

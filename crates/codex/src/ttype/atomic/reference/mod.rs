@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -14,11 +13,11 @@ pub enum TReferenceMemberSelector {
     /// A wildcard member selector, e.g., `Foo::*`.
     Wildcard,
     /// A specific member name, e.g., `Foo::bar`.
-    Identifier(StringIdentifier),
+    Identifier(Atom),
     /// A member that starts with a specific prefix, e.g., `Foo::bar*`.
-    StartsWith(StringIdentifier),
+    StartsWith(Atom),
     /// A member that ends with a specific suffix, e.g., `*::bar`.
-    EndsWith(StringIdentifier),
+    EndsWith(Atom),
 }
 
 /// Represents an unresolved reference to a symbol or a class-like member.
@@ -30,7 +29,7 @@ pub enum TReference {
     /// Example: `Foo`, `Bar<int>`, `T`.
     Symbol {
         /// The potentially qualified name identifier being referenced.
-        name: StringIdentifier,
+        name: Atom,
         /// Generic arguments provided at the reference site, e.g., the `<int>` in `Foo<int>`.
         /// Kept original name `type_params` as requested for fields.
         parameters: Option<Vec<TUnion>>,
@@ -42,7 +41,7 @@ pub enum TReference {
     /// Example: `Client::THRESHOLD`, `Status::Ok`.
     Member {
         /// The FQCN of the class-like structure containing the member.
-        class_like_name: StringIdentifier,
+        class_like_name: Atom,
         /// The name of the member being referenced (constant name, case name).
         member_selector: TReferenceMemberSelector,
     },
@@ -51,19 +50,19 @@ pub enum TReference {
 impl TReference {
     /// Creates a simple symbol reference with no generic parameters.
     #[inline]
-    pub fn new_symbol(name: StringIdentifier) -> Self {
+    pub fn new_symbol(name: Atom) -> Self {
         TReference::Symbol { name, parameters: None, intersection_types: None }
     }
 
     /// Creates a symbol reference with generic parameters.
     #[inline]
-    pub fn new_symbol_with_parameters(name: StringIdentifier, parameters: Vec<TUnion>) -> Self {
+    pub fn new_symbol_with_parameters(name: Atom, parameters: Vec<TUnion>) -> Self {
         TReference::Symbol { name, parameters: Some(parameters), intersection_types: None }
     }
 
     /// Creates a class-like member reference.
     #[inline]
-    pub fn new_member(class_like_name: StringIdentifier, member_selector: TReferenceMemberSelector) -> Self {
+    pub fn new_member(class_like_name: Atom, member_selector: TReferenceMemberSelector) -> Self {
         TReference::Member { class_like_name, member_selector }
     }
 
@@ -82,7 +81,7 @@ impl TReference {
     /// Returns the name and parameters if this is a Symbol reference.
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub const fn get_symbol_data(&self) -> Option<(&StringIdentifier, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
+    pub const fn get_symbol_data(&self) -> Option<(&Atom, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
         match self {
             TReference::Symbol { name, parameters, intersection_types } => Some((name, parameters, intersection_types)),
             _ => None,
@@ -91,7 +90,7 @@ impl TReference {
 
     /// Returns the class-like name and member name if this is a Member reference.
     #[inline]
-    pub const fn get_member_data(&self) -> Option<(&StringIdentifier, &TReferenceMemberSelector)> {
+    pub const fn get_member_data(&self) -> Option<(&Atom, &TReferenceMemberSelector)> {
         match self {
             TReference::Member { class_like_name: classlike_name, member_selector } => {
                 Some((classlike_name, member_selector))
@@ -169,35 +168,22 @@ impl TType for TReference {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let mut str = String::new();
         str += "unknown-ref(";
 
         match self {
             TReference::Symbol { name, .. } => {
-                if let Some(interner) = interner {
-                    str += interner.lookup(name);
-                } else {
-                    str += name.to_string().as_str();
-                }
+                str += name.as_str();
             }
             TReference::Member { class_like_name, member_selector } => {
-                if let Some(interner) = interner {
-                    str += interner.lookup(class_like_name);
-                } else {
-                    str += class_like_name.to_string().as_str();
-                }
-
+                str += class_like_name.as_str();
                 str += "::";
 
                 match member_selector {
                     TReferenceMemberSelector::Wildcard => str += "*",
                     TReferenceMemberSelector::Identifier(member_name) => {
-                        if let Some(interner) = interner {
-                            str += interner.lookup(member_name);
-                        } else {
-                            str += member_name.to_string().as_str();
-                        }
+                        str += member_name.as_str();
                     }
                     TReferenceMemberSelector::StartsWith(member_name) => {
                         str += &format!("{member_name}*");

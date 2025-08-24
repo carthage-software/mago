@@ -27,12 +27,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
 
         let mut invocation_targets = vec![];
         for resolved_method in method_resolution.resolved_methods {
-            let metadata = get_class_like(context.codebase, context.interner, &resolved_method.classname)
+            let metadata = get_class_like(context.codebase, &resolved_method.classname)
                 .expect("class-like metadata should exist for resolved method");
 
-            let method_metadata =
-                get_method_by_id(context.codebase, context.interner, &resolved_method.method_identifier)
-                    .expect("method metadata should exist for resolved method");
+            let method_metadata = get_method_by_id(context.codebase, &resolved_method.method_identifier)
+                .expect("method metadata should exist for resolved method");
 
             let method_target_context = MethodTargetContext {
                 declaring_method_id: Some(resolved_method.method_identifier),

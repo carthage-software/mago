@@ -5,7 +5,6 @@ use ahash::HashMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::negate_formula;
 use mago_collector::Collector;
-use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -16,7 +15,6 @@ use crate::code::IssueCode;
 /// Checks for two types of logical issues between a set of existing assertions (`formula_1`)
 /// and a new set of assertions (`formula_2`) from a conditional expression.
 pub fn check_for_paradox(
-    interner: &ThreadedInterner,
     collector: &mut Collector<'_, '_>,
     formula_1: &[Rc<Clause>],
     formula_2: &[Clause],
@@ -33,7 +31,7 @@ pub fn check_for_paradox(
                 formula_1_hashes.get(&formula_2_clause.hash).or_else(|| formula_2_hashes.get(&formula_2_clause.hash))
             && *original_span != span
         {
-            report_redundant_condition(interner, collector, formula_2_clause, span, *original_span);
+            report_redundant_condition(collector, formula_2_clause, span, *original_span);
         }
 
         formula_2_hashes.entry(formula_2_clause.hash).or_insert(formula_2_clause.condition_span);
@@ -63,7 +61,7 @@ pub fn check_for_paradox(
             });
 
             if is_subset && !clause_1.possibilities.is_empty() {
-                report_paradoxical_condition(interner, collector, clause_1, negated_clause_2, span);
+                report_paradoxical_condition(collector, clause_1, negated_clause_2, span);
 
                 return;
             }
@@ -72,13 +70,12 @@ pub fn check_for_paradox(
 }
 
 fn report_redundant_condition(
-    interner: &ThreadedInterner,
     collector: &mut Collector<'_, '_>,
     redundant_clause: &Clause,
     redundant_span: Span,
     original_span: Span,
 ) {
-    let clause_string = redundant_clause.to_string(interner);
+    let clause_string = redundant_clause.to_string();
     let (kind, title) = if clause_string == "isset" {
         (IssueCode::RedundantIssetCheck, "Redundant `isset` check")
     } else {
@@ -102,7 +99,6 @@ fn report_redundant_condition(
 }
 
 fn report_paradoxical_condition(
-    interner: &ThreadedInterner,
     collector: &mut Collector<'_, '_>,
     original_clause: &Clause,
     negated_conflicting_clause: &Clause,
@@ -112,8 +108,8 @@ fn report_paradoxical_condition(
         return;
     };
 
-    let new_condition_str = conflicting_clause.iter().map(|c| c.to_string(interner)).collect::<Vec<_>>().join(" && ");
-    let established_fact_str = original_clause.to_string(interner);
+    let new_condition_str = conflicting_clause.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" && ");
+    let established_fact_str = original_clause.to_string();
 
     collector.report_with_code(
         IssueCode::ParadoxicalCondition,

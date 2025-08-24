@@ -2,6 +2,8 @@ use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_optional_union_type;
@@ -13,7 +15,6 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::StringIdentifier;
 
 use crate::context::Context;
 
@@ -31,7 +32,7 @@ use crate::context::Context;
 /// types like `self`, `static`, etc., within the final template type definitions.
 ///
 /// # Arguments
-/// * `context` - The analysis context, providing codebase and interner access.
+/// * `context` - The analysis context, providing codebase metadata.
 /// * `declaring_class_meta` - Metadata of the class where the member is originally declared.
 /// * `appearing_class_name` - The name of the class through which the member is being accessed (might differ from declaring class due to inheritance). Used for `self::` resolution during final expansion.
 /// * `calling_class_meta` - Metadata of the class context from which the call originates (`$this` or `static::class`). Used for `static::` resolution.
@@ -40,21 +41,20 @@ use crate::context::Context;
 ///
 /// # Returns
 ///
-/// An `IndexMap` where keys are template parameter names (`StringIdentifier`) and values are
+/// An `IndexMap` where keys are template parameter names (`str`) and values are
 /// `HashMap`s mapping the defining entity (`GenericParent` - class or function) to the
 /// fully resolved and expanded `TUnion` for that template parameter in this specific context.
 pub fn get_template_types_for_class_member(
     context: &Context<'_, '_>,
     declaring_class_meta: Option<&ClassLikeMetadata>,
-    appearing_class_name: Option<&StringIdentifier>,
+    appearing_class_name: Option<Atom>,
     calling_class_meta: Option<&ClassLikeMetadata>,
-    existing_template_types: &[(StringIdentifier, Vec<(GenericParent, TUnion)>)],
-    class_template_parameters: &IndexMap<StringIdentifier, Vec<(GenericParent, TUnion)>, RandomState>,
-) -> IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState> {
+    existing_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
+    class_template_parameters: &IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+) -> IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState> {
     let codebase = context.codebase;
-    let interner = context.interner;
 
-    let mut template_types: IndexMap<StringIdentifier, Vec<(GenericParent, TUnion)>, RandomState> =
+    let mut template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
         IndexMap::from_iter(existing_template_types.iter().cloned());
 
     if let Some(declaring_class_meta) = declaring_class_meta {
@@ -85,7 +85,7 @@ pub fn get_template_types_for_class_member(
                                         defining_entity,
                                         parameter_name,
                                         calling_template_extended,
-                                        &combined_parameters.into_iter().collect::<HashMap<_, _>>(),
+                                        &combined_parameters.into_iter().collect::<AtomMap<_>>(),
                                     )
                                 } else {
                                     wrap_atomic(atomic_type.clone())
@@ -95,7 +95,6 @@ pub fn get_template_types_for_class_member(
                                     resolved_atomic_type_union,
                                     resolved_union.as_ref(),
                                     codebase,
-                                    interner,
                                 ));
                             }
 
@@ -134,7 +133,6 @@ pub fn get_template_types_for_class_member(
         for (generic_parent, mut expanded_union) in type_map_vec {
             expander::expand_union(
                 codebase,
-                interner,
                 &mut expanded_union,
                 &TypeExpansionOptions {
                     self_class: appearing_class_name,
@@ -143,7 +141,7 @@ pub fn get_template_types_for_class_member(
                     } else {
                         StaticClassType::None
                     },
-                    parent_class: declaring_class_meta.and_then(|m| m.direct_parent_class.as_ref()),
+                    parent_class: declaring_class_meta.and_then(|m| m.direct_parent_class),
                     function_is_final: calling_class_meta.is_some_and(|m| m.flags.is_final()),
                     expand_templates: true,
                     ..Default::default()
@@ -165,24 +163,15 @@ pub fn get_template_types_for_class_member(
 /// context (finding `U`), and then recursively look up `U` in `ClassC`'s context, ultimately
 /// resolving to `int`.
 ///
-/// # Arguments
-///
-/// * `class_like_name` - The identifier of the class where the template parameter is originally defined.
-/// * `template_name` - The identifier of the template parameter to resolve (e.g., `T`).
-/// * `template_extended_parameters` - A map representing how classes extend others with specific template arguments
-///   (e.g., `ClassB -> { ClassA -> { T -> string } }` means B extends A with T=string).
-/// * `found_generic_parameters` - A map containing already resolved template types in the current specific context
-///   (e.g., if we are analyzing an instance `ClassC<int>`, this might contain `U -> int`).
-///
 /// # Returns
 ///
 /// An `TUnion` representing the resolved concrete type for the template parameter,
 /// or `any` if it cannot be resolved.
 pub fn get_generic_parameter_for_offset(
-    class_like_name: &StringIdentifier,
-    template_name: &StringIdentifier,
-    template_extended_parameters: &HashMap<StringIdentifier, IndexMap<StringIdentifier, TUnion, RandomState>>,
-    found_generic_parameters: &HashMap<StringIdentifier, Vec<(GenericParent, TUnion)>>,
+    class_like_name: &Atom,
+    template_name: &Atom,
+    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+    found_generic_parameters: &AtomMap<Vec<(GenericParent, TUnion)>>,
 ) -> TUnion {
     if let Some(result_map) = found_generic_parameters.get(template_name)
         && let Some(found_parameter_type) = result_map

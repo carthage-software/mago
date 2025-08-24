@@ -2,8 +2,7 @@ use mago_database::file::FileId;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 use mago_span::Position;
 
 use crate::identifier::method::MethodIdentifier;
@@ -15,12 +14,12 @@ use crate::identifier::method::MethodIdentifier;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum FunctionLikeIdentifier {
     /// A globally or namespaced defined function.
-    /// * `StringIdentifier` - The fully qualified name (FQN) of the function.
-    Function(StringIdentifier),
+    /// * `Atom` - The fully qualified name (FQN) of the function.
+    Function(Atom),
     /// A method within a class, interface, trait, or enum.
-    /// * `StringIdentifier` - The fully qualified class name (FQCN) of the containing structure.
-    /// * `StringIdentifier` - The name of the method.
-    Method(StringIdentifier, StringIdentifier),
+    /// * `Atom` - The fully qualified class name (FQCN) of the containing structure.
+    /// * `Atom` - The name of the method.
+    Method(Atom, Atom),
     /// A closure (anonymous function `function() {}` or arrow function `fn() => expr`).
     ///
     /// * `FileId` - The identifier of the file where the closure is defined.
@@ -79,19 +78,15 @@ impl FunctionLikeIdentifier {
         }
     }
 
-    /// Converts the identifier to a human-readable string representation using the provided interner.
+    /// Converts the identifier to a human-readable string representation.
     ///
     /// For closures, this typically includes the filename and starting offset.
-    ///
-    /// # Arguments
-    ///
-    /// * `interner` - A reference to the `ThreadedInterner` used to resolve `StringIdentifier`s.
     #[inline]
-    pub fn as_string(&self, interner: &ThreadedInterner) -> String {
+    pub fn as_string(&self) -> String {
         match self {
-            FunctionLikeIdentifier::Function(fn_name) => interner.lookup(fn_name).to_string(),
+            FunctionLikeIdentifier::Function(fn_name) => fn_name.to_string(),
             FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
-                format!("{}::{}", interner.lookup(fq_classlike_name), interner.lookup(method_name))
+                format!("{}::{}", fq_classlike_name, method_name)
             }
             FunctionLikeIdentifier::Closure(file_id, position) => {
                 format!("{}:{}", file_id, position.offset)
@@ -99,11 +94,7 @@ impl FunctionLikeIdentifier {
         }
     }
 
-    /// Creates a stable string representation suitable for use as a key or unique ID,
-    /// without requiring an interner lookup.
-    ///
-    /// This uses the internal representation of `StringIdentifier`
-    /// and position information directly.
+    /// Creates a stable string representation suitable for use as a key or unique ID.
     #[inline]
     pub fn to_hash(&self) -> String {
         match self {

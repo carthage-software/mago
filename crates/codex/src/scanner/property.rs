@@ -1,4 +1,5 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -82,7 +83,7 @@ pub fn scan_promoted_property<'ast, 'arena>(
     property_metadata.set_visibility(read_visibility, write_visibility);
     property_metadata.set_is_virtual(parameter.hooks.is_some());
     property_metadata.set_type_declaration_metadata(
-        parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(&class_metadata.name), context)),
+        parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(class_metadata.name), context)),
     );
 
     if let Some(type_metadata) = parameter_metadata.type_metadata.as_ref()
@@ -98,7 +99,7 @@ pub fn scan_promoted_property<'ast, 'arena>(
 pub fn scan_properties<'ast, 'arena>(
     property: &'ast Property<'arena>,
     class_like_metadata: &mut ClassLikeMetadata,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     type_context: &TypeResolutionContext,
     context: &mut Context<'_, 'ast, 'arena>,
     scope: &NamespaceScope,
@@ -189,12 +190,12 @@ pub fn scan_properties<'ast, 'arena>(
                     plain_property
                         .hint
                         .as_ref()
-                        .map(|hint| get_type_metadata_from_hint(hint, Some(&class_like_metadata.name), context)),
+                        .map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
                 );
 
                 if let Some(docblock) = docblock.as_ref() {
                     if let Some(type_string) = &docblock.type_string {
-                        match get_type_metadata_from_type_string(type_string, classname, type_context, context, scope) {
+                        match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
                             Ok(property_type_metadata) => {
                                 metadata.set_type_metadata(Some(property_type_metadata));
                             }
@@ -242,13 +243,13 @@ pub fn scan_properties<'ast, 'arena>(
                 hooked_property
                     .hint
                     .as_ref()
-                    .map(|hint| get_type_metadata_from_hint(hint, Some(&class_like_metadata.name), context)),
+                    .map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
             );
 
             if let Some(docblock) = docblock.as_ref()
                 && let Some(type_string) = &docblock.type_string
             {
-                match get_type_metadata_from_type_string(type_string, classname, type_context, context, scope) {
+                match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
                     Ok(property_type) => {
                         metadata.set_type_metadata(Some(property_type));
                     }
@@ -278,7 +279,7 @@ pub fn scan_property_item<'ast, 'arena>(
 ) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
     match property_item {
         PropertyItem::Abstract(property_abstract_item) => {
-            let name = VariableIdentifier(context.interner.intern(property_abstract_item.variable.name));
+            let name = VariableIdentifier(atom(property_abstract_item.variable.name));
             let name_span = property_abstract_item.variable.span;
             let has_default = false;
             let default_type = None;
@@ -286,15 +287,14 @@ pub fn scan_property_item<'ast, 'arena>(
             (name, name_span, has_default, default_type)
         }
         PropertyItem::Concrete(property_concrete_item) => {
-            let name = VariableIdentifier(context.interner.intern(property_concrete_item.variable.name));
+            let name = VariableIdentifier(atom(property_concrete_item.variable.name));
             let name_span = property_concrete_item.variable.span;
             let has_default = true;
-            let default_type =
-                infer(context.interner, context.resolved_names, &property_concrete_item.value).map(|u| {
-                    let mut type_metadata = TypeMetadata::new(u, property_concrete_item.value.span());
-                    type_metadata.inferred = true;
-                    type_metadata
-                });
+            let default_type = infer(context.resolved_names, &property_concrete_item.value).map(|u| {
+                let mut type_metadata = TypeMetadata::new(u, property_concrete_item.value.span());
+                type_metadata.inferred = true;
+                type_metadata
+            });
 
             (name, name_span, has_default, default_type)
         }

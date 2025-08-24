@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::interface_exists;
 use mago_codex::is_instance_of;
@@ -28,7 +29,6 @@ use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::ThreadedInterner;
 use mago_span::Span;
 
 use crate::context::Context;
@@ -53,10 +53,10 @@ pub fn reconcile<'ctx, 'arena>(
     let existing_var_type = if let Some(existing_var_type) = existing_var_type {
         existing_var_type
     } else {
-        return get_missing_type(context.interner, assertion, inside_loop);
+        return get_missing_type(assertion, inside_loop);
     };
 
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
 
     if is_negation {
         return negated_assertion_reconciler::reconcile(
@@ -116,7 +116,6 @@ pub fn reconcile<'ctx, 'arena>(
 
         expander::expand_union(
             codebase,
-            context.interner,
             &mut refined_type,
             &TypeExpansionOptions { expand_generic: true, ..Default::default() },
         );
@@ -135,7 +134,7 @@ pub(crate) fn refine_atomic_with_union(
     let intersection_type = intersect_union_with_atomic(context, existing_var_type, new_type);
     if let Some(mut intersection_type) = intersection_type {
         for intersection_atomic_type in intersection_type.types.to_mut() {
-            intersection_atomic_type.remove_placeholders(context.interner);
+            intersection_atomic_type.remove_placeholders();
         }
 
         return intersection_type;
@@ -160,7 +159,7 @@ fn intersect_union_with_atomic(
 
     if !acceptable_types.is_empty() {
         if acceptable_types.len() > 1 {
-            acceptable_types = combiner::combine(acceptable_types, context.codebase, context.interner, false);
+            acceptable_types = combiner::combine(acceptable_types, context.codebase, false);
         }
 
         return Some(TUnion::from_vec(acceptable_types));
@@ -177,7 +176,6 @@ pub(crate) fn intersect_atomic_with_atomic(
     let mut atomic_comparison_results = ComparisonResult::new();
     if atomic_comparator::is_contained_by(
         context.codebase,
-        context.interner,
         second_type,
         first_type,
         true,
@@ -200,7 +198,6 @@ pub(crate) fn intersect_atomic_with_atomic(
     atomic_comparison_results = ComparisonResult::new();
     if atomic_comparator::is_contained_by(
         context.codebase,
-        context.interner,
         first_type,
         second_type,
         false,
@@ -230,7 +227,7 @@ pub(crate) fn intersect_atomic_with_atomic(
 
     match (first_type, second_type) {
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
-            if is_instance_of(context.codebase, context.interner, &first_enum.name, &second_enum.name)
+            if is_instance_of(context.codebase, &first_enum.name, &second_enum.name)
                 && first_enum.case == second_enum.case
             {
                 return Some(first_type.clone());
@@ -242,9 +239,9 @@ pub(crate) fn intersect_atomic_with_atomic(
             let first_object_name = first_object.get_name_ref();
             let second_object_name = second_object.get_name_ref();
 
-            if (interface_exists(context.codebase, context.interner, first_object_name)
+            if (interface_exists(context.codebase, first_object_name)
                 && context.codebase.is_inheritable(second_object_name))
-                || (interface_exists(context.codebase, context.interner, second_object_name)
+                || (interface_exists(context.codebase, second_object_name)
                     && context.codebase.is_inheritable(first_object_name))
             {
                 let mut first_type = first_type.clone();
@@ -483,8 +480,7 @@ pub(crate) fn intersect_union_with_union(
                     })
                     .collect::<Vec<_>>();
 
-                let combined_union =
-                    TUnion::from_vec(combiner::combine(new_types, context.codebase, context.interner, false));
+                let combined_union = TUnion::from_vec(combiner::combine(new_types, context.codebase, false));
 
                 if combined_union.is_never() { None } else { Some(combined_union) }
             }
@@ -552,14 +548,14 @@ fn intersect_contained_atomic_with_another(
     Some(sub_atomic.clone())
 }
 
-fn get_missing_type(interner: &ThreadedInterner, assertion: &Assertion, inside_loop: bool) -> TUnion {
+fn get_missing_type(assertion: &Assertion, inside_loop: bool) -> TUnion {
     if matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset) {
         return get_mixed_maybe_from_loop(inside_loop);
     }
 
     if let Assertion::IsIdentical(atomic) | Assertion::IsType(atomic) = assertion {
         let mut atomic = atomic.clone();
-        atomic.remove_placeholders(interner);
+        atomic.remove_placeholders();
         return wrap_atomic(atomic.clone());
     }
 
@@ -678,7 +674,7 @@ fn handle_literal_equality_with_int(
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
-            })) if is_loose_equality && string_value.as_ref() == assertion_integer.to_string() => {
+            })) if is_loose_equality && string_value.as_str() == assertion_integer.to_string() => {
                 return TUnion::from_atomic(existing_var_atomic_type.clone());
             }
             _ => {}
@@ -721,7 +717,7 @@ fn handle_literal_equality_with_str(
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
-    let literal_asserted_type = TAtomic::Scalar(TScalar::literal_string(assertion_str_val.to_owned()));
+    let literal_asserted_type = TAtomic::Scalar(TScalar::literal_string(atom(assertion_str_val)));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
     if existing_var_type.has_scalar() || existing_var_type.has_array_key() || existing_var_type.has_mixed() {

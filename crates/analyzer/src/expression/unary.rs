@@ -3,8 +3,12 @@ use std::ops::Add;
 use std::ops::Sub;
 use std::rc::Rc;
 
+use mago_atom::atom;
+use mago_atom::empty_atom;
+use mago_atom::f64_atom;
+use mago_atom::i64_atom;
 use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_id;
+use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_method;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
@@ -146,8 +150,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                     resulting_types.push(TAtomic::Scalar(TScalar::float()));
                 }
 
-                let resulting_type =
-                    TUnion::from_vec(combine(resulting_types, context.codebase, context.interner, false));
+                let resulting_type = TUnion::from_vec(combine(resulting_types, context.codebase, false));
 
                 artifacts.set_expression_type(self, resulting_type);
             }
@@ -370,7 +373,7 @@ fn increment_operand<'ctx, 'arena>(
                         possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
                     } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
                         if string_val.is_empty() {
-                            possibilities.push(TAtomic::Scalar(TScalar::static_literal_string("1")));
+                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
                         } else if str_is_numeric(string_val) {
                             let mut negative = false;
                             let value = if let Some(value) = string_val.strip_prefix("+") {
@@ -402,7 +405,7 @@ fn increment_operand<'ctx, 'arena>(
                                 possibilities.push(TAtomic::Scalar(TScalar::float()));
                             }
                         } else if let Some(incremented) = str_increment(string_val) {
-                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(incremented)));
+                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom(&incremented))));
                         } else {
                             possibilities
                                 .push(TAtomic::Scalar(TScalar::String(string_scalar.with_unspecified_literal())));
@@ -436,9 +439,9 @@ fn increment_operand<'ctx, 'arena>(
                         IssueCode::InvalidOperand,
                         Issue::warning(format!(
                             "Incrementing a generic scalar type (`{}`). This may not yield the expected result.",
-                            scalar.get_id(Some(context.interner))
+                            scalar.get_id()
                         ))
-                        .with_annotation(Annotation::primary(operand.span()).with_message(format!("Type is `{}`", scalar.get_id(Some(context.interner)))))
+                        .with_annotation(Annotation::primary(operand.span()).with_message(format!("Type is `{}`", scalar.get_id())))
                         .with_help("Ensure the generic type resolves to a numeric type or string suitable for increment, or provide a more specific type."),
                     );
 
@@ -464,7 +467,7 @@ fn increment_operand<'ctx, 'arena>(
                             IssueCode::InvalidOperand,
                             Issue::error(format!(
                                 "Cannot reliably increment callable of type `{}`.",
-                                callable.get_id(Some(context.interner))
+                                callable.get_id()
                             ))
                             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid callable type for increment"))
                             .with_note("Incrementing array callables or invocable objects without specific overload behavior leads to errors."),
@@ -474,7 +477,7 @@ fn increment_operand<'ctx, 'arena>(
                 }
             }
             _ => {
-                let type_name = operand_atomic_type.get_id(Some(context.interner));
+                let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
                         IssueCode::InvalidOperand,
                         Issue::error(format!(
@@ -499,14 +502,13 @@ fn increment_operand<'ctx, 'arena>(
     let resulting_type_union = if possibilities.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
+        TUnion::from_vec(combine(possibilities, context.codebase, false))
     };
 
     let operand_id = get_expression_id(
         operand,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -670,9 +672,9 @@ fn decrement_operand<'ctx, 'arena>(
                             IssueCode::InvalidOperand,
                             Issue::warning(format!(
                                 "Decrementing a generic scalar type (`{}`). This may not yield the expected result.",
-                                scalar.get_id(Some(context.interner))
+                                scalar.get_id()
                             ))
-                                .with_annotation(Annotation::primary(operand.span()).with_message(format!("Type is `{}`", scalar.get_id(Some(context.interner)))))
+                                .with_annotation(Annotation::primary(operand.span()).with_message(format!("Type is `{}`", scalar.get_id())))
                                 .with_help("Ensure the generic type resolves to a numeric type or string suitable for increment, or provide a more specific type."),
                         );
 
@@ -699,7 +701,7 @@ fn decrement_operand<'ctx, 'arena>(
                         IssueCode::InvalidOperand,
                         Issue::error(format!(
                             "Cannot reliably decrement callable of type `{}`.",
-                            callable.get_id(Some(context.interner))
+                            callable.get_id()
                         ))
                             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid callable type for decrement"))
                             .with_note("Decrementing array callables or invocable objects without specific overload behavior leads to errors."),
@@ -709,7 +711,7 @@ fn decrement_operand<'ctx, 'arena>(
                 }
             }
             _ => {
-                let type_name = operand_atomic_type.get_id(Some(context.interner));
+                let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
                         IssueCode::InvalidOperand,
                         Issue::error(format!(
@@ -734,14 +736,13 @@ fn decrement_operand<'ctx, 'arena>(
     let resulting_type_union = if possibilities.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
+        TUnion::from_vec(combine(possibilities, context.codebase, false))
     };
 
     let operand_id = get_expression_id(
         operand,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -778,10 +779,10 @@ fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
     context.collector.report_with_code(
         IssueCode::RedundantCast,
         Issue::help(format!("Redundant cast to `{}`: the expression already has this type.", cast_operator.as_str()))
-            .with_annotation(Annotation::primary(expression.operand.span()).with_message(format!(
-                "This expression already has type `{}`.",
-                known_type.get_id(Some(context.interner))
-            )))
+            .with_annotation(
+                Annotation::primary(expression.operand.span())
+                    .with_message(format!("This expression already has type `{}`.", known_type.get_id())),
+            )
             .with_note("Casting a value to a type it already possesses has no effect.")
             .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
     );
@@ -821,11 +822,11 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
                     IssueCode::InvalidTypeCast,
                     Issue::error(format!(
                         "Casting type `{}` to `array` will produce an empty array.",
-                        atomic_type.get_id(Some(context.interner))
+                        atomic_type.get_id()
                     ))
                     .with_annotation(
                         Annotation::primary(cast_expression.span())
-                            .with_message(format!("Invalid cast from `{}` to `array`", atomic_type.get_id(Some(context.interner))))
+                            .with_message(format!("Invalid cast from `{}` to `array`", atomic_type.get_id()))
                     )
                     .with_note("Casting `null` or `void` to `array` produces an empty array. This is often a sign of an uninitialized variable or logic error.")
                     .with_help("Initialize the variable with an array or handle the `null`/`void` case explicitly before casting."),
@@ -846,7 +847,7 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
             TAtomic::Object(casted_object) => {
                 let is_stdclass = casted_object.get_name().is_some_and(|name| {
                     // Check if the object is stdClass
-                    context.interner.lookup(name).eq_ignore_ascii_case("stdClass")
+                    name.eq_ignore_ascii_case("stdClass")
                 });
 
                 // Object to array: properties become key-value pairs.
@@ -857,7 +858,7 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
                         IssueCode::InvalidTypeCast,
                         Issue::warning(format!(
                             "Object of type `{}` cast to `array`. Property visibility (public, protected, private) affects the resulting array.",
-                            atomic_type.get_id(Some(context.interner))
+                            atomic_type.get_id()
                         ))
                         .with_annotation(Annotation::primary(cast_expression.span()).with_message("Object cast to array"))
                         .with_note("Casting an object to an array converts its properties to key-value pairs. Private/protected properties will have mangled keys.")
@@ -900,10 +901,10 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
                             "Cannot reliably cast type `{}` to `array`.",
-                            atomic_type.get_id(Some(context.interner))
+                            atomic_type.get_id()
                         ))
                         .with_annotation(Annotation::primary(cast_expression.span())
-                            .with_message(format!("Unclear cast from `{}` to `array`", atomic_type.get_id(Some(context.interner)))))
+                            .with_message(format!("Unclear cast from `{}` to `array`", atomic_type.get_id())))
                         .with_help("Ensure the expression being cast has a defined conversion to array (e.g., scalar, null, object, or already an array)."),
                     );
 
@@ -920,7 +921,7 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
     }
 
     // Combine all potential array types resulting from the cast.
-    TUnion::from_vec(combine(resulting_array_atomics, context.codebase, context.interner, false))
+    TUnion::from_vec(combine(resulting_array_atomics, context.codebase, false))
 }
 
 fn cast_type_to_bool<'ctx, 'ast, 'arena>(
@@ -1042,7 +1043,7 @@ fn cast_type_to_float<'ctx, 'ast, 'arena>(
                             if !s.is_numeric {
                                 context.collector.report_with_code(
                                     IssueCode::InvalidTypeCast,
-                                    Issue::warning(format!("Non numeric string of type `{}` implicitly cast to `float`.", s.get_id(Some(context.interner))))
+                                    Issue::warning(format!("Non numeric string of type `{}` implicitly cast to `float`.", s.get_id()))
                                         .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("String cast to float"))
                                         .with_note("PHP will attempt to parse a leading numeric value; otherwise, it results in `0.0`. This can be error-prone.")
                                         .with_help("Ensure the string is numeric or use explicit parsing if a specific float value is expected."),
@@ -1084,7 +1085,7 @@ fn cast_type_to_float<'ctx, 'ast, 'arena>(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
                             "Object of type `{}` cannot be cast to `float`. PHP will attempt this and produce `1.0` after an error.",
-                            atomic_type.get_id(Some(context.interner))
+                            atomic_type.get_id()
                         ))
                         .with_annotation(Annotation::primary(cast_expression.span()).with_message("Invalid cast from object to float"))
                         .with_note("This operation will raise an `E_WARNING` and result in `1.0`.")
@@ -1127,7 +1128,7 @@ fn cast_type_to_float<'ctx, 'ast, 'arena>(
         return get_float();
     }
 
-    TUnion::from_vec(combine(resulting_float_atomics, context.codebase, context.interner, false))
+    TUnion::from_vec(combine(resulting_float_atomics, context.codebase, false))
 }
 
 fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUnion {
@@ -1201,7 +1202,7 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUn
         possibilities.push(possible);
     }
 
-    TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
+    TUnion::from_vec(combine(possibilities, context.codebase, false))
 }
 
 fn cast_type_to_object<'ctx, 'ast, 'arena>(
@@ -1241,10 +1242,10 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
     }
 
     if possibilities.is_empty() {
-        return get_named_object(context.interner, context.interner.intern("stdClass"), None);
+        return get_named_object(atom("stdClass"), None);
     }
 
-    TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false))
+    TUnion::from_vec(combine(possibilities, context.codebase, false))
 }
 
 pub fn cast_type_to_string<'ctx, 'arena>(
@@ -1260,25 +1261,25 @@ pub fn cast_type_to_string<'ctx, 'arena>(
             TAtomic::Scalar(scalar) => match scalar {
                 TScalar::Bool(boolean) => {
                     if boolean.is_true() {
-                        TAtomic::Scalar(TScalar::literal_string("1".to_string()))
+                        TAtomic::Scalar(TScalar::literal_string(atom("1")))
                     } else if boolean.is_false() {
-                        TAtomic::Scalar(TScalar::literal_string("".to_string()))
+                        TAtomic::Scalar(TScalar::literal_string(empty_atom()))
                     } else {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string("".to_string())));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_atom())));
 
-                        TAtomic::Scalar(TScalar::literal_string("1".to_string()))
+                        TAtomic::Scalar(TScalar::literal_string(atom("1")))
                     }
                 }
                 TScalar::Integer(integer) => {
                     if let Some(value) = integer.get_literal_value() {
-                        TAtomic::Scalar(TScalar::literal_string(format!("{value}")))
+                        TAtomic::Scalar(TScalar::literal_string(i64_atom(value)))
                     } else {
                         TAtomic::Scalar(TScalar::numeric_string())
                     }
                 }
                 TScalar::Float(float) => {
                     if let Some(value) = float.get_literal_value() {
-                        TAtomic::Scalar(TScalar::literal_string(format!("{value}")))
+                        TAtomic::Scalar(TScalar::literal_string(f64_atom(value)))
                     } else {
                         TAtomic::Scalar(TScalar::numeric_string())
                     }
@@ -1287,9 +1288,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                 TScalar::String(string) => TAtomic::Scalar(TScalar::String(string.clone())),
                 TScalar::ClassLikeString(class_string) => {
                     if let Some(value) = class_string.literal_value() {
-                        let value_string = context.interner.lookup(&value).to_string();
-
-                        TAtomic::Scalar(TScalar::literal_string(value_string))
+                        TAtomic::Scalar(TScalar::literal_string(value))
                     } else {
                         TAtomic::Scalar(TScalar::non_empty_string())
                     }
@@ -1317,7 +1316,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                         IssueCode::InvalidTypeCast,
                         Issue::warning(format!(
                             "Cannot reliably cast callable of type `{}` to `string`.",
-                            callable.get_id(Some(context.interner))
+                            callable.get_id()
                         ))
                             .with_annotation(
                                 Annotation::primary(expression_span.span())
@@ -1356,16 +1355,15 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                     TObject::Enum(enum_instance) => enum_instance.get_name(),
                 };
 
-                let Some(class_metadata) = get_class_like(context.codebase, context.interner, &class_like_name) else {
+                let Some(class_metadata) = get_class_like(context.codebase, &class_like_name) else {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
-                            "Cannot cast object of type `{}` to `string` because the class does not exist.",
-                            context.interner.lookup(&class_like_name)
+                            "Cannot cast object of type `{class_like_name}` to `string` because the class does not exist.",
                         ))
                         .with_annotation(
                             Annotation::primary(expression_span.span())
-                                .with_message(format!("Class `{}` does not exist.", context.interner.lookup(&class_like_name)))
+                                .with_message(format!("Class `{class_like_name}` does not exist."))
                         )
                         .with_note("Casting an object to `string` requires the class to exist and implement `Stringable` or have a `__toString()` method.")
                         .with_help("Ensure the class exists or avoid casting this object type to `string`."),
@@ -1379,11 +1377,11 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
                             "Cannot cast enum instance of type `{}` to `string`.",
-                            object.get_id(Some(context.interner)),
+                            object.get_id(),
                         ))
                         .with_annotation(
                             Annotation::primary(expression_span.span())
-                                .with_message(format!("Enum `{}` cannot be cast to `string`.", context.interner.lookup(&class_like_name)))
+                                .with_message(format!("Enum `{class_like_name}` cannot be cast to `string`."))
                         )
                         .with_note("Casting an enum instance to `string` is not allowed and will throw a fatal error at runtime.")
                         .with_help("Use the enum's name or value instead, or avoid casting the enum instance to `string`."),
@@ -1392,20 +1390,18 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                     return Ok(get_string());
                 }
 
-                let to_string_method_id = context.interner.intern("__toString");
-                let declaring_method_id = get_declaring_method_id(
+                let to_string_method_id = atom("__toString");
+                let declaring_method_id = get_declaring_method_identifier(
                     context.codebase,
-                    context.interner,
                     &MethodIdentifier::new(class_metadata.original_name, to_string_method_id),
                 );
 
                 let Some(to_string_metadata) = get_method(
                     context.codebase,
-                    context.interner,
                     declaring_method_id.get_class_name(),
                     declaring_method_id.get_method_name(),
                 ) else {
-                    let class_name_str = context.interner.lookup(&class_metadata.original_name);
+                    let class_name_str = class_metadata.original_name;
 
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
@@ -1462,9 +1458,9 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                     ),
                 );
 
-                TAtomic::Scalar(TScalar::literal_string("Array".to_string()))
+                TAtomic::Scalar(TScalar::literal_string(atom("Array")))
             }
-            TAtomic::Null | TAtomic::Void => TAtomic::Scalar(TScalar::literal_string("".to_string())),
+            TAtomic::Null | TAtomic::Void => TAtomic::Scalar(TScalar::literal_string(atom(""))),
             TAtomic::Resource(_) => TAtomic::Scalar(TScalar::non_empty_string()),
             TAtomic::Never => return Ok(get_never()),
             _ => return Ok(get_string()),
@@ -1473,7 +1469,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
         possibilities.push(possible);
     }
 
-    Ok(TUnion::from_vec(combine(possibilities, context.codebase, context.interner, false)))
+    Ok(TUnion::from_vec(combine(possibilities, context.codebase, false)))
 }
 
 #[cfg(test)]

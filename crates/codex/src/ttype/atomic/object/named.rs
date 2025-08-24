@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -16,7 +15,7 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TNamedObject {
     /// The fully qualified class name (FQCN) of the primary type (e.g., `A` in `A&B<T>&S`).
-    pub name: StringIdentifier,
+    pub name: Atom,
     /// Concrete types provided for generic type parameters, if any.
     pub type_parameters: Option<Vec<TUnion>>,
     /// `true` if this specifically represents the `$this` variable within its own class context.
@@ -31,31 +30,31 @@ pub struct TNamedObject {
 impl TNamedObject {
     /// Creates metadata for a named object type with default flags and no generics/intersections.
     #[inline]
-    pub fn new(name: StringIdentifier) -> Self {
+    pub fn new(name: Atom) -> Self {
         Self { name, type_parameters: None, is_this: false, remapped_parameters: false, intersection_types: None }
     }
 
     /// Creates metadata for a named object type with specified type parameters.
     #[inline]
-    pub fn new_with_type_parameters(name: StringIdentifier, type_parameters: Option<Vec<TUnion>>) -> Self {
+    pub fn new_with_type_parameters(name: Atom, type_parameters: Option<Vec<TUnion>>) -> Self {
         Self { name, type_parameters, is_this: false, remapped_parameters: false, intersection_types: None }
     }
 
     /// Creates metadata representing the `$this` variable for a specific class.
     #[inline]
-    pub fn new_this(name: StringIdentifier) -> Self {
+    pub fn new_this(name: Atom) -> Self {
         Self { name, type_parameters: None, is_this: true, remapped_parameters: false, intersection_types: None }
     }
 
-    /// Returns the `StringIdentifier` for the primary class/interface name.
+    /// Returns the `Atom` for the primary class/interface name.
     #[inline]
-    pub const fn get_name(&self) -> StringIdentifier {
+    pub const fn get_name(&self) -> Atom {
         self.name
     }
 
-    /// Returns the `StringIdentifier` for the primary class/interface name.
+    /// Returns the `Atom` for the primary class/interface name.
     #[inline]
-    pub const fn get_name_ref(&self) -> &StringIdentifier {
+    pub const fn get_name_ref(&self) -> &Atom {
         &self.name
     }
 
@@ -157,11 +156,8 @@ impl TType for TNamedObject {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
-        let mut id = match interner {
-            Some(interner) => interner.lookup(&self.name).to_string(),
-            None => self.name.to_string(),
-        };
+    fn get_id(&self) -> String {
+        let mut id = self.name.to_string();
 
         if let Some(parameters) = self.get_type_parameters() {
             id += "<";
@@ -170,7 +166,7 @@ impl TType for TNamedObject {
                     id += ", ";
                 }
 
-                id += &atomic.get_id(interner);
+                id += &atomic.get_id();
             }
 
             id += ">";
@@ -183,7 +179,7 @@ impl TType for TNamedObject {
                     id += "&";
                 }
 
-                id += &atomic.get_id(interner);
+                id += &atomic.get_id();
             }
         }
 

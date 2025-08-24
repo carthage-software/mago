@@ -8,7 +8,6 @@ use indexmap::IndexMap;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
-use mago_interner::ThreadedInterner;
 use mago_span::Span;
 
 #[derive(Clone, Debug, Eq)]
@@ -112,7 +111,7 @@ impl Clause {
             .collect()
     }
 
-    pub fn to_string(&self, interner: &ThreadedInterner) -> String {
+    pub fn as_string(&self) -> String {
         let mut clause_strings = vec![];
 
         if self.possibilities.is_empty() {
@@ -142,14 +141,13 @@ impl Clause {
                         continue;
                     }
                     Assertion::IsType(value) | Assertion::IsIdentical(value) => {
-                        clause_string_parts.push(var_id.to_string() + " is " + value.get_id(Some(interner)).as_str());
+                        clause_string_parts.push(var_id.to_string() + " is " + value.get_id().as_str());
                     }
                     Assertion::IsNotType(value) | Assertion::IsNotIdentical(value) => {
-                        clause_string_parts
-                            .push(var_id.to_string() + " is not " + value.get_id(Some(interner)).as_str());
+                        clause_string_parts.push(var_id.to_string() + " is not " + value.get_id().as_str());
                     }
                     _ => {
-                        clause_string_parts.push(value.as_string(Some(interner)));
+                        clause_string_parts.push(value.as_string());
                     }
                 }
             }
@@ -193,5 +191,11 @@ fn get_hash(
         }
 
         hasher.finish() as u32
+    }
+}
+
+impl std::fmt::Display for Clause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_string())
     }
 }

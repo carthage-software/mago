@@ -1,4 +1,3 @@
-use mago_interner::ThreadedInterner;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -118,7 +117,7 @@ impl TType for TIterable {
         self.key_type.is_expandable() || self.value_type.is_expandable()
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let intersection_types = self.intersection_types.as_deref();
 
         let mut id = String::new();
@@ -127,9 +126,9 @@ impl TType for TIterable {
         }
 
         id += "iterable<";
-        id += &self.key_type.get_id(interner);
+        id += &self.key_type.get_id();
         id += ", ";
-        id += &self.value_type.get_id(interner);
+        id += &self.value_type.get_id();
         id += ">";
         if let Some(intersection_types) = intersection_types {
             id += "&";
@@ -138,7 +137,7 @@ impl TType for TIterable {
                     id += "&";
                 }
 
-                id += &atomic.get_id(interner);
+                id += &atomic.get_id();
             }
 
             id += ")";

@@ -77,7 +77,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
             )
             .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!(
                 "This expression (type `{}`) is never `null` or undefined",
-                lhs_type.get_id(Some(context.interner))
+                lhs_type.get_id()
             )))
             .with_annotation(
                 Annotation::secondary(binary.rhs.span()).with_message("This right-hand side will never be evaluated"),
@@ -96,7 +96,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         let rhs_type =
             artifacts.get_expression_type(&binary.rhs).map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
 
-        result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, context.interner, false);
+        result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, false);
     }
 
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));

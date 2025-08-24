@@ -41,7 +41,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map(|union| union.get_id(Some(context.interner)))
+                                    .map(|union| union.get_id())
                                     .unwrap_or_else(|| "unknown".to_string())
                             )),
                         ),
@@ -124,13 +124,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         loop_scope.redefined_loop_variables.retain(|redefined_var, current_redefined_type| {
             match redefined_vars.get(redefined_var) {
                 Some(outer_redefined_type) => {
-                    *current_redefined_type = combine_union_types(
-                        outer_redefined_type,
-                        current_redefined_type,
-                        context.codebase,
-                        context.interner,
-                        false,
-                    );
+                    *current_redefined_type =
+                        combine_union_types(outer_redefined_type, current_redefined_type, context.codebase, false);
 
                     true
                 }
@@ -145,7 +140,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                     var_type,
                     loop_scope.possibly_redefined_loop_variables.get(&var_id),
                     context.codebase,
-                    context.interner,
                 ),
             );
         }
@@ -154,8 +148,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             let mut finally_scope = (*finally_scope).borrow_mut();
             for (var_id, var_type) in &block_context.locals {
                 if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                    *finally_type =
-                        Rc::new(combine_union_types(finally_type, var_type, context.codebase, context.interner, false));
+                    *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
                 } else {
                     finally_scope.locals.insert(var_id.clone(), var_type.clone());
                 }

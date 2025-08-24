@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -17,7 +17,7 @@ use crate::ttype::union::TUnion;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: StringIdentifier,
+    pub name: Atom,
     pub span: Span,
     pub inferred_type: Option<TUnion>,
     pub flags: MetadataFlags,
@@ -32,7 +32,7 @@ impl ConstantMetadata {
     /// * `name`: The identifier (name) of the constant.
     /// * `span`: The source code location of this specific constant's definition item (`NAME = value`).
     #[inline]
-    pub fn new(name: StringIdentifier, span: Span, flags: MetadataFlags) -> Self {
+    pub fn new(name: Atom, span: Span, flags: MetadataFlags) -> Self {
         Self { attributes: Vec::new(), name, span, flags, inferred_type: None, issues: Vec::new() }
     }
 

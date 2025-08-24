@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_reporting::Issue;
 use mago_span::Span;
 
@@ -18,7 +18,7 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
-pub type TemplateTuple = (StringIdentifier, Vec<(GenericParent, TUnion)>);
+pub type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
 
 /// Contains metadata specific to methods defined within classes, interfaces, enums, or traits.
 ///
@@ -45,7 +45,7 @@ pub struct MethodMetadata {
     /// The key is the name of a class-level template parameter (e.g., `T`), and the value
     /// is the `TUnion` type constraint that `T` must satisfy for this specific method
     /// to be considered callable.
-    pub where_constraints: HashMap<StringIdentifier, TypeMetadata>,
+    pub where_constraints: AtomMap<TypeMetadata>,
 }
 
 /// Distinguishes between different kinds of callable constructs in PHP.
@@ -73,10 +73,10 @@ pub struct FunctionLikeMetadata {
     /// The name of the function or method, lowercased, if applicable.
     /// `None` for closures and arrow functions unless assigned to a variable later.
     /// Example: `processRequest`, `__construct`, `my_global_func`.
-    pub name: Option<StringIdentifier>,
+    pub name: Option<Atom>,
 
     /// The original name of the function or method, in its original case.
-    pub original_name: Option<StringIdentifier>,
+    pub original_name: Option<Atom>,
 
     /// The specific source code location (span) of the function or method name identifier.
     /// `None` if the function/method has no name (closures/arrow functions).
@@ -124,15 +124,15 @@ pub struct FunctionLikeMetadata {
     /// Assertions about parameter types or variable types that are guaranteed to be true
     /// *after* this function/method returns normally. From `@psalm-assert`, `@phpstan-assert`, etc.
     /// Maps variable/parameter name to a list of type assertions.
-    pub assertions: BTreeMap<StringIdentifier, Vec<Assertion>>,
+    pub assertions: BTreeMap<Atom, Vec<Assertion>>,
 
     /// Assertions about parameter/variable types that are guaranteed to be true if this
     /// function/method returns `true`. From `@psalm-assert-if-true`, etc.
-    pub if_true_assertions: BTreeMap<StringIdentifier, Vec<Assertion>>,
+    pub if_true_assertions: BTreeMap<Atom, Vec<Assertion>>,
 
     /// Assertions about parameter/variable types that are guaranteed to be true if this
     /// function/method returns `false`. From `@psalm-assert-if-false`, etc.
-    pub if_false_assertions: BTreeMap<StringIdentifier, Vec<Assertion>>,
+    pub if_false_assertions: BTreeMap<Atom, Vec<Assertion>>,
 
     pub flags: MetadataFlags,
 }
@@ -205,13 +205,13 @@ impl FunctionLikeMetadata {
 
     /// Returns a reference to specific parameter metadata by name, if it exists.
     #[inline]
-    pub fn get_parameter(&self, name: StringIdentifier) -> Option<&FunctionLikeParameterMetadata> {
+    pub fn get_parameter(&self, name: Atom) -> Option<&FunctionLikeParameterMetadata> {
         self.parameters.iter().find(|parameter| parameter.get_name().0 == name)
     }
 
     /// Returns a mutable reference to specific parameter metadata by name, if it exists.
     #[inline]
-    pub fn get_parameter_mut(&mut self, name: StringIdentifier) -> Option<&mut FunctionLikeParameterMetadata> {
+    pub fn get_parameter_mut(&mut self, name: Atom) -> Option<&mut FunctionLikeParameterMetadata> {
         self.parameters.iter_mut().find(|parameter| parameter.get_name().0 == name)
     }
 

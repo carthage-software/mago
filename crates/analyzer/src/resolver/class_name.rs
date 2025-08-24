@@ -1,3 +1,6 @@
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_codex::get_class_like;
 use mago_codex::get_interface;
 use mago_codex::metadata::CodebaseMetadata;
@@ -9,8 +12,6 @@ use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -60,9 +61,9 @@ pub enum ResolutionOrigin {
 /// resolution was performed via `ResolutionOrigin`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ResolvedClassname {
-    /// The fully qualified class name (`StringIdentifier`) if a specific class could be identified.
+    /// The fully qualified class name (`Atom`) if a specific class could be identified.
     /// This is `None` for ambiguous or generic types like `object`, `class-string`, or `mixed`.
-    pub fq_class_id: Option<StringIdentifier>,
+    pub fqcn: Option<Atom>,
     /// Describes how the class name was resolved.
     pub origin: ResolutionOrigin,
     /// A list of other `ResolvedClassname` instances that this class name intersects with.
@@ -72,14 +73,14 @@ pub struct ResolvedClassname {
 impl ResolvedClassname {
     /// Creates a new `ResolvedClassname`.
     #[inline]
-    const fn new(fq_class_id: Option<StringIdentifier>, origin: ResolutionOrigin) -> Self {
-        Self { fq_class_id, origin, intersections: Vec::new() }
+    const fn new(fq_class_id: Option<Atom>, origin: ResolutionOrigin) -> Self {
+        Self { fqcn: fq_class_id, origin, intersections: Vec::new() }
     }
 
     /// Creates a `ResolvedClassname` that is definitively invalid.
     #[inline]
     const fn invalid() -> Self {
-        Self { fq_class_id: None, origin: ResolutionOrigin::Invalid, intersections: Vec::new() }
+        Self { fqcn: None, origin: ResolutionOrigin::Invalid, intersections: Vec::new() }
     }
 
     /// Creates a `ResolvedClassname` that is definitively invalid.
@@ -165,18 +166,18 @@ impl ResolvedClassname {
     }
 
     #[inline]
-    pub fn get_object_type(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> TAtomic {
+    pub fn get_object_type(&self, codebase: &CodebaseMetadata) -> TAtomic {
         let mut object_atomic = if let ResolutionOrigin::SpecificClassLikeString(class_string) = &self.origin {
-            class_string.get_object_type(codebase, interner)
+            class_string.get_object_type(codebase)
         } else {
-            TAtomic::Object(match self.fq_class_id {
-                Some(class_id) => {
-                    let lowered_class_id = interner.lowered(&class_id);
+            TAtomic::Object(match self.fqcn {
+                Some(fqcn) => {
+                    let lowercase_fqcn = ascii_lowercase_atom(&fqcn);
 
-                    if codebase.symbols.contains_enum(&lowered_class_id) {
-                        TObject::Enum(TEnum::new(class_id))
+                    if codebase.symbols.contains_enum(&lowercase_fqcn) {
+                        TObject::Enum(TEnum::new(fqcn))
                     } else {
-                        TObject::Named(TNamedObject::new(class_id))
+                        TObject::Named(TNamedObject::new(fqcn))
                     }
                 }
                 None => TObject::Any,
@@ -184,7 +185,7 @@ impl ResolvedClassname {
         };
 
         for intersection_class in &self.intersections {
-            object_atomic.add_intersection_type(intersection_class.get_object_type(codebase, interner));
+            object_atomic.add_intersection_type(intersection_class.get_object_type(codebase));
         }
 
         object_atomic
@@ -210,12 +211,10 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
     let mut possible_types = vec![];
     match class_expression.unparenthesized() {
         Expression::Identifier(name_node) => {
-            let fq_class_id = context.interner.intern(context.resolved_names.get(name_node));
+            let fqcn = atom(context.resolved_names.get(name_node));
 
-            possible_types.push(ResolvedClassname::new(
-                Some(fq_class_id),
-                ResolutionOrigin::Named { is_parent: false, is_self: false },
-            ));
+            possible_types
+                .push(ResolvedClassname::new(Some(fqcn), ResolutionOrigin::Named { is_parent: false, is_self: false }));
         }
         Expression::Self_(self_keyword) => {
             if let Some(self_class) = block_context.scope.get_class_like() {
@@ -256,10 +255,8 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         }
         Expression::Parent(parent_keyword) => {
             if let Some(self_meta) = block_context.scope.get_class_like() {
-                if let Some(parent_metadata) = self_meta
-                    .direct_parent_class
-                    .as_ref()
-                    .and_then(|id| get_class_like(context.codebase, context.interner, id))
+                if let Some(parent_metadata) =
+                    self_meta.direct_parent_class.as_ref().and_then(|id| get_class_like(context.codebase, id))
                 {
                     let origin = ResolutionOrigin::Named { is_parent: true, is_self: false };
                     let mut classname = ResolvedClassname::new(Some(parent_metadata.original_name), origin);
@@ -271,14 +268,12 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                         IssueCode::InvalidParentType,
                         Issue::error(format!(
                             "Cannot use `parent` as the current type (`{}`) does not have a parent class.",
-                            context.interner.lookup(&self_meta.original_name)
+                            self_meta.original_name
                         ))
                         .with_annotation(Annotation::primary(parent_keyword.span()).with_message("`parent` used here"))
                         .with_annotation(
-                            Annotation::secondary(self_meta.name_span.unwrap_or(self_meta.span)).with_message(format!(
-                                "Class `{}` has no parent",
-                                context.interner.lookup(&self_meta.original_name)
-                            )),
+                            Annotation::secondary(self_meta.name_span.unwrap_or(self_meta.span))
+                                .with_message(format!("Class `{}` has no parent", self_meta.original_name)),
                         ),
                     );
 
@@ -307,7 +302,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
             let expression_type = artifacts.get_expression_type(expression);
 
             for atomic in expression_type.map(|u| u.types.iter()).unwrap_or_default() {
-                if let Some(resolved_classname) = get_class_name_from_atomic(context.interner, atomic) {
+                if let Some(resolved_classname) = get_class_name_from_atomic(atomic) {
                     possible_types.push(resolved_classname);
                 } else {
                     possible_types.push(ResolvedClassname::invalid());
@@ -315,7 +310,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                         IssueCode::InvalidClassStringExpression,
                         Issue::error(format!(
                             "Expression of type `{}` cannot be used as a class name.",
-                            atomic.get_id(Some(context.interner))
+                            atomic.get_id()
                         ))
                         .with_annotation(Annotation::primary(expression.span()).with_message("This expression is used as a class name"))
                         .with_note("To use an expression as a class name, it must evaluate to a string that is a valid class name (e.g., a `class-string` type).")
@@ -337,10 +332,9 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
 /// - `mixed`, `any`, `object`: Resolved with a corresponding generic origin.
 ///
 /// Returns `None` for atomic types that can never be a class name (e.g., int, bool, array).
-pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic) -> Option<ResolvedClassname> {
+pub fn get_class_name_from_atomic(atomic: &TAtomic) -> Option<ResolvedClassname> {
     #[inline]
     fn get_class_name_from_atomic_impl(
-        interner: &ThreadedInterner,
         atomic: &TAtomic,
         active_class_string: Option<&TClassLikeString>,
     ) -> Option<ResolvedClassname> {
@@ -379,7 +373,7 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
                     TClassLikeString::Any { .. } => ResolvedClassname::new(None, ResolutionOrigin::AnyClassString),
                     TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. } => {
                         // This is a `class-string<T>`. We resolve `T` to get the class name.
-                        get_class_name_from_atomic_impl(interner, constraint.as_ref(), Some(class_string))?
+                        get_class_name_from_atomic_impl(constraint.as_ref(), Some(class_string))?
                     }
                     TClassLikeString::Literal { value } => {
                         ResolvedClassname::new(Some(*value), ResolutionOrigin::LiteralClassString)
@@ -391,7 +385,7 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
                     // A literal string value is treated as a generic string because, while its value
                     // is known, it's not guaranteed to be a class name without further checks.
                     // It's different from `MyClass::class` which is guaranteed.
-                    let class_id = interner.intern(literal_string);
+                    let class_id = atom(literal_string);
 
                     ResolvedClassname::new(Some(class_id), ResolutionOrigin::AnyString)
                 } else if scalar.is_string() {
@@ -410,7 +404,7 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
         if let Some(intersections) = atomic.get_intersection_types() {
             let intersection_class_names = intersections
                 .iter()
-                .filter_map(|intersection| get_class_name_from_atomic_impl(interner, intersection, None))
+                .filter_map(|intersection| get_class_name_from_atomic_impl(intersection, None))
                 .collect::<Vec<_>>();
 
             class_name.intersections = intersection_class_names;
@@ -419,7 +413,7 @@ pub fn get_class_name_from_atomic(interner: &ThreadedInterner, atomic: &TAtomic)
         Some(class_name)
     }
 
-    get_class_name_from_atomic_impl(interner, atomic, None)
+    get_class_name_from_atomic_impl(atomic, None)
 }
 
 fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLikeMetadata) -> Vec<ResolvedClassname> {
@@ -429,7 +423,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
 
     let mut intersections = vec![];
     for required_interface in &metadata.require_implements {
-        let Some(interface_metadata) = get_interface(context.codebase, context.interner, required_interface) else {
+        let Some(interface_metadata) = get_interface(context.codebase, required_interface) else {
             continue;
         };
 
@@ -441,7 +435,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     }
 
     for required_class in &metadata.require_extends {
-        let Some(parent_class_metadata) = get_class_like(context.codebase, context.interner, required_class) else {
+        let Some(parent_class_metadata) = get_class_like(context.codebase, required_class) else {
             continue;
         };
 
@@ -455,15 +449,13 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     intersections
 }
 
-pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: &StringIdentifier) {
-    let class_name_str = context.interner.lookup(classname);
-
+pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: &Atom) {
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
-        Issue::error(format!("Class, Interface, or Trait `{class_name_str}` does not exist."))
+        Issue::error(format!("Class, Interface, or Trait `{classname}` does not exist."))
             .with_annotation(
                 Annotation::primary(span).with_message("This expression refers to a non-existent class-like type"),
             )
-            .with_help(format!("Ensure the `{class_name_str}` is defined in the codebase.")),
+            .with_help(format!("Ensure the `{classname}` is defined in the codebase.")),
     );
 }

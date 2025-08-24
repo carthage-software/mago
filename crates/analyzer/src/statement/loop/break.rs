@@ -43,7 +43,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map(|union| union.get_id(Some(context.interner)))
+                                    .map(|union| union.get_id())
                                     .unwrap_or_else(|| "unknown".to_string())
                             )),
                         ),
@@ -91,7 +91,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                         var_type,
                         loop_scope.possibly_redefined_loop_parent_variables.get(&var_id).map(|rc| rc.as_ref()),
                         context.codebase,
-                        context.interner,
                     )),
                 );
             }
@@ -105,7 +104,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                                 var_type.as_ref().clone(),
                                 loop_scope.possibly_defined_loop_parent_variables.get(var_id),
                                 context.codebase,
-                                context.interner,
                             ),
                         );
                     }
@@ -116,13 +114,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                 let mut finally_scope = (*finally_scope).borrow_mut();
                 for (var_id, var_type) in &block_context.locals {
                     if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                        *finally_type = Rc::new(combine_union_types(
-                            finally_type,
-                            var_type,
-                            context.codebase,
-                            context.interner,
-                            false,
-                        ));
+                        *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
                     } else {
                         finally_scope.locals.insert(var_id.clone(), var_type.clone());
                     }
@@ -137,12 +129,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                 for (var_id, var_type) in &block_context.locals {
                     new_break_vars.insert(
                         var_id.clone(),
-                        combine_optional_union_types(
-                            Some(var_type),
-                            new_break_vars.get(var_id),
-                            context.codebase,
-                            context.interner,
-                        ),
+                        combine_optional_union_types(Some(var_type), new_break_vars.get(var_id), context.codebase),
                     );
                 }
 

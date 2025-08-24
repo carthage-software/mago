@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
@@ -59,7 +59,7 @@ pub enum TAtomic {
     Resource(TResource),
     Reference(TReference),
     GenericParameter(TGenericParameter),
-    Variable(StringIdentifier),
+    Variable(Atom),
     Conditional(TConditional),
     Derived(TDerived),
     Never,
@@ -133,7 +133,7 @@ impl TAtomic {
         matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this())
     }
 
-    pub fn get_object_or_enum_name(&self) -> Option<StringIdentifier> {
+    pub fn get_object_or_enum_name(&self) -> Option<Atom> {
         match self {
             TAtomic::Object(object) => match object {
                 TObject::Named(named_object) => Some(named_object.get_name()),
@@ -144,7 +144,7 @@ impl TAtomic {
         }
     }
 
-    pub fn get_all_object_names(&self) -> Vec<StringIdentifier> {
+    pub fn get_all_object_names(&self) -> Vec<Atom> {
         let mut object_names = vec![];
 
         if let TAtomic::Object(object) = self {
@@ -162,26 +162,26 @@ impl TAtomic {
         object_names
     }
 
-    pub fn is_stdclass(&self, interner: &ThreadedInterner) -> bool {
+    pub fn is_stdclass(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
-            object.get_name().is_some_and(|name| interner.lookup(name).eq_ignore_ascii_case("stdClass"))
+            object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("stdClass"))
         })
     }
 
-    pub fn is_generator(&self, interner: &ThreadedInterner) -> bool {
+    pub fn is_generator(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
-            object.get_name().is_some_and(|name| interner.lookup(name).eq_ignore_ascii_case("Generator"))
+            object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("Generator"))
         })
     }
 
-    pub fn get_generator_parameters(&self, interner: &ThreadedInterner) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
+    pub fn get_generator_parameters(&self) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
         let generator_parameters = 'parameters: {
             let TAtomic::Object(TObject::Named(named_object)) = self else {
                 break 'parameters None;
             };
 
-            let name_str = interner.lookup(named_object.get_name_ref());
-            if !name_str.eq_ignore_ascii_case("Generator") {
+            let object_name = named_object.get_name_ref();
+            if !object_name.eq_ignore_ascii_case("Generator") {
                 break 'parameters None;
             }
 
@@ -202,7 +202,7 @@ impl TAtomic {
 
         if let Some(intersection_types) = self.get_intersection_types() {
             for intersection_type in intersection_types {
-                if let Some(parameters) = intersection_type.get_generator_parameters(interner) {
+                if let Some(parameters) = intersection_type.get_generator_parameters() {
                     return Some(parameters);
                 }
             }
@@ -259,25 +259,20 @@ impl TAtomic {
     }
 
     #[inline]
-    pub fn extends_or_implements(
-        &self,
-        codebase: &CodebaseMetadata,
-        interner: &ThreadedInterner,
-        interface: StringIdentifier,
-    ) -> bool {
+    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
         let object = match self {
             TAtomic::Object(object) => object,
             TAtomic::GenericParameter(parameter) => {
                 if let Some(intersection_types) = parameter.get_intersection_types() {
                     for intersection_type in intersection_types {
-                        if intersection_type.extends_or_implements(codebase, interner, interface) {
+                        if intersection_type.extends_or_implements(codebase, interface) {
                             return true;
                         }
                     }
                 }
 
                 for constraint_atomic in parameter.constraint.types.as_ref() {
-                    if constraint_atomic.extends_or_implements(codebase, interner, interface) {
+                    if constraint_atomic.extends_or_implements(codebase, interface) {
                         return true;
                     }
                 }
@@ -287,7 +282,7 @@ impl TAtomic {
             TAtomic::Iterable(iterable) => {
                 if let Some(intersection_types) = iterable.get_intersection_types() {
                     for intersection_type in intersection_types {
-                        if intersection_type.extends_or_implements(codebase, interner, interface) {
+                        if intersection_type.extends_or_implements(codebase, interface) {
                             return true;
                         }
                     }
@@ -303,14 +298,14 @@ impl TAtomic {
                 return true;
             }
 
-            if is_instance_of(codebase, interner, object_name, &interface) {
+            if is_instance_of(codebase, object_name, interface) {
                 return true;
             }
         }
 
         if let Some(intersection_types) = object.get_intersection_types() {
             for intersection_type in intersection_types {
-                if intersection_type.extends_or_implements(codebase, interner, interface) {
+                if intersection_type.extends_or_implements(codebase, interface) {
                     return true;
                 }
             }
@@ -320,38 +315,38 @@ impl TAtomic {
     }
 
     #[inline]
-    pub fn is_countable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
+    pub fn is_countable(&self, codebase: &CodebaseMetadata) -> bool {
         match self {
             TAtomic::Array(_) => true,
-            _ => self.extends_or_implements(codebase, interner, interner.intern("Countable")),
+            _ => self.extends_or_implements(codebase, "Countable"),
         }
     }
 
     #[inline]
-    pub fn could_be_countable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
-        self.is_mixed() || self.is_countable(codebase, interner)
+    pub fn could_be_countable(&self, codebase: &CodebaseMetadata) -> bool {
+        self.is_mixed() || self.is_countable(codebase)
     }
 
     #[inline]
-    pub fn is_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
-        self.extends_or_implements(codebase, interner, interner.intern("Traversable"))
-            || self.extends_or_implements(codebase, interner, interner.intern("Iterator"))
-            || self.extends_or_implements(codebase, interner, interner.intern("IteratorAggregate"))
-            || self.extends_or_implements(codebase, interner, interner.intern("Generator"))
+    pub fn is_traversable(&self, codebase: &CodebaseMetadata) -> bool {
+        self.extends_or_implements(codebase, "Traversable")
+            || self.extends_or_implements(codebase, "Iterator")
+            || self.extends_or_implements(codebase, "IteratorAggregate")
+            || self.extends_or_implements(codebase, "Generator")
     }
 
     #[inline]
-    pub fn is_array_or_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
+    pub fn is_array_or_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         match self {
             TAtomic::Iterable(_) => true,
             TAtomic::Array(_) => true,
-            _ => self.is_traversable(codebase, interner),
+            _ => self.is_traversable(codebase),
         }
     }
 
     #[inline]
-    pub fn could_be_array_or_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
-        self.is_mixed() || self.is_array_or_traversable(codebase, interner)
+    pub fn could_be_array_or_traversable(&self, codebase: &CodebaseMetadata) -> bool {
+        self.is_mixed() || self.is_array_or_traversable(codebase)
     }
 
     pub fn is_non_empty_array(&self) -> bool {
@@ -362,7 +357,7 @@ impl TAtomic {
         match self {
             TAtomic::Scalar(TScalar::Integer(int)) => int.get_literal_value().map(ArrayKey::Integer),
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
-                Some(ArrayKey::String(value.clone()))
+                Some(ArrayKey::String(*value))
             }
             _ => None,
         }
@@ -585,7 +580,7 @@ impl TAtomic {
     }
 
     #[inline]
-    pub const fn get_generic_parameter_name(&self) -> Option<StringIdentifier> {
+    pub const fn get_generic_parameter_name(&self) -> Option<Atom> {
         match self {
             TAtomic::GenericParameter(parameter) => Some(parameter.parameter_name),
             _ => None,
@@ -657,7 +652,7 @@ impl TAtomic {
         clone
     }
 
-    pub fn remove_placeholders(&mut self, interner: &ThreadedInterner) {
+    pub fn remove_placeholders(&mut self) {
         match self {
             TAtomic::Array(array) => {
                 array.remove_placeholders();
@@ -665,8 +660,7 @@ impl TAtomic {
             TAtomic::Object(TObject::Named(named_object)) => {
                 let name = named_object.get_name();
                 if let Some(type_parameters) = named_object.get_type_parameters_mut() {
-                    let name_str = interner.lookup(&name);
-                    if name_str.eq_ignore_ascii_case("Traversable") {
+                    if name.eq_ignore_ascii_case("Traversable") {
                         let has_kv_pair = type_parameters.len() == 2;
 
                         if let Some(key_or_value_param) = type_parameters.get_mut(0)
@@ -701,7 +695,7 @@ impl TAtomic {
         }
     }
 
-    pub fn get_class_string_value(&self) -> Option<StringIdentifier> {
+    pub fn get_class_string_value(&self) -> Option<Atom> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_class_string_value(),
             _ => None,
@@ -897,26 +891,20 @@ impl TType for TAtomic {
         }
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
-            TAtomic::Scalar(scalar) => scalar.get_id(interner),
-            TAtomic::Array(array) => array.get_id(interner),
-            TAtomic::Callable(callable) => callable.get_id(interner),
-            TAtomic::Object(object) => object.get_id(interner),
-            TAtomic::Reference(reference) => reference.get_id(interner),
-            TAtomic::Mixed(mixed) => mixed.get_id(interner),
-            TAtomic::Resource(resource) => resource.get_id(interner),
-            TAtomic::Iterable(iterable) => iterable.get_id(interner),
-            TAtomic::GenericParameter(parameter) => parameter.get_id(interner),
-            TAtomic::Conditional(conditional) => conditional.get_id(interner),
-            TAtomic::Derived(derived) => derived.get_id(interner),
-            TAtomic::Variable(name) => {
-                if let Some(interner) = interner {
-                    interner.lookup(name).to_string()
-                } else {
-                    name.to_string()
-                }
-            }
+            TAtomic::Scalar(scalar) => scalar.get_id(),
+            TAtomic::Array(array) => array.get_id(),
+            TAtomic::Callable(callable) => callable.get_id(),
+            TAtomic::Object(object) => object.get_id(),
+            TAtomic::Reference(reference) => reference.get_id(),
+            TAtomic::Mixed(mixed) => mixed.get_id(),
+            TAtomic::Resource(resource) => resource.get_id(),
+            TAtomic::Iterable(iterable) => iterable.get_id(),
+            TAtomic::GenericParameter(parameter) => parameter.get_id(),
+            TAtomic::Conditional(conditional) => conditional.get_id(),
+            TAtomic::Derived(derived) => derived.get_id(),
+            TAtomic::Variable(name) => name.to_string(),
             TAtomic::Never => "never".to_string(),
             TAtomic::Null => "null".to_string(),
             TAtomic::Void => "void".to_string(),
@@ -928,7 +916,6 @@ impl TType for TAtomic {
 pub fn populate_atomic_type(
     unpopulated_atomic: &mut TAtomic,
     codebase_symbols: &Symbols,
-    interner: &ThreadedInterner,
     reference_source: Option<&ReferenceSource>,
     symbol_references: &mut SymbolReferences,
     force: bool,
@@ -939,7 +926,6 @@ pub fn populate_atomic_type(
                 populate_union_type(
                     list.element_type.as_mut(),
                     codebase_symbols,
-                    interner,
                     reference_source,
                     symbol_references,
                     force,
@@ -947,28 +933,14 @@ pub fn populate_atomic_type(
 
                 if let Some(known_elements) = list.known_elements.as_mut() {
                     for (_, element_type) in known_elements.values_mut() {
-                        populate_union_type(
-                            element_type,
-                            codebase_symbols,
-                            interner,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate_union_type(element_type, codebase_symbols, reference_source, symbol_references, force);
                     }
                 }
             }
             TArray::Keyed(keyed_array) => {
                 if let Some(known_items) = keyed_array.known_items.as_mut() {
                     for (_, item_type) in known_items.values_mut() {
-                        populate_union_type(
-                            item_type,
-                            codebase_symbols,
-                            interner,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate_union_type(item_type, codebase_symbols, reference_source, symbol_references, force);
                     }
                 }
 
@@ -976,7 +948,6 @@ pub fn populate_atomic_type(
                     populate_union_type(
                         parameters.0.as_mut(),
                         codebase_symbols,
-                        interner,
                         reference_source,
                         symbol_references,
                         force,
@@ -985,7 +956,6 @@ pub fn populate_atomic_type(
                     populate_union_type(
                         parameters.1.as_mut(),
                         codebase_symbols,
-                        interner,
                         reference_source,
                         symbol_references,
                         force,
@@ -995,26 +965,12 @@ pub fn populate_atomic_type(
         },
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
-                populate_union_type(
-                    return_type,
-                    codebase_symbols,
-                    interner,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate_union_type(return_type, codebase_symbols, reference_source, symbol_references, force);
             }
 
             for param in signature.get_parameters_mut() {
                 if let Some(param_type) = param.get_type_signature_mut() {
-                    populate_union_type(
-                        param_type,
-                        codebase_symbols,
-                        interner,
-                        reference_source,
-                        symbol_references,
-                        force,
-                    );
+                    populate_union_type(param_type, codebase_symbols, reference_source, symbol_references, force);
                 }
             }
         }
@@ -1029,14 +985,7 @@ pub fn populate_atomic_type(
             } else {
                 if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                     for parameter in type_parameters {
-                        populate_union_type(
-                            parameter,
-                            codebase_symbols,
-                            interner,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate_union_type(parameter, codebase_symbols, reference_source, symbol_references, force);
                     }
                 }
 
@@ -1045,7 +994,6 @@ pub fn populate_atomic_type(
                         populate_atomic_type(
                             intersection_type,
                             codebase_symbols,
-                            interner,
                             reference_source,
                             symbol_references,
                             force,
@@ -1069,7 +1017,6 @@ pub fn populate_atomic_type(
             populate_union_type(
                 iterable.get_key_type_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1078,7 +1025,6 @@ pub fn populate_atomic_type(
             populate_union_type(
                 iterable.get_value_type_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1089,7 +1035,6 @@ pub fn populate_atomic_type(
                     populate_atomic_type(
                         intersection_type,
                         codebase_symbols,
-                        interner,
                         reference_source,
                         symbol_references,
                         force,
@@ -1099,18 +1044,9 @@ pub fn populate_atomic_type(
         }
         TAtomic::Reference(reference) => match reference {
             TReference::Symbol { name, parameters, intersection_types } => {
-                let lower_name = interner.lowered(name);
-
                 if let Some(parameters) = parameters {
                     for parameter in parameters {
-                        populate_union_type(
-                            parameter,
-                            codebase_symbols,
-                            interner,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate_union_type(parameter, codebase_symbols, reference_source, symbol_references, force);
                     }
                 }
 
@@ -1125,7 +1061,7 @@ pub fn populate_atomic_type(
                     }
                 }
 
-                if let Some(symbol_kind) = codebase_symbols.get_kind(&lower_name) {
+                if let Some(symbol_kind) = codebase_symbols.get_kind(&ascii_lowercase_atom(name)) {
                     match symbol_kind {
                         SymbolKind::Enum => {
                             *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
@@ -1138,7 +1074,6 @@ pub fn populate_atomic_type(
                                         populate_atomic_type(
                                             &mut intersection_type,
                                             codebase_symbols,
-                                            interner,
                                             reference_source,
                                             symbol_references,
                                             force,
@@ -1179,21 +1114,13 @@ pub fn populate_atomic_type(
             }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {
-            populate_union_type(
-                constraint.as_mut(),
-                codebase_symbols,
-                interner,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate_union_type(constraint.as_mut(), codebase_symbols, reference_source, symbol_references, force);
 
             if let Some(intersection_types) = intersection_types.as_mut() {
                 for intersection_type in intersection_types {
                     populate_atomic_type(
                         intersection_type,
                         codebase_symbols,
-                        interner,
                         reference_source,
                         symbol_references,
                         force,
@@ -1204,20 +1131,12 @@ pub fn populate_atomic_type(
         TAtomic::Scalar(TScalar::ClassLikeString(
             TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. },
         )) => {
-            populate_atomic_type(
-                constraint.as_mut(),
-                codebase_symbols,
-                interner,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate_atomic_type(constraint.as_mut(), codebase_symbols, reference_source, symbol_references, force);
         }
         TAtomic::Conditional(conditional) => {
             populate_union_type(
                 conditional.get_subject_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1226,7 +1145,6 @@ pub fn populate_atomic_type(
             populate_union_type(
                 conditional.get_target_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1235,7 +1153,6 @@ pub fn populate_atomic_type(
             populate_union_type(
                 conditional.get_then_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1244,7 +1161,6 @@ pub fn populate_atomic_type(
             populate_union_type(
                 conditional.get_otherwise_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,
@@ -1254,7 +1170,6 @@ pub fn populate_atomic_type(
             populate_atomic_type(
                 derived.get_target_type_mut(),
                 codebase_symbols,
-                interner,
                 reference_source,
                 symbol_references,
                 force,

@@ -60,7 +60,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &value_type,
             &v,
             false,
@@ -72,12 +71,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
                 IssueCode::InvalidYieldValueType,
                 Issue::error(format!(
                     "Invalid value type yielded; expected `{}`, but found `{}`.",
-                    v.get_id(Some(context.interner)),
-                    value_type.get_id(Some(context.interner))
+                    v.get_id(),
+                    value_type.get_id()
                 ))
                 .with_annotation(
                     Annotation::primary(self.value.as_ref().map_or_else(|| self.span(), |val| val.span()))
-                        .with_message(format!("This expression yields type `{}`", value_type.get_id(Some(context.interner)))),
+                        .with_message(format!("This expression yields type `{}`", value_type.get_id())),
                 )
                 .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
                 .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint."),
@@ -86,7 +85,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &key_type,
             &k,
             false,
@@ -98,12 +96,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
                 IssueCode::InvalidYieldKeyType,
                 Issue::error(format!(
                     "Invalid key type yielded implicitly; expected `{}`, but implicit key is `{}`.",
-                    k.get_id(Some(context.interner)),
-                    key_type.get_id(Some(context.interner))
+                    k.get_id(),
+                    key_type.get_id()
                 ))
                 .with_annotation(
                     Annotation::primary(self.span())
-                        .with_message(format!("Implicitly yields key of type `{}`", key_type.get_id(Some(context.interner)))),
+                        .with_message(format!("Implicitly yields key of type `{}`", key_type.get_id())),
                 )
                 .with_note("When `yield $value` is used, an implicit integer key is generated. This key must be assignable to the key type declared in the Generator's return type hint.")
                 .with_help("Use `yield $key => $value;` to specify a key of the correct type, or adjust the Generator's key type hint."),
@@ -147,7 +145,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &value_type,
             &v,
             false,
@@ -159,12 +156,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
                IssueCode::InvalidYieldValueType,
                Issue::error(format!(
                    "Invalid value type yielded; expected `{}`, but found `{}`.",
-                   v.get_id(Some(context.interner)),
-                   value_type.get_id(Some(context.interner))
+                   v.get_id(),
+                   value_type.get_id()
                ))
                .with_annotation(
                    Annotation::primary(self.value.span())
-                       .with_message(format!("This expression yields type `{}`", value_type.get_id(Some(context.interner)))),
+                       .with_message(format!("This expression yields type `{}`", value_type.get_id())),
                )
                .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
                .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint."),
@@ -173,7 +170,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &key_type,
             &k,
             false,
@@ -185,12 +181,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
                 IssueCode::InvalidYieldKeyType,
                 Issue::error(format!(
                     "Invalid key type yielded; expected `{}`, but found `{}`.",
-                    k.get_id(Some(context.interner)),
-                    key_type.get_id(Some(context.interner))
+                    k.get_id(),
+                    key_type.get_id()
                 ))
                 .with_annotation(
                     Annotation::primary(self.key.span())
-                        .with_message(format!("This key has type `{}`", key_type.get_id(Some(context.interner)))),
+                        .with_message(format!("This key has type `{}`", key_type.get_id())),
                 )
                 .with_note("The type of the key yielded must be assignable to the key type declared in the Generator's return type hint.")
                 .with_help("Ensure the yielded key matches the expected type, or adjust the Generator's key type hint."),
@@ -241,12 +237,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
         };
 
         for atomic in iterator_type.types.iter() {
-            let (key, value) = if let Some(generator) = atomic.get_generator_parameters(context.interner) {
+            let (key, value) = if let Some(generator) = atomic.get_generator_parameters() {
                 // the iterator is a generator! not only does it have to match key and value,
                 // but also `send` type must be compatible with the current generator's `send` type
                 if !union_comparator::is_contained_by(
                     context.codebase,
-                    context.interner,
                     &s,
                     &generator.2,
                     false,
@@ -258,12 +253,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                         IssueCode::YieldFromInvalidSendType,
                         Issue::error(format!(
                             "Incompatible `send` type for `yield from`: current generator expects to be sent `{}`, but yielded generator expects `{}`.",
-                            s.get_id(Some(context.interner)),
-                            generator.2.get_id(Some(context.interner))
+                            s.get_id(),
+                            generator.2.get_id()
                         ))
                         .with_annotation(
                             Annotation::primary(self.iterator.span())
-                                .with_message(format!("This generator expects to be sent `{}`", generator.2.get_id(Some(context.interner)))),
+                                .with_message(format!("This generator expects to be sent `{}`", generator.2.get_id())),
                         )
                         .with_note("When using `yield from` with another Generator, the `send` type of the inner generator (Ts') must be a supertype of (or equal to) the `send` type of the outer generator (Ts). This means `Ts <: Ts'`.")
                         .with_help("Ensure the send types are compatible, or adjust the Generator type hints."),
@@ -271,18 +266,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                 }
 
                 (generator.0, generator.1)
-            } else if let Some(parameters) = get_iterable_parameters(atomic, context.codebase, context.interner) {
+            } else if let Some(parameters) = get_iterable_parameters(atomic, context.codebase) {
                 parameters
             } else {
                 context.collector.report_with_code(
                     IssueCode::YieldFromNonIterable,
                     Issue::error(format!(
                         "Cannot `yield from` non-iterable type `{}`.",
-                        atomic.get_id(Some(context.interner))
+                        atomic.get_id()
                     ))
                     .with_annotation(Annotation::primary(self.iterator.span()).with_message(format!(
                         "Expression cannot be yielded from; it is of type `{}`",
-                        atomic.get_id(Some(context.interner))
+                        atomic.get_id()
                     )))
                     .with_note(
                         "`yield from` requires an `iterable` (e.g., `array` or an object implementing `Traversable`).",
@@ -295,7 +290,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
 
             if !union_comparator::is_contained_by(
                 context.codebase,
-                context.interner,
                 &value,
                 &v,
                 false,
@@ -307,12 +301,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                     IssueCode::YieldFromInvalidValueType,
                     Issue::error(format!(
                         "Invalid value type from `yield from`: current generator expects to yield `{}`, but the inner iterable yields `{}`.",
-                        v.get_id(Some(context.interner)),
-                        value.get_id(Some(context.interner))
+                        v.get_id(),
+                        value.get_id()
                     ))
                     .with_annotation(
                         Annotation::primary(self.iterator.span())
-                            .with_message(format!("This iterable yields values of type `{}`", value.get_id(Some(context.interner)))),
+                            .with_message(format!("This iterable yields values of type `{}`", value.get_id())),
                     )
                     .with_note("The value type yielded by the inner iterable (Tv') must be assignable to the value type of the current generator (Tv). This means `Tv' <: Tv`.")
                     .with_help("Ensure the inner iterable yields compatible value types, or adjust the current Generator's type hint."),
@@ -321,7 +315,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
 
             if !union_comparator::is_contained_by(
                 context.codebase,
-                context.interner,
                 &key,
                 &k,
                 false,
@@ -333,12 +326,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                    IssueCode::YieldFromInvalidKeyType,
                    Issue::error(format!(
                        "Invalid key type from `yield from`: current generator expects to yield keys of type `{}`, but the inner iterable yields keys of type `{}`.",
-                       k.get_id(Some(context.interner)),
-                       key.get_id(Some(context.interner))
+                       k.get_id(),
+                       key.get_id()
                    ))
                    .with_annotation(
                        Annotation::primary(self.iterator.span())
-                           .with_message(format!("This iterable yields keys of type `{}`", key.get_id(Some(context.interner)))),
+                           .with_message(format!("This iterable yields keys of type `{}`", key.get_id())),
                    )
                    .with_note("The key type yielded by the inner iterable (Tk') must be assignable to the key type of the current generator (Tk). This means `Tk' <: Tk`.")
                    .with_help("Ensure the inner iterable yields compatible key types, or adjust the current Generator's type hint."),
@@ -381,17 +374,17 @@ fn get_current_generator_parameters<'ctx, 'arena>(
     let mut sent = None;
     let mut r#return = None;
     for atomic_iterable in iterable_type.types.as_ref() {
-        match atomic_iterable.get_generator_parameters(context.interner) {
+        match atomic_iterable.get_generator_parameters() {
             Some((k, v, s, r)) => {
-                key = Some(add_optional_union_type(k, key.as_ref(), context.codebase, context.interner));
-                value = Some(add_optional_union_type(v, value.as_ref(), context.codebase, context.interner));
-                sent = Some(add_optional_union_type(s, sent.as_ref(), context.codebase, context.interner));
-                r#return = Some(add_optional_union_type(r, r#return.as_ref(), context.codebase, context.interner));
+                key = Some(add_optional_union_type(k, key.as_ref(), context.codebase));
+                value = Some(add_optional_union_type(v, value.as_ref(), context.codebase));
+                sent = Some(add_optional_union_type(s, sent.as_ref(), context.codebase));
+                r#return = Some(add_optional_union_type(r, r#return.as_ref(), context.codebase));
             }
-            None => match get_iterable_parameters(atomic_iterable, context.codebase, context.interner) {
+            None => match get_iterable_parameters(atomic_iterable, context.codebase) {
                 Some((k, v)) => {
-                    key = Some(add_optional_union_type(k, key.as_ref(), context.codebase, context.interner));
-                    value = Some(add_optional_union_type(v, value.as_ref(), context.codebase, context.interner));
+                    key = Some(add_optional_union_type(k, key.as_ref(), context.codebase));
+                    value = Some(add_optional_union_type(v, value.as_ref(), context.codebase));
                     sent = Some(get_mixed());
                     r#return = Some(get_mixed());
                 }
@@ -400,12 +393,12 @@ fn get_current_generator_parameters<'ctx, 'arena>(
                         IssueCode::InvalidGeneratorReturnType,
                         Issue::error(format!(
                             "Declared return type `{}` for generator function `{}` is not a valid Generator or iterable type.",
-                            iterable_type.get_id(Some(context.interner)),
-                            function.name.map_or_else(|| "current".to_string(), |id| context.interner.lookup(&id).to_string())
+                            iterable_type.get_id(),
+                            function.name.map_or_else(|| "current", |id| id.as_str())
                         ))
                         .with_annotation(
                             Annotation::primary(return_type_metadata.span)
-                                .with_message(format!("Declared return type is `{}`", iterable_type.get_id(Some(context.interner)))),
+                                .with_message(format!("Declared return type is `{}`", iterable_type.get_id())),
                         )
                         .with_annotation(
                             Annotation::secondary(yield_span)

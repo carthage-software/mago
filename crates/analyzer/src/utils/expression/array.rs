@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use mago_atom::atom;
 use mago_codex::get_class_like;
 use mago_codex::is_instance_of;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -164,8 +165,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, context.interner, false));
+                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -191,8 +191,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 new_type.set_possibly_undefined(possibly_undefined, None);
 
                 if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, context.interner, false));
+                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -207,8 +206,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, context.interner, false));
+                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -217,8 +215,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, context.interner, false));
+                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -229,8 +226,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, context.interner, false));
+                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -253,12 +249,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                         );
                     }
 
-                    value_type = Some(add_optional_union_type(
-                        get_null(),
-                        value_type.as_ref(),
-                        context.codebase,
-                        context.interner,
-                    ));
+                    value_type = Some(add_optional_union_type(get_null(), value_type.as_ref(), context.codebase));
                 }
 
                 has_valid_expected_index = true;
@@ -273,8 +264,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     &mut expected_index_types,
                 );
 
-                value_type =
-                    Some(add_optional_union_type(new_type, value_type.as_ref(), context.codebase, context.interner));
+                value_type = Some(add_optional_union_type(new_type, value_type.as_ref(), context.codebase));
             }
             _ => {
                 has_valid_expected_index = true;
@@ -283,13 +273,10 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     }
 
     if !has_valid_expected_index {
-        let index_type_str = index_type.get_id(Some(context.interner));
-        let array_like_type_str = array_like_type.get_id(Some(context.interner));
-        let expected_index_types_str = expected_index_types
-            .iter()
-            .flat_map(|union| union.types.as_ref())
-            .map(|t| t.get_id(Some(context.interner)))
-            .collect::<Vec<_>>();
+        let index_type_str = index_type.get_id();
+        let array_like_type_str = array_like_type.get_id();
+        let expected_index_types_str =
+            expected_index_types.iter().flat_map(|union| union.types.as_ref()).map(|t| t.get_id()).collect::<Vec<_>>();
 
         let expected_types_list = if let Some(last_index_str) = expected_index_types_str.last() {
             if expected_index_types_str.len() == 1 {
@@ -403,7 +390,6 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
-        context.interner,
         dim_type,
         &expected_key_type,
         false,
@@ -442,7 +428,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
                             Issue::warning(format!(
                                 "Possibly undefined array key `{}` accessed on `{}`.",
                                 val,
-                                list.get_id(Some(context.interner))
+                                list.get_id()
                             ))
                             .with_annotation(
                                 Annotation::primary(span)
@@ -472,7 +458,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
                         Issue::error(format!(
                             "Undefined list index `{}` accessed on `{}`.",
                             index,
-                            list.get_id(Some(context.interner))
+                            list.get_id()
                         ))
                         .with_annotation(
                             Annotation::primary(span)
@@ -499,13 +485,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
         }
 
         for (_, known_item) in known_elements.values() {
-            type_param = Cow::Owned(add_union_type(
-                type_param.into_owned(),
-                known_item,
-                context.codebase,
-                context.interner,
-                false,
-            ));
+            type_param = Cow::Owned(add_union_type(type_param.into_owned(), known_item, context.codebase, false));
         }
 
         return if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
@@ -518,15 +498,14 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
             {
                 context.collector.report_with_code(
                     IssueCode::ImpossibleArrayAccess,
-                    Issue::error(format!(
-                        "Cannot access elements of an empty list `{}`.",
-                        list.get_id(Some(context.interner))
-                    ))
-                    .with_annotation(
-                        Annotation::primary(span).with_message("The list is empty, no elements to access."),
-                    )
-                    .with_note("Attempting to access an element in an empty list will always result in a `null` value.")
-                    .with_help("Ensure the list is not empty before accessing its elements."),
+                    Issue::error(format!("Cannot access elements of an empty list `{}`.", list.get_id()))
+                        .with_annotation(
+                            Annotation::primary(span).with_message("The list is empty, no elements to access."),
+                        )
+                        .with_note(
+                            "Attempting to access an element in an empty list will always result in a `null` value.",
+                        )
+                        .with_help("Ensure the list is not empty before accessing its elements."),
                 );
             }
 
@@ -579,7 +558,6 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
-        context.interner,
         index_type,
         &key_parameter,
         false,
@@ -613,7 +591,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                             Issue::warning(format!(
                                 "Possibly undefined array key {} accessed on `{}`.",
                                 array_key,
-                                keyed_array.get_id(Some(context.interner))
+                                keyed_array.get_id()
                             ))
                             .with_annotation(
                                 Annotation::primary(span)
@@ -647,7 +625,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                         Issue::error(format!(
                             "Undefined array key {} accessed on `{}`.",
                             array_key,
-                            keyed_array.get_id(Some(context.interner))
+                            keyed_array.get_id()
                         ))
                         .with_annotation(
                             Annotation::primary(span)
@@ -670,7 +648,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                         Issue::warning(format!(
                             "Impossible `isset` check on key `{}` accessed on `{}`.",
                             array_key,
-                            keyed_array.get_id(Some(context.interner))
+                            keyed_array.get_id()
                         ))
                         .with_annotation(
                             Annotation::primary(span)
@@ -698,19 +676,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
         }
 
         for (_, known_item) in known_items.values() {
-            value_parameter = Cow::Owned(add_union_type(
-                value_parameter.into_owned(),
-                known_item,
-                context.codebase,
-                context.interner,
-                false,
-            ));
+            value_parameter =
+                Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
         }
 
         let array_key = get_arraykey();
         let is_contained = is_contained_by(
             context.codebase,
-            context.interner,
             &key_parameter,
             if index_type.is_mixed() { &array_key } else { index_type },
             true,
@@ -736,13 +708,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                 *has_possibly_undefined = true;
 
                 if !allow_possibly_undefined && index_type.get_single_array_key().is_some() {
-                    let index_type_str = index_type.get_id(Some(context.interner));
+                    let index_type_str = index_type.get_id();
 
                     context.collector.report_with_code(
                         IssueCode::PossiblyUndefinedArrayIndex,
                         Issue::warning(format!(
                             "Possibly undefined array key `{index_type_str}` accessed on `{}`.",
-                            keyed_array.get_id(Some(context.interner))
+                            keyed_array.get_id()
                         ))
                         .with_annotation(
                             Annotation::primary(span)
@@ -787,16 +759,16 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
                 break 'metadata None;
             };
 
-            let array_access = context.interner.intern("ArrayAccess");
-            if !is_instance_of(context.codebase, context.interner, &named_object.name, &array_access) {
+            let array_access = atom("ArrayAccess");
+            if !is_instance_of(context.codebase, &named_object.name, &array_access) {
                 break 'metadata None;
             }
 
-            let Some(metadata) = get_class_like(context.codebase, context.interner, &named_object.name) else {
+            let Some(metadata) = get_class_like(context.codebase, &named_object.name) else {
                 break 'metadata None;
             };
 
-            let Some(array_access_metadata) = get_class_like(context.codebase, context.interner, &array_access) else {
+            let Some(array_access_metadata) = get_class_like(context.codebase, &array_access) else {
                 break 'metadata None;
             };
 
@@ -810,7 +782,6 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
 
             let key_type = get_specialized_template_type(
                 context.codebase,
-                context.interner,
                 key_template_name,
                 &array_access,
                 metadata,
@@ -820,7 +791,6 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
 
             let value_type = get_specialized_template_type(
                 context.codebase,
-                context.interner,
                 value_template_name,
                 &array_access,
                 metadata,
@@ -853,19 +823,9 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
         let mut value_type = None;
 
         for (key_parameter_type, value_parameter_type) in parameters {
-            key_type = Some(add_optional_union_type(
-                key_parameter_type,
-                key_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            key_type = Some(add_optional_union_type(key_parameter_type, key_type.as_ref(), context.codebase));
 
-            value_type = Some(add_optional_union_type(
-                value_parameter_type,
-                value_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            value_type = Some(add_optional_union_type(value_parameter_type, value_type.as_ref(), context.codebase));
         }
 
         if class_likes.is_empty() {
@@ -883,7 +843,7 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
             IssueCode::InvalidArrayAccess,
             Issue::error(format!(
                 "Cannot access array index on object `{}` that does not implement `ArrayAccess`.",
-                named_object.get_id(Some(context.interner))
+                named_object.get_id()
             ))
             .with_annotation(Annotation::primary(span).with_message("Object does not implement `ArrayAccess`."))
             .with_note("Only objects implementing `ArrayAccess` can be accessed like arrays.")
@@ -896,7 +856,6 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
-        context.interner,
         index_type,
         &expected_key_type,
         false,
@@ -942,7 +901,6 @@ pub(crate) fn handle_array_access_on_string<'ctx, 'arena>(
 
     if !is_contained_by(
         context.codebase,
-        context.interner,
         &index_type,
         &valid_index_type,
         false,
@@ -988,7 +946,7 @@ pub(crate) fn handle_array_access_on_mixed<'ctx, 'arena>(
                     IssueCode::MixedArrayAssignment,
                     Issue::error(format!(
                         "Unsafe array assignment on type `{}`.",
-                        mixed.get_id(Some(context.interner))
+                        mixed.get_id()
                     ))
                     .with_annotation(
                         Annotation::primary(span)
@@ -1005,7 +963,7 @@ pub(crate) fn handle_array_access_on_mixed<'ctx, 'arena>(
         } else {
             context.collector.report_with_code(
                 IssueCode::MixedArrayAccess,
-                Issue::error(format!("Unsafe array access on type `{}`.", mixed.get_id(None)))
+                Issue::error(format!("Unsafe array access on type `{}`.", mixed.get_id()))
                 .with_annotation(Annotation::primary(span).with_message("Cannot safely access index because base type is `mixed`."))
                 .with_note("The variable being accessed might not be an array at runtime.")
                 .with_help("Ensure the variable holds an array before accessing an index, potentially using type checks or assertions."),

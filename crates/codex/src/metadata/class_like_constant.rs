@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -14,7 +14,7 @@ use crate::visibility::Visibility;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ClassLikeConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: StringIdentifier,
+    pub name: Atom,
     pub span: Span,
     pub visibility: Visibility,
     pub type_declaration: Option<TypeMetadata>,
@@ -24,7 +24,7 @@ pub struct ClassLikeConstantMetadata {
 }
 
 impl ClassLikeConstantMetadata {
-    pub fn new(name: StringIdentifier, span: Span, visibility: Visibility, flags: MetadataFlags) -> Self {
+    pub fn new(name: Atom, span: Span, visibility: Visibility, flags: MetadataFlags) -> Self {
         Self {
             attributes: Vec::new(),
             name,

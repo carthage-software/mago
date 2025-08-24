@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -17,7 +17,7 @@ use crate::ttype::atomic::TAtomic;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EnumCaseMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: StringIdentifier,
+    pub name: Atom,
     pub name_span: Span,
     pub span: Span,
     pub value_type: Option<TAtomic>,
@@ -35,7 +35,7 @@ impl EnumCaseMetadata {
     /// * `name_span`: The source code location of the name identifier.
     /// * `span`: The source code location of the entire case declaration.
     #[inline]
-    pub fn new(name: StringIdentifier, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
+    pub fn new(name: Atom, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
         Self { attributes: Vec::new(), name, name_span, span, flags, value_type: None }
     }
 }

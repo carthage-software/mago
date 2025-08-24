@@ -5,8 +5,9 @@ use ahash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_reporting::IssueCollection;
 
 use crate::get_closure;
@@ -44,25 +45,25 @@ pub mod ttype;
 pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,
-    /// Map from type alias name (`StringIdentifier`) to its metadata (`TypeMetadata`).
-    pub aliases: HashMap<StringIdentifier, TypeMetadata>,
-    /// Map from class-like FQCN (`StringIdentifier`) to its detailed metadata (`ClassLikeMetadata`).
-    pub class_likes: HashMap<StringIdentifier, ClassLikeMetadata>,
+    /// Map from type alias name (`Atom`) to its metadata (`TypeMetadata`).
+    pub aliases: AtomMap<TypeMetadata>,
+    /// Map from class-like FQCN (`Atom`) to its detailed metadata (`ClassLikeMetadata`).
+    pub class_likes: AtomMap<ClassLikeMetadata>,
     /// Map from a function/method identifier tuple `(scope_id, function_id)` to its metadata (`FunctionLikeMetadata`).
-    /// `scope_id` is the FQCN for methods or often `StringIdentifier::empty()` for global functions.
-    pub function_likes: HashMap<(StringIdentifier, StringIdentifier), FunctionLikeMetadata>,
+    /// `scope_id` is the FQCN for methods or often `Atom::empty()` for global functions.
+    pub function_likes: HashMap<(Atom, Atom), FunctionLikeMetadata>,
     /// Stores the kind (Class, Interface, etc.) for every known symbol FQCN.
     pub symbols: Symbols,
-    /// Map from global constant FQN (`StringIdentifier`) to its metadata (`ConstantMetadata`).
-    pub constants: HashMap<StringIdentifier, ConstantMetadata>,
+    /// Map from global constant FQN (`Atom`) to its metadata (`ConstantMetadata`).
+    pub constants: AtomMap<ConstantMetadata>,
     /// Map from class/interface FQCN to the set of all its descendants (recursive).
-    pub all_class_like_descendants: HashMap<StringIdentifier, HashSet<StringIdentifier>>,
+    pub all_class_like_descendants: AtomMap<AtomSet>,
     /// Map from class/interface FQCN to the set of its direct descendants (children).
-    pub direct_classlike_descendants: HashMap<StringIdentifier, HashSet<StringIdentifier>>,
-    /// Set of symbols (FQCNs) considered "safe".
-    pub safe_symbols: HashSet<StringIdentifier>,
-    /// Set of specific members `(SymbolFQCN, MemberName)` considered "safe" or trusted.
-    pub safe_symbol_members: HashSet<(StringIdentifier, StringIdentifier)>,
+    pub direct_classlike_descendants: AtomMap<AtomSet>,
+    /// Set of symbols (FQCNs).
+    pub safe_symbols: AtomSet,
+    /// Set of specific members `(SymbolFQCN, MemberName)`.
+    pub safe_symbol_members: HashSet<(Atom, Atom)>,
 }
 
 impl CodebaseMetadata {
@@ -75,7 +76,7 @@ impl CodebaseMetadata {
     /// Checks if a class-like structure can be part of an intersection.
     /// Generally, only final classes cannot be intersected further down the hierarchy.
     #[inline]
-    pub fn is_inheritable(&self, fq_class_name: &StringIdentifier) -> bool {
+    pub fn is_inheritable(&self, fq_class_name: &Atom) -> bool {
         match self.symbols.get_kind(fq_class_name) {
             Some(SymbolKind::Class) => {
                 // Check if the class metadata exists and if it's NOT final
@@ -93,11 +94,7 @@ impl CodebaseMetadata {
     }
 
     #[inline]
-    pub fn class_or_trait_can_use_trait(
-        &self,
-        child_class: &StringIdentifier,
-        parent_trait: &StringIdentifier,
-    ) -> bool {
+    pub fn class_or_trait_can_use_trait(&self, child_class: &Atom, parent_trait: &Atom) -> bool {
         if let Some(metadata) = self.class_likes.get(child_class) {
             if metadata.used_traits.contains(parent_trait) {
                 return true;
@@ -111,11 +108,7 @@ impl CodebaseMetadata {
     /// Retrieves the literal value (as a `TAtomic`) of a class constant, if it was inferred.
     /// Returns `None` if the class/constant doesn't exist or the value type wasn't inferred.
     #[inline]
-    pub fn get_classconst_literal_value(
-        &self,
-        fq_class_name: &StringIdentifier,
-        const_name: &StringIdentifier,
-    ) -> Option<&TAtomic> {
+    pub fn get_classconst_literal_value(&self, fq_class_name: &Atom, const_name: &Atom) -> Option<&TAtomic> {
         self.class_likes
             .get(fq_class_name)
             .and_then(|class_metadata| class_metadata.constants.get(const_name))
@@ -125,7 +118,7 @@ impl CodebaseMetadata {
     /// Checks if a property with the given name exists (is declared or inherited) within the class-like structure.
     /// Relies on `ClassLikeMetadata::has_appearing_property`.
     #[inline]
-    pub fn property_exists(&self, classlike_name: &StringIdentifier, property_name: &StringIdentifier) -> bool {
+    pub fn property_exists(&self, classlike_name: &Atom, property_name: &Atom) -> bool {
         self.class_likes
             .get(classlike_name)
             .is_some_and(|metadata| metadata.appearing_property_ids.contains_key(property_name))
@@ -134,20 +127,20 @@ impl CodebaseMetadata {
     /// Checks if a method with the given name exists within the class-like structure.
     /// Relies on `ClassLikeMetadata::has_method`.
     #[inline]
-    pub fn method_exists(&self, classlike_name: &StringIdentifier, method_name: &StringIdentifier) -> bool {
+    pub fn method_exists(&self, classlike_name: &Atom, method_name: &Atom) -> bool {
         self.class_likes.get(classlike_name).is_some_and(|metadata| metadata.methods.contains(method_name))
     }
 
     /// Checks if a method with the given name exists (is declared or inherited) within the class-like structure.
     /// Relies on `ClassLikeMetadata::has_appearing_method`.
     #[inline]
-    pub fn appearing_method_exists(&self, classlike_name: &StringIdentifier, method_name: &StringIdentifier) -> bool {
+    pub fn appearing_method_exists(&self, classlike_name: &Atom, method_name: &Atom) -> bool {
         self.class_likes.get(classlike_name).is_some_and(|metadata| metadata.has_appearing_method(method_name))
     }
 
     /// Checks specifically if a method is *declared* directly within the given class-like (not just inherited).
     #[inline]
-    pub fn declaring_method_exists(&self, classlike_name: &StringIdentifier, method_name: &StringIdentifier) -> bool {
+    pub fn declaring_method_exists(&self, classlike_name: &Atom, method_name: &Atom) -> bool {
         self.class_likes.get(classlike_name).and_then(|metadata| metadata.declaring_method_ids.get(method_name))
             == Some(classlike_name) // Check if declaring class is this class
     }
@@ -155,11 +148,7 @@ impl CodebaseMetadata {
     /// Finds the FQCN of the class/trait where a property was originally declared for a given class context.
     /// Returns `None` if the property doesn't appear in the class hierarchy.
     #[inline]
-    pub fn get_declaring_class_for_property(
-        &self,
-        fq_class_name: &StringIdentifier,
-        property_name: &StringIdentifier,
-    ) -> Option<&StringIdentifier> {
+    pub fn get_declaring_class_for_property(&self, fq_class_name: &Atom, property_name: &Atom) -> Option<&Atom> {
         self.class_likes.get(fq_class_name).and_then(|metadata| metadata.declaring_property_ids.get(property_name))
     }
 
@@ -167,11 +156,7 @@ impl CodebaseMetadata {
     /// This might be the metadata from the declaring class.
     /// Returns `None` if the class or property doesn't exist in this context.
     #[inline]
-    pub fn get_property_metadata(
-        &self,
-        fq_class_name: &StringIdentifier,
-        property_name: &StringIdentifier,
-    ) -> Option<&PropertyMetadata> {
+    pub fn get_property_metadata(&self, fq_class_name: &Atom, property_name: &Atom) -> Option<&PropertyMetadata> {
         // Find where the property appears (could be inherited)
         let appearing_class_fqcn =
             self.class_likes.get(fq_class_name).and_then(|meta| meta.appearing_property_ids.get(property_name)); // Assumes get_appearing_property_ids
@@ -186,11 +171,7 @@ impl CodebaseMetadata {
     /// It finds the declaring class of the property and returns its type signature.
     /// Returns `None` if the property or its type cannot be found.
     #[inline]
-    pub fn get_property_type(
-        &self,
-        fq_class_name: &StringIdentifier,
-        property_name: &StringIdentifier,
-    ) -> Option<&TUnion> {
+    pub fn get_property_type(&self, fq_class_name: &Atom, property_name: &Atom) -> Option<&TUnion> {
         // Find the class where the property was originally declared
         let declaring_class_fqcn = self.get_declaring_class_for_property(fq_class_name, property_name)?;
         // Get the metadata for that property from its declaring class
@@ -212,17 +193,13 @@ impl CodebaseMetadata {
 
     /// Retrieves the metadata for a specific function-like construct using its identifier.
     #[inline]
-    pub fn get_function_like(
-        &self,
-        identifier: &FunctionLikeIdentifier,
-        interner: &ThreadedInterner,
-    ) -> Option<&FunctionLikeMetadata> {
+    pub fn get_function_like(&self, identifier: &FunctionLikeIdentifier) -> Option<&FunctionLikeMetadata> {
         match identifier {
-            FunctionLikeIdentifier::Function(fq_function_name) => get_function(self, interner, fq_function_name),
+            FunctionLikeIdentifier::Function(fq_function_name) => get_function(self, fq_function_name),
             FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
-                get_method(self, interner, fq_classlike_name, method_name)
+                get_method(self, fq_classlike_name, method_name)
             }
-            FunctionLikeIdentifier::Closure(file_id, position) => get_closure(self, interner, file_id, position),
+            FunctionLikeIdentifier::Closure(file_id, position) => get_closure(self, file_id, position),
         }
     }
 
@@ -352,15 +329,15 @@ impl Default for CodebaseMetadata {
     #[inline]
     fn default() -> Self {
         Self {
-            class_likes: HashMap::default(),
-            aliases: HashMap::default(),
+            class_likes: AtomMap::default(),
+            aliases: AtomMap::default(),
             function_likes: HashMap::default(),
             symbols: Symbols::new(),
             infer_types_from_usage: false,
-            constants: HashMap::default(),
-            all_class_like_descendants: HashMap::default(),
-            direct_classlike_descendants: HashMap::default(),
-            safe_symbols: HashSet::default(),
+            constants: AtomMap::default(),
+            all_class_like_descendants: AtomMap::default(),
+            direct_classlike_descendants: AtomMap::default(),
+            safe_symbols: AtomSet::default(),
             safe_symbol_members: HashSet::default(),
         }
     }

@@ -1,3 +1,4 @@
+use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -9,8 +10,6 @@ use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -144,8 +143,8 @@ impl<'ctx> InvocationTarget<'ctx> {
     ///
     /// Returns the name of a function/method if statically known,
     /// or "Closure" or "callable" for dynamic callables.
-    pub fn guess_name(&self, interner: &ThreadedInterner) -> String {
-        self.get_function_like_identifier().map(|id| id.as_string(interner)).unwrap_or_else(|| {
+    pub fn guess_name(&self) -> String {
+        self.get_function_like_identifier().map(|id| id.as_string()).unwrap_or_else(|| {
             if self.is_non_closure_callable() { "callable".to_string() } else { "Closure".to_string() }
         })
     }
@@ -203,9 +202,9 @@ impl<'ctx> InvocationTarget<'ctx> {
     /// If this target is a method, returns the fully qualified name of the class it belongs to.
     #[inline]
     #[allow(dead_code)]
-    pub const fn get_method_class_like_name(&self) -> Option<&StringIdentifier> {
+    pub const fn get_method_class_like_name(&self) -> Option<Atom> {
         match self.get_function_like_identifier() {
-            Some(FunctionLikeIdentifier::Method(fq_class_like_name, _)) => Some(fq_class_like_name),
+            Some(FunctionLikeIdentifier::Method(fq_class_like_name, _)) => Some(*fq_class_like_name),
             _ => None,
         }
     }

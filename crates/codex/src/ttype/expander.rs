@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 
 use crate::get_class_like;
 use crate::get_closure;
@@ -34,15 +34,15 @@ use crate::ttype::union::TUnion;
 pub enum StaticClassType {
     #[default]
     None,
-    Name(StringIdentifier),
+    Name(Atom),
     Object(TObject),
 }
 
 #[derive(Debug)]
-pub struct TypeExpansionOptions<'a> {
-    pub self_class: Option<&'a StringIdentifier>,
+pub struct TypeExpansionOptions {
+    pub self_class: Option<Atom>,
     pub static_class_type: StaticClassType,
-    pub parent_class: Option<&'a StringIdentifier>,
+    pub parent_class: Option<Atom>,
     pub evaluate_class_constants: bool,
     pub evaluate_conditional_types: bool,
     pub function_is_final: bool,
@@ -50,7 +50,7 @@ pub struct TypeExpansionOptions<'a> {
     pub expand_templates: bool,
 }
 
-impl Default for TypeExpansionOptions<'_> {
+impl Default for TypeExpansionOptions {
     fn default() -> Self {
         Self {
             self_class: None,
@@ -65,26 +65,21 @@ impl Default for TypeExpansionOptions<'_> {
     }
 }
 
-pub fn expand_union(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    return_type: &mut TUnion,
-    options: &TypeExpansionOptions,
-) {
+pub fn expand_union(codebase: &CodebaseMetadata, return_type: &mut TUnion, options: &TypeExpansionOptions) {
     if !return_type.is_expandable() {
         return;
     }
 
     let mut types = std::mem::take(&mut return_type.types).into_owned();
 
-    types = combiner::combine(types, codebase, interner, false);
+    types = combiner::combine(types, codebase, false);
 
     let mut new_return_type_parts = vec![];
     let mut skipped_keys = vec![];
 
     for (i, return_type_part) in types.iter_mut().enumerate() {
         let mut skip_key = false;
-        expand_atomic(return_type_part, codebase, interner, options, &mut skip_key, &mut new_return_type_parts);
+        expand_atomic(return_type_part, codebase, options, &mut skip_key, &mut new_return_type_parts);
 
         if skip_key {
             skipped_keys.push(i);
@@ -106,7 +101,7 @@ pub fn expand_union(
         }
 
         types = if new_return_type_parts.len() > 1 {
-            combiner::combine(new_return_type_parts, codebase, interner, false)
+            combiner::combine(new_return_type_parts, codebase, false)
         } else {
             new_return_type_parts
         };
@@ -118,7 +113,6 @@ pub fn expand_union(
 pub(crate) fn expand_atomic(
     return_type_part: &mut TAtomic,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     options: &TypeExpansionOptions,
     skip_key: &mut bool,
     new_return_type_parts: &mut Vec<TAtomic>,
@@ -127,46 +121,46 @@ pub(crate) fn expand_atomic(
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    expand_union(codebase, interner, key_parameter, options);
-                    expand_union(codebase, interner, value_parameter, options);
+                    expand_union(codebase, key_parameter, options);
+                    expand_union(codebase, value_parameter, options);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
                     for (_, item_type) in known_items.values_mut() {
-                        expand_union(codebase, interner, item_type, options);
+                        expand_union(codebase, item_type, options);
                     }
                 }
             }
             TArray::List(list_data) => {
-                expand_union(codebase, interner, &mut list_data.element_type, options);
+                expand_union(codebase, &mut list_data.element_type, options);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
-                        expand_union(codebase, interner, element_type, options);
+                        expand_union(codebase, element_type, options);
                     }
                 }
             }
         },
         TAtomic::Object(TObject::Named(named_object)) => {
-            expand_named_object(named_object, codebase, interner, options);
+            expand_named_object(named_object, codebase, options);
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
-                expand_union(codebase, interner, return_type, options);
+                expand_union(codebase, return_type, options);
             }
 
             for param in signature.get_parameters_mut() {
                 if let Some(param_type) = param.get_type_signature_mut() {
-                    expand_union(codebase, interner, param_type, options);
+                    expand_union(codebase, param_type, options);
                 }
             }
         }
         TAtomic::GenericParameter(parameter) => {
-            expand_union(codebase, interner, parameter.constraint.as_mut(), options);
+            expand_union(codebase, parameter.constraint.as_mut(), options);
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
             let mut atomic_return_type_parts = vec![];
-            expand_atomic(constraint, codebase, interner, options, &mut false, &mut atomic_return_type_parts);
+            expand_atomic(constraint, codebase, options, &mut false, &mut atomic_return_type_parts);
 
             if !atomic_return_type_parts.is_empty() {
                 *constraint = Box::new(atomic_return_type_parts.remove(0));
@@ -177,7 +171,7 @@ pub(crate) fn expand_atomic(
 
             match member_selector {
                 TReferenceMemberSelector::Wildcard => {
-                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -191,7 +185,6 @@ pub(crate) fn expand_atomic(
                             expand_atomic(
                                 &mut inferred_type,
                                 codebase,
-                                interner,
                                 options,
                                 &mut skip_inferred_type,
                                 new_return_type_parts,
@@ -203,7 +196,7 @@ pub(crate) fn expand_atomic(
                         } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
                             let mut constant_type = type_metadata.type_union.clone();
 
-                            expand_union(codebase, interner, &mut constant_type, options);
+                            expand_union(codebase, &mut constant_type, options);
 
                             new_return_type_parts.extend(constant_type.types.into_owned());
                         } else {
@@ -217,18 +210,14 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::StartsWith(prefix) => {
-                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
                     };
 
-                    let prefix_str = interner.lookup(prefix);
-
                     for (constant_name, constant) in class_like.constants.iter() {
-                        let constant_name_str = interner.lookup(constant_name);
-
-                        if !constant_name_str.starts_with(prefix_str) {
+                        if !constant_name.starts_with(prefix.as_str()) {
                             continue;
                         }
 
@@ -239,7 +228,6 @@ pub(crate) fn expand_atomic(
                             expand_atomic(
                                 &mut inferred_type,
                                 codebase,
-                                interner,
                                 options,
                                 &mut skip_inferred_type,
                                 new_return_type_parts,
@@ -251,7 +239,7 @@ pub(crate) fn expand_atomic(
                         } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
                             let mut constant_type = type_metadata.type_union.clone();
 
-                            expand_union(codebase, interner, &mut constant_type, options);
+                            expand_union(codebase, &mut constant_type, options);
 
                             new_return_type_parts.extend(constant_type.types.into_owned());
                         } else {
@@ -260,9 +248,7 @@ pub(crate) fn expand_atomic(
                     }
 
                     for enum_case_name in class_like.enum_cases.keys() {
-                        let enum_case_name_str = interner.lookup(enum_case_name);
-
-                        if !enum_case_name_str.starts_with(prefix_str) {
+                        if !enum_case_name.starts_with(prefix.as_str()) {
                             continue;
                         }
 
@@ -271,18 +257,14 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::EndsWith(suffix) => {
-                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
                     };
 
-                    let suffix_str = interner.lookup(suffix);
-
                     for (constant_name, constant) in class_like.constants.iter() {
-                        let constant_name_str = interner.lookup(constant_name);
-
-                        if !constant_name_str.ends_with(suffix_str) {
+                        if !constant_name.ends_with(suffix.as_str()) {
                             continue;
                         }
 
@@ -293,7 +275,6 @@ pub(crate) fn expand_atomic(
                             expand_atomic(
                                 &mut inferred_type,
                                 codebase,
-                                interner,
                                 options,
                                 &mut skip_inferred_type,
                                 new_return_type_parts,
@@ -305,7 +286,7 @@ pub(crate) fn expand_atomic(
                         } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
                             let mut constant_type = type_metadata.type_union.clone();
 
-                            expand_union(codebase, interner, &mut constant_type, options);
+                            expand_union(codebase, &mut constant_type, options);
 
                             new_return_type_parts.extend(constant_type.types.into_owned());
                         } else {
@@ -314,9 +295,7 @@ pub(crate) fn expand_atomic(
                     }
 
                     for enum_case_name in class_like.enum_cases.keys() {
-                        let enum_case_name_str = interner.lookup(enum_case_name);
-
-                        if !enum_case_name_str.ends_with(suffix_str) {
+                        if !enum_case_name.ends_with(suffix.as_str()) {
                             continue;
                         }
 
@@ -325,7 +304,7 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::Identifier(member_name) => {
-                    let Some(class_like) = get_class_like(codebase, interner, class_like_name) else {
+                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -342,7 +321,6 @@ pub(crate) fn expand_atomic(
                             expand_atomic(
                                 &mut inferred_type,
                                 codebase,
-                                interner,
                                 options,
                                 &mut skip_inferred_type,
                                 new_return_type_parts,
@@ -354,7 +332,7 @@ pub(crate) fn expand_atomic(
                         } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
                             let mut constant_type = type_metadata.type_union.clone();
 
-                            expand_union(codebase, interner, &mut constant_type, options);
+                            expand_union(codebase, &mut constant_type, options);
 
                             new_return_type_parts.extend(constant_type.types.into_owned());
                         } else {
@@ -367,7 +345,7 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::Callable(TCallable::Alias(id)) => {
-            if let Some(value) = get_atomic_of_function_like_identifier(id, codebase, interner) {
+            if let Some(value) = get_atomic_of_function_like_identifier(id, codebase) {
                 *skip_key = true;
                 new_return_type_parts.push(value);
             }
@@ -378,8 +356,8 @@ pub(crate) fn expand_atomic(
             let mut then = conditional.then.clone();
             let mut otherwise = conditional.otherwise.clone();
 
-            expand_union(codebase, interner, &mut then, options);
-            expand_union(codebase, interner, &mut otherwise, options);
+            expand_union(codebase, &mut then, options);
+            expand_union(codebase, &mut otherwise, options);
 
             new_return_type_parts.extend(then.types.into_owned());
             new_return_type_parts.extend(otherwise.types.into_owned());
@@ -387,11 +365,11 @@ pub(crate) fn expand_atomic(
         TAtomic::Derived(derived) => match derived {
             TDerived::KeyOf(key_of) => {
                 *skip_key = true;
-                new_return_type_parts.extend(expand_key_of(key_of, codebase, interner, options));
+                new_return_type_parts.extend(expand_key_of(key_of, codebase, options));
             }
             TDerived::ValueOf(value_of) => {
                 *skip_key = true;
-                new_return_type_parts.extend(expand_value_of(value_of, codebase, interner, options));
+                new_return_type_parts.extend(expand_value_of(value_of, codebase, options));
             }
             TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
         },
@@ -399,13 +377,8 @@ pub(crate) fn expand_atomic(
     }
 }
 
-fn expand_named_object(
-    named_object: &mut TNamedObject,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    options: &TypeExpansionOptions,
-) {
-    let name_str_lc = interner.lookup(&named_object.name).to_lowercase();
+fn expand_named_object(named_object: &mut TNamedObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    let name_str_lc = ascii_lowercase_atom(named_object.name.as_str());
 
     if named_object.is_this() || name_str_lc == "static" || name_str_lc == "$this" {
         match &options.static_class_type {
@@ -430,18 +403,18 @@ fn expand_named_object(
         }
     } else if name_str_lc == "self" {
         if let Some(self_class_name) = options.self_class {
-            named_object.name = *self_class_name;
+            named_object.name = self_class_name;
         }
     } else if name_str_lc == "parent"
         && let Some(self_class_name) = options.self_class
-        && let Some(class_metadata) = get_class_like(codebase, interner, self_class_name)
+        && let Some(class_metadata) = get_class_like(codebase, &self_class_name)
         && let Some(parent_name) = class_metadata.direct_parent_class
     {
         named_object.name = parent_name;
     }
 
     if named_object.type_parameters.is_none()
-        && let Some(class_like_metadata) = get_class_like(codebase, interner, &named_object.name)
+        && let Some(class_like_metadata) = get_class_like(codebase, &named_object.name)
         && !class_like_metadata.template_types.is_empty()
     {
         let default_params: Vec<TUnion> = class_like_metadata
@@ -459,41 +432,37 @@ fn expand_named_object(
 pub fn get_signature_of_function_like_identifier(
     function_like_identifier: &FunctionLikeIdentifier,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
 ) -> Option<TCallableSignature> {
     Some(match function_like_identifier {
         FunctionLikeIdentifier::Function(name) => {
-            let function_like_metadata = get_function(codebase, interner, name)?;
+            let function_like_metadata = get_function(codebase, name)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
-                interner,
                 &TypeExpansionOptions::default(),
             )
         }
         FunctionLikeIdentifier::Closure(file_id, position) => {
-            let function_like_metadata = get_closure(codebase, interner, file_id, position)?;
+            let function_like_metadata = get_closure(codebase, file_id, position)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
-                interner,
                 &TypeExpansionOptions::default(),
             )
         }
         FunctionLikeIdentifier::Method(classlike_name, method_name) => {
-            let function_like_metadata = get_declaring_method(codebase, interner, classlike_name, method_name)?;
+            let function_like_metadata = get_declaring_method(codebase, classlike_name, method_name)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
-                interner,
                 &TypeExpansionOptions {
-                    self_class: Some(classlike_name),
+                    self_class: Some(*classlike_name),
                     static_class_type: StaticClassType::Name(*classlike_name),
                     ..Default::default()
                 },
@@ -505,9 +474,8 @@ pub fn get_signature_of_function_like_identifier(
 pub fn get_atomic_of_function_like_identifier(
     function_like_identifier: &FunctionLikeIdentifier,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
 ) -> Option<TAtomic> {
-    let signature = get_signature_of_function_like_identifier(function_like_identifier, codebase, interner)?;
+    let signature = get_signature_of_function_like_identifier(function_like_identifier, codebase)?;
 
     Some(TAtomic::Callable(TCallable::Signature(signature)))
 }
@@ -516,7 +484,6 @@ pub fn get_signature_of_function_like_metadata(
     function_like_identifier: &FunctionLikeIdentifier,
     function_like_metadata: &FunctionLikeMetadata,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     options: &TypeExpansionOptions,
 ) -> TCallableSignature {
     let parameters: Vec<_> = function_like_metadata
@@ -525,7 +492,7 @@ pub fn get_signature_of_function_like_metadata(
         .map(|parameter_metadata| {
             let type_signature = if let Some(t) = parameter_metadata.get_type_metadata() {
                 let mut t = t.type_union.clone();
-                expand_union(codebase, interner, &mut t, options);
+                expand_union(codebase, &mut t, options);
                 Some(Box::new(t))
             } else {
                 None
@@ -542,7 +509,7 @@ pub fn get_signature_of_function_like_metadata(
 
     let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
-        expand_union(codebase, interner, &mut return_type, options);
+        expand_union(codebase, &mut return_type, options);
         Some(Box::new(return_type))
     } else {
         None
@@ -563,7 +530,6 @@ pub fn get_signature_of_function_like_metadata(
 fn expand_key_of(
     return_type_key_of: &TKeyOf,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     options: &TypeExpansionOptions,
 ) -> Vec<TAtomic> {
     let mut type_atomics = vec![];
@@ -571,13 +537,13 @@ fn expand_key_of(
     let mut target_type = return_type_key_of.get_target_type().clone();
     let mut new_atomics = vec![];
     let mut remove_target_atomic = false;
-    expand_atomic(&mut target_type, codebase, interner, options, &mut remove_target_atomic, &mut new_atomics);
+    expand_atomic(&mut target_type, codebase, options, &mut remove_target_atomic, &mut new_atomics);
     type_atomics.extend(new_atomics);
     if !remove_target_atomic {
         type_atomics.push(target_type);
     }
 
-    let Some(new_return_types) = TKeyOf::get_key_of_targets(&type_atomics, codebase, interner, false) else {
+    let Some(new_return_types) = TKeyOf::get_key_of_targets(&type_atomics, codebase, false) else {
         return vec![TAtomic::Derived(TDerived::KeyOf(return_type_key_of.clone()))];
     };
 
@@ -587,7 +553,6 @@ fn expand_key_of(
 fn expand_value_of(
     return_type_value_of: &TValueOf,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     options: &TypeExpansionOptions,
 ) -> Vec<TAtomic> {
     let mut type_atomics = vec![];
@@ -595,13 +560,13 @@ fn expand_value_of(
     let mut target_type = return_type_value_of.get_target_type().clone();
     let mut new_atomics = vec![];
     let mut remove_target_atomic = false;
-    expand_atomic(&mut target_type, codebase, interner, options, &mut remove_target_atomic, &mut new_atomics);
+    expand_atomic(&mut target_type, codebase, options, &mut remove_target_atomic, &mut new_atomics);
     type_atomics.extend(new_atomics);
     if !remove_target_atomic {
         type_atomics.push(target_type);
     }
 
-    let Some(new_return_types) = TValueOf::get_value_of_targets(&type_atomics, codebase, interner, false) else {
+    let Some(new_return_types) = TValueOf::get_value_of_targets(&type_atomics, codebase, false) else {
         return vec![TAtomic::Derived(TDerived::ValueOf(return_type_value_of.clone()))];
     };
 

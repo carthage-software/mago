@@ -68,7 +68,6 @@ impl SpecialFunctionLikeHandlerTrait for GetCurrentClosureMethodHandler {
                 &closure_identifier,
                 closure,
                 context.codebase,
-                context.interner,
                 &TypeExpansionOptions::default(),
             ))))
         } else {

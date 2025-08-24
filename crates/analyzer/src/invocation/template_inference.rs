@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use ahash::HashMap;
 
 use ahash::HashSet;
+use mago_atom::Atom;
 use mago_codex::get_class_like;
 use mago_codex::is_instance_of;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -31,7 +32,6 @@ use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
 use mago_codex::ttype::template::standin_type_replacer::insert_bound_type;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -49,7 +49,7 @@ pub struct InferenceOptions {
 
 #[derive(Debug)]
 pub struct TemplateInferenceViolation {
-    pub template_name: StringIdentifier,
+    pub template_name: Atom,
     pub inferred_bound: TUnion,
     pub constraint: TUnion,
 }
@@ -86,7 +86,6 @@ fn infer_templates_from_input_and_container_types(
                 && !concrete_container_parts.iter().any(|container_atomic| {
                     atomic_comparator::is_contained_by(
                         context.codebase,
-                        context.interner,
                         container_atomic,
                         argument_atomic,
                         false,
@@ -158,7 +157,6 @@ fn infer_templates_from_input_and_container_types(
                                                     input_element.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    context.interner,
                                                     false,
                                                 ))
                                             }
@@ -230,14 +228,12 @@ fn infer_templates_from_input_and_container_types(
                                                     input_key.to_union(),
                                                     input_key_type.as_deref(),
                                                     context.codebase,
-                                                    context.interner,
                                                 )));
 
                                                 input_value_type = Some(Cow::Owned(add_optional_union_type(
                                                     input_item.clone(),
                                                     input_value_type.as_deref(),
                                                     context.codebase,
-                                                    context.interner,
                                                 )));
                                             }
                                         }
@@ -295,11 +291,7 @@ fn infer_templates_from_input_and_container_types(
                                             .map(|params| params.1.as_ref())
                                             .map(Cow::Borrowed)
                                             .unwrap_or_else(|| {
-                                                Cow::Owned(get_array_value_parameter(
-                                                    input_array,
-                                                    context.codebase,
-                                                    context.interner,
-                                                ))
+                                                Cow::Owned(get_array_value_parameter(input_array, context.codebase))
                                             });
 
                                         infer_templates_from_input_and_container_types(
@@ -318,11 +310,7 @@ fn infer_templates_from_input_and_container_types(
                                         if let Some(params) = input_keyed_array.parameters.as_ref() {
                                             Cow::Borrowed(params.1.as_ref())
                                         } else {
-                                            Cow::Owned(get_array_value_parameter(
-                                                input_array,
-                                                context.codebase,
-                                                context.interner,
-                                            ))
+                                            Cow::Owned(get_array_value_parameter(input_array, context.codebase))
                                         };
 
                                     if let Some(known_input_items) = &input_keyed_array.known_items {
@@ -332,7 +320,6 @@ fn infer_templates_from_input_and_container_types(
                                                     input_item.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    context.interner,
                                                     false,
                                                 ));
                                             }
@@ -403,8 +390,7 @@ fn infer_templates_from_input_and_container_types(
                                 }
 
                                 if let Some(container_parameter) = container_array.parameters.as_ref() {
-                                    let input_params =
-                                        get_array_parameters(input_array, context.codebase, context.interner);
+                                    let input_params = get_array_parameters(input_array, context.codebase);
                                     let mut input_key_type = Some(Cow::Owned(input_params.0));
                                     let mut input_value_type = Some(Cow::Borrowed(&input_params.1));
 
@@ -417,14 +403,12 @@ fn infer_templates_from_input_and_container_types(
                                                     int_key.to_union(),
                                                     input_key_type.as_deref(),
                                                     context.codebase,
-                                                    context.interner,
                                                 )));
 
                                                 input_value_type = Some(Cow::Owned(add_optional_union_type(
                                                     input_element.clone(),
                                                     input_value_type.as_deref(),
                                                     context.codebase,
-                                                    context.interner,
                                                 )));
                                             }
                                         }
@@ -459,8 +443,7 @@ fn infer_templates_from_input_and_container_types(
             }
             TAtomic::Iterable(container_iterable) => {
                 for input_atomic in residual_input_type.types.as_ref() {
-                    let Some(input_params) = get_iterable_parameters(input_atomic, context.codebase, context.interner)
-                    else {
+                    let Some(input_params) = get_iterable_parameters(input_atomic, context.codebase) else {
                         return;
                     };
 
@@ -487,9 +470,7 @@ fn infer_templates_from_input_and_container_types(
                 let container_signature = match container_callable {
                     TCallable::Signature(signature) => Cow::Borrowed(signature),
                     TCallable::Alias(id) => {
-                        let Some(signature) =
-                            get_signature_of_function_like_identifier(id, context.codebase, context.interner)
-                        else {
+                        let Some(signature) = get_signature_of_function_like_identifier(id, context.codebase) else {
                             continue;
                         };
 
@@ -503,8 +484,7 @@ fn infer_templates_from_input_and_container_types(
                             Cow::Borrowed(argument_signature)
                         }
                         TAtomic::Callable(TCallable::Alias(id)) => {
-                            let Some(signature) =
-                                get_signature_of_function_like_identifier(id, context.codebase, context.interner)
+                            let Some(signature) = get_signature_of_function_like_identifier(id, context.codebase)
                             else {
                                 continue;
                             };
@@ -570,8 +550,7 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 };
 
-                let Some(container_meta) = get_class_like(context.codebase, context.interner, &container_obj.name)
-                else {
+                let Some(container_meta) = get_class_like(context.codebase, &container_obj.name) else {
                     continue;
                 };
 
@@ -580,11 +559,11 @@ fn infer_templates_from_input_and_container_types(
                         continue;
                     };
 
-                    let Some(input_meta) = get_class_like(context.codebase, context.interner, &input_obj.name) else {
+                    let Some(input_meta) = get_class_like(context.codebase, &input_obj.name) else {
                         continue;
                     };
 
-                    if !is_instance_of(context.codebase, context.interner, &input_obj.name, &container_obj.name) {
+                    if !is_instance_of(context.codebase, &input_obj.name, &container_obj.name) {
                         continue;
                     }
 
@@ -602,7 +581,6 @@ fn infer_templates_from_input_and_container_types(
 
                             if let Some(inferred_bound) = get_specialized_template_type(
                                 context.codebase,
-                                context.interner,
                                 template_name,
                                 &container_meta.name,
                                 input_meta,
@@ -610,7 +588,6 @@ fn infer_templates_from_input_and_container_types(
                             ) {
                                 if !union_comparator::is_contained_by(
                                     context.codebase,
-                                    context.interner,
                                     &inferred_bound,
                                     &generic_parameter.constraint,
                                     false,
@@ -657,7 +634,7 @@ fn infer_templates_from_input_and_container_types(
                         continue;
                     };
 
-                    input_objects.push(class_string.get_object_type(context.codebase, context.interner));
+                    input_objects.push(class_string.get_object_type(context.codebase));
                 }
 
                 if input_objects.is_empty() || !should_add_bound {
@@ -669,7 +646,6 @@ fn infer_templates_from_input_and_container_types(
                     for (_, template_type) in template_types {
                         if !union_comparator::is_contained_by(
                             context.codebase,
-                            context.interner,
                             &lower_bound_type,
                             template_type,
                             false,
@@ -726,7 +702,6 @@ fn infer_templates_from_input_and_container_types(
             for (_, template_type) in template_types {
                 if !union_comparator::is_contained_by(
                     context.codebase,
-                    context.interner,
                     &residual_input_type,
                     template_type,
                     false,
@@ -800,7 +775,6 @@ pub fn infer_templates_for_method_call<'ctx, 'arena>(
         for (template_name, _) in &declaring_class_like_metadata.template_types {
             let template_type = get_specialized_template_type(
                 context.codebase,
-                context.interner,
                 template_name,
                 &declaring_class_like_metadata.name,
                 method_target_context.class_like_metadata,
@@ -820,7 +794,6 @@ pub fn infer_templates_for_method_call<'ctx, 'arena>(
     for (template_name, where_constraint) in &method_metadata.where_constraints {
         let Some(actual_type) = get_specialized_template_type(
             context.codebase,
-            context.interner,
             template_name,
             &declaring_class_like_metadata.name,
             method_target_context.class_like_metadata,
@@ -831,7 +804,6 @@ pub fn infer_templates_for_method_call<'ctx, 'arena>(
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &actual_type,
             &where_constraint.type_union,
             false,
@@ -898,21 +870,18 @@ pub fn infer_parameter_templates_from_argument<'ctx, 'arena>(
     for violation in violations {
         context.collector.report_with_code(
             IssueCode::TemplateConstraintViolation,
-            Issue::error(format!(
-                "Argument type mismatch for template `{}`.",
-                context.interner.lookup(&violation.template_name),
-            ))
-            .with_annotation(Annotation::primary(argument_span).with_message(format!(
-                "This argument has type `{}`, which is not compatible with the required template constraint `{}`.",
-                violation.inferred_bound.get_id(Some(context.interner)),
-                violation.constraint.get_id(Some(context.interner))
-            )))
-            .with_note(format!(
-                "Template parameter `{}` is constrained with `{}`.",
-                context.interner.lookup(&violation.template_name),
-                violation.constraint.get_id(Some(context.interner))
-            ))
-            .with_help("Ensure the argument's type satisfies the template constraint."),
+            Issue::error(format!("Argument type mismatch for template `{}`.", violation.template_name,))
+                .with_annotation(Annotation::primary(argument_span).with_message(format!(
+                    "This argument has type `{}`, which is not compatible with the required template constraint `{}`.",
+                    violation.inferred_bound.get_id(),
+                    violation.constraint.get_id()
+                )))
+                .with_note(format!(
+                    "Template parameter `{}` is constrained with `{}`.",
+                    violation.template_name,
+                    violation.constraint.get_id()
+                ))
+                .with_help("Ensure the argument's type satisfies the template constraint."),
         );
     }
 }

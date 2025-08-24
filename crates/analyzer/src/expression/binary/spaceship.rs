@@ -54,10 +54,10 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
             IssueCode::InvalidOperand,
             Issue::error(format!(
                 "Comparing an `array` with a non-array type `{}` using `<=>`.",
-                rhs_type.get_id(Some(context.interner))
+                rhs_type.get_id()
             ))
             .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
-            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id(Some(context.interner)))))
+            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
             .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
             .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
         );
@@ -66,9 +66,9 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
             IssueCode::InvalidOperand,
             Issue::error(format!(
                 "Comparing a non-array type `{}` with an `array` using `<=>`.",
-                lhs_type.get_id(Some(context.interner))
+                lhs_type.get_id()
             ))
-            .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id(Some(context.interner)))))
+            .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
             .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
             .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
             .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
@@ -138,7 +138,7 @@ fn check_spaceship_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
                 "{side} operand in spaceship comparison (`<=>`) might be `null` (type `{}`).",
-                operand_type.get_id(Some(context.interner))
+                operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `null`"))
             .with_note("If this operand is `null` at runtime, PHP's specific comparison rules for `null` will apply.")
@@ -167,7 +167,7 @@ fn check_spaceship_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
                 "{side} operand in spaceship comparison (`<=>`) might be `false` (type `{}`).",
-                operand_type.get_id(Some(context.interner))
+                operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `false`"))
             .with_note("If this operand is `false` at runtime, PHP's specific comparison rules for `false` will apply.")

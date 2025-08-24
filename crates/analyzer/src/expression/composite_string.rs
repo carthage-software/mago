@@ -1,3 +1,4 @@
+use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
@@ -139,7 +140,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
         let resulting_type = if impossible {
             get_never()
         } else if let Some(literal_string) = resulting_string {
-            get_literal_string(literal_string)
+            get_literal_string(atom(literal_string.as_ref()))
         } else if non_empty {
             if all_literals { get_non_empty_unspecified_literal_string() } else { get_non_empty_string() }
         } else if all_literals {

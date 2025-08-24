@@ -1,8 +1,9 @@
+use mago_atom::Atom;
 use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_id;
+use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_interface;
 use mago_codex::get_method_by_id;
-use mago_codex::get_method_id;
+use mago_codex::get_method_identifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -13,7 +14,6 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::StringIdentifier;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -97,19 +97,19 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
 fn resolve_method_from_classname<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
-    method_name: StringIdentifier,
+    method_name: Atom,
     class_span: Span,
     method_span: Span,
     classname: &ResolvedClassname,
     result: &mut MethodResolutionResult,
 ) -> Vec<ResolvedMethod> {
     let mut resolve_method_from_class_id =
-        |fq_class_id,
+        |fq_class_id: Atom,
          is_relative: bool,
          from_instance: bool,
          from_class_string: bool,
          result: &mut MethodResolutionResult| {
-            let Some(defining_class_metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
+            let Some(defining_class_metadata) = get_class_like(context.codebase, &fq_class_id) else {
                 return (false, None);
             };
 
@@ -164,7 +164,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     let mut resolved_methods = vec![];
     let mut could_method_ever_exist = false;
     let mut first_class_id = None;
-    if let Some(fq_class_id) = classname.fq_class_id {
+    if let Some(fq_class_id) = classname.fqcn {
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
             classname.is_relative(),
@@ -182,7 +182,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     }
 
     for intersection in &classname.intersections {
-        let Some(fq_class_id) = intersection.fq_class_id else {
+        let Some(fq_class_id) = intersection.fqcn else {
             continue;
         };
 
@@ -209,7 +209,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             result.has_invalid_target = true;
 
             if !could_method_ever_exist {
-                report_non_existent_method(context, class_span, method_span, method_name, &fq_class_id);
+                report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
             }
         } else {
             result.has_ambiguous_target = true;
@@ -222,14 +222,14 @@ fn resolve_method_from_classname<'ctx, 'arena>(
 fn resolve_method_from_metadata<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
-    method_name: StringIdentifier,
-    fq_class_id: &StringIdentifier,
+    method_name: Atom,
+    fq_class_id: &Atom,
     defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
 ) -> Option<ResolvedMethod> {
-    let method_id = get_method_id(&defining_class_metadata.original_name, &method_name);
-    let declaring_method_id = get_declaring_method_id(context.codebase, context.interner, &method_id);
-    let function_like = get_method_by_id(context.codebase, context.interner, &declaring_method_id)?;
+    let method_id = get_method_identifier(&defining_class_metadata.original_name, &method_name);
+    let declaring_method_id = get_declaring_method_identifier(context.codebase, &method_id);
+    let function_like = get_method_by_id(context.codebase, &declaring_method_id)?;
 
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata
         && classname.is_relative()
@@ -264,7 +264,7 @@ fn get_metadata_object<'ctx>(
 
     let mut intersections = vec![];
     for required_interface in &class_like_metadata.require_implements {
-        let Some(interface_metadata) = get_interface(context.codebase, context.interner, required_interface) else {
+        let Some(interface_metadata) = get_interface(context.codebase, required_interface) else {
             continue;
         };
 
@@ -284,7 +284,7 @@ fn get_metadata_object<'ctx>(
     }
 
     for required_class in &class_like_metadata.require_extends {
-        let Some(parent_class_metadata) = get_class_like(context.codebase, context.interner, required_class) else {
+        let Some(parent_class_metadata) = get_class_like(context.codebase, required_class) else {
             continue;
         };
 
@@ -313,7 +313,6 @@ fn get_metadata_object<'ctx>(
                     .map(|(parameter_name, template_map)| {
                         if let Some(parameter) = get_specialized_template_type(
                             context.codebase,
-                            context.interner,
                             parameter_name,
                             &class_like_metadata.name,
                             current_class_metadata,
@@ -346,8 +345,9 @@ fn get_metadata_object<'ctx>(
 }
 
 fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier, span: Span) {
-    let method_name = context.interner.lookup(method_id.get_method_name());
-    let class_name = context.interner.lookup(method_id.get_class_name());
+    let method_name = method_id.get_method_name();
+    let class_name = method_id.get_class_name();
+
     context.collector.report_with_code(
         IssueCode::InvalidStaticMethodAccess,
         Issue::error(format!("Cannot call non-static method `{class_name}::{method_name}` statically."))
@@ -356,31 +356,24 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
     );
 }
 
-fn report_static_call_on_interface(
-    context: &mut Context,
-    name: &StringIdentifier,
-    span: Span,
-    from_class_string: bool,
-) {
-    let name_str = context.interner.lookup(name);
-
+fn report_static_call_on_interface(context: &mut Context, name: &Atom, span: Span, from_class_string: bool) {
     if from_class_string {
         context.collector.report_with_code(
             IssueCode::PossiblyStaticAccessOnInterface,
-            Issue::warning(format!("Potential static method call on interface `{name_str}` via `class-string`."))
+            Issue::warning(format!("Potential static method call on interface `{name}` via `class-string`."))
                 .with_annotation(
                     Annotation::primary(span)
                         .with_message("This `class-string` could resolve to an interface name at runtime"),
                 )
                 .with_note(
-                    format!("While a `class-string<{name_str}>` can hold a concrete class name (which is valid), it can also hold the interface name itself, which would cause a fatal error.")
+                    format!("While a `class-string<{name}>` can hold a concrete class name (which is valid), it can also hold the interface name itself, which would cause a fatal error.")
                 )
                 .with_help("Ensure the variable or expression always holds the name of a concrete class, not an interface."),
         );
     } else {
         context.collector.report_with_code(
             IssueCode::StaticAccessOnInterface,
-            Issue::error(format!("Cannot call a static method directly on an interface (`{name_str}`)."))
+            Issue::error(format!("Cannot call a static method directly on an interface (`{name}`)."))
                 .with_annotation(Annotation::primary(span).with_message("This is a direct static call on an interface"))
                 .with_note(
                     "Static methods belong to classes that implement behavior, not interfaces that only define contracts.",
@@ -390,12 +383,10 @@ fn report_static_call_on_interface(
     }
 }
 
-fn report_deprecated_static_access_on_trait(context: &mut Context, name: &StringIdentifier, span: Span) {
-    let name_str = context.interner.lookup(name);
-
+fn report_deprecated_static_access_on_trait(context: &mut Context, name: &Atom, span: Span) {
     context.collector.report_with_code(
         IssueCode::DeprecatedFeature,
-        Issue::warning(format!("Calling static methods directly on traits (`{name_str}`) is deprecated."))
+        Issue::warning(format!("Calling static methods directly on traits (`{name}`) is deprecated."))
             .with_annotation(Annotation::primary(span).with_message("This is a trait"))
             .with_help("Static methods should be called on a class that uses the trait."),
     );

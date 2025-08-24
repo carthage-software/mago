@@ -43,7 +43,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             iterator,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
-            context.interner,
             Some(context.codebase),
         );
 
@@ -63,7 +62,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                 key_expression,
                 block_context.scope.get_class_like_name(),
                 context.resolved_names,
-                context.interner,
                 Some(context.codebase),
             );
 
@@ -99,7 +97,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             value_expression,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
-            context.interner,
             Some(context.codebase),
         );
 

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use mago_atom::atom;
 use mago_codex::function_exists;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -59,18 +60,16 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
     expression: &Expression<'arena>,
 ) -> Result<Vec<Cow<'artifacts, TCallable>>, AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
-        let name = context.resolved_names.get(function_name);
-        let name_id = context.interner.intern(name);
-        let unqualified_name = function_name.value();
-        let unqualified_name_id = context.interner.intern(unqualified_name);
+        let name = atom(context.resolved_names.get(function_name));
+        let unqualified_name = atom(function_name.value());
 
-        let identifier = if function_exists(context.codebase, context.interner, &name_id) {
-            FunctionLikeIdentifier::Function(name_id)
+        let identifier = if function_exists(context.codebase, &name) {
+            FunctionLikeIdentifier::Function(name)
         } else if !function_name.is_fully_qualified()
             && unqualified_name != name
-            && function_exists(context.codebase, context.interner, &unqualified_name_id)
+            && function_exists(context.codebase, &unqualified_name)
         {
-            FunctionLikeIdentifier::Function(unqualified_name_id)
+            FunctionLikeIdentifier::Function(unqualified_name)
         } else {
             let issue = if unqualified_name != name {
                 Issue::error(format!(
@@ -110,10 +109,10 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
 
     let mut targets = vec![];
     for atomic in expression_type.types.as_ref() {
-        let as_callable = cast_atomic_to_callable(atomic, context.codebase, context.interner, None);
+        let as_callable = cast_atomic_to_callable(atomic, context.codebase, None);
 
         let Some(callable) = as_callable else {
-            let type_name = atomic.get_id(Some(context.interner));
+            let type_name = atomic.get_id();
 
             context.collector.report_with_code(
                 IssueCode::InvalidCallable,

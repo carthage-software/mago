@@ -3,8 +3,9 @@
 //! This module provides canonical, reusable instances for common PHP types.
 //! Using these constants avoids repeated allocations for frequently used types.
 
-use std::borrow::Cow;
 use std::sync::LazyLock;
+
+use mago_atom::empty_atom;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -108,13 +109,15 @@ pub const OBJECT_ATOMIC: &TAtomic = &TAtomic::Object(TObject::Any);
 /// A static `TAtomic` representing the `numeric` type (`int|float|numeric-string`).
 pub const NUMERIC_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Numeric);
 /// A static `TAtomic` representing an empty string literal (`""`).
-pub const EMPTY_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::String(TString {
-    literal: Some(TStringLiteral::Value(Cow::Borrowed(""))),
-    is_numeric: false,
-    is_truthy: false,
-    is_non_empty: false,
-    is_lowercase: false,
-}));
+pub static EMPTY_STRING_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
+    TAtomic::Scalar(TScalar::String(TString {
+        literal: Some(TStringLiteral::Value(empty_atom())),
+        is_numeric: false,
+        is_truthy: false,
+        is_non_empty: false,
+        is_lowercase: false,
+    }))
+});
 /// A static `TAtomic` representing a `literal-string` where the value is unknown.
 pub const UNSPECIFIED_LITERAL_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::unspecified_literal_string(false));
 /// A static `TAtomic` representing a non-empty `literal-string` where the value is unknown.

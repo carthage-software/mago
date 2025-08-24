@@ -1,3 +1,4 @@
+use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -53,14 +54,12 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
     template_result: &mut TemplateResult,
 ) -> Result<(Vec<InvocationTarget<'ctx>>, bool), AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
-        let name = context.resolved_names.get(function_name);
-        let name_id = context.interner.intern(name);
-        let unqualified_name = function_name.value();
-        let unqualified_name_id = context.interner.intern(unqualified_name);
+        let name = atom(context.resolved_names.get(function_name));
+        let unqualified_name = atom(function_name.value());
 
-        let identifier = FunctionLikeIdentifier::Function(name_id);
+        let identifier = FunctionLikeIdentifier::Function(name);
         let alternative = if function_name.is_local() && unqualified_name != name {
-            Some(FunctionLikeIdentifier::Function(unqualified_name_id))
+            Some(FunctionLikeIdentifier::Function(unqualified_name))
         } else {
             None
         };
@@ -82,9 +81,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
     let mut encountered_invalid_targets = false;
     let mut targets = vec![];
     for atomic in expression_type.types.as_ref() {
-        if let Some(callable) =
-            cast_atomic_to_callable(atomic, context.codebase, context.interner, Some(template_result))
-        {
+        if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, Some(template_result)) {
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {
                     if let Some(id) = callable_signature.get_source() {
@@ -110,7 +107,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
                 }
             };
         } else {
-            let type_name = atomic.get_id(Some(context.interner));
+            let type_name = atomic.get_id();
 
             context.collector.report_with_code(
                 IssueCode::InvalidCallable,

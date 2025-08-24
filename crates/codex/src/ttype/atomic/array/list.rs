@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
@@ -138,7 +136,7 @@ impl TType for TList {
         self.element_type.is_expandable()
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         if let Some(elements) = &self.known_elements {
             // Format as list{...} shape
             let mut str = String::new();
@@ -163,7 +161,7 @@ impl TType for TList {
                     str += ": ";
                 }
 
-                str += &element_type.get_id(interner);
+                str += &element_type.get_id();
             }
 
             if !self.element_type.is_never() {
@@ -172,7 +170,7 @@ impl TType for TList {
                 }
 
                 str += "...<";
-                str += &self.element_type.get_id(interner);
+                str += &self.element_type.get_id();
                 str += ">";
             }
 
@@ -180,7 +178,7 @@ impl TType for TList {
             str
         } else {
             let prefix = if self.is_non_empty() { "non-empty-list<" } else { "list<" };
-            let element_id = self.element_type.get_id(interner);
+            let element_id = self.element_type.get_id();
 
             format!("{prefix}{element_id}>")
         }

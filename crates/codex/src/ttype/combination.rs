@@ -2,9 +2,11 @@ use std::collections::BTreeMap;
 
 use ahash::HashMap;
 use ahash::HashSet;
+use mago_atom::AtomSet;
 use ordered_float::OrderedFloat;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -16,9 +18,9 @@ use crate::ttype::union::TUnion;
 pub struct TypeCombination {
     pub value_types: HashMap<String, TAtomic>,
     pub has_object_top_type: bool,
-    pub enum_names: HashSet<(StringIdentifier, Option<StringIdentifier>)>,
-    pub object_type_params: HashMap<String, (StringIdentifier, Vec<TUnion>)>,
-    pub object_static: HashMap<StringIdentifier, bool>,
+    pub enum_names: HashSet<(Atom, Option<Atom>)>,
+    pub object_type_params: HashMap<String, (Atom, Vec<TUnion>)>,
+    pub object_static: AtomMap<bool>,
     pub list_array_counts: Option<HashSet<usize>>,
     pub list_array_sometimes_filled: bool,
     pub list_array_always_filled: bool,
@@ -37,9 +39,9 @@ pub struct TypeCombination {
     pub has_mixed: bool,
     pub mixed_from_loop_isset: Option<bool>,
     pub integers: HashSet<TInteger>,
-    pub literal_strings: HashSet<String>,
+    pub literal_strings: AtomSet,
     pub literal_floats: HashSet<OrderedFloat<f64>>,
-    pub class_string_types: HashMap<String, TAtomic>,
+    pub class_string_types: AtomMap<TAtomic>,
     pub derived_types: HashSet<TDerived>,
     pub resource: bool,
     pub open_resource: bool,
@@ -58,7 +60,7 @@ impl TypeCombination {
             value_types: HashMap::default(),
             has_object_top_type: false,
             object_type_params: HashMap::default(),
-            object_static: HashMap::default(),
+            object_static: AtomMap::default(),
             list_array_counts: Some(HashSet::default()),
             list_array_sometimes_filled: false,
             list_array_always_filled: true,
@@ -76,10 +78,10 @@ impl TypeCombination {
             generic_mixed: false,
             has_mixed: false,
             mixed_from_loop_isset: None,
-            literal_strings: HashSet::default(),
+            literal_strings: AtomSet::default(),
             integers: HashSet::default(),
             literal_floats: HashSet::default(),
-            class_string_types: HashMap::default(),
+            class_string_types: AtomMap::default(),
             enum_names: HashSet::default(),
             derived_types: HashSet::default(),
             resource: false,

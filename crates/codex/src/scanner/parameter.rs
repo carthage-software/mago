@@ -1,4 +1,5 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::atom;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -14,7 +15,7 @@ use crate::scanner::ttype::get_type_metadata_from_hint;
 #[inline]
 pub fn scan_function_like_parameter<'ctx, 'ast, 'arena>(
     parameter: &'ast FunctionLikeParameter<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'ctx, 'ast, 'arena>,
 ) -> FunctionLikeParameterMetadata {
     let mut flags = MetadataFlags::empty();
@@ -37,7 +38,7 @@ pub fn scan_function_like_parameter<'ctx, 'ast, 'arena>(
     }
 
     let mut metadata = FunctionLikeParameterMetadata::new(
-        VariableIdentifier(context.interner.intern(parameter.variable.name)),
+        VariableIdentifier(atom(parameter.variable.name)),
         parameter.span(),
         parameter.variable.span,
         flags,
@@ -47,7 +48,7 @@ pub fn scan_function_like_parameter<'ctx, 'ast, 'arena>(
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;
-        metadata.default_type = infer(context.interner, context.resolved_names, &default_value.value).map(|u| {
+        metadata.default_type = infer(context.resolved_names, &default_value.value).map(|u| {
             let mut type_metadata = TypeMetadata::new(u, default_value.span());
             type_metadata.inferred = true;
             type_metadata

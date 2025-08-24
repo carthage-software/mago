@@ -54,15 +54,14 @@ pub fn analyze_attributes<'ctx, 'arena>(
 
     let mut used_attributes = HashMap::default();
     for attribute in attributes {
-        let attribute_name_str = context.resolved_names.get(&attribute.name);
-        let attribute_name = context.interner.intern(attribute_name_str);
+        let attribute_name = context.resolved_names.get(&attribute.name);
 
-        let Some(metadata) = get_class_like(context.codebase, context.interner, &attribute_name) else {
+        let Some(metadata) = get_class_like(context.codebase, attribute_name) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentAttributeClass,
-                Issue::error(format!("Attribute class `{attribute_name_str}` not found or could not be autoloaded."))
+                Issue::error(format!("Attribute class `{attribute_name}` not found or could not be autoloaded."))
                 .with_annotation(
-                    Annotation::primary(attribute.name.span()).with_message(format!("Unknown attribute class `{attribute_name_str}`")),
+                    Annotation::primary(attribute.name.span()).with_message(format!("Unknown attribute class `{attribute_name}`")),
                 )
                 .with_note("Attributes must be classes that are defined, correctly namespaced, and autoloadable. Ensure the class exists and is accessible.")
                 .with_help("Verify the attribute class name, its namespace, and your autoloader configuration. Make sure the class is defined."),
@@ -77,25 +76,25 @@ pub fn analyze_attributes<'ctx, 'arena>(
             context.collector.report_with_code(
                 IssueCode::NonClassUsedAsAttribute,
                 Issue::error(format!(
-                    "The {class_like_kind_str} `{attribute_name_str}` cannot be used as an attribute.",
+                    "The {class_like_kind_str} `{attribute_name}` cannot be used as an attribute.",
                 ))
                 .with_annotation(
                     Annotation::primary(attribute.name.span())
                         .with_message(format!(
-                            "`{attribute_name_str}` is a{} {class_like_kind_str} and not a class",
+                            "`{attribute_name}` is a{} {class_like_kind_str} and not a class",
                             if metadata.kind.is_interface() || metadata.kind.is_enum() { "n" } else { "" }
                         )),
                 )
                 .with_annotation(
                     Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
                         .with_message(format!(
-                            "`{attribute_name_str}` defined as a{} {class_like_kind_str} here",
+                            "`{attribute_name}` defined as a{} {class_like_kind_str} here",
                             if metadata.kind.is_interface() || metadata.kind.is_enum() { "n" } else { "" }
                         )),
                 )
                 .with_note("Only classes can be declared as attributes.")
                 .with_note("Interfaces, enums, and traits are not valid attribute types.")
-                .with_help(format!("Ensure you are using a class intended to be an attribute. Replace `{attribute_name_str}` with a valid attribute class.")),
+                .with_help(format!("Ensure you are using a class intended to be an attribute. Replace `{attribute_name}` with a valid attribute class.")),
             );
 
             continue;
@@ -104,16 +103,16 @@ pub fn analyze_attributes<'ctx, 'arena>(
         if metadata.flags.is_abstract() {
             context.collector.report_with_code(
                 IssueCode::AbstractClassUsedAsAttribute,
-                Issue::error(format!("The abstract class `{attribute_name_str}` cannot be used as an attribute.",))
+                Issue::error(format!("The abstract class `{attribute_name}` cannot be used as an attribute.",))
                     .with_annotation(Annotation::primary(attribute.name.span()).with_message(format!(
-                        "`{attribute_name_str}` is an abstract class and cannot be instantiated as an attribute"
+                        "`{attribute_name}` is an abstract class and cannot be instantiated as an attribute"
                     )))
                     .with_annotation(
                         Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
-                            .with_message(format!("`{attribute_name_str}` defined here as an abstract class")),
+                            .with_message(format!("`{attribute_name}` defined here as an abstract class")),
                     )
                     .with_note("Attributes must be concrete classes that can be instantiated.")
-                    .with_help(format!("Use a concrete class instead of `{attribute_name_str}` for attributes.")),
+                    .with_help(format!("Use a concrete class instead of `{attribute_name}` for attributes.")),
             );
 
             continue;
@@ -123,17 +122,17 @@ pub fn analyze_attributes<'ctx, 'arena>(
             context.collector.report_with_code(
                 IssueCode::ClassNotMarkedAsAttribute,
                 Issue::error(format!(
-                    "Class `{attribute_name_str}` is used as an attribute but is not declared with `#[Attribute]`.",
+                    "Class `{attribute_name}` is used as an attribute but is not declared with `#[Attribute]`.",
                 ))
                 .with_annotation(
-                    Annotation::primary(attribute.name.span()).with_message(format!("`{attribute_name_str}` used as an attribute here")),
+                    Annotation::primary(attribute.name.span()).with_message(format!("`{attribute_name}` used as an attribute here")),
                 )
                 .with_annotation(
                     Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
-                        .with_message(format!("Class `{attribute_name_str}` defined here needs an `#[Attribute]` declaration")),
+                        .with_message(format!("Class `{attribute_name}` defined here needs an `#[Attribute]` declaration")),
                 )
                 .with_note("To be used as a PHP attribute, a class must itself be decorated with the `#[\\Attribute]` system attribute.")
-                .with_help(format!("Add `#[\\Attribute]` to the definition of class `{attribute_name_str}` to declare it as an attribute, or use a different class that is a valid attribute.")),
+                .with_help(format!("Add `#[\\Attribute]` to the definition of class `{attribute_name}` to declare it as an attribute, or use a different class that is a valid attribute.")),
             );
 
             continue;
@@ -144,20 +143,20 @@ pub fn analyze_attributes<'ctx, 'arena>(
         {
             context.collector.report_with_code(
                 IssueCode::AttributeNotRepeatable,
-                Issue::error(format!("Attribute `{attribute_name_str}` is not declared as repeatable and has already been used."))
+                Issue::error(format!("Attribute `{attribute_name}` is not declared as repeatable and has already been used."))
                 .with_annotation(
                     Annotation::primary(attribute.name.span())
-                        .with_message(format!("Duplicate use of non-repeatable attribute `{attribute_name_str}`")),
+                        .with_message(format!("Duplicate use of non-repeatable attribute `{attribute_name}`")),
                 )
                 .with_annotation(
                     Annotation::secondary(*first_usage_span)
-                        .with_message(format!("Attribute `{attribute_name_str}` was first used here")),
+                        .with_message(format!("Attribute `{attribute_name}` was first used here")),
                 )
                 .with_note(format!(
-                    "The attribute `{attribute_name_str}` is not declared with `Attribute::IS_REPEATABLE` in its `#[Attribute]` flags. Non-repeatable attributes can only be applied once to a given target (e.g., a class, method, property).",
+                    "The attribute `{attribute_name}` is not declared with `Attribute::IS_REPEATABLE` in its `#[Attribute]` flags. Non-repeatable attributes can only be applied once to a given target (e.g., a class, method, property).",
                 ))
                 .with_help(format!(
-                    "Remove this duplicate `{attribute_name_str}` attribute, or if multiple instances are intended and valid, modify the attribute class `{attribute_name_str}` to include `Attribute::IS_REPEATABLE` in its `#[Attribute]` declaration (e.g., `#[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]`).",
+                    "Remove this duplicate `{attribute_name}` attribute, or if multiple instances are intended and valid, modify the attribute class `{attribute_name}` to include `Attribute::IS_REPEATABLE` in its `#[Attribute]` declaration (e.g., `#[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]`).",
                 )),
             );
 
@@ -194,23 +193,23 @@ fn report_invalid_target<'ctx, 'arena>(
     target: AttributeTarget,
     flags: AttributeFlags,
 ) {
-    let attribute_name_str = context.interner.lookup(&metadata.original_name);
-    let short_attribute_name_str = attribute_name_str.split("\\").last().unwrap_or(attribute_name_str);
+    let attribute_name = metadata.original_name;
+    let short_attribute_name = attribute_name.split("\\").last().unwrap_or(attribute_name.as_str());
     let allowed_targets = flags.get_target_names().join(", ");
 
     context.collector.report_with_code(
         IssueCode::InvalidAttributeTarget,
-        Issue::error(format!("Attribute `{attribute_name_str}` cannot be used on {}.", target.as_str()))
+        Issue::error(format!("Attribute `{attribute_name}` cannot be used on {}.", target.as_str()))
             .with_annotation(Annotation::primary(attribute.name.span()).with_message("This attribute is not allowed here"))
             .with_annotation(
                 Annotation::secondary(metadata.name_span.unwrap_or(metadata.span))
-                    .with_message(format!("`{attribute_name_str}` defined here")),
+                    .with_message(format!("`{attribute_name}` defined here")),
             )
             .with_note(format!(
-                "The definition of `{attribute_name_str}` restricts its use to the following targets: {allowed_targets}."
+                "The definition of `{attribute_name}` restricts its use to the following targets: {allowed_targets}."
             ))
             .with_help(format!(
-                "Remove the `#[{short_attribute_name_str}]` attribute from this location, or update the `#[Attribute]` declaration on the `{attribute_name_str}` class to include `{}` as a valid target.",
+                "Remove the `#[{short_attribute_name}]` attribute from this location, or update the `#[Attribute]` declaration on the `{attribute_name}` class to include `{}` as a valid target.",
                 target.as_str()
             ))
     );

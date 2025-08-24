@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -18,7 +16,6 @@ use super::integer_comparator;
 #[allow(clippy::too_many_arguments)]
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type: &TUnion,
     container_type: &TUnion,
     ignore_null: bool,
@@ -118,17 +115,16 @@ pub fn is_contained_by(
         if let TAtomic::Iterable(_) = input_type_part
             && !container_type.has_iterable()
             && container_type.has_array()
-            && container_type.has_traversable(codebase, interner)
+            && container_type.has_traversable(codebase)
         {
             let mut matched_all = true;
             for container_atomic_type in &container_atomic_types {
-                if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase, interner) {
+                if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase) {
                     continue;
                 }
 
                 matched_all &= iterable_comparator::is_contained_by(
                     codebase,
-                    interner,
                     input_type_part,
                     container_atomic_type,
                     inside_assertion,
@@ -174,7 +170,6 @@ pub fn is_contained_by(
             let mut atomic_comparison_result = ComparisonResult::new();
             let is_atomic_contained_by = atomic_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_type_part,
                 inside_assertion,
@@ -274,7 +269,6 @@ pub fn is_contained_by(
 
 pub(crate) fn can_be_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type: &TUnion,
     container_type: &TUnion,
     ignore_null: bool,
@@ -303,7 +297,6 @@ pub(crate) fn can_be_contained_by(
 
             let is_atomic_contained_by = atomic_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_type_part,
                 false,
@@ -311,7 +304,7 @@ pub(crate) fn can_be_contained_by(
             );
 
             if is_atomic_contained_by || atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
-                matching_input_keys.push(input_type_part.get_id(None));
+                matching_input_keys.push(input_type_part.get_id());
             }
         }
     }
@@ -321,7 +314,6 @@ pub(crate) fn can_be_contained_by(
 
 pub fn can_expression_types_be_identical(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     type1: &TUnion,
     type2: &TUnion,
     inside_assertion: bool,
@@ -340,7 +332,6 @@ pub fn can_expression_types_be_identical(
         for type2_part in type2.types.as_ref() {
             if atomic_comparator::can_be_identical(
                 codebase,
-                interner,
                 type1_part,
                 type2_part,
                 inside_assertion,

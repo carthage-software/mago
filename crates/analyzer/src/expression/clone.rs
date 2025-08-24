@@ -51,7 +51,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                         invalid_clone_atomics.push(atomic_type);
                     }
                     TObject::Named(named_object) => {
-                        if !class_or_interface_exists(context.codebase, context.interner, &named_object.name) {
+                        if !class_or_interface_exists(context.codebase, &named_object.name) {
                             invalid_clone_atomics.push(atomic_type);
                         } else {
                             has_cloneable_object = true;
@@ -86,7 +86,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                 Issue::warning("Cannot statically verify `clone` on a `mixed` type.")
                     .with_annotation(Annotation::primary(self.object.span()).with_message(format!(
                         "This expression has type `{}`, which could be a non-object at runtime.",
-                        object_type.get_id(Some(context.interner))
+                        object_type.get_id()
                     )))
                     .with_note("Cloning requires the value to be an object. Using `clone` on a non-object will cause a fatal error.")
                     .with_help("Use type hints or `is_object()` checks to ensure the value is an object before cloning."),
@@ -94,15 +94,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
         }
 
         if !invalid_clone_atomics.is_empty() {
-            let invalid_types_str =
-                invalid_clone_atomics.iter().map(|t| t.get_id(Some(context.interner))).collect::<Vec<_>>().join("|");
+            let invalid_types_str = invalid_clone_atomics.iter().map(|t| t.get_id()).collect::<Vec<_>>().join("|");
 
             if has_cloneable_object || has_mixed_type {
                 context.collector.report_with_code(
                     IssueCode::PossiblyInvalidClone,
                     Issue::warning(format!(
                         "Expression of type `{}` might not be a cloneable object.",
-                        object_type.get_id(Some(context.interner))
+                        object_type.get_id()
                     ))
                     .with_annotation(Annotation::primary(self.object.span()).with_message(format!(
                         "This could be of type `{invalid_types_str}`, which cannot be cloned"
@@ -139,7 +138,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
             Rc::new(if has_mixed_type {
                 get_mixed()
             } else if has_cloneable_object {
-                combine_union_types(&object_type, &get_never(), context.codebase, context.interner, false)
+                combine_union_types(&object_type, &get_never(), context.codebase, false)
             } else {
                 get_never()
             })

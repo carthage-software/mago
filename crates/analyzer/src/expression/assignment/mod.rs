@@ -80,7 +80,6 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         target_expression,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -354,7 +353,6 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
         target_expression,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -362,7 +360,6 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
         referenced_expression,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -406,7 +403,6 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         if let Some(constraint_type) = constraint.constraint_type.as_ref()
             && !union_comparator::is_contained_by(
                 context.codebase,
-                context.interner,
                 &assigned_type,
                 constraint_type,
                 assigned_type.ignore_nullable_issues,
@@ -415,8 +411,8 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
                 &mut ComparisonResult::default(),
             )
         {
-            let assigned_type_str = assigned_type.get_id(Some(context.interner));
-            let constraint_type_str = constraint_type.get_id(Some(context.interner));
+            let assigned_type_str = assigned_type.get_id();
+            let constraint_type_str = constraint_type.get_id();
             let primary_error_span = source_expression.map_or(variable_span, |expr| expr.span());
 
             let issue = match constraint.source {
@@ -554,7 +550,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     }
 
     if !from_docblock && assigned_type.is_mixed() && !variable_id.starts_with("$_") {
-        let assigned_type_str = assigned_type.get_id(Some(context.interner));
+        let assigned_type_str = assigned_type.get_id();
 
         let mut issue = Issue::warning(format!(
             "Assigning `{assigned_type_str}` type to a variable may lead to unexpected behavior."
@@ -607,7 +603,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
     let mut non_array = false;
 
     if !array_type.is_array() {
-        let assigned_type_str = array_type.get_id(Some(context.interner));
+        let assigned_type_str = array_type.get_id();
 
         let mut issue = Issue::error(format!(
             "Invalid destructuring assignment: Cannot unpack type `{assigned_type_str}` into variables.",

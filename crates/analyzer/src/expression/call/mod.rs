@@ -1,5 +1,4 @@
-use ahash::HashMap;
-
+use mago_atom::AtomMap;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -66,29 +65,20 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         if let InvocationTarget::FunctionLike { metadata, .. } = &target
             && let Some(name) = metadata.name
         {
-            let name_str = context.interner.lookup(&name);
-            match name_str.to_lowercase().as_str() {
-                "mago\\inspect" => {
+            match true {
+                _ if name.eq_ignore_ascii_case("mago\\inspect") => {
                     inspect_arguments(context, block_context, artifacts, &target, &invocation_arguments)?;
 
-                    resulting_type = Some(add_optional_union_type(
-                        get_void(),
-                        resulting_type.as_ref(),
-                        context.codebase,
-                        context.interner,
-                    ));
+                    resulting_type =
+                        Some(add_optional_union_type(get_void(), resulting_type.as_ref(), context.codebase));
 
                     continue;
                 }
-                "mago\\confirm" => {
+                _ if name.eq_ignore_ascii_case("mago\\confirm") => {
                     confirm_argument_type(context, block_context, artifacts, &target, &invocation_arguments)?;
 
-                    resulting_type = Some(add_optional_union_type(
-                        get_void(),
-                        resulting_type.as_ref(),
-                        context.codebase,
-                        context.interner,
-                    ));
+                    resulting_type =
+                        Some(add_optional_union_type(get_void(), resulting_type.as_ref(), context.codebase));
 
                     continue;
                 }
@@ -97,7 +87,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         }
 
         let invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
-        let mut argument_types = HashMap::default();
+        let mut argument_types = AtomMap::default();
 
         analyze_invocation(
             context,
@@ -120,7 +110,6 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
             ),
             resulting_type.as_ref(),
             context.codebase,
-            context.interner,
         ));
 
         post_invocation_process(
@@ -142,7 +131,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
             } else if encountered_mixed_targets {
                 get_mixed()
             } else if should_add_null {
-                combine_union_types(&resulting_type, &get_null(), context.codebase, context.interner, false)
+                combine_union_types(&resulting_type, &get_null(), context.codebase, false)
             } else {
                 resulting_type
             }
@@ -193,9 +182,9 @@ fn get_function_like_target<'ctx, 'arena>(
 ) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
     let mut identifier = function_like;
 
-    let metadata = context.codebase.get_function_like(&identifier, context.interner).or_else(|| {
+    let metadata = context.codebase.get_function_like(&identifier).or_else(|| {
         if let Some(alternative) = alternative {
-            context.codebase.get_function_like(&alternative, context.interner).inspect(|_| {
+            context.codebase.get_function_like(&alternative).inspect(|_| {
                 identifier = alternative;
             })
         } else {
@@ -206,10 +195,10 @@ fn get_function_like_target<'ctx, 'arena>(
     let Some(metadata) = metadata else {
         let title_str = function_like.title_kind_str();
         let kind_str = function_like.kind_str();
-        let name_str = function_like.as_string(context.interner);
+        let name_str = function_like.as_string();
 
         let issue = if let Some(alt_id) = alternative {
-            let alt_name_str = alt_id.as_string(context.interner);
+            let alt_name_str = alt_id.as_string();
 
             Issue::error(format!(
                 "Could not find definition for {kind_str} `{name_str}` (also tried as `{alt_name_str}` in a broader scope)."
@@ -263,9 +252,8 @@ fn inspect_arguments<'ctx, 'ast, 'arena>(
     for (idx, argument) in invocation_arguments.get_arguments().iter().enumerate() {
         let argument_expression = argument.value();
         let argument_span = argument_expression.span();
-        let argument_type_string = artifacts
-            .get_expression_type(argument_expression)
-            .map_or("<unknown type>".to_string(), |t| t.get_id(Some(context.interner)));
+        let argument_type_string =
+            artifacts.get_expression_type(argument_expression).map_or("<unknown type>".to_string(), |t| t.get_id());
 
         argument_annotations.push(
             Annotation::secondary(argument_span)
@@ -387,10 +375,10 @@ fn confirm_argument_type<'ctx, 'ast, 'arena>(
             IssueCode::TypeConfirmation,
             Issue::error(format!(
                 "Second argument to `Mago\\confirm()` must be a literal string, but found type `{}`.",
-                expected_type_expression_type.get_id(Some(context.interner))
+                expected_type_expression_type.get_id()
             ))
             .with_annotation(Annotation::primary(expected_type_expression.span())
-                .with_message(format!("Expected a literal string here, not type `{}`", expected_type_expression_type.get_id(Some(context.interner)))))
+                .with_message(format!("Expected a literal string here, not type `{}`", expected_type_expression_type.get_id())))
             .with_annotation(Annotation::secondary(target.span())
                 .with_message("`Mago\\confirm()` expects a value to check and a string representing the expected type."))
             .with_note("`Mago\\confirm()` uses the second argument as a string representation of the expected type for comparison.")
@@ -401,7 +389,7 @@ fn confirm_argument_type<'ctx, 'ast, 'arena>(
         return Ok(());
     };
 
-    let actual_argument_type_string = actual_argument_type.get_id(Some(context.interner));
+    let actual_argument_type_string = actual_argument_type.get_id();
     let is_match = expected_type_literal_string.eq_ignore_ascii_case(&actual_argument_type_string);
 
     if is_match {

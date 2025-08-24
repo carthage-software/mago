@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
@@ -30,7 +28,6 @@ use super::iterable_comparator;
 
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_part: &TAtomic,
     container_type_part: &TAtomic,
     inside_assertion: bool,
@@ -47,7 +44,6 @@ pub fn is_contained_by(
         for container_intersection_type in container_intersection_types {
             if !is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_intersection_type,
                 inside_assertion,
@@ -72,7 +68,6 @@ pub fn is_contained_by(
         for input_intersection_type in input_intersection_types {
             if is_contained_by(
                 codebase,
-                interner,
                 input_intersection_type,
                 container_type_part,
                 inside_assertion,
@@ -86,7 +81,6 @@ pub fn is_contained_by(
     if input_type_part.is_derived() || container_type_part.is_derived() {
         return derived_comparator::is_contained_by(
             codebase,
-            interner,
             input_type_part,
             container_type_part,
             inside_assertion,
@@ -102,7 +96,6 @@ pub fn is_contained_by(
         if container_type_part.is_some_scalar() {
             return scalar_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_type_part,
                 inside_assertion,
@@ -133,7 +126,7 @@ pub fn is_contained_by(
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         return match input_type_part {
             TAtomic::Object(TObject::Enum(enum_input)) => {
-                if !is_instance_of(codebase, interner, enum_input.get_name_ref(), enum_container.get_name_ref()) {
+                if !is_instance_of(codebase, enum_input.get_name_ref(), enum_container.get_name_ref()) {
                     return false;
                 }
 
@@ -148,7 +141,7 @@ pub fn is_contained_by(
                 true
             }
             TAtomic::Object(TObject::Named(named_object)) if enum_container.case.is_none() => {
-                if !is_instance_of(codebase, interner, named_object.get_name_ref(), enum_container.get_name_ref()) {
+                if !is_instance_of(codebase, named_object.get_name_ref(), enum_container.get_name_ref()) {
                     return false;
                 }
 
@@ -182,7 +175,6 @@ pub fn is_contained_by(
         if input_type_part.can_be_callable() {
             return callable_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_type_part,
                 atomic_comparison_result,
@@ -195,10 +187,9 @@ pub fn is_contained_by(
     if let TAtomic::Object(TObject::Named(_)) = container_type_part {
         match input_type_part {
             TAtomic::Array(TArray::Keyed(_)) => {
-                if let Some(parameters) = get_iterable_parameters(container_type_part, codebase, interner) {
+                if let Some(parameters) = get_iterable_parameters(container_type_part, codebase) {
                     return self::is_contained_by(
                         codebase,
-                        interner,
                         input_type_part,
                         &TAtomic::Array(TArray::Keyed(TKeyedArray {
                             parameters: Some((Box::new(parameters.0), Box::new(parameters.1))),
@@ -211,10 +202,9 @@ pub fn is_contained_by(
                 }
             }
             TAtomic::Array(TArray::List(_)) => {
-                if let Some(value_parameter) = get_iterable_value_parameter(container_type_part, codebase, interner) {
+                if let Some(value_parameter) = get_iterable_value_parameter(container_type_part, codebase) {
                     return self::is_contained_by(
                         codebase,
-                        interner,
                         input_type_part,
                         &TAtomic::Array(TArray::List(TList {
                             element_type: Box::new(value_parameter),
@@ -240,7 +230,6 @@ pub fn is_contained_by(
     {
         return array_comparator::is_contained_by(
             codebase,
-            interner,
             input_type_part,
             container_type_part,
             inside_assertion,
@@ -251,7 +240,6 @@ pub fn is_contained_by(
     if let TAtomic::Iterable(_) = container_type_part {
         return iterable_comparator::is_contained_by(
             codebase,
-            interner,
             input_type_part,
             container_type_part,
             inside_assertion,
@@ -277,7 +265,6 @@ pub fn is_contained_by(
     {
         return union_comparator::is_contained_by(
             codebase,
-            interner,
             input_constraint,
             container_constraint,
             false,
@@ -294,7 +281,6 @@ pub fn is_contained_by(
     {
         if !object_comparator::is_intersection_shallowly_contained_by(
             codebase,
-            interner,
             input_type_part,
             container_type_part,
             inside_assertion,
@@ -306,7 +292,6 @@ pub fn is_contained_by(
         if matches!(container_type_part, TAtomic::Object(TObject::Named(obj)) if obj.has_type_parameters())
             && !generic_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_type_part,
                 container_type_part,
                 inside_assertion,
@@ -330,7 +315,6 @@ pub fn is_contained_by(
             if inside_assertion
                 && is_contained_by(
                     codebase,
-                    interner,
                     input_type_part,
                     container_extends_type_part,
                     inside_assertion,
@@ -350,7 +334,6 @@ pub fn is_contained_by(
         for input_intersection_type in input_intersection_types {
             if is_contained_by(
                 codebase,
-                interner,
                 input_intersection_type,
                 container_type_part,
                 inside_assertion,
@@ -371,7 +354,6 @@ pub fn is_contained_by(
             for input_intersection_type in input_intersection_types {
                 if is_contained_by(
                     codebase,
-                    interner,
                     input_intersection_type,
                     container_type_part,
                     inside_assertion,
@@ -389,7 +371,6 @@ pub fn is_contained_by(
 
             if is_contained_by(
                 codebase,
-                interner,
                 input_constraint_part,
                 container_type_part,
                 inside_assertion,
@@ -407,7 +388,6 @@ pub fn is_contained_by(
 
 pub(crate) fn can_be_identical<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &'a ThreadedInterner,
     first_part: &'a TAtomic,
     second_part: &'a TAtomic,
     inside_assertion: bool,
@@ -447,7 +427,6 @@ pub(crate) fn can_be_identical<'a>(
         {
             union_comparator::can_expression_types_be_identical(
                 codebase,
-                interner,
                 first_element_type,
                 second_element_type,
                 inside_assertion,
@@ -461,14 +440,14 @@ pub(crate) fn can_be_identical<'a>(
     if let (TAtomic::Array(TArray::Keyed(first_array)), TAtomic::Array(TArray::Keyed(second_array))) =
         (first_part, second_part)
     {
-        return keyed_arrays_can_be_identical(interner, first_array, second_array, codebase, inside_assertion);
+        return keyed_arrays_can_be_identical(first_array, second_array, codebase, inside_assertion);
     }
 
     let mut first_comparison_result = ComparisonResult::new();
     let mut second_comparison_result = ComparisonResult::new();
 
-    if is_contained_by(codebase, interner, first_part, second_part, inside_assertion, &mut first_comparison_result)
-        || is_contained_by(codebase, interner, second_part, first_part, inside_assertion, &mut second_comparison_result)
+    if is_contained_by(codebase, first_part, second_part, inside_assertion, &mut first_comparison_result)
+        || is_contained_by(codebase, second_part, first_part, inside_assertion, &mut second_comparison_result)
         || (first_comparison_result.type_coerced.unwrap_or(false)
             && second_comparison_result.type_coerced.unwrap_or(false))
         || (allow_type_coercion && first_part.is_some_scalar() && second_part.is_some_scalar())
@@ -478,14 +457,7 @@ pub(crate) fn can_be_identical<'a>(
 
     if let TAtomic::GenericParameter(first_generic) = first_part {
         for first_constraint_part in first_generic.constraint.types.iter() {
-            if can_be_identical(
-                codebase,
-                interner,
-                first_constraint_part,
-                second_part,
-                inside_assertion,
-                allow_type_coercion,
-            ) {
+            if can_be_identical(codebase, first_constraint_part, second_part, inside_assertion, allow_type_coercion) {
                 return true;
             }
         }
@@ -493,14 +465,7 @@ pub(crate) fn can_be_identical<'a>(
 
     if let TAtomic::GenericParameter(second_generic) = second_part {
         for second_constraint_part in second_generic.constraint.types.iter() {
-            if can_be_identical(
-                codebase,
-                interner,
-                first_part,
-                second_constraint_part,
-                inside_assertion,
-                allow_type_coercion,
-            ) {
+            if can_be_identical(codebase, first_part, second_constraint_part, inside_assertion, allow_type_coercion) {
                 return true;
             }
         }
@@ -516,7 +481,6 @@ pub fn expand_constant_value(v: &ClassLikeConstantMetadata) -> TAtomic {
 }
 
 fn keyed_arrays_can_be_identical(
-    interner: &ThreadedInterner,
     first_array: &TKeyedArray,
     second_array: &TKeyedArray,
     codebase: &CodebaseMetadata,
@@ -528,14 +492,12 @@ fn keyed_arrays_can_be_identical(
             (Some(first_parameters), Some(second_parameters)) => {
                 union_comparator::can_expression_types_be_identical(
                     codebase,
-                    interner,
                     &first_parameters.0,
                     &second_parameters.0,
                     inside_assertion,
                     false,
                 ) && union_comparator::can_expression_types_be_identical(
                     codebase,
-                    interner,
                     &first_parameters.1,
                     &second_parameters.1,
                     inside_assertion,
@@ -555,7 +517,6 @@ fn keyed_arrays_can_be_identical(
                     (Some(first_entry), Some(second_entry)) => {
                         if !union_comparator::can_expression_types_be_identical(
                             codebase,
-                            interner,
                             &first_entry.1,
                             &second_entry.1,
                             inside_assertion,
@@ -568,7 +529,6 @@ fn keyed_arrays_can_be_identical(
                         if let Some(second_parameters) = &second_array.parameters {
                             if !union_comparator::can_expression_types_be_identical(
                                 codebase,
-                                interner,
                                 &first_entry.1,
                                 &second_parameters.1,
                                 inside_assertion,
@@ -584,7 +544,6 @@ fn keyed_arrays_can_be_identical(
                         if let Some(first_parameters) = &first_array.parameters {
                             if !union_comparator::can_expression_types_be_identical(
                                 codebase,
-                                interner,
                                 &first_parameters.1,
                                 &second_entry.1,
                                 inside_assertion,
@@ -607,7 +566,6 @@ fn keyed_arrays_can_be_identical(
                 if let Some(second_parameters) = &second_array.parameters {
                     if !union_comparator::can_expression_types_be_identical(
                         codebase,
-                        interner,
                         &first_entry.1,
                         &second_parameters.1,
                         inside_assertion,
@@ -625,7 +583,6 @@ fn keyed_arrays_can_be_identical(
                 if let Some(first_parameters) = &first_array.parameters {
                     if !union_comparator::can_expression_types_be_identical(
                         codebase,
-                        interner,
                         &first_parameters.1,
                         &second_entry.1,
                         inside_assertion,
@@ -646,14 +603,12 @@ fn keyed_arrays_can_be_identical(
         (Some(first_parameters), Some(second_parameters)) => {
             union_comparator::can_expression_types_be_identical(
                 codebase,
-                interner,
                 &first_parameters.0,
                 &second_parameters.0,
                 inside_assertion,
                 false,
             ) && union_comparator::can_expression_types_be_identical(
                 codebase,
-                interner,
                 &first_parameters.1,
                 &second_parameters.1,
                 inside_assertion,

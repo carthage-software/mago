@@ -14,7 +14,6 @@ use mago_analyzer::Analyzer;
 use mago_codex::reference::SymbolReferences;
 use mago_database::file::File;
 use mago_formatter::Formatter;
-use mago_interner::ThreadedInterner;
 use mago_linter::Linter;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
@@ -41,7 +40,6 @@ pub struct WasmAnalysisResults {
 /// Runs the complete analysis pipeline on a string of PHP code.
 pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults {
     let arena = Bump::new();
-    let interner = ThreadedInterner::new();
     let source_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
 
     let (program, parse_error) = parse_file(&arena, &source_file);
@@ -49,19 +47,18 @@ pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults
 
     let semantic_issues = SemanticsChecker::new(settings.php_version).check(&source_file, program, &resolved_names);
 
-    let mut codebase = mago_codex::scanner::scan_program(&interner, &arena, &source_file, program, &resolved_names);
+    let mut codebase = mago_codex::scanner::scan_program(&arena, &source_file, program, &resolved_names);
     let mut symbol_references = SymbolReferences::new();
 
     mago_codex::populator::populate_codebase(
         &mut codebase,
-        &interner,
         &mut symbol_references,
         Default::default(),
         Default::default(),
     );
 
     let analyzer_settings = settings.analyzer.to_analyzer_settings(settings.php_version);
-    let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, &interner, analyzer_settings);
+    let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, analyzer_settings);
     let mut analyzer_analysis_result = mago_analyzer::analysis_result::AnalysisResult::new(Default::default());
     analyzer.analyze(program, &mut analyzer_analysis_result).unwrap();
     let analyzer_issues = analyzer_analysis_result.issues;

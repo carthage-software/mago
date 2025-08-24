@@ -1,12 +1,12 @@
-use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
+use mago_atom::AtomMap;
 use mago_codex::get_all_descendants;
 use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_id;
+use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_method_by_id;
-use mago_codex::get_method_id;
+use mago_codex::get_method_identifier;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -58,13 +58,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
         if classnames.len() > 1 {
             let possible_class_names_str = classnames
                 .iter()
-                .map(|classname| classname.fq_class_id.map(|id| context.interner.lookup(&id)).unwrap_or("<unknown>"))
+                .map(|classname| classname.fqcn.map(|id| id.as_str()).unwrap_or("<unknown>"))
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let class_expression_type_str = artifacts
-                .get_expression_type(&self.class)
-                .map_or("<unknown>".to_string(), |u| u.get_id(Some(context.interner)));
+            let class_expression_type_str =
+                artifacts.get_expression_type(&self.class).map_or("<unknown>".to_string(), |u| u.get_id());
 
             context.collector.report_with_code(
                 IssueCode::AmbiguousInstantiationTarget,
@@ -104,12 +103,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
                 argument_list,
             )?;
 
-            resulting_type = Some(add_optional_union_type(
-                type_candidate,
-                resulting_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            resulting_type = Some(add_optional_union_type(type_candidate, resulting_type.as_ref(), context.codebase));
         }
 
         if let Some(resulting_type) = resulting_type {
@@ -137,7 +131,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_never());
     }
 
-    let Some(fq_class_id) = classname.fq_class_id else {
+    let Some(fq_classname) = classname.fqcn else {
         context.collector.report_with_code(
             IssueCode::UnknownClassInstantiation,
             Issue::error("Cannot determine the concrete class for instantiation.")
@@ -152,15 +146,13 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_object());
     };
 
-    let Some(metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
-        let class_name_str = context.interner.lookup(&fq_class_id);
-
+    let Some(metadata) = get_class_like(context.codebase, &fq_classname) else {
         context.collector.report_with_code(
             IssueCode::NonExistentClass,
-            Issue::error(format!("Class `{class_name_str}` not found."))
+            Issue::error(format!("Class `{fq_classname}` not found."))
             .with_annotation(
                 Annotation::primary(class_expression_span)
-                    .with_message(format!("`{class_name_str}` is not defined or cannot be autoloaded")),
+                    .with_message(format!("`{fq_classname}` is not defined or cannot be autoloaded")),
             )
             .with_help(
                 "Ensure the name is correct, including its namespace, and that it's properly defined and autoloadable.",
@@ -172,18 +164,17 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_never());
     };
 
-    let class_name_str = context.interner.lookup(&metadata.original_name);
-
+    let classname_str = &metadata.original_name;
     if metadata.kind.is_interface() {
         context.collector.report_with_code(
              IssueCode::InterfaceInstantiation,
-             Issue::error(format!("Interface `{class_name_str}` cannot be instantiated with `new`."))
+             Issue::error(format!("Interface `{classname_str}` cannot be instantiated with `new`."))
                  .with_annotation(
                      Annotation::primary(class_expression_span)
                          .with_message("Attempting to instantiate an interface"),
                  )
                  .with_note("Interfaces are contracts and cannot be directly instantiated. You need to instantiate a class that implements the interface.")
-                 .with_help(format!("Instantiate a concrete class that implements `{class_name_str}` instead.")),
+                 .with_help(format!("Instantiate a concrete class that implements `{classname_str}` instead.")),
          );
 
         argument_list.analyze(context, block_context, artifacts)?;
@@ -192,13 +183,13 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     } else if metadata.kind.is_trait() {
         context.collector.report_with_code(
             IssueCode::TraitInstantiation,
-            Issue::error(format!("Trait `{class_name_str}` cannot be instantiated with `new`."))
+            Issue::error(format!("Trait `{classname_str}` cannot be instantiated with `new`."))
                 .with_annotation(
                     Annotation::primary(class_expression_span).with_message("Attempting to instantiate a trait"),
                 )
                 .with_note("Traits are designed for code reuse and cannot be instantiated directly.")
                 .with_help(format!(
-                    "Use the trait `{class_name_str}` within a class definition using the `use` keyword."
+                    "Use the trait `{classname_str}` within a class definition using the `use` keyword."
                 )),
         );
 
@@ -208,14 +199,14 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     } else if metadata.kind.is_enum() {
         context.collector.report_with_code(
             IssueCode::EnumInstantiation,
-            Issue::error(format!("Enum `{class_name_str}` cannot be instantiated with `new`."))
+            Issue::error(format!("Enum `{classname_str}` cannot be instantiated with `new`."))
                 .with_annotation(
                     Annotation::primary(class_expression_span)
                         .with_message("Attempting to instantiate an enum with `new`"),
                 )
                 .with_note("Enum instances are created by accessing their cases directly (e.g., `MyEnum::CaseName`).")
                 .with_help(format!(
-                    "Use `{class_name_str}::CASE_NAME` to get an enum case instance, or `{class_name_str}::cases()` to get all cases."
+                    "Use `{classname_str}::CASE_NAME` to get an enum case instance, or `{classname_str}::cases()` to get all cases."
                 )),
         );
 
@@ -228,7 +219,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     if metadata.flags.is_abstract() && !classname.can_extend_static() {
         context.collector.report_with_code(
             IssueCode::AbstractInstantiation,
-            Issue::error(format!("Cannot instantiate abstract class `{class_name_str}`."))
+            Issue::error(format!("Cannot instantiate abstract class `{classname_str}`."))
                 .with_annotation(
                     Annotation::primary(class_expression_span)
                         .with_message("Attempting to instantiate an abstract class"),
@@ -248,7 +239,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     {
         context.collector.report_with_code(
             IssueCode::DeprecatedClass,
-            Issue::warning(format!("Class `{class_name_str}` is deprecated and should no longer be used."))
+            Issue::warning(format!("Class `{classname_str}` is deprecated and should no longer be used."))
                 .with_annotation(
                     Annotation::primary(class_expression_span).with_message("Instantiation of deprecated class"),
                 )
@@ -260,9 +251,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut type_parameters = None;
 
-    let constructor_name_id = context.interner.intern("__construct");
-    let constructor_id = get_method_id(&metadata.original_name, &constructor_name_id);
-    let constructor_declraing_id = get_declaring_method_id(context.codebase, context.interner, &constructor_id);
+    let constructor_id = get_method_identifier(&metadata.original_name, "__construct");
+    let constructor_declraing_id = get_declaring_method_identifier(context.codebase, &constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
 
@@ -274,8 +264,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         IndexMap::with_hasher(RandomState::default()),
     );
 
-    let is_spl_object_storage = class_name_str.eq_ignore_ascii_case("splobjectstorage");
-    if let Some(constructor) = get_method_by_id(context.codebase, context.interner, &constructor_declraing_id) {
+    let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
+    if let Some(constructor) = get_method_by_id(context.codebase, &constructor_declraing_id) {
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
         constructor_span = Some(constructor.name_span.unwrap_or(constructor.span));
@@ -303,7 +293,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             span: instantiation_span,
         };
 
-        let mut argument_types = HashMap::default();
+        let mut argument_types = AtomMap::default();
         analyze_invocation(
             context,
             block_context,
@@ -341,7 +331,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             let template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(template_name, &metadata.name)
             {
-                get_most_specific_type_from_bounds(lower_bounds, context.codebase, context.interner)
+                get_most_specific_type_from_bounds(lower_bounds, context.codebase)
             } else if !metadata.template_extended_parameters.is_empty() && !template_result.lower_bounds.is_empty() {
                 let found_generic_parameters = template_result
                     .lower_bounds
@@ -354,17 +344,13 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                                 .map(|(generic_parent, lower_bounds)| {
                                     (
                                         *generic_parent,
-                                        get_most_specific_type_from_bounds(
-                                            lower_bounds,
-                                            context.codebase,
-                                            context.interner,
-                                        ),
+                                        get_most_specific_type_from_bounds(lower_bounds, context.codebase),
                                     )
                                 })
                                 .collect::<Vec<_>>(),
                         )
                     })
-                    .collect::<HashMap<_, _>>();
+                    .collect::<AtomMap<_>>();
 
                 get_generic_parameter_for_offset(
                     &metadata.name,
@@ -390,12 +376,12 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         context.collector.report_with_code(
             IssueCode::TooManyArguments,
             Issue::error(format!(
-                "Class `{class_name_str}` has no `__construct` method, but arguments were provided to `new`."
+                "Class `{classname_str}` has no `__construct` method, but arguments were provided to `new`."
             ))
             .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
             .with_annotation(
                 Annotation::secondary(class_expression_span)
-                    .with_message(format!("For class `{class_name_str}` which has no constructor")),
+                    .with_message(format!("For class `{classname_str}` which has no constructor")),
             )
             .with_help("Remove the arguments, or define a `__construct` method in the class if arguments are needed for initialization."),
         );
@@ -422,17 +408,17 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     {
         let mut issue = if classname.is_static() {
             Issue::warning(format!(
-                "Unsafe `new static()`: constructor of `{class_name_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
+                "Unsafe `new static()`: constructor of `{classname_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
             ))
             .with_annotation(Annotation::primary(class_expression_span).with_message("`new static()` used here"))
         } else if classname.is_from_class_string() {
             Issue::warning(format!(
-                "Unsafe `new $class_name`: constructor of `{class_name_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
+                "Unsafe `new $class_name`: constructor of `{classname_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
             ))
             .with_annotation(Annotation::primary(class_expression_span).with_message("`new $class_name()` used here"))
         } else {
             Issue::warning(format!(
-                "Unsafe `new $object`: constructor of `{class_name_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
+                "Unsafe `new $object`: constructor of `{classname_str}` is not final and its signature might change in child classes, potentially leading to runtime errors.",
             ))
             .with_annotation(Annotation::primary(class_expression_span).with_message("`new $object` used here"))
         };
@@ -452,12 +438,12 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     }
 
     if classname.is_from_class_string() || classname.is_from_any_object() {
-        let descendants = get_all_descendants(context.codebase, context.interner, &metadata.name);
+        let descendants = get_all_descendants(context.codebase, &metadata.name);
 
         for descendant_class in descendants {
             artifacts.symbol_references.add_reference_to_overridden_class_member(
                 &block_context.scope,
-                (descendant_class, constructor_name_id),
+                (descendant_class, *constructor_id.get_method_name()),
             );
         }
     }

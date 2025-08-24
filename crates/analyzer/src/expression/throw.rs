@@ -33,13 +33,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
             for (variable, previous_type) in block_context.locals.iter() {
                 match finally_scope.locals.get_mut(variable) {
                     Some(finally_type) => {
-                        let resulting_type = combine_union_types(
-                            previous_type.as_ref(),
-                            finally_type.as_ref(),
-                            context.codebase,
-                            context.interner,
-                            false,
-                        );
+                        let resulting_type =
+                            combine_union_types(previous_type.as_ref(), finally_type.as_ref(), context.codebase, false);
 
                         finally_scope.locals.insert(variable.clone(), Rc::new(resulting_type));
                     }
@@ -54,15 +49,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
         }
 
         if let Some(exception_type) = artifacts.get_expression_type(self.exception) {
-            let throwable = context.interner.intern("Throwable");
-
             for exception_atomic in exception_type.types.as_ref() {
-                if exception_atomic.extends_or_implements(context.codebase, context.interner, throwable) {
+                if exception_atomic.extends_or_implements(context.codebase, "Throwable") {
                     for object_name in exception_atomic.get_all_object_names() {
                         block_context.possibly_thrown_exceptions.entry(object_name).or_default().insert(self.span());
                     }
                 } else {
-                    let exception_atomic_str = exception_atomic.get_id(Some(context.interner));
+                    let exception_atomic_str = exception_atomic.get_id();
 
                     context.collector.report_with_code(
                         IssueCode::InvalidThrow,

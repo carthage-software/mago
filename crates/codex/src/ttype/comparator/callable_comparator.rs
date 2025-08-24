@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use mago_interner::ThreadedInterner;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::callable::TCallable;
@@ -12,7 +10,6 @@ use crate::ttype::expander::get_signature_of_function_like_identifier;
 
 pub(crate) fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_part: &TAtomic,
     container_type_part: &TAtomic,
     atomic_comparison_result: &mut ComparisonResult,
@@ -21,16 +18,14 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
-    let Some(input_callable) = cast_atomic_to_callable(input_type_part, codebase, interner, None) else {
+    let Some(input_callable) = cast_atomic_to_callable(input_type_part, codebase, None) else {
         return false;
     };
 
     let input_signature = match input_callable.as_ref() {
         TCallable::Signature(signature) => Cow::Borrowed(signature),
         TCallable::Alias(function_like_identifier) => {
-            let Some(signature) =
-                get_signature_of_function_like_identifier(function_like_identifier, codebase, interner)
-            else {
+            let Some(signature) = get_signature_of_function_like_identifier(function_like_identifier, codebase) else {
                 return false;
             };
 
@@ -76,7 +71,6 @@ pub(crate) fn is_contained_by(
 
         if !union_comparator::is_contained_by(
             codebase,
-            interner,
             container_parameter_type,
             input_parameter_type,
             false,
@@ -121,7 +115,6 @@ pub(crate) fn is_contained_by(
 
     union_comparator::is_contained_by(
         codebase,
-        interner,
         input_return_type,
         container_return_type,
         false,

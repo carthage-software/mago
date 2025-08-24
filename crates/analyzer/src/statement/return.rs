@@ -107,8 +107,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         let mut finally_scope = (*finally_scope).borrow_mut();
         for (var_id, var_type) in &block_context.locals {
             if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                *finally_type =
-                    Rc::new(combine_union_types(finally_type, var_type, context.codebase, context.interner, false));
+                *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
             } else {
                 finally_scope.locals.insert(var_id.clone(), var_type.clone());
             }
@@ -132,12 +131,11 @@ pub fn handle_return_value<'ctx, 'arena>(
 
         expand_union(
             context.codebase,
-            context.interner,
             &mut inner_union,
             &TypeExpansionOptions {
                 self_class: block_context.scope.get_class_like_name(),
                 static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
-                    StaticClassType::Name(*calling_class)
+                    StaticClassType::Name(calling_class)
                 } else {
                     StaticClassType::None
                 },
@@ -153,7 +151,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         inferred_return_type = Rc::new(inner_union);
     }
 
-    let function_name = function_like_identifier.as_string(context.interner);
+    let function_name = function_like_identifier.as_string();
 
     if let Some(return_value) = return_value {
         if function_like_metadata.flags.is_by_reference() {
@@ -193,12 +191,11 @@ pub fn handle_return_value<'ctx, 'arena>(
 
             expand_union(
                 context.codebase,
-                context.interner,
                 &mut expected_type,
                 &TypeExpansionOptions {
                     self_class: block_context.scope.get_class_like_name(),
                     static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
-                        StaticClassType::Name(*calling_class)
+                        StaticClassType::Name(calling_class)
                     } else {
                         StaticClassType::None
                     },
@@ -228,8 +225,8 @@ pub fn handle_return_value<'ctx, 'arena>(
         match get_generator_return_type(context, &expected_return_type) {
             Some((return_type, is_from_generator)) => {
                 if !is_from_generator {
-                    let inferred_return_type_str = inferred_return_type.get_id(Some(context.interner));
-                    let expected_return_type_str = expected_return_type.get_id(Some(context.interner));
+                    let inferred_return_type_str = inferred_return_type.get_id();
+                    let expected_return_type_str = expected_return_type.get_id();
 
                     let type_declaration_span = function_like_metadata
                         .return_type_metadata
@@ -304,7 +301,7 @@ pub fn handle_return_value<'ctx, 'arena>(
                 Issue::error(format!(
                     "Could not infer a precise return type for function `{}`. Saw type `{}`.",
                     function_name,
-                    inferred_return_type.get_id(Some(context.interner))
+                    inferred_return_type.get_id()
                 ))
                 .with_annotation(
                     Annotation::primary(return_value.span())
@@ -325,7 +322,6 @@ pub fn handle_return_value<'ctx, 'arena>(
 
         let is_contained_by = is_contained_by(
             context.codebase,
-            context.interner,
             &inferred_return_type,
             &expected_return_type,
             inferred_return_type.ignore_nullable_issues,
@@ -338,8 +334,8 @@ pub fn handle_return_value<'ctx, 'arena>(
             return Ok(());
         }
 
-        let expected_return_type_str = expected_return_type.get_id(Some(context.interner));
-        let inferred_return_type_str = inferred_return_type.get_id(Some(context.interner));
+        let expected_return_type_str = expected_return_type.get_id();
+        let inferred_return_type_str = inferred_return_type.get_id();
 
         if inferred_return_type.is_nullable()
             && !inferred_return_type.ignore_nullable_issues
@@ -470,10 +466,10 @@ pub fn handle_return_value<'ctx, 'arena>(
         && !matches!(
             block_context.scope.get_function_like_identifier(),
             Some(FunctionLikeIdentifier::Method(_, name))
-            if context.interner.lookup(&name).eq_ignore_ascii_case("__construct")
+            if name.eq_ignore_ascii_case("__construct")
         )
     {
-        let expected_return_type_str = expected_return_type.get_id(Some(context.interner));
+        let expected_return_type_str = expected_return_type.get_id();
 
         context.collector.report_with_code(
             IssueCode::InvalidReturnStatement,
@@ -503,24 +499,19 @@ fn get_generator_return_type(context: &Context, return_type: &TUnion) -> Option<
     let mut generator_return = None;
     let mut could_be_array_or_traversable = false;
     for atomic in return_type.types.iter() {
-        if !atomic.could_be_array_or_traversable(context.codebase, context.interner) {
+        if !atomic.could_be_array_or_traversable(context.codebase) {
             continue;
         }
 
         could_be_array_or_traversable = true;
-        let Some(generator_parameters) = atomic.get_generator_parameters(context.interner) else {
+        let Some(generator_parameters) = atomic.get_generator_parameters() else {
             continue;
         };
 
         match generator_return.as_mut() {
             Some(existing_return) => {
-                *existing_return = combine_union_types(
-                    existing_return,
-                    &generator_parameters.3,
-                    context.codebase,
-                    context.interner,
-                    false,
-                );
+                *existing_return =
+                    combine_union_types(existing_return, &generator_parameters.3, context.codebase, false);
             }
             None => {
                 generator_return = Some(generator_parameters.3);

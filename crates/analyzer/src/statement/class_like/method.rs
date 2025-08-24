@@ -1,3 +1,5 @@
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -38,23 +40,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             return Ok(());
         };
 
-        let method_name = context.interner.intern(self.name.value);
-        let lc_method_name = context.interner.intern(self.name.value.to_lowercase());
+        let method_name = atom(self.name.value);
+        let lowercase_method_name = ascii_lowercase_atom(self.name.value);
         if context.settings.diff
-            && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, lc_method_name))
+            && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, lowercase_method_name))
         {
             return Ok(());
         }
 
-        let Some(method_metadata) = get_method_by_id(
-            context.codebase,
-            context.interner,
-            &MethodIdentifier::new(class_like_metadata.name, lc_method_name),
-        ) else {
+        let Some(method_metadata) =
+            get_method_by_id(context.codebase, &MethodIdentifier::new(class_like_metadata.name, lowercase_method_name))
+        else {
             tracing::error!(
                 "Failed to find method metadata for `{}` in class `{}`.",
                 self.name.value,
-                context.interner.lookup(&class_like_metadata.original_name)
+                class_like_metadata.original_name
             );
 
             return Ok(());
@@ -75,7 +75,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             None,
         )?;
 
-        if !is_method_overriding(context.codebase, context.interner, &class_like_metadata.name, &method_name) {
+        if !is_method_overriding(context.codebase, &class_like_metadata.name, &method_name) {
             heuristic::check_function_like(
                 method_metadata,
                 self.parameter_list.parameters.as_slice(),

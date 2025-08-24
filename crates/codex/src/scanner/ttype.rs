@@ -1,5 +1,6 @@
+use mago_atom::Atom;
+use mago_atom::atom;
 use mago_docblock::tag::TypeString;
-use mago_interner::StringIdentifier;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::Hint;
@@ -22,7 +23,7 @@ use crate::ttype::*;
 #[inline]
 pub fn get_type_metadata_from_hint<'ast, 'arena>(
     hint: &'ast Hint<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'_, 'ast, 'arena>,
 ) -> TypeMetadata {
     let type_union = get_union_from_hint(hint, classname, context);
@@ -35,24 +36,21 @@ pub fn get_type_metadata_from_hint<'ast, 'arena>(
 #[inline]
 pub fn get_type_metadata_from_type_string(
     ttype: &TypeString,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_, '_, '_>,
     scope: &NamespaceScope,
 ) -> Result<TypeMetadata, TypeError> {
-    builder::get_type_from_string(&ttype.value, ttype.span, scope, type_context, classname, context.interner).map(
-        |type_union| {
-            let mut type_metadata = TypeMetadata::new(type_union, ttype.span);
-            type_metadata.from_docblock = true;
-            type_metadata
-        },
-    )
+    builder::get_type_from_string(&ttype.value, ttype.span, scope, type_context, classname).map(|type_union| {
+        let mut type_metadata = TypeMetadata::new(type_union, ttype.span);
+        type_metadata.from_docblock = true;
+        type_metadata
+    })
 }
 
 #[inline]
 fn get_union_from_hint<'ast, 'arena>(
     hint: &'ast Hint<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'_, 'ast, 'arena>,
 ) -> TUnion {
     match hint {
@@ -96,12 +94,12 @@ fn get_union_from_hint<'ast, 'arena>(
         Hint::Array(_) => get_mixed_keyed_array(),
         Hint::Callable(_) => get_mixed_callable(),
         Hint::Static(_) => {
-            let classname = if let Some(classname) = classname { *classname } else { context.interner.intern("this") };
+            let classname = classname.unwrap_or_else(|| atom("static"));
 
             wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(classname))))
         }
         Hint::Self_(_) => {
-            let classname = if let Some(classname) = classname { *classname } else { context.interner.intern("this") };
+            let classname = classname.unwrap_or_else(|| atom("static"));
 
             wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(classname))))
         }
@@ -158,7 +156,7 @@ fn get_union_from_identifier_hint<'ast, 'arena>(
 
     if name.eq_ignore_ascii_case("Generator") {
         return wrap_atomic(TAtomic::Object(TObject::Named(
-            TNamedObject::new(context.interner.intern(name)).with_type_parameters(Some(vec![
+            TNamedObject::new(atom(name)).with_type_parameters(Some(vec![
                 get_mixed(),
                 get_mixed(),
                 get_mixed(),
@@ -171,9 +169,5 @@ fn get_union_from_identifier_hint<'ast, 'arena>(
         return wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(true))));
     }
 
-    wrap_atomic(TAtomic::Reference(TReference::Symbol {
-        name: context.interner.intern(name),
-        parameters: None,
-        intersection_types: None,
-    }))
+    wrap_atomic(TAtomic::Reference(TReference::Symbol { name: atom(name), parameters: None, intersection_types: None }))
 }

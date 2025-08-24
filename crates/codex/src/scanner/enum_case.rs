@@ -1,3 +1,4 @@
+use mago_atom::atom;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -24,7 +25,7 @@ pub fn scan_enum_case<'ctx, 'ast, 'arena>(
                 flags |= MetadataFlags::BUILTIN;
             }
 
-            let mut meta = EnumCaseMetadata::new(context.interner.intern(item.name.value), item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
             meta.value_type = None;
@@ -38,11 +39,10 @@ pub fn scan_enum_case<'ctx, 'ast, 'arena>(
                 flags |= MetadataFlags::BUILTIN;
             }
 
-            let mut meta = EnumCaseMetadata::new(context.interner.intern(item.name.value), item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
-            meta.value_type =
-                infer(context.interner, context.resolved_names, &item.value).map(|u| u.get_single_owned());
+            meta.value_type = infer(context.resolved_names, &item.value).map(|u| u.get_single_owned());
 
             meta
         }

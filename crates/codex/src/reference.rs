@@ -1,9 +1,12 @@
 use ahash::HashMap;
 use ahash::HashSet;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::empty_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::AtomSet;
 
 use crate::context::ScopeContext;
 use crate::diff::CodebaseDiff;
@@ -17,13 +20,13 @@ use crate::symbol::SymbolIdentifier;
 pub enum ReferenceSource {
     /// A reference from a top-level symbol (function, class, enum, trait, interface, constant).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
-    /// The StringIdentifier is the name (FQCN or FQN) of the referencing symbol.
-    Symbol(bool, StringIdentifier),
+    /// The Atom is the name (FQCN or FQN) of the referencing symbol.
+    Symbol(bool, Atom),
     /// A reference from a member within a class-like structure (method, property, class constant, enum case).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
-    /// The first StringIdentifier is the FQCN of the class-like structure.
-    /// The second StringIdentifier is the name of the member.
-    ClassLikeMember(bool, StringIdentifier, StringIdentifier),
+    /// The first Atom is the FQCN of the class-like structure.
+    /// The second Atom is the name of the member.
+    ClassLikeMember(bool, Atom, Atom),
 }
 
 /// Holds sets of symbols and members identified as invalid during analysis,
@@ -38,7 +41,7 @@ pub struct InvalidSymbols {
     invalid_symbol_and_member_bodies: HashSet<SymbolIdentifier>,
     /// Set of top-level symbols (class FQCN, function FQN) that are partially invalid,
     /// meaning at least one member's signature or body is invalid, but not necessarily the whole symbol.
-    partially_invalid_symbols: HashSet<StringIdentifier>,
+    partially_invalid_symbols: AtomSet,
 }
 
 /// Stores various maps tracking references between symbols (classes, functions, etc.)
@@ -89,7 +92,7 @@ impl SymbolReferences {
     #[inline]
     pub fn add_symbol_reference_to_class_member(
         &mut self,
-        referencing_symbol: StringIdentifier,
+        referencing_symbol: Atom,
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
@@ -97,7 +100,7 @@ impl SymbolReferences {
         self.add_symbol_reference_to_symbol(referencing_symbol, class_member.0, false);
 
         // Use empty member for the referencing symbol key
-        let key = (referencing_symbol, StringIdentifier::empty());
+        let key = (referencing_symbol, empty_atom());
         if in_signature {
             self.symbol_references_to_symbols_in_signature.entry(key).or_default().insert(class_member);
         } else {
@@ -114,19 +117,14 @@ impl SymbolReferences {
     /// * `symbol`: The FQN of the symbol being referenced.
     /// * `in_signature`: `true` if the reference occurs in a signature context, `false` if in the body.
     #[inline]
-    pub fn add_symbol_reference_to_symbol(
-        &mut self,
-        referencing_symbol: StringIdentifier,
-        symbol: StringIdentifier,
-        in_signature: bool,
-    ) {
+    pub fn add_symbol_reference_to_symbol(&mut self, referencing_symbol: Atom, symbol: Atom, in_signature: bool) {
         if referencing_symbol == symbol {
             return;
         }
 
         // Represent top-level symbols with an empty member identifier
-        let referencing_key = (referencing_symbol, StringIdentifier::empty());
-        let referenced_key = (symbol, StringIdentifier::empty());
+        let referencing_key = (referencing_symbol, empty_atom());
+        let referenced_key = (symbol, empty_atom());
 
         if in_signature {
             self.symbol_references_to_symbols_in_signature.entry(referencing_key).or_default().insert(referenced_key);
@@ -191,7 +189,7 @@ impl SymbolReferences {
     pub fn add_class_member_reference_to_symbol(
         &mut self,
         referencing_class_member: SymbolIdentifier,
-        symbol: StringIdentifier,
+        symbol: Atom,
         in_signature: bool,
     ) {
         if referencing_class_member.0 == symbol {
@@ -202,7 +200,7 @@ impl SymbolReferences {
         self.add_symbol_reference_to_symbol(referencing_class_member.0, symbol, false);
 
         // Represent the referenced symbol with an empty member identifier
-        let referenced_key = (symbol, StringIdentifier::empty());
+        let referenced_key = (symbol, empty_atom());
 
         if in_signature {
             self.symbol_references_to_symbols_in_signature
@@ -246,7 +244,7 @@ impl SymbolReferences {
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
             // Reference from the class scope itself (e.g., property default)
-            self.add_symbol_reference_to_class_member(*calling_class, class_member, in_signature)
+            self.add_symbol_reference_to_class_member(ascii_lowercase_atom(&calling_class), class_member, in_signature)
         }
         // If no context, the reference source is unknown/untracked in this map
     }
@@ -260,8 +258,8 @@ impl SymbolReferences {
     pub fn add_reference_for_property_access(
         &mut self,
         scope: &ScopeContext<'_>,
-        class_name: StringIdentifier,
-        property_name: StringIdentifier,
+        class_name: Atom,
+        property_name: Atom,
     ) {
         self.add_reference_to_class_member(scope, (class_name, property_name), false);
     }
@@ -272,7 +270,7 @@ impl SymbolReferences {
     pub fn add_reference_to_overridden_class_member(&mut self, scope: &ScopeContext, class_member: SymbolIdentifier) {
         let referencing_key = if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
-                FunctionLikeIdentifier::Function(function_name) => (StringIdentifier::empty(), function_name),
+                FunctionLikeIdentifier::Function(function_name) => (empty_atom(), function_name),
                 FunctionLikeIdentifier::Method(class_name, function_name) => (class_name, function_name),
                 _ => {
                     // A reference from a closure can be ignored for now.
@@ -280,7 +278,7 @@ impl SymbolReferences {
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            (*calling_class, StringIdentifier::empty())
+            (ascii_lowercase_atom(&calling_class), empty_atom())
         } else {
             return; // Cannot record reference without a source context
         };
@@ -291,7 +289,7 @@ impl SymbolReferences {
     /// Convenience method to add a reference *from* the current function context *to* a top-level symbol.
     /// Delegates to appropriate `add_*` methods based on the function context.
     #[inline]
-    pub fn add_reference_to_symbol(&mut self, scope: &ScopeContext, symbol: StringIdentifier, in_signature: bool) {
+    pub fn add_reference_to_symbol(&mut self, scope: &ScopeContext, symbol: Atom, in_signature: bool) {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
                 FunctionLikeIdentifier::Function(function_name) => {
@@ -305,7 +303,7 @@ impl SymbolReferences {
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            self.add_symbol_reference_to_symbol(*calling_class, symbol, in_signature)
+            self.add_symbol_reference_to_symbol(ascii_lowercase_atom(&calling_class), symbol, in_signature)
         }
     }
 
@@ -467,16 +465,13 @@ impl SymbolReferences {
     /// contains symbols with at least one invalid member.
     /// Returns `None` if the propagation exceeds an expense limit (currently 5000 steps).
     #[inline]
-    pub fn get_invalid_symbols(
-        &self,
-        codebase_diff: &CodebaseDiff,
-    ) -> Option<(HashSet<SymbolIdentifier>, HashSet<StringIdentifier>)> {
+    pub fn get_invalid_symbols(&self, codebase_diff: &CodebaseDiff) -> Option<(HashSet<SymbolIdentifier>, AtomSet)> {
         let mut invalid_signatures = HashSet::default();
-        let mut partially_invalid_symbols = HashSet::default();
+        let mut partially_invalid_symbols = AtomSet::default();
 
         for sig_ref_key in self.symbol_references_to_symbols_in_signature.keys() {
             // Represent the containing symbol (ignore member part for diff check)
-            let containing_symbol = (sig_ref_key.0, StringIdentifier::empty());
+            let containing_symbol = (sig_ref_key.0, empty_atom());
 
             if codebase_diff.contains_add_or_delete_entry(&containing_symbol) {
                 invalid_signatures.insert(*sig_ref_key);

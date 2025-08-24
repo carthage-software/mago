@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
@@ -64,7 +62,7 @@ impl TType for TPropertiesOf {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let mut id = String::new();
         if let Some(visibility) = &self.visibility {
             id += visibility.as_str();
@@ -72,7 +70,7 @@ impl TType for TPropertiesOf {
         }
 
         id += "properties-of<";
-        id += &self.target_type.get_id(interner);
+        id += &self.target_type.get_id();
         id += ">";
 
         id

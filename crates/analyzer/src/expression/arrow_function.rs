@@ -31,7 +31,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
     ) -> Result<(), AnalysisError> {
         let s = self.span();
 
-        let Some(function_metadata) = get_closure(context.codebase, context.interner, &s.file_id, &s.start) else {
+        let Some(function_metadata) = get_closure(context.codebase, &s.file_id, &s.start) else {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for arrow function defined in `{}` at offset {} not found.",
@@ -87,7 +87,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 &function_identifier,
                 function_metadata,
                 context.codebase,
-                context.interner,
                 &TypeExpansionOptions::default(),
             );
 
@@ -97,7 +96,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                     (*inferred_return).clone(),
                     inferred_return_type.as_ref(),
                     context.codebase,
-                    context.interner,
                 ));
             }
 

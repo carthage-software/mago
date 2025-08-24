@@ -1,13 +1,13 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AttributeMetadata {
-    pub name: StringIdentifier,
+    pub name: Atom,
     pub span: Span,
 }
 

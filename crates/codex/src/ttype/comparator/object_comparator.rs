@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-
 use crate::get_class_like;
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
@@ -15,7 +13,6 @@ use crate::uses_trait;
 
 pub(crate) fn is_shallowly_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_part: &TAtomic,
     container_type_part: &TAtomic,
     inside_assertion: bool,
@@ -26,14 +23,7 @@ pub(crate) fn is_shallowly_contained_by(
         && !container_intersection_types.is_empty()
     {
         for part in container_intersection_types {
-            if !is_shallowly_contained_by(
-                codebase,
-                interner,
-                input_type_part,
-                part,
-                inside_assertion,
-                atomic_comparison_result,
-            ) {
+            if !is_shallowly_contained_by(codebase, input_type_part, part, inside_assertion, atomic_comparison_result) {
                 return false;
             }
         }
@@ -45,7 +35,6 @@ pub(crate) fn is_shallowly_contained_by(
         for part in input_intersection_types {
             if is_shallowly_contained_by(
                 codebase,
-                interner,
                 part,
                 container_type_part,
                 inside_assertion,
@@ -58,7 +47,6 @@ pub(crate) fn is_shallowly_contained_by(
 
     is_intersection_shallowly_contained_by(
         codebase,
-        interner,
         input_type_part,
         container_type_part,
         inside_assertion,
@@ -68,7 +56,6 @@ pub(crate) fn is_shallowly_contained_by(
 
 pub(super) fn is_intersection_shallowly_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     intersection_input_type: &TAtomic,
     intersection_container_type: &TAtomic,
     inside_assertion: bool,
@@ -97,7 +84,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
                     GenericParent::ClassLike(container_defining_class),
                 ) => {
                     if input_defining_class != container_defining_class
-                        && let Some(input_class_metadata) = get_class_like(codebase, interner, input_defining_class)
+                        && let Some(input_class_metadata) = get_class_like(codebase, input_defining_class)
                         && let Some(defining_entity_params) =
                             &input_class_metadata.template_extended_parameters.get(container_defining_class)
                         && defining_entity_params.get(container_parameter_name).is_some()
@@ -138,7 +125,6 @@ pub(super) fn is_intersection_shallowly_contained_by(
 
         return union_comparator::is_contained_by(
             codebase,
-            interner,
             input_constraint,
             &wrap_atomic(intersection_container_type),
             false,
@@ -169,13 +155,11 @@ pub(super) fn is_intersection_shallowly_contained_by(
         return false;
     }
 
-    if is_instance_of(codebase, interner, &input_name, &container_name)
-        || uses_trait(codebase, interner, &input_name, &container_name)
-    {
+    if is_instance_of(codebase, &input_name, &container_name) || uses_trait(codebase, &input_name, &container_name) {
         return true;
     }
 
-    if is_instance_of(codebase, interner, &container_name, &input_name) {
+    if is_instance_of(codebase, &container_name, &input_name) {
         atomic_comparison_result.type_coerced = Some(true);
     }
 

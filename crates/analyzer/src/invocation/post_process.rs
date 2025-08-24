@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
 
@@ -12,6 +11,8 @@ use mago_algebra::assertion_set::add_and_assertion;
 use mago_algebra::assertion_set::add_and_clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::get_function_like_thrown_types;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -23,7 +24,6 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -53,7 +53,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     invoication: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: Option<String>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
     apply_assertions: bool,
 ) -> Result<(), AnalysisError> {
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
@@ -67,11 +67,10 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     };
 
     let (callable_kind_str, full_callable_name) = match identifier {
-        FunctionLikeIdentifier::Function(name_id) => ("function", format!("`{}`", context.interner.lookup(name_id))),
-        FunctionLikeIdentifier::Method(class_name_id, method_name_id) => (
-            "method",
-            format!("`{}::{}`", context.interner.lookup(class_name_id), context.interner.lookup(method_name_id)),
-        ),
+        FunctionLikeIdentifier::Function(name) => ("function", format!("`{name}`")),
+        FunctionLikeIdentifier::Method(class_name, method_name) => {
+            ("method", format!("`{}::{}`", class_name, method_name))
+        }
         FunctionLikeIdentifier::Closure(file_id, position) => (
             "closure",
             format!(
@@ -210,9 +209,9 @@ fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: &Option<String>,
-    assertions: &BTreeMap<StringIdentifier, Conjunction<Assertion>>,
+    assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
 ) {
     let type_assertions = resolve_invocation_assertion(
         context,
@@ -255,7 +254,7 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
 ) -> Result<(), AnalysisError> {
     let constraint_type = invocation.target.is_method_call();
 
@@ -322,9 +321,9 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: &Option<String>,
-    assertions: &BTreeMap<StringIdentifier, Disjunction<Assertion>>,
+    assertions: &BTreeMap<Atom, Disjunction<Assertion>>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
 ) -> IndexMap<String, AssertionSet> {
     let mut type_assertions: IndexMap<String, AssertionSet> = IndexMap::new();
     if assertions.is_empty() {
@@ -364,7 +363,6 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                             Assertion::IsType(_) => {
                                 if !can_expression_types_be_identical(
                                     context.codebase,
-                                    context.interner,
                                     asserted_type,
                                     &resolved_assertion_type,
                                     false,
@@ -502,11 +500,11 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    parameter_name: &StringIdentifier,
+    parameter_name: &Atom,
     this_variable: &Option<String>,
 ) -> (Option<&'ast Expression<'arena>>, Option<String>) {
     // First, check if the name refers to a special assertion target like `$this->...`
-    if let Some(resolved_id) = resolve_special_assertion_target(context, block_context, parameter_name, this_variable) {
+    if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
     }
 
@@ -523,7 +521,6 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// targets do not correspond to passed arguments.
 ///
 /// # Arguments
-/// * `context`: The analysis context, used for looking up string identifiers.
 /// * `block_context`: The context of the current block, used to get class scope information.
 /// * `target_name`: The string identifier for the assertion target (e.g., `'$this->prop'`).
 /// * `this_variable`: The name of the variable holding the object instance (`$this`), if any.
@@ -531,25 +528,21 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// # Returns
 /// * `Some(String)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
-fn resolve_special_assertion_target<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn resolve_special_assertion_target<'ctx>(
     block_context: &BlockContext<'ctx>,
-    target_name: &StringIdentifier,
+    target_name: &Atom,
     this_variable: &Option<String>,
 ) -> Option<String> {
-    let variable = context.interner.lookup(target_name);
-
     if let Some(this_variable) = this_variable
-        && variable.starts_with("$this")
+        && target_name.starts_with("$this")
     {
-        return Some(variable.replacen("$this", this_variable, 1));
+        return Some(target_name.replacen("$this", this_variable, 1));
     }
 
     if let Some(class) = block_context.scope.get_class_like_name()
-        && variable.starts_with("self::")
+        && target_name.starts_with("self::")
     {
-        let class_name = context.interner.lookup(class);
-        return Some(variable.replacen("self::", class_name, 1));
+        return Some(target_name.replacen("self::", &class, 1));
     }
 
     None
@@ -579,7 +572,7 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
-    mut parameter_name: Option<StringIdentifier>,
+    mut parameter_name: Option<Atom>,
 ) -> (Option<&'ast Expression<'arena>>, Option<String>) {
     // If neither name nor offset is provided, we can't do anything.
     if parameter_name.is_none() && parameter_offset.is_none() {
@@ -611,10 +604,8 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
 
     // a. Look for a named argument first.
     let find_by_name = || {
-        let name = parameter_name?;
-
-        let variable = context.interner.lookup(&name);
-        let variable_name = if let Some(variable) = variable.strip_prefix('$') { variable } else { variable };
+        let variable = parameter_name?;
+        let variable_name = if let Some(variable) = variable.strip_prefix('$') { variable } else { variable.as_str() };
 
         arguments.iter().find(|argument| {
             if let Some(named_argument) = argument.get_named_argument() {
@@ -640,7 +631,6 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
         argument_expression,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 

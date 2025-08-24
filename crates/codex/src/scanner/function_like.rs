@@ -1,5 +1,7 @@
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_docblock::tag::TypeString;
-use mago_interner::StringIdentifier;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -29,7 +31,7 @@ use crate::visibility::Visibility;
 
 #[inline]
 pub fn scan_method<'ctx, 'ast, 'arena>(
-    functionlike_id: (StringIdentifier, StringIdentifier),
+    functionlike_id: (Atom, Atom),
     method: &'ast Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
     context: &mut Context<'ctx, 'ast, 'arena>,
@@ -52,21 +54,21 @@ pub fn scan_method<'ctx, 'ast, 'arena>(
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span, flags);
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
-    metadata.name = Some(context.interner.intern(method.name.value.to_lowercase()));
-    metadata.original_name = Some(context.interner.intern(method.name.value));
+    metadata.name = Some(ascii_lowercase_atom(method.name.value));
+    metadata.original_name = Some(atom(method.name.value));
 
     metadata.name_span = Some(method.name.span);
     metadata.parameters = method
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, Some(&class_like_metadata.name), context))
+        .map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context))
         .collect();
 
     if let Some(return_hint) = method.return_type_hint.as_ref() {
         metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
-            Some(&class_like_metadata.name),
+            Some(class_like_metadata.name),
             context,
         )));
     }
@@ -100,16 +102,16 @@ pub fn scan_method<'ctx, 'ast, 'arena>(
 
     metadata.method_metadata = Some(method_metadata);
 
-    scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(&class_like_metadata.name), context, scope);
+    scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(class_like_metadata.name), context, scope);
 
     metadata
 }
 
 #[inline]
 pub fn scan_function<'ctx, 'ast, 'arena>(
-    functionlike_id: (StringIdentifier, StringIdentifier),
+    functionlike_id: (Atom, Atom),
     function: &'ast Function<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
@@ -137,8 +139,8 @@ pub fn scan_function<'ctx, 'ast, 'arena>(
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags);
 
-    metadata.name = Some(context.interner.intern(name.to_lowercase()));
-    metadata.original_name = Some(context.interner.intern(name));
+    metadata.name = Some(ascii_lowercase_atom(name));
+    metadata.original_name = Some(atom(name));
     metadata.name_span = Some(function.name.span);
     metadata.parameters = function
         .parameter_list
@@ -166,9 +168,9 @@ pub fn scan_function<'ctx, 'ast, 'arena>(
 
 #[inline]
 pub fn scan_closure<'ctx, 'ast, 'arena>(
-    functionlike_id: (StringIdentifier, StringIdentifier),
+    functionlike_id: (Atom, Atom),
     closure: &'ast Closure<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
@@ -217,9 +219,9 @@ pub fn scan_closure<'ctx, 'ast, 'arena>(
 
 #[inline]
 pub fn scan_arrow_function<'ctx, 'ast, 'arena>(
-    functionlike_id: (StringIdentifier, StringIdentifier),
+    functionlike_id: (Atom, Atom),
     arrow_function: &'ast ArrowFunction<'arena>,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
@@ -268,9 +270,9 @@ pub fn scan_arrow_function<'ctx, 'ast, 'arena>(
 
 fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     span: Span,
-    functionlike_id: (StringIdentifier, StringIdentifier),
+    functionlike_id: (Atom, Atom),
     metadata: &mut FunctionLikeMetadata,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &mut NamespaceScope,
 ) {
@@ -328,16 +330,9 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
 
     let mut type_context = metadata.type_resolution_context.clone().unwrap_or_default();
     for template in docblock.templates.iter() {
-        let template_name = context.interner.intern(&template.name);
+        let template_name = atom(&template.name);
         let template_as_type = if let Some(type_string) = &template.type_string {
-            match builder::get_type_from_string(
-                &type_string.value,
-                type_string.span,
-                scope,
-                &type_context,
-                classname,
-                context.interner,
-            ) {
+            match builder::get_type_from_string(&type_string.value, type_string.span, scope, &type_context, classname) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
                     metadata.issues.push(
@@ -360,7 +355,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
         let definition = vec![(GenericParent::FunctionLike(functionlike_id), template_as_type)];
 
         metadata.add_template_type((template_name, definition.clone()));
-        type_context = type_context.with_template_definition(template.name.clone(), definition);
+        type_context = type_context.with_template_definition(template_name, definition);
     }
 
     for parameter_tag in docblock.parameters {
@@ -369,10 +364,10 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
         let is_variadic = parameter_tag.name.starts_with("...");
         if is_variadic {
             parameter_name_str = &parameter_tag.name[3..];
-            parameter_name = context.interner.intern(parameter_name_str);
+            parameter_name = atom(parameter_name_str);
         } else {
             parameter_name_str = &parameter_tag.name;
-            parameter_name = context.interner.intern(parameter_name_str);
+            parameter_name = atom(parameter_name_str);
         }
 
         let param_type_string = &parameter_tag.type_string;
@@ -414,7 +409,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
             );
         }
 
-        match get_type_metadata_from_type_string(param_type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(param_type_string, classname, &type_context, scope) {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.flags.is_variadic()
@@ -447,7 +442,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     for param_out in docblock.parameters_out {
-        let param_name = context.interner.intern(&param_out.name);
+        let param_name = atom(&param_out.name);
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
             metadata.issues.push(
@@ -479,7 +474,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        match get_type_metadata_from_type_string(&param_out.type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&param_out.type_string, classname, &type_context, scope) {
             Ok(parameter_out_type) => {
                 parameter_metadata.out_type = Some(parameter_out_type);
             }
@@ -498,7 +493,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     if let Some(return_type) = docblock.return_type.as_ref() {
-        match get_type_metadata_from_type_string(&return_type.type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&return_type.type_string, classname, &type_context, scope) {
             Ok(return_type_signature) => metadata.set_return_type_metadata(Some(return_type_signature)),
             Err(typing_error) => {
                 metadata.issues.push(
@@ -545,9 +540,9 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        match get_type_metadata_from_type_string(&where_tag.type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&where_tag.type_string, classname, &type_context, scope) {
             Ok(constraint_type) => {
-                let template_name = context.interner.intern(&where_tag.name);
+                let template_name = atom(&where_tag.name);
 
                 method_metadata.where_constraints.insert(template_name, constraint_type);
             }
@@ -562,7 +557,7 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     for thrown in docblock.throws {
-        match get_type_metadata_from_type_string(&thrown.type_string, classname, &type_context, context, scope) {
+        match get_type_metadata_from_type_string(&thrown.type_string, classname, &type_context, scope) {
             Ok(thrown_type) => {
                 metadata.thrown_types.push(thrown_type);
             }
@@ -581,10 +576,9 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     for assertion_tag in docblock.assertions {
-        let assertion_param_name = context.interner.intern(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.parameter_name);
 
-        let assertions =
-            parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
+        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -592,10 +586,9 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     for assertion_tag in docblock.if_true_assertions {
-        let assertion_param_name = context.interner.intern(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.parameter_name);
 
-        let assertions =
-            parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
+        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.if_true_assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -603,10 +596,9 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 
     for assertion_tag in docblock.if_false_assertions {
-        let assertion_param_name = context.interner.intern(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.parameter_name);
 
-        let assertions =
-            parse_assertion_string(assertion_tag.type_string, classname, &type_context, context, scope, metadata);
+        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.if_false_assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -628,11 +620,10 @@ fn scan_function_like_docblock<'ctx, 'ast, 'arena>(
     }
 }
 
-fn parse_assertion_string<'ctx, 'ast, 'arena>(
+fn parse_assertion_string(
     mut type_string: TypeString,
-    classname: Option<&StringIdentifier>,
+    classname: Option<Atom>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'ctx, 'ast, 'arena>,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
 ) -> Vec<Assertion> {
@@ -675,7 +666,7 @@ fn parse_assertion_string<'ctx, 'ast, 'arena>(
         type_string.span = type_string.span.from_start(type_string.span.start + 1);
     }
 
-    match get_type_metadata_from_type_string(&type_string, classname, type_context, context, scope) {
+    match get_type_metadata_from_type_string(&type_string, classname, type_context, scope) {
         Ok(type_metadata) => match (is_equal, is_negation) {
             (true, true) => {
                 for atomic in type_metadata.type_union.types.into_owned() {

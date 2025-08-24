@@ -195,8 +195,8 @@ fn verify_construct_input_type<'ctx, 'ast, 'arena>(
         );
     }
 
-    let input_type_str = input_type.get_id(Some(context.interner));
-    let parameter_type_str = parameter_type.get_id(Some(context.interner));
+    let input_type_str = input_type.get_id();
+    let parameter_type_str = parameter_type.get_id();
 
     if !parameter_type.accepts_null() {
         if input_type.is_null() {
@@ -253,7 +253,6 @@ fn verify_construct_input_type<'ctx, 'ast, 'arena>(
     let mut comparison = ComparisonResult::new();
     if union_comparator::is_contained_by(
         context.codebase,
-        context.interner,
         input_type,
         parameter_type,
         true,
@@ -527,31 +526,25 @@ fn report_invalid_or_possibly_invalid_input<'ctx, 'ast, 'arena>(
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
 
-    let issue = if union_comparator::can_expression_types_be_identical(
-        context.codebase,
-        context.interner,
-        in_type,
-        param_type,
-        false,
-        false,
-    ) {
-        Issue::error(format!("The {position} {term} for `{kind}` might have the wrong type."))
-            .with_code(IssueCode::PossiblyInvalidArgument)
-            .with_annotation(Annotation::primary(expr.span()).with_message(format!(
-                "This is `{in_type_str}`, which only sometimes overlaps with `{param_type_str}`"
-            )))
-            .with_annotation(Annotation::secondary(keyword.span()).with_message(format!("`{kind}` called here")))
-            .with_help("Add a type check to ensure the value is what you expect.")
-    } else {
-        Issue::error(format!("Invalid type for the {position} {term}."))
-            .with_code(IssueCode::InvalidArgument)
-            .with_annotation(
-                Annotation::primary(expr.span())
-                    .with_message(format!("This is type `{in_type_str}`, but expected `{param_type_str}`")),
-            )
-            .with_annotation(Annotation::secondary(keyword.span()).with_message(format!("`{kind}` called here")))
-            .with_help("Adjust the value to match the expected type.")
-    };
+    let issue =
+        if union_comparator::can_expression_types_be_identical(context.codebase, in_type, param_type, false, false) {
+            Issue::error(format!("The {position} {term} for `{kind}` might have the wrong type."))
+                .with_code(IssueCode::PossiblyInvalidArgument)
+                .with_annotation(Annotation::primary(expr.span()).with_message(format!(
+                    "This is `{in_type_str}`, which only sometimes overlaps with `{param_type_str}`"
+                )))
+                .with_annotation(Annotation::secondary(keyword.span()).with_message(format!("`{kind}` called here")))
+                .with_help("Add a type check to ensure the value is what you expect.")
+        } else {
+            Issue::error(format!("Invalid type for the {position} {term}."))
+                .with_code(IssueCode::InvalidArgument)
+                .with_annotation(
+                    Annotation::primary(expr.span())
+                        .with_message(format!("This is type `{in_type_str}`, but expected `{param_type_str}`")),
+                )
+                .with_annotation(Annotation::secondary(keyword.span()).with_message(format!("`{kind}` called here")))
+                .with_help("Adjust the value to match the expected type.")
+        };
 
     context.collector.report(issue);
 }

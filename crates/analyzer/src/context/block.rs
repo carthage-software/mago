@@ -6,6 +6,7 @@ use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_algebra::clause::Clause;
+use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
@@ -17,7 +18,6 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 use mago_span::Span;
 
 use crate::context::Context;
@@ -104,7 +104,7 @@ pub struct BlockContext<'ctx> {
     pub loop_bounds: (u32, u32),
     pub if_body_context: Option<Rc<RefCell<Self>>>,
     pub control_actions: HashSet<ControlAction>,
-    pub possibly_thrown_exceptions: HashMap<StringIdentifier, HashSet<Span>>,
+    pub possibly_thrown_exceptions: AtomMap<HashSet<Span>>,
 }
 
 impl BreakContext {
@@ -178,7 +178,7 @@ impl<'ctx> BlockContext<'ctx> {
             loop_bounds: (0, 0),
             if_body_context: None,
             control_actions: HashSet::default(),
-            possibly_thrown_exceptions: HashMap::default(),
+            possibly_thrown_exceptions: AtomMap::default(),
         }
     }
 
@@ -608,7 +608,7 @@ fn substitute_types<'ctx, 'arena>(
     let updated_type =
         if existing_type.eq(&old_type) { get_mixed() } else { subtract_union_types(context, existing_type, old_type) };
 
-    add_optional_union_type(updated_type, new_type, context.codebase, context.interner)
+    add_optional_union_type(updated_type, new_type, context.codebase)
 }
 
 /// Subtracts the types in `type_to_remove` from `existing_type`.
@@ -623,7 +623,7 @@ fn substitute_types<'ctx, 'arena>(
 ///
 /// # Arguments
 ///
-/// * `context` - The reconciliation context, providing access to codebase and interner.
+/// * `context` - The reconciliation context, and providing access to codebase.
 /// * `existing_type` - The initial `TUnion` type (the minuend).
 /// * `type_to_remove` - The `TUnion` type whose components should be subtracted from `existing_type`.
 ///
@@ -642,7 +642,6 @@ pub fn subtract_union_types<'ctx, 'arena>(
     if !(existing_type.has_literal_value() && type_to_remove.has_literal_value())
         && union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &existing_type,
             &type_to_remove,
             false,
@@ -657,7 +656,7 @@ pub fn subtract_union_types<'ctx, 'arena>(
     let mut result = existing_type;
     for atomic in type_to_remove.types.into_owned() {
         let assertion = Assertion::IsNotType(atomic);
-        let key = result.get_id(Some(context.interner));
+        let key = result.get_id();
 
         result = negated_assertion_reconciler::reconcile(context, &assertion, &result, false, None, key, None, true);
         if result.is_never() {

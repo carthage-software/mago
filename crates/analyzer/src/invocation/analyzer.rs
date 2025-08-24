@@ -3,6 +3,9 @@ use std::borrow::Cow;
 use ahash::HashMap;
 use itertools::Itertools;
 
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::concat_atom;
 use mago_codex::get_class_like;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -13,7 +16,6 @@ use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::*;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -54,19 +56,17 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    calling_class_like: Option<(StringIdentifier, Option<&TAtomic>)>,
+    calling_class_like: Option<(Atom, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
-    parameter_types: &mut HashMap<StringIdentifier, TUnion>,
+    parameter_types: &mut AtomMap<TUnion>,
 ) -> Result<(), AnalysisError> {
-    fn get_parameter_of_argument<'invocation, 'ctx, 'ast, 'arena>(
-        context: &Context<'ctx, 'arena>,
+    fn get_parameter_of_argument<'invocation, 'ast, 'arena>(
         parameters: &[InvocationTargetParameter<'invocation>],
         argument: &InvocationArgument<'ast, 'arena>,
         mut argument_offset: usize,
     ) -> Option<(usize, InvocationTargetParameter<'invocation>)> {
         if let Some(named_argument) = argument.get_named_argument() {
-            let argument_variable_name_str = format!("${}", named_argument.name.value);
-            let argument_variable_name = context.interner.intern(&argument_variable_name_str);
+            let argument_variable_name = concat_atom!("$", named_argument.name.value);
 
             let named_offset = parameters.iter().position(|parameter| {
                 let Some(parameter_name) = parameter.get_name() else {
@@ -107,15 +107,14 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         }
     }
 
-    let calling_class_like_metadata =
-        calling_class_like.and_then(|(id, _)| get_class_like(context.codebase, context.interner, &id));
+    let calling_class_like_metadata = calling_class_like.and_then(|(id, _)| get_class_like(context.codebase, &id));
     let base_class_metadata =
         invocation.target.get_method_context().map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let method_call_context = invocation.target.get_method_context();
 
     for (argument_offset, argument) in &non_closure_arguments {
         let argument_expression = argument.value();
-        let parameter = get_parameter_of_argument(context, &parameter_refs, argument, *argument_offset);
+        let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
 
         analyze_and_store_argument_type(
             context,
@@ -156,7 +155,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 
     for (argument_offset, argument) in &closure_arguments {
         let argument_expression = argument.value();
-        let parameter = get_parameter_of_argument(context, &parameter_refs, argument, *argument_offset);
+        let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
         let mut parameter_type_had_template_types = false;
         let parameter_type = if let Some((_, parameter_ref)) = parameter {
             let base_parameter_type = get_parameter_type(
@@ -170,12 +169,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             if base_parameter_type.has_template_types() {
                 parameter_type_had_template_types = true;
 
-                Some(inferred_type_replacer::replace(
-                    &base_parameter_type,
-                    template_result,
-                    context.codebase,
-                    context.interner,
-                ))
+                Some(inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase))
             } else {
                 Some(base_parameter_type)
             }
@@ -228,7 +222,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
     let mut assigned_parameters_by_position = HashMap::default();
 
     let target_kind_str = invocation.target.guess_kind();
-    let target_name_str = invocation.target.guess_name(context.interner);
+    let target_name_str = invocation.target.guess_name();
     let mut has_too_many_arguments = false;
     let mut last_argument_offset: isize = -1;
     for (argument_offset, argument) in
@@ -240,7 +234,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             .cloned()
             .unwrap_or_else(|| (get_mixed(), argument_expression.span()));
 
-        let parameter_ref = get_parameter_of_argument(context, &parameter_refs, argument, *argument_offset);
+        let parameter_ref = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
         if let Some((parameter_offset, parameter_ref)) = parameter_ref {
             if let Some(parameter_name) = parameter_ref.get_name() {
                 parameter_types.insert(parameter_name.0, argument_value_type.clone());
@@ -306,12 +300,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             );
 
             let final_parameter_type = if template_result.has_template_types() {
-                inferred_type_replacer::replace(
-                    &base_parameter_type,
-                    template_result,
-                    context.codebase,
-                    context.interner,
-                )
+                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
             } else {
                 base_parameter_type
             };
@@ -348,7 +337,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                         parameter_refs
                             .iter()
                             .filter_map(|p| p.get_name())
-                            .map(|n| context.interner.lookup(&n.0).trim_start_matches('$'))
+                            .map(|n| n.0.trim_start_matches('$'))
                             .collect::<Vec<_>>()
                             .join("`, `")
                     )
@@ -421,12 +410,8 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     calling_class_like.and_then(|(_, atomic)| atomic),
                 );
 
-                let final_variadic_parameter_type = inferred_type_replacer::replace(
-                    &base_variadic_parameter_type,
-                    template_result,
-                    context.codebase,
-                    context.interner,
-                );
+                let final_variadic_parameter_type =
+                    inferred_type_replacer::replace(&base_variadic_parameter_type, template_result, context.codebase);
 
                 for unpacked_argument in unpacked_arguments {
                     let argument_expression = unpacked_argument.value();
@@ -478,7 +463,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     Issue::error(format!(
                         "Cannot unpack arguments into non-variadic {} `{}`.",
                         invocation.target.guess_kind(),
-                        invocation.target.guess_name(context.interner),
+                        invocation.target.guess_name(),
                     ))
                     .with_annotation(
                         Annotation::primary(unpacked_arguments[0].span())
@@ -494,7 +479,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                 Issue::error(format!(
                     "Cannot unpack arguments into {} `{}` which expects no arguments.",
                     invocation.target.guess_kind(),
-                    invocation.target.guess_name(context.interner)
+                    invocation.target.guess_name()
                 ))
                 .with_annotation(
                     Annotation::primary(unpacked_arguments[0].span()).with_message("Unexpected argument unpacking"),
@@ -599,7 +584,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 ///
 /// # Arguments
 ///
-/// * `context` - The analysis context, providing codebase and interner access.
+/// * `context` - The analysis context, providing codebase metadata.
 /// * `parameter_ref` - An optional reference to the parameter's definition (either `FunctionLike` or `Callable`).
 /// * `base_class_metadata` - Optional metadata for the class where the method is *defined*. Used for resolving `self::` and `parent::`.
 /// * `calling_class_like_metadata` - Optional metadata for the class context from which the call is made. Used for resolving `static::`.
@@ -627,10 +612,9 @@ fn get_parameter_type<'ctx, 'arena>(
 
     expander::expand_union(
         context.codebase,
-        context.interner,
         &mut resolved_parameter_type,
         &TypeExpansionOptions {
-            self_class: base_class_metadata.map(|meta| &meta.name),
+            self_class: base_class_metadata.map(|meta| meta.name),
             static_class_type: match calling_class_like_metadata {
                 Some(calling_meta) => {
                     if let Some(TAtomic::Object(instance_type)) = calling_instance_type {
@@ -641,7 +625,7 @@ fn get_parameter_type<'ctx, 'arena>(
                 }
                 None => StaticClassType::None,
             },
-            parent_class: base_class_metadata.and_then(|meta| meta.direct_parent_class.as_ref()),
+            parent_class: base_class_metadata.and_then(|meta| meta.direct_parent_class),
             function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.flags.is_final()),
             ..Default::default()
         },

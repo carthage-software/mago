@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -41,12 +41,12 @@ pub enum TClassLikeString {
     },
     Generic {
         kind: TClassLikeStringKind,
-        parameter_name: StringIdentifier,
+        parameter_name: Atom,
         defining_entity: GenericParent,
         constraint: Box<TAtomic>,
     },
     Literal {
-        value: StringIdentifier,
+        value: Atom,
     },
     OfType {
         kind: TClassLikeStringKind,
@@ -71,7 +71,7 @@ impl TClassLikeString {
     #[inline]
     pub fn generic(
         kind: TClassLikeStringKind,
-        parameter_name: StringIdentifier,
+        parameter_name: Atom,
         defining_entity: GenericParent,
         constraint: TAtomic,
     ) -> Self {
@@ -80,7 +80,7 @@ impl TClassLikeString {
 
     /// Creates a new `class-string` instance with a literal value.
     #[inline]
-    pub const fn literal(value: StringIdentifier) -> Self {
+    pub const fn literal(value: Atom) -> Self {
         Self::Literal { value }
     }
 
@@ -209,7 +209,7 @@ impl TClassLikeString {
 
     /// Returns the literal string value (class/interface/enum name) if this is a `Literal` variant.
     #[inline]
-    pub fn literal_value(&self) -> Option<StringIdentifier> {
+    pub fn literal_value(&self) -> Option<Atom> {
         match self {
             Self::Literal { value } => Some(*value),
             _ => None,
@@ -228,7 +228,7 @@ impl TClassLikeString {
 
     /// Returns the generic parameter name if this is a `Generic` variant.
     #[inline]
-    pub fn generic_parameter_name(&self) -> Option<StringIdentifier> {
+    pub fn generic_parameter_name(&self) -> Option<Atom> {
         match self {
             Self::Generic { parameter_name, .. } => Some(*parameter_name),
             _ => None,
@@ -246,7 +246,7 @@ impl TClassLikeString {
 
     /// Returns the atomic type representation of the object type this string refers to.
     #[inline]
-    pub fn get_object_type(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> TAtomic {
+    pub fn get_object_type(&self, codebase: &CodebaseMetadata) -> TAtomic {
         match self {
             TClassLikeString::Any { .. } => TAtomic::Object(TObject::Any),
             TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
@@ -257,9 +257,7 @@ impl TClassLikeString {
                 ))
             }
             TClassLikeString::Literal { value } => {
-                let lowered_value = interner.lowered(value);
-
-                if codebase.symbols.contains_enum(&lowered_value) {
+                if codebase.symbols.contains_enum(&ascii_lowercase_atom(value)) {
                     TAtomic::Object(TObject::Enum(TEnum::new(*value)))
                 } else {
                     TAtomic::Object(TObject::Named(TNamedObject::new(*value)))
@@ -299,27 +297,15 @@ impl TType for TClassLikeString {
         }
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
             TClassLikeString::Any { kind } => kind.to_string(),
             TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint, .. } => {
-                format!(
-                    "{kind}<'{}.{} extends {}>",
-                    if let Some(interner) = interner {
-                        interner.lookup(parameter_name).to_string()
-                    } else {
-                        parameter_name.to_string()
-                    },
-                    defining_entity.to_string(interner),
-                    constraint.get_id(interner)
-                )
+                format!("{kind}<'{}.{} extends {}>", parameter_name, defining_entity, constraint.get_id())
             }
-            TClassLikeString::Literal { value } => match interner {
-                Some(interner) => format!("class-string<{}>", interner.lookup(value)),
-                None => format!("class-string<{value}>"),
-            },
+            TClassLikeString::Literal { value } => format!("class-string<{value}>"),
             TClassLikeString::OfType { kind, constraint } => {
-                format!("{kind}<{}>", constraint.get_id(interner))
+                format!("{kind}<{}>", constraint.get_id())
             }
         }
     }

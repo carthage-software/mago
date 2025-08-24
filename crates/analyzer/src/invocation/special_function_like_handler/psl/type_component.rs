@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
@@ -24,7 +25,7 @@ pub struct TypeComponentFunctionsHandler;
 impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
     fn get_return_type<'ctx, 'ast, 'arena>(
         &self,
-        context: &mut Context<'ctx, 'arena>,
+        _context: &mut Context<'ctx, 'arena>,
         _block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like_name: &str,
@@ -73,7 +74,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
 
                         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(
                             TNamedObject::new_with_type_parameters(
-                                context.interner.intern("Psl\\Type\\TypeInterface"),
+                                atom("Psl\\Type\\TypeInterface"),
                                 Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::List(TList {
                                     element_type: if allows_unknown_elements {
                                         Box::new(get_mixed())
@@ -104,7 +105,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
 
                         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(
                             TNamedObject::new_with_type_parameters(
-                                context.interner.intern("Psl\\Type\\TypeInterface"),
+                                atom("Psl\\Type\\TypeInterface"),
                                 Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     parameters: if allows_unknown_elements {
                                         Some((Box::new(get_arraykey()), Box::new(get_mixed())))

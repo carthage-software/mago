@@ -1,3 +1,4 @@
+use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -208,7 +209,7 @@ pub(crate) fn reconcile(
                         continue;
                     }
                     TAtomic::Iterable(iterable) => {
-                        let mut traversable = TNamedObject::new(context.interner.intern("Traversable"))
+                        let mut traversable = TNamedObject::new(atom("Traversable"))
                             .with_type_parameters(Some(vec![*iterable.key_type.clone(), *iterable.value_type.clone()]));
 
                         if let Some(intersections) = iterable.get_intersection_types() {
@@ -656,7 +657,7 @@ fn subtract_arraykey(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
     let mut did_remove_type = false;
     let existing_var_types = existing_var_type.types.as_ref();
     let mut existing_var_type = existing_var_type.clone();
@@ -718,7 +719,7 @@ fn subtract_bool(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -898,7 +899,7 @@ fn subtract_false(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -965,7 +966,7 @@ fn subtract_true(
         return existing_var_type.clone();
     }
 
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
     let mut existing_var_type = existing_var_type.clone();
@@ -1069,11 +1070,11 @@ fn reconcile_falsy_or_empty(
                 }
                 TAtomic::Scalar(TScalar::String(s)) => {
                     if !s.is_non_empty {
-                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string("".to_owned())));
+                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(atom(""))));
                     }
 
                     if !is_empty_assertion {
-                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string("0".to_owned())));
+                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(atom("0"))));
                     }
                 }
                 TAtomic::Scalar(TScalar::Integer(i)) => {
@@ -1242,15 +1243,7 @@ fn reconcile_not_in_array(
     if let Some(key) = key
         && let Some(pos) = span
     {
-        trigger_issue_for_impossible(
-            context,
-            &existing_var_type.get_id(Some(context.interner)),
-            key,
-            assertion,
-            true,
-            negated,
-            pos,
-        );
+        trigger_issue_for_impossible(context, &existing_var_type.get_id(), key, assertion, true, negated, pos);
     }
 
     get_mixed()
@@ -1281,7 +1274,6 @@ fn reconcile_no_array_key(
                     } else if let Some((key_parameter, _)) = parameters
                         && union_comparator::can_expression_types_be_identical(
                             context.codebase,
-                            context.interner,
                             &key_name.to_general_union(),
                             key_parameter,
                             false,
@@ -1293,7 +1285,6 @@ fn reconcile_no_array_key(
                 } else if let Some((key_parameter, _)) = parameters
                     && union_comparator::can_expression_types_be_identical(
                         context.codebase,
-                        context.interner,
                         &key_name.to_general_union(),
                         key_parameter,
                         false,

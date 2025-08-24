@@ -17,7 +17,7 @@ mago-codex = { workspace = true }
 mago-reporting = { workspace = true }
 mago-fixer = { workspace = true }
 mago-syntax = { workspace = true }
-mago-interner = { workspace = true }
+mago-atom = { workspace = true }
 mago-span = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }

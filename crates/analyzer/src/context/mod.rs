@@ -1,12 +1,11 @@
 use bumpalo::Bump;
+use mago_atom::Atom;
 use mago_codex::function_exists;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::resolution::TypeResolutionContext;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_docblock::document::Document;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -33,7 +32,6 @@ pub mod utils;
 #[derive(Debug)]
 pub struct Context<'ctx, 'arena> {
     pub(super) arena: &'arena Bump,
-    pub(super) interner: &'ctx ThreadedInterner,
     pub(super) codebase: &'ctx CodebaseMetadata,
     pub(super) source_file: &'ctx File,
     pub(super) resolved_names: &'ctx ResolvedNames<'arena>,
@@ -48,7 +46,6 @@ pub struct Context<'ctx, 'arena> {
 impl<'ctx, 'arena> Context<'ctx, 'arena> {
     pub fn new(
         arena: &'arena Bump,
-        interner: &'ctx ThreadedInterner,
         codebase: &'ctx CodebaseMetadata,
         source: &'ctx File,
         resolved_names: &'ctx ResolvedNames<'arena>,
@@ -59,7 +56,6 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     ) -> Self {
         Self {
             arena,
-            interner,
             codebase,
             source_file: source,
             resolved_names,
@@ -107,16 +103,16 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
             return stripped;
         }
 
-        let fqfn_id = self.resolved_names.get(&identifier);
-        if function_exists(self.codebase, self.interner, &self.interner.intern(fqfn_id)) {
-            return fqfn_id;
+        let fqfn = self.resolved_names.get(&identifier);
+        if function_exists(self.codebase, fqfn) {
+            return fqfn;
         }
 
-        if !name.contains('\\') && function_exists(self.codebase, self.interner, &self.interner.intern(name)) {
+        if !name.contains('\\') && function_exists(self.codebase, name) {
             return name;
         }
 
-        fqfn_id
+        fqfn
     }
 
     pub fn get_assertion_context_from_block(
@@ -127,14 +123,10 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 
     #[inline]
-    pub fn get_assertion_context(
-        &self,
-        this_class_name: Option<&'ctx StringIdentifier>,
-    ) -> AssertionContext<'ctx, 'arena> {
+    pub fn get_assertion_context(&self, this_class_name: Option<Atom>) -> AssertionContext<'ctx, 'arena> {
         AssertionContext {
             arena: self.arena,
             resolved_names: self.resolved_names,
-            interner: self.interner,
             codebase: self.codebase,
             this_class_name,
         }

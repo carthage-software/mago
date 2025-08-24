@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -36,25 +35,25 @@ impl TObject {
 
     /// Creates a new `Object` representing a specific named object type (default flags).
     #[inline]
-    pub fn new_named(name: StringIdentifier) -> Self {
+    pub fn new_named(name: Atom) -> Self {
         TObject::Named(TNamedObject::new(name))
     }
 
     /// Creates a new `Object` representing `$this` for a given class name.
     #[inline]
-    pub fn new_named_this(name: StringIdentifier) -> Self {
+    pub fn new_named_this(name: Atom) -> Self {
         TObject::Named(TNamedObject::new_this(name))
     }
 
     /// Creates a new `TObject` representing an enum.
     #[inline]
-    pub fn new_enum(name: StringIdentifier) -> Self {
+    pub fn new_enum(name: Atom) -> Self {
         TObject::Enum(TEnum::new(name))
     }
 
     /// Creates a new `TObject` representing an enum case.
     #[inline]
-    pub fn new_enum_case(name: StringIdentifier, case: StringIdentifier) -> Self {
+    pub fn new_enum_case(name: Atom, case: Atom) -> Self {
         TObject::Enum(TEnum::new_case(name, case))
     }
 
@@ -108,7 +107,7 @@ impl TObject {
 
     /// Returns the primary name identifier if this is a `Named` or `Enum` variant.
     #[inline]
-    pub const fn get_name(&self) -> Option<&StringIdentifier> {
+    pub const fn get_name(&self) -> Option<&Atom> {
         match self {
             TObject::Any => None,
             TObject::Enum(enum_object) => Some(&enum_object.name),
@@ -192,11 +191,11 @@ impl TType for TObject {
         }
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
             TObject::Any => "object".to_string(),
-            TObject::Enum(enum_object) => enum_object.get_id(interner),
-            TObject::Named(named_object) => named_object.get_id(interner),
+            TObject::Enum(enum_object) => enum_object.get_id(),
+            TObject::Named(named_object) => named_object.get_id(),
         }
     }
 }

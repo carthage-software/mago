@@ -2,8 +2,6 @@ use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 
 /// Represents PHP float types: general `float` or a specific literal like `12.3`.
@@ -75,7 +73,7 @@ impl TType for TFloat {
         false
     }
 
-    fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self.value {
             Some(value) => format!("float({value})"),
             None => "float".to_string(),

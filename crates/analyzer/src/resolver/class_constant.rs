@@ -1,3 +1,4 @@
+use mago_atom::Atom;
 use mago_codex::get_class_like;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -10,7 +11,6 @@ use mago_codex::ttype::get_class_string;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -79,7 +79,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
         for selector_resolution in &selectors {
             // Handle `::class` magic constant
             if let ResolvedSelector::Identifier(const_name) = selector_resolution
-                && context.interner.lookup(const_name).eq_ignore_ascii_case("class")
+                && const_name.eq_ignore_ascii_case("class")
             {
                 if let Some(const_type) = handle_class_magic_constant(
                     context,
@@ -97,7 +97,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
                 continue;
             }
 
-            let Some(fq_class_id) = class_resolution.fq_class_id else {
+            let Some(fq_class_id) = class_resolution.fqcn else {
                 result.has_ambiguous_path = true;
                 report_ambiguous_constant_access(context, class_expr);
                 continue 'resolved_classes;
@@ -114,7 +114,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
             };
 
             // Handle regular constants and enum cases
-            let Some(metadata) = get_class_like(context.codebase, context.interner, &fq_class_id) else {
+            let Some(metadata) = get_class_like(context.codebase, &fq_class_id) else {
                 result.has_invalid_path = true;
                 report_non_existent_class(context, &fq_class_id, class_expr.span());
                 continue;
@@ -162,7 +162,7 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
         return None;
     }
 
-    let class_string = match class_resolution.fq_class_id {
+    let class_string = match class_resolution.fqcn {
         Some(fq_class_id) => {
             artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, fq_class_id, false);
 
@@ -171,7 +171,7 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
             } else {
                 TScalar::ClassLikeString(TClassLikeString::of_type(
                     TClassLikeStringKind::Class,
-                    class_resolution.get_object_type(context.codebase, context.interner),
+                    class_resolution.get_object_type(context.codebase),
                 ))
             }
         }
@@ -185,7 +185,7 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
 fn find_constant_in_class<'ctx>(
     context: &mut Context<'ctx, '_>,
     metadata: &'ctx ClassLikeMetadata,
-    const_name: StringIdentifier,
+    const_name: Atom,
     class_span: Span,
     const_span: Span,
 ) -> Option<ResolvedConstant> {
@@ -215,14 +215,13 @@ fn find_constant_in_class<'ctx>(
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.
-fn report_non_existent_class(context: &mut Context<'_, '_>, class_id: &StringIdentifier, class_span: Span) {
-    let class_name_str = context.interner.lookup(class_id);
+fn report_non_existent_class(context: &mut Context<'_, '_>, classname: &Atom, class_span: Span) {
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
-        Issue::error(format!("Class, interface, enum, or trait `{class_name_str}` not found."))
+        Issue::error(format!("Class, interface, enum, or trait `{classname}` not found."))
             .with_annotation(
                 Annotation::primary(class_span)
-                    .with_message(format!("`{class_name_str}` is not defined or cannot be found")),
+                    .with_message(format!("`{classname}` is not defined or cannot be found")),
             )
             .with_help(
                 "Ensure the name is correct, including its namespace, and that it's properly defined and autoloadable.",
@@ -233,38 +232,34 @@ fn report_non_existent_class(context: &mut Context<'_, '_>, class_id: &StringIde
 fn report_non_existent_constant<'ctx>(
     context: &mut Context<'ctx, '_>,
     metadata: &'ctx ClassLikeMetadata,
-    const_name: StringIdentifier,
+    const_name: Atom,
     class_span: Span,
     const_span: Span,
 ) {
     let class_kind_str = metadata.kind.as_str();
-    let class_str = context.interner.lookup(&metadata.original_name);
-    let constant_name_str = context.interner.lookup(&const_name);
+    let class_str = &metadata.original_name;
 
     let (main_message, primary_annotation_message) = if metadata.kind.is_enum() {
         (
-            format!("Enum constant or case `{constant_name_str}` does not exist."),
-            format!("Constant or case `{constant_name_str}` not found in enum `{class_str}`"),
+            format!("Enum constant or case `{const_name}` does not exist."),
+            format!("Constant or case `{const_name}` not found in enum `{class_str}`"),
         )
     } else {
         (
-            format!("Class-like constant `{constant_name_str}` does not exist."),
-            format!("Constant `{constant_name_str}` not found in `{class_str}`"),
+            format!("Class-like constant `{const_name}` does not exist."),
+            format!("Constant `{const_name}` not found in `{class_str}`"),
         )
     };
 
     context.collector.report_with_code(
         IssueCode::NonExistentClassConstant,
         Issue::error(main_message)
+            .with_annotation(Annotation::primary(const_span).with_message(primary_annotation_message))
             .with_annotation(
-                Annotation::primary(const_span).with_message(primary_annotation_message),
-            )
-            .with_annotation(
-                Annotation::secondary(class_span)
-                    .with_message(format!("On this {class_kind_str} `{class_str}`")),
+                Annotation::secondary(class_span).with_message(format!("On this {class_kind_str} `{class_str}`")),
             )
             .with_help(format!(
-                "Check for typos or ensure `{constant_name_str}` is defined in `{class_str}` or its ancestors/interfaces.",
+                "Check for typos or ensure `{const_name}` is defined in `{class_str}` or its ancestors/interfaces.",
             )),
     );
 }

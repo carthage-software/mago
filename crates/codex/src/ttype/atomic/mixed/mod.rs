@@ -174,7 +174,7 @@ impl TType for TMixed {
         false
     }
 
-    fn get_id(&self, _interner: Option<&mago_interner::ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let id = match self.truthiness {
             TMixedTruthiness::Truthy => "truthy-mixed",
             TMixedTruthiness::Falsy => "falsy-mixed",

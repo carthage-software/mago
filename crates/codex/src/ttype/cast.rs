@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use mago_interner::ThreadedInterner;
+use mago_atom::atom;
 
 use crate::get_class_like;
 use crate::identifier::function_like::FunctionLikeIdentifier;
@@ -16,7 +16,6 @@ use crate::ttype::template::TemplateResult;
 pub fn cast_atomic_to_callable<'a>(
     atomic: &'a TAtomic,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     template_result: Option<&mut TemplateResult>,
 ) -> Option<Cow<'a, TCallable>> {
     if let TAtomic::Callable(callable) = atomic {
@@ -24,12 +23,12 @@ pub fn cast_atomic_to_callable<'a>(
     }
 
     if let Some(literal_string) = atomic.get_literal_string_value() {
-        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(interner.intern(literal_string)))));
+        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(atom(literal_string)))));
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {
         if let Some(template_result) = template_result
-            && let Some(class_metadata) = get_class_like(codebase, interner, named_object.get_name_ref())
+            && let Some(class_metadata) = get_class_like(codebase, named_object.get_name_ref())
         {
             for (index, parameter) in named_object.get_type_parameters().unwrap_or_default().iter().enumerate() {
                 let Some(template_name) = class_metadata.get_template_name_for_index(index) else {
@@ -46,7 +45,7 @@ pub fn cast_atomic_to_callable<'a>(
 
         return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(
             named_object.get_name(),
-            interner.intern("__invoke"),
+            atom("__invoke"),
         ))));
     }
 
@@ -66,16 +65,14 @@ pub fn cast_atomic_to_callable<'a>(
         }
 
         let class_or_object = class_or_object.get_single();
-        let method_name = interner.intern(method.get_single_literal_string_value()?);
+        let method_name = atom(method.get_single_literal_string_value()?);
         if let Some(class_name) = class_or_object.get_literal_string_value() {
-            let class_name = interner.intern(class_name);
-
-            return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(class_name, method_name))));
+            return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(atom(class_name), method_name))));
         }
 
         if let TAtomic::Object(TObject::Named(named_object)) = class_or_object {
             if let Some(template_result) = template_result
-                && let Some(class_metadata) = get_class_like(codebase, interner, named_object.get_name_ref())
+                && let Some(class_metadata) = get_class_like(codebase, named_object.get_name_ref())
             {
                 for (index, parameter) in named_object.get_type_parameters().unwrap_or_default().iter().enumerate() {
                     let Some(template_name) = class_metadata.get_template_name_for_index(index) else {

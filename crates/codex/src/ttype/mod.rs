@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::atom;
 
 use crate::get_class_like;
 use crate::is_instance_of;
@@ -107,12 +107,9 @@ pub trait TType {
     /// Return a human-readable identifier for this type, which is
     /// suitable for use in error messages or debugging.
     ///
-    /// The `interner` parameter is optional and can be used to resolve
-    /// string identifiers to their actual names.
-    ///
     /// The resulting identifier must be unique for the type,
     /// but it does not have to be globally unique.
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String;
+    fn get_id(&self) -> String;
 }
 
 /// Implements the `TType` trait for `TypeRef`.
@@ -159,10 +156,10 @@ impl<'a> TType for TypeRef<'a> {
         }
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
-            TypeRef::Union(ttype) => ttype.get_id(interner),
-            TypeRef::Atomic(ttype) => ttype.get_id(interner),
+            TypeRef::Union(ttype) => ttype.get_id(),
+            TypeRef::Atomic(ttype) => ttype.get_id(),
         }
     }
 }
@@ -374,7 +371,7 @@ pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bo
 }
 
 #[inline]
-pub fn get_literal_class_string(value: StringIdentifier) -> TUnion {
+pub fn get_literal_class_string(value: Atom) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(value)))))
 }
 
@@ -427,7 +424,7 @@ pub fn get_trait_string_of_type(constraint: TAtomic) -> TUnion {
 }
 
 #[inline]
-pub fn get_literal_string(value: String) -> TUnion {
+pub fn get_literal_string(value: Atom) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::literal_string(value))))
 }
 
@@ -542,7 +539,7 @@ pub fn get_non_empty_string() -> TUnion {
 
 #[inline]
 pub fn get_empty_string() -> TUnion {
-    TUnion::from_single(Cow::Borrowed(EMPTY_STRING_ATOMIC))
+    TUnion::from_single(Cow::Borrowed(&EMPTY_STRING_ATOMIC))
 }
 
 #[inline]
@@ -601,21 +598,16 @@ pub fn get_mixed_closure() -> TUnion {
 }
 
 #[inline]
-pub fn get_named_object(
-    interner: &ThreadedInterner,
-    name: StringIdentifier,
-    type_resolution_context: Option<&TypeResolutionContext>,
-) -> TUnion {
-    if let Some(type_resolution_context) = type_resolution_context {
-        let name_str = interner.lookup(&name);
-        if let Some(defining_entities) = type_resolution_context.get_template_definition(name_str) {
-            return wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
-                kind: TClassLikeStringKind::Class,
-                parameter_name: name,
-                defining_entity: defining_entities[0].0,
-                constraint: Box::new((*(defining_entities[0].1.get_single())).clone()),
-            })));
-        }
+pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
+    if let Some(type_resolution_context) = type_resolution_context
+        && let Some(defining_entities) = type_resolution_context.get_template_definition(&name)
+    {
+        return wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+            kind: TClassLikeStringKind::Class,
+            parameter_name: name,
+            defining_entity: defining_entities[0].0,
+            constraint: Box::new((*(defining_entities[0].1.get_single())).clone()),
+        })));
     }
 
     wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(name))))
@@ -640,13 +632,8 @@ pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion
 }
 
 #[inline]
-pub fn add_optional_union_type(
-    base_type: TUnion,
-    maybe_type: Option<&TUnion>,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> TUnion {
-    if let Some(type_2) = maybe_type { add_union_type(base_type, type_2, codebase, interner, false) } else { base_type }
+pub fn add_optional_union_type(base_type: TUnion, maybe_type: Option<&TUnion>, codebase: &CodebaseMetadata) -> TUnion {
+    if let Some(type_2) = maybe_type { add_union_type(base_type, type_2, codebase, false) } else { base_type }
 }
 
 #[inline]
@@ -654,10 +641,9 @@ pub fn combine_optional_union_types(
     type_1: Option<&TUnion>,
     type_2: Option<&TUnion>,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
 ) -> TUnion {
     match (type_1, type_2) {
-        (Some(type_1), Some(type_2)) => combine_union_types(type_1, type_2, codebase, interner, false),
+        (Some(type_1), Some(type_2)) => combine_union_types(type_1, type_2, codebase, false),
         (Some(type_1), None) => type_1.clone(),
         (None, Some(type_2)) => type_2.clone(),
         (None, None) => get_mixed(),
@@ -669,7 +655,6 @@ pub fn combine_union_types(
     type_1: &TUnion,
     type_2: &TUnion,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     overwrite_empty_array: bool,
 ) -> TUnion {
     if type_1 == type_2 {
@@ -686,8 +671,7 @@ pub fn combine_union_types(
         let mut all_atomic_types = type_1.types.clone().into_owned();
         all_atomic_types.extend(type_2.types.clone().into_owned());
 
-        let mut result =
-            TUnion::from_vec(combiner::combine(all_atomic_types, codebase, interner, overwrite_empty_array));
+        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, overwrite_empty_array));
 
         if type_1.had_template && type_2.had_template {
             result.had_template = true;
@@ -720,7 +704,6 @@ pub fn add_union_type(
     mut base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     overwrite_empty_array: bool,
 ) -> TUnion {
     if &base_type == other_type {
@@ -735,7 +718,7 @@ pub fn add_union_type(
     base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
         base_type.types
     } else {
-        combine_union_types(&base_type, other_type, codebase, interner, overwrite_empty_array).types
+        combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
     };
 
     if !other_type.had_template {
@@ -758,35 +741,30 @@ pub fn intersect_union_types(_type_1: &TUnion, _type_2: &TUnion, _codebase: &Cod
     None
 }
 
-pub fn get_iterable_parameters(
-    atomic: &TAtomic,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> Option<(TUnion, TUnion)> {
-    if let Some(generator_parameters) = atomic.get_generator_parameters(interner) {
+pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<(TUnion, TUnion)> {
+    if let Some(generator_parameters) = atomic.get_generator_parameters() {
         return Some((generator_parameters.0, generator_parameters.1));
     }
 
     let parameters = 'parameters: {
         match atomic {
             TAtomic::Iterable(iterable) => Some((iterable.get_key_type().clone(), iterable.get_value_type().clone())),
-            TAtomic::Array(array_type) => Some(get_array_parameters(array_type, codebase, interner)),
+            TAtomic::Array(array_type) => Some(get_array_parameters(array_type, codebase)),
             TAtomic::Object(object) => {
                 let name = object.get_name()?;
-                let traversable = interner.intern("traversable");
+                let traversable = atom("traversable");
 
-                let class_metadata = get_class_like(codebase, interner, name)?;
-                if !is_instance_of(codebase, interner, &class_metadata.name, &traversable) {
+                let class_metadata = get_class_like(codebase, name)?;
+                if !is_instance_of(codebase, &class_metadata.name, &traversable) {
                     break 'parameters None;
                 }
 
-                let traversable_metadata = get_class_like(codebase, interner, &traversable)?;
+                let traversable_metadata = get_class_like(codebase, &traversable)?;
                 let key_template = traversable_metadata.template_types.first().map(|(name, _)| name)?;
                 let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
 
                 let key_type = get_specialized_template_type(
                     codebase,
-                    interner,
                     key_template,
                     &traversable,
                     class_metadata,
@@ -796,7 +774,6 @@ pub fn get_iterable_parameters(
 
                 let value_type = get_specialized_template_type(
                     codebase,
-                    interner,
                     value_template,
                     &traversable,
                     class_metadata,
@@ -816,7 +793,7 @@ pub fn get_iterable_parameters(
 
     if let Some(intersection_types) = atomic.get_intersection_types() {
         for intersection_type in intersection_types {
-            if let Some((key_type, value_type)) = get_iterable_parameters(intersection_type, codebase, interner) {
+            if let Some((key_type, value_type)) = get_iterable_parameters(intersection_type, codebase) {
                 return Some((key_type, value_type));
             }
         }
@@ -825,11 +802,7 @@ pub fn get_iterable_parameters(
     None
 }
 
-pub fn get_array_parameters(
-    array_type: &TArray,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> (TUnion, TUnion) {
+pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) -> (TUnion, TUnion) {
     match array_type {
         TArray::Keyed(keyed_data) => {
             let mut key_types = vec![];
@@ -846,11 +819,11 @@ pub fn get_array_parameters(
             if let Some(known_items) = &keyed_data.known_items {
                 for (key, (_, item_type)) in known_items {
                     key_types.push(key.to_atomic());
-                    value_param = add_union_type(value_param, item_type, codebase, interner, false);
+                    value_param = add_union_type(value_param, item_type, codebase, false);
                 }
             }
 
-            let combined_key_types = combiner::combine(key_types, codebase, interner, false);
+            let combined_key_types = combiner::combine(key_types, codebase, false);
             let key_param_union = TUnion::from_vec(combined_key_types);
 
             (key_param_union, value_param)
@@ -863,7 +836,7 @@ pub fn get_array_parameters(
                 for (key_idx, (_, element_type)) in known_elements {
                     key_types.push(TAtomic::Scalar(TScalar::literal_int(*key_idx as i64)));
 
-                    value_type = combine_union_types(element_type, &value_type, codebase, interner, false);
+                    value_type = combine_union_types(element_type, &value_type, codebase, false);
                 }
             }
 
@@ -875,40 +848,35 @@ pub fn get_array_parameters(
                 }
             }
 
-            let key_type = TUnion::from_vec(combiner::combine(key_types, codebase, interner, false));
+            let key_type = TUnion::from_vec(combiner::combine(key_types, codebase, false));
 
             (key_type, value_type)
         }
     }
 }
 
-pub fn get_iterable_value_parameter(
-    atomic: &TAtomic,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> Option<TUnion> {
-    if let Some(generator_parameters) = atomic.get_generator_parameters(interner) {
+pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<TUnion> {
+    if let Some(generator_parameters) = atomic.get_generator_parameters() {
         return Some(generator_parameters.1);
     }
 
     let parameter = match atomic {
         TAtomic::Iterable(iterable) => Some(iterable.get_value_type().clone()),
-        TAtomic::Array(array_type) => Some(get_array_value_parameter(array_type, codebase, interner)),
+        TAtomic::Array(array_type) => Some(get_array_value_parameter(array_type, codebase)),
         TAtomic::Object(object) => {
             let name = object.get_name()?;
-            let traversable = interner.intern("traversable");
+            let traversable = atom("traversable");
 
-            let class_metadata = get_class_like(codebase, interner, name)?;
-            if !is_instance_of(codebase, interner, &class_metadata.name, &traversable) {
+            let class_metadata = get_class_like(codebase, name)?;
+            if !is_instance_of(codebase, &class_metadata.name, &traversable) {
                 return None;
             }
 
-            let traversable_metadata = get_class_like(codebase, interner, &traversable)?;
+            let traversable_metadata = get_class_like(codebase, &traversable)?;
             let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
 
             get_specialized_template_type(
                 codebase,
-                interner,
                 value_template,
                 &traversable,
                 class_metadata,
@@ -924,7 +892,7 @@ pub fn get_iterable_value_parameter(
 
     if let Some(intersection_types) = atomic.get_intersection_types() {
         for intersection_type in intersection_types {
-            if let Some(value_param) = get_iterable_value_parameter(intersection_type, codebase, interner) {
+            if let Some(value_param) = get_iterable_value_parameter(intersection_type, codebase) {
                 return Some(value_param);
             }
         }
@@ -933,11 +901,7 @@ pub fn get_iterable_value_parameter(
     None
 }
 
-pub fn get_array_value_parameter(
-    array_type: &TArray,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> TUnion {
+pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadata) -> TUnion {
     match array_type {
         TArray::Keyed(keyed_data) => {
             let mut value_param;
@@ -950,7 +914,7 @@ pub fn get_array_value_parameter(
 
             if let Some(known_items) = &keyed_data.known_items {
                 for (_, item_type) in known_items.values() {
-                    value_param = combine_union_types(item_type, &value_param, codebase, interner, false);
+                    value_param = combine_union_types(item_type, &value_param, codebase, false);
                 }
             }
 
@@ -961,7 +925,7 @@ pub fn get_array_value_parameter(
 
             if let Some(known_elements) = &list_data.known_elements {
                 for (_, element_type) in known_elements.values() {
-                    value_param = combine_union_types(element_type, &value_param, codebase, interner, false);
+                    value_param = combine_union_types(element_type, &value_param, codebase, false);
                 }
             }
 
@@ -976,13 +940,12 @@ pub fn get_array_value_parameter(
 /// concrete type of a template parameter.
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    template_name: &StringIdentifier,
-    template_defining_class_id: &StringIdentifier,
+    template_name: &Atom,
+    template_defining_class_id: &Atom,
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let defining_class_metadata = get_class_like(codebase, interner, template_defining_class_id)?;
+    let defining_class_metadata = get_class_like(codebase, template_defining_class_id)?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
@@ -1022,7 +985,7 @@ pub fn get_specialized_template_type(
         }
     }
 
-    let mut template_type = inferred_type_replacer::replace(&template_union, &template_result, codebase, interner);
+    let mut template_type = inferred_type_replacer::replace(&template_union, &template_result, codebase);
     if let Some(type_parameters) = instantiated_type_parameters {
         let mut template_result = TemplateResult::default();
         for (i, parameter_type) in type_parameters.iter().enumerate() {
@@ -1036,7 +999,7 @@ pub fn get_specialized_template_type(
         }
 
         if !template_result.lower_bounds.is_empty() {
-            template_type = inferred_type_replacer::replace(&template_type, &template_result, codebase, interner);
+            template_type = inferred_type_replacer::replace(&template_type, &template_result, codebase);
         }
     }
 

@@ -1,11 +1,13 @@
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_id;
+use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_method_by_id;
-use mago_codex::get_method_id;
+use mago_codex::get_method_identifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::method_id_exists;
+use mago_codex::method_identifier_exists;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -18,7 +20,6 @@ use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::TemplateResult;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -40,7 +41,7 @@ use crate::visibility::check_method_visibility;
 pub struct ResolvedMethod {
     /// The name of the class this method is called on, not necessarily the same
     /// as the class of the method itself, especially in cases of inheritance.
-    pub classname: StringIdentifier,
+    pub classname: Atom,
     /// The method identifiers that were successfully resolved.
     pub method_identifier: MethodIdentifier,
     /// The type of `$this` or the static class type if it's a static method.
@@ -101,7 +102,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
         }
 
         if let Some(name) = resolved_selector.name() {
-            method_names.push(context.interner.lowered(&name));
+            method_names.push(ascii_lowercase_atom(&name));
         } else {
             result.has_invalid_target = true;
         }
@@ -168,7 +169,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 if resolved_methods.is_empty() {
                     if let Some(classname) = obj_type.get_name() {
                         result.has_invalid_target = true;
-                        report_non_existent_method(context, object.span(), selector.span(), *method_name, classname);
+                        report_non_existent_method(context, object.span(), selector.span(), classname, method_name);
                     } else {
                         // ambiguous
                     }
@@ -192,7 +193,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_type: &TObject,
-    method_name: StringIdentifier,
+    method_name: Atom,
     access_span: Span,
     result: &mut MethodResolutionResult,
 ) -> Vec<ResolvedMethod> {
@@ -212,12 +213,10 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
 
     for (metadata, declaring_method_id, object, classname) in method_ids {
         let declaring_class_metadata =
-            get_class_like(context.codebase, context.interner, declaring_method_id.get_class_name())
-                .unwrap_or(metadata);
+            get_class_like(context.codebase, declaring_method_id.get_class_name()).unwrap_or(metadata);
 
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
-            context.interner,
             metadata,
             declaring_class_metadata,
             Some(object_type),
@@ -258,10 +257,10 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_type: &'object TObject,
     outer_object: &'object TObject,
-    method_name: StringIdentifier,
+    method_name: Atom,
     access_span: Span,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, &'object TObject, StringIdentifier)> {
+) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, &'object TObject, Atom)> {
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {
@@ -271,18 +270,18 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
-    let Some(class_metadata) = get_class_like(context.codebase, context.interner, name) else {
+    let Some(class_metadata) = get_class_like(context.codebase, name) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
         return ids;
     };
 
-    let mut method_id = get_method_id(&class_metadata.original_name, &method_name);
-    if !method_id_exists(context.codebase, context.interner, &method_id) {
-        method_id = get_declaring_method_id(context.codebase, context.interner, &method_id);
+    let mut method_id = get_method_identifier(&class_metadata.original_name, &method_name);
+    if !method_identifier_exists(context.codebase, &method_id) {
+        method_id = get_declaring_method_identifier(context.codebase, &method_id);
     }
 
-    if let Some(function_like_metadata) = get_method_by_id(context.codebase, context.interner, &method_id) {
+    if let Some(function_like_metadata) = get_method_by_id(context.codebase, &method_id) {
         if !check_method_visibility(
             context,
             block_context,
@@ -362,7 +361,7 @@ fn check_where_method_constraints(
     selector: &ClassLikeMemberSelector,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
-    defining_class_id: &StringIdentifier,
+    defining_class_id: &Atom,
 ) -> bool {
     let Some(method_metadata) = function_like_metadata.method_metadata.as_ref() else {
         return true;
@@ -375,7 +374,6 @@ fn check_where_method_constraints(
     for (template_name, constraint) in &method_metadata.where_constraints {
         let actual_template_type = get_specialized_template_type(
             context.codebase,
-            context.interner,
             template_name,
             defining_class_id,
             class_like_metadata,
@@ -385,7 +383,6 @@ fn check_where_method_constraints(
 
         if is_contained_by(
             context.codebase,
-            context.interner,
             &actual_template_type,
             &constraint.type_union,
             false,
@@ -396,14 +393,13 @@ fn check_where_method_constraints(
             continue;
         }
 
-        let template_name_str = context.interner.lookup(template_name);
-        let required_constraint_str = constraint.type_union.get_id(Some(context.interner));
-        let actual_template_type_str = actual_template_type.get_id(Some(context.interner));
+        let required_constraint_str = constraint.type_union.get_id();
+        let actual_template_type_str = actual_template_type.get_id();
 
         context.collector.report_with_code(
             IssueCode::WhereConstraintViolation,
             Issue::error(format!(
-                "Method call violates `@where` constraint for template `{template_name_str}`.",
+                "Method call violates `@where` constraint for template `{template_name}`.",
             ))
             .with_annotation(
                 Annotation::primary(selector.span())
@@ -412,7 +408,7 @@ fn check_where_method_constraints(
             .with_annotation(
                 Annotation::secondary(object.span())
                     .with_message(format!(
-                        "...because this object's template parameter `{template_name_str}` is type `{actual_template_type_str}`...",
+                        "...because this object's template parameter `{template_name}` is type `{actual_template_type_str}`...",
                     )),
             )
             .with_annotation(
@@ -425,7 +421,7 @@ fn check_where_method_constraints(
                 "The `@where` tag on a method adds a constraint that must be satisfied by the object's generic types at the time of the call."
             )
             .with_help(
-                format!("Ensure the object's template parameter `{template_name_str}` satisfies the `{required_constraint_str}` constraint before calling this method.")
+                format!("Ensure the object's template parameter `{template_name}` satisfies the `{required_constraint_str}` constraint before calling this method.")
             ),
         );
 
@@ -436,7 +432,7 @@ fn check_where_method_constraints(
 }
 
 fn report_call_on_non_object(context: &mut Context, atomic_type: &TAtomic, obj_span: Span, selector_span: Span) {
-    let type_str = atomic_type.get_id(Some(context.interner));
+    let type_str = atomic_type.get_id();
 
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedMethodAccess } else { IssueCode::InvalidMethodAccess },
@@ -464,21 +460,16 @@ pub(super) fn report_non_existent_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    method_name: StringIdentifier,
-    class_name: &StringIdentifier,
+    classname: &Atom,
+    method_name: &Atom,
 ) {
-    let method_name_str = context.interner.lookup(&method_name);
-    let class_name_str = context.interner.lookup(class_name);
-
     context.collector.report_with_code(
         IssueCode::NonExistentMethod,
-        Issue::error(format!("Method `{method_name_str}` does not exist on type `{class_name_str}`."))
+        Issue::error(format!("Method `{method_name}` does not exist on type `{classname}`."))
             .with_annotation(Annotation::primary(selector_span).with_message("This method selection is invalid"))
             .with_annotation(
-                Annotation::secondary(obj_span).with_message(format!("This expression has type `{class_name_str}`")),
+                Annotation::secondary(obj_span).with_message(format!("This expression has type `{classname}`")),
             )
-            .with_help(format!(
-                "Ensure the `{method_name_str}` method is defined in the `{class_name_str}` class-like."
-            )),
+            .with_help(format!("Ensure the `{method_name}` method is defined in the `{classname}` class-like.")),
     );
 }

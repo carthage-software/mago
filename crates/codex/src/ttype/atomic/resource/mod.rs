@@ -1,4 +1,3 @@
-use mago_interner::ThreadedInterner;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -46,7 +45,7 @@ impl TType for TResource {
         false
     }
 
-    fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self.closed {
             Some(true) => "closed-resource".to_string(),
             Some(false) => "open-resource".to_string(),

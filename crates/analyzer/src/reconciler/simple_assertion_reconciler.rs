@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -412,7 +413,7 @@ pub(crate) fn intersect_null(
         && let Some(key) = key
         && let Some(span) = span
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -477,7 +478,7 @@ pub(crate) fn intersect_resource(
         && let Some(key) = key
         && let Some(span) = span
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -525,7 +526,7 @@ fn intersect_object(
         && let Some(key) = key
         && let Some(span) = span
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -554,7 +555,7 @@ fn intersect_iterable(
     let mut did_remove_type = false;
 
     for atomic in existing_var_type.types.as_ref() {
-        if atomic.is_array_or_traversable(context.codebase, context.interner) {
+        if atomic.is_array_or_traversable(context.codebase) {
             acceptable_types.push(atomic.clone());
 
             continue;
@@ -588,7 +589,7 @@ fn intersect_iterable(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -695,7 +696,7 @@ fn intersect_array_list(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -788,7 +789,7 @@ fn intersect_keyed_array(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -868,7 +869,7 @@ fn intersect_arraykey(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -945,7 +946,7 @@ fn intersect_numeric(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -1031,7 +1032,6 @@ fn intersect_string(
             _ => {
                 if atomic_comparator::is_contained_by(
                     context.codebase,
-                    context.interner,
                     atomic,
                     get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase).get_single(),
                     false,
@@ -1051,7 +1051,7 @@ fn intersect_string(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -1106,7 +1106,6 @@ fn intersect_int(
             _ => {
                 if atomic_comparator::is_contained_by(
                     context.codebase,
-                    context.interner,
                     atomic,
                     &TAtomic::Scalar(TScalar::Integer(*integer)),
                     false,
@@ -1126,7 +1125,7 @@ fn intersect_int(
     {
         trigger_issue_for_impossible(
             context,
-            &existing_var_type.get_id(Some(context.interner)),
+            &existing_var_type.get_id(),
             key,
             assertion,
             !did_remove_type,
@@ -1263,7 +1262,7 @@ fn reconcile_isset(
         && let Some(span) = span
         && (!did_remove_type || acceptable_types.is_empty())
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -1331,7 +1330,7 @@ fn reconcile_non_empty_countable(
         && !recursive_check
         && (!did_remove_type || acceptable_types.is_empty())
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -1354,7 +1353,7 @@ fn reconcile_exactly_countable(
     recursive_check: bool,
     count: &usize,
 ) -> TUnion {
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
 
     let mut did_remove_type = false;
 
@@ -1436,7 +1435,7 @@ fn reconcile_countable(
 ) -> TUnion {
     if existing_var_type.has_mixed() || existing_var_type.has_template() {
         return TUnion::from_vec(vec![
-            TAtomic::Object(TObject::Named(TNamedObject::new(context.interner.intern("Countable")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))),
             MIXED_KEYED_ARRAY_ATOMIC.clone(),
         ]);
     }
@@ -1445,14 +1444,13 @@ fn reconcile_countable(
     let mut countable_types = vec![];
 
     for atomic in existing_var_type.types.as_ref() {
-        if atomic.is_countable(context.codebase, context.interner) {
+        if atomic.is_countable(context.codebase) {
             countable_types.push(atomic.clone());
         } else if let TAtomic::Object(TObject::Any) = atomic {
-            countable_types
-                .push(TAtomic::Object(TObject::Named(TNamedObject::new(context.interner.intern("Countable")))));
+            countable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))));
             redundant = false;
         } else if matches!(atomic, TAtomic::Object(_)) {
-            let mut countable = TNamedObject::new(context.interner.intern("Countable"));
+            let mut countable = TNamedObject::new(atom("Countable"));
             countable.add_intersection_type(atomic.clone());
             countable_types.push(TAtomic::Object(TObject::Named(countable)));
 
@@ -1465,13 +1463,10 @@ fn reconcile_countable(
                 ))));
             }
 
-            let traversable_name = context.interner.intern("Traversable");
-            let countable_name = context.interner.intern("Countable");
-
-            let mut object = TNamedObject::new(traversable_name)
+            let mut object = TNamedObject::new(atom("Traversable"))
                 .with_type_parameters(Some(vec![iterable.get_key_type().clone(), iterable.get_value_type().clone()]));
 
-            object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(countable_name))));
+            object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))));
 
             countable_types.push(TAtomic::Object(TObject::Named(object)));
             redundant = false;
@@ -1485,7 +1480,7 @@ fn reconcile_countable(
         if let Some(key) = key
             && let Some(span) = span
         {
-            let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+            let old_var_type_string = existing_var_type.get_id();
 
             trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, redundant, negated, span);
         }
@@ -1601,7 +1596,7 @@ fn reconcile_integer_comparison(
     is_less_than: bool,
     or_equal: bool,
 ) -> TUnion {
-    let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+    let old_var_type_string = existing_var_type.get_id();
 
     let existing_var_types = existing_var_type.types.as_ref();
     let mut existing_var_type = existing_var_type.clone();
@@ -1699,7 +1694,7 @@ fn reconcile_array_access(
         if let Some(key) = key
             && let Some(span) = span
         {
-            let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+            let old_var_type_string = existing_var_type.get_id();
 
             trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, false, negated, span);
         }
@@ -1730,15 +1725,7 @@ fn reconcile_in_array(
     if let Some(key) = key
         && let Some(span) = span
     {
-        trigger_issue_for_impossible(
-            context,
-            &existing_var_type.get_id(Some(context.interner)),
-            key,
-            assertion,
-            true,
-            negated,
-            span,
-        );
+        trigger_issue_for_impossible(context, &existing_var_type.get_id(), key, assertion, true, negated, span);
     }
 
     get_mixed()
@@ -1780,7 +1767,6 @@ fn reconcile_has_array_key(
 
                     if union_comparator::can_expression_types_be_identical(
                         context.codebase,
-                        context.interner,
                         &key_name.to_general_union(),
                         key_param.as_ref(),
                         false,
@@ -1874,7 +1860,7 @@ fn reconcile_has_array_key(
         && let Some(span) = span
         && (!did_remove_type || acceptable_types.is_empty())
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -1932,7 +1918,6 @@ fn reconcile_has_nonnull_entry_for_key(
 
                     if union_comparator::can_expression_types_be_identical(
                         context.codebase,
-                        context.interner,
                         &key_name.to_general_union(),
                         key_param,
                         false,
@@ -2029,7 +2014,7 @@ fn reconcile_has_nonnull_entry_for_key(
         && let Some(span) = span
         && (!did_remove_type || acceptable_types.is_empty())
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }
@@ -2059,7 +2044,7 @@ pub(crate) fn get_acceptable_type(
         && let Some(key) = key
         && let Some(span) = span
     {
-        let old_var_type_string = existing_var_type.get_id(Some(context.interner));
+        let old_var_type_string = existing_var_type.get_id();
 
         trigger_issue_for_impossible(context, &old_var_type_string, key, assertion, !did_remove_type, negated, span);
     }

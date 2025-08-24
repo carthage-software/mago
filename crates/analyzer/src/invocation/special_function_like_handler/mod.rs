@@ -46,7 +46,7 @@ pub fn handle_special_functions<'ctx, 'ast, 'arena>(
     ];
 
     let function_like_identifier = invocation.target.get_function_like_identifier()?;
-    let name = function_like_identifier.as_string(context.interner).to_lowercase();
+    let name = function_like_identifier.as_string().to_lowercase();
 
     for handler in HANDLERS {
         if let Some(return_type) = handler.get_return_type(context, block_context, artifacts, &name, invocation) {

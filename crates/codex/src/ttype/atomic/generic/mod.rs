@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::misc::GenericParent;
 use crate::ttype::TType;
@@ -14,7 +13,7 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TGenericParameter {
     /// The name of the template parameter (e.g., `T` in `@template T`).
-    pub parameter_name: StringIdentifier,
+    pub parameter_name: Atom,
     /// The upper bound or constraint (`Bound` in `T of Bound`), represented as a type union.
     pub constraint: Box<TUnion>,
     /// The scope (class-like or function-like) where this template parameter was defined.
@@ -34,13 +33,13 @@ impl TGenericParameter {
     /// * `constraint`: The primary bound (`TUnion`), boxed (e.g., `of SomeInterface`).
     /// * `defining_entity`: The scope (`GenericParent`) where it was defined.
     #[inline]
-    pub fn new(parameter_name: StringIdentifier, constraint: Box<TUnion>, defining_entity: GenericParent) -> Self {
+    pub fn new(parameter_name: Atom, constraint: Box<TUnion>, defining_entity: GenericParent) -> Self {
         Self { parameter_name, constraint, defining_entity, intersection_types: None }
     }
 
     /// Returns the name identifier of the template parameter.
     #[inline]
-    pub const fn get_parameter_name(&self) -> StringIdentifier {
+    pub const fn get_parameter_name(&self) -> Atom {
         self.parameter_name
     }
 
@@ -132,18 +131,13 @@ impl TType for TGenericParameter {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let mut str = String::from("'");
-        if let Some(interner) = interner {
-            str += interner.lookup(&self.parameter_name);
-        } else {
-            str += self.parameter_name.to_string().as_str();
-        };
-
+        str += self.parameter_name.as_str();
         str += ".";
-        str += &self.defining_entity.to_string(interner);
+        str += &self.defining_entity.to_string();
         str += " extends ";
-        str += &self.constraint.get_id(interner);
+        str += &self.constraint.get_id();
 
         if let Some(intersection_types) = &self.intersection_types {
             str = format!("({str})");
@@ -152,7 +146,7 @@ impl TType for TGenericParameter {
                 if atomic.has_intersection_types() {
                     str += "(";
                 }
-                str += &atomic.get_id(interner);
+                str += &atomic.get_id();
                 if atomic.has_intersection_types() {
                     str += ")";
                 }

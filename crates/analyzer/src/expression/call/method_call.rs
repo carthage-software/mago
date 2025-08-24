@@ -1,5 +1,4 @@
-use ahash::HashMap;
-
+use mago_atom::AtomMap;
 use mago_codex::get_class_like;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -165,7 +164,7 @@ pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
         &invocation,
         None,
         &template_result,
-        &HashMap::default(),
+        &AtomMap::default(),
         false,
     )?;
 
@@ -187,10 +186,10 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
 
     let mut invocation_targets = vec![];
     for resolved_method in method_resolution.resolved_methods {
-        let metadata = get_class_like(context.codebase, context.interner, &resolved_method.classname)
+        let metadata = get_class_like(context.codebase, &resolved_method.classname)
             .expect("class-like metadata should exist for resolved method");
 
-        let method_metadata = get_method_by_id(context.codebase, context.interner, &resolved_method.method_identifier)
+        let method_metadata = get_method_by_id(context.codebase, &resolved_method.method_identifier)
             .expect("method metadata should exist for resolved method");
 
         let method_target_context = MethodTargetContext {

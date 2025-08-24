@@ -4,7 +4,6 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use mago_database::DatabaseReader;
-use mago_interner::ThreadedInterner;
 
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
@@ -51,8 +50,6 @@ pub struct AnalyzeCommand {
 /// 3. Analyzing the user-defined sources against the compiled codebase (with progress).
 /// 4. Reporting any found issues.
 pub fn execute(command: AnalyzeCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    let interner = ThreadedInterner::new();
-
     let database = if !command.path.is_empty() {
         database::from_paths(&configuration.source, command.path, !command.no_stubs)?
     } else {
@@ -66,7 +63,7 @@ pub fn execute(command: AnalyzeCommand, configuration: Configuration) -> Result<
     }
 
     let analyzer_settings = configuration.analyzer.to_setttings(configuration.php_version);
-    let analysis_results = run_analysis_pipeline(&interner, database.read_only(), analyzer_settings)?;
+    let analysis_results = run_analysis_pipeline(database.read_only(), analyzer_settings)?;
 
     let mut issues = analysis_results.issues;
     issues.filter_out_ignored(&configuration.analyzer.ignore);

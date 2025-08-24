@@ -23,7 +23,6 @@ wasm-opt = false
 
 [dependencies]
 mago-syntax = { workspace = true }
-mago-interner = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-php-version = { workspace = true }

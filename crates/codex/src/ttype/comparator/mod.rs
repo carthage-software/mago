@@ -1,4 +1,4 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::template::TemplateBound;
@@ -27,8 +27,8 @@ pub struct ComparisonResult {
     pub type_coerced_to_literal: Option<bool>,
     pub replacement_union_type: Option<TUnion>,
     pub replacement_atomic_type: Option<TAtomic>,
-    pub type_variable_lower_bounds: Vec<(StringIdentifier, TemplateBound)>,
-    pub type_variable_upper_bounds: Vec<(StringIdentifier, TemplateBound)>,
+    pub type_variable_lower_bounds: Vec<(Atom, TemplateBound)>,
+    pub type_variable_upper_bounds: Vec<(Atom, TemplateBound)>,
 }
 
 impl Default for ComparisonResult {

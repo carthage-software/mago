@@ -64,7 +64,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
                 "Left operand in arithmetic operation might be `null` (type `{}`).",
-                left_type.get_id(Some(context.interner))
+                left_type.get_id()
             ))
             .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This might be `null`."))
             .with_note("Performing arithmetic operations on `null` typically results in `0`.")
@@ -89,7 +89,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
                 "Right operand in arithmetic operation might be `null` (type `{}`).",
-                right_type.get_id(Some(context.interner))
+                right_type.get_id()
             ))
             .with_annotation(Annotation::primary(binary.rhs.span()).with_message("This might be `null`"))
             .with_note("Performing arithmetic operations on `null` typically results in `0`.")
@@ -130,7 +130,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
                 "Left operand in arithmetic operation might be `false` (type `{}`).",
-                left_type.get_id(Some(context.interner))
+                left_type.get_id()
             ))
             .with_annotation(
                 Annotation::primary(binary.lhs.span())
@@ -167,7 +167,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
                 "Right operand in arithmetic operation might be `false` (type `{}`).",
-                right_type.get_id(Some(context.interner))
+                right_type.get_id()
             ))
             .with_annotation(
                 Annotation::primary(binary.rhs.span())
@@ -296,20 +296,16 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
 
                     let array_key_type = match (left_atomic.get_array_key_type(), right_atomic.get_array_key_type()) {
                         (Some(left_key), Some(right_key)) => {
-                            combine_union_types(&left_key, &right_key, context.codebase, context.interner, false)
+                            combine_union_types(&left_key, &right_key, context.codebase, false)
                         }
                         _ => get_arraykey(),
                     };
 
                     let array_value_type =
                         match (left_atomic.get_array_value_type(), right_atomic.get_array_value_type()) {
-                            (Some(left_value), Some(right_value)) => combine_union_types(
-                                &left_value,
-                                &right_value,
-                                context.codebase,
-                                context.interner,
-                                false,
-                            ),
+                            (Some(left_value), Some(right_value)) => {
+                                combine_union_types(&left_value, &right_value, context.codebase, false)
+                            }
                             _ => get_mixed(),
                         };
 
@@ -324,19 +320,13 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 } else {
                     if left_atomic.is_array() {
                         invalid_right_messages.push((
-                            format!(
-                                "Cannot add array to non-array type {}",
-                                right_atomic.get_id(Some(context.interner))
-                            ),
+                            format!("Cannot add array to non-array type {}", right_atomic.get_id()),
                             binary.rhs.span(),
                         ));
                         has_valid_left_operand = true;
                     } else {
                         invalid_left_messages.push((
-                            format!(
-                                "Cannot add {} to non-array type array",
-                                left_atomic.get_id(Some(context.interner))
-                            ),
+                            format!("Cannot add {} to non-array type array", left_atomic.get_id()),
                             binary.lhs.span(),
                         ));
                         has_valid_right_operand = true;
@@ -368,38 +358,26 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 }
             } else if left_atomic.is_numeric() {
                 invalid_right_messages.push((
-                    format!(
-                        "Cannot perform arithmetic operation with non-numeric type {}",
-                        right_atomic.get_id(Some(context.interner))
-                    ),
+                    format!("Cannot perform arithmetic operation with non-numeric type {}", right_atomic.get_id()),
                     binary.rhs.span(),
                 ));
                 has_valid_left_operand = true;
                 invalid_pair = true;
             } else if right_atomic.is_numeric() {
                 invalid_left_messages.push((
-                    format!(
-                        "Cannot perform arithmetic operation with non-numeric type {}",
-                        left_atomic.get_id(Some(context.interner))
-                    ),
+                    format!("Cannot perform arithmetic operation with non-numeric type {}", left_atomic.get_id()),
                     binary.lhs.span(),
                 ));
                 has_valid_right_operand = true;
                 invalid_pair = true;
             } else {
                 invalid_left_messages.push((
-                    format!(
-                        "Cannot perform arithmetic operation on type {}",
-                        left_atomic.get_id(Some(context.interner))
-                    ),
+                    format!("Cannot perform arithmetic operation on type {}", left_atomic.get_id()),
                     binary.lhs.span(),
                 ));
 
                 invalid_right_messages.push((
-                    format!(
-                        "Cannot perform arithmetic operation on type {}",
-                        right_atomic.get_id(Some(context.interner))
-                    ),
+                    format!("Cannot perform arithmetic operation on type {}", right_atomic.get_id()),
                     binary.rhs.span(),
                 ));
 
@@ -467,7 +445,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     }
 
     let final_type = if !result_atomic_types.is_empty() {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, context.interner, false))
+        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, false))
     } else {
         // No valid pairs found, and potentially errors issued.
         // Psalm often defaults to mixed here if operands were invalid.
@@ -499,7 +477,6 @@ fn is_arithmetic_compatible_generic<'ctx, 'arena>(
         for other_atomic in other_union.types.iter() {
             if !atomic_comparator::is_contained_by(
                 context.codebase,
-                context.interner,
                 other_atomic,
                 constraint_atomic,
                 false,

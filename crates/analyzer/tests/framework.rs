@@ -7,12 +7,12 @@ use bumpalo::Bump;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::settings::Settings;
+use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file;
 
@@ -34,7 +34,6 @@ impl<'a> TestCase<'a> {
 
 fn run_test_case_inner(config: TestCase) {
     let arena = Bump::new();
-    let interner = ThreadedInterner::new();
     let source_file = File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string()));
 
     let (program, parse_issues) = parse_file(&arena, &source_file);
@@ -44,10 +43,10 @@ fn run_test_case_inner(config: TestCase) {
 
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
-    let mut codebase = scan_program(&interner, &arena, &source_file, program, &resolved_names);
+    let mut codebase = scan_program(&arena, &source_file, program, &resolved_names);
     let mut symbol_references = SymbolReferences::new();
 
-    populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
+    populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(
@@ -55,7 +54,6 @@ fn run_test_case_inner(config: TestCase) {
         &source_file,
         &resolved_names,
         &codebase,
-        &interner,
         Settings { find_unused_expressions: true, check_throws: true, ..Default::default() },
     );
 

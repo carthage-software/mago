@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
-mago-interner = { workspace = true }
+mago-atom = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-type-syntax = { workspace = true }

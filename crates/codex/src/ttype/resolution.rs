@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+
 use crate::misc::GenericParent;
 use crate::ttype::union::TUnion;
 
@@ -12,11 +14,11 @@ use crate::ttype::union::TUnion;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
-    template_definitions: Vec<(String, Vec<(GenericParent, TUnion)>)>,
+    template_definitions: Vec<(Atom, Vec<(GenericParent, TUnion)>)>,
 
     /// Concrete types that template parameters (often from an outer scope) resolve to
     /// within this specific context.
-    resolved_template_types: Vec<(String, TUnion)>,
+    resolved_template_types: Vec<(Atom, TUnion)>,
 }
 
 /// Provides a default, empty type resolution context.
@@ -44,7 +46,7 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The name of the template parameter (e.g., `"T"`).
     /// * `constraints`: A list of constraints, each specifying the origin (parent) and the constraint type.
-    pub fn with_template_definition(mut self, name: String, constraints: Vec<(GenericParent, TUnion)>) -> Self {
+    pub fn with_template_definition(mut self, name: Atom, constraints: Vec<(GenericParent, TUnion)>) -> Self {
         self.template_definitions.push((name, constraints));
         self
     }
@@ -56,32 +58,32 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The name of the template parameter (e.g., `"T"`).
     /// * `resolved_type`: The concrete `TUnion` type that `name` resolves to here.
-    pub fn with_resolved_template_type(mut self, name: String, resolved_type: TUnion) -> Self {
+    pub fn with_resolved_template_type(mut self, name: Atom, resolved_type: TUnion) -> Self {
         self.resolved_template_types.push((name, resolved_type));
         self
     }
 
     /// Returns a slice of the defined template parameters and their constraints for this context.
     #[inline]
-    pub fn get_template_definitions(&self) -> &[(String, Vec<(GenericParent, TUnion)>)] {
+    pub fn get_template_definitions(&self) -> &[(Atom, Vec<(GenericParent, TUnion)>)] {
         &self.template_definitions
     }
 
     /// Returns a mutable slice of the defined template parameters and their constraints for this context.
     #[inline]
-    pub fn get_template_definitions_mut(&mut self) -> &mut [(String, Vec<(GenericParent, TUnion)>)] {
+    pub fn get_template_definitions_mut(&mut self) -> &mut [(Atom, Vec<(GenericParent, TUnion)>)] {
         &mut self.template_definitions
     }
 
     /// Returns a slice of the template parameters that have resolved to concrete types in this context.
     #[inline]
-    pub fn get_resolved_template_types(&self) -> &[(String, TUnion)] {
+    pub fn get_resolved_template_types(&self) -> &[(Atom, TUnion)] {
         &self.resolved_template_types
     }
 
     /// Returns a mutable slice of the template parameters that have resolved to concrete types in this context.
     #[inline]
-    pub fn get_resolved_template_types_mut(&mut self) -> &mut [(String, TUnion)] {
+    pub fn get_resolved_template_types_mut(&mut self) -> &mut [(Atom, TUnion)] {
         &mut self.resolved_template_types
     }
 

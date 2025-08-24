@@ -47,7 +47,6 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
 
         if !union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             constraint_type,
             outer_constraint_type,
             false,
@@ -55,8 +54,8 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
             false,
             &mut ComparisonResult::default(),
         ) {
-            let constraint_type_str = constraint_type.get_id(Some(context.interner));
-            let outer_constraint_type_str = outer_constraint_type.get_id(Some(context.interner));
+            let constraint_type_str = constraint_type.get_id();
+            let outer_constraint_type_str = outer_constraint_type.get_id();
 
             context.collector.report_with_code(
                 IssueCode::ConflictingReferenceConstraint,

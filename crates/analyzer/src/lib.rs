@@ -5,7 +5,6 @@ use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_collector::Collector;
 use mago_database::file::File;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
 use mago_syntax::ast::Program;
@@ -47,7 +46,6 @@ pub struct Analyzer<'ctx, 'ast, 'arena> {
     pub source_file: &'ctx File,
     pub resolved_names: &'ast ResolvedNames<'arena>,
     pub codebase: &'ctx CodebaseMetadata,
-    pub interner: &'ctx ThreadedInterner,
     pub settings: Settings,
 }
 
@@ -57,10 +55,9 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         source_file: &'ctx File,
         resolved_names: &'ast ResolvedNames<'arena>,
         codebase: &'ctx CodebaseMetadata,
-        interner: &'ctx ThreadedInterner,
         settings: Settings,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, interner, settings }
+        Self { arena, source_file, resolved_names, codebase, settings }
     }
 
     pub fn analyze(
@@ -157,7 +154,6 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         let mut context = Context::new(
             self.arena,
-            self.interner,
             self.codebase,
             self.source_file,
             self.resolved_names,
@@ -187,12 +183,12 @@ mod tests {
 
     use ahash::HashSet;
 
+    use mago_atom::AtomSet;
     use mago_codex::metadata::CodebaseMetadata;
     use mago_codex::populator::populate_codebase;
     use mago_codex::reference::SymbolReferences;
     use mago_codex::scanner::scan_program;
     use mago_database::file::File;
-    use mago_interner::ThreadedInterner;
     use mago_names::resolver::NameResolver;
     use mago_syntax::parser::parse_file;
 
@@ -241,7 +237,6 @@ mod tests {
 
     fn run_test_case_inner(config: TestCase) {
         let arena = bumpalo::Bump::new();
-        let interner = ThreadedInterner::new();
         let source_file = File::ephemeral(Cow::Borrowed(config.name), Cow::Borrowed(config.content));
 
         let (program, parse_issues) = parse_file(&arena, &source_file);
@@ -251,13 +246,13 @@ mod tests {
 
         let resolver = NameResolver::new(&arena);
         let resolved_names = resolver.resolve(program);
-        let mut codebase = scan_program(&interner, &arena, &source_file, program, &resolved_names);
+        let mut codebase = scan_program(&arena, &source_file, program, &resolved_names);
         let mut symbol_references = SymbolReferences::new();
 
-        populate_codebase(&mut codebase, &interner, &mut symbol_references, HashSet::default(), HashSet::default());
+        populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
 
         let mut analysis_result = AnalysisResult::new(symbol_references);
-        let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, &interner, config.settings);
+        let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, config.settings);
 
         let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
 

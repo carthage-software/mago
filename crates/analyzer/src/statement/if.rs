@@ -130,13 +130,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
         }
 
-        check_for_paradox(
-            context.interner,
-            &mut context.collector,
-            &block_context.clauses,
-            &if_clauses,
-            self.condition.span(),
-        );
+        check_for_paradox(&mut context.collector, &block_context.clauses, &if_clauses, self.condition.span());
 
         if_clauses = saturate_clauses(if_clauses.iter());
         let combined_clauses = if block_context.clauses.is_empty() {
@@ -298,8 +292,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 continue;
             }
 
-            let new_type =
-                combine_union_types(&existing_type, &variable_type, context.codebase, context.interner, false);
+            let new_type = combine_union_types(&existing_type, &variable_type, context.codebase, false);
 
             if !new_type.eq(&existing_type) {
                 block_context.remove_descendants(context, &variable_id, &existing_type, Some(&new_type));
@@ -640,13 +633,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         entry_clauses.push(Rc::new(clause));
     }
 
-    check_for_paradox(
-        context.interner,
-        &mut context.collector,
-        &entry_clauses,
-        &else_if_clauses,
-        else_if_clause.0.span(),
-    );
+    check_for_paradox(&mut context.collector, &entry_clauses, &else_if_clauses, else_if_clause.0.span());
 
     let else_if_clauses = saturate_clauses(else_if_clauses.iter());
     else_if_block_context.clauses = if entry_clauses.is_empty() {
@@ -1134,13 +1121,7 @@ fn update_if_scope<'ctx, 'arena>(
                 if !if_block_context.has_variable(new_variable) {
                     to_remove.push(new_variable.clone());
                 } else if let Some(variable_type) = if_block_context.locals.get(new_variable) {
-                    *new_variable_type = combine_union_types(
-                        new_variable_type,
-                        variable_type,
-                        context.codebase,
-                        context.interner,
-                        false,
-                    );
+                    *new_variable_type = combine_union_types(new_variable_type, variable_type, context.codebase, false);
                 } else {
                     unreachable!("variable is known to be in if_block_context");
                 }
@@ -1193,8 +1174,7 @@ fn update_if_scope<'ctx, 'arena>(
                     continue;
                 };
 
-                *variable_type =
-                    combine_union_types(&redefined_type, variable_type, context.codebase, context.interner, false);
+                *variable_type = combine_union_types(&redefined_type, variable_type, context.codebase, false);
             }
 
             for variable in variables_to_remove {
@@ -1203,9 +1183,7 @@ fn update_if_scope<'ctx, 'arena>(
 
             for (variable_id, variable_type) in possibly_redefined_variables {
                 let resulting_type = match if_scope.possibly_redefined_variables.get(&variable_id) {
-                    Some(existing_type) => {
-                        combine_union_types(&variable_type, existing_type, context.codebase, context.interner, false)
-                    }
+                    Some(existing_type) => combine_union_types(&variable_type, existing_type, context.codebase, false),
                     None => variable_type,
                 };
 

@@ -65,11 +65,11 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
                     "Comparing an `array` with a non-array type `{}` using `{}`.",
-                    rhs_type.get_id(Some(context.interner)),
+                    rhs_type.get_id(),
                     binary.operator.as_str()
                 ))
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
-                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id(Some(context.interner)))))
+                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
                 .with_note("PHP's comparison rules for arrays against other types can be non-obvious (e.g., an array is usually considered 'greater' than non-null scalars).")
                 .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison if this behavior is not intended."),
             );
@@ -79,10 +79,10 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
                     "Comparing a non-array type `{}` with an `array` using `{}`.",
-                    lhs_type.get_id(Some(context.interner)),
+                    lhs_type.get_id(),
                     binary.operator.as_str()
                 ))
-                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id(Some(context.interner)))))
+                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
                 .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
                 .with_note("PHP's comparison rules for arrays against other types can be non-obvious.")
                 .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison if this behavior is not intended."),
@@ -226,7 +226,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     }
 
                     get_true()
-                } else if are_definitely_not_identical(context.codebase, context.interner, lhs_type, rhs_type, false) {
+                } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
                     if !block_context.inside_loop_expressions {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
@@ -249,7 +249,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     }
 
                     get_false()
-                } else if are_definitely_not_identical(context.codebase, context.interner, lhs_type, rhs_type, false) {
+                } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
                     if !block_context.inside_loop_expressions {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
@@ -298,7 +298,7 @@ fn check_comparison_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
                 "{} operand in `{}` comparison might be `null` (type `{}`).",
-                side, op_str, operand_type.get_id(Some(context.interner))
+                side, op_str, operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `null`"))
             .with_note(format!("If this operand is `null` at runtime, PHP's specific comparison rules for `null` with `{op_str}` will apply."))
@@ -329,7 +329,7 @@ fn check_comparison_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
                 "{} operand in `{}` comparison might be `false` (type `{}`).",
-                side, op_str, operand_type.get_id(Some(context.interner))
+                side, op_str, operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `false`"))
             .with_note(format!("If this operand is `false` at runtime, PHP's specific comparison rules for `false` with `{op_str}` will apply."))
@@ -363,13 +363,13 @@ fn report_redundant_comparison<'ctx, 'ast, 'arena>(
         ))
         .with_annotation(Annotation::primary(binary.lhs.span()).with_message(
             match artifacts.get_expression_type(&binary.lhs) {
-                Some(t) => format!("Left operand is `{}`", t.get_id(Some(context.interner))),
+                Some(t) => format!("Left operand is `{}`", t.get_id()),
                 None => "Left operand type is unknown".to_string(),
             },
         ))
         .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(
             match artifacts.get_expression_type(&binary.rhs) {
-                Some(t) => format!("Right operand is `{}`", t.get_id(Some(context.interner))),
+                Some(t) => format!("Right operand is `{}`", t.get_id()),
                 None => "Right operand type is unknown".to_string(),
             },
         ))

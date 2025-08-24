@@ -1,10 +1,11 @@
-use ahash::HashMap;
 use ahash::HashSet;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
+use mago_atom::atom;
 
 use crate::is_method_abstract;
 use crate::metadata::CodebaseMetadata;
@@ -14,6 +15,7 @@ use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::misc::GenericParent;
 use crate::reference::ReferenceSource;
 use crate::reference::SymbolReferences;
+use crate::symbol::SymbolIdentifier;
 use crate::symbol::Symbols;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -34,10 +36,9 @@ use crate::ttype::union::populate_union_type;
 /// TODO(azjezz): This function is a performance bottleneck.
 pub fn populate_codebase(
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: HashSet<StringIdentifier>,
-    safe_symbol_members: HashSet<(StringIdentifier, StringIdentifier)>,
+    safe_symbols: AtomSet,
+    safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
     let mut class_likes_to_repopulate = Vec::new();
     for (name, metadata) in codebase.class_likes.iter() {
@@ -58,7 +59,7 @@ pub fn populate_codebase(
     }
 
     for class_name in &class_likes_to_repopulate {
-        populate_class_like_metadata(class_name, codebase, interner, symbol_references, &safe_symbols);
+        populate_class_like_metadata(class_name, codebase, symbol_references, &safe_symbols);
     }
 
     for (name, function_like_metadata) in codebase.function_likes.iter_mut() {
@@ -75,7 +76,6 @@ pub fn populate_codebase(
         populate_function_like_metadata(
             function_like_metadata,
             &codebase.symbols,
-            interner,
             &reference_source,
             symbol_references,
             force_repopulation,
@@ -93,7 +93,6 @@ pub fn populate_codebase(
                 populate_union_type(
                     &mut signature.type_union,
                     &codebase.symbols,
-                    interner,
                     Some(&property_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -104,7 +103,6 @@ pub fn populate_codebase(
                 populate_union_type(
                     &mut signature.type_union,
                     &codebase.symbols,
-                    interner,
                     Some(&property_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -115,7 +113,6 @@ pub fn populate_codebase(
                 populate_union_type(
                     &mut default.type_union,
                     &codebase.symbols,
-                    interner,
                     Some(&property_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -129,7 +126,6 @@ pub fn populate_codebase(
                     populate_union_type(
                         v,
                         &codebase.symbols,
-                        interner,
                         Some(&class_like_reference_source),
                         symbol_references,
                         userland_force_repopulation,
@@ -144,7 +140,6 @@ pub fn populate_codebase(
                     populate_union_type(
                         v,
                         &codebase.symbols,
-                        interner,
                         Some(&class_like_reference_source),
                         symbol_references,
                         userland_force_repopulation,
@@ -168,7 +163,6 @@ pub fn populate_codebase(
                 populate_union_type(
                     &mut signature.type_union,
                     &codebase.symbols,
-                    interner,
                     Some(&constant_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -179,7 +173,6 @@ pub fn populate_codebase(
                 populate_atomic_type(
                     inferred,
                     &codebase.symbols,
-                    interner,
                     Some(&constant_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -202,7 +195,6 @@ pub fn populate_codebase(
                 populate_atomic_type(
                     value_type,
                     &codebase.symbols,
-                    interner,
                     Some(&enum_case_reference_source),
                     symbol_references,
                     userland_force_repopulation,
@@ -214,7 +206,6 @@ pub fn populate_codebase(
             populate_atomic_type(
                 enum_type,
                 &codebase.symbols,
-                interner,
                 Some(&ReferenceSource::Symbol(true, *name)),
                 symbol_references,
                 userland_force_repopulation,
@@ -231,7 +222,6 @@ pub fn populate_codebase(
             populate_union_type(
                 inferred_type,
                 &codebase.symbols,
-                interner,
                 Some(&ReferenceSource::Symbol(true, *name)),
                 symbol_references,
                 !safe_symbols.contains(name),
@@ -239,26 +229,26 @@ pub fn populate_codebase(
         }
     }
 
-    let mut direct_classlike_descendants = HashMap::default();
-    let mut all_classlike_descendants = HashMap::default();
+    let mut direct_classlike_descendants = AtomMap::default();
+    let mut all_classlike_descendants = AtomMap::default();
 
     for (class_like_name, class_like_metadata) in &codebase.class_likes {
         for parent_interface in &class_like_metadata.all_parent_interfaces {
             all_classlike_descendants
                 .entry(*parent_interface)
-                .or_insert_with(HashSet::default)
+                .or_insert_with(AtomSet::default)
                 .insert(*class_like_name);
         }
 
         for parent_interface in &class_like_metadata.direct_parent_interfaces {
             direct_classlike_descendants
                 .entry(*parent_interface)
-                .or_insert_with(HashSet::default)
+                .or_insert_with(AtomSet::default)
                 .insert(*class_like_name);
         }
 
         for parent_class in &class_like_metadata.all_parent_classes {
-            all_classlike_descendants.entry(*parent_class).or_insert_with(HashSet::default).insert(*class_like_name);
+            all_classlike_descendants.entry(*parent_class).or_insert_with(AtomSet::default).insert(*class_like_name);
         }
 
         for used_trait in &class_like_metadata.used_traits {
@@ -266,7 +256,7 @@ pub fn populate_codebase(
         }
 
         if let Some(parent_class) = &class_like_metadata.direct_parent_class {
-            direct_classlike_descendants.entry(*parent_class).or_insert_with(HashSet::default).insert(*class_like_name);
+            direct_classlike_descendants.entry(*parent_class).or_insert_with(AtomSet::default).insert(*class_like_name);
         }
     }
 
@@ -283,7 +273,6 @@ pub fn populate_codebase(
 fn populate_function_like_metadata(
     metadata: &mut FunctionLikeMetadata,
     codebase_symbols: &Symbols,
-    interner: &ThreadedInterner,
     reference_source: &ReferenceSource,
     symbol_references: &mut SymbolReferences,
     force_type_population: bool,
@@ -308,7 +297,6 @@ fn populate_function_like_metadata(
         populate_union_type(
             &mut return_type.type_union,
             codebase_symbols,
-            interner,
             Some(reference_source),
             symbol_references,
             force_type_population,
@@ -319,7 +307,6 @@ fn populate_function_like_metadata(
         populate_union_type(
             &mut return_type.type_union,
             codebase_symbols,
-            interner,
             Some(reference_source),
             symbol_references,
             force_type_population,
@@ -331,7 +318,6 @@ fn populate_function_like_metadata(
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
-                interner,
                 Some(reference_source),
                 symbol_references,
                 force_type_population,
@@ -342,7 +328,6 @@ fn populate_function_like_metadata(
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
-                interner,
                 Some(reference_source),
                 symbol_references,
                 force_type_population,
@@ -353,7 +338,6 @@ fn populate_function_like_metadata(
             populate_union_type(
                 &mut type_metadata.type_union,
                 codebase_symbols,
-                interner,
                 Some(reference_source),
                 symbol_references,
                 force_type_population,
@@ -377,7 +361,6 @@ fn populate_function_like_metadata(
                 populate_union_type(
                     type_parameter,
                     codebase_symbols,
-                    interner,
                     Some(reference_source),
                     symbol_references,
                     force_type_population,
@@ -393,7 +376,6 @@ fn populate_function_like_metadata(
                     populate_union_type(
                         type_parameter,
                         codebase_symbols,
-                        interner,
                         Some(reference_source),
                         symbol_references,
                         force_type_population,
@@ -408,7 +390,6 @@ fn populate_function_like_metadata(
             populate_union_type(
                 &mut where_constraint.type_union,
                 codebase_symbols,
-                interner,
                 Some(reference_source),
                 symbol_references,
                 force_type_population,
@@ -420,7 +401,6 @@ fn populate_function_like_metadata(
         populate_union_type(
             &mut thrown_type.type_union,
             codebase_symbols,
-            interner,
             Some(reference_source),
             symbol_references,
             force_type_population,
@@ -433,7 +413,6 @@ fn populate_function_like_metadata(
                 populate_atomic_type(
                     assertion_type,
                     codebase_symbols,
-                    interner,
                     Some(reference_source),
                     symbol_references,
                     force_type_population,
@@ -448,7 +427,6 @@ fn populate_function_like_metadata(
                 populate_atomic_type(
                     assertion_type,
                     codebase_symbols,
-                    interner,
                     Some(reference_source),
                     symbol_references,
                     force_type_population,
@@ -463,7 +441,6 @@ fn populate_function_like_metadata(
                 populate_atomic_type(
                     assertion_type,
                     codebase_symbols,
-                    interner,
                     Some(reference_source),
                     symbol_references,
                     force_type_population,
@@ -481,11 +458,10 @@ fn populate_function_like_metadata(
 /// interfaces, and used traits before processing the current class-like.
 /// It uses a remove/insert pattern to handle mutable borrowing across recursive calls.
 fn populate_class_like_metadata(
-    classlike_name: &StringIdentifier,
+    classlike_name: &Atom,
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: &HashSet<StringIdentifier>,
+    safe_symbols: &AtomSet,
 ) {
     if let Some(metadata) = codebase.class_likes.get(classlike_name)
         && metadata.flags.is_populated()
@@ -518,7 +494,6 @@ fn populate_class_like_metadata(
             populate_union_type(
                 parameter_type,
                 &codebase.symbols,
-                interner,
                 Some(&ReferenceSource::Symbol(true, *classlike_name)),
                 symbol_references,
                 force_repopulation,
@@ -527,14 +502,13 @@ fn populate_class_like_metadata(
     }
 
     for trait_name in metadata.used_traits.iter().copied().collect::<Vec<_>>() {
-        populate_metadata_from_trait(&mut metadata, codebase, interner, trait_name, symbol_references, safe_symbols);
+        populate_metadata_from_trait(&mut metadata, codebase, trait_name, symbol_references, safe_symbols);
     }
 
     if let Some(parent_classname) = metadata.direct_parent_class {
         populate_metadata_from_parent_class_like(
             &mut metadata,
             codebase,
-            interner,
             parent_classname,
             symbol_references,
             safe_symbols,
@@ -546,7 +520,6 @@ fn populate_class_like_metadata(
         populate_interface_metadata_from_parent_interface(
             &mut metadata,
             codebase,
-            interner,
             direct_parent_interface,
             symbol_references,
             safe_symbols,
@@ -557,7 +530,6 @@ fn populate_class_like_metadata(
         populate_metadata_from_required_class_like(
             &mut metadata,
             codebase,
-            interner,
             required_class,
             symbol_references,
             safe_symbols,
@@ -568,7 +540,6 @@ fn populate_class_like_metadata(
         populate_interface_metadata_from_parent_interface(
             &mut metadata,
             codebase,
-            interner,
             required_interface,
             symbol_references,
             safe_symbols,
@@ -592,12 +563,11 @@ fn populate_class_like_metadata(
 fn populate_interface_metadata_from_parent_interface(
     metadata: &mut ClassLikeMetadata,
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
-    parent_interface: StringIdentifier,
+    parent_interface: Atom,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: &HashSet<StringIdentifier>,
+    safe_symbols: &AtomSet,
 ) {
-    populate_class_like_metadata(&parent_interface, codebase, interner, symbol_references, safe_symbols);
+    populate_class_like_metadata(&parent_interface, codebase, symbol_references, safe_symbols);
 
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_interface, true);
 
@@ -625,7 +595,7 @@ fn populate_interface_metadata_from_parent_interface(
     extend_template_parameters(metadata, parent_interface_metadata);
     // Inherit methods (appearing/declaring ids) from the parent interface
     // Pass codebase immutably if possible, or mutably if method inheritance logic needs it
-    inherit_methods_from_parent(metadata, parent_interface_metadata, codebase, interner);
+    inherit_methods_from_parent(metadata, parent_interface_metadata, codebase);
     inherit_properties_from_parent(metadata, parent_interface_metadata);
 }
 
@@ -633,12 +603,11 @@ fn populate_interface_metadata_from_parent_interface(
 fn populate_metadata_from_parent_class_like(
     metadata: &mut ClassLikeMetadata,
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
-    parent_class: StringIdentifier,
+    parent_class: Atom,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: &HashSet<StringIdentifier>,
+    safe_symbols: &AtomSet,
 ) {
-    populate_class_like_metadata(&parent_class, codebase, interner, symbol_references, safe_symbols);
+    populate_class_like_metadata(&parent_class, codebase, symbol_references, safe_symbols);
 
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
@@ -660,7 +629,7 @@ fn populate_metadata_from_parent_class_like(
 
     extend_template_parameters(metadata, parent_metadata);
 
-    inherit_methods_from_parent(metadata, parent_metadata, codebase, interner);
+    inherit_methods_from_parent(metadata, parent_metadata, codebase);
     inherit_properties_from_parent(metadata, parent_metadata);
 
     for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
@@ -678,12 +647,11 @@ fn populate_metadata_from_parent_class_like(
 fn populate_metadata_from_required_class_like(
     metadata: &mut ClassLikeMetadata,
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
-    parent_class: StringIdentifier,
+    parent_class: Atom,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: &HashSet<StringIdentifier>,
+    safe_symbols: &AtomSet,
 ) {
-    populate_class_like_metadata(&parent_class, codebase, interner, symbol_references, safe_symbols);
+    populate_class_like_metadata(&parent_class, codebase, symbol_references, safe_symbols);
 
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
@@ -702,12 +670,11 @@ fn populate_metadata_from_required_class_like(
 fn populate_metadata_from_trait(
     metadata: &mut ClassLikeMetadata,
     codebase: &mut CodebaseMetadata,
-    interner: &ThreadedInterner,
-    trait_name: StringIdentifier,
+    trait_name: Atom,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: &HashSet<StringIdentifier>,
+    safe_symbols: &AtomSet,
 ) {
-    populate_class_like_metadata(&trait_name, codebase, interner, symbol_references, safe_symbols);
+    populate_class_like_metadata(&trait_name, codebase, symbol_references, safe_symbols);
 
     symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);
 
@@ -733,7 +700,7 @@ fn populate_metadata_from_trait(
     extend_template_parameters(metadata, trait_metadata);
 
     // Inherit methods and properties from the trait
-    inherit_methods_from_parent(metadata, trait_metadata, codebase, interner);
+    inherit_methods_from_parent(metadata, trait_metadata, codebase);
     inherit_properties_from_parent(metadata, trait_metadata);
 }
 
@@ -743,7 +710,6 @@ fn inherit_methods_from_parent(
     metadata: &mut ClassLikeMetadata,
     parent_metadata: &ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
 ) {
     let class_like_name = metadata.name;
     let is_trait = metadata.kind.is_trait();
@@ -758,7 +724,7 @@ fn inherit_methods_from_parent(
             .insert(*method_name, if is_trait { class_like_name } else { *appearing_class_like });
 
         if codebase.function_likes.contains_key(&(class_like_name, *method_name)) {
-            metadata.potential_declaring_method_ids.insert(*method_name, HashSet::from_iter([class_like_name]));
+            metadata.potential_declaring_method_ids.insert(*method_name, AtomSet::from_iter([class_like_name]));
         } else {
             if let Some(parent_potential_method_ids) = parent_metadata.get_potential_declaring_method_id(method_name) {
                 metadata.potential_declaring_method_ids.insert(*method_name, parent_potential_method_ids.clone());
@@ -769,11 +735,9 @@ fn inherit_methods_from_parent(
         }
     }
 
-    let constructor_id = interner.intern("__construct");
     for (method_name, declaring_class) in &parent_metadata.inheritable_method_ids {
-        if !method_name.eq(&constructor_id) || parent_metadata.flags.has_consistent_constructor() {
-            if !parent_metadata.kind.is_trait() || is_method_abstract(codebase, interner, declaring_class, method_name)
-            {
+        if !method_name.eq(&atom("__construct")) || parent_metadata.flags.has_consistent_constructor() {
+            if !parent_metadata.kind.is_trait() || is_method_abstract(codebase, declaring_class, method_name) {
                 metadata.add_overridden_method_parent(*method_name, *declaring_class);
             }
 
@@ -793,7 +757,7 @@ fn inherit_methods_from_parent(
         for aliased_method_name in aliased_method_names {
             let implementing_method_id = metadata.declaring_method_ids.get(&aliased_method_name);
             if let Some(implementing_method_id) = implementing_method_id
-                && !is_method_abstract(codebase, interner, implementing_method_id, &aliased_method_name)
+                && !is_method_abstract(codebase, implementing_method_id, &aliased_method_name)
             {
                 continue;
             }
@@ -910,7 +874,7 @@ fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metadata:
 /// maps `T` defined on `ParentClass` to `string`, this returns a `TUnion` containing `string`.
 fn extend_type(
     extended_type: &TUnion,
-    template_extended_parameters: &HashMap<StringIdentifier, IndexMap<StringIdentifier, TUnion, RandomState>>,
+    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
 ) -> TUnion {
     if !extended_type.has_template() {
         return extended_type.clone();

@@ -1,6 +1,7 @@
+use mago_atom::Atom;
+use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -22,9 +23,9 @@ use crate::error::AnalysisError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolvedSelector {
     /// A resolved name from a direct identifier (e.g., `foo`).
-    Identifier(StringIdentifier),
+    Identifier(Atom),
     /// A resolved name from an expression that evaluated to a literal string (e.g., `{'foo'}`).
-    LiteralString(StringIdentifier),
+    LiteralString(Atom),
     /// The selector is a non-literal string; its specific name is unknown statically.
     GenericString,
     /// The selector is of type `mixed`; it might be a valid name at runtime.
@@ -35,7 +36,7 @@ pub enum ResolvedSelector {
 
 impl ResolvedSelector {
     /// Returns the specific name of the selector, if it could be resolved.
-    pub fn name(&self) -> Option<StringIdentifier> {
+    pub fn name(&self) -> Option<Atom> {
         match self {
             Self::Identifier(name) | Self::LiteralString(name) => Some(*name),
             _ => None,
@@ -74,9 +75,7 @@ pub fn resolve_member_selector<'ctx, 'arena>(
     selector: &ClassLikeMemberSelector<'arena>,
 ) -> Result<Vec<ResolvedSelector>, AnalysisError> {
     match selector {
-        ClassLikeMemberSelector::Identifier(ident) => {
-            Ok(vec![ResolvedSelector::Identifier(context.interner.intern(ident.value))])
-        }
+        ClassLikeMemberSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(atom(ident.value))]),
         ClassLikeMemberSelector::Expression(expr) => {
             let was_inside_general_use = block_context.inside_general_use;
             block_context.inside_general_use = true;
@@ -110,9 +109,7 @@ pub fn resolve_constant_selector<'ctx, 'arena>(
     selector: &ClassLikeConstantSelector<'arena>,
 ) -> Result<Vec<ResolvedSelector>, AnalysisError> {
     match selector {
-        ClassLikeConstantSelector::Identifier(ident) => {
-            Ok(vec![ResolvedSelector::Identifier(context.interner.intern(ident.value))])
-        }
+        ClassLikeConstantSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(atom(ident.value))]),
         ClassLikeConstantSelector::Expression(expr) => {
             let was_inside_general_use = block_context.inside_general_use;
             block_context.inside_general_use = true;
@@ -158,11 +155,11 @@ fn resolve_selector_from_type(
     let mut resolved_selectors = vec![];
     for atomic in selector_type.types.as_ref() {
         if let Some(literal_string) = atomic.get_literal_string_value() {
-            resolved_selectors.push(ResolvedSelector::LiteralString(context.interner.intern(literal_string)));
+            resolved_selectors.push(ResolvedSelector::LiteralString(atom(literal_string)));
             continue;
         }
 
-        let atomic_type_id = atomic.get_id(Some(context.interner));
+        let atomic_type_id = atomic.get_id();
 
         if atomic.is_any_string() {
             let issue_kind = match kind {

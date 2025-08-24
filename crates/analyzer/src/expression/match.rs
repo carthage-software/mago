@@ -4,6 +4,7 @@ use std::rc::Rc;
 use ahash::HashSet;
 
 use mago_algebra::saturate_clauses;
+use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
@@ -197,13 +198,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         }
 
         let final_type = arm_body_types.into_iter().reduce(|acc, item| {
-            Rc::new(combine_union_types(
-                acc.as_ref(),
-                item.as_ref(),
-                self.context.codebase,
-                self.context.interner,
-                false,
-            ))
+            Rc::new(combine_union_types(acc.as_ref(), item.as_ref(), self.context.codebase, false))
         });
 
         self.artifacts.set_rc_expression_type(self.stmt, final_type.unwrap_or_else(|| Rc::new(get_mixed())));
@@ -216,7 +211,6 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             self.stmt.expression,
             self.block_context.scope.get_class_like_name(),
             self.context.resolved_names,
-            self.context.interner,
             Some(self.context.codebase),
         ) {
             (false, id, self.stmt.expression.clone())
@@ -388,8 +382,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
     ) {
         let block_context = block_context.unwrap_or(self.block_context);
 
-        let error_name = self.context.interner.intern("UnhandledMatchError");
-        block_context.possibly_thrown_exceptions.entry(error_name).or_default().insert(span);
+        block_context.possibly_thrown_exceptions.entry(atom("UnhandledMatchError")).or_default().insert(span);
 
         if always_throws {
             block_context.has_returned = true;
@@ -418,12 +411,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
 
             for arm_context in &reachable_contexts {
                 let arm_type = arm_context.locals.get(&var_id).map(|rc| rc.as_ref());
-                final_type = Some(combine_optional_union_types(
-                    final_type.as_ref(),
-                    arm_type,
-                    self.context.codebase,
-                    self.context.interner,
-                ));
+                final_type = Some(combine_optional_union_types(final_type.as_ref(), arm_type, self.context.codebase));
             }
 
             if let Some(final_type) = final_type {
@@ -528,11 +516,11 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             IssueCode::MatchNotExhaustive,
             Issue::error(format!(
                 "Non-exhaustive `match` expression: subject of type `{}` is not fully handled.",
-                subject_type.get_id(Some(self.context.interner))
+                subject_type.get_id()
             ))
             .with_annotation(Annotation::primary(self.stmt.expression.span()).with_message(format!(
                 "Unhandled portion of subject: `{}`",
-                unhandled_type.get_id(Some(self.context.interner))
+                unhandled_type.get_id()
             )))
             .with_annotation(
                 Annotation::secondary(self.stmt.span()).with_message(
@@ -544,7 +532,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             )
             .with_help(format!(
                 "Add conditional arms to cover type(s) `{}` or include a `default` arm to handle all other possibilities.",
-                unhandled_type.get_id(Some(self.context.interner))
+                unhandled_type.get_id()
             )),
         );
     }

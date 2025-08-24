@@ -1,10 +1,12 @@
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_class_for_property;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::{self};
 use mago_codex::ttype::get_mixed;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -39,7 +41,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
     'resolve_names: {
         let variable_type = match property_variable {
             Variable::Direct(direct_variable) => {
-                property_names.push(context.interner.intern(direct_variable.name));
+                property_names.push(atom(direct_variable.name));
 
                 break 'resolve_names;
             }
@@ -77,10 +79,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
                 continue;
             };
 
-            let property_name = "$".to_string() + property_name;
-            let property_name_id = context.interner.intern(property_name);
-
-            property_names.push(property_name_id);
+            property_names.push(concat_atom!("$", property_name));
         }
     };
 
@@ -95,7 +94,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        let Some(fq_class_id) = resolved_classname.fq_class_id else {
+        let Some(fqcn) = resolved_classname.fqcn else {
             result.has_ambiguous_path = true;
             continue;
         };
@@ -104,7 +103,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
             if let Some(resolved_property) = find_static_property_in_class(
                 context,
                 block_context,
-                &fq_class_id,
+                &fqcn,
                 property_name,
                 property_variable,
                 class_expression,
@@ -122,33 +121,33 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
 fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    class_id: &StringIdentifier,
-    prop_name: &StringIdentifier,
+    class_id: &Atom,
+    property_name: &Atom,
     variable: &'ast Variable<'arena>,
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
-    let Some(class_metadata) = get_class_like(context.codebase, context.interner, class_id) else {
+    let Some(class_metadata) = get_class_like(context.codebase, class_id) else {
         // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
         result.has_invalid_path = true;
         return Ok(None);
     };
 
-    let declaring_class_id = get_declaring_class_for_property(context.codebase, context.interner, class_id, prop_name)
+    let declaring_class_id = get_declaring_class_for_property(context.codebase, class_id, property_name)
         .unwrap_or(class_metadata.original_name);
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, context.interner, &declaring_class_id) else {
+    let Some(declaring_class_metadata) = get_class_like(context.codebase, &declaring_class_id) else {
         // Should not happen if declaring_class_id is valid.
         result.has_error_path = true;
         return Ok(None);
     };
 
-    let Some(property_metadata) = declaring_class_metadata.properties.get(prop_name) else {
+    let Some(property_metadata) = declaring_class_metadata.properties.get(property_name) else {
         result.has_invalid_path = true;
         report_non_existent_property(
             context,
             &declaring_class_metadata.original_name,
-            prop_name,
+            property_name,
             variable.span(),
             class_expr.span(),
         );
@@ -157,15 +156,14 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     };
 
     if !property_metadata.flags.is_static() {
-        let class_name_str = context.interner.lookup(&declaring_class_metadata.original_name);
-        let prop_name_str = context.interner.lookup(prop_name);
+        let classname = declaring_class_metadata.original_name;
 
         context.collector.report_with_code(
             IssueCode::InvalidStaticPropertyAccess,
-            Issue::error(format!("Cannot access instance property `{class_name_str}::{prop_name_str}` statically."))
+            Issue::error(format!("Cannot access instance property `{classname}::{property_name}` statically."))
                 .with_annotation(Annotation::primary(variable.span()).with_message("This is an instance property"))
                 .with_note("Static properties are declared with the `static` keyword and accessed with `::` on a class name, not an instance.")
-                .with_help(format!("To access this property, you need an instance of the class (e.g., `$instance->{prop_name_str}`), or declare the property as `static`.")),
+                .with_help(format!("To access this property, you need an instance of the class (e.g., `$instance->{property_name}`), or declare the property as `static`.")),
         );
 
         result.has_error_path = true;
@@ -176,7 +174,7 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
         context,
         block_context,
         &declaring_class_id,
-        prop_name,
+        property_name,
         class_expr.span(),
         Some(variable.span()),
     ) {
@@ -189,19 +187,18 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
 
     expander::expand_union(
         context.codebase,
-        context.interner,
         &mut property_type,
         &TypeExpansionOptions {
-            self_class: Some(&declaring_class_id),
+            self_class: Some(declaring_class_id),
             static_class_type: StaticClassType::Name(*class_id),
-            parent_class: declaring_class_metadata.direct_parent_class.as_ref(),
+            parent_class: declaring_class_metadata.direct_parent_class,
             ..Default::default()
         },
     );
 
     Ok(Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
-        property_name: *prop_name,
+        property_name: *property_name,
         declaring_class_id,
         property_type,
     }))
@@ -209,26 +206,22 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
 
 fn report_non_existent_property<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    classname: &StringIdentifier,
-    prop_name: &StringIdentifier,
+    classname: &Atom,
+    property_name: &Atom,
     selector_span: Span,
     class_like_name_span: Span,
 ) {
-    let class_name_str = context.interner.lookup(classname);
-    let property_name_str = context.interner.lookup(prop_name);
-    let class_kind_str =
-        get_class_like(context.codebase, context.interner, classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = get_class_like(context.codebase, classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
-        Issue::error(format!(
-            "Static property `{property_name_str}` does not exist on {class_kind_str} `{class_name_str}`."
-        ))
-        .with_annotation(
-            Annotation::primary(selector_span).with_message("This selector refers to a non-existent static property"),
-        )
-        .with_annotation(Annotation::secondary(class_like_name_span).with_message(format!(
-            "The {class_kind_str} `{class_name_str}` does not have a static property named `{property_name_str}`",
-        ))),
+        Issue::error(format!("Static property `{property_name}` does not exist on {class_kind_str} `{classname}`."))
+            .with_annotation(
+                Annotation::primary(selector_span)
+                    .with_message("This selector refers to a non-existent static property"),
+            )
+            .with_annotation(Annotation::secondary(class_like_name_span).with_message(format!(
+                "The {class_kind_str} `{classname}` does not have a static property named `{property_name}`",
+            ))),
     );
 }

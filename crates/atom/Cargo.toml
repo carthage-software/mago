@@ -1,5 +1,5 @@
 [package]
-name = "mago-interner"
+name = "mago-atom"
 description = "A string interning library that stores and reuses identical strings efficiently, improving memory use in large codebases or tools."
 version.workspace = true
 edition.workspace = true
@@ -13,12 +13,4 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-serde = { workspace = true }
-lasso = { workspace = true }
-
-[dev-dependencies]
-criterion = { workspace = true }
-
-[[bench]]
-name = "general"
-harness = false
+ustr = { workspace = true }

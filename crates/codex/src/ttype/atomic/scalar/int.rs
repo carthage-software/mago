@@ -15,8 +15,6 @@ use std::ops::Sub;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 
 /// Represents an integer type in a static analysis context, which can be either a
@@ -744,7 +742,7 @@ impl TType for TInteger {
         false
     }
 
-    fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
             TInteger::Literal(value) => format!("int({value})"),
             TInteger::From(value) => {

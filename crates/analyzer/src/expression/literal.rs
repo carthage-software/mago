@@ -1,3 +1,5 @@
+use mago_atom::atom;
+use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_int_or_float;
 use mago_codex::ttype::get_literal_float;
@@ -25,12 +27,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Literal<'arena> {
             &self,
             match self {
                 Literal::String(literal_string) => match literal_string.value {
-                    Some(value) => get_literal_string(value.to_owned()),
+                    Some(value) => get_literal_string(atom(value)),
                     None => {
                         if literal_string.raw.len() >= 3 {
                             get_non_empty_string()
                         } else {
-                            get_literal_string(String::new())
+                            get_empty_string()
                         }
                     }
                 },

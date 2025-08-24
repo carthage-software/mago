@@ -36,7 +36,6 @@ pub fn analyze<'ctx, 'arena>(
         false,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -61,7 +60,6 @@ pub fn analyze<'ctx, 'arena>(
 
         let type_match_found = union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             assigned_value_type,
             &resolved_property.property_type,
             true,
@@ -71,9 +69,9 @@ pub fn analyze<'ctx, 'arena>(
         );
 
         if !type_match_found {
-            let property_name_str = context.interner.lookup(&resolved_property.property_name).replace('$', "");
-            let property_type_str = resolved_property.property_type.get_id(Some(context.interner));
-            let assigned_type_str = assigned_value_type.get_id(Some(context.interner));
+            let property_name = resolved_property.property_name;
+            let property_type_str = resolved_property.property_type.get_id();
+            let assigned_type_str = assigned_value_type.get_id();
 
             let mut issue;
 
@@ -83,13 +81,13 @@ pub fn analyze<'ctx, 'arena>(
                 if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
                     issue_kind = IssueCode::MixedPropertyTypeCoercion;
                     issue = Issue::error(format!(
-                        "A value with a less specific type `{assigned_type_str}` is being assigned to property `${property_name_str}` ({property_type_str})."
+                        "A value with a less specific type `{assigned_type_str}` is being assigned to property `${property_name}` ({property_type_str})."
                     ))
                     .with_note("The assigned value contains a nested `mixed` type, which can hide potential bugs.");
                 } else {
                     issue_kind = IssueCode::PropertyTypeCoercion;
                     issue = Issue::error(format!(
-                        "A value of a less specific type `{assigned_type_str}` is being assigned to property `${property_name_str}` ({property_type_str})."
+                        "A value of a less specific type `{assigned_type_str}` is being assigned to property `${property_name}` ({property_type_str})."
                     ))
                     .with_note(format!("While `{assigned_type_str}` can be assigned to `{property_type_str}`, it is a wider type which may accept values that are invalid for this property."));
                 }
@@ -108,7 +106,7 @@ pub fn analyze<'ctx, 'arena>(
 
                 if let Some(property_span) = resolved_property.property_span {
                     issue = issue.with_annotation(Annotation::secondary(property_span).with_message(format!(
-                        "This property `{property_name_str}` is declared with type `{property_type_str}`"
+                        "This property `{property_name}` is declared with type `{property_type_str}`"
                     )));
                 }
 
@@ -121,7 +119,7 @@ pub fn analyze<'ctx, 'arena>(
             } else {
                 if let Some(value_span) = assigned_value_span {
                     issue = Issue::error(format!(
-                        "Invalid type for property `${property_name_str}`: expected `{property_type_str}`, but got `{assigned_type_str}`."
+                        "Invalid type for property `${property_name}`: expected `{property_type_str}`, but got `{assigned_type_str}`."
                     ))
                     .with_annotation(
                         Annotation::primary(value_span)
@@ -129,7 +127,7 @@ pub fn analyze<'ctx, 'arena>(
                     );
                 } else {
                     issue = Issue::error(format!(
-                        "Invalid assignment to property `${property_name_str}`: cannot assign value of type `{assigned_type_str}` to expected type `{property_type_str}`."
+                        "Invalid assignment to property `${property_name}`: cannot assign value of type `{assigned_type_str}` to expected type `{property_type_str}`."
                     ))
                     .with_annotation(
                         Annotation::primary(property_access.span())
@@ -139,7 +137,7 @@ pub fn analyze<'ctx, 'arena>(
 
                 if let Some(property_span) = resolved_property.property_span {
                     issue = issue.with_annotation(Annotation::secondary(property_span).with_message(format!(
-                        "This property `${property_name_str}` is declared with type `{property_type_str}`"
+                        "This property `${property_name}` is declared with type `{property_type_str}`"
                     )));
                 }
 
@@ -156,7 +154,6 @@ pub fn analyze<'ctx, 'arena>(
             resolved_property.property_type,
             resolved_property_type.as_ref(),
             context.codebase,
-            context.interner,
         ));
 
         matched_all_properties &= type_match_found;
@@ -172,13 +169,11 @@ pub fn analyze<'ctx, 'arena>(
         || resolution_result.encountered_mixed
         || resolution_result.has_possibly_defined_property
     {
-        resulting_type =
-            Some(add_optional_union_type(get_mixed(), resulting_type.as_ref(), context.codebase, context.interner));
+        resulting_type = Some(add_optional_union_type(get_mixed(), resulting_type.as_ref(), context.codebase));
     }
 
     if resolution_result.has_error_path || resolution_result.has_invalid_path || resolution_result.encountered_null {
-        resulting_type =
-            Some(add_optional_union_type(get_never(), resulting_type.as_ref(), context.codebase, context.interner));
+        resulting_type = Some(add_optional_union_type(get_never(), resulting_type.as_ref(), context.codebase));
     }
 
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));

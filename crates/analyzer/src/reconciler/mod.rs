@@ -6,9 +6,12 @@ use std::sync::LazyLock;
 use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
+use mago_atom::atom;
+use mago_atom::concat_atom;
 use regex::Regex;
 
 use mago_algebra::assertion_set::AssertionSet;
+use mago_atom::Atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::class_like_exists;
 use mago_codex::class_or_interface_exists;
@@ -36,7 +39,6 @@ use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -182,12 +184,8 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                     negated,
                 );
 
-                orred_type = Some(add_optional_union_type(
-                    result_type_candidate,
-                    orred_type.as_ref(),
-                    context.codebase,
-                    context.interner,
-                ));
+                orred_type =
+                    Some(add_optional_union_type(result_type_candidate, orred_type.as_ref(), context.codebase));
             }
 
             result_type = orred_type;
@@ -319,7 +317,7 @@ fn adjust_array_type<'ctx>(
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(Cow::Owned(arraykey_offset.clone()))
+                    ArrayKey::String(atom(&arraykey_offset))
                 } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
                     ArrayKey::Integer(arraykey_value)
                 } else {
@@ -453,7 +451,7 @@ fn add_nested_assertions<'ctx>(
                     let entry = new_types.entry(base_key.clone()).or_default();
 
                     let new_key = if array_key.starts_with('\'') {
-                        Some(ArrayKey::String(Cow::Owned(array_key[1..(array_key.len() - 1)].to_string())))
+                        Some(ArrayKey::String(atom(&array_key[1..(array_key.len() - 1)])))
                     } else if array_key.starts_with('$') {
                         None
                     } else if let Ok(arraykey_value) = array_key.parse::<i64>() {
@@ -656,19 +654,14 @@ fn get_value_for_key<'ctx>(
     if !block_context.locals.contains_key(&base_key) {
         if base_key.contains("::") {
             let base_key_parts = &base_key.split("::").collect::<Vec<&str>>();
-            let fq_class_name = base_key_parts[0].to_string();
-            let const_name = base_key_parts[1].to_string();
+            let fq_class_name = &base_key_parts[0];
+            let const_name = &base_key_parts[1];
 
-            let fq_class_name = context.interner.intern(fq_class_name.as_str());
-            if !class_like_exists(context.codebase, context.interner, &fq_class_name) {
+            if !class_like_exists(context.codebase, fq_class_name) {
                 return None;
             }
 
-            let class_constant = if let Some(const_name) = context.interner.get(&const_name) {
-                get_class_constant_type(context.codebase, context.interner, &fq_class_name, &const_name)
-            } else {
-                None
-            };
+            let class_constant = get_class_constant_type(context.codebase, fq_class_name, const_name);
 
             if let Some(class_constant) = class_constant {
                 let class_constant = Rc::new(match class_constant {
@@ -704,7 +697,7 @@ fn get_value_for_key<'ctx>(
             let array_key_type = if let Some(array_key_offset) = array_key_offset {
                 ArrayKey::Integer(array_key_offset as i64)
             } else {
-                ArrayKey::String(Cow::Owned(array_key.replace('\'', "").to_string()))
+                ArrayKey::String(atom(&array_key.replace('\'', "")))
             };
 
             let new_base_key = base_key.clone() + "[" + array_key.as_str() + "]";
@@ -748,11 +741,8 @@ fn get_value_for_key<'ctx>(
                                 return None;
                             }
 
-                            new_base_type_candidate = get_iterable_value_parameter(
-                                &existing_key_type_part,
-                                context.codebase,
-                                context.interner,
-                            )?;
+                            new_base_type_candidate =
+                                get_iterable_value_parameter(&existing_key_type_part, context.codebase)?;
 
                             if new_base_type_candidate.is_mixed()
                                 && !has_isset
@@ -766,13 +756,8 @@ fn get_value_for_key<'ctx>(
                                 && new_assertions.contains_key(&new_base_key)
                             {
                                 if has_inverted_isset && new_base_key.eq(&key) {
-                                    new_base_type_candidate = add_union_type(
-                                        new_base_type_candidate,
-                                        &get_null(),
-                                        context.codebase,
-                                        context.interner,
-                                        false,
-                                    );
+                                    new_base_type_candidate =
+                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
                                 *possibly_undefined = true;
@@ -798,23 +783,15 @@ fn get_value_for_key<'ctx>(
                                 *possibly_undefined = true;
                             }
                         } else {
-                            new_base_type_candidate = get_iterable_value_parameter(
-                                &existing_key_type_part,
-                                context.codebase,
-                                context.interner,
-                            )?;
+                            new_base_type_candidate =
+                                get_iterable_value_parameter(&existing_key_type_part, context.codebase)?;
 
                             if (has_isset || has_inverted_isset || has_inverted_key_exists)
                                 && new_assertions.contains_key(&new_base_key)
                             {
                                 if has_inverted_isset && new_base_key.eq(&key) {
-                                    new_base_type_candidate = add_union_type(
-                                        new_base_type_candidate,
-                                        &get_null(),
-                                        context.codebase,
-                                        context.interner,
-                                        false,
-                                    );
+                                    new_base_type_candidate =
+                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
                                 *possibly_undefined = true;
@@ -838,13 +815,7 @@ fn get_value_for_key<'ctx>(
                     }
 
                     let resulting_type = Rc::new(if let Some(new_base_type) = &new_base_type {
-                        add_union_type(
-                            new_base_type_candidate,
-                            new_base_type,
-                            context.codebase,
-                            context.interner,
-                            false,
-                        )
+                        add_union_type(new_base_type_candidate, new_base_type, context.codebase, false)
                     } else {
                         new_base_type_candidate.clone()
                     });
@@ -880,8 +851,9 @@ fn get_value_for_key<'ctx>(
                         class_property_type = get_mixed();
                     } else if let TAtomic::Object(TObject::Named(named_object)) = existing_key_type_part {
                         let fq_class_name = named_object.get_name_ref();
-                        if context.interner.lookup(fq_class_name).eq_ignore_ascii_case("stdClass")
-                            || !class_or_interface_exists(context.codebase, context.interner, fq_class_name)
+
+                        if fq_class_name.eq_ignore_ascii_case("stdClass")
+                            || !class_or_interface_exists(context.codebase, fq_class_name)
                         {
                             class_property_type = get_mixed();
                         } else {
@@ -895,7 +867,6 @@ fn get_value_for_key<'ctx>(
                         class_property_type,
                         new_base_type.as_deref(),
                         context.codebase,
-                        context.interner,
                     ));
 
                     new_base_type = Some(resulting_type.clone());
@@ -912,27 +883,20 @@ fn get_value_for_key<'ctx>(
     block_context.locals.get(&base_key).map(|t| (**t).clone())
 }
 
-fn get_property_type(
-    context: &Context<'_, '_>,
-    classlike_name: &StringIdentifier,
-    property_name_str: &str,
-) -> Option<TUnion> {
+fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_name_str: &str) -> Option<TUnion> {
     // Add `$` prefix
-    let prefixed_property_name = "$".to_owned() + property_name_str;
-    let property_name = context.interner.intern(&prefixed_property_name);
+    let property_name = concat_atom!("$", property_name_str);
 
-    let declaring_property_class =
-        get_declaring_class_for_property(context.codebase, context.interner, classlike_name, &property_name)?;
-    let property_metadata = get_property(context.codebase, context.interner, classlike_name, &property_name)?;
+    let declaring_property_class = get_declaring_class_for_property(context.codebase, classlike_name, &property_name)?;
+    let property_metadata = get_property(context.codebase, classlike_name, &property_name)?;
     let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
 
     let property_type = if let Some(mut property_type) = property_type {
         expander::expand_union(
             context.codebase,
-            context.interner,
             &mut property_type,
             &TypeExpansionOptions {
-                self_class: Some(&declaring_property_class),
+                self_class: Some(declaring_property_class),
                 static_class_type: StaticClassType::Name(declaring_property_class),
                 ..Default::default()
             },
@@ -955,7 +919,7 @@ pub(crate) fn trigger_issue_for_impossible(
     negated: bool,
     span: &Span,
 ) {
-    let mut assertion_string = assertion.as_string(Some(context.interner));
+    let mut assertion_string = assertion.as_string();
     let mut not_operator = assertion_string.starts_with('!');
 
     if not_operator {

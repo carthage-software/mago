@@ -8,6 +8,7 @@ use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
+use mago_atom::atom;
 use mago_codex::get_enum;
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
@@ -143,13 +144,7 @@ fn inherit_loop_block_context<'ctx, 'arena>(
             if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
                 block_context.locals.insert(
                     variable,
-                    Rc::new(ttype::combine_union_types(
-                        &variable_type,
-                        possible_type,
-                        context.codebase,
-                        context.interner,
-                        false,
-                    )),
+                    Rc::new(ttype::combine_union_types(&variable_type, possible_type, context.codebase, false)),
                 );
             }
         }
@@ -405,7 +400,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                                 &continue_context_type,
                                 parent_context_type,
                                 context.codebase,
-                                context.interner,
                                 false,
                             )),
                         );
@@ -423,13 +417,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
                             variable_id.clone(),
-                            Rc::new(combine_union_types(
-                                &continue_context_type,
-                                loop_context_type,
-                                codebase,
-                                context.interner,
-                                false,
-                            )),
+                            Rc::new(combine_union_types(&continue_context_type, loop_context_type, codebase, false)),
                         );
 
                         // if there's a change, invalidate related clauses
@@ -590,7 +578,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                             possibly_redefined_variable_type,
                             do_context_type,
                             codebase,
-                            context.interner,
                             always_enters_loop,
                         ))
                     };
@@ -607,7 +594,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                         variable_type,
                         loop_parent_context_type,
                         codebase,
-                        context.interner,
                         always_enters_loop,
                     ));
                 }
@@ -622,13 +608,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             if loop_context_type != variable_type {
                 loop_parent_context.locals.insert(
                     variable_id.clone(),
-                    Rc::new(combine_union_types(
-                        variable_type,
-                        loop_context_type,
-                        codebase,
-                        context.interner,
-                        always_enters_loop,
-                    )),
+                    Rc::new(combine_union_types(variable_type, loop_context_type, codebase, always_enters_loop)),
                 );
 
                 loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -655,7 +635,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                             &variable_type,
                             continue_context_type,
                             codebase,
-                            context.interner,
                             always_enters_loop,
                         )),
                     );
@@ -722,13 +701,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                 {
                     loop_parent_context.locals.insert(
                         variable_id.clone(),
-                        Rc::new(combine_union_types(
-                            variable_type,
-                            possibly_defined_type,
-                            codebase,
-                            context.interner,
-                            true,
-                        )),
+                        Rc::new(combine_union_types(variable_type, possibly_defined_type, codebase, true)),
                     );
                 }
             } else {
@@ -881,7 +854,6 @@ fn update_loop_scope_contexts<'ctx, 'arena>(
                         },
                         variable_type,
                         context.codebase,
-                        context.interner,
                         false,
                     )),
                 );
@@ -984,7 +956,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     if iterator_type.is_nullable() && !iterator_type.ignore_nullable_issues {
         context.collector.report_with_code(
             IssueCode::PossiblyNullIterator,
-            Issue::warning(format!("Expression being iterated (type `{}`) might be `null` at runtime.", iterator_type.get_id(Some(context.interner))))
+            Issue::warning(format!("Expression being iterated (type `{}`) might be `null` at runtime.", iterator_type.get_id()))
                 .with_annotation(Annotation::primary(iterator.span()).with_message("This might be `null`"))
                 .with_annotation(Annotation::secondary(foreach.span()).with_message("This `foreach` might not be executed"))
                 .with_note("If this expression is `null`, it will be treated as an empty array, and the loop body will not execute.")
@@ -995,7 +967,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     if iterator_type.is_falsable() && !iterator_type.ignore_falsable_issues {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseIterator,
-            Issue::warning(format!("Expression being iterated (type `{}`) might be `false` at runtime.", iterator_type.get_id(Some(context.interner))))
+            Issue::warning(format!("Expression being iterated (type `{}`) might be `false` at runtime.", iterator_type.get_id()))
                 .with_annotation(Annotation::primary(iterator.span()).with_message("This might be `false`"))
                 .with_annotation(Annotation::secondary(foreach.span()).with_message("This `foreach` might not be executed"))
                 .with_note("If this expression is `false`, it will be treated as an empty array, and the loop body will not execute.")
@@ -1026,7 +998,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                     has_at_least_one_entry = true;
                 }
 
-                let (k, v) = get_array_parameters(array, context.codebase, context.interner);
+                let (k, v) = get_array_parameters(array, context.codebase);
                 collected_key_atomics.extend(k.types.into_owned());
                 collected_value_atomics.extend(v.types.into_owned());
             }
@@ -1051,13 +1023,11 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         (get_string(), get_mixed())
                     }
                     TObject::Named(atomic_object) => {
-                        if let Some((k, v)) =
-                            get_iterable_parameters(iterator_atomic, context.codebase, context.interner)
-                        {
+                        if let Some((k, v)) = get_iterable_parameters(iterator_atomic, context.codebase) {
                             (k, v)
                         } else {
-                            let class_name = context.interner.lookup(&atomic_object.name);
-                            let iterator_atomic_str = iterator_atomic.get_id(Some(context.interner));
+                            let class_name = atomic_object.name;
+                            let iterator_atomic_str = iterator_atomic.get_id();
 
                             context.collector.report_with_code(
                                 IssueCode::NonIterableObjectIteration,
@@ -1079,10 +1049,9 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                     TObject::Enum(enum_instance) => {
                         has_at_least_one_entry = true;
 
-                        let enum_name = context.interner.lookup(&enum_instance.get_name());
-                        let enum_backing_type =
-                            get_enum(context.codebase, context.interner, enum_instance.get_name_ref())
-                                .and_then(|class_like| class_like.enum_type.as_ref());
+                        let enum_name = enum_instance.get_name();
+                        let enum_backing_type = get_enum(context.codebase, enum_instance.get_name_ref())
+                            .and_then(|class_like| class_like.enum_type.as_ref());
 
                         context.collector.report_with_code(
                             IssueCode::EnumIteration,
@@ -1105,15 +1074,15 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         match enum_backing_type {
                             Some(backing_type) => (
                                 TUnion::from_vec(vec![
-                                    TAtomic::Scalar(TScalar::literal_string("name".to_owned())),
-                                    TAtomic::Scalar(TScalar::literal_string("value".to_owned())),
+                                    TAtomic::Scalar(TScalar::literal_string(atom("name"))),
+                                    TAtomic::Scalar(TScalar::literal_string(atom("value"))),
                                 ]),
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::non_empty_string()),
                                     backing_type.clone(),
                                 ]),
                             ),
-                            None => (get_literal_string("name".to_owned()), get_non_empty_string()),
+                            None => (get_literal_string(atom("name")), get_non_empty_string()),
                         }
                     }
                 };
@@ -1124,14 +1093,14 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                 collected_value_atomics.extend(obj_value_type.types.into_owned());
             }
             _ => {
-                let iterator_atomic_id = iterator_atomic.get_id(Some(context.interner));
+                let iterator_atomic_id = iterator_atomic.get_id();
                 invalid_atomic_ids.push(iterator_atomic_id);
             }
         }
     }
 
     if !has_valid_iterable_type {
-        let iterator_type_id_str = iterator_type.get_id(Some(context.interner));
+        let iterator_type_id_str = iterator_type.get_id();
         let problematic_types_str = if invalid_atomic_ids.is_empty() {
             format!("resolved to type `{iterator_type_id_str}` which is not iterable in this context")
         } else if invalid_atomic_ids.len() == 1 {
@@ -1166,7 +1135,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 
         return Ok((false, get_never(), get_never()));
     } else if !invalid_atomic_ids.is_empty() {
-        let iterator_type_id_str = iterator_type.get_id(Some(context.interner));
+        let iterator_type_id_str = iterator_type.get_id();
         let problematic_types_list_str = invalid_atomic_ids.join("`, `");
 
         context.collector.report_with_code(
@@ -1192,13 +1161,13 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     let final_key_type = if collected_key_atomics.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(collected_key_atomics, context.codebase, context.interner, false))
+        TUnion::from_vec(combine(collected_key_atomics, context.codebase, false))
     };
 
     let final_value_type = if collected_value_atomics.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(collected_value_atomics, context.codebase, context.interner, false))
+        TUnion::from_vec(combine(collected_value_atomics, context.codebase, false))
     };
 
     Ok((has_at_least_one_entry, final_key_type, final_value_type))
@@ -1209,7 +1178,6 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 ///
 /// # Arguments
 ///
-/// * `context` - Provides access to the interner for looking up string names.
 /// * `expression` - The AST expression node to scrape.
 ///
 /// # Returns

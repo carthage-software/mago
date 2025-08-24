@@ -1,5 +1,5 @@
+use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_int_range;
-use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::union::TUnion;
 
@@ -62,11 +62,7 @@ impl SpecialFunctionLikeHandlerTrait for RandomFunctionsHandler {
                 let length_argument_integer = length_argument_type.get_single_int()?;
                 let minimum_value = length_argument_integer.get_minimum_value()?;
 
-                Some(if minimum_value > 0 {
-                    get_non_empty_string()
-                } else {
-                    get_literal_string(String::with_capacity(0))
-                })
+                Some(if minimum_value > 0 { get_non_empty_string() } else { get_empty_string() })
             }
             _ => None,
         }

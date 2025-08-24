@@ -1,7 +1,6 @@
+use mago_atom::atom;
 use serde::Deserialize;
 use serde::Serialize;
-
-use mago_interner::ThreadedInterner;
 
 use crate::get_class_like;
 use crate::get_enum;
@@ -38,7 +37,6 @@ impl TValueOf {
     pub fn get_value_of_targets(
         target_types: &[TAtomic],
         codebase: &CodebaseMetadata,
-        interner: &ThreadedInterner,
         retain_generics: bool,
     ) -> Option<TUnion> {
         let mut value_types = vec![];
@@ -46,7 +44,7 @@ impl TValueOf {
         for target in target_types {
             match target {
                 TAtomic::Array(array) => {
-                    let (_, array_value_type) = get_array_parameters(array, codebase, interner);
+                    let (_, array_value_type) = get_array_parameters(array, codebase);
 
                     value_types.extend(array_value_type.types.iter().cloned());
                 }
@@ -54,7 +52,7 @@ impl TValueOf {
                     value_types.extend(iterable.get_value_type().types.iter().cloned());
                 }
                 TAtomic::Object(TObject::Enum(TEnum { name: enum_name, case: Some(case_name) })) => {
-                    let Some(metadata) = get_enum(codebase, interner, enum_name) else {
+                    let Some(metadata) = get_enum(codebase, enum_name) else {
                         continue;
                     };
 
@@ -71,7 +69,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(class_like_metadata) = get_class_like(codebase, interner, name) else {
+                    let Some(class_like_metadata) = get_class_like(codebase, name) else {
                         continue;
                     };
 
@@ -89,22 +87,19 @@ impl TValueOf {
                         continue;
                     }
 
-                    let unit_enum_interface = interner.intern("unitenum");
                     let is_enum_interface = class_like_metadata.flags.is_enum_interface()
-                        || is_instance_of(codebase, interner, &class_like_metadata.name, &unit_enum_interface);
+                        || is_instance_of(codebase, &class_like_metadata.name, &atom("unitenum"));
 
                     if !is_enum_interface {
                         continue;
                     }
 
-                    let string_backed_enum_interface = interner.intern("stringbackedenum");
-                    if is_instance_of(codebase, interner, &class_like_metadata.name, &string_backed_enum_interface) {
+                    if is_instance_of(codebase, &class_like_metadata.name, &atom("stringbackedenum")) {
                         value_types.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
 
-                    let int_backed_enum_interface = interner.intern("intbackedenum");
-                    if is_instance_of(codebase, interner, &class_like_metadata.name, &int_backed_enum_interface) {
+                    if is_instance_of(codebase, &class_like_metadata.name, &atom("intbackedenum")) {
                         value_types.push(TAtomic::Scalar(TScalar::int()));
                         continue;
                     }
@@ -115,12 +110,9 @@ impl TValueOf {
                 TAtomic::GenericParameter(parameter) => {
                     if retain_generics {
                         value_types.push(TAtomic::GenericParameter(parameter.clone()));
-                    } else if let Some(generic_value_types) = Self::get_value_of_targets(
-                        parameter.get_constraint().types.as_ref(),
-                        codebase,
-                        interner,
-                        retain_generics,
-                    ) {
+                    } else if let Some(generic_value_types) =
+                        Self::get_value_of_targets(parameter.get_constraint().types.as_ref(), codebase, retain_generics)
+                    {
                         value_types.extend(generic_value_types.types.into_owned());
                     }
                 }
@@ -147,10 +139,10 @@ impl TType for TValueOf {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let mut id = String::new();
         id += "value-of<";
-        id += &self.0.get_id(interner);
+        id += &self.0.get_id();
         id += ">";
         id
     }

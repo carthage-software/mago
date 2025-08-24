@@ -6,8 +6,6 @@ use ahash::AHasher;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -57,17 +55,17 @@ pub enum Assertion {
 }
 
 impl Assertion {
-    pub fn as_string(&self, interner: Option<&ThreadedInterner>) -> String {
+    pub fn as_string(&self) -> String {
         match self {
             Assertion::Any => "any".to_string(),
             Assertion::Falsy => "falsy".to_string(),
             Assertion::Truthy => "truthy".to_string(),
-            Assertion::IsType(atomic) => atomic.get_id(interner),
-            Assertion::IsNotType(atomic) => "!".to_string() + &atomic.get_id(interner),
-            Assertion::IsIdentical(atomic) => "=".to_string() + &atomic.get_id(interner),
-            Assertion::IsNotIdentical(atomic) => "!=".to_string() + &atomic.get_id(interner),
-            Assertion::IsEqual(atomic) => "~".to_string() + &atomic.get_id(interner),
-            Assertion::IsNotEqual(atomic) => "!~".to_string() + &atomic.get_id(interner),
+            Assertion::IsType(atomic) => atomic.get_id(),
+            Assertion::IsNotType(atomic) => "!".to_string() + &atomic.get_id(),
+            Assertion::IsIdentical(atomic) => "=".to_string() + &atomic.get_id(),
+            Assertion::IsNotIdentical(atomic) => "!=".to_string() + &atomic.get_id(),
+            Assertion::IsEqual(atomic) => "~".to_string() + &atomic.get_id(),
+            Assertion::IsNotEqual(atomic) => "!~".to_string() + &atomic.get_id(),
             Assertion::IsEqualIsset => "=isset".to_string(),
             Assertion::IsIsset => "isset".to_string(),
             Assertion::IsNotIsset => "!isset".to_string(),
@@ -81,8 +79,8 @@ impl Assertion {
             Assertion::DoesNotHaveNonnullEntryForKey(key) => {
                 "!=has-nonnull-entry-for-".to_string() + key.to_string().as_str()
             }
-            Assertion::InArray(union) => "=in-array-".to_string() + &union.get_id(interner),
-            Assertion::NotInArray(union) => "!=in-array-".to_string() + &union.get_id(interner),
+            Assertion::InArray(union) => "=in-array-".to_string() + &union.get_id(),
+            Assertion::NotInArray(union) => "!=in-array-".to_string() + &union.get_id(),
             Assertion::NonEmptyCountable(negatable) => {
                 if *negatable {
                     "non-empty-countable".to_string()
@@ -108,7 +106,7 @@ impl Assertion {
 
     pub fn to_hash(&self) -> u64 {
         let mut state = AHasher::default();
-        self.as_string(None).hash(&mut state);
+        self.as_string().hash(&mut state);
         state.finish()
     }
 
@@ -269,16 +267,11 @@ impl Assertion {
         }
     }
 
-    pub fn resolve_templates(
-        &self,
-        codebase: &CodebaseMetadata,
-        interner: &ThreadedInterner,
-        template_result: &TemplateResult,
-    ) -> Vec<Self> {
+    pub fn resolve_templates(&self, codebase: &CodebaseMetadata, template_result: &TemplateResult) -> Vec<Self> {
         match self {
             Assertion::IsType(atomic) => {
                 let union = TUnion::from_single(Cow::Owned(atomic.clone()));
-                let resolved_union = inferred_type_replacer::replace(&union, template_result, codebase, interner);
+                let resolved_union = inferred_type_replacer::replace(&union, template_result, codebase);
 
                 let mut result = vec![];
                 for resolved_atomic in resolved_union.types.into_owned() {
@@ -293,7 +286,7 @@ impl Assertion {
             }
             Assertion::IsNotType(atomic) => {
                 let union = TUnion::from_single(Cow::Owned(atomic.clone()));
-                let resolved_union = inferred_type_replacer::replace(&union, template_result, codebase, interner);
+                let resolved_union = inferred_type_replacer::replace(&union, template_result, codebase);
 
                 let mut result = vec![];
                 for resolved_atomic in resolved_union.types.into_owned() {
@@ -307,12 +300,12 @@ impl Assertion {
                 result
             }
             Assertion::InArray(union) => {
-                let resolved_union = inferred_type_replacer::replace(union, template_result, codebase, interner);
+                let resolved_union = inferred_type_replacer::replace(union, template_result, codebase);
 
                 vec![Assertion::InArray(resolved_union)]
             }
             Assertion::NotInArray(union) => {
-                let resolved_union = inferred_type_replacer::replace(union, template_result, codebase, interner);
+                let resolved_union = inferred_type_replacer::replace(union, template_result, codebase);
 
                 vec![Assertion::NotInArray(resolved_union)]
             }

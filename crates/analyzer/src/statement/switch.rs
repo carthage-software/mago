@@ -110,7 +110,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             switch.expression,
             self.block_context.scope.get_class_like_name(),
             self.context.resolved_names,
-            self.context.interner,
             Some(self.context.codebase),
         ) {
             switch_var_id
@@ -216,13 +215,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
                 self.block_context.locals.insert(
                     var_id.clone(),
-                    Rc::new(combine_union_types(
-                        &var_type,
-                        &context_type,
-                        self.context.codebase,
-                        self.context.interner,
-                        false,
-                    )),
+                    Rc::new(combine_union_types(&var_type, &context_type, self.context.codebase, false)),
                 );
             }
         }
@@ -338,7 +331,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 if (switch_condition_type.is_true() && condition_type.is_always_falsy())
                     || !can_expression_types_be_identical(
                         self.context.codebase,
-                        self.context.interner,
                         switch_condition_type.as_ref(),
                         condition_type.as_ref(),
                         false,
@@ -352,12 +344,14 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                         Issue::error("Switch case condition will never match")
                             .with_annotation(Annotation::primary(case_condition.span()).with_message(format!(
                                 "This case with type `{}` will never match the subject type.",
-                                condition_type.get_id(Some(self.context.interner))
+                                condition_type.get_id()
                             )))
-                            .with_annotation(Annotation::secondary(switch.expression.span()).with_message(format!(
-                                "Switch subject has type `{}`.",
-                                switch_condition_type.get_id(Some(self.context.interner))
-                            )))
+                            .with_annotation(
+                                Annotation::secondary(switch.expression.span()).with_message(format!(
+                                    "Switch subject has type `{}`.",
+                                    switch_condition_type.get_id()
+                                )),
+                            )
                             .with_note("This case condition will never match the switch subject's type.")
                             .with_help("Remove this case or ensure that the switch subject's type can still match it."),
                     );
@@ -374,10 +368,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                                 Annotation::primary(case_condition.span())
                                     .with_message("This case will always match the subject."),
                             )
-                            .with_annotation(Annotation::secondary(switch.expression.span()).with_message(format!(
-                                "Switch subject has type `{}`.",
-                                switch_condition_type.get_id(Some(self.context.interner))
-                            )))
+                            .with_annotation(
+                                Annotation::secondary(switch.expression.span()).with_message(format!(
+                                    "Switch subject has type `{}`.",
+                                    switch_condition_type.get_id()
+                                )),
+                            )
                             .with_note("All subsequent `case` and `default` statements are unreachable.")
                             .with_help(
                                 "Remove this case or rearrange the switch cases to ensure that this case is last.",
@@ -471,7 +467,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         case_block_context.clauses = if !case_clauses.is_empty() {
             if let Some(case_condition) = switch_case.expression() {
                 check_for_paradox(
-                    self.context.interner,
                     &mut self.context.collector,
                     &entry_clauses.iter().map(|v| Rc::new(v.clone())).collect::<Vec<_>>(),
                     &case_clauses,
@@ -570,7 +565,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                             Some(var_type),
                             possibly_redefined_var_ids.get(var_id),
                             self.context.codebase,
-                            self.context.interner,
                         ),
                     );
                 }
@@ -590,13 +584,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                         if case_block_context.locals.contains_key(&var_id) {
                             new_locals.insert(
                                 var_id.clone(),
-                                Rc::new(combine_union_types(
-                                    break_var_type,
-                                    &var_type,
-                                    self.context.codebase,
-                                    self.context.interner,
-                                    false,
-                                )),
+                                Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                             );
                         } else {
                             new_locals.remove(&var_id);
@@ -612,13 +600,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         redefined_vars.insert(
                             var_id.clone(),
-                            Rc::new(combine_union_types(
-                                break_var_type,
-                                &var_type,
-                                self.context.codebase,
-                                self.context.interner,
-                                false,
-                            )),
+                            Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                         );
                     } else {
                         redefined_vars.remove(&var_id);
@@ -652,7 +634,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                         Some(var_type),
                         possibly_redefined_var_ids.get(var_id),
                         self.context.codebase,
-                        self.context.interner,
                     ),
                 );
             }
@@ -671,13 +652,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
                     redefined_vars.insert(
                         var_id.clone(),
-                        Rc::new(combine_union_types(
-                            break_var_type,
-                            &var_type,
-                            self.context.codebase,
-                            self.context.interner,
-                            false,
-                        )),
+                        Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                     );
                 } else {
                     redefined_vars.remove(&var_id);
@@ -692,13 +667,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
                     new_locals.insert(
                         var_id.clone(),
-                        Rc::new(combine_union_types(
-                            existing_var_type,
-                            &var_type,
-                            self.context.codebase,
-                            self.context.interner,
-                            false,
-                        )),
+                        Rc::new(combine_union_types(existing_var_type, &var_type, self.context.codebase, false)),
                     );
                 } else {
                     new_locals.remove(&var_id);

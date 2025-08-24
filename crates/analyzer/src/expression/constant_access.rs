@@ -22,12 +22,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let name = context.resolved_names.get(self);
-        let name_id = context.interner.intern(name);
         let unqualified_name = self.name.value();
-        let unqualified_name_id = context.interner.intern(unqualified_name);
 
-        let constant_metadata = get_constant(context.codebase, context.interner, &name_id)
-            .or_else(|| get_constant(context.codebase, context.interner, &unqualified_name_id));
+        let constant_metadata =
+            get_constant(context.codebase, name).or_else(|| get_constant(context.codebase, unqualified_name));
 
         let Some(constant_metadata) = constant_metadata else {
             context.collector.report_with_code(
@@ -64,12 +62,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
 
         let mut constant_type = constant_metadata.inferred_type.clone().unwrap_or_else(get_mixed);
 
-        expander::expand_union(
-            context.codebase,
-            context.interner,
-            &mut constant_type,
-            &TypeExpansionOptions::default(),
-        );
+        expander::expand_union(context.codebase, &mut constant_type, &TypeExpansionOptions::default());
 
         artifacts.set_expression_type(self, constant_type);
 

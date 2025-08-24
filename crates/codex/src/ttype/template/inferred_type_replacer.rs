@@ -3,8 +3,7 @@ use ahash::HashSet;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::get_class_like;
 use crate::metadata::CodebaseMetadata;
@@ -26,18 +25,13 @@ use crate::ttype::template::standin_type_replacer::get_most_specific_type_from_b
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
-pub fn replace(
-    union: &TUnion,
-    template_result: &TemplateResult,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> TUnion {
+pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TUnion {
     let mut keys_to_unset = HashSet::default();
     let mut new_types = Vec::new();
 
     for atomic_type in union.types.as_ref() {
         let mut atomic_type = atomic_type.clone();
-        atomic_type = replace_atomic(atomic_type, template_result, codebase, interner);
+        atomic_type = replace_atomic(atomic_type, template_result, codebase);
 
         match &atomic_type {
             TAtomic::GenericParameter(TGenericParameter {
@@ -53,7 +47,6 @@ pub fn replace(
                     parameter_name,
                     defining_entity,
                     codebase,
-                    interner,
                     constraint,
                     intersection_types,
                     template_result,
@@ -76,7 +69,7 @@ pub fn replace(
                 if let Some(bounds) =
                     template_result.lower_bounds.get(parameter_name).unwrap_or(&HashMap::default()).get(defining_entity)
                 {
-                    let template_type = get_most_specific_type_from_bounds(bounds, codebase, interner);
+                    let template_type = get_most_specific_type_from_bounds(bounds, codebase);
 
                     let mut class_template_type = None;
 
@@ -130,20 +123,19 @@ pub fn replace(
         return get_never();
     }
 
-    union.clone_with_types(combiner::combine(new_types, codebase, interner, false))
+    union.clone_with_types(combiner::combine(new_types, codebase, false))
 }
 
 #[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
-    inferred_lower_bounds: &IndexMap<StringIdentifier, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
-    parameter_name: &StringIdentifier,
+    inferred_lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
+    parameter_name: &Atom,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     constraint: &TUnion,
     intersection_types: &Option<Vec<TAtomic>>,
     template_result: &TemplateResult,
-    key: &StringIdentifier,
+    key: &Atom,
 ) -> Option<TUnion> {
     let mut template_type = None;
     let traversed_type = standin_type_replacer::get_root_template_type(
@@ -152,7 +144,6 @@ fn replace_template_parameter(
         defining_entity,
         HashSet::default(),
         codebase,
-        interner,
     );
 
     if let Some(traversed_type) = traversed_type {
@@ -168,7 +159,7 @@ fn replace_template_parameter(
             let replaced_intersection_parts: Vec<TAtomic> = intersection_types
                 .iter()
                 .cloned()
-                .map(|part| replace_atomic(part, template_result, codebase, interner))
+                .map(|part| replace_atomic(part, template_result, codebase))
                 .collect();
 
             for atomic_template_type in template_type_inner.types.to_mut() {
@@ -208,15 +199,14 @@ fn replace_template_parameter(
         for (_, template_type_map) in inferred_lower_bounds {
             for map_defining_entity in template_type_map.keys() {
                 if let GenericParent::ClassLike(classlike_name) = map_defining_entity
-                    && let Some(metadata) = get_class_like(codebase, interner, classlike_name)
+                    && let Some(metadata) = get_class_like(codebase, classlike_name)
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
                     && let Some(param) = extended_parameter_map.get(key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
                     && let Some(bounds) = bounds_map.get(map_defining_entity)
                 {
-                    template_type =
-                        Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase, interner));
+                    template_type = Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase));
                 }
             }
         }
@@ -225,80 +215,72 @@ fn replace_template_parameter(
     template_type
 }
 
-fn replace_atomic(
-    mut atomic: TAtomic,
-    template_result: &TemplateResult,
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-) -> TAtomic {
+fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TAtomic {
     match &mut atomic {
         TAtomic::Conditional(conditional) => {
-            conditional.subject = Box::new(replace(&conditional.subject, template_result, codebase, interner));
-            conditional.target = Box::new(replace(&conditional.target, template_result, codebase, interner));
-            conditional.then = Box::new(replace(&conditional.then, template_result, codebase, interner));
-            conditional.otherwise = Box::new(replace(&conditional.otherwise, template_result, codebase, interner));
+            conditional.subject = Box::new(replace(&conditional.subject, template_result, codebase));
+            conditional.target = Box::new(replace(&conditional.target, template_result, codebase));
+            conditional.then = Box::new(replace(&conditional.then, template_result, codebase));
+            conditional.otherwise = Box::new(replace(&conditional.otherwise, template_result, codebase));
         }
         TAtomic::Array(array_type) => match array_type {
             TArray::List(list_data) => {
-                list_data.element_type =
-                    Box::new(replace(&list_data.element_type, template_result, codebase, interner));
+                list_data.element_type = Box::new(replace(&list_data.element_type, template_result, codebase));
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
-                        *element_type = replace(element_type, template_result, codebase, interner);
+                        *element_type = replace(element_type, template_result, codebase);
                     }
                 }
             }
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    *key_parameter = Box::new(replace(key_parameter, template_result, codebase, interner));
-                    *value_parameter = Box::new(replace(value_parameter, template_result, codebase, interner));
+                    *key_parameter = Box::new(replace(key_parameter, template_result, codebase));
+                    *value_parameter = Box::new(replace(value_parameter, template_result, codebase));
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
                     for (_, item_type) in known_items.values_mut() {
-                        *item_type = replace(item_type, template_result, codebase, interner);
+                        *item_type = replace(item_type, template_result, codebase);
                     }
                 }
             }
         },
         TAtomic::Iterable(iterable) => {
             let key_type = iterable.get_key_type_mut();
-            *key_type = replace(key_type, template_result, codebase, interner);
+            *key_type = replace(key_type, template_result, codebase);
 
             let value_type = iterable.get_value_type_mut();
-            *value_type = replace(value_type, template_result, codebase, interner);
+            *value_type = replace(value_type, template_result, codebase);
 
             if let Some(intersection_types) = iterable.get_intersection_types_mut() {
                 let old_intersection_types = TUnion::from_vec(intersection_types.clone());
 
-                *intersection_types =
-                    replace(&old_intersection_types, template_result, codebase, interner).types.into_owned();
+                *intersection_types = replace(&old_intersection_types, template_result, codebase).types.into_owned();
             }
         }
         TAtomic::Object(TObject::Named(named_object)) => {
             if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                 for parameter in type_parameters {
-                    *parameter = replace(parameter, template_result, codebase, interner);
+                    *parameter = replace(parameter, template_result, codebase);
                 }
             }
 
             if let Some(intersection_types) = named_object.get_intersection_types_mut() {
                 let old_intersection_types = TUnion::from_vec(intersection_types.clone());
 
-                *intersection_types =
-                    replace(&old_intersection_types, template_result, codebase, interner).types.into_owned();
+                *intersection_types = replace(&old_intersection_types, template_result, codebase).types.into_owned();
             }
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             for parameter in signature.get_parameters_mut() {
                 if let Some(t) = parameter.get_type_signature_mut() {
-                    *t = replace(t, template_result, codebase, interner);
+                    *t = replace(t, template_result, codebase);
                 }
             }
 
             if let Some(return_type) = signature.get_return_type_mut() {
-                *return_type = replace(return_type, template_result, codebase, interner);
+                *return_type = replace(return_type, template_result, codebase);
             }
         }
         _ => (),

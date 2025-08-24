@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -144,7 +142,7 @@ impl TType for TKeyedArray {
         false
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         if let Some(items) = &self.known_items {
             let mut str = String::new();
             str += "array{";
@@ -162,7 +160,7 @@ impl TType for TKeyedArray {
                 }
 
                 str += ": ";
-                str += &item_type.get_id(interner);
+                str += &item_type.get_id();
             }
 
             if let Some((key_type, value_type)) = &self.parameters {
@@ -173,9 +171,9 @@ impl TType for TKeyedArray {
                 str += "...";
                 if !key_type.is_array_key() || !value_type.is_mixed() {
                     str += "<";
-                    str += &key_type.get_id(interner);
+                    str += &key_type.get_id();
                     str += ", ";
-                    str += &value_type.get_id(interner);
+                    str += &value_type.get_id();
                     str += ">";
                 }
             }
@@ -186,9 +184,9 @@ impl TType for TKeyedArray {
             let mut str = String::new();
             str += if self.is_non_empty() { "non-empty-array" } else { "array" };
             str += "<";
-            str += &key_type.get_id(interner);
+            str += &key_type.get_id();
             str += ", ";
-            str += &value_type.get_id(interner);
+            str += &value_type.get_id();
             str += ">";
 
             str.to_string()

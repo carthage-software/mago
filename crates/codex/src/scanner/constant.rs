@@ -1,10 +1,10 @@
+use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::issue::ScanningIssueKind;
-use crate::lower_constant_name;
 use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
@@ -31,11 +31,11 @@ pub fn scan_constant<'ctx, 'ast, 'arena>(
         .items
         .iter()
         .map(|item| {
-            let name = lower_constant_name(context.interner, context.resolved_names.get(&item.name));
+            let name = ascii_lowercase_constant_name_atom(context.resolved_names.get(&item.name));
 
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
             metadata.attributes = attributes.clone();
-            metadata.inferred_type = infer(context.interner, context.resolved_names, &item.value);
+            metadata.inferred_type = infer(context.resolved_names, &item.value);
 
             match &docblock {
                 Ok(Some(docblock)) => {
@@ -91,7 +91,7 @@ pub fn scan_defined_constant<'ctx, 'ast, 'arena>(
         return None;
     };
 
-    let name = lower_constant_name(context.interner, name_string.value?);
+    let name = ascii_lowercase_constant_name_atom(name_string.value?);
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
         flags |= MetadataFlags::USER_DEFINED;
@@ -100,7 +100,7 @@ pub fn scan_defined_constant<'ctx, 'ast, 'arena>(
     }
 
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
-    metadata.inferred_type = infer(context.interner, context.resolved_names, arguments[1].value());
+    metadata.inferred_type = infer(context.resolved_names, arguments[1].value());
 
     Some(metadata)
 }

@@ -4,7 +4,6 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::ThreadedInterner;
 
 #[inline]
 pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
@@ -142,7 +141,6 @@ pub fn is_always_identical_to(lhs: &TUnion, rhs: &TUnion) -> bool {
 
 pub fn are_definitely_not_identical(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     lhs: &TUnion,
     rhs: &TUnion,
     allow_type_coercion: bool,
@@ -152,7 +150,7 @@ pub fn are_definitely_not_identical(
         return false;
     }
 
-    if !can_expression_types_be_identical(codebase, interner, lhs, rhs, true, allow_type_coercion) {
+    if !can_expression_types_be_identical(codebase, lhs, rhs, true, allow_type_coercion) {
         return true;
     }
 
@@ -187,26 +185,24 @@ pub fn are_definitely_not_identical(
     if let Some(l) = lhs.get_single_literal_int_value()
         && let Some(r) = rhs.get_single_literal_int_value()
     {
-        return l != r;
-    }
-
-    if let Some(l) = lhs.get_single_literal_float_value()
+        l != r
+    } else if let Some(l) = lhs.get_single_literal_float_value()
         && let Some(r) = rhs.get_single_literal_float_value()
     {
-        return l != r;
-    }
-
-    if let Some(l) = lhs.get_single_literal_string_value() {
+        l != r
+    } else if let Some(l) = lhs.get_single_literal_string_value() {
         if let Some(r) = rhs.get_single_literal_string_value() {
-            return l != r;
+            l != r
         } else if let Some(r) = rhs.get_single_class_string_value() {
-            return !l.eq_ignore_ascii_case(interner.lookup(&r));
+            !l.eq_ignore_ascii_case(&r)
+        } else {
+            false
         }
     } else if let Some(r) = rhs.get_single_literal_string_value()
         && let Some(l) = lhs.get_single_class_string_value()
     {
-        return !r.eq_ignore_ascii_case(interner.lookup(&l));
+        !r.eq_ignore_ascii_case(&l)
+    } else {
+        false
     }
-
-    false
 }

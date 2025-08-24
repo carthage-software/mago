@@ -37,7 +37,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
     ) -> Result<(), AnalysisError> {
         let s = self.span();
 
-        let Some(function_metadata) = get_closure(context.codebase, context.interner, &s.file_id, &s.start) else {
+        let Some(function_metadata) = get_closure(context.codebase, &s.file_id, &s.start) else {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for closure defined in `{}` at offset {} not found.",
@@ -150,13 +150,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             };
 
             let variable_type = match block_context.locals.remove(&referenced_variable) {
-                Some(existing_type) => Rc::new(add_union_type(
-                    Rc::unwrap_or_clone(inner_type),
-                    &existing_type,
-                    context.codebase,
-                    context.interner,
-                    false,
-                )),
+                Some(existing_type) => {
+                    Rc::new(add_union_type(Rc::unwrap_or_clone(inner_type), &existing_type, context.codebase, false))
+                }
                 None => inner_type,
             };
 
@@ -170,7 +166,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 &function_identifier,
                 function_metadata,
                 context.codebase,
-                context.interner,
                 &TypeExpansionOptions::default(),
             );
 
@@ -180,7 +175,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     (*inferred_return).clone(),
                     inferred_return_type.as_ref(),
                     context.codebase,
-                    context.interner,
                 ));
             }
 

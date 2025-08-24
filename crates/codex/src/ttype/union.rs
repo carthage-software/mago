@@ -6,8 +6,7 @@ use derivative::Derivative;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
 
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
@@ -595,9 +594,9 @@ impl TUnion {
         true
     }
 
-    pub fn is_generator(&self, interner: &ThreadedInterner) -> bool {
+    pub fn is_generator(&self) -> bool {
         for atomic in self.types.as_ref() {
-            if atomic.is_generator(interner) {
+            if atomic.is_generator() {
                 continue;
             }
 
@@ -607,14 +606,9 @@ impl TUnion {
         true
     }
 
-    pub fn extends_or_implements(
-        &self,
-        codebase: &CodebaseMetadata,
-        interner: &ThreadedInterner,
-        interface: StringIdentifier,
-    ) -> bool {
+    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
         for atomic in self.types.as_ref() {
-            if !atomic.extends_or_implements(codebase, interner, interface) {
+            if !atomic.extends_or_implements(codebase, interface) {
                 return false;
             }
         }
@@ -741,8 +735,8 @@ impl TUnion {
         self.types.iter().any(|atomic| atomic.is_array()) && !self.types.is_empty()
     }
 
-    pub fn has_traversable(&self, codebase: &CodebaseMetadata, interner: &ThreadedInterner) -> bool {
-        self.types.iter().any(|atomic| atomic.is_traversable(codebase, interner)) && !self.types.is_empty()
+    pub fn has_traversable(&self, codebase: &CodebaseMetadata) -> bool {
+        self.types.iter().any(|atomic| atomic.is_traversable(codebase)) && !self.types.is_empty()
     }
 
     pub fn has_array_key_like(&self) -> bool {
@@ -926,7 +920,7 @@ impl TUnion {
 
     /// Return a vector of pairs containing the enum name, and their case name
     /// if specified.
-    pub fn get_enum_cases(&self) -> Vec<(StringIdentifier, Option<StringIdentifier>)> {
+    pub fn get_enum_cases(&self) -> Vec<(Atom, Option<Atom>)> {
         self.types
             .iter()
             .filter_map(|t| match t {
@@ -960,7 +954,7 @@ impl TUnion {
         if self.is_single() { self.get_single().get_literal_string_value() } else { None }
     }
 
-    pub fn get_single_class_string_value(&self) -> Option<StringIdentifier> {
+    pub fn get_single_class_string_value(&self) -> Option<Atom> {
         if self.is_single() { self.get_single().get_class_string_value() } else { None }
     }
 
@@ -1010,12 +1004,12 @@ impl TUnion {
         self.types.iter().filter(|a| a.is_known_literal_string()).collect()
     }
 
-    pub fn get_literal_string_values(&self) -> Vec<Option<Cow<'static, str>>> {
+    pub fn get_literal_string_values(&self) -> Vec<Option<Atom>> {
         self.get_literal_strings()
             .into_iter()
             .map(|atom| match atom {
                 TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
-                    Some(value.clone())
+                    Some(*value)
                 }
                 _ => None,
             })
@@ -1086,14 +1080,15 @@ impl TType for TUnion {
         self.types.iter().any(|t| t.is_expandable())
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let types = self.types.clone();
         let len = types.len();
 
         let mut atomic_ids = types
             .iter()
             .map(|atomic| {
-                let id = atomic.get_id(interner);
+                let id = atomic.get_id();
+
                 if atomic.has_intersection_types() && len > 1 { format!("({id})") } else { id }
             })
             .collect::<Vec<_>>();
@@ -1143,7 +1138,6 @@ impl PartialEq for TUnion {
 pub fn populate_union_type(
     unpopulated_union: &mut TUnion,
     codebase_symbols: &Symbols,
-    interner: &ThreadedInterner,
     reference_source: Option<&ReferenceSource>,
     symbol_references: &mut SymbolReferences,
     force: bool,
@@ -1165,26 +1159,12 @@ pub fn populate_union_type(
             )) => {
                 let mut new_constraint = (**constraint).clone();
 
-                populate_atomic_type(
-                    &mut new_constraint,
-                    codebase_symbols,
-                    interner,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate_atomic_type(&mut new_constraint, codebase_symbols, reference_source, symbol_references, force);
 
                 *constraint = Box::new(new_constraint);
             }
             _ => {
-                populate_atomic_type(
-                    unpopulated_atomic,
-                    codebase_symbols,
-                    interner,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate_atomic_type(unpopulated_atomic, codebase_symbols, reference_source, symbol_references, force);
             }
         }
     }

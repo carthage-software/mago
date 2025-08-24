@@ -1,9 +1,7 @@
-use ahash::HashMap;
-
+use mago_atom::AtomMap;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
@@ -18,7 +16,7 @@ pub fn fetch_invocation_return_type<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
 ) -> TUnion {
     if let Some(return_type) = handle_special_functions(context, block_context, artifacts, invocation) {
         return return_type;

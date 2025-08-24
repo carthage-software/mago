@@ -220,7 +220,7 @@ pub fn handle_paradoxical_condition<'ctx, 'ast, 'arena, T: HasSpan>(
     expression: &'ast T,
     expression_type: &TUnion,
 ) {
-    let type_id = expression_type.get_id(Some(context.interner));
+    let type_id = expression_type.get_id();
 
     if expression_type.is_always_falsy() {
         context.collector.report_with_code(

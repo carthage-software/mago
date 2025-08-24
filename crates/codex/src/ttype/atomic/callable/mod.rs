@@ -2,7 +2,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_database::file::FileId;
-use mago_interner::ThreadedInterner;
 use mago_span::Position;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
@@ -233,7 +232,7 @@ impl TType for TCallable {
         matches!(self, TCallable::Alias(_))
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
             TCallable::Signature(signature) => {
                 let mut str = String::new();
@@ -253,7 +252,7 @@ impl TType for TCallable {
                     }
 
                     if let Some(parameter_type) = parameter.get_type_signature() {
-                        str += parameter_type.get_id(interner).as_str();
+                        str += parameter_type.get_id().as_str();
                     } else {
                         str += "mixed";
                     }
@@ -265,7 +264,7 @@ impl TType for TCallable {
 
                 str += "): ";
                 if let Some(return_type) = signature.get_return_type() {
-                    str += return_type.get_id(interner).as_str();
+                    str += return_type.get_id().as_str();
                 } else {
                     str += "mixed";
                 }
@@ -276,10 +275,22 @@ impl TType for TCallable {
             }
             TCallable::Alias(id) => {
                 let mut str = String::from("Closure<");
-                if let Some(interner) = interner {
-                    str += id.as_string(interner).as_str();
-                } else {
-                    str += id.to_hash().as_str();
+
+                match id {
+                    FunctionLikeIdentifier::Function(fn_name) => {
+                        str += fn_name.as_str();
+                    }
+                    FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
+                        str += fq_classlike_name.as_str();
+                        str += "::";
+                        str += method_name.as_str();
+                    }
+                    FunctionLikeIdentifier::Closure(file_id, position) => {
+                        str += "anonymous@";
+                        str += &file_id.to_string();
+                        str += ":";
+                        str += &position.offset.to_string();
+                    }
                 }
 
                 str += ">(...)";

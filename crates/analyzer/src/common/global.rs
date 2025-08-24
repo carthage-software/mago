@@ -1,9 +1,9 @@
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
 use ahash::HashMap;
+use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -46,9 +46,9 @@ std::thread_local! {
 
         map.insert("$GLOBALS", Rc::new({
             let mut known_items = BTreeMap::new();
-            known_items.insert(ArrayKey::String(Cow::Borrowed("arvc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(atom("arvc")), (true, get_positive_int()));
             known_items.insert(
-                ArrayKey::String(Cow::Borrowed("argv")),
+                ArrayKey::String(atom("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
             );
 
@@ -97,105 +97,105 @@ std::thread_local! {
 
             let mut known_items = BTreeMap::new();
             // Standard CGI/1.1 and PHP variables
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PHP_SELF")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("GATEWAY_INTERFACE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_ADDR")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_SOFTWARE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_PROTOCOL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REQUEST_METHOD")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REQUEST_TIME")), (true, get_int_range(Some(time), None)));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REQUEST_TIME_FLOAT")), (true, get_float()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("QUERY_STRING")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DOCUMENT_ROOT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_ACCEPT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_ACCEPT_CHARSET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_ACCEPT_ENCODING")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_ACCEPT_LANGUAGE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_REFERER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_USER_AGENT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTPS")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REMOTE_ADDR")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REMOTE_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REMOTE_PORT")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REMOTE_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REDIRECT_REMOTE_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SCRIPT_FILENAME")), (false, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_ADMIN")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SERVER_SIGNATURE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PATH_TRANSLATED")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SCRIPT_NAME")), (false, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REQUEST_URI")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PHP_AUTH_DIGEST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PHP_AUTH_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PHP_AUTH_PW")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("AUTH_TYPE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PATH_INFO")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("ORIG_PATH_INFO")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("CONTENT_LENGTH")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("CONTENT_TYPE")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("PHP_SELF")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("GATEWAY_INTERFACE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_ADDR")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_SOFTWARE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_PROTOCOL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REQUEST_METHOD")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REQUEST_TIME")), (true, get_int_range(Some(time), None)));
+            known_items.insert(ArrayKey::String(atom("REQUEST_TIME_FLOAT")), (true, get_float()));
+            known_items.insert(ArrayKey::String(atom("QUERY_STRING")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("DOCUMENT_ROOT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_CHARSET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_ENCODING")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_LANGUAGE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_REFERER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_USER_AGENT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTPS")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("REMOTE_ADDR")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REMOTE_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REMOTE_PORT")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("REMOTE_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REDIRECT_REMOTE_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SCRIPT_FILENAME")), (false, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_ADMIN")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SERVER_SIGNATURE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PATH_TRANSLATED")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SCRIPT_NAME")), (false, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REQUEST_URI")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PHP_AUTH_DIGEST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PHP_AUTH_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PHP_AUTH_PW")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("AUTH_TYPE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PATH_INFO")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("ORIG_PATH_INFO")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("CONTENT_LENGTH")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("CONTENT_TYPE")), (true, get_string()));
             // Common, miscellaneous variables
-            known_items.insert(ArrayKey::String(Cow::Borrowed("FCGI_ROLE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HOME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CACHE_CONTROL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_COOKIE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_PRIORITY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PATH")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REDIRECT_STATUS")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("REQUEST_SCHEME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("FCGI_ROLE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HOME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_CACHE_CONTROL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_COOKIE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_PRIORITY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PATH")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REDIRECT_STATUS")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("REQUEST_SCHEME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("USER")), (true, get_non_empty_string()));
             // Common proxy and CDN headers
             known_items.insert(
-                ArrayKey::String(Cow::Borrowed("HTTP_UPGRADE_INSECURE_REQUESTS")),
+                ArrayKey::String(atom("HTTP_UPGRADE_INSECURE_REQUESTS")),
                 (true, get_non_empty_string()),
             );
             known_items
-                .insert(ArrayKey::String(Cow::Borrowed("HTTP_X_FORWARDED_PROTO")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CLIENT_IP")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_X_REAL_IP")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_X_FORWARDED_FOR")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(atom("HTTP_X_FORWARDED_PROTO")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_CLIENT_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_X_REAL_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_X_FORWARDED_FOR")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(Cow::Borrowed("HTTP_CF_CONNECTING_IP")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CF_IPCOUNTRY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CF_VISITOR")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_CDN_LOOP")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(atom("HTTP_CF_CONNECTING_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_CF_IPCOUNTRY")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_CF_VISITOR")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_CDN_LOOP")), (true, get_non_empty_string()));
             // Common Sec-Fetch headers
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_DNT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_FETCH_DEST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_FETCH_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_FETCH_MODE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_FETCH_SITE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_DNT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_DEST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_MODE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_SITE")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_CH_UA_PLATFORM")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(atom("HTTP_SEC_CH_UA_PLATFORM")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_CH_UA_MOBILE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HTTP_SEC_CH_UA")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(atom("HTTP_SEC_CH_UA_MOBILE")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(atom("HTTP_SEC_CH_UA")), (true, get_non_empty_string()));
 
             // Common framework and application variables (e.g., Symfony, PHPUnit, Laravel)
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_DEBUG")), (true, get_bool()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_ENV")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_KEY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DATABASE_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("CACHE_DRIVER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_DATABASE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_USERNAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_PASSWORD")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("APP_DEBUG")), (true, get_bool()));
+            known_items.insert(ArrayKey::String(atom("APP_ENV")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("APP_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_KEY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DATABASE_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("CACHE_DRIVER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_DATABASE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_USERNAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_PASSWORD")), (true, get_string()));
 
-            known_items.insert(ArrayKey::String(Cow::Borrowed("arvc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(atom("arvc")), (true, get_positive_int()));
             known_items.insert(
-                ArrayKey::String(Cow::Borrowed("argv")),
+                ArrayKey::String(atom("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
             );
 
@@ -210,29 +210,29 @@ std::thread_local! {
             let mut known_items = BTreeMap::new();
 
             // Standard environment variables
-            known_items.insert(ArrayKey::String(Cow::Borrowed("PATH")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("HOME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SHELL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("PATH")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("HOME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SHELL")), (true, get_non_empty_string()));
 
             // Common framework and application variables (e.g., Symfony, PHPUnit, Laravel)
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_DEBUG")), (true, get_bool()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_ENV")), (true, get_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_KEY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DATABASE_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("CACHE_DRIVER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_DATABASE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_USERNAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(Cow::Borrowed("DB_PASSWORD")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("APP_DEBUG")), (true, get_bool()));
+            known_items.insert(ArrayKey::String(atom("APP_ENV")), (true, get_string()));
+            known_items.insert(ArrayKey::String(atom("APP_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_KEY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DATABASE_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("CACHE_DRIVER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_DATABASE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_USERNAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(atom("DB_PASSWORD")), (true, get_string()));
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: Some(known_items),
@@ -248,7 +248,7 @@ std::thread_local! {
                 Box::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(BTreeMap::from([
                         (
-                            ArrayKey::String(Cow::Borrowed("name")),
+                            ArrayKey::String(atom("name")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -260,7 +260,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(Cow::Borrowed("type")),
+                            ArrayKey::String(atom("type")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -272,7 +272,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(Cow::Borrowed("tmp_name")),
+                            ArrayKey::String(atom("tmp_name")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -284,7 +284,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(Cow::Borrowed("full_path")),
+                            ArrayKey::String(atom("full_path")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -296,7 +296,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(Cow::Borrowed("error")),
+                            ArrayKey::String(atom("error")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -308,7 +308,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(Cow::Borrowed("size")),
+                            ArrayKey::String(atom("size")),
                             (
                                 true,
                                 TUnion::from_vec(vec![

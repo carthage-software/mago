@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use ahash::HashMap;
 use either::Either;
 
+use mago_atom::AtomMap;
+use mago_atom::empty_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
@@ -18,7 +20,6 @@ use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 
 use crate::context::Context;
 use crate::invocation::Invocation;
@@ -29,7 +30,7 @@ pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
     invocation_type: TUnion,
 ) -> TUnion {
     let mut template_result = Cow::Borrowed(template_result);
@@ -38,9 +39,7 @@ pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
         if let Some(function_like_identifier) = invocation.target.get_function_like_identifier() {
             let generic_parent = match function_like_identifier {
                 FunctionLikeIdentifier::Method(class, method) => GenericParent::FunctionLike((*class, *method)),
-                FunctionLikeIdentifier::Function(function) => {
-                    GenericParent::FunctionLike((StringIdentifier::empty(), *function))
-                }
+                FunctionLikeIdentifier::Function(function) => GenericParent::FunctionLike((empty_atom(), *function)),
                 _ => {
                     break 'populate_templates;
                 }
@@ -74,7 +73,7 @@ fn resolve_union<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
     union_to_resolve: TUnion,
 ) -> TUnion {
     let mut resulting_union = union_to_resolve;
@@ -95,13 +94,11 @@ fn resolve_union<'ctx, 'ast, 'arena>(
     if !template_result.lower_bounds.is_empty() || resulting_union.has_template_types() {
         expander::expand_union(
             context.codebase,
-            context.interner,
             &mut resulting_union,
             &TypeExpansionOptions { expand_templates: false, ..Default::default() },
         );
 
-        resulting_union =
-            inferred_type_replacer::replace(&resulting_union, template_result, context.codebase, context.interner);
+        resulting_union = inferred_type_replacer::replace(&resulting_union, template_result, context.codebase);
     }
 
     let static_class_type;
@@ -111,8 +108,8 @@ fn resolve_union<'ctx, 'ast, 'arena>(
 
     if let Some(method_context) = invocation.target.get_method_context() {
         static_class_type = method_context.class_type.clone();
-        parent_class = method_context.class_like_metadata.direct_parent_class.as_ref();
-        self_class = Some(&method_context.class_like_metadata.name);
+        parent_class = method_context.class_like_metadata.direct_parent_class;
+        self_class = Some(method_context.class_like_metadata.name);
         function_is_final = invocation
             .target
             .get_function_like_metadata()
@@ -127,7 +124,6 @@ fn resolve_union<'ctx, 'ast, 'arena>(
 
     expander::expand_union(
         context.codebase,
-        context.interner,
         &mut resulting_union,
         &TypeExpansionOptions {
             expand_templates: false,
@@ -147,12 +143,11 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     template_result: &TemplateResult,
-    parameters: &HashMap<StringIdentifier, TUnion>,
+    parameters: &AtomMap<TUnion>,
     atomic_to_resolve: TAtomic,
 ) -> Either<TAtomic, TUnion> {
     if let TAtomic::Variable(variable) = atomic_to_resolve {
-        let variable_str = context.interner.lookup(&variable);
-        if variable_str.eq_ignore_ascii_case("$this")
+        if variable.eq_ignore_ascii_case("$this")
             && let Some(method_context) = invocation.target.get_method_context()
             && let StaticClassType::Object(this_type) = &method_context.class_type
         {
@@ -160,12 +155,7 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
         }
 
         return parameters.get(&variable).map_or(Either::Right(get_mixed()), |argument_type| {
-            Either::Right(inferred_type_replacer::replace(
-                argument_type,
-                template_result,
-                context.codebase,
-                context.interner,
-            ))
+            Either::Right(inferred_type_replacer::replace(argument_type, template_result, context.codebase))
         });
     }
 
@@ -179,13 +169,12 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
     let otherwise_type = resolve_union(context, invocation, template_result, parameters, *conditional.otherwise);
     let negated = conditional.negated;
 
-    let subject = inferred_type_replacer::replace(&subject, template_result, context.codebase, context.interner);
-    let target = inferred_type_replacer::replace(&target, template_result, context.codebase, context.interner);
+    let subject = inferred_type_replacer::replace(&subject, template_result, context.codebase);
+    let target = inferred_type_replacer::replace(&target, template_result, context.codebase);
 
     if !subject.is_never() {
         if union_comparator::is_contained_by(
             context.codebase,
-            context.interner,
             &subject,
             &target,
             false,
@@ -196,19 +185,13 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
             return if negated { Either::Right(otherwise_type) } else { Either::Right(then_type) };
         }
 
-        let are_disjoint = !union_comparator::can_expression_types_be_identical(
-            context.codebase,
-            context.interner,
-            &subject,
-            &target,
-            false,
-            false,
-        );
+        let are_disjoint =
+            !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
 
         if are_disjoint {
             return if negated { Either::Right(then_type) } else { Either::Right(otherwise_type) };
         }
     }
 
-    Either::Right(add_union_type(then_type, &otherwise_type, context.codebase, context.interner, false))
+    Either::Right(add_union_type(then_type, &otherwise_type, context.codebase, false))
 }

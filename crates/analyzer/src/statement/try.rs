@@ -7,6 +7,10 @@ use ahash::HashMap;
 use ahash::HashSet;
 use ahash::HashSetExt;
 
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_codex::get_class_like;
 use mago_codex::is_instance_of;
 use mago_codex::ttype;
@@ -14,7 +18,6 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::union::TUnion;
-use mago_interner::StringIdentifier;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -88,7 +91,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         occupied_entry.get(),
                         variable_type.as_ref(),
                         context.codebase,
-                        context.interner,
                         false,
                     );
 
@@ -111,13 +113,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             for (variable_id, variable_type) in &block_context.locals {
                 if let Some(existing_type) = mutable_try_scope.locals.get_mut(variable_id) {
-                    let combined_type = ttype::combine_union_types(
-                        existing_type,
-                        variable_type.as_ref(),
-                        context.codebase,
-                        context.interner,
-                        false,
-                    );
+                    let combined_type =
+                        ttype::combine_union_types(existing_type, variable_type.as_ref(), context.codebase, false);
 
                     *existing_type = Rc::new(combined_type);
                 } else {
@@ -158,7 +155,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                             variable_type.as_ref(),
                             old_type,
                             context.codebase,
-                            context.interner,
                             false,
                         ));
                     }
@@ -174,13 +170,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let caught_classes = get_caught_classes(context, &catch_clause.hint);
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
             for caught_class in caught_classes.iter() {
-                let caught_class_str = context.interner.lookup(caught_class);
-
                 for (possibly_thrown_exception, _) in possibly_thrown_exceptions.iter() {
-                    let possibly_thrown_exception_str = context.interner.lookup(possibly_thrown_exception);
-
-                    if possibly_thrown_exception_str.eq_ignore_ascii_case(caught_class_str)
-                        || is_instance_of(context.codebase, context.interner, possibly_thrown_exception, caught_class)
+                    if possibly_thrown_exception.eq_ignore_ascii_case(caught_class)
+                        || is_instance_of(context.codebase, possibly_thrown_exception, caught_class)
                     {
                         original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                         block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
@@ -254,7 +246,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 existing_type.as_ref(),
                                 variable_type.as_ref(),
                                 context.codebase,
-                                context.interner,
                                 false,
                             )),
                         );
@@ -273,7 +264,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                             finally_variable_type.as_ref(),
                             variable_type.as_ref(),
                             context.codebase,
-                            context.interner,
                             false,
                         )
                     } else {
@@ -329,7 +319,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 existing_type.as_ref(),
                                 finally_variable_type.as_ref(),
                                 context.codebase,
-                                context.interner,
                                 false,
                             );
 
@@ -377,18 +366,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     hint: &'ast Hint<'arena>,
-) -> HashSet<StringIdentifier> {
-    let mut caught_identifiers: HashMap<StringIdentifier, Span> = HashMap::default();
+) -> AtomSet {
+    let mut caught_identifiers: AtomMap<Span> = AtomMap::default();
 
     fn walk<'ctx, 'ast, 'arena>(
         context: &mut Context<'ctx, 'arena>,
         hint: &'ast Hint<'arena>,
-        caught: &mut HashMap<StringIdentifier, Span>,
+        caught: &mut AtomMap<Span>,
     ) {
         match hint {
             Hint::Identifier(identifier) => {
                 let name = context.resolved_names.get(identifier);
-                let id = context.interner.intern(name);
+                let id = atom(name);
 
                 if let Some(&first_span) = caught.get(&id) {
                     context.collector.report_with_code(
@@ -435,24 +424,26 @@ pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
 
     walk(context, hint, &mut caught_identifiers);
 
-    let throwable = context.interner.intern("Throwable");
-    let mut caught_classes = HashSet::with_capacity(caught_identifiers.len());
+    let throwable = atom("Throwable");
+    let mut caught_classes = AtomSet::with_capacity(caught_identifiers.len());
     for (caught_type, caught_span) in caught_identifiers.into_iter() {
-        let caught_type_str = context.interner.lookup(&caught_type).to_ascii_lowercase();
-        if caught_type_str == "throwable" || caught_type_str == "exception" || caught_type_str == "error" {
+        let lowercase_caught_type = ascii_lowercase_atom(&caught_type);
+
+        if lowercase_caught_type == "throwable"
+            || lowercase_caught_type == "exception"
+            || lowercase_caught_type == "error"
+        {
             caught_classes.insert(caught_type);
             continue;
         }
 
-        let Some(class_like_metadata) = get_class_like(context.codebase, context.interner, &caught_type) else {
-            let caught_type_str = context.interner.lookup(&caught_type);
-
+        let Some(class_like_metadata) = get_class_like(context.codebase, &caught_type) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentCatchType,
-                Issue::error(format!("Attempting to catch an undefined class or interface: `{caught_type_str}`."))
+                Issue::error(format!("Attempting to catch an undefined class or interface: `{caught_type}`."))
                 .with_annotation(
                     Annotation::primary(caught_span)
-                        .with_message(format!("Type `{caught_type_str}` is not defined or cannot be found")),
+                        .with_message(format!("Type `{caught_type}` is not defined or cannot be found")),
                 )
                 .with_note(
                     "Types used in `catch` blocks must be existing and autoloadable classes or interfaces."
@@ -466,21 +457,20 @@ pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
         };
 
         if class_like_metadata.kind.is_enum() || class_like_metadata.kind.is_trait() {
-            let caught_type_str = context.interner.lookup(&caught_type);
             let kind_str = if class_like_metadata.kind.is_enum() { "an enum" } else { "a trait" };
 
             context.collector.report_with_code(
                 IssueCode::InvalidCatchTypeNotClassOrInterface,
                 Issue::error(format!(
-                    "Only classes or interfaces can be caught, but `{caught_type_str}` is {kind_str}.",
+                    "Only classes or interfaces can be caught, but `{caught_type}` is {kind_str}.",
                 ))
                 .with_annotation(
                     Annotation::primary(caught_span)
-                        .with_message(format!("Cannot catch `{caught_type_str}` because it is {kind_str}")),
+                        .with_message(format!("Cannot catch `{caught_type}` because it is {kind_str}")),
                 )
                 .with_annotation(
                     Annotation::secondary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
-                        .with_message(format!("`{caught_type_str}` is defined as {kind_str} here")),
+                        .with_message(format!("`{caught_type}` is defined as {kind_str} here")),
                 )
                 .with_note("PHP `catch` blocks require a class or interface type. Enums and traits are not valid types for catching exceptions as they cannot be thrown or extend `Throwable`.")
                 .with_help("Specify a class or interface that implements `Throwable` (e.g., `Exception`, `Error`, or a custom exception class)."),
@@ -489,24 +479,24 @@ pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        let is_throwable = is_instance_of(context.codebase, context.interner, &caught_type, &throwable);
+        let is_throwable = is_instance_of(context.codebase, &caught_type, &throwable);
 
         if !is_throwable {
             context.collector.report_with_code(
                 IssueCode::CatchTypeNotThrowable,
                 Issue::error(format!(
-                    "The type `{caught_type_str}` caught in a catch block must implement the `Throwable` interface.",
+                    "The type `{lowercase_caught_type}` caught in a catch block must implement the `Throwable` interface.",
                 ))
                 .with_annotation(
                     Annotation::primary(caught_span)
-                        .with_message(format!("`{caught_type_str}` is not an instance of `Throwable`")),
+                        .with_message(format!("`{lowercase_caught_type}` is not an instance of `Throwable`")),
                 )
                 .with_annotation(
                     Annotation::secondary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
-                        .with_message(format!("`{caught_type_str}` defined here does not implement `Throwable`")),
+                        .with_message(format!("`{lowercase_caught_type}` defined here does not implement `Throwable`")),
                 )
                 .with_note("In PHP, only objects that implement the `Throwable` interface (this includes `Exception` and `Error` classes and their children) can be caught in a `catch` block.")
-                .with_help(format!("Ensure that `{caught_type_str}` implements the `Throwable` interface, or catch a more general exception type like `Exception` or `Throwable` itself.")),
+                .with_help(format!("Ensure that `{lowercase_caught_type}` implements the `Throwable` interface, or catch a more general exception type like `Exception` or `Throwable` itself.")),
             );
 
             continue;

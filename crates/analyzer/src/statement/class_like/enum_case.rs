@@ -60,7 +60,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
             ));
         };
 
-        let enum_name = context.interner.lookup(&current_enum.original_name);
+        let enum_name = current_enum.original_name;
         let case_name = self.name.value;
 
         let Some(backing_type) = &current_enum.enum_type else {
@@ -94,10 +94,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
             return Ok(());
         };
 
-        let backing_type_str = backing_type.get_id(Some(context.interner));
+        let backing_type_str = backing_type.get_id();
 
         if (backing_type.is_int() && !value_type.is_int()) || (backing_type.is_string() && !value_type.is_string()) {
-            let value_type_str = value_type.get_id(Some(context.interner));
+            let value_type_str = value_type.get_id();
 
             context.collector.report_with_code(
                 IssueCode::InvalidEnumCaseValue,

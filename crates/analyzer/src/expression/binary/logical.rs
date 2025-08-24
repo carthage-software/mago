@@ -258,7 +258,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
             if let Some(context_type) = cloned_vars.get(var_id) {
                 block_context.locals.insert(
                     var_id.clone(),
-                    Rc::new(combine_union_types(context_type, left_type, context.codebase, context.interner, false)),
+                    Rc::new(combine_union_types(context_type, left_type, context.codebase, false)),
                 );
             } else if left_block_context.assigned_variable_ids.contains_key(var_id) {
                 block_context.locals.insert(var_id.clone(), left_type.clone());
@@ -478,15 +478,13 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         let if_vars = if_body_context_inner.locals.clone();
         for (var_id, right_type) in right_block_context.locals.clone() {
             if let Some(if_type) = if_vars.get(&var_id) {
-                if_body_context_inner.locals.insert(
-                    var_id,
-                    Rc::new(combine_union_types(&right_type, if_type, context.codebase, context.interner, false)),
-                );
+                if_body_context_inner
+                    .locals
+                    .insert(var_id, Rc::new(combine_union_types(&right_type, if_type, context.codebase, false)));
             } else if let Some(left_type) = left_vars.get(&var_id) {
-                if_body_context_inner.locals.insert(
-                    var_id,
-                    Rc::new(combine_union_types(&right_type, left_type, context.codebase, context.interner, false)),
-                );
+                if_body_context_inner
+                    .locals
+                    .insert(var_id, Rc::new(combine_union_types(&right_type, left_type, context.codebase, false)));
             }
         }
 

@@ -34,7 +34,7 @@ mago-composer = { path = "crates/composer", version = "1.0.0-alpha.12" }
 mago-docblock = { path = "crates/docblock", version = "1.0.0-alpha.12" }
 mago-fixer = { path = "crates/fixer", version = "1.0.0-alpha.12" }
 mago-formatter = { path = "crates/formatter", version = "1.0.0-alpha.12" }
-mago-interner = { path = "crates/interner", version = "1.0.0-alpha.12" }
+mago-atom = { path = "crates/atom", version = "1.0.0-alpha.12" }
 mago-linter = { path = "crates/linter", version = "1.0.0-alpha.12" }
 mago-names = { path = "crates/names", version = "1.0.0-alpha.12" }
 mago-reporting = { path = "crates/reporting", version = "1.0.0-alpha.12" }
@@ -67,7 +67,6 @@ cruet = "0.15.0"
 indicatif = { version = "0.18.0" }
 paste = "1.0.15"
 criterion = "0.7.0"
-lasso = { version = "0.7.3", features = ["multi-threaded", "ahasher", "inline-more"] }
 clap = { version = "4.5.20", features = ["cargo", "derive", "unicode", "wrap_help"] }
 async-walkdir = "2.0.0"
 termtree = "0.5.1"
@@ -97,12 +96,13 @@ globset = "0.4"
 rayon = "1.10.0"
 bumpalo = { version = "3", features = ["collections", "serde"] }
 dhat = "0.3"
+ustr = { version = "1.1.0", features = ["serde"] }
 
 [dependencies]
 mago-syntax = { workspace = true }
 mago-syntax-core = { workspace = true }
 mago-reporting = { workspace = true }
-mago-interner = { workspace = true }
+mago-atom = { workspace = true }
 mago-database = { workspace = true }
 mago-linter = { workspace = true }
 mago-names = { workspace = true }

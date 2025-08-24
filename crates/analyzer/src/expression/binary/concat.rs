@@ -1,8 +1,11 @@
-use std::borrow::Cow;
 use std::rc::Rc;
 
-use mago_codex::get_method_id;
-use mago_codex::method_id_exists;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::f64_atom;
+use mago_atom::i64_atom;
+use mago_codex::get_method_identifier;
+use mago_codex::method_identifier_exists;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -37,7 +40,7 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
     analyze_string_concat_operand(context, artifacts, binary.lhs, "Left")?;
     analyze_string_concat_operand(context, artifacts, binary.rhs, "Right")?;
 
-    let result_type = concat_operands(binary.lhs, binary.rhs, context, artifacts);
+    let result_type = concat_operands(binary.lhs, binary.rhs, artifacts);
 
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
@@ -93,7 +96,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             Issue::warning(format!(
                 "Possibly null {} operand used in string concatenation (type `{}`).",
                 side.to_ascii_lowercase(),
-                operand_type.get_id(Some(context.interner))
+                operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `null`"))
             .with_note("If this operand is `null` at runtime, it will be implicitly converted to an empty string `''`.")
@@ -107,7 +110,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             Issue::warning(format!(
                 "Possibly false {} operand used in string concatenation (type `{}`).",
                 side.to_ascii_lowercase(),
-                operand_type.get_id(Some(context.interner))
+                operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `false`"))
             .with_note(
@@ -147,8 +150,8 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                             Issue::error(format!(
                                 "Invalid {} operand: template parameter `{}` constraint `{}` is not compatible with string concatenation.",
                                 side.to_ascii_lowercase(),
-                                context.interner.lookup(&parameter.parameter_name),
-                                parameter.constraint.get_id(Some(context.interner))
+                                parameter.parameter_name,
+                                parameter.constraint.get_id()
                             ))
                             .with_annotation(Annotation::primary(operand.span()).with_message("Template type not guaranteed to be string/numeric"))
                             .with_help("Ensure the template parameter constraint allows string conversion or cast the value explicitly."),
@@ -184,10 +187,9 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     continue;
                 };
 
-                let to_string_method_name = context.interner.intern("__toString");
-                let method_id = get_method_id(class_like_name, &to_string_method_name);
+                let method_identifier = get_method_identifier(class_like_name, "__toString");
 
-                if method_id_exists(context.codebase, context.interner, &method_id) {
+                if method_identifier_exists(context.codebase, &method_identifier) {
                     current_atomic_is_valid = true;
 
                     context.collector.report_with_code(
@@ -195,10 +197,10 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         Issue::warning(format!(
                             "Implicit conversion to `string` for {} operand via `{}`.",
                             side.to_ascii_lowercase(),
-                            method_id.as_string(context.interner)
+                            method_identifier.as_string()
                         ))
                         .with_annotation(Annotation::primary(operand.span())
-                            .with_message(format!("Object implicitly converted using `{}`", method_id.as_string(context.interner)))
+                            .with_message(format!("Object implicitly converted using `{}`", method_identifier.as_string()))
                         )
                         .with_note("Objects implementing `__toString` are automatically converted when used in string context.")
                         .with_help("For clarity, consider explicit casting `(string) $object` or calling the `__toString` method directly."),
@@ -210,10 +212,10 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                             Issue::error(format!(
                                 "Invalid {} operand: object of type `{}` cannot be converted to `string`.",
                                 side.to_ascii_lowercase(),
-                                operand_atomic_type.get_id(Some(context.interner))
+                                operand_atomic_type.get_id()
                             ))
                             .with_annotation(Annotation::primary(operand.span())
-                                .with_message(format!("Type `{}` does not have a `__toString` method", operand_atomic_type.get_id(Some(context.interner))))
+                                .with_message(format!("Type `{}` does not have a `__toString` method", operand_atomic_type.get_id()))
                             )
                             .with_note("Only objects implementing the `Stringable` interface (or having a `__toString` method) can be used in string concatenation.")
                             .with_help("Implement `__toString` on the class or avoid using this object in string context."),
@@ -264,7 +266,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         Issue::error(format!(
                             "Invalid {} operand: type `{}` cannot be reliably used in string concatenation.",
                             side.to_ascii_lowercase(),
-                            operand_atomic_type.get_id(Some(context.interner))
+                            operand_atomic_type.get_id()
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Operand has `mixed` type"))
                         .with_note("Using `mixed` in string concatenation is unsafe as the actual runtime type and its string representation are unknown.")
@@ -282,7 +284,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         IssueCode::InvalidOperand,
                         Issue::error(format!(
                             "Invalid type `{}` for {} operand in string concatenation.",
-                             operand_atomic_type.get_id(Some(context.interner)),
+                             operand_atomic_type.get_id(),
                              side.to_ascii_lowercase()
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Invalid type for concatenation"))
@@ -304,7 +306,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::InvalidOperand,
             Issue::error(format!(
                 "Invalid type `{}` for {} operand in string concatenation.",
-                operand_type.get_id(Some(context.interner)), side.to_ascii_lowercase()
+                operand_type.get_id(), side.to_ascii_lowercase()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid type for concatenation"))
             .with_note("Operands in string concatenation must be strings, numbers, null, false, resources, or objects implementing `__toString`.")
@@ -315,7 +317,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyInvalidOperand,
             Issue::warning(format!(
                 "Possibly invalid type `{}` for {} operand in string concatenation.",
-                operand_type.get_id(Some(context.interner)),
+                operand_type.get_id(),
                 side.to_ascii_lowercase()
             ))
             .with_annotation(
@@ -331,21 +333,18 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn concat_operands<'ctx, 'ast, 'arena>(
+fn concat_operands<'ast, 'arena>(
     left: &'ast Expression<'arena>,
     right: &'ast Expression<'arena>,
-    context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
 ) -> TUnion {
     let left_type = artifacts.get_expression_type(left);
     let right_type = artifacts.get_expression_type(right);
 
     let (left_strings, right_strings) = match (left_type, right_type) {
-        (Some(left_type), Some(right_type)) => {
-            (get_operand_strings(context, left_type), get_operand_strings(context, right_type))
-        }
-        (Some(left_type), None) => (get_operand_strings(context, left_type), vec![TString::general()]),
-        (None, Some(right_type)) => (vec![TString::general()], get_operand_strings(context, right_type)),
+        (Some(left_type), Some(right_type)) => (get_operand_strings(left_type), get_operand_strings(right_type)),
+        (Some(left_type), None) => (get_operand_strings(left_type), vec![TString::general()]),
+        (None, Some(right_type)) => (vec![TString::general()], get_operand_strings(right_type)),
         (None, None) => {
             return get_string();
         }
@@ -373,7 +372,7 @@ fn concat_operands<'ctx, 'ast, 'arena>(
             resulting_string.is_lowercase = left_string.is_lowercase && right_string.is_lowercase;
             resulting_string.literal = match (&left_string.literal, &right_string.literal) {
                 (Some(TStringLiteral::Value(left_literal)), Some(TStringLiteral::Value(right_literal))) => {
-                    result_strings.push(TString::known_literal(Cow::Owned(format!("{left_literal}{right_literal}"))));
+                    result_strings.push(TString::known_literal(concat_atom!(left_literal, right_literal)));
 
                     continue;
                 }
@@ -401,18 +400,18 @@ fn concat_operands<'ctx, 'ast, 'arena>(
 }
 
 #[inline]
-fn get_operand_strings<'ctx, 'arena>(context: &mut Context<'ctx, 'arena>, operand_type: &TUnion) -> Vec<TString> {
+fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
     let mut operand_strings = vec![];
 
     for operand_atomic_type in operand_type.types.as_ref() {
         match operand_atomic_type {
             TAtomic::Array(_) => {
-                operand_strings.push(TString::known_literal(Cow::Borrowed("Array")));
+                operand_strings.push(TString::known_literal(atom("Array")));
 
                 continue;
             }
             TAtomic::Never | TAtomic::Null | TAtomic::Void => {
-                operand_strings.push(TString::known_literal(Cow::Borrowed("")));
+                operand_strings.push(TString::known_literal(atom("")));
 
                 continue;
             }
@@ -433,24 +432,24 @@ fn get_operand_strings<'ctx, 'arena>(context: &mut Context<'ctx, 'arena>, operan
         match operand_scalar {
             TScalar::Bool(boolean) => {
                 if boolean.is_true() {
-                    operand_strings.push(TString::known_literal(Cow::Borrowed("1")));
+                    operand_strings.push(TString::known_literal(atom("1")));
                 } else if boolean.is_false() {
-                    operand_strings.push(TString::known_literal(Cow::Borrowed("")));
+                    operand_strings.push(TString::known_literal(atom("")));
                 } else {
-                    operand_strings.push(TString::known_literal(Cow::Borrowed("1")));
-                    operand_strings.push(TString::known_literal(Cow::Borrowed("")));
+                    operand_strings.push(TString::known_literal(atom("1")));
+                    operand_strings.push(TString::known_literal(atom("")));
                 }
             }
             TScalar::Integer(tint) => {
                 if let Some(v) = tint.get_literal_value() {
-                    operand_strings.push(TString::known_literal(Cow::Owned(v.to_string())));
+                    operand_strings.push(TString::known_literal(i64_atom(v)));
                 } else {
                     operand_strings.push(TString::general_with_props(true, false, false, true));
                 }
             }
             TScalar::Float(tfloat) => {
                 if let Some(v) = tfloat.get_literal_value() {
-                    operand_strings.push(TString::known_literal(Cow::Owned(v.to_string())));
+                    operand_strings.push(TString::known_literal(f64_atom(v)));
                 } else {
                     operand_strings.push(TString::general_with_props(true, false, false, true));
                 }
@@ -460,9 +459,7 @@ fn get_operand_strings<'ctx, 'arena>(context: &mut Context<'ctx, 'arena>, operan
             }
             TScalar::ClassLikeString(tclass_like_string) => {
                 if let Some(id) = tclass_like_string.literal_value() {
-                    let id = context.interner.lookup(&id).to_string();
-
-                    operand_strings.push(TString::known_literal(Cow::Owned(id)));
+                    operand_strings.push(TString::known_literal(id));
                 } else {
                     operand_strings.push(TString::general_with_props(false, true, true, false));
                 }

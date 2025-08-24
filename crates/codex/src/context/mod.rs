@@ -1,4 +1,4 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -51,8 +51,8 @@ impl<'ctx> ScopeContext<'ctx> {
 
     /// Returns the calling class FQCN, if inside a class scope.
     #[inline]
-    pub fn get_class_like_name(&self) -> Option<&'ctx StringIdentifier> {
-        self.class_like.map(|class| &class.original_name)
+    pub fn get_class_like_name(&self) -> Option<Atom> {
+        self.class_like.map(|class| class.original_name)
     }
 
     /// Returns the calling function-like context, if available.

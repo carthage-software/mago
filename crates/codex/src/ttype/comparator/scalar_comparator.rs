@@ -1,5 +1,3 @@
-use mago_interner::ThreadedInterner;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::scalar::TScalar;
@@ -9,7 +7,6 @@ use crate::ttype::comparator::class_string_comparator;
 
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_part: &TAtomic,
     container_type_part: &TAtomic,
     inside_assertion: bool,
@@ -97,7 +94,6 @@ pub fn is_contained_by(
         (TAtomic::Scalar(TScalar::ClassLikeString(container_class_string)), TAtomic::Scalar(input_scalar)) => {
             return class_string_comparator::is_contained_by(
                 codebase,
-                interner,
                 input_scalar,
                 container_class_string,
                 inside_assertion,

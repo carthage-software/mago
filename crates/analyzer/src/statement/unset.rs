@@ -40,7 +40,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 value,
                 block_context.scope.get_class_like_name(),
                 context.resolved_names,
-                context.interner,
                 Some(context.codebase),
             );
 
@@ -57,7 +56,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                     array_access.array,
                     block_context.scope.get_class_like_name(),
                     context.resolved_names,
-                    context.interner,
                     Some(context.codebase),
                 ) else {
                     break 'array_access;
@@ -76,7 +74,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 let array_key = key_type.get_single_array_key();
                 for atomic in Rc::unwrap_or_clone(array_variable).types.into_owned() {
                     if let TAtomic::Scalar(scalar) = &atomic {
-                        let scalar_str = scalar.get_id(Some(context.interner));
+                        let scalar_str = scalar.get_id();
 
                         context.collector.report_with_code(
                             IssueCode::InvalidUnset,

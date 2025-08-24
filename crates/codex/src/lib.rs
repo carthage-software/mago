@@ -1,10 +1,14 @@
 use std::borrow::Cow;
 
-use ahash::HashSet;
-
+use mago_atom::Atom;
+use mago_atom::AtomSet;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::ascii_lowercase_constant_name_atom;
+use mago_atom::atom;
+use mago_atom::empty_atom;
+use mago_atom::u32_atom;
+use mago_atom::u64_atom;
 use mago_database::file::FileId;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_span::Position;
 use mago_span::Span;
 
@@ -43,163 +47,143 @@ mod utils;
 /// Checks if a global function exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for function names.
-pub fn function_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
-    codebase.function_likes.contains_key(&(StringIdentifier::empty(), lowered_id))
+pub fn function_exists(codebase: &CodebaseMetadata, function_name: &str) -> bool {
+    let lowercase_function_name = ascii_lowercase_atom(function_name);
+    let function_identifier = (empty_atom(), lowercase_function_name);
+
+    codebase.function_likes.contains_key(&function_identifier)
 }
 
 /// Checks if a global constant exists in the codebase.
 ///
 /// The lookup for the namespace part of the constant name is case-insensitive,
 /// but the constant name itself is case-sensitive, matching PHP's behavior.
-pub fn constant_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = lower_constant_name(interner, interner.lookup(id));
-    codebase.constants.contains_key(&lowered_id)
+pub fn constant_exists(codebase: &CodebaseMetadata, constant_name: &str) -> bool {
+    let lowercase_constant_name = ascii_lowercase_constant_name_atom(constant_name);
+
+    codebase.constants.contains_key(&lowercase_constant_name)
 }
 
 /// Checks if a class exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for class names.
-pub fn class_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn class_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Class))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class))
 }
 
 /// Checks if a class or trait exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for class names.
-pub fn class_or_trait_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn class_or_trait_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Class | SymbolKind::Trait))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
 }
 
 /// Checks if an interface exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for interface names.
-pub fn interface_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn interface_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Interface))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Interface))
 }
 
 /// Checks if a class or interface exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for class names.
-pub fn class_or_interface_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn class_or_interface_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Class | SymbolKind::Interface))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
 }
 
 /// Checks if an enum exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for enum names.
-pub fn enum_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn enum_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Enum))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Enum))
 }
 
 /// Checks if a trait exists in the codebase.
 ///
 /// This lookup is case-insensitive, in line with PHP's behavior for trait names.
-pub fn trait_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn trait_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(codebase.symbols.get_kind(&lowered_id), Some(SymbolKind::Trait))
+    matches!(codebase.symbols.get_kind(&lowercase_name), Some(SymbolKind::Trait))
 }
 
 /// Checks if a class-like (class, interface, enum, or trait) exists in the codebase.
 ///
 /// This lookup is case-insensitive.
-pub fn class_like_exists(codebase: &CodebaseMetadata, interner: &ThreadedInterner, id: &StringIdentifier) -> bool {
-    let lowered_id = interner.lowered(id);
+pub fn class_like_exists(codebase: &CodebaseMetadata, name: &str) -> bool {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    matches!(
-        codebase.symbols.get_kind(&lowered_id),
-        Some(SymbolKind::Class | SymbolKind::Interface | SymbolKind::Enum | SymbolKind::Trait)
-    )
+    codebase.symbols.contains(&lowercase_name)
 }
 
 /// Checks if a method exists on a given class-like (including inherited methods).
 ///
 /// The lookup for both the class-like name and the method name is case-insensitive.
-pub fn method_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_id);
+pub fn method_exists(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
 
     codebase
         .class_likes
-        .get(&lowered_fqc_id)
-        .is_some_and(|meta| meta.appearing_method_ids.contains_key(&lowered_method_id))
+        .get(&lowercase_fqcn)
+        .is_some_and(|meta| meta.appearing_method_ids.contains_key(&lowercase_method_name))
 }
 
-pub fn method_id_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    method_id: &MethodIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(method_id.get_class_name());
-    let lowered_method_id = interner.lowered(method_id.get_method_name());
+pub fn method_identifier_exists(codebase: &CodebaseMetadata, method_identifier: &MethodIdentifier) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(method_identifier.get_class_name());
+    let lowercase_method_name = ascii_lowercase_atom(method_identifier.get_method_name());
 
-    codebase.function_likes.contains_key(&(lowered_fqc_id, lowered_method_id))
+    let method_identifier = (lowercase_fqcn, lowercase_method_name);
+
+    codebase.function_likes.contains_key(&method_identifier)
 }
 
-pub fn is_method_abstract(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_id);
+pub fn is_method_abstract(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
+
+    let method_identifier = (lowercase_fqcn, lowercase_method_name);
 
     codebase
         .function_likes
-        .get(&(lowered_fqc_id, lowered_method_id))
+        .get(&method_identifier)
         .and_then(|meta| meta.method_metadata.as_ref())
         .is_some_and(|method| method.is_abstract)
 }
 
-pub fn is_method_static(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_id);
+pub fn is_method_static(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
+
+    let method_identifier = (lowercase_fqcn, lowercase_method_name);
 
     codebase
         .function_likes
-        .get(&(lowered_fqc_id, lowered_method_id))
+        .get(&method_identifier)
         .and_then(|meta| meta.method_metadata.as_ref())
         .is_some_and(|method| method.is_static)
 }
 
-pub fn is_method_final(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_id);
+pub fn is_method_final(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
+
+    let method_identifier = (lowercase_fqcn, lowercase_method_name);
 
     codebase
         .function_likes
-        .get(&(lowered_fqc_id, lowered_method_id))
+        .get(&method_identifier)
         .and_then(|meta| meta.method_metadata.as_ref())
         .is_some_and(|method| method.is_final)
 }
@@ -207,62 +191,47 @@ pub fn is_method_final(
 /// Checks if a property exists on a given class-like (including inherited properties).
 ///
 /// The lookup for the class-like name is case-insensitive, but the property name is case-sensitive.
-pub fn property_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    property_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
+pub fn property_exists(codebase: &CodebaseMetadata, fqcn: &str, property_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
 
-    codebase.class_likes.get(&lowered_fqc_id).is_some_and(|meta| meta.appearing_property_ids.contains_key(property_id))
+    codebase
+        .class_likes
+        .get(&lowercase_fqcn)
+        .is_some_and(|meta| meta.appearing_property_ids.contains_key(&atom(property_name)))
 }
 
 /// Checks if a method is declared directly on a given class-like (not inherited).
 ///
 /// The lookup for both the class-like name and the method name is case-insensitive.
-pub fn declaring_method_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_id);
+pub fn declaring_method_exists(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
 
     codebase
         .class_likes
-        .get(&lowered_fqc_id)
-        .is_some_and(|meta| meta.declaring_method_ids.contains_key(&lowered_method_id))
+        .get(&lowercase_fqcn)
+        .is_some_and(|meta| meta.declaring_method_ids.contains_key(&lowercase_method_name))
 }
 
 /// Checks if a property is declared directly on a given class-like (not inherited).
 ///
 /// The lookup for the class-like name is case-insensitive, but the property name is case-sensitive.
-pub fn declaring_property_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    property_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
+pub fn declaring_property_exists(codebase: &CodebaseMetadata, fqcn: &str, property_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let property_name = atom(property_name);
 
-    codebase.class_likes.get(&lowered_fqc_id).is_some_and(|meta| meta.properties.contains_key(property_id))
+    codebase.class_likes.get(&lowercase_fqcn).is_some_and(|meta| meta.properties.contains_key(&property_name))
 }
 
 /// Checks if a constant or enum case exists on a given class-like.
 ///
 /// The lookup for the class-like name is case-insensitive, but the constant/case name is case-sensitive.
-pub fn class_like_constant_or_enum_case_exists(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    constant_id: &StringIdentifier,
-) -> bool {
-    let lowered_fqc_id = interner.lowered(fqc_id);
+pub fn class_like_constant_or_enum_case_exists(codebase: &CodebaseMetadata, fqcn: &str, constant_name: &str) -> bool {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let constant_name = atom(constant_name);
 
-    if let Some(meta) = codebase.class_likes.get(&lowered_fqc_id) {
-        return meta.constants.contains_key(constant_id) || meta.enum_cases.contains_key(constant_id);
+    if let Some(meta) = codebase.class_likes.get(&lowercase_fqcn) {
+        return meta.constants.contains_key(&constant_name) || meta.enum_cases.contains_key(&constant_name);
     }
 
     false
@@ -271,14 +240,11 @@ pub fn class_like_constant_or_enum_case_exists(
 /// Retrieves the metadata for a global function.
 ///
 /// This lookup is case-insensitive.
-pub fn get_function<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a FunctionLikeMetadata> {
-    let lowered_id = interner.lowered(id);
+pub fn get_function<'a>(codebase: &'a CodebaseMetadata, function_name: &str) -> Option<&'a FunctionLikeMetadata> {
+    let lowercase_function_name = ascii_lowercase_atom(function_name);
+    let function_identifier = (empty_atom(), lowercase_function_name);
 
-    codebase.function_likes.get(&(StringIdentifier::empty(), lowered_id))
+    codebase.function_likes.get(&function_identifier)
 }
 
 /// Retrieves the metadata for a closure based on its position in the source code.
@@ -286,122 +252,112 @@ pub fn get_function<'a>(
 /// This function uses the source ID and the closure's position to uniquely identify it.
 pub fn get_closure<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
     file_id: &FileId,
     position: &Position,
 ) -> Option<&'a FunctionLikeMetadata> {
-    let file_id = interner.intern(file_id.to_string());
-    let closure_id = interner.intern(position.to_string());
+    let file_ref = u64_atom(file_id.as_u64());
+    let closure_ref = u32_atom(position.offset);
+    let identifier = (file_ref, closure_ref);
 
-    codebase.function_likes.get(&(file_id, closure_id))
+    codebase.function_likes.get(&identifier)
 }
 
 /// Retrieves the metadata for a global constant.
 ///
 /// The namespace lookup is case-insensitive, but the constant name itself is case-sensitive.
-pub fn get_constant<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ConstantMetadata> {
-    let lowered_id = lower_constant_name(interner, interner.lookup(id));
+pub fn get_constant<'a>(codebase: &'a CodebaseMetadata, constant_name: &str) -> Option<&'a ConstantMetadata> {
+    let lowercase_constant_name = ascii_lowercase_constant_name_atom(constant_name);
 
-    codebase.constants.get(&lowered_id)
+    codebase.constants.get(&lowercase_constant_name)
 }
 
 /// Retrieves the metadata for a class.
 ///
 /// This lookup is case-insensitive.
-pub fn get_class<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ClassLikeMetadata> {
-    let lowered_id = interner.lowered(id);
+pub fn get_class<'a>(codebase: &'a CodebaseMetadata, name: &str) -> Option<&'a ClassLikeMetadata> {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    if class_exists(codebase, interner, id) { codebase.class_likes.get(&lowered_id) } else { None }
+    if codebase.symbols.contains_class(&lowercase_name) { codebase.class_likes.get(&lowercase_name) } else { None }
 }
 
 /// Retrieves the metadata for an interface.
 ///
 /// This lookup is case-insensitive.
-pub fn get_interface<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ClassLikeMetadata> {
-    let lowered_id = interner.lowered(id);
+pub fn get_interface<'a>(codebase: &'a CodebaseMetadata, name: &str) -> Option<&'a ClassLikeMetadata> {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    if interface_exists(codebase, interner, id) { codebase.class_likes.get(&lowered_id) } else { None }
+    if codebase.symbols.contains_interface(&lowercase_name) { codebase.class_likes.get(&lowercase_name) } else { None }
 }
 
 /// Retrieves the metadata for an enum.
 ///
 /// This lookup is case-insensitive.
-pub fn get_enum<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ClassLikeMetadata> {
-    let lowered_id = interner.lowered(id);
+pub fn get_enum<'a>(codebase: &'a CodebaseMetadata, name: &str) -> Option<&'a ClassLikeMetadata> {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    if enum_exists(codebase, interner, id) { codebase.class_likes.get(&lowered_id) } else { None }
+    if codebase.symbols.contains_enum(&lowercase_name) { codebase.class_likes.get(&lowercase_name) } else { None }
 }
 
 /// Retrieves the metadata for a trait.
 ///
 /// This lookup is case-insensitive.
-pub fn get_trait<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ClassLikeMetadata> {
-    let lowered_id = interner.lowered(id);
+pub fn get_trait<'a>(codebase: &'a CodebaseMetadata, name: &str) -> Option<&'a ClassLikeMetadata> {
+    let lowercase_name = ascii_lowercase_atom(name);
 
-    if trait_exists(codebase, interner, id) { codebase.class_likes.get(&lowered_id) } else { None }
+    if codebase.symbols.contains_trait(&lowercase_name) { codebase.class_likes.get(&lowercase_name) } else { None }
 }
 
-pub fn get_anonymous_class_name(interner: &ThreadedInterner, span: Span) -> StringIdentifier {
-    interner.intern(format!("class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset,))
+pub fn get_anonymous_class_name(span: Span) -> Atom {
+    use std::io::Write;
+
+    // A 64-byte buffer on the stack. This is ample space for the prefix,
+    // u64 file id, and 2 u32 integers, preventing any chance of a heap allocation.
+    let mut buffer = [0u8; 64];
+
+    // Use a block to limit the scope of the mutable writer
+    // `writer` is a mutable slice that implements `std::io::Write`.
+    let mut writer = &mut buffer[..];
+
+    // SAFETY: We use `unwrap_unchecked` here because we are writing to a fixed-size buffer
+    unsafe {
+        write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset).unwrap_unchecked()
+    };
+
+    // Determine how many bytes were written by checking the length of the original buffer
+    // against what the `writer` had left. This is a common pattern for `io::Write` on slices.
+    let written_len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+
+    atom(
+        // SAFETY: We use `unwrap_unchecked` here because we are certain the bytes
+        // up to `written_len` are valid UTF-8.
+        unsafe { std::str::from_utf8(&buffer[..written_len]).unwrap_unchecked() },
+    )
 }
 
 /// Retrieves the metadata for an anonymous class based on its span.
 ///
 /// This function generates a unique name for the anonymous class based on its span,
 /// which includes the source file and the start and end offsets.
-pub fn get_anonymous_class<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    span: Span,
-) -> Option<&'a ClassLikeMetadata> {
-    let name = get_anonymous_class_name(interner, span);
+pub fn get_anonymous_class(codebase: &CodebaseMetadata, span: Span) -> Option<&ClassLikeMetadata> {
+    let name = get_anonymous_class_name(span);
 
-    if class_exists(codebase, interner, &name) { codebase.class_likes.get(&name) } else { None }
+    if class_exists(codebase, &name) { codebase.class_likes.get(&name) } else { None }
 }
 
 /// Retrieves the metadata for any class-like (class, interface, enum, or trait).
 ///
 /// This lookup is case-insensitive.
-pub fn get_class_like<'a>(
-    codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    id: &StringIdentifier,
-) -> Option<&'a ClassLikeMetadata> {
-    let lowered_id = interner.lowered(id);
-    codebase.class_likes.get(&lowered_id)
+pub fn get_class_like<'a>(codebase: &'a CodebaseMetadata, name: &str) -> Option<&'a ClassLikeMetadata> {
+    let lowercase_name = ascii_lowercase_atom(name);
+
+    codebase.class_likes.get(&lowercase_name)
 }
 
-pub fn get_declaring_class_for_property(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    property_id: &StringIdentifier,
-) -> Option<StringIdentifier> {
-    let lowered_fqc_id = interner.lowered(fqc_id);
+pub fn get_declaring_class_for_property(codebase: &CodebaseMetadata, fqcn: &str, property_name: &str) -> Option<Atom> {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let property_name = atom(property_name);
 
-    let class_like = codebase.class_likes.get(&lowered_fqc_id)?;
-
-    class_like.declaring_property_ids.get(property_id).copied()
+    codebase.class_likes.get(&lowercase_fqcn)?.declaring_property_ids.get(&property_name).copied()
 }
 
 /// Retrieves the metadata for a property, searching the inheritance hierarchy.
@@ -410,49 +366,49 @@ pub fn get_declaring_class_for_property(
 /// The lookup for the class-like name is case-insensitive, but the property name is case-sensitive.
 pub fn get_declaring_property<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    property_id: &StringIdentifier,
+    fqcn: &str,
+    property_name: &str,
 ) -> Option<&'a PropertyMetadata> {
-    let declaring_fqc_id = get_declaring_class_for_property(codebase, interner, fqc_id, property_id)?;
-    let declaring_class_like = codebase.class_likes.get(&declaring_fqc_id)?;
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let property_name = atom(property_name);
 
-    declaring_class_like.properties.get(property_id)
+    let declaring_fqcn = codebase.class_likes.get(&lowercase_fqcn)?.declaring_property_ids.get(&property_name)?;
+
+    codebase.class_likes.get(declaring_fqcn)?.properties.get(&property_name)
 }
 
-pub fn get_method_id(fqc_id: &StringIdentifier, method_name_id: &StringIdentifier) -> MethodIdentifier {
-    MethodIdentifier::new(*fqc_id, *method_name_id)
+pub fn get_method_identifier(fqcn: &str, method_name: &str) -> MethodIdentifier {
+    MethodIdentifier::new(atom(fqcn), atom(method_name))
 }
 
-pub fn get_declaring_method_id(
+pub fn get_declaring_method_identifier(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    method_id: &MethodIdentifier,
+    method_identifier: &MethodIdentifier,
 ) -> MethodIdentifier {
-    let lowered_fqc_id = interner.lowered(method_id.get_class_name());
-    let lowered_method_id = interner.lowered(method_id.get_method_name());
+    let lowercase_fqcn = ascii_lowercase_atom(method_identifier.get_class_name());
+    let lowercase_method_name = ascii_lowercase_atom(method_identifier.get_method_name());
 
-    let Some(class_like_metadata) = codebase.class_likes.get(&lowered_fqc_id) else {
+    let Some(class_like_metadata) = codebase.class_likes.get(&lowercase_fqcn) else {
         // If the class-like doesn't exist, return the method ID as is
-        return *method_id;
+        return *method_identifier;
     };
 
-    if let Some(declaring_fqcn) = class_like_metadata.declaring_method_ids.get(&lowered_method_id)
+    if let Some(declaring_fqcn) = class_like_metadata.declaring_method_ids.get(&lowercase_method_name)
         && let Some(declaring_class_metadata) = codebase.class_likes.get(declaring_fqcn)
     {
-        return MethodIdentifier::new(declaring_class_metadata.original_name, *method_id.get_method_name());
+        return MethodIdentifier::new(declaring_class_metadata.original_name, *method_identifier.get_method_name());
     };
 
     if class_like_metadata.flags.is_abstract()
-        && let Some(overridden_classes) = class_like_metadata.overridden_method_ids.get(&lowered_method_id)
+        && let Some(overridden_classes) = class_like_metadata.overridden_method_ids.get(&lowercase_method_name)
         && let Some(first_class) = overridden_classes.iter().next()
         && let Some(first_class_metadata) = codebase.class_likes.get(first_class)
     {
-        return MethodIdentifier::new(first_class_metadata.original_name, *method_id.get_method_name());
+        return MethodIdentifier::new(first_class_metadata.original_name, *method_identifier.get_method_name());
     }
 
     // If the method isn't declared in this class, return the method ID as is
-    *method_id
+    *method_identifier
 }
 
 /// Retrieves the metadata for a method, searching the inheritance hierarchy.
@@ -463,37 +419,37 @@ pub fn get_declaring_method_id(
 /// The lookup for both the class-like name and the method name is case-insensitive.
 pub fn get_declaring_method<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_name_id: &StringIdentifier,
+    fqcn: &str,
+    method_name: &str,
 ) -> Option<&'a FunctionLikeMetadata> {
-    let method_id = MethodIdentifier::new(interner.lowered(fqc_id), interner.lowered(method_name_id));
-    let declaring_method_id = get_declaring_method_id(codebase, interner, &method_id);
+    let method_id = MethodIdentifier::new(atom(fqcn), atom(method_name));
+    let declaring_method_id = get_declaring_method_identifier(codebase, &method_id);
 
-    get_method(codebase, interner, declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
+    get_method(codebase, declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
 }
 
 pub fn get_method_by_id<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    method_id: &MethodIdentifier,
+    method_identifier: &MethodIdentifier,
 ) -> Option<&'a FunctionLikeMetadata> {
-    let lowered_fqc_id = interner.lowered(method_id.get_class_name());
-    let lowered_method_id = interner.lowered(method_id.get_method_name());
+    let lowercase_fqcn = ascii_lowercase_atom(method_identifier.get_class_name());
+    let lowercase_method_name = ascii_lowercase_atom(method_identifier.get_method_name());
 
-    codebase.function_likes.get(&(lowered_fqc_id, lowered_method_id))
+    let function_identifier = (lowercase_fqcn, lowercase_method_name);
+
+    codebase.function_likes.get(&function_identifier)
 }
 
 pub fn get_method<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_name_id: &StringIdentifier,
+    fqcn: &str,
+    method_name: &str,
 ) -> Option<&'a FunctionLikeMetadata> {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let lowered_method_id = interner.lowered(method_name_id);
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
+    let function_like_identifier = (lowercase_fqcn, lowercase_method_name);
 
-    codebase.function_likes.get(&(lowered_fqc_id, lowered_method_id))
+    codebase.function_likes.get(&function_like_identifier)
 }
 
 /// Retrieves the metadata for a property that is declared directly on the given class-like.
@@ -502,15 +458,13 @@ pub fn get_method<'a>(
 /// The lookup for the class-like name is case-insensitive, but the property name is case-sensitive.
 pub fn get_property<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    property_id: &StringIdentifier,
+    fqcn: &str,
+    property_name: &str,
 ) -> Option<&'a PropertyMetadata> {
-    let lowered_fqc_id = interner.lowered(fqc_id);
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let property_name = atom(property_name);
 
-    let class_like = codebase.class_likes.get(&lowered_fqc_id)?;
-
-    class_like.properties.get(property_id)
+    codebase.class_likes.get(&lowercase_fqcn)?.properties.get(&property_name)
 }
 
 /// An enum to represent either a class constant or an enum case.
@@ -525,18 +479,19 @@ pub enum ClassConstantOrEnumCase<'a> {
 /// The lookup for the class-like name is case-insensitive, but the constant/case name is case-sensitive.
 pub fn get_class_like_constant_or_enum_case<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    constant_id: &StringIdentifier,
+    fqcn: &str,
+    constant_name: &str,
 ) -> Option<ClassConstantOrEnumCase<'a>> {
-    let lowered_fqc_id = interner.lowered(fqc_id);
-    let class_like = codebase.class_likes.get(&lowered_fqc_id)?;
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
+    let constant_name = atom(constant_name);
 
-    if let Some(constant_meta) = class_like.constants.get(constant_id) {
+    let class_like = codebase.class_likes.get(&lowercase_fqcn)?;
+
+    if let Some(constant_meta) = class_like.constants.get(&constant_name) {
         return Some(ClassConstantOrEnumCase::Constant(constant_meta));
     }
 
-    if let Some(enum_case_meta) = class_like.enum_cases.get(constant_id) {
+    if let Some(enum_case_meta) = class_like.enum_cases.get(&constant_name) {
         return Some(ClassConstantOrEnumCase::EnumCase(enum_case_meta));
     }
 
@@ -547,127 +502,97 @@ pub fn get_class_like_constant_or_enum_case<'a>(
 ///
 /// This function checks if the `child` class-like is an instance of the `parent` class-like
 /// by looking up their metadata in the codebase.
-pub fn is_instance_of(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    parent: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_parent = interner.lowered(parent);
-
-    if lowered_child == lowered_parent {
+pub fn is_instance_of(codebase: &CodebaseMetadata, child_name: &str, parent_name: &str) -> bool {
+    if child_name == parent_name {
         return true;
     }
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_parent_name = ascii_lowercase_atom(parent_name);
+
+    if lowercase_child_name == lowercase_parent_name {
+        return true;
+    }
+
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.has_parent(&lowered_parent)
+    child_meta.has_parent(&lowercase_parent_name)
 }
 
-pub fn inherits_class(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    parent: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_parent = interner.lowered(parent);
+pub fn inherits_class(codebase: &CodebaseMetadata, child_name: &str, parent_name: &str) -> bool {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_parent_name = ascii_lowercase_atom(parent_name);
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.all_parent_classes.contains(&lowered_parent)
+    child_meta.all_parent_classes.contains(&lowercase_parent_name)
 }
 
-pub fn directly_inherits_class(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    parent: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_parent = interner.lowered(parent);
+pub fn directly_inherits_class(codebase: &CodebaseMetadata, child_name: &str, parent_name: &str) -> bool {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_parent_name = ascii_lowercase_atom(parent_name);
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.direct_parent_class.as_ref().is_some_and(|parent_class| parent_class == &lowered_parent)
+    child_meta.direct_parent_class.as_ref().is_some_and(|parent_class| parent_class == &lowercase_parent_name)
 }
 
-pub fn inherits_interface(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    parent: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_parent = interner.lowered(parent);
+pub fn inherits_interface(codebase: &CodebaseMetadata, child_name: &str, parent_name: &str) -> bool {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_parent_name = ascii_lowercase_atom(parent_name);
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.all_parent_interfaces.contains(&lowered_parent)
+    child_meta.all_parent_interfaces.contains(&lowercase_parent_name)
 }
 
-pub fn directly_inherits_interface(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    parent: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_parent = interner.lowered(parent);
+pub fn directly_inherits_interface(codebase: &CodebaseMetadata, child_name: &str, parent_name: &str) -> bool {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_parent_name = ascii_lowercase_atom(parent_name);
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.direct_parent_interfaces.contains(&lowered_parent)
+    child_meta.direct_parent_interfaces.contains(&lowercase_parent_name)
 }
 
-pub fn uses_trait(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    child: &StringIdentifier,
-    trait_name: &StringIdentifier,
-) -> bool {
-    let lowered_child = interner.lowered(child);
-    let lowered_trait_name = interner.lowered(trait_name);
+pub fn uses_trait(codebase: &CodebaseMetadata, child_name: &str, trait_name: &str) -> bool {
+    let lowercase_child_name = ascii_lowercase_atom(child_name);
+    let lowercase_trait_name = ascii_lowercase_atom(trait_name);
 
-    let Some(child_meta) = codebase.class_likes.get(&lowered_child) else {
+    let Some(child_meta) = codebase.class_likes.get(&lowercase_child_name) else {
         return false;
     };
 
-    child_meta.used_traits.contains(&lowered_trait_name)
+    child_meta.used_traits.contains(&lowercase_trait_name)
 }
 
 /// Recursively collects all descendant class/interface/enum FQCNs for a given class-like structure.
 /// Uses the pre-computed `all_classlike_descendants` map if available, otherwise might be empty.
 /// Warning: Recursive; could stack overflow on extremely deep hierarchies if map isn't precomputed well.
 #[inline]
-pub fn get_all_descendants(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    class_like_name: &StringIdentifier,
-) -> HashSet<StringIdentifier> {
-    let fqc_id = interner.lowered(class_like_name);
+pub fn get_all_descendants(codebase: &CodebaseMetadata, fqcn: &str) -> AtomSet {
+    let lowercase_fqcn = ascii_lowercase_atom(fqcn);
 
     // This implementation assumes direct_classlike_descendants is populated correctly.
-    let mut all_descendants = HashSet::default();
-    let mut queue = vec![&fqc_id];
-    let mut visited = HashSet::default();
-    visited.insert(&fqc_id); // Don't include self in descendants
+    let mut all_descendants = AtomSet::default();
+    let mut queue = vec![&lowercase_fqcn];
+    let mut visited = AtomSet::default();
+    visited.insert(lowercase_fqcn); // Don't include self in descendants
 
     while let Some(current_name) = queue.pop() {
         if let Some(direct_descendants) = codebase.direct_classlike_descendants.get(current_name) {
             for descendant in direct_descendants {
-                if visited.insert(descendant) {
+                if visited.insert(*descendant) {
                     // Add to results only if not visited before
                     all_descendants.insert(*descendant);
                     queue.push(descendant); // Add to queue for further exploration
@@ -675,6 +600,7 @@ pub fn get_all_descendants(
             }
         }
     }
+
     all_descendants
 }
 
@@ -684,16 +610,11 @@ pub fn get_all_descendants(
 /// is overridden from a parent class-like by looking up the metadata in the codebase.
 ///
 /// The lookup for both the class-like name and the method name is case-insensitive.
-pub fn is_method_overriding(
-    codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fqc_id: &StringIdentifier,
-    method_name: &StringIdentifier,
-) -> bool {
-    let lowered_method_name = interner.lowered(method_name);
+pub fn is_method_overriding(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str) -> bool {
+    let lowercase_method_name = ascii_lowercase_atom(method_name);
 
-    get_class_like(codebase, interner, fqc_id)
-        .is_some_and(|metadata| metadata.overridden_method_ids.contains_key(&lowered_method_name))
+    get_class_like(codebase, fqcn)
+        .is_some_and(|metadata| metadata.overridden_method_ids.contains_key(&lowercase_method_name))
 }
 
 pub fn get_function_like_thrown_types<'a>(
@@ -739,20 +660,20 @@ pub fn get_function_like_thrown_types<'a>(
 #[inline]
 pub fn get_class_constant_type<'a>(
     codebase: &'a CodebaseMetadata,
-    interner: &ThreadedInterner,
-    fq_class_name: &StringIdentifier,
-    constant_name: &StringIdentifier,
+    fq_class_name: &str,
+    constant_name: &str,
 ) -> Option<Cow<'a, TUnion>> {
-    let class_metadata = get_class_like(codebase, interner, fq_class_name)?;
+    let class_metadata = get_class_like(codebase, fq_class_name)?;
+    let constant_name = atom(constant_name);
 
-    if class_metadata.kind.is_enum() && class_metadata.enum_cases.contains_key(constant_name) {
-        let atomic = Cow::Owned(TAtomic::Object(TObject::new_enum_case(class_metadata.original_name, *constant_name)));
+    if class_metadata.kind.is_enum() && class_metadata.enum_cases.contains_key(&constant_name) {
+        let atomic = TAtomic::Object(TObject::new_enum_case(class_metadata.original_name, constant_name));
 
-        return Some(Cow::Owned(TUnion::from_single(atomic)));
+        return Some(Cow::Owned(TUnion::from_atomic(atomic)));
     }
 
     // It's a regular class constant
-    let constant_metadata = class_metadata.constants.get(constant_name)?;
+    let constant_metadata = class_metadata.constants.get(&constant_name)?;
 
     // Prefer the type signature if available
     if let Some(type_metadata) = constant_metadata.type_metadata.as_ref() {
@@ -765,28 +686,6 @@ pub fn get_class_constant_type<'a>(
     // Fall back to inferred type if no signature
     constant_metadata.inferred_type.as_ref().map(|atomic_type| {
         // Wrap the atomic type in a TUnion if returning inferred type
-        Cow::Owned(TUnion::from_single(Cow::Owned(atomic_type.clone())))
+        Cow::Owned(TUnion::from_atomic(atomic_type.clone()))
     })
-}
-
-/// Lowers the namespace part of a fully qualified constant name while preserving the case of the constant name itself.
-///
-/// For example, `My\Namespace\MY_CONST` becomes `my\namespace\MY_CONST`. This is necessary because
-/// PHP constant lookups are case-insensitive for the namespace but case-sensitive for the final constant name.
-fn lower_constant_name(interner: &ThreadedInterner, name: &str) -> StringIdentifier {
-    if !name.contains('\\') {
-        return interner.intern(name);
-    }
-
-    let mut parts: Vec<_> = name.split('\\').map(str::to_owned).collect();
-    let total_parts = parts.len();
-    if total_parts > 1 {
-        parts = parts
-            .into_iter()
-            .enumerate()
-            .map(|(i, part)| if i < total_parts - 1 { part.to_ascii_lowercase() } else { part })
-            .collect::<Vec<_>>();
-    }
-
-    interner.intern(parts.join("\\"))
 }

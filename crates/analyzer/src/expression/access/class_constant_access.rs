@@ -21,12 +21,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
 
         let mut resulting_type = if resolution.has_ambiguous_path { Some(get_mixed()) } else { None };
         for resolved_constant in resolution.constants {
-            resulting_type = Some(add_optional_union_type(
-                resolved_constant.const_type,
-                resulting_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            resulting_type =
+                Some(add_optional_union_type(resolved_constant.const_type, resulting_type.as_ref(), context.codebase));
         }
 
         artifacts.set_expression_type(

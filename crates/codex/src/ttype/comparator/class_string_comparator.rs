@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use mago_interner::ThreadedInterner;
+use mago_atom::atom;
 
 use crate::enum_exists;
 use crate::metadata::CodebaseMetadata;
@@ -18,7 +18,6 @@ use crate::ttype::comparator::atomic_comparator;
 #[inline]
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_scalar: &TScalar,
     container_class_string: &TClassLikeString,
     inside_assertion: bool,
@@ -31,18 +30,18 @@ pub fn is_contained_by(
         TClassLikeString::Literal { value } => {
             if let Some(str_value) = input_scalar.get_known_literal_string_value()
                 && is_valid_class_string(str_value)
-                && str_value.eq_ignore_ascii_case(interner.lookup(value))
+                && str_value.eq_ignore_ascii_case(value)
             {
                 return true;
             }
 
             if let Some(literal_class_string) = input_scalar.get_literal_class_string_value()
-                && interner.lowered(&literal_class_string) == interner.lowered(value)
+                && literal_class_string.eq_ignore_ascii_case(value)
             {
                 return true;
             }
 
-            if enum_exists(codebase, interner, value) {
+            if enum_exists(codebase, value) {
                 Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
             } else {
                 Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
@@ -58,12 +57,10 @@ pub fn is_contained_by(
                 return false;
             }
 
-            let value = interner.intern(string_value);
-
-            if enum_exists(codebase, interner, &value) {
-                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(value))))
+            if enum_exists(codebase, string_value) {
+                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(atom(string_value)))))
             } else {
-                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(value))))
+                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(atom(string_value)))))
             }
         }
         TScalar::ClassLikeString(input_class_string) => match input_class_string {
@@ -71,7 +68,7 @@ pub fn is_contained_by(
                 return matches!(fake_container_type.as_ref(), TAtomic::Object(TObject::Any));
             }
             TClassLikeString::Literal { value } => {
-                if enum_exists(codebase, interner, value) {
+                if enum_exists(codebase, value) {
                     Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
                 } else {
                     Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
@@ -87,7 +84,6 @@ pub fn is_contained_by(
 
     atomic_comparator::is_contained_by(
         codebase,
-        interner,
         fake_input_type.as_ref(),
         fake_container_type.as_ref(),
         inside_assertion,

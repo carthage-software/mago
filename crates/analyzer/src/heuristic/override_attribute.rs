@@ -1,3 +1,4 @@
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::get_class_like;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_fixer::SafetyClassification;
@@ -13,8 +14,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
     members: &[ClassLikeMember<'arena>],
     context: &mut Context<'ctx, 'arena>,
 ) {
-    let class_name = context.interner.lookup(&metadata.original_name);
-
+    let class_name = metadata.original_name;
     for member in members {
         let ClassLikeMember::Method(method) = member else {
             continue;
@@ -59,7 +59,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
             continue;
         }
 
-        let lowercase_name = context.interner.intern(method.name.value.to_lowercase());
+        let lowercase_name = ascii_lowercase_atom(method.name.value);
         let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
             if let Some(attribute) = override_attribute {
                 let issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))
@@ -88,15 +88,13 @@ pub fn check_override_attribute<'ctx, 'arena>(
             continue;
         }
 
-        let Some(parents_metadata) = parent_class_names
-            .iter()
-            .filter_map(|parent_class| get_class_like(context.codebase, context.interner, parent_class))
-            .next()
+        let Some(parents_metadata) =
+            parent_class_names.iter().filter_map(|parent_class| get_class_like(context.codebase, parent_class)).next()
         else {
             continue;
         };
 
-        let parent_classname = context.interner.lookup(&parents_metadata.original_name);
+        let parent_classname = parents_metadata.original_name;
 
         let issue =
             Issue::error(format!("Missing `#[Override]` attribute on overriding method `{class_name}::{name}`."))

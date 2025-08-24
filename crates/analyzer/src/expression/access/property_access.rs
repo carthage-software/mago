@@ -73,7 +73,6 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         is_null_safe,
         block_context.scope.get_class_like_name(),
         context.resolved_names,
-        context.interner,
         Some(context.codebase),
     );
 
@@ -104,7 +103,6 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
                 resolved_property.property_type,
                 resulting_expression_type.as_ref(),
                 context.codebase,
-                context.interner,
             ));
         }
 
@@ -112,21 +110,13 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
             || resolution_result.encountered_mixed
             || resolution_result.has_possibly_defined_property
         {
-            resulting_expression_type = Some(add_optional_union_type(
-                get_mixed(),
-                resulting_expression_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            resulting_expression_type =
+                Some(add_optional_union_type(get_mixed(), resulting_expression_type.as_ref(), context.codebase));
         }
 
         if resolution_result.has_invalid_path || resolution_result.encountered_null {
-            resulting_expression_type = Some(add_optional_union_type(
-                get_null(),
-                resulting_expression_type.as_ref(),
-                context.codebase,
-                context.interner,
-            ));
+            resulting_expression_type =
+                Some(add_optional_union_type(get_null(), resulting_expression_type.as_ref(), context.codebase));
         }
     }
 

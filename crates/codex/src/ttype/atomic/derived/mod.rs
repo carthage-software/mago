@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
@@ -78,11 +76,11 @@ impl TType for TDerived {
         }
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self {
-            TDerived::KeyOf(key_of) => key_of.get_id(interner),
-            TDerived::ValueOf(value_of) => value_of.get_id(interner),
-            TDerived::PropertiesOf(properties_of) => properties_of.get_id(interner),
+            TDerived::KeyOf(key_of) => key_of.get_id(),
+            TDerived::ValueOf(value_of) => value_of.get_id(),
+            TDerived::PropertiesOf(properties_of) => properties_of.get_id(),
         }
     }
 }

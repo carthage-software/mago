@@ -1,9 +1,8 @@
-use std::borrow::Cow;
-
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
+use mago_atom::Atom;
+use mago_atom::atom;
 
 use crate::ttype::TType;
 use crate::utils::str_is_numeric;
@@ -15,7 +14,7 @@ pub enum TStringLiteral {
     /// The string originates from a literal, but its specific value isn't tracked here.
     Unspecified,
     /// The string originates from a literal, and its value is known.
-    Value(Cow<'static, str>),
+    Value(Atom),
 }
 
 /// Represents a PHP string type, tracking literal origin and guaranteed properties.
@@ -42,20 +41,20 @@ impl TStringLiteral {
 
     /// Creates the 'Value' literal state with a specific string value.
     #[inline]
-    pub const fn value(value: String) -> Self {
-        TStringLiteral::Value(Cow::Owned(value))
+    pub fn value(value: String) -> Self {
+        TStringLiteral::Value(atom(value.as_str()))
     }
 
     /// Creates the 'Value' literal state from a static string slice.
     #[inline]
     pub fn value_from_static_str(value: &'static str) -> Self {
-        TStringLiteral::Value(Cow::Borrowed(value))
+        TStringLiteral::Value(atom(value))
     }
 
     /// Creates the 'Value' literal state from a string slice.
     #[inline]
     pub fn value_from_str(value: &str) -> Self {
-        TStringLiteral::Value(Cow::Owned(value.to_string()))
+        TStringLiteral::Value(atom(value))
     }
 
     /// Checks if this represents an unspecified literal value.
@@ -158,10 +157,10 @@ impl TString {
     /// Creates an instance representing a known literal string type (e.g., `"hello"`).
     /// Properties (`is_numeric`, `is_truthy`, `is_non_empty`) are derived from the value.
     #[inline]
-    pub fn known_literal(value: Cow<'static, str>) -> Self {
+    pub fn known_literal(value: Atom) -> Self {
         let is_numeric = str_is_numeric(&value);
         let is_non_empty = is_numeric || !value.is_empty();
-        let is_truthy = is_non_empty && value.as_ref() != "0";
+        let is_truthy = is_non_empty && value.as_str() != "0";
         let is_lowercase = value.chars().all(|c| !c.is_uppercase());
 
         Self::new(Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty, is_lowercase)
@@ -282,7 +281,7 @@ impl TType for TString {
         false
     }
 
-    fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let s = match &self.literal {
             Some(TStringLiteral::Value(s)) => return format!("string('{}')", s.replace('\'', "\\'")),
             Some(_) => {
@@ -343,18 +342,13 @@ impl Default for TString {
     }
 }
 
-impl From<&'static str> for TString {
-    /// Converts a string slice into a `known_literal` StringScalar.
+impl<T> From<T> for TString
+where
+    T: AsRef<str>,
+{
+    /// Converts any type that can be referenced as a string slice into a `known_literal` StringScalar.
     /// Derives properties from the literal value.
-    fn from(value: &'static str) -> Self {
-        Self::known_literal(Cow::Borrowed(value))
-    }
-}
-
-impl From<String> for TString {
-    /// Converts a String into a `known_literal` StringScalar.
-    /// Derives properties from the literal value.
-    fn from(value: String) -> Self {
-        Self::known_literal(Cow::Owned(value))
+    fn from(value: T) -> Self {
+        Self::known_literal(atom(value.as_ref()))
     }
 }

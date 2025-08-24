@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 
 /// Represents PHP's boolean type system, including the general `bool` type
@@ -65,7 +63,7 @@ impl TType for TBool {
         false
     }
 
-    fn get_id(&self, _interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         match self.value {
             Some(true) => "true".to_string(),
             Some(false) => "false".to_string(),

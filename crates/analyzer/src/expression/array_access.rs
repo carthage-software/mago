@@ -25,7 +25,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             self,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
-            context.interner,
             Some(context.codebase),
         );
 
@@ -33,7 +32,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             self.array,
             block_context.scope.get_class_like_name(),
             context.resolved_names,
-            context.interner,
             Some(context.codebase),
         );
 

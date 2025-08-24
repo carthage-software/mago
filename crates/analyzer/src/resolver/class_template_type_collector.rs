@@ -2,6 +2,9 @@ use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
@@ -13,21 +16,18 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 
 pub(crate) fn collect(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     class_metadata: &ClassLikeMetadata,
     static_class_metadata: &ClassLikeMetadata,
     object_type: Option<&TObject>,
-) -> Option<IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState>> {
+) -> Option<IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>> {
     if class_metadata.template_types.is_empty() {
         return None;
     }
 
-    let mut class_template_parameters: IndexMap<StringIdentifier, HashMap<GenericParent, TUnion>, RandomState> =
+    let mut class_template_parameters: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState> =
         IndexMap::default();
 
     if let Some(TObject::Named(TNamedObject { type_parameters: Some(parameters), .. })) = &object_type {
@@ -53,13 +53,8 @@ pub(crate) fn collect(
                     .get(&class_metadata.name)
                     .and_then(|m| m.get(template_name))
             {
-                let output_type_extends = resolve_template_parameter(
-                    codebase,
-                    interner,
-                    input_type_extends,
-                    static_class_metadata,
-                    parameters,
-                );
+                let output_type_extends =
+                    resolve_template_parameter(codebase, input_type_extends, static_class_metadata, parameters);
 
                 class_template_parameters
                     .entry(*template_name)
@@ -97,7 +92,7 @@ pub(crate) fn collect(
 
             let self_call =
                 if let Some(TObject::Named(TNamedObject { name: self_class_name, is_this: true, .. })) = object_type {
-                    template_classname == &GenericParent::ClassLike(interner.lowered(self_class_name))
+                    template_classname == &GenericParent::ClassLike(ascii_lowercase_atom(self_class_name))
                 } else {
                     false
                 };
@@ -117,7 +112,6 @@ pub(crate) fn collect(
 
 pub(crate) fn resolve_template_parameter(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_extends: &TUnion,
     static_class_storage: &ClassLikeMetadata,
     type_params: &Vec<TUnion>,
@@ -137,12 +131,8 @@ pub(crate) fn resolve_template_parameter(
                 let mapped_offset = entry.0;
 
                 if let Some(type_param) = type_params.get(mapped_offset) {
-                    output_type_extends = Some(add_optional_union_type(
-                        type_param.clone(),
-                        output_type_extends.as_ref(),
-                        codebase,
-                        interner,
-                    ));
+                    output_type_extends =
+                        Some(add_optional_union_type(type_param.clone(), output_type_extends.as_ref(), codebase));
                 }
             } else if let Some(input_type_extends) = static_class_storage
                 .template_extended_parameters
@@ -150,21 +140,12 @@ pub(crate) fn resolve_template_parameter(
                 .unwrap_or(&IndexMap::default())
                 .get(parameter_name)
             {
-                let nested_output_type = resolve_template_parameter(
-                    codebase,
-                    interner,
-                    input_type_extends,
-                    static_class_storage,
-                    type_params,
-                );
+                let nested_output_type =
+                    resolve_template_parameter(codebase, input_type_extends, static_class_storage, type_params);
 
                 if let Some(nested_output_type) = nested_output_type {
-                    output_type_extends = Some(add_optional_union_type(
-                        nested_output_type,
-                        output_type_extends.as_ref(),
-                        codebase,
-                        interner,
-                    ));
+                    output_type_extends =
+                        Some(add_optional_union_type(nested_output_type, output_type_extends.as_ref(), codebase));
                 }
             }
         } else {
@@ -172,7 +153,6 @@ pub(crate) fn resolve_template_parameter(
                 wrap_atomic(type_extends_atomic.clone()),
                 output_type_extends.as_ref(),
                 codebase,
-                interner,
             ));
         }
     }
@@ -182,9 +162,9 @@ pub(crate) fn resolve_template_parameter(
 
 fn expand_type(
     input_type_extends: &TUnion,
-    template_extended_parameters: &HashMap<StringIdentifier, IndexMap<StringIdentifier, TUnion, RandomState>>,
-    static_class_name: &StringIdentifier,
-    static_class_template_types: &[(StringIdentifier, Vec<(GenericParent, TUnion)>)],
+    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+    static_class_name: &Atom,
+    static_class_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
 ) -> Vec<TAtomic> {
     let mut output_type_extends = Vec::new();
 

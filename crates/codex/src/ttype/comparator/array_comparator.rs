@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use mago_interner::ThreadedInterner;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -15,7 +13,6 @@ use crate::ttype::wrap_atomic;
 
 pub(crate) fn is_contained_by(
     codebase: &CodebaseMetadata,
-    interner: &ThreadedInterner,
     input_type_part: &TAtomic,
     container_type_part: &TAtomic,
     inside_assertion: bool,
@@ -113,7 +110,6 @@ pub(crate) fn is_contained_by(
                 }
                 if !union_comparator::is_contained_by(
                     codebase,
-                    interner,
                     input_item_value_type,
                     container_item_value_type,
                     false,
@@ -126,7 +122,6 @@ pub(crate) fn is_contained_by(
             } else if let (Some(ck_type), cv_type) = (&container_key_type, &container_value_type) {
                 if !union_comparator::is_contained_by(
                     codebase,
-                    interner,
                     &input_key.to_union(),
                     ck_type,
                     false,
@@ -135,7 +130,6 @@ pub(crate) fn is_contained_by(
                     atomic_comparison_result,
                 ) || !union_comparator::is_contained_by(
                     codebase,
-                    interner,
                     input_item_value_type,
                     cv_type,
                     false,
@@ -156,7 +150,6 @@ pub(crate) fn is_contained_by(
     if let (Some(input_key_type), Some(container_key_type)) = (input_key_type, container_key_type)
         && !union_comparator::is_contained_by(
             codebase,
-            interner,
             &input_key_type,
             &container_key_type,
             false,
@@ -171,7 +164,6 @@ pub(crate) fn is_contained_by(
     if !input_value_type.is_never()
         && !union_comparator::is_contained_by(
             codebase,
-            interner,
             &input_value_type,
             &container_value_type,
             false,

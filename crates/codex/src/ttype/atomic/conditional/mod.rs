@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_interner::ThreadedInterner;
-
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
@@ -85,20 +83,20 @@ impl TType for TConditional {
         true
     }
 
-    fn get_id(&self, interner: Option<&ThreadedInterner>) -> String {
+    fn get_id(&self) -> String {
         let mut id = "(".to_string();
 
-        id += &self.subject.get_id(interner);
+        id += &self.subject.get_id();
         id += " is ";
         if self.negated {
             id += "not ";
         }
 
-        id += &self.target.get_id(interner);
+        id += &self.target.get_id();
         id += " ? ";
-        id += &self.then.get_id(interner);
+        id += &self.then.get_id();
         id += " : ";
-        id += &self.otherwise.get_id(interner);
+        id += &self.otherwise.get_id();
         id += ")";
 
         id

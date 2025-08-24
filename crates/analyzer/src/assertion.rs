@@ -2,6 +2,7 @@ use ahash::HashMap;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
+use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::get_class_like;
 use mago_codex::ttype::atomic::TAtomic;
@@ -37,7 +38,6 @@ pub fn scrape_assertions(
         expression,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     ) {
         if_types.insert(var_name, vec![vec![Assertion::Truthy]]);
@@ -75,7 +75,6 @@ pub fn scrape_assertions(
                         null_safe_method_call.object,
                         assertion_context.this_class_name,
                         assertion_context.resolved_names,
-                        assertion_context.interner,
                         Some(assertion_context.codebase),
                     );
 
@@ -92,7 +91,6 @@ pub fn scrape_assertions(
                     empty_construct.value,
                     assertion_context.this_class_name,
                     assertion_context.resolved_names,
-                    assertion_context.interner,
                     Some(assertion_context.codebase),
                 ) else {
                     return vec![];
@@ -114,7 +112,6 @@ pub fn scrape_assertions(
                         value,
                         assertion_context.this_class_name,
                         assertion_context.resolved_names,
-                        assertion_context.interner,
                         Some(assertion_context.codebase),
                     ) {
                         if let Expression::Variable(variable) = value
@@ -137,7 +134,6 @@ pub fn scrape_assertions(
                                 root_array,
                                 assertion_context.this_class_name,
                                 assertion_context.resolved_names,
-                                assertion_context.interner,
                                 Some(assertion_context.codebase),
                             );
                         }
@@ -176,7 +172,6 @@ pub fn scrape_assertions(
                         binary.lhs,
                         assertion_context.this_class_name,
                         assertion_context.resolved_names,
-                        assertion_context.interner,
                         Some(assertion_context.codebase),
                     );
 
@@ -213,7 +208,6 @@ pub fn scrape_assertions(
                 null_safe_property_access.object,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -293,7 +287,6 @@ fn scrape_special_function_call_assertions(
                 argument_expression,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             )
         })
@@ -475,7 +468,6 @@ fn get_empty_array_equality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -507,7 +499,6 @@ fn get_empty_array_inequality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -542,7 +533,6 @@ fn get_enum_case_equality_assertions(
         variable_expression,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -573,7 +563,6 @@ fn get_enum_case_inequality_assertions(
         variable_expression,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -600,7 +589,6 @@ fn get_null_equality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -627,7 +615,6 @@ fn get_null_inequality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -654,7 +641,6 @@ fn get_false_inquality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -681,7 +667,6 @@ fn get_true_inquality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -757,7 +742,6 @@ fn scrape_lesser_than_assertions(
         left,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -765,7 +749,6 @@ fn scrape_lesser_than_assertions(
         right,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -916,7 +899,6 @@ fn scrape_greater_than_assertions(
             left,
             assertion_context.this_class_name,
             assertion_context.resolved_names,
-            assertion_context.interner,
             Some(assertion_context.codebase),
         )
     {
@@ -962,7 +944,6 @@ fn scrape_greater_than_assertions(
             right,
             assertion_context.this_class_name,
             assertion_context.resolved_names,
-            assertion_context.interner,
             Some(assertion_context.codebase),
         )
     {
@@ -1012,13 +993,7 @@ fn scrape_instanceof_assertions(
 ) -> Vec<HashMap<String, AssertionSet>> {
     let mut if_types = HashMap::default();
 
-    let variable_id = get_expression_id(
-        left,
-        context.this_class_name,
-        context.resolved_names,
-        context.interner,
-        Some(context.codebase),
-    );
+    let variable_id = get_expression_id(left, context.this_class_name, context.resolved_names, Some(context.codebase));
 
     if let Some(counter_variable_id) = variable_id {
         match right {
@@ -1027,9 +1002,9 @@ fn scrape_instanceof_assertions(
 
                 if_types.insert(
                     counter_variable_id,
-                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(
-                        context.interner.intern(resolved_name),
-                    ))))]],
+                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(atom(
+                        resolved_name,
+                    )))))]],
                 );
             }
             Expression::Self_(_) => {
@@ -1037,7 +1012,7 @@ fn scrape_instanceof_assertions(
                     if_types.insert(
                         counter_variable_id,
                         vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new_this(
-                            *self_class,
+                            self_class,
                         ))))]],
                     );
                 }
@@ -1047,14 +1022,14 @@ fn scrape_instanceof_assertions(
                     if_types.insert(
                         counter_variable_id,
                         vec![vec![Assertion::IsIdentical(TAtomic::Object(TObject::Named(TNamedObject::new_this(
-                            *self_class,
+                            self_class,
                         ))))]],
                     );
                 }
             }
             Expression::Parent(_) => {
                 if let Some(self_class) = context.this_class_name
-                    && let Some(self_meta) = get_class_like(context.codebase, context.interner, self_class)
+                    && let Some(self_meta) = get_class_like(context.codebase, &self_class)
                     && let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref()
                 {
                     if_types.insert(
@@ -1069,11 +1044,11 @@ fn scrape_instanceof_assertions(
                 if let Some(expression_type) = artifacts.get_expression_type(expression) {
                     let mut assertions = vec![];
                     for atomic in expression_type.types.as_ref() {
-                        let Some(name) = get_class_name_from_atomic(context.interner, atomic) else {
+                        let Some(name) = get_class_name_from_atomic(atomic) else {
                             continue;
                         };
 
-                        assertions.push(Assertion::IsType(name.get_object_type(context.codebase, context.interner)));
+                        assertions.push(Assertion::IsType(name.get_object_type(context.codebase)));
                     }
 
                     // If we failed to resolve the class-name on the rhs of
@@ -1171,7 +1146,6 @@ fn get_true_equality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -1199,7 +1173,6 @@ pub fn has_typed_value_comparison(
         left,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -1207,7 +1180,6 @@ pub fn has_typed_value_comparison(
         right,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -1246,7 +1218,6 @@ fn get_false_equality_assertions(
         base_conditional,
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     );
 
@@ -1284,7 +1255,6 @@ fn get_typed_value_equality_assertions(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -1292,7 +1262,6 @@ fn get_typed_value_equality_assertions(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -1304,14 +1273,12 @@ fn get_typed_value_equality_assertions(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
             other_value_var_name = get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -1376,14 +1343,12 @@ fn get_typed_value_inequality_assertions(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
             other_value_var_name = get_expression_id(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -1395,14 +1360,12 @@ fn get_typed_value_inequality_assertions(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
             other_value_var_name = get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
-                assertion_context.interner,
                 Some(assertion_context.codebase),
             );
 
@@ -1459,7 +1422,6 @@ fn get_first_argument_expression_id(
         argument_list.arguments.first()?.value(),
         assertion_context.this_class_name,
         assertion_context.resolved_names,
-        assertion_context.interner,
         Some(assertion_context.codebase),
     )
 }

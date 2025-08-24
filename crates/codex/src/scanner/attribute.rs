@@ -1,4 +1,5 @@
-use mago_interner::StringIdentifier;
+use mago_atom::Atom;
+use mago_atom::atom;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -17,7 +18,7 @@ pub fn scan_attribute_lists<'ctx, 'ast, 'arena>(
     for attribute_list in attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
             metadata.push(AttributeMetadata {
-                name: context.interner.intern(context.resolved_names.get(&attribute.name)),
+                name: atom(context.resolved_names.get(&attribute.name)),
                 span: attribute.span(),
             });
         }
@@ -28,12 +29,11 @@ pub fn scan_attribute_lists<'ctx, 'ast, 'arena>(
 
 #[inline]
 pub fn get_attribute_flags<'ctx, 'ast, 'arena>(
-    class_like_name: StringIdentifier,
+    class_like_name: Atom,
     attribute_lists: &'ast Sequence<'arena, AttributeList<'arena>>,
     context: &mut Context<'ctx, 'ast, 'arena>,
 ) -> Option<AttributeFlags> {
-    let class_like_name_str = context.interner.lookup(&class_like_name);
-    if class_like_name_str.eq_ignore_ascii_case("Attribute") {
+    if class_like_name.eq_ignore_ascii_case("Attribute") {
         return Some(AttributeFlags::TARGET_CLASS);
     }
 
@@ -50,7 +50,7 @@ pub fn get_attribute_flags<'ctx, 'ast, 'arena>(
             return Some(AttributeFlags::TARGET_ALL);
         };
 
-        let inferred_type = infer(context.interner, context.resolved_names, first_argument.value());
+        let inferred_type = infer(context.resolved_names, first_argument.value());
         let bits = inferred_type.and_then(|i| i.get_single_literal_int_value()).and_then(|value| {
             if !(0..=255).contains(&value) {
                 return None;

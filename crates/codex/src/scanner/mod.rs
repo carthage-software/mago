@@ -1,7 +1,12 @@
 use bumpalo::Bump;
+
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
+use mago_atom::empty_atom;
+use mago_atom::u32_atom;
+use mago_atom::u64_atom;
 use mago_database::file::File;
-use mago_interner::StringIdentifier;
-use mago_interner::ThreadedInterner;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
@@ -39,14 +44,13 @@ mod property;
 mod ttype;
 
 #[inline]
-pub fn scan_program<'ctx, 'ast, 'arena>(
-    interner: &'ctx ThreadedInterner,
+pub fn scan_program<'ast, 'arena>(
     arena: &'arena Bump,
-    file: &'ctx File,
+    file: &File,
     program: &'ast Program<'arena>,
     resolved_names: &'ast ResolvedNames<'arena>,
 ) -> CodebaseMetadata {
-    let mut context = Context::new(interner, arena, file, program, resolved_names);
+    let mut context = Context::new(arena, file, program, resolved_names);
     let mut scanner = Scanner::new();
 
     scanner.walk_program(program, &mut context);
@@ -55,7 +59,6 @@ pub fn scan_program<'ctx, 'ast, 'arena>(
 
 #[derive(Clone, Debug)]
 struct Context<'ctx, 'ast, 'arena> {
-    pub interner: &'ctx ThreadedInterner,
     pub arena: &'arena Bump,
     pub file: &'ctx File,
     pub program: &'ast Program<'arena>,
@@ -64,13 +67,12 @@ struct Context<'ctx, 'ast, 'arena> {
 
 impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     pub fn new(
-        interner: &'ctx ThreadedInterner,
         arena: &'arena Bump,
         file: &'ctx File,
         program: &'ast Program<'arena>,
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> Self {
-        Self { interner, arena, file, program, resolved_names }
+        Self { arena, file, program, resolved_names }
     }
 
     pub fn get_docblock(&self, node: impl HasSpan) -> Option<&'ast Trivia<'arena>> {
@@ -78,13 +80,13 @@ impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     }
 }
 
-type TemplateConstraint = (String, Vec<(GenericParent, TUnion)>);
+type TemplateConstraint = (Atom, Vec<(GenericParent, TUnion)>);
 type TemplateConstraintList = Vec<TemplateConstraint>;
 
 #[derive(Debug, Default)]
 struct Scanner {
     codebase: CodebaseMetadata,
-    stack: Vec<StringIdentifier>,
+    stack: Vec<Atom>,
     template_constraints: Vec<TemplateConstraintList>,
     scope: NamespaceScope,
     has_constructor: bool,
@@ -100,7 +102,7 @@ impl Scanner {
         for template_constraint_list in self.template_constraints.iter().rev() {
             for (name, constraints) in template_constraint_list {
                 if !context.has_template_definition(name) {
-                    context = context.with_template_definition(name.clone(), constraints.clone());
+                    context = context.with_template_definition(*name, constraints.clone());
                 }
             }
         }
@@ -132,14 +134,15 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
     fn walk_in_function(&mut self, function: &'ast Function<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         let type_context = self.get_current_type_resolution_context();
 
-        let name = context.interner.intern(context.resolved_names.get(&function.name).to_lowercase());
-        let identifier = (StringIdentifier::empty(), name);
-        let metadata = scan_function(identifier, function, self.stack.last(), context, &mut self.scope, type_context);
+        let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
+        let identifier = (empty_atom(), name);
+        let metadata =
+            scan_function(identifier, function, self.stack.last().copied(), context, &mut self.scope, type_context);
 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((context.interner.lookup(template_name).to_string(), template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.to_vec()));
             }
 
             constraints
@@ -157,18 +160,24 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
     fn walk_in_closure(&mut self, closure: &'ast Closure<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
         let span = closure.span();
 
-        let file_ref = context.interner.intern(span.file_id.to_string());
-        let closure_ref = context.interner.intern(span.start.to_string());
+        let file_ref = u64_atom(span.file_id.as_u64());
+        let closure_ref = u32_atom(span.start.offset);
         let identifier = (file_ref, closure_ref);
 
         let type_resolution_context = self.get_current_type_resolution_context();
-        let metadata =
-            scan_closure(identifier, closure, self.stack.last(), context, &mut self.scope, type_resolution_context);
+        let metadata = scan_closure(
+            identifier,
+            closure,
+            self.stack.last().copied(),
+            context,
+            &mut self.scope,
+            type_resolution_context,
+        );
 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((context.interner.lookup(template_name).to_string(), template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.to_vec()));
             }
 
             constraints
@@ -190,8 +199,8 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
     ) {
         let span = arrow_function.span();
 
-        let file_ref = context.interner.intern(span.file_id.to_string());
-        let closure_ref = context.interner.intern(span.start.to_string());
+        let file_ref = u64_atom(span.file_id.as_u64());
+        let closure_ref = u32_atom(span.start.offset);
         let identifier = (file_ref, closure_ref);
 
         let type_resolution_context = self.get_current_type_resolution_context();
@@ -199,7 +208,7 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
         let metadata = scan_arrow_function(
             identifier,
             arrow_function,
-            self.stack.last(),
+            self.stack.last().copied(),
             context,
             &mut self.scope,
             type_resolution_context,
@@ -208,7 +217,7 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((context.interner.lookup(template_name).to_string(), template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.to_vec()));
             }
 
             constraints
@@ -309,13 +318,13 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
 
     #[inline]
     fn walk_in_method(&mut self, method: &'ast Method<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
-        let current_class = self.stack.last().expect("Expected class-like stack to be non-empty");
+        let current_class = self.stack.last().copied().expect("Expected class-like stack to be non-empty");
         let mut class_like_metadata =
-            self.codebase.class_likes.remove(current_class).expect("Expected class-like metadata to be present");
+            self.codebase.class_likes.remove(&current_class).expect("Expected class-like metadata to be present");
 
-        let name = context.interner.intern(method.name.value.to_lowercase());
+        let name = ascii_lowercase_atom(method.name.value);
         if class_like_metadata.methods.contains(&name) {
-            self.codebase.class_likes.insert(*current_class, class_like_metadata);
+            self.codebase.class_likes.insert(current_class, class_like_metadata);
             self.template_constraints.push(vec![]);
 
             return;
@@ -350,7 +359,7 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
                 class_like_metadata.add_property_metadata(property_metadata);
             }
         } else {
-            is_clone = name == context.interner.intern("__clone");
+            is_clone = name == atom("__clone");
         }
 
         class_like_metadata.methods.insert(name);
@@ -367,13 +376,13 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, Context<'ctx, 'ast, 'arena>> fo
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &function_like_metadata.template_types {
-                constraints.push((context.interner.lookup(template_name).to_string(), template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.to_vec()));
             }
 
             constraints
         });
 
-        self.codebase.class_likes.insert(*current_class, class_like_metadata);
+        self.codebase.class_likes.insert(current_class, class_like_metadata);
         self.codebase.function_likes.insert(method_id, function_like_metadata);
     }
 
@@ -429,7 +438,7 @@ fn finalize_class_like<'ctx, 'ast, 'arena>(scanner: &mut Scanner, context: &mut 
     };
 
     if class_like_metadata.flags.has_consistent_constructor() {
-        let constructor_name = context.interner.intern("__construct");
+        let constructor_name = atom("__construct");
 
         class_like_metadata.methods.insert(constructor_name);
         class_like_metadata.add_declaring_method_id(constructor_name, class_like_metadata.name);

@@ -1,10 +1,10 @@
 use ahash::HashSet;
 
+use mago_atom::Atom;
 use mago_codex::get_function;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
-use mago_interner::StringIdentifier;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -233,14 +233,12 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     artifacts: &mut AnalysisArtifacts,
 ) {
-    if let Some((issue_kind, name_id)) = has_unused_must_use(expression, context, artifacts) {
-        let name_str = context.interner.lookup(&name_id);
-
+    if let Some((issue_kind, name)) = has_unused_must_use(expression, context, artifacts) {
         context.collector.report_with_code(
             issue_kind,
-            Issue::error(format!("The return value of '{name_str}' must be used."))
+            Issue::error(format!("The return value of '{name}' must be used."))
                 .with_annotation(Annotation::primary(statement.span()).with_message("The result of this call is ignored"))
-                .with_note(format!("The function or method '{name_str}' is marked with @must-use or #[NoDiscard], indicating its return value is important and should not be discarded."))
+                .with_note(format!("The function or method '{name}' is marked with @must-use or #[NoDiscard], indicating its return value is important and should not be discarded."))
                 .with_help("Assign the result to a variable, pass it to another function, or use it in an expression.")
         );
 
@@ -276,16 +274,10 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
             };
 
             let unqualified_name = function_name.value();
-            let unqualified_name_id = context.interner.intern(unqualified_name);
             let name = context.resolved_names.get(function_name);
-            let name_id = context.interner.intern(name);
 
-            let Some(function) = get_function(context.codebase, context.interner, &name_id).or_else(|| {
-                if !function_name.is_local() {
-                    None
-                } else {
-                    get_function(context.codebase, context.interner, &unqualified_name_id)
-                }
+            let Some(function) = get_function(context.codebase, name).or_else(|| {
+                if !function_name.is_local() { None } else { get_function(context.codebase, unqualified_name) }
             }) else {
                 return;
             };
@@ -327,43 +319,30 @@ fn has_unused_must_use<'ctx, 'ast, 'arena>(
     expression: &'ast Expression<'arena>,
     context: &Context<'ctx, 'arena>,
     artifacts: &AnalysisArtifacts,
-) -> Option<(IssueCode, StringIdentifier)> {
+) -> Option<(IssueCode, Atom)> {
     let call_expression = match expression {
         Expression::Call(call_expr) => call_expr,
         _ => return None,
     };
 
-    let functionlike_id_from_call = get_function_like_id_from_call(
-        call_expression,
-        context.resolved_names,
-        context.interner,
-        &artifacts.expression_types,
-    )?;
+    let functionlike_id_from_call =
+        get_function_like_id_from_call(call_expression, context.resolved_names, &artifacts.expression_types)?;
 
     match functionlike_id_from_call {
         FunctionLikeIdentifier::Function(function_id) => {
-            let function_metadata = get_function(context.codebase, context.interner, &function_id)?;
+            let function_metadata = get_function(context.codebase, &function_id)?;
 
             let must_use = function_metadata.flags.must_use()
-                || function_metadata
-                    .attributes
-                    .iter()
-                    .any(|attr| context.interner.lookup(&attr.name).eq_ignore_ascii_case("NoDiscard"));
+                || function_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));
 
             if must_use { Some((IssueCode::UnusedFunctionCall, function_id)) } else { None }
         }
         FunctionLikeIdentifier::Method(method_class, method_name) => {
-            let method_metadata = get_method_by_id(
-                context.codebase,
-                context.interner,
-                &MethodIdentifier::new(method_class, method_name),
-            )?;
+            let method_metadata =
+                get_method_by_id(context.codebase, &MethodIdentifier::new(method_class, method_name))?;
 
             let must_use = method_metadata.flags.must_use()
-                || method_metadata
-                    .attributes
-                    .iter()
-                    .any(|attr| context.interner.lookup(&attr.name).eq_ignore_ascii_case("NoDiscard"));
+                || method_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));
 
             if must_use { Some((IssueCode::UnusedMethodCall, method_name)) } else { None }
         }
