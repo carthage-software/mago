@@ -229,7 +229,16 @@ impl TType for TCallable {
     }
 
     fn is_expandable(&self) -> bool {
-        matches!(self, TCallable::Alias(_))
+        match self {
+            TCallable::Alias(_) => true,
+            TCallable::Signature(signature) => {
+                signature.return_type.as_ref().is_some_and(|ty| ty.is_expandable())
+                    || signature
+                        .parameters
+                        .iter()
+                        .any(|param| param.get_type_signature().is_some_and(|ty| ty.is_expandable()))
+            }
+        }
     }
 
     fn get_id(&self) -> String {

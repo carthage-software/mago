@@ -31,13 +31,11 @@ pub fn parse_literal_string_in<'arena>(
         return None;
     };
 
-    // --- Fast Path Optimization ---
-    let needs_processing = content.contains('\\') || (quote_char.is_some() && content.contains(quote_char.unwrap()));
+    let needs_processing = content.contains('\\') || quote_char.is_some_and(|q| content.contains(q));
     if !needs_processing {
         return Some(content);
     }
 
-    // --- Slow Path: Build unescaped string in the arena ---
     let mut result = Vec::with_capacity_in(content.len(), arena);
     let mut chars = content.chars().peekable();
     let mut buf = [0; 4];
@@ -49,11 +47,10 @@ pub fn parse_literal_string_in<'arena>(
         }
 
         let Some(&next_char) = chars.peek() else {
-            result.push(b'\\'); // Dangling backslash at the end
+            result.push(b'\\');
             continue;
         };
 
-        // Consume the peeked character for all successful escapes
         let mut consumed = true;
 
         match next_char {
@@ -132,7 +129,7 @@ pub fn parse_literal_string_in<'arena>(
         }
     }
 
-    Some(unsafe { std::str::from_utf8_unchecked(result.into_bump_slice()) })
+    std::str::from_utf8(result.into_bump_slice()).ok()
 }
 
 /// Parses a PHP literal string, handling all escape sequences, and returns the result as a `String`.

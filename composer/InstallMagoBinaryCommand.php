@@ -22,6 +22,8 @@ use function is_string;
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:halstead
  * @mago-expect lint:no-shorthand-ternary
+ *
+ * @mago-expect analysis:mixed-assignment
  */
 final class InstallMagoBinaryCommand extends BaseCommand
 {
