@@ -33,15 +33,11 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
 use std::io::Write;
-use std::sync::LazyLock;
 
 use ustr::IdentityHasher;
-use ustr::Ustr;
+
 pub use ustr::Ustr as Atom;
 pub use ustr::ustr as atom;
-
-/// A pair of `Atom`s, commonly used for representing key-value pairs.
-pub type AtomPair = (Atom, Atom);
 
 /// A high-performance `HashMap` using `Atom` as the key.
 ///
@@ -49,25 +45,14 @@ pub type AtomPair = (Atom, Atom);
 /// `Atom`'s pre-computed hash instead of hashing the string content on every lookup.
 pub type AtomMap<V> = HashMap<Atom, V, BuildHasherDefault<IdentityHasher>>;
 
-/// A high-performance `HashMap` using `AtomPair` as the key.
-pub type AtomPairMap<V> = HashMap<AtomPair, V, BuildHasherDefault<IdentityHasher>>;
-
 /// A high-performance `HashSet` using `Atom` as the key.
 ///
 /// This set is significantly faster than a standard `HashSet` because it uses the
 /// `Atom`'s pre-computed hash.
 pub type AtomSet = HashSet<Atom, BuildHasherDefault<IdentityHasher>>;
 
-/// A high-performance `HashSet` using `AtomPair` as the key.
-pub type AtomPairSet = HashSet<AtomPair, BuildHasherDefault<IdentityHasher>>;
-
 /// The maximum size in bytes for a string to be processed on the stack.
 const STACK_BUF_SIZE: usize = 256;
-
-/// A lazily-initialized, static instance of the empty `Atom`.
-///
-/// For direct use, prefer the `empty_atom()` function, as `Atom` is a `Copy` type.
-pub static EMPTY_ATOM: LazyLock<Ustr> = LazyLock::new(|| atom(""));
 
 /// Returns the canonical `Atom` for an empty string.
 ///
