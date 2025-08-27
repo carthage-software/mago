@@ -62,7 +62,7 @@ impl LintRule for ExplicitOctalRule {
 
                 $a = 0123;
             "#},
-            category: Category::Migration,
+            category: Category::Clarity,
             php: PHPVersionRange::from(PHPVersion::PHP81),
             requires: IntegrationSet::empty(),
         };

@@ -73,10 +73,10 @@ impl LintRule for StrStartsWithRule {
                 $a = 'hello world';
                 $b = 'hello';
                 if (strpos($a, $b) === 0) {
-                echo 'Found';
+                    echo 'Found';
                 }
             "},
-            category: Category::Migration,
+            category: Category::Clarity,
             php: PHPVersionRange::from(PHPVersion::PHP80),
             requires: IntegrationSet::empty(),
         };

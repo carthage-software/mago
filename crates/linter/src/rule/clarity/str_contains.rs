@@ -78,7 +78,7 @@ impl LintRule for StrContainsRule {
                     echo 'Found';
                 }
             "#},
-            category: Category::Migration,
+            category: Category::Clarity,
             php: PHPVersionRange::from(PHPVersion::PHP80),
             requires: IntegrationSet::empty(),
         };

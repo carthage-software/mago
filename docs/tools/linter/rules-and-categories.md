@@ -15,7 +15,6 @@ The **Mago** Linter comes with a wide variety of rules, each designed to catch a
 - [Correctness](./rules/correctness)
 - [Deprecation](./rules/deprecation)
 - [Maintainability](./rules/maintainability)
-- [Migration](./rules/migration)
 - [Redundancy](./rules/redundancy)
 - [Safety](./rules/safety)
 - [Security](./rules/security)

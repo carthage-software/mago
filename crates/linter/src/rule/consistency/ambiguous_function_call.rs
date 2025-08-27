@@ -31,7 +31,7 @@ pub struct AmbiguousFunctionCallConfig {
 
 impl Default for AmbiguousFunctionCallConfig {
     fn default() -> Self {
-        Self { level: Level::Error }
+        Self { level: Level::Help }
     }
 }
 
