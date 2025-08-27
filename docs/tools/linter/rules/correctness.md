@@ -12,6 +12,7 @@ This document details the rules available in the `Correctness` category.
 | :--- | :---------- |
 | Assert Description | [`assert-description`](#assert-description) |
 | Identity Comparison | [`identity-comparison`](#identity-comparison) |
+| Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
 | No Boolean Literal Comparison | [`no-boolean-literal-comparison`](#no-boolean-literal-comparison) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
@@ -92,6 +93,44 @@ if ($a === $b) {
 if ($a == $b) {
     echo '$a is same as $b';
 }
+```
+
+---
+
+## <a id="invalid-open-tag"></a>`invalid-open-tag`
+
+Detects misspelled PHP opening tags like `<php?` instead of `<?php`.
+
+A misspelled opening tag will cause the PHP interpreter to treat the
+following code as plain text, leading to the code being output directly
+to the browser instead of being executed. This can cause unexpected
+behavior and potential security vulnerabilities.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+### Examples
+
+#### Correct Code
+
+```php
+<?php
+
+echo 'Hello, world!';
+```
+
+#### Incorrect Code
+
+```php
+<php?
+
+echo 'Hello, world!';
 ```
 
 ---

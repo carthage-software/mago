@@ -33,6 +33,7 @@ pub mod function_name;
 pub mod halstead;
 pub mod identity_comparison;
 pub mod interface_name;
+pub mod invalid_open_tag;
 pub mod kan_defect;
 pub mod literal_named_argument;
 pub mod loop_does_not_iterate;
@@ -137,6 +138,7 @@ pub use function_name::*;
 pub use halstead::*;
 pub use identity_comparison::*;
 pub use interface_name::*;
+pub use invalid_open_tag::*;
 pub use kan_defect::*;
 pub use literal_named_argument::*;
 pub use loop_does_not_iterate::*;
@@ -378,8 +380,9 @@ define_rules! {
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
-    InterfaceName(interface_name @ InterfaceNameRule),
     IdentityComparison(identity_comparison @ IdentityComparisonRule),
+    InterfaceName(interface_name @ InterfaceNameRule),
+    InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),
     FunctionName(function_name @ FunctionNameRule),
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
     ExplicitNullableParam(explicit_nullable_param @ ExplicitNullableParamRule),

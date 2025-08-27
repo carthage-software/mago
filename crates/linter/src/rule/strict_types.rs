@@ -92,36 +92,52 @@ impl LintRule for StrictTypesRule {
         };
 
         let mut found = false;
+        let mut has_useful_statements = false;
         for statement in program.statements.iter() {
-            if let Statement::Declare(declare) = statement {
-                for item in declare.items.iter() {
-                    if item.name.value != STRICT_TYPES_DIRECTIVE {
-                        continue;
-                    }
+            let declare = match statement {
+                Statement::Declare(declare) => declare,
+                _ => {
+                    has_useful_statements |= !matches!(
+                        statement,
+                        Statement::OpeningTag(_) | Statement::ClosingTag(_) | Statement::Inline(_) | Statement::Noop(_)
+                    );
 
-                    match &item.value {
-                        Expression::Literal(Literal::Integer(integer)) => {
-                            if integer.value == Some(0) && !self.cfg.allow_disabling {
-                                let issue = Issue::new(self.cfg.level(), "The `strict_types` directive is disabled.")
-                                    .with_code(self.meta.code)
-                                    .with_annotation(
-                                        Annotation::primary(item.span())
-                                            .with_message("The `strict_types` is disabled here"),
-                                    )
-                                    .with_note("Disabling `strict_types` can lead to type safety issues.")
-                                    .with_help("Consider setting `strict_types` to `1` to enforce strict typing.");
-
-                                ctx.collector.report(issue);
-                            }
-                        }
-                        _ => {
-                            // ignore other values, as they will be caught by the semantics checker
-                        }
-                    };
-
-                    found = true;
+                    break;
                 }
+            };
+
+            for item in declare.items.iter() {
+                if item.name.value != STRICT_TYPES_DIRECTIVE {
+                    continue;
+                }
+
+                match &item.value {
+                    Expression::Literal(Literal::Integer(integer)) => {
+                        if integer.value == Some(0) && !self.cfg.allow_disabling {
+                            let issue = Issue::new(self.cfg.level(), "The `strict_types` directive is disabled.")
+                                .with_code(self.meta.code)
+                                .with_annotation(
+                                    Annotation::primary(item.span())
+                                        .with_message("The `strict_types` is disabled here"),
+                                )
+                                .with_note("Disabling `strict_types` can lead to type safety issues.")
+                                .with_help("Consider setting `strict_types` to `1` to enforce strict typing.");
+
+                            ctx.collector.report(issue);
+                        }
+                    }
+                    _ => {
+                        // ignore other values, as they will be caught by the semantics checker
+                    }
+                };
+
+                found = true;
             }
+        }
+
+        if !has_useful_statements {
+            // empty file or file with only opening/closing tags, inline HTML, or no-op statements
+            return;
         }
 
         if !found {
