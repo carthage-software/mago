@@ -1,9 +1,9 @@
 [files]
 extend-exclude = [
     ".git/",
-    "stubs/extensions/",
     "crates/formatter/tests/cases/array_alignment/after.php",
     "crates/formatter/tests/cases/array_alignment/before.php",
+    "crates/prelude/assets/extensions",
 ]
 ignore-hidden = false
 
@@ -23,3 +23,6 @@ extend-ignore-re = [
 
 [default.extend-identifiers]
 "Gaurd" = "Gaurd"
+
+[type.rust.extend-identifiers]
+"thr" = "thr"
