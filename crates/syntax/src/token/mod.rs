@@ -349,6 +349,26 @@ impl Precedence {
             _ => return None,
         })
     }
+
+    #[inline]
+    pub const fn is_associative(&self) -> bool {
+        self.associativity().is_some()
+    }
+
+    #[inline]
+    pub const fn is_right_associative(&self) -> bool {
+        matches!(self.associativity(), Some(Associativity::Right))
+    }
+
+    #[inline]
+    pub const fn is_left_associative(&self) -> bool {
+        matches!(self.associativity(), Some(Associativity::Left))
+    }
+
+    #[inline]
+    pub const fn is_non_associative(&self) -> bool {
+        matches!(self.associativity(), Some(Associativity::NonAssociative))
+    }
 }
 
 impl TokenKind {

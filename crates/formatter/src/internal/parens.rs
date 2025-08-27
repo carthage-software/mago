@@ -141,6 +141,17 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
                 return true;
             }
             Some(Node::Binary(e)) => {
+                let parent_op_precedence = e.operator.precedence();
+
+                if parent_op_precedence == operator.precedence()
+                    && ((parent_op_precedence.is_right_associative()
+                        && node.end_position() < e.operator.start_position())
+                        || (parent_op_precedence.is_left_associative()
+                            && node.start_position() > e.operator.end_position()))
+                {
+                    return true;
+                }
+
                 if (operator.is_arithmetic() && !e.operator.is_arithmetic())
                     || (operator.is_multiplicative() || e.operator.is_multiplicative())
                     || (operator.is_bit_shift() && !e.operator.is_bit_shift())
@@ -272,7 +283,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             }
 
             if let Expression::Instantiation(instantiation) = expression {
-                return instantiation_needs_parens(self, instantiation);
+                return self.instantiation_needs_parens(instantiation);
             } else {
                 return self.callee_expression_need_parenthesis(expression, false);
             }
@@ -359,6 +370,22 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         )
     }
 
+    pub(crate) fn instantiation_needs_parens(&self, i: &'arena Instantiation<'arena>) -> bool {
+        if self.php_version.is_supported(Feature::NewWithoutParentheses) {
+            if i.argument_list.as_ref().is_none_or(|list| list.arguments.is_empty()) {
+                if self.settings.parentheses_in_new_expression {
+                    self.settings.parentheses_around_new_in_member_access
+                } else {
+                    true
+                }
+            } else {
+                self.settings.parentheses_around_new_in_member_access
+            }
+        } else {
+            true
+        }
+    }
+
     const fn is_unary_or_binary_or_ternary(&self, node: Node<'arena, 'arena>) -> bool {
         self.is_unary(node) || self.is_binaryish(node) || self.is_conditional(node)
     }
@@ -378,24 +405,5 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
 
     const fn is_conditional(&self, node: Node<'arena, 'arena>) -> bool {
         if let Node::Conditional(op) = node { op.then.is_some() } else { false }
-    }
-}
-
-pub(crate) fn instantiation_needs_parens<'arena>(
-    f: &FormatterState<'_, 'arena>,
-    i: &'arena Instantiation<'arena>,
-) -> bool {
-    if f.php_version.is_supported(Feature::NewWithoutParentheses) {
-        if i.argument_list.as_ref().is_none_or(|list| list.arguments.is_empty()) {
-            if f.settings.parentheses_in_new_expression {
-                f.settings.parentheses_around_new_in_member_access
-            } else {
-                true
-            }
-        } else {
-            f.settings.parentheses_around_new_in_member_access
-        }
-    } else {
-        true
     }
 }

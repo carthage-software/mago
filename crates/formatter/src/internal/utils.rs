@@ -79,7 +79,7 @@ pub fn is_at_call_like_expression(f: &FormatterState<'_, '_>) -> bool {
 }
 
 #[inline]
-pub fn unwrap_parenthesized<'arena>(mut expression: &'arena Expression<'arena>) -> &'arena Expression<'arena> {
+pub fn unwrap_parenthesized<'ast, 'arena>(mut expression: &'ast Expression<'arena>) -> &'ast Expression<'arena> {
     while let Expression::Parenthesized(parenthesized) = expression {
         expression = parenthesized.expression;
     }

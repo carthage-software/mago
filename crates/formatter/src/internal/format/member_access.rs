@@ -17,7 +17,6 @@ use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_string_word_type;
-use crate::internal::parens::instantiation_needs_parens;
 use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
@@ -548,7 +547,7 @@ fn base_needs_parerns<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expr
     }
 
     match base {
-        Expression::Instantiation(instantiation) => instantiation_needs_parens(f, instantiation),
+        Expression::Instantiation(instantiation) => f.instantiation_needs_parens(instantiation),
         Expression::Binary(_)
         | Expression::UnaryPrefix(_)
         | Expression::UnaryPostfix(_)

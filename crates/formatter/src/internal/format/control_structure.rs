@@ -23,7 +23,9 @@ impl<'arena> Format<'arena> for If<'arena> {
                 self.r#if.format(f),
                 misc::print_condition(
                     f,
+                    self.left_parenthesis,
                     self.condition,
+                    self.right_parenthesis,
                     f.settings.space_before_if_parenthesis,
                     f.settings.space_within_if_parenthesis,
                 ),
@@ -80,7 +82,9 @@ impl<'arena> Format<'arena> for IfStatementBodyElseIfClause<'arena> {
                 self.elseif.format(f),
                 misc::print_condition(
                     f,
+                    self.left_parenthesis,
                     self.condition,
+                    self.right_parenthesis,
                     f.settings.space_before_if_parenthesis,
                     f.settings.space_within_if_parenthesis,
                 ),
@@ -145,7 +149,9 @@ impl<'arena> Format<'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
 
             let condition = misc::print_condition(
                 f,
+                self.left_parenthesis,
                 self.condition,
+                self.right_parenthesis,
                 f.settings.space_before_if_parenthesis,
                 f.settings.space_within_if_parenthesis,
             );
@@ -204,7 +210,9 @@ impl<'arena> Format<'arena> for DoWhile<'arena> {
                 self.r#while.format(f),
                 misc::print_condition(
                     f,
+                    self.left_parenthesis,
                     self.condition,
+                    self.right_parenthesis,
                     f.settings.space_before_while_parenthesis,
                     f.settings.space_within_while_parenthesis,
                 ),
@@ -308,7 +316,9 @@ impl<'arena> Format<'arena> for Switch<'arena> {
                 self.switch.format(f),
                 misc::print_condition(
                     f,
+                    self.left_parenthesis,
                     self.expression,
+                    self.right_parenthesis,
                     f.settings.space_before_switch_parenthesis,
                     f.settings.space_within_switch_parenthesis,
                 ),
@@ -441,7 +451,9 @@ impl<'arena> Format<'arena> for While<'arena> {
                 self.r#while.format(f),
                 misc::print_condition(
                     f,
+                    self.left_parenthesis,
                     self.condition,
+                    self.right_parenthesis,
                     f.settings.space_before_while_parenthesis,
                     f.settings.space_within_while_parenthesis,
                 ),

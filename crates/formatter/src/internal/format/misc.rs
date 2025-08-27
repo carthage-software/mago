@@ -13,6 +13,7 @@ use crate::document::Separator;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
+use crate::internal::format::format_token;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::settings::BraceStyle;
@@ -402,31 +403,27 @@ pub(super) fn adjust_clause<'arena>(
                 BraceStyle::SameLine => Document::Array(vec![in f.arena;Document::space(), clause]),
                 BraceStyle::NextLine => {
                     if f.settings.inline_empty_control_braces && is_block_empty {
-                        Document::Array(vec![in f.arena;Document::space(), clause])
+                        Document::Array(vec![in f.arena; Document::space(), clause])
                     } else {
-                        Document::Array(vec![in f.arena;Document::Line(Line::default()), clause])
+                        Document::Array(vec![in f.arena; Document::Line(Line::default()), clause])
                     }
                 }
             }
         }
         _ => {
             if force_space {
-                Document::Array(vec![in f.arena;Document::space(), clause])
+                Document::Array(vec![in f.arena; Document::space(), clause])
             } else {
-                Document::Indent(vec![in f.arena;Document::BreakParent, Document::Line(Line::hard()), clause])
+                Document::Indent(vec![in f.arena; Document::BreakParent, Document::Line(Line::hard()), clause])
             }
         }
     };
 
     if has_trailing_segment {
-        if is_block {
-            if f.is_followed_by_comment_on_next_line(node.span()) {
-                Document::Array(vec![in f.arena;clause, Document::Line(Line::hard())])
-            } else {
-                Document::Array(vec![in f.arena;clause, Document::space()])
-            }
+        if !is_block || f.is_followed_by_comment_on_next_line(node.span()) {
+            Document::Array(vec![in f.arena; clause, Document::Line(Line::hard())])
         } else {
-            Document::Indent(vec![in f.arena;Document::BreakParent, clause, Document::Line(Line::hard())])
+            Document::Array(vec![in f.arena; clause, Document::space()])
         }
     } else {
         clause
@@ -435,7 +432,9 @@ pub(super) fn adjust_clause<'arena>(
 
 pub(super) fn print_condition<'arena>(
     f: &mut FormatterState<'_, 'arena>,
+    left_parenthesis: Span,
     condition: &'arena Expression<'arena>,
+    right_parenthesis: Span,
     space_before: bool,
     space_within: bool,
 ) -> Document<'arena> {
@@ -445,14 +444,14 @@ pub(super) fn print_condition<'arena>(
     let condition = Document::Group(Group::new(vec![
         in f.arena;
         if space_before { Document::space() } else { Document::empty() },
-        Document::String("("),
+        format_token(f, left_parenthesis, "("),
         Document::IndentIfBreak(IndentIfBreak::new(vec![
             in f.arena;
             Document::Line(if space_within { Line::default() } else { Line::soft() }),
             condition.format(f),
         ])),
         Document::Line(if space_within { Line::default() } else { Line::soft() }),
-        Document::String(")"),
+        format_token(f, right_parenthesis, ")"),
     ]));
 
     f.in_condition = was_in_condition;
