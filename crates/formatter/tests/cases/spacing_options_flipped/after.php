@@ -18,7 +18,7 @@ if ($condition) {
     // ...
 }
 
-for ($i=0; $i<10; $i++) {
+for ($i = 0; $i < 10; $i++) {
     // ...
 }
 
@@ -45,8 +45,8 @@ match ($value) {
 };
 
 // Closures and functions
-$closure=function ($x) use ($y) {
-    return $x+$y;
+$closure = function ($x) use ($y) {
+    return $x + $y;
 };
 
 function foo($param1, $param2)
@@ -58,7 +58,7 @@ class MyClass
 {
     public function bar($param1, $param2)
     {
-        return $param1*$param2;
+        return $param1 * $param2;
     }
 }
 
@@ -93,7 +93,7 @@ enum Qux: string
 }
 
 // Method chains
-$result=$obj
+$result = $obj
     ->method1()
     ->method2()
     ->method3()
@@ -106,47 +106,47 @@ $result=$obj
     ->method10();
 
 // Binary operators
-$a=$b+$c;
-$d=$e-$f;
-$g=$h*$i;
-$j=$k/$l;
-$m=$n%$o;
-$p=$q**$r;
-$s=$t<<$u;
-$v=$w>>$x;
-$y=$z.$aa;
-$bb=$cc??$dd;
-$ee=$ff?:$gg;
-$hh=$ii&&$jj;
-$kk=$ll||$mm;
-$nn=$oo==$pp;
-$qq=$rr===$ss;
-$tt=$uu!=$vv;
-$ww=$xx!==$yy;
-$zz=$aaa<$bbb;
-$ccc=$ddd>$eee;
-$fff=$ggg<=$hhh;
-$iii=$jjj>=$kkk;
-$lll=$mmm<=>$nnn;
-$ooo=$ppp&$qqq;
-$rrr=$sss|$ttt;
-$uuu=$vvv^$www;
+$a = $b + $c;
+$d = $e - $f;
+$g = $h * $i;
+$j = $k / $l;
+$m = $n % $o;
+$p = $q ** $r;
+$s = $t << $u;
+$v = $w >> $x;
+$y = $z.$aa;
+$bb = $cc ?? $dd;
+$ee = $ff ?: $gg;
+$hh = $ii && $jj;
+$kk = $ll || $mm;
+$nn = $oo == $pp;
+$qq = $rr === $ss;
+$tt = $uu != $vv;
+$ww = $xx !== $yy;
+$zz = $aaa < $bbb;
+$ccc = $ddd > $eee;
+$fff = $ggg <= $hhh;
+$iii = $jjj >= $kkk;
+$lll = $mmm <=> $nnn;
+$ooo = $ppp & $qqq;
+$rrr = $sss | $ttt;
+$uuu = $vvv ^ $www;
 
 // Unary operators
-$a=+ $b;
-$c=- $d;
-$e=! $f;
-$g=~ $h;
-$i=++ $j;
-$k=-- $l;
-$l=(int)$m;
-$n=& $o;
-$p=@ $q;
-$r=++ $s;
-$t=-- $u;
+$a = + $b;
+$c = - $d;
+$e = ! $f;
+$g = ~ $h;
+$i = ++ $j;
+$k = -- $l;
+$l = (int)$m;
+$n = & $o;
+$p = @ $q;
+$r = ++ $s;
+$t = -- $u;
 
 // Arrays
-$array=[
+$array = [
     ['foo',  1.2,  123, false],
     ['bar',  52.4, 456, true],
     ['baz',  3.6,  789, false],
@@ -171,8 +171,8 @@ function intersectionTypeFunction(Foo&Bar $param): Foo&Bar
 }
 
 // New expressions
-$obj=new Foo();
-$result=new Foo()->baz();
+$obj = new Foo();
+$result = new Foo()->baz();
 
 // Exit and die
 exit();
@@ -195,13 +195,13 @@ namedArgs(
 );
 
 // List destructuring
-list($a, $b)=[1, 2];
+list($a, $b) = [1, 2];
 
 // Legacy array
-$legacyArray=array($a, $b);
+$legacyArray = array($a, $b);
 
 // Array access
-$value=$array[$key];
+$value = $array[$key];
 
 // Grouping parenthesis
-$result=( $a+$b )*$c;
+$result = ( $a + $b ) * $c;

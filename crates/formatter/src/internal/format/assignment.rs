@@ -69,12 +69,6 @@ pub(super) fn print_assignment<'arena>(
     operator: Document<'arena>,
     rhs_expression: &'arena Expression<'arena>,
 ) -> Document<'arena> {
-    let needs_spacing = if matches!(assignment_node, AssignmentLikeNode::AssignmentOperation(_)) {
-        f.settings.space_around_assignment_operators
-    } else {
-        true
-    };
-
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
     let rhs = rhs_expression.format(f);
 
@@ -82,50 +76,50 @@ pub(super) fn print_assignment<'arena>(
         Layout::Chain => Document::Array(vec![
             in f.arena;
             Document::Group(Group::new(vec![in f.arena; lhs])),
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
-            if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
+            Document::Line(Line::default()),
             rhs,
         ]),
         Layout::ChainTailArrowChain => Document::Array(vec![
             in f.arena;
             Document::Group(Group::new(vec![in f.arena; lhs])),
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
             rhs,
         ]),
         Layout::ChainTail => Document::Group(Group::new(vec![
             in f.arena;
             lhs,
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
             Document::Indent(vec![in f.arena; Document::Line(Line::hard()), rhs]),
         ])),
         Layout::BreakAfterOperator => Document::Group(Group::new(vec![
             in f.arena;
             Document::Group(Group::new(vec![in f.arena; lhs])),
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
             Document::Group(Group::new(vec![in f.arena; Document::IndentIfBreak(IndentIfBreak::new(vec![
                 in f.arena;
-                if needs_spacing { Document::Line(Line::default()) } else { Document::Line(Line::soft()) },
+                Document::Line(Line::default()),
                 rhs,
             ]))])),
         ])),
         Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec![
             in f.arena;
             Document::Group(Group::new(vec![in f.arena; lhs])),
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             Document::Group(Group::new(vec![in f.arena; rhs])),
         ])),
         Layout::BreakLhs => Document::Group(Group::new(vec![
             in f.arena;
             lhs,
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             operator,
-            if needs_spacing { Document::space() } else { Document::empty() },
+            Document::space(),
             Document::Group(Group::new(vec![in f.arena; rhs])),
         ])),
         Layout::Fluid => {
@@ -134,15 +128,13 @@ pub(super) fn print_assignment<'arena>(
             Document::Group(Group::new(vec![
                 in f.arena;
                 lhs,
-                if needs_spacing { Document::space() } else { Document::empty() },
+                Document::space(),
                 operator,
                 Document::Group(
-                    Group::new(vec![in f.arena; Document::Indent(vec![in f.arena; if needs_spacing {
-                        Document::Line(Line::default())
-                    } else {
-                        Document::Line(Line::soft())
-                    }])])
-                    .with_id(assignment_id),
+                    Group::new(vec![
+                        in f.arena;
+                        Document::Indent(vec![in f.arena; Document::Line(Line::default())])
+                    ]).with_id(assignment_id),
                 ),
                 Document::IndentIfBreak(IndentIfBreak::new(vec![in f.arena; rhs]).with_id(assignment_id)),
             ]))

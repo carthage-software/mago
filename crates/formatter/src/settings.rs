@@ -699,87 +699,6 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_after_additive_unary_prefix_operator: bool,
 
-    /// Whether to add spaces around assignment operators.
-    ///
-    /// When enabled: `$a = $b`
-    /// When disabled: `$a=$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_assignment_operators: bool,
-
-    /// Whether to add spaces around logical operators (&&, ||, and, or, xor).
-    ///
-    /// When enabled: `$a && $b`
-    /// When disabled: `$a&&$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_logical_binary_operators: bool,
-
-    /// Whether to add spaces around equality operators (==, ===, !=, !==).
-    ///
-    /// When enabled: `$a === $b`
-    /// When disabled: `$a===$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_equality_binary_operators: bool,
-
-    /// Whether to add spaces around comparison operators (<, >, <=, >=, <=>).
-    ///
-    /// When enabled: `$a < $b`
-    /// When disabled: `$a<$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_comparison_binary_operators: bool,
-
-    /// Whether to add spaces around bitwise operators (&, |, ^).
-    ///
-    /// When enabled: `$a | $b`
-    /// When disabled: `$a|$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_bitwise_binary_operators: bool,
-
-    /// Whether to add spaces around additive operators (+ and -).
-    ///
-    /// When enabled: `$a + $b`
-    /// When disabled: `$a+$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_additive_binary_operators: bool,
-
-    /// Whether to add spaces around multiplicative operators (*, /, %).
-    ///
-    /// When enabled: `$a * $b`
-    /// When disabled: `$a*$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_multiplicative_binary_operators: bool,
-
-    /// Whether to add spaces around exponentiation operator (**).
-    ///
-    /// When enabled: `$a ** $b`
-    /// When disabled: `$a**$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_exponentiation_binary_operators: bool,
-
-    /// Whether to add spaces around shift operators (<<, >>).
-    ///
-    /// When enabled: `$a << $b`
-    /// When disabled: `$a<<$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_shift_binary_operators: bool,
-
     /// Whether to add spaces around the concatenation operator (.)
     ///
     /// When enabled: `$a . $b`
@@ -788,24 +707,6 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub space_around_concatenation_binary_operator: bool,
-
-    /// Whether to add spaces around the null coalescing operator (??).
-    ///
-    /// When enabled: `$a ?? $b`
-    /// When disabled: `$a??$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_null_coalescing_binary_operator: bool,
-
-    /// Whether to add spaces around the elvis operator (?:).
-    ///
-    /// When enabled: `$a ?: $b`
-    /// When disabled: `$a?:$b`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_elvis_binary_operator: bool,
 
     /// Whether to add spaces around the assignment in declare statements.
     ///
@@ -992,18 +893,7 @@ impl Default for FormatSettings {
             space_around_assignment_in_declare: false,
             space_within_grouping_parenthesis: false,
             space_before_hook_parameter_list_parenthesis: false,
-            space_around_assignment_operators: true,
-            space_around_logical_binary_operators: true,
-            space_around_equality_binary_operators: true,
-            space_around_comparison_binary_operators: true,
-            space_around_bitwise_binary_operators: true,
-            space_around_additive_binary_operators: true,
-            space_around_multiplicative_binary_operators: true,
-            space_around_exponentiation_binary_operators: true,
-            space_around_shift_binary_operators: true,
             space_around_concatenation_binary_operator: true,
-            space_around_null_coalescing_binary_operator: true,
-            space_around_elvis_binary_operator: true,
             space_after_cast_unary_prefix_operators: true,
             space_after_reference_unary_prefix_operator: false,
             space_after_error_control_unary_prefix_operator: false,

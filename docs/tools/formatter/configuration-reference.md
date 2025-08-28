@@ -71,18 +71,7 @@ use-tabs = true
 | `space-after-increment-unary-prefix-operator` | `boolean` | `false` | Add a space after the prefix increment operator (`++`). |
 | `space-after-decrement-unary-prefix-operator` | `boolean` | `false` | Add a space after the prefix decrement operator (`--`). |
 | `space-after-additive-unary-prefix-operator` | `boolean` | `false` | Add a space after unary `+` and `-`. |
-| `space-around-assignment-operators` | `boolean` | `true` | Add spaces around assignment operators (`=`, `+=`, etc.). |
-| `space-around-logical-binary-operators` | `boolean` | `true` | Add spaces around logical operators (`&&`, `||`, etc.). |
-| `space-around-equality-binary-operators` | `boolean` | `true` | Add spaces around equality operators (`==`, `===`, etc.). |
-| `space-around-comparison-binary-operators` | `boolean` | `true` | Add spaces around comparison operators (`<`, `>`, etc.). |
-| `space-around-bitwise-binary-operators` | `boolean` | `true` | Add spaces around bitwise operators (`&`, `|`, `^`). |
-| `space-around-additive-binary-operators` | `boolean` | `true` | Add spaces around additive operators (`+`, `-`). |
-| `space-around-multiplicative-binary-operators` | `boolean` | `true` | Add spaces around multiplicative operators (`*`, `/`, `%`). |
-| `space-around-exponentiation-binary-operators` | `boolean` | `true` | Add spaces around the exponentiation operator (`**`). |
-| `space-around-shift-binary-operators` | `boolean` | `true` | Add spaces around shift operators (`<<`, `>>`). |
 | `space-around-concatenation-binary-operator` | `boolean` | `true` | Add spaces around the concatenation operator (`.`). |
-| `space-around-null-coalescing-binary-operator` | `boolean` | `true` | Add spaces around the null coalescing operator (`??`). |
-| `space-around-elvis-binary-operator` | `boolean` | `true` | Add spaces around the elvis operator (`?:`). |
 | `space-around-assignment-in-declare` | `boolean` | `false` | Add spaces around `=` in `declare` statements. |
 | `space-within-grouping-parenthesis` | `boolean` | `false` | Add spaces inside grouping parentheses `( 1 + 2 )`. |
 | `empty-line-after-control-structure` | `boolean` | `false` | Add an empty line after control structures. |
