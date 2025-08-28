@@ -158,10 +158,6 @@ impl<'arena> MemberAccessChain<'arena> {
 
     #[inline]
     pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'arena>) -> bool {
-        if f.settings.preserve_breaking_member_access_chain && self.is_already_broken(f) {
-            return true;
-        }
-
         if self.has_comments_in_chain(f) {
             return true;
         }
@@ -223,7 +219,6 @@ impl<'arena> MemberAccessChain<'arena> {
 
     #[inline]
     fn is_already_broken(&self, f: &FormatterState) -> bool {
-        // Check if there are comments after the base expression
         if let Some(first_access) = self.accesses.first() {
             let base_end = self.base.span().end;
             let first_op_start = first_access.get_operator_span().start;
@@ -445,7 +440,7 @@ pub(super) fn print_member_access_chain<'arena>(
     f: &mut FormatterState<'_, 'arena>,
 ) -> Document<'arena> {
     let base_document = member_access_chain.base.format(f);
-    let mut parts = if base_needs_parerns(f, member_access_chain.base) {
+    let mut parts = if base_needs_parens(f, member_access_chain.base) {
         vec![in f.arena; Document::String("("), base_document, Document::String(")")]
     } else {
         vec![in f.arena; base_document]
@@ -541,9 +536,9 @@ pub(super) fn print_member_access_chain<'arena>(
     Document::Group(Group::new(parts).with_id(group_id))
 }
 
-fn base_needs_parerns<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expression<'arena>) -> bool {
+fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expression<'arena>) -> bool {
     if let Expression::Parenthesized(parenthesized) = base {
-        return base_needs_parerns(f, parenthesized.expression);
+        return base_needs_parens(f, parenthesized.expression);
     }
 
     match base {

@@ -173,7 +173,7 @@ pub(super) fn print_argument_list<'arena>(
 
         parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
 
-        Document::Group(Group::new(parts))
+        Document::Group(Group::new(parts).with_break(true))
     };
 
     if should_break_all {
