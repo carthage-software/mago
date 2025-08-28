@@ -13,8 +13,13 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 
 impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
-    pub(crate) fn add_parens(&mut self, document: Document<'arena>, node: Node<'arena, 'arena>) -> Document<'arena> {
-        if self.should_indent(node) {
+    pub(crate) fn add_parens(
+        &mut self,
+        document: Document<'arena>,
+        node: Node<'arena, 'arena>,
+        has_leading_comments: bool,
+    ) -> Document<'arena> {
+        if has_leading_comments || self.should_indent(node) {
             Document::Group(Group::new(vec![
                 in self.arena;
                 Document::String("("),
