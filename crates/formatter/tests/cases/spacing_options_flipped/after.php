@@ -14,49 +14,49 @@ use const Foo\A;
 use const Foo\B;
 
 // Control structures
-if( $condition ) {
+if ($condition) {
     // ...
 }
 
-for( $i=0; $i<10; $i++ ) {
+for ($i=0; $i<10; $i++) {
     // ...
 }
 
-foreach( $items as $item ) {
+foreach ($items as $item) {
     // ...
 }
 
-while( $condition ) {
+while ($condition) {
     // ...
 }
 
 try {
     // ...
-} catch( Exception $e ) {
+} catch (Exception $e) {
     // ...
 }
 
-switch( $value ) {
+switch ($value) {
     // ...
 }
 
-match( $value ) {
+match ($value) {
     // ...
 };
 
 // Closures and functions
-$closure=function( $x ) use($y) {
+$closure=function ($x) use ($y) {
     return $x+$y;
 };
 
-function foo ( $param1, $param2 )
+function foo($param1, $param2)
 {
     return $param1.$param2;
 }
 
 class MyClass
 {
-    public function bar ( $param1, $param2 )
+    public function bar($param1, $param2)
     {
         return $param1*$param2;
     }
@@ -67,7 +67,7 @@ class Foo
 {
     public static $bar;
 
-    public function baz ( )
+    public function baz()
     {
         return 'baz';
     }
@@ -75,18 +75,18 @@ class Foo
 
 interface Bar
 {
-    public function qux ( );
+    public function qux();
 }
 
 trait Baz
 {
-    public function quux ( )
+    public function quux()
     {
         return 'quux';
     }
 }
 
-enum Qux :string
+enum Qux: string
 {
     case A = 'a';
     case B = 'b';
@@ -94,16 +94,16 @@ enum Qux :string
 
 // Method chains
 $result=$obj
-    ->method1 ( )
-    ->method2 ( )
-    ->method3 ( )
-    ->method4 ( )
-    ->method5 ( )
-    ->method6 ( )
-    ->method7 ( )
-    ->method8 ( )
-    ->method9 ( )
-    ->method10 ( );
+    ->method1()
+    ->method2()
+    ->method3()
+    ->method4()
+    ->method5()
+    ->method6()
+    ->method7()
+    ->method8()
+    ->method9()
+    ->method10();
 
 // Binary operators
 $a=$b+$c;
@@ -155,28 +155,28 @@ $array=[
 ];
 
 // Null type hints
-function nullableFunction ( null | string $param ) : null | int
+function nullableFunction(null|string $param): null|int
 {
     return null;
 }
 
-function unionTypeFunction ( string | int $param ) : string | int
+function unionTypeFunction(string|int $param): string|int
 {
     return $param;
 }
 
-function intersectionTypeFunction ( Foo & Bar $param ) : Foo & Bar
+function intersectionTypeFunction(Foo&Bar $param): Foo&Bar
 {
     return $param;
 }
 
 // New expressions
-$obj=new Foo ( );
-$result=new Foo ( )->baz ( );
+$obj=new Foo();
+$result=new Foo()->baz();
 
 // Exit and die
-exit ( );
-die ( );
+exit();
+die();
 
 // Attributes
 #[SomeAttribute]
@@ -185,20 +185,20 @@ class MyClassWithAttribute
 }
 
 // Named arguments
-function namedArgs ( string $name = 'foo', int $age = 30 )
+function namedArgs(string $name = 'foo', int $age = 30)
 {
 }
 
-namedArgs (
+namedArgs(
     name: 'bar',
     age: 25,
 );
 
 // List destructuring
-list ( $a, $b )=[ 1, 2 ];
+list($a, $b)=[1, 2];
 
 // Legacy array
-$legacyArray=array ( $a, $b );
+$legacyArray=array($a, $b);
 
 // Array access
 $value=$array[$key];

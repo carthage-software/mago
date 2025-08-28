@@ -28,17 +28,7 @@ pub(super) fn print_call_arguments<'arena>(
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
-            let mut contents = vec![in f.arena];
-            if f.settings.space_before_argument_list_parenthesis {
-                contents.push(Document::String(" "));
-            }
-            contents.push(Document::String("("));
-            if f.settings.space_within_argument_list_parenthesis {
-                contents.push(Document::space());
-            }
-            contents.push(Document::String(")"));
-
-            Document::Array(contents)
+            Document::String("()")
         } else {
             Document::empty()
         };
@@ -52,11 +42,7 @@ pub(super) fn print_call_arguments<'arena>(
         return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
             Document::Array(vec![
                 in f.arena;
-                if f.settings.space_before_argument_list_parenthesis {
-                    Document::String(" (")
-                } else {
-                    Document::String("(")
-                },
+                Document::String("("),
                 inner_comments,
                 Document::String(")"),
             ])
@@ -77,7 +63,6 @@ pub(super) fn print_argument_list<'arena>(
     let left_parenthesis = {
         let mut contents = vec![
             in f.arena;
-            if f.settings.space_before_argument_list_parenthesis { Document::space() } else { Document::empty() },
             Document::String("("),
         ];
 
@@ -87,8 +72,6 @@ pub(super) fn print_argument_list<'arena>(
         {
             contents.push(trailing_comments);
             should_break = true;
-        } else if f.settings.space_within_argument_list_parenthesis {
-            contents.push(Document::space());
         }
 
         Document::Array(contents)
@@ -341,18 +324,10 @@ fn print_right_parenthesis<'arena>(
             Some(true) => {
                 contents.push(Document::Line(Line::hard()));
             }
-            Some(false) => {
-                if f.settings.space_within_argument_list_parenthesis {
-                    contents.push(Document::Space(Space::soft()));
-                }
-            }
             None => {
-                if f.settings.space_within_argument_list_parenthesis {
-                    contents.push(Document::Line(Line::default()));
-                } else {
-                    contents.push(Document::Line(Line::soft()));
-                }
+                contents.push(Document::Line(Line::soft()));
             }
+            _ => { /* nothing */ }
         }
     }
 

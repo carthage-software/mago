@@ -911,10 +911,6 @@ impl<'arena> Format<'arena> for Method<'arena> {
             let has_parameters_or_inner_parameter_comments =
                 !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
 
-            if f.settings.space_before_method_parameter_list_parenthesis {
-                signature.push(Document::space());
-            }
-
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
                 signature.push(return_type.format(f));
@@ -1101,8 +1097,8 @@ impl<'arena> Format<'arena> for EnumBackingTypeHint<'arena> {
         wrap!(f, self, EnumBackingTypeHint, {
             Document::Group(Group::new(vec![
                 in f.arena;
-                Document::String(":"),
-                if f.settings.space_after_colon_in_enum_backing_type { Document::space() } else { Document::empty() },
+                format_token(f, self.colon, ":"),
+                Document::space(),
                 self.hint.format(f),
             ]))
         })
@@ -1181,11 +1177,7 @@ impl<'arena> Format<'arena> for Enum<'arena> {
                 Document::space(),
                 self.name.format(f),
                 if let Some(backing_type_hint) = &self.backing_type_hint {
-                    if f.settings.space_before_colon_in_enum_backing_type {
-                        Document::Array(vec![in f.arena; Document::space(), backing_type_hint.format(f)])
-                    } else {
-                        backing_type_hint.format(f)
-                    }
+                    backing_type_hint.format(f)
                 } else {
                     Document::empty()
                 },
@@ -1306,11 +1298,9 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                 Hint::Identifier(identifier) => identifier.format(f),
                 Hint::Parenthesized(parenthesized_hint) => Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::String("("),
-                    if f.settings.space_within_type_parenthesis { Document::space() } else { Document::empty() },
+                    format_token(f, parenthesized_hint.left_parenthesis, "("),
                     parenthesized_hint.hint.format(f),
-                    if f.settings.space_within_type_parenthesis { Document::space() } else { Document::empty() },
-                    Document::String(")"),
+                    format_token(f, parenthesized_hint.right_parenthesis, ")"),
                 ])),
                 Hint::Nullable(nullable_hint) => {
                     // If the nullable type is nested inside another type hint,
@@ -1325,17 +1315,7 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                         return Document::Group(Group::new(vec![
                             in f.arena;
                             Document::String("null"),
-                            if f.settings.space_around_pipe_in_union_type {
-                                Document::space()
-                            } else {
-                                Document::empty()
-                            },
                             Document::String("|"),
-                            if f.settings.space_around_pipe_in_union_type {
-                                Document::space()
-                            } else {
-                                Document::empty()
-                            },
                             nullable_hint.hint.format(f),
                         ]));
                     }
@@ -1344,17 +1324,7 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                         NullTypeHint::NullPipe => Document::Group(Group::new(vec![
                             in f.arena;
                             Document::String("null"),
-                            if f.settings.space_around_pipe_in_union_type {
-                                Document::space()
-                            } else {
-                                Document::empty()
-                            },
                             Document::String("|"),
-                            if f.settings.space_around_pipe_in_union_type {
-                                Document::space()
-                            } else {
-                                Document::empty()
-                            },
                             nullable_hint.hint.format(f),
                         ])),
                         NullTypeHint::Question => Document::Group(Group::new(
@@ -1396,26 +1366,14 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                     Document::Group(Group::new(vec![
                         in f.arena;
                         union_hint.left.format(f),
-                        if f.settings.space_around_pipe_in_union_type { Document::space() } else { Document::empty() },
-                        Document::String("|"),
-                        if f.settings.space_around_pipe_in_union_type { Document::space() } else { Document::empty() },
+                        format_token(f, union_hint.pipe, "|"),
                         union_hint.right.format(f),
                     ]))
                 }
                 Hint::Intersection(intersection_hint) => Document::Group(Group::new(vec![
                     in f.arena;
                     intersection_hint.left.format(f),
-                    if f.settings.space_around_ampersand_in_intersection_type {
-                        Document::space()
-                    } else {
-                        Document::empty()
-                    },
-                    Document::String("&"),
-                    if f.settings.space_around_ampersand_in_intersection_type {
-                        Document::space()
-                    } else {
-                        Document::empty()
-                    },
+                    format_token(f, intersection_hint.ampersand, "&"),
                     intersection_hint.right.format(f),
                 ])),
                 Hint::Null(_) => Document::String("null"),
@@ -1688,8 +1646,7 @@ impl<'arena> Format<'arena> for FunctionLikeReturnTypeHint<'arena> {
         wrap!(f, self, FunctionLikeReturnTypeHint, {
             Document::Group(Group::new(vec![
                 in f.arena;
-                if f.settings.space_before_colon_in_return_type { Document::space() } else { Document::empty() },
-                Document::String(":"),
+                format_token(f, self.colon, ":"),
                 Document::space(),
                 self.hint.format(f),
             ]))
@@ -1717,10 +1674,6 @@ impl<'arena> Format<'arena> for Function<'arena> {
             signature.push(self.name.format(f));
             let has_parameters_or_inner_parameter_comments =
                 !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
-
-            if f.settings.space_before_function_parameter_list_parenthesis {
-                signature.push(Document::space());
-            }
 
             signature.push(self.parameter_list.format(f));
             if let Some(return_type) = &self.return_type_hint {
@@ -1794,10 +1747,8 @@ impl<'arena> Format<'arena> for TryCatchClause<'arena> {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.catch.format(f),
-                if f.settings.space_before_catch_parenthesis { Document::space() } else { Document::empty() },
-                f.print_leading_comments(self.left_parenthesis).unwrap_or(Document::empty()),
-                Document::String("("),
-                if f.settings.space_within_catch_parenthesis { Document::space() } else { Document::empty() },
+                Document::space(),
+                format_token(f, self.left_parenthesis, "("),
                 Document::Group(Group::new({
                     let mut context = vec![in f.arena; self.hint.format(f)];
                     if let Some(variable) = &self.variable {
@@ -1807,9 +1758,7 @@ impl<'arena> Format<'arena> for TryCatchClause<'arena> {
 
                     context
                 })),
-                if f.settings.space_within_catch_parenthesis { Document::space() } else { Document::empty() },
-                Document::String(")"),
-                f.print_trailing_comments(self.right_parenthesis).unwrap_or(Document::empty()),
+                format_token(f, self.right_parenthesis, ")"),
                 Document::space(),
                 self.block.format(f),
             ]))

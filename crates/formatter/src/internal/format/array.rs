@@ -54,15 +54,6 @@ impl<'arena> ArrayLike<'arena> {
     }
 
     #[inline]
-    pub const fn has_space_within_delimiters(&self, f: &FormatterState<'_, 'arena>) -> bool {
-        match self {
-            Self::Array(_) => f.settings.space_within_array_brackets,
-            Self::List(_) => f.settings.space_within_list_parenthesis,
-            Self::LegacyArray(_) => f.settings.space_within_legacy_array_parenthesis,
-        }
-    }
-
-    #[inline]
     pub const fn get_left_delimiter(&self) -> &'static str {
         if matches!(self, Self::List(_) | Self::LegacyArray(_)) { "(" } else { "[" }
     }
@@ -83,16 +74,8 @@ impl<'arena> ArrayLike<'arena> {
 
     fn prefix(&self, f: &mut FormatterState<'_, 'arena>) -> Option<Document<'arena>> {
         match self {
-            Self::List(list) => Some(Document::Array(vec![
-                in f.arena;
-                list.list.format(f),
-                if f.settings.space_before_list_parenthesis { Document::space() } else { Document::empty() },
-            ])),
-            Self::LegacyArray(array) => Some(Document::Array(vec![
-                in f.arena;
-                array.array.format(f),
-                if f.settings.space_before_legacy_array_parenthesis { Document::space() } else { Document::empty() },
-            ])),
+            Self::List(list) => Some(list.list.format(f)),
+            Self::LegacyArray(array) => Some(array.array.format(f)),
             _ => None,
         }
     }
@@ -143,11 +126,7 @@ pub(super) fn print_array_like<'arena>(
         if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
             parts.push(dangling_comments);
         } else {
-            parts.push(if array_like.has_space_within_delimiters(f) {
-                Document::Line(Line::default())
-            } else {
-                Document::Line(Line::soft())
-            });
+            parts.push(Document::Line(Line::soft()));
         }
 
         parts.push(get_right_delimiter(f, &array_like));
@@ -173,11 +152,7 @@ pub(super) fn print_array_like<'arena>(
     parts.push(Document::Indent({
         let len = elements.len();
         let mut indent_parts = vec![in f.arena;];
-        indent_parts.push(if array_like.has_space_within_delimiters(f) {
-            Document::Line(Line::default())
-        } else {
-            Document::Line(Line::soft())
-        });
+        indent_parts.push(Document::Line(Line::soft()));
 
         if let Some(widths) = column_widths {
             for (i, element) in elements.into_iter().enumerate() {
@@ -214,11 +189,7 @@ pub(super) fn print_array_like<'arena>(
     if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
         parts.push(dangling_comments);
     } else {
-        parts.push(if array_like.has_space_within_delimiters(f) {
-            Document::Line(Line::default())
-        } else {
-            Document::Line(Line::soft())
-        });
+        parts.push(Document::Line(Line::soft()));
     }
 
     parts.push(get_right_delimiter(f, &array_like));

@@ -435,22 +435,20 @@ pub(super) fn print_condition<'arena>(
     left_parenthesis: Span,
     condition: &'arena Expression<'arena>,
     right_parenthesis: Span,
-    space_before: bool,
-    space_within: bool,
 ) -> Document<'arena> {
     let was_in_condition = f.in_condition;
     f.in_condition = true;
 
     let condition = Document::Group(Group::new(vec![
         in f.arena;
-        if space_before { Document::space() } else { Document::empty() },
+        Document::space(),
         format_token(f, left_parenthesis, "("),
         Document::IndentIfBreak(IndentIfBreak::new(vec![
             in f.arena;
-            Document::Line(if space_within { Line::default() } else { Line::soft() }),
+            Document::Line(Line::soft()),
             condition.format(f),
         ])),
-        Document::Line(if space_within { Line::default() } else { Line::soft() }),
+        Document::Line(Line::soft()),
         format_token(f, right_parenthesis, ")"),
     ]));
 

@@ -58,24 +58,10 @@ use-tabs = true
 | `parentheses-in-new-expression` | `boolean` | `true` | Add parentheses to `new` expressions without arguments (`new Foo()`). |
 | `parentheses-in-exit-and-die` | `boolean` | `true` | Add parentheses to `exit` and `die` constructs. |
 | `parentheses-in-attribute` | `boolean` | `false` | Add parentheses to attributes without arguments. |
-| `space-before-if-parenthesis` | `boolean` | `true` | Add a space before `if` parentheses. |
-| `space-before-for-parenthesis` | `boolean` | `true` | Add a space before `for` parentheses. |
-| `space-before-foreach-parenthesis` | `boolean` | `true` | Add a space before `foreach` parentheses. |
-| `space-before-while-parenthesis` | `boolean` | `true` | Add a space before `while` parentheses. |
-| `space-before-catch-parenthesis` | `boolean` | `true` | Add a space before `catch` parentheses. |
-| `space-before-switch-parenthesis` | `boolean` | `true` | Add a space before `switch` parentheses. |
-| `space-before-match-parenthesis` | `boolean` | `true` | Add a space before `match` parentheses. |
 | `space-before-arrow-function-parameter-list-parenthesis` | `boolean` | `false` | Add a space before arrow function parameters. |
 | `space-before-closure-parameter-list-parenthesis` | `boolean` | `true` | Add a space before closure parameters. |
 | `space-before-hook-parameter-list-parenthesis` | `boolean` | `false` | Add a space before hook parameters. |
-| `space-before-function-parameter-list-parenthesis` | `boolean` | `false` | Add a space before function parameters. |
-| `space-before-method-parameter-list-parenthesis` | `boolean` | `false` | Add a space before method parameters. |
 | `space-before-closure-use-clause-parenthesis` | `boolean` | `true` | Add a space before closure `use` parentheses. |
-| `space-before-argument-list-parenthesis` | `boolean` | `false` | Add a space before function call arguments. |
-| `space-before-list-parenthesis` | `boolean` | `false` | Add a space before `list` parentheses. |
-| `space-before-legacy-array-parenthesis` | `boolean` | `false` | Add a space before legacy `array` parentheses. |
-| `space-before-colon-in-return-type` | `boolean` | `false` | Add a space before the colon in return types. |
-| `space-before-colon-in-enum-backing-type` | `boolean` | `false` | Add a space before the colon in enum backing types. |
 | `space-after-colon-in-enum-backing-type` | `boolean` | `true` | Add a space after the colon in enum backing types. |
 | `space-after-cast-unary-prefix-operators` | `boolean` | `true` | Add a space after cast operators like `(int)`. |
 | `space-after-reference-unary-prefix-operator` | `boolean` | `false` | Add a space after the reference operator (`&`). |
@@ -98,22 +84,7 @@ use-tabs = true
 | `space-around-null-coalescing-binary-operator` | `boolean` | `true` | Add spaces around the null coalescing operator (`??`). |
 | `space-around-elvis-binary-operator` | `boolean` | `true` | Add spaces around the elvis operator (`?:`). |
 | `space-around-assignment-in-declare` | `boolean` | `false` | Add spaces around `=` in `declare` statements. |
-| `space-around-pipe-in-union-type` | `boolean` | `false` | Add spaces around `|` in union types. |
-| `space-around-ampersand-in-intersection-type` | `boolean` | `false` | Add spaces around `&` in intersection types. |
-| `space-within-type-parenthesis` | `boolean` | `false` | Add spaces inside type parentheses `( int\|string )`. |
-| `space-within-array-brackets` | `boolean` | `false` | Add spaces inside array brackets `[ 1, 2 ]`. |
 | `space-within-grouping-parenthesis` | `boolean` | `false` | Add spaces inside grouping parentheses `( 1 + 2 )`. |
-| `space-within-legacy-array-parenthesis` | `boolean` | `false` | Add spaces inside legacy `array( ... )`. |
-| `space-within-list-parenthesis` | `boolean` | `false` | Add spaces inside `list( ... )`. |
-| `space-within-argument-list-parenthesis` | `boolean` | `false` | Add spaces inside argument list parentheses. |
-| `space-within-parameter-list-parenthesis` | `boolean` | `false` | Add spaces inside parameter list parentheses. |
-| `space-within-if-parenthesis` | `boolean` | `false` | Add spaces inside `if` parentheses. |
-| `space-within-for-parenthesis` | `boolean` | `false` | Add spaces inside `for` parentheses. |
-| `space-within-foreach-parenthesis` | `boolean` | `false` | Add spaces inside `foreach` parentheses. |
-| `space-within-while-parenthesis` | `boolean` | `false` | Add spaces inside `while` parentheses. |
-| `space-within-catch-parenthesis` | `boolean` | `false` | Add spaces inside `catch` parentheses. |
-| `space-within-switch-parenthesis` | `boolean` | `false` | Add spaces inside `switch` parentheses. |
-| `space-within-match-parenthesis` | `boolean` | `false` | Add spaces inside `match` parentheses. |
 | `empty-line-after-control-structure` | `boolean` | `false` | Add an empty line after control structures. |
 | `empty-line-after-opening-tag` | `boolean` | `true` | Add an empty line after the opening `<?php` tag. |
 | `empty-line-after-declare` | `boolean` | `true` | Add an empty line after a `declare` statement. |

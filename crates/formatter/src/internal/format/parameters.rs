@@ -15,10 +15,6 @@ pub(super) fn print_function_like_parameters<'arena>(
 ) -> Document<'arena> {
     if parameter_list.parameters.is_empty() {
         let mut contents = vec![in f.arena; Document::String("(")];
-        if f.settings.space_within_parameter_list_parenthesis {
-            contents.push(Document::space());
-        }
-
         if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
             contents.push(comments);
         }
@@ -56,9 +52,6 @@ pub(super) fn print_function_like_parameters<'arena>(
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
     let mut parts = vec![in f.arena; Document::String("(")];
-    if f.settings.space_within_parameter_list_parenthesis {
-        parts.push(Document::space());
-    }
 
     let mut printed = vec![in f.arena; ];
     let len = parameter_list.parameters.len();
@@ -79,10 +72,6 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     if should_hug_the_parameters {
         parts.extend(printed);
-        if f.settings.space_within_parameter_list_parenthesis {
-            parts.push(Document::space());
-        }
-
         parts.push(Document::String(")"));
 
         return Document::Array(parts);
@@ -102,8 +91,6 @@ pub(super) fn print_function_like_parameters<'arena>(
         f.print_dangling_comments(parameter_list.left_parenthesis.join(parameter_list.right_parenthesis), true)
     {
         parts.push(comments);
-    } else if f.settings.space_within_parameter_list_parenthesis {
-        parts.push(Document::Line(Line::default()));
     } else {
         parts.push(Document::Line(Line::soft()));
     }

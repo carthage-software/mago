@@ -918,8 +918,6 @@ impl<'arena> Format<'arena> for Match<'arena> {
                     self.left_parenthesis,
                     self.expression,
                     self.right_parenthesis,
-                    f.settings.space_before_match_parenthesis,
-                    f.settings.space_within_match_parenthesis,
                 ),
             ];
 

@@ -80,7 +80,6 @@ test_case!(inline_php);
 test_case!(inline_html_alignment);
 test_case!(inline_echo);
 test_case!(parameter_attributes);
-test_case!(space_before_enum_backing_type_colon);
 test_case!(no_space_before_enum_backing_type_colon);
 test_case!(closing_echo_tag_preserved);
 test_case!(closing_tag_removed);

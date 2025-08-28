@@ -591,69 +591,6 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub parentheses_in_attribute: bool,
 
-    /// Whether to add a space before the opening parenthesis in `if` statements.
-    ///
-    /// When enabled: `if ($condition)`
-    /// When disabled: `if($condition)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_if_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `for` loops.
-    ///
-    /// When enabled: `for ($i = 0; $i < 10; $i++)`
-    /// When disabled: `for($i = 0; $i < 10; $i++)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_for_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `foreach` loops.
-    ///
-    /// When enabled: `foreach ($items as $item)`
-    /// When disabled: `foreach($items as $item)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_foreach_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `while` loops.
-    ///
-    /// When enabled: `while ($condition)`
-    /// When disabled: `while($condition)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_while_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `catch` blocks.
-    ///
-    /// When enabled: `catch (Exception $e)`
-    /// When disabled: `catch(Exception $e)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_catch_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `switch` statements.
-    ///
-    /// When enabled: `switch ($value)`
-    /// When disabled: `switch($value)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_switch_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in `match` expressions.
-    ///
-    /// When enabled: `match ($value)`
-    /// When disabled: `match($value)`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_match_parenthesis: bool,
-
     /// Whether to add a space before the opening parameters in arrow functions.
     ///
     /// When enabled: `fn ($x) => $x * 2`
@@ -681,24 +618,6 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_before_hook_parameter_list_parenthesis: bool,
 
-    /// Whether to add a space before the opening parameters in function declarations.
-    ///
-    /// When enabled: `function foo ($param)`
-    /// When disabled: `function foo($param)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_function_parameter_list_parenthesis: bool,
-
-    /// Whether to add a space before the opening parameters in method declarations.
-    ///
-    /// When enabled: `public function foo ($param)`
-    /// When disabled: `public function foo($param)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_method_parameter_list_parenthesis: bool,
-
     /// Whether to add a space before the opening parenthesis in closure use clause.
     ///
     /// When enabled: `function() use ($var)`
@@ -707,60 +626,6 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub space_before_closure_use_clause_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in function-like calls.
-    ///
-    /// When enabled: `foo ($arg)`
-    /// When disabled: `foo($arg)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_argument_list_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in list destructuring.
-    ///
-    /// When enabled: `list ($a, $b) = $array`
-    /// When disabled: `list($a, $b) = $array`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_list_parenthesis: bool,
-
-    /// Whether to add a space before the opening parenthesis in legacy array syntax.
-    ///
-    /// When enabled: `array ($item)`
-    /// When disabled: `array($item)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_legacy_array_parenthesis: bool,
-
-    /// Whether to add a space before the colon in return type hints.
-    ///
-    /// When enabled: `function foo() : string`
-    /// When disabled: `function foo(): string`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_colon_in_return_type: bool,
-
-    /// Whether to add a space before the colon in enum backing types.
-    ///
-    /// When enabled: `enum Foo : string`
-    /// When disabled: `enum Foo: string`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_colon_in_enum_backing_type: bool,
-
-    /// Whether to add a space after the colon in enum backing types.
-    ///
-    /// When enabled: `enum Foo: string`
-    /// When disabled: `enum Foo:string`
-    ///
-    /// Default: true
-    #[serde(default = "default_true")]
-    pub space_after_colon_in_enum_backing_type: bool,
 
     /// Whether to add a space after cast operators (int, float, string, etc.).
     ///
@@ -951,42 +816,6 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_around_assignment_in_declare: bool,
 
-    /// Whether to add spaces around the pipe in union type hints.
-    ///
-    /// When enabled: `function foo(int | string $bar)`
-    /// When disabled: `function foo(int|string $bar)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_around_pipe_in_union_type: bool,
-
-    /// Whether to add spaces around the pipe in union type hints.
-    ///
-    /// When enabled: `function foo(Foo & Bar $bar)`
-    /// When disabled: `function foo(Foo&Bar $bar)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_around_ampersand_in_intersection_type: bool,
-
-    /// Whether to add spaces within type parentheses.
-    ///
-    /// When enabled: `function foo(string|( Foo&Stringable ) $bar)`
-    /// When disabled: `function foo(string|(Foo&Stringable) $bar)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_type_parenthesis: bool,
-
-    /// Whether to add spaces within array brackets.
-    ///
-    /// When enabled: `[ $item1, $item2 ]`
-    /// When disabled: `[$item1, $item2]`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_array_brackets: bool,
-
     /// Whether to add spaces within grouping parentheses.
     ///
     /// When enabled: `( $expr ) - $expr`
@@ -995,105 +824,6 @@ pub struct FormatSettings {
     /// Default: false
     #[serde(default = "default_false")]
     pub space_within_grouping_parenthesis: bool,
-
-    /// Whether to add spaces within legacy array parentheses.
-    ///
-    /// When enabled: `array( $item1, $item2 )`
-    /// When disabled: `array($item1, $item2)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_legacy_array_parenthesis: bool,
-
-    /// Whether to add spaces within list parentheses.
-    ///
-    /// When enabled: `list( $item1, $item2 )`
-    /// When disabled: `list($item1, $item2)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_list_parenthesis: bool,
-
-    /// Whether to add spaces within argument list parentheses.
-    ///
-    /// When enabled: `some_function( $arg1, $arg2 )`
-    /// When disabled: `some_function($arg1, $arg2)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_argument_list_parenthesis: bool,
-
-    /// Whether to add spaces within parameter list parentheses.
-    ///
-    /// When enabled: `function foo( $param1, $param2 )`
-    /// When disabled: `function foo($param1, $param2)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_parameter_list_parenthesis: bool,
-
-    /// Whether to add spaces within if statement parentheses.
-    ///
-    /// When enabled: `if ( $condition )`
-    /// When disabled: `if ($condition)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_if_parenthesis: bool,
-
-    /// Whether to add spaces within for loop parentheses.
-    ///
-    /// When enabled: `for ( $i = 0; $i < 10; $i++ )`
-    /// When disabled: `for ($i = 0; $i < 10; $i++)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_for_parenthesis: bool,
-
-    /// Whether to add spaces within foreach loop parentheses.
-    ///
-    /// When enabled: `foreach ( $items as $item )`
-    /// When disabled: `foreach ($items as $item)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_foreach_parenthesis: bool,
-
-    /// Whether to add spaces within while loop parentheses.
-    ///
-    /// When enabled: `while ( $condition )`
-    /// When disabled: `while ($condition)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_while_parenthesis: bool,
-
-    /// Whether to add spaces within catch block parentheses.
-    ///
-    /// When enabled: `catch ( Throwable $exception )`
-    /// When disabled: `catch (Throwable $exception)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_catch_parenthesis: bool,
-
-    /// Whether to add spaces within switch statement parentheses.
-    ///
-    /// When enabled: `switch ( $value )`
-    /// When disabled: `switch ($value)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_switch_parenthesis: bool,
-
-    /// Whether to add spaces within match statement parentheses.
-    ///
-    /// When enabled: `match ( $value )`
-    /// When disabled: `match ($value)`
-    ///
-    /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_match_parenthesis: bool,
 
     /// Whether to add an empty line after control structures (if, for, foreach, while, do, switch).
     ///
@@ -1256,39 +986,12 @@ impl Default for FormatSettings {
             preserve_breaking_parameter_list: false,
             preserve_breaking_attribute_list: false,
             preserve_breaking_conditional_expression: false,
-            space_before_if_parenthesis: true,
-            space_before_for_parenthesis: true,
-            space_before_foreach_parenthesis: true,
-            space_before_while_parenthesis: true,
-            space_before_catch_parenthesis: true,
-            space_before_switch_parenthesis: true,
-            space_before_match_parenthesis: true,
             space_before_arrow_function_parameter_list_parenthesis: false,
             space_before_closure_parameter_list_parenthesis: true,
             space_before_closure_use_clause_parenthesis: true,
-            space_before_argument_list_parenthesis: false,
-            space_before_function_parameter_list_parenthesis: false,
-            space_before_list_parenthesis: false,
-            space_before_legacy_array_parenthesis: false,
-            space_before_colon_in_return_type: false,
-            space_before_colon_in_enum_backing_type: false,
             space_around_assignment_in_declare: false,
-            space_around_pipe_in_union_type: false,
-            space_within_array_brackets: false,
             space_within_grouping_parenthesis: false,
-            space_within_list_parenthesis: false,
-            space_within_argument_list_parenthesis: false,
-            space_within_parameter_list_parenthesis: false,
-            space_within_if_parenthesis: false,
-            space_within_for_parenthesis: false,
-            space_within_foreach_parenthesis: false,
-            space_within_while_parenthesis: false,
-            space_within_catch_parenthesis: false,
-            space_within_switch_parenthesis: false,
-            space_within_match_parenthesis: false,
-            space_after_colon_in_enum_backing_type: true,
             space_before_hook_parameter_list_parenthesis: false,
-            space_before_method_parameter_list_parenthesis: false,
             space_around_assignment_operators: true,
             space_around_logical_binary_operators: true,
             space_around_equality_binary_operators: true,
@@ -1301,9 +1004,6 @@ impl Default for FormatSettings {
             space_around_concatenation_binary_operator: true,
             space_around_null_coalescing_binary_operator: true,
             space_around_elvis_binary_operator: true,
-            space_around_ampersand_in_intersection_type: false,
-            space_within_type_parenthesis: false,
-            space_within_legacy_array_parenthesis: false,
             space_after_cast_unary_prefix_operators: true,
             space_after_reference_unary_prefix_operator: false,
             space_after_error_control_unary_prefix_operator: false,

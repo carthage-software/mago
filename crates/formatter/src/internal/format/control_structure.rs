@@ -9,6 +9,7 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::block::print_block_of_nodes;
+use crate::internal::format::format_token;
 use crate::internal::format::misc;
 use crate::internal::format::misc::print_colon_delimited_body;
 use crate::internal::format::statement::print_statement_sequence;
@@ -26,8 +27,6 @@ impl<'arena> Format<'arena> for If<'arena> {
                     self.left_parenthesis,
                     self.condition,
                     self.right_parenthesis,
-                    f.settings.space_before_if_parenthesis,
-                    f.settings.space_within_if_parenthesis,
                 ),
                 self.body.format(f),
             ]))
@@ -85,8 +84,6 @@ impl<'arena> Format<'arena> for IfStatementBodyElseIfClause<'arena> {
                     self.left_parenthesis,
                     self.condition,
                     self.right_parenthesis,
-                    f.settings.space_before_if_parenthesis,
-                    f.settings.space_within_if_parenthesis,
                 ),
                 misc::print_clause(f, self.statement, false),
             ]))
@@ -147,14 +144,7 @@ impl<'arena> Format<'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
         wrap!(f, self, IfColonDelimitedBodyElseIfClause, {
             let mut parts = vec![in f.arena; self.elseif.format(f)];
 
-            let condition = misc::print_condition(
-                f,
-                self.left_parenthesis,
-                self.condition,
-                self.right_parenthesis,
-                f.settings.space_before_if_parenthesis,
-                f.settings.space_within_if_parenthesis,
-            );
+            let condition = misc::print_condition(f, self.left_parenthesis, self.condition, self.right_parenthesis);
             let is_first_stmt_closing_tag = matches!(self.statements.first(), Some(Statement::ClosingTag(_)));
             if is_first_stmt_closing_tag {
                 parts.push(Document::Indent(vec![in f.arena; condition, Document::String(":")]));
@@ -213,8 +203,6 @@ impl<'arena> Format<'arena> for DoWhile<'arena> {
                     self.left_parenthesis,
                     self.condition,
                     self.right_parenthesis,
-                    f.settings.space_before_while_parenthesis,
-                    f.settings.space_within_while_parenthesis,
                 ),
                 self.terminator.format(f),
             ]))
@@ -228,9 +216,8 @@ impl<'arena> Format<'arena> for For<'arena> {
             let mut contents = vec![
                 in f.arena;
                 self.r#for.format(f),
-                if f.settings.space_before_for_parenthesis { Document::space() } else { Document::empty() },
-                Document::String("("),
-                if f.settings.space_within_for_parenthesis { Document::space() } else { Document::empty() },
+                Document::space(),
+                format_token(f, self.left_parenthesis, "("),
             ];
 
             let format_expressions = |f: &mut FormatterState<'_, 'arena>, exprs: &'arena [Expression<'arena>]| {
@@ -273,11 +260,7 @@ impl<'arena> Format<'arena> for For<'arena> {
                 Document::Line(Line::soft()),
             ])));
 
-            if f.settings.space_within_for_parenthesis {
-                contents.push(Document::space());
-            }
-
-            contents.push(Document::String(")"));
+            contents.push(format_token(f, self.right_parenthesis, ")"));
             contents.push(self.body.format(f));
 
             Document::Group(Group::new(contents))
@@ -319,8 +302,6 @@ impl<'arena> Format<'arena> for Switch<'arena> {
                     self.left_parenthesis,
                     self.expression,
                     self.right_parenthesis,
-                    f.settings.space_before_switch_parenthesis,
-                    f.settings.space_within_switch_parenthesis,
                 ),
                 self.body.format(f),
             ])
@@ -454,8 +435,6 @@ impl<'arena> Format<'arena> for While<'arena> {
                     self.left_parenthesis,
                     self.condition,
                     self.right_parenthesis,
-                    f.settings.space_before_while_parenthesis,
-                    f.settings.space_within_while_parenthesis,
                 ),
                 self.body.format(f),
             ])
@@ -488,16 +467,14 @@ impl<'arena> Format<'arena> for Foreach<'arena> {
             Document::Array(vec![
                 in f.arena;
                 self.foreach.format(f),
-                if f.settings.space_before_foreach_parenthesis { Document::space() } else { Document::empty() },
-                Document::String("("),
-                if f.settings.space_within_foreach_parenthesis { Document::space() } else { Document::empty() },
+                Document::space(),
+                format_token(f, self.left_parenthesis, "("),
                 self.expression.format(f),
                 Document::space(),
                 self.r#as.format(f),
                 Document::space(),
                 self.target.format(f),
-                if f.settings.space_within_foreach_parenthesis { Document::space() } else { Document::empty() },
-                Document::String(")"),
+                format_token(f, self.right_parenthesis, ")"),
                 self.body.format(f),
             ])
         })
