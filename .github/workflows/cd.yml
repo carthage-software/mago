@@ -173,7 +173,15 @@ jobs:
           cargo -V
           rustc -V
 
+      - name: build (Windows)
+        if: contains(matrix.job.target, '-pc-windows-')
+        shell: bash
+        env:
+          RUSTFLAGS: "-C link-arg=/STACK:8388608"
+        run: $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
+
       - name: build
+        if: "!(contains(matrix.job.target, '-pc-windows-'))"
         shell: bash
         run: $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
 
@@ -199,8 +207,15 @@ jobs:
           echo "binary for target '${{ matrix.job.target }}' requires the following GLIBC versions:"
           strings "${{ steps.bin.outputs.BIN_PATH }}" | grep GLIBC_ || echo "No GLIBC version strings found."
 
-      - name: run tests
-        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/')
+      - name: run tests (Windows)
+        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/') && contains(matrix.job.target, '-pc-windows-')
+        shell: bash
+        env:
+          RUSTFLAGS: "-C link-arg=/STACK:8388608"
+        run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
+
+      - name: run tests (non-Windows)
+        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/') && !contains(matrix.job.target, '-pc-windows-')
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 

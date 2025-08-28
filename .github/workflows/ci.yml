@@ -57,7 +57,14 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: cargo test
+      - name: cargo test (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          RUSTFLAGS: "-C link-arg=/STACK:8388608"
+        run: cargo test --workspace --locked --all-targets
+
+      - name: cargo test (macOS & Linux)
+        if: matrix.os != 'windows-latest'
         run: cargo test --workspace --locked --all-targets
 
       - name: cargo build
