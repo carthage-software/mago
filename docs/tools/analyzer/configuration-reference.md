@@ -1,10 +1,10 @@
 ---
-title: Configuration Reference
+title: Analyzer configuration Reference
 ---
 
-# Configuration Reference
+# Configuration reference
 
-The **Mago** Analyzer is highly configurable, allowing you to tailor the analysis to your project's specific needs. All settings go under the `[analyzer]` table in your `mago.toml` file.
+**Mago**'s analyzer is highly configurable, allowing you to tailor the analysis to your project's specific needs. All settings go under the `[analyzer]` table in your `mago.toml` file.
 
 ```toml
 [analyzer]
@@ -15,14 +15,14 @@ redundancy-issues = false
 ignore = ["mixed-argument"]
 ```
 
-## General Options
+## General options
 
 | Option     | Type       | Default | Description                                        |
 | :--------- | :--------- | :------ | :------------------------------------------------- |
 | `excludes` | `string[]` | `[]`    | A list of glob patterns to exclude from analysis.  |
 | `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally. |
 
-## Issue Categories
+## Issue categories
 
 You can enable or disable entire categories of issues. All categories are enabled by default.
 
@@ -48,7 +48,7 @@ You can enable or disable entire categories of issues. All categories are enable
 | `method-issues`        | `true`  | Report issues related to methods and their usage.             |
 | `iterator-issues`      | `true`  | Report issues related to iterators and their usage.           |
 
-## Feature Flags
+## Feature flags
 
 These flags control specific, powerful analysis capabilities.
 

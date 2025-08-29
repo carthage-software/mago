@@ -1,12 +1,11 @@
 ---
-title: Clarity Rules
+title: Clarity rules
+outline: [2, 3]
 ---
 
-# Clarity Rules
+# Clarity rules
 
 This document details the rules available in the `Clarity` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -22,7 +21,6 @@ This document details the rules available in the `Clarity` category.
 | Tagged TODO | [`tagged-todo`](#tagged-todo) |
 | Valid Docblock | [`valid-docblock`](#valid-docblock) |
 
----
 
 ## <a id="explicit-octal"></a>`explicit-octal`
 
@@ -31,7 +29,7 @@ Detects implicit octal numeral notation and suggests replacing it with explicit 
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.1.0`
+- **PHP version:** PHP `>= 8.1.0`
 
 ### Configuration
 
@@ -42,7 +40,7 @@ Detects implicit octal numeral notation and suggests replacing it with explicit 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -50,7 +48,7 @@ Detects implicit octal numeral notation and suggests replacing it with explicit 
 $a = 0o123;
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -71,7 +69,7 @@ where the intent is often ambiguous without the parameter name.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.0.0`
+- **PHP version:** PHP `>= 8.0.0`
 
 ### Configuration
 
@@ -82,7 +80,7 @@ where the intent is often ambiguous without the parameter name.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -92,7 +90,7 @@ function set_option(string $key, bool $enable_feature) {}
 set_option(key: 'feature_x', enable_feature: true); // ✅ clear intent
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -122,7 +120,7 @@ developer's intent or expectation, making it preferable to use explicit checks.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -132,7 +130,7 @@ if ($myArray === []) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -162,7 +160,7 @@ tools that expect the normal ASCII `#` symbol.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -173,7 +171,7 @@ tools that expect the normal ASCII `#` symbol.
 class Foo {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -201,7 +199,7 @@ confusion and unexpected behavior, and is generally considered poor practice.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -210,7 +208,7 @@ $b = 0;
 $a = $b;
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -236,7 +234,7 @@ Both shorthand ternary operator (`$a ? : $b`) and elvis operator (`$a ?: $b`) re
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -245,7 +243,7 @@ $value = $foo ?? $default;
 $value = $foo ? $foo : $default;
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -262,7 +260,7 @@ for improved readability and intent clarity.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.0.0`
+- **PHP version:** PHP `>= 8.0.0`
 
 ### Configuration
 
@@ -273,7 +271,7 @@ for improved readability and intent clarity.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -286,7 +284,7 @@ if (str_contains($a, $b)) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -308,7 +306,7 @@ for improved readability and intent clarity.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.0.0`
+- **PHP version:** PHP `>= 8.0.0`
 
 ### Configuration
 
@@ -319,7 +317,7 @@ for improved readability and intent clarity.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -331,7 +329,7 @@ if (str_starts_with($a, $b)) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -361,7 +359,7 @@ issue reference ensures that the issue is tracked and resolved.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -371,7 +369,7 @@ issue reference ensures that the issue is tracked and resolved.
 // FIXME(#123) This is a valid FIXME comment.
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -397,7 +395,7 @@ makes it easier to track progress and ensures that tasks are not forgotten.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -407,7 +405,7 @@ makes it easier to track progress and ensures that tasks are not forgotten.
 // TODO(#123) This is a valid TODO comment.
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -432,7 +430,7 @@ it can be noisy and may not be relevant to all codebases.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -446,7 +444,7 @@ function foo($a) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

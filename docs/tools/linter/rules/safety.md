@@ -1,12 +1,11 @@
 ---
-title: Safety Rules
+title: Safety rules
+outline: [2, 3]
 ---
 
-# Safety Rules
+# Safety rules
 
 This document details the rules available in the `Safety` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -19,7 +18,6 @@ This document details the rules available in the `Safety` category.
 | No Shell Execute String | [`no-shell-execute-string`](#no-shell-execute-string) |
 | No Unsafe Finally | [`no-unsafe-finally`](#no-unsafe-finally) |
 
----
 
 ## <a id="no-error-control-operator"></a>`no-error-control-operator`
 
@@ -38,7 +36,7 @@ The error control operator suppresses errors and makes debugging more difficult.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -50,7 +48,7 @@ try {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -75,7 +73,7 @@ The `eval` construct executes arbitrary code, which can be a major security risk
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -84,7 +82,7 @@ The `eval` construct executes arbitrary code, which can be a major security risk
 $result = json_decode($jsonString);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -113,7 +111,7 @@ If you are confident in your use of FFI and understand the risks, you can disabl
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -123,7 +121,7 @@ $data = 'some data';
 $hash = hash('sha256', $data);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -152,7 +150,7 @@ The `global` keyword introduces global state into your function, making it harde
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -162,7 +160,7 @@ function foo(string $bar): void {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -195,7 +193,7 @@ It is recommended to use `$request->only([...])` to specify the inputs you need 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -219,7 +217,7 @@ class UserController extends Controller
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -261,7 +259,7 @@ Use `$_GET`, `$_POST`, or `$_COOKIE` instead for better clarity.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -269,7 +267,7 @@ Use `$_GET`, `$_POST`, or `$_COOKIE` instead for better clarity.
 $identifier = $_GET['id'];
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -293,7 +291,7 @@ Detects the use of shell execute strings (`...`) in PHP code.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -301,7 +299,7 @@ Detects the use of shell execute strings (`...`) in PHP code.
 $output = shell_exec('ls -l');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -328,7 +326,7 @@ leading to unexpected behavior.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -342,7 +340,7 @@ function example(): int {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

@@ -1,10 +1,10 @@
 ---
-title: Configuration Reference
+title: Formatter configuration reference
 ---
 
-# Configuration Reference
+# Configuration reference
 
-While the **Mago** Formatter is opinionated and works great out of the box with its PSR-12 compliant defaults, you can customize its behavior in your `mago.toml` file.
+While **Mago**'s formatter is opinionated and works great out-of-the-box with its PSR-12 compliant defaults, you can customize its behavior in your `mago.toml` file.
 
 All settings go under the `[formatter]` table.
 
@@ -14,7 +14,7 @@ print-width = 100
 use-tabs = true
 ```
 
-## Configuration Options
+## Configuration options
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |

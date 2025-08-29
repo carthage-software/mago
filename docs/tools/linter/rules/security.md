@@ -1,12 +1,11 @@
 ---
-title: Security Rules
+title: Security rules
+outline: [2, 3]
 ---
 
-# Security Rules
+# Security rules
 
 This document details the rules available in the `Security` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -17,7 +16,6 @@ This document details the rules available in the `Security` category.
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
 | Tainted Data to Sink | [`tainted-data-to-sink`](#tainted-data-to-sink) |
 
----
 
 ## <a id="disallowed-functions"></a>`disallowed-functions`
 
@@ -40,7 +38,7 @@ security restrictions, or the usage of preferred alternatives.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -52,7 +50,7 @@ function allowed_function(): void {
 allowed_function(); // Not flagged
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -80,7 +78,7 @@ intended for production environments.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -89,7 +87,7 @@ intended for production environments.
 error_log('Processing user request.');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -119,7 +117,7 @@ Instead, use `hash_equals` for comparing strings or `password_verify` for valida
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -129,7 +127,7 @@ if (hash_equals($storedToken, $userToken)) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -157,7 +155,7 @@ and should be avoided. Use environment variables or secure configuration managem
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -165,7 +163,7 @@ and should be avoided. Use environment variables or secure configuration managem
 $password = getenv('DB_PASSWORD');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -195,7 +193,7 @@ interpreted correctly.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -203,7 +201,7 @@ interpreted correctly.
 echo "Hello, World!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?
@@ -231,7 +229,7 @@ or other injection attacks.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -240,7 +238,7 @@ or other injection attacks.
 echo htmlspecialchars($_GET['name'] ?? '', ENT_QUOTES, 'UTF-8');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

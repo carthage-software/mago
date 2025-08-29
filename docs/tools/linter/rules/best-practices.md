@@ -1,12 +1,11 @@
 ---
-title: BestPractices Rules
+title: BestPractices rules
+outline: [2, 3]
 ---
 
-# BestPractices Rules
+# BestPractices rules
 
 This document details the rules available in the `BestPractices` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -30,7 +29,6 @@ This document details the rules available in the `BestPractices` category.
 | Psl String Functions | [`psl-string-functions`](#psl-string-functions) |
 | Use Compound Assignment | [`use-compound-assignment`](#use-compound-assignment) |
 
----
 
 ## <a id="combine-consecutive-issets"></a>`combine-consecutive-issets`
 
@@ -51,7 +49,7 @@ the rule will still warn, but it will not attempt an automated fix.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -61,7 +59,7 @@ if (isset($a, $b)) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -89,7 +87,7 @@ since they give the impression of iteration but never actually do so.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -102,7 +100,7 @@ for ($i = 0; $i < 3; $i++) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -133,7 +131,7 @@ Middlewares should be applied in the routes file, not in the controller.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -142,7 +140,7 @@ Middlewares should be applied in the routes file, not in the controller.
 Route::get('/user', 'UserController@index')->middleware('auth');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -179,7 +177,7 @@ harder to see at a glance.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -188,7 +186,7 @@ $name = 'World';
 $greeting = sprintf('Hello, %s!', $name);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -218,7 +216,7 @@ making them the recommended approach for migrations.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -243,7 +241,7 @@ return new class extends Migration {
 };
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -282,7 +280,7 @@ This improves readability by reducing boilerplate code.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.1.0`
+- **PHP version:** PHP `>= 8.1.0`
 
 ### Configuration
 
@@ -293,7 +291,7 @@ This improves readability by reducing boilerplate code.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -302,7 +300,7 @@ $names = ['Alice', 'Bob', 'Charlie'];
 $uppercased_names = array_map(strtoupper(...), $names);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -330,7 +328,7 @@ Detects when an implementation class is used instead of the interface.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -346,7 +344,7 @@ class UserController
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -384,7 +382,7 @@ Using the array parameter directly is more concise and readable.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -395,7 +393,7 @@ return view('user.profile', [
 ]);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -423,7 +421,7 @@ initializations or increments. This can make the code more readable and concise.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -435,7 +433,7 @@ while ($i < 10) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -467,7 +465,7 @@ Psl array functions are preferred because they are type-safe and provide more co
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -475,7 +473,7 @@ Psl array functions are preferred because they are type-safe and provide more co
 $filtered = Psl\Vec\filter($xs, fn($x) => $x > 2);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -504,7 +502,7 @@ Psl data structures are preferred because they are type-safe and provide more co
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -516,7 +514,7 @@ use Psl\DataStructure\Stack;
 $stack = new Stack();
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -547,7 +545,7 @@ Psl DateTime classes and functions are preferred because they are type-safe and 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -555,7 +553,7 @@ Psl DateTime classes and functions are preferred because they are type-safe and 
 $dateTime = new Psl\DateTime\DateTime();
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -583,7 +581,7 @@ Psl math functions are preferred because they are type-safe and provide more con
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -591,7 +589,7 @@ Psl math functions are preferred because they are type-safe and provide more con
 $abs = Psl\Math\abs($number);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -619,7 +617,7 @@ Psl output functions are preferred because they are type-safe and provide more c
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -627,7 +625,7 @@ Psl output functions are preferred because they are type-safe and provide more c
 Psl\IO\write_line("Hello, world!");
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -656,7 +654,7 @@ Psl randomness functions are preferred because they are type-safe and provide mo
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -664,7 +662,7 @@ Psl randomness functions are preferred because they are type-safe and provide mo
 $randomInt = Psl\SecureRandom\int(0, 10);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -693,7 +691,7 @@ Psl regex functions are preferred because they are type-safe and provide more co
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -701,7 +699,7 @@ Psl regex functions are preferred because they are type-safe and provide more co
 $result = Psl\Regex\matches('Hello, World!', '/\w+/');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -731,7 +729,7 @@ and allow other tasks within the event loop to continue executing while the curr
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -742,7 +740,7 @@ use Psl\DateTime;
 Async\sleep(DateTime\Duration::seconds(1));
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -771,7 +769,7 @@ Psl string functions are preferred because they are type-safe and provide more c
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -779,7 +777,7 @@ Psl string functions are preferred because they are type-safe and provide more c
 $capitalized = Psl\Str\capitalize($string);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -808,7 +806,7 @@ creating an intermediate copy of the string.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -817,7 +815,7 @@ $count += 1;
 $message .= ' Hello';
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

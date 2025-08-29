@@ -10,7 +10,7 @@ hero:
     id: mago-logo
   actions:
     - theme: brand
-      text: Get Started
+      text: Get started
       link: /guide/getting-started
     - theme: alt
       text: View on GitHub
@@ -18,18 +18,18 @@ hero:
 
 features:
   - icon: ⚡️
-    title: The Fastest Toolchain
+    title: The fastest toolchain
     details: Mago is engineered from the ground up for maximum performance, leveraging Rust and a parallel pipeline to analyze and format code faster than any other tool.
   - icon: 🛠️
-    title: All-in-One Solution
+    title: All-in-one solution
     details: Get a powerful static analyzer, a configurable linter with auto-fixing, and an opinionated code formatter in a single, cohesive binary.
   - icon: 🎨
-    title: Smart & Opinionated
+    title: Smart & opinionated
     details: With a focus on correctness and modern PHP standards, Mago provides intelligent feedback and consistent formatting to eliminate style debates and prevent bugs.
 ---
 
 <div class="consulting-container">
-  <h2>Professional Consulting</h2>
+  <h2>Professional consulting</h2>
   <p class="description">
     Need expert help with high-performance and high-load PHP applications?
   </p>
@@ -39,6 +39,6 @@ features:
 </div>
 
 <div class="sponsor-container">
-  <h2>Sponsored By</h2>
+  <h2>Sponsored by</h2>
   <p>Your logo here? <a href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Become a sponsor!</a></p>
 </div>

@@ -1,12 +1,11 @@
 ---
-title: Maintainability Rules
+title: Maintainability rules
+outline: [2, 3]
 ---
 
-# Maintainability Rules
+# Maintainability rules
 
 This document details the rules available in the `Maintainability` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -22,7 +21,6 @@ This document details the rules available in the `Maintainability` category.
 | Too Many Methods | [`too-many-methods`](#too-many-methods) |
 | Too Many Properties | [`too-many-properties`](#too-many-properties) |
 
----
 
 ## <a id="cyclomatic-complexity"></a>`cyclomatic-complexity`
 
@@ -62,7 +60,7 @@ Consider refactoring to use early returns, helper methods, or clearer control fl
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -74,7 +72,7 @@ if ($condition) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -183,7 +181,7 @@ Refactor by extracting the flag logic into its own class or method.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -197,7 +195,7 @@ function get_difference_case_insensitive(string $a, string $b): string {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -227,7 +225,7 @@ the code easier to read and maintain by reducing its cyclomatic complexity.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -242,7 +240,7 @@ function process($user) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -276,7 +274,7 @@ and make it difficult to follow the flow of execution.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -290,7 +288,7 @@ while ($i < 10) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -325,7 +323,7 @@ This rule checks the number of cases in enums. If the number of cases exceeds a 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 enum SimpleEnum {
@@ -335,7 +333,7 @@ enum SimpleEnum {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 enum LargeEnum {
@@ -385,7 +383,7 @@ If the number of methods exceeds a configurable threshold, an issue is reported.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 class SimpleClass {
@@ -395,7 +393,7 @@ class SimpleClass {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 class ComplexClass {
@@ -443,7 +441,7 @@ If the number of properties exceeds a configurable threshold, an issue is report
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 class SimpleClass {
@@ -452,7 +450,7 @@ class SimpleClass {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 class ComplexClass {

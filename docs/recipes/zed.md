@@ -1,8 +1,8 @@
 ---
-title: Zed Editor Recipe
+title: Zed editor recipe
 ---
 
-# 🧩 Zed Editor Recipe
+# 🧩 Zed editor recipe
 
 Integrate Mago directly into the [Zed editor](https://zed.dev) for seamless, high-performance code formatting on save.
 

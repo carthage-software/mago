@@ -1,12 +1,12 @@
 ---
-title: Usage
+title: Linter usage
 ---
 
 # Usage
 
 The `mago lint` command is the entry point for running the linter.
 
-## Linting Your Project
+## Linting your project
 
 To lint all the source files defined in your `mago.toml` configuration, simply run:
 
@@ -16,7 +16,7 @@ mago lint
 
 Mago will scan your project in parallel and report any issues it finds.
 
-## Auto-Fixing Issues
+## Auto-fixing issues
 
 Many lint rules provide automatic fixes. To apply them, use the `--fix` flag:
 
@@ -30,7 +30,7 @@ This will modify your files in place. To see what changes would be made without 
 mago lint --fix --dry-run
 ```
 
-## Running Specific Rules
+## Running specific rules
 
 If you want to run only a specific set of rules, use the `--only` flag. This is great for incrementally introducing new rules to a project.
 

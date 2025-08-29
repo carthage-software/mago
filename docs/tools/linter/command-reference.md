@@ -1,8 +1,9 @@
 ---
-title: Command Reference
+title: Linter command reference
+outline: deep
 ---
 
-# Command Reference
+# Command reference
 
 The `mago lint` command is the entry point for all linting-related tasks.
 
@@ -38,13 +39,15 @@ Run only a specific, comma-separated list of rules, overriding the configuration
 
 Enable all linter rules for the most exhaustive analysis possible. This overrides your configuration, ignores PHP version constraints, and enables rules that are disabled by default.
 
-> **Warning:** This mode is extremely noisy, not recommended for general use.
+:::warning
+This mode is extremely noisy, not recommended for general use.
+:::
 
 ### `-s`, `--semantics`
 
 Perform only the parsing and basic semantic checks without running any lint rules.
 
-### Auto-Fixing
+### Auto-fixing
 
 | Flag | Description |
 | :--- | :--- |

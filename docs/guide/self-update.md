@@ -6,7 +6,7 @@ title: Updating Mago
 
 Keeping **Mago** up-to-date is simple. We provide a built-in command to handle the entire update process for you, ensuring you always have the latest features and performance improvements.
 
-## Recommended Method (`self-update`)
+## Recommended method
 
 If you installed Mago using the shell script, `brew`, `cargo`, or by manually downloading the binary, the easiest way to update is with the built-in `self-update` command.
 
@@ -34,7 +34,7 @@ composer update carthage-software/mago
 
 This ensures that your project's `composer.lock` file is updated correctly.
 
-## Verifying the Update
+## Checking the current version
 
 After the update process completes, you can verify that you have the latest version by running:
 

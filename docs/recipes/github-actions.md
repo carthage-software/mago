@@ -1,12 +1,12 @@
 ---
-title: GitHub Actions Recipe
+title: GitHub Actions recipe
 ---
 
-# 🧩 GitHub Actions Recipe
+# 🧩 GitHub Actions recipe
 
 Automate your code quality checks by running **Mago** directly in your GitHub workflow. This setup will check for formatting and linting errors on every push and pull request, providing direct feedback within GitHub.
 
-## Quick Setup
+## Quick setup
 
 Create a new file at `.github/workflows/mago.yml` and add the following content:
 

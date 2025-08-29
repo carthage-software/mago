@@ -317,14 +317,14 @@ function generate_overview_page(string $docs_dir, array $rules_by_category, arra
     $overviewPagePath = $docs_dir . '/tools/linter/rules-and-categories.md';
     writeln('✍️ ', 'Generating main overview page: %s', $overviewPagePath);
 
-    $overviewContent = "---\nsidebar_position: 3\ntitle: Rules & Categories\n---\n\n# Rules & Categories\n\n";
-    $overviewContent .= "The **Mago** Linter comes with a wide variety of rules, each designed to catch a specific type of issue.\n\n";
-    $overviewContent .= "## Rule Categories\n\n";
+    $overviewContent = "---\nsidebar_position: 3\ntitle: Rules & categories\n---\n\n# Rules & categories\n\n";
+    $overviewContent .= "**Mago**'s linter comes with a wide variety of rules, each designed to catch a specific type of issue.\n\n";
+    $overviewContent .= "## Rule categories\n\n";
     foreach ($rules_by_category as $categoryName => $data) {
         $overviewContent .= "- [{$categoryName}](./rules/{$data['kebab']})\n";
     }
 
-    $overviewContent .= "\n## Integration-Specific Rules\n\n";
+    $overviewContent .= "\n## Integration-specific rules\n\n";
     if ([] === $rules_by_integration) {
         $overviewContent .= "There are currently no rules that require a specific integration.\n";
     } else {
@@ -362,14 +362,13 @@ function create_category_markdown_content(string $category_name, array $rules, a
 
     $content = <<<MD
     ---
-    title: {$category_name} Rules
+    title: {$category_name} rules
+    outline: [2, 3]
     ---
 
-    # {$category_name} Rules
+    # {$category_name} rules
 
     This document details the rules available in the `{$category_name}` category.
-
-    ## Available Rules
 
     | Rule | Code |
     | :--- | :---------- |
@@ -379,7 +378,7 @@ function create_category_markdown_content(string $category_name, array $rules, a
         $content .= "\n| {$rule['name']} | [`{$rule['code']}`](#{$rule['code']}) |";
     }
 
-    $content .= "\n\n---\n";
+    $content .= "\n\n";
 
     foreach ($rules as $rule) {
         $rule_config = $linter_config['rules'][$rule['code']] ?? ['enabled' => true, 'level' => 'error'];
@@ -438,7 +437,7 @@ function generate_rule_docs_section(array $rule, array $config): string
     }
 
     if ($phpVersion) {
-        $requirements_items[] = "- **PHP Version:** {$phpVersion}";
+        $requirements_items[] = "- **PHP version:** {$phpVersion}";
     }
     if ([] !== $requiredIntegrations) {
         $plural = count($requiredIntegrations) > 1 ? 's' : '';
@@ -466,10 +465,10 @@ function generate_rule_docs_section(array $rule, array $config): string
     if ('' !== $good_example || '' !== $bad_example) {
         $examples_section .= "### Examples\n\n";
         if ('' !== $good_example) {
-            $examples_section .= "#### Correct Code\n\n```php\n{$good_example}\n```\n\n";
+            $examples_section .= "#### Correct code\n\n```php\n{$good_example}\n```\n\n";
         }
         if ('' !== $bad_example) {
-            $examples_section .= "#### Incorrect Code\n\n```php\n{$bad_example}\n```\n\n";
+            $examples_section .= "#### Incorrect code\n\n```php\n{$bad_example}\n```\n\n";
         }
     }
 

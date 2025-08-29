@@ -1,12 +1,11 @@
 ---
-title: Correctness Rules
+title: Correctness rules
+outline: [2, 3]
 ---
 
-# Correctness Rules
+# Correctness rules
 
 This document details the rules available in the `Correctness` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -24,7 +23,6 @@ This document details the rules available in the `Correctness` category.
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
 
----
 
 ## <a id="assert-description"></a>`assert-description`
 
@@ -43,7 +41,7 @@ Assert functions should have a description to make it easier to understand the p
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -51,7 +49,7 @@ Assert functions should have a description to make it easier to understand the p
 assert($user->isActivated(), 'User MUST be activated at this point.');
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -67,7 +65,7 @@ Detects class constants that are missing a type hint.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.3.0`
+- **PHP version:** PHP `>= 8.3.0`
 
 ### Configuration
 
@@ -78,7 +76,7 @@ Detects class constants that are missing a type hint.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -100,7 +98,7 @@ class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -138,7 +136,7 @@ Detects equality and inequality comparisons that should use identity comparison 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -148,7 +146,7 @@ if ($a === $b) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -179,7 +177,7 @@ behavior and potential security vulnerabilities.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -187,7 +185,7 @@ behavior and potential security vulnerabilities.
 echo 'Hello, world!';
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <php?
@@ -212,7 +210,7 @@ to read and understand.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -223,7 +221,7 @@ if ($x == 1) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -253,7 +251,7 @@ For example, `if ($x === true)` is equivalent to the more concise `if ($x)`, and
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -262,7 +260,7 @@ if ($x) { /* ... */ }
 if (!$y) { /* ... */ }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -291,7 +289,7 @@ potentially hiding errors that should be addressed. This practice, known as
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -304,7 +302,7 @@ try {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -324,7 +322,7 @@ Detects parameters that are missing a type hint.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 7.0.0`
+- **PHP version:** PHP `>= 7.0.0`
 
 ### Configuration
 
@@ -337,7 +335,7 @@ Detects parameters that are missing a type hint.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -348,7 +346,7 @@ function foo(string $bar): void
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -367,7 +365,7 @@ Detects class-like properties that are missing a type hint.
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 7.4.0`
+- **PHP version:** PHP `>= 7.4.0`
 
 ### Configuration
 
@@ -378,7 +376,7 @@ Detects class-like properties that are missing a type hint.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -389,7 +387,7 @@ class Foo
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -408,7 +406,7 @@ Detects functions, methods, closures, and arrow functions that are missing a ret
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 7.0.0`
+- **PHP version:** PHP `>= 7.0.0`
 
 ### Configuration
 
@@ -421,7 +419,7 @@ Detects functions, methods, closures, and arrow functions that are missing a ret
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -431,7 +429,7 @@ function foo(): int {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -462,7 +460,7 @@ instead of `assertEquals` or `assertNotEquals`.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -480,7 +478,7 @@ final class SomeTest extends TestCase
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -507,7 +505,7 @@ The use of loose comparison for these functions may lead to hard-to-debug, unexp
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 7.0.0`
+- **PHP version:** PHP `>= 7.0.0`
 
 ### Configuration
 
@@ -519,7 +517,7 @@ The use of loose comparison for these functions may lead to hard-to-debug, unexp
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -527,7 +525,7 @@ The use of loose comparison for these functions may lead to hard-to-debug, unexp
 in_array(1, ['foo', 'bar', 'baz'], strict: true);
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -543,7 +541,7 @@ Detects missing `declare(strict_types=1);` statement at the beginning of the fil
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 7.0.0`
+- **PHP version:** PHP `>= 7.0.0`
 
 ### Configuration
 
@@ -555,7 +553,7 @@ Detects missing `declare(strict_types=1);` statement at the beginning of the fil
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -565,7 +563,7 @@ declare(strict_types=1);
 echo "Hello, World!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

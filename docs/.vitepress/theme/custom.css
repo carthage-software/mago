@@ -54,10 +54,15 @@
     font-size: 1.25em;
     padding-bottom: 0.3rem;
     text-decoration: underline;
+    text-underline-offset: 6px;
     text-decoration-thickness: 2px;
     text-decoration-color: var(--heading-underline-color);
     margin-top: 2.5rem;
     margin-bottom: 1.25rem;
+}
+
+.VPDoc h3 a {
+  text-decoration: none;
 }
 
 .VPDoc h4 {
@@ -79,6 +84,9 @@
 .dark {
     --heading-text-color: #47a467;
     --heading-underline-color: #1aa0d2;
+
+    --vp-code-bg: #494a4b29;
+    --vp-c-brand-1: #5fbb7f;
 }
 
 @keyframes float {
@@ -128,4 +136,12 @@
 
 .consulting-container p.description {
     margin: 0 auto 1rem auto;
+}
+
+.custom-block {
+  padding: 12px 16px 3px;
+
+  & .custom-block-title + p {
+    margin-top: 2%px;
+  }
 }

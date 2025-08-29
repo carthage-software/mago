@@ -1,12 +1,11 @@
 ---
-title: Consistency Rules
+title: Consistency rules
+outline: [2, 3]
 ---
 
-# Consistency Rules
+# Consistency rules
 
 This document details the rules available in the `Consistency` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -28,7 +27,6 @@ This document details the rules available in the `Consistency` category.
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
 | Trait Name | [`trait-name`](#trait-name) |
 
----
 
 ## <a id="ambiguous-function-call"></a>`ambiguous-function-call`
 
@@ -53,7 +51,7 @@ performance gains in some cases.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -72,7 +70,7 @@ $length2 = \strlen("hello");
 $value = namespace\my_function();
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -102,7 +100,7 @@ is the preferred way to define arrays in PHP.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -111,7 +109,7 @@ is the preferred way to define arrays in PHP.
 $arr = [1, 2, 3];
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -144,7 +142,7 @@ This rule can be configured to enforce the preferred style.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -158,7 +156,7 @@ final class SomeTest extends TestCase
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -192,7 +190,7 @@ This improves readability and prevents potential errors when adding new statemen
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -206,7 +204,7 @@ for ($i = 0; $i < 10; $i++) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -237,7 +235,7 @@ especially when variables are followed by alphanumeric characters. This rule pro
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -248,7 +246,7 @@ $c = "Hello, {$$name}!";
 $d = "Hello, {${$object->getMethod()}}!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -278,7 +276,7 @@ Class names should be in class case, also known as PascalCase.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -286,7 +284,7 @@ Class names should be in class case, also known as PascalCase.
 class MyClass {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -316,7 +314,7 @@ Constant names should be in constant case, also known as UPPER_SNAKE_CASE.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -328,7 +326,7 @@ class MyClass {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -362,7 +360,7 @@ Enum names should be in class case, also known as PascalCase.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -370,7 +368,7 @@ Enum names should be in class case, also known as PascalCase.
 enum MyEnum {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -400,7 +398,7 @@ Function names should be in camel case or snake case, depending on the configura
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -408,7 +406,7 @@ Function names should be in camel case or snake case, depending on the configura
 function my_function() {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -437,7 +435,7 @@ Interface names should be in class case and suffixed with `Interface`, depending
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -445,7 +443,7 @@ Interface names should be in class case and suffixed with `Interface`, depending
 interface MyInterface {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -472,7 +470,7 @@ in lowercase. Using uppercase or mixed case is discouraged for consistency and r
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -484,7 +482,7 @@ if (true) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?PHP
@@ -514,7 +512,7 @@ and readability.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -524,7 +522,7 @@ function example(int $param): void {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -552,7 +550,7 @@ This is primarily for consistency and clarity.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -561,7 +559,7 @@ This is primarily for consistency and clarity.
 $freeSpace = disk_free_space("/");
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -587,7 +585,7 @@ in PHP, as they are more consistent with the language's syntax and are easier to
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -595,7 +593,7 @@ in PHP, as they are more consistent with the language's syntax and are easier to
 // This is a good comment.
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -620,7 +618,7 @@ Discourages the use of `?><?php` as a statement terminator. Recommends using a s
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -628,7 +626,7 @@ Discourages the use of `?><?php` as a statement terminator. Recommends using a s
 echo "Hello World";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -653,7 +651,7 @@ diffs and formatting issues, so it is recommended to remove it.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -661,7 +659,7 @@ diffs and formatting issues, so it is recommended to remove it.
 // This is a good comment.
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -687,7 +685,7 @@ Trait names should be in class case and suffixed with `Trait`, depending on the 
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -695,7 +693,7 @@ Trait names should be in class case and suffixed with `Trait`, depending on the 
 trait MyTrait {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

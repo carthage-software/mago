@@ -1,12 +1,12 @@
 ---
-title: Usage
+title: Analyzer usage
 ---
 
-# Using the Mago Analyzer
+# Using the analyzer
 
 The `mago analyze` command is your primary tool for running a deep, type-level analysis on your project.
 
-## Analyzing Your Project
+## Analyzing your project
 
 To analyze all the source files defined in your `mago.toml` configuration, simply run:
 
@@ -16,7 +16,7 @@ mago analyze
 
 Mago will first compile a model of your entire codebase (including dependencies and stubs) and then analyze your source files in parallel, reporting any issues it finds.
 
-## Analyzing Specific Files
+## Analyzing specific files
 
 You can also analyze specific files or directories by passing them as arguments. This will override the `paths` in your configuration for this run.
 
@@ -28,7 +28,7 @@ mago analyze src/Services/UserService.php
 mago analyze src/Controller/
 ```
 
-## Working with a Baseline
+## Working with a baseline
 
 When introducing Mago to an existing project, you might have a large number of pre-existing issues. A "baseline" allows you to ignore these for now and focus only on new issues in new code.
 
@@ -46,7 +46,7 @@ To use a baseline, simply run the analyzer as usual. Mago will automatically det
 mago analyze --baseline /path/to/your/baseline.php
 ```
 
-## Disabling Stubs
+## Disabling stubs
 
 By default, Mago loads a "prelude" of stubs for PHP's built-in functions and classes. If you wish to disable this for any reason, you can use the `--no-stubs` flag. Note that this may lead to a large number of "symbol not found" errors if your code uses standard PHP features.
 

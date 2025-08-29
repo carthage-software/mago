@@ -1,8 +1,8 @@
 ---
-title: Helix Editor Recipe
+title: Helix Editor recipe
 ---
 
-# 🧩 Helix Editor Recipe
+# 🧩 Helix editor recipe
 
 Integrate Mago directly with the [Helix editor](https://helix-editor.com/) for fast, reliable, and automatic code formatting.
 

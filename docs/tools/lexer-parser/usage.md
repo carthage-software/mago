@@ -1,8 +1,8 @@
 ---
-title: Usage
+title: Lexer and parser usage
 ---
 
-# Using Mago's Lexer and Parser
+# Using Mago's lexer and parser
 
 The primary way to interact with Mago's parser is through the `mago ast` command. It takes a single PHP file and can output its structure in several different formats.
 
@@ -14,7 +14,7 @@ Let's consider a simple file, `example.php`:
 echo 'Hello, World!';
 ```
 
-### Default Tree View
+### Default tree view
 
 By default, `mago ast` prints a human-readable tree that visualizes the Abstract Syntax Tree (AST).
 
@@ -38,7 +38,7 @@ Program
         └── Terminator ;
 ```
 
-### Token View
+### Token view
 
 To see the raw token stream from the lexer, use the `--tokens` flag. This is useful for debugging low-level syntax issues.
 
@@ -60,7 +60,7 @@ This will output a table of all tokens found in the file:
   Whitespace                "\n"                                               [29..29]
 ```
 
-### JSON Output
+### JSON output
 
 For machine-readable output, you can combine the `--json` flag with either the default AST view or the `--tokens` view. This is perfect for scripting or for other tools to consume Mago's output.
 

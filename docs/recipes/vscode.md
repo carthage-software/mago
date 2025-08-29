@@ -1,8 +1,8 @@
 ---
-title: Visual Studio Code Recipe
+title: Visual Studio Code recipe
 ---
 
-# 🧩 Visual Studio Code Recipe
+# 🧩 Visual Studio Code recipe
 
 Integrate Mago directly into Visual Studio Code for powerful, automatic PHP code formatting.
 
@@ -15,7 +15,7 @@ This guide uses the [Custom Local Formatters](https://marketplace.visualstudio.c
 
 ## Configuration
 
-### Step 1: Install the Extension
+### Install the extension
 
 First, you need to install the bridge extension that allows VS Code to run Mago as a formatter.
 
@@ -23,7 +23,7 @@ First, you need to install the bridge extension that allows VS Code to run Mago 
 2.  Search for `Custom Local Formatters`.
 3.  Install the extension created by **`jkillian`**.
 
-### Step 2: Configure `settings.json`
+### Configure `settings.json`
 
 Next, you'll configure the extension to use Mago and tell VS Code to use it for PHP files.
 
@@ -59,4 +59,4 @@ Next, you'll configure the extension to use Mago and tell VS Code to use it for 
 Your setup is now complete.
 
 - With `editor.formatOnSave` enabled, your PHP files will be automatically formatted by Mago every time you save.
-- You can also manually format a file at any time by opening the Command Palette (`Ctrl+Shift+P`) and running the **Format Document** command.
+- You can also manually format a file at any time by opening the command palette (`Ctrl+Shift+P`) and running the **Format document** command.

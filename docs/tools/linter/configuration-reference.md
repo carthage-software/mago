@@ -1,10 +1,10 @@
 ---
-title: Configuration Reference
+title: Linter configuration reference
 ---
 
-# Configuration Reference
+# Configuration reference
 
-The **Mago** Linter is configured in your `mago.toml` file under the `[linter]` and `[linter.rules]` tables.
+**Mago**'s linter is configured in your `mago.toml` file under the `[linter]` and `[linter.rules]` tables.
 
 ```toml
 # Example linter configuration
@@ -23,26 +23,25 @@ no-else-clause = { level = "warning" }
 cyclomatic-complexity = { threshold = 20 }
 ```
 
-## `[linter]` Table
+## `[linter]`
 
 | Option         | Type       | Default | Description                                                                  |
 | :------------- | :--------- | :------ | :--------------------------------------------------------------------------- |
 | `excludes`     | `string[]` | `[]`    | A list of glob patterns to exclude from linting.                             |
 | `integrations` | `string[]` | `[]`    | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
 
-## `[linter.rules]` Table
+## `[linter.rules]`
 
 This table allows you to configure individual lint rules. Each key is the rule's code (in `kebab-case`).
 
-### Common Rule Options
+### Common rule options
 
 All rules accept two common options:
 
 - `enabled`: A boolean (`true` or `false`) to enable or disable the rule.
 - `level`: A string to set the issue severity. Options are `"error"`, `"warning"`, `"help"`, and `"note"`.
 
-### Rule-Specific Options
-
+### Rule-specific options
 Some rules have additional configuration options. For example, `cyclomatic-complexity` has a `threshold`:
 
 ```toml

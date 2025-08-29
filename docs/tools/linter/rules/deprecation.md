@@ -1,12 +1,11 @@
 ---
-title: Deprecation Rules
+title: Deprecation rules
+outline: [2, 3]
 ---
 
-# Deprecation Rules
+# Deprecation rules
 
 This document details the rules available in the `Deprecation` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -15,7 +14,6 @@ This document details the rules available in the `Deprecation` category.
 | No Void Reference Return | [`no-void-reference-return`](#no-void-reference-return) |
 | Optional Parameter Before Required | [`optional-param-order`](#optional-param-order) |
 
----
 
 ## <a id="explicit-nullable-param"></a>`explicit-nullable-param`
 
@@ -26,7 +24,7 @@ Such parameters are considered deprecated; an explicit nullable type hint is rec
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.4.0`
+- **PHP version:** PHP `>= 8.4.0`
 
 ### Configuration
 
@@ -37,7 +35,7 @@ Such parameters are considered deprecated; an explicit nullable type hint is rec
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -49,7 +47,7 @@ function bar(null|string $param) {}
 function baz(null|object $param = null) {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -71,7 +69,7 @@ Such names are considered deprecated; a more descriptive identifier is recommend
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.4.0`
+- **PHP version:** PHP `>= 8.4.0`
 
 ### Configuration
 
@@ -82,7 +80,7 @@ Such names are considered deprecated; a more descriptive identifier is recommend
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -90,7 +88,7 @@ Such names are considered deprecated; a more descriptive identifier is recommend
 class MyService {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -107,7 +105,7 @@ Such functions are considered deprecated; returning by reference from a void fun
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.2.0`
+- **PHP version:** PHP `>= 8.2.0`
 
 ### Configuration
 
@@ -118,7 +116,7 @@ Such functions are considered deprecated; returning by reference from a void fun
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -128,7 +126,7 @@ function &foo(): string {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -147,7 +145,7 @@ Such parameter order is considered deprecated; required parameters should preced
 
 ### Requirements
 
-- **PHP Version:** PHP `>= 8.0.0`
+- **PHP version:** PHP `>= 8.0.0`
 
 ### Configuration
 
@@ -158,7 +156,7 @@ Such parameter order is considered deprecated; required parameters should preced
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -166,7 +164,7 @@ Such parameter order is considered deprecated; required parameters should preced
 function foo(string $required, ?string $optional = null): void {}
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

@@ -1,16 +1,19 @@
 ---
-title: Command Reference
+title: Analyzer command reference
+outline: deep
 ---
 
-# Command Reference
+# Command reference
 
 The `mago analyze` command is the entry point for running Mago's static type checker.
-
-> **Note:** `mago analyse` is a convenient alias for `mago analyze`. Both can be used interchangeably.
 
 ```sh
 Usage: mago analyze [OPTIONS] [PATHS]...
 ```
+
+:::tip
+`mago analyse` is a convenient alias for `mago analyze`. Both can be used interchangeably.
+:::
 
 ## Arguments
 

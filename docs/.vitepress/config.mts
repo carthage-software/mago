@@ -1,6 +1,5 @@
 import { defineConfig } from "vitepress";
 
-// A placeholder for your site's domain
 const site = "https://mago.carthage.software";
 
 export default defineConfig({
@@ -61,7 +60,7 @@ export default defineConfig({
         text: "📖 Guide",
         collapsed: false,
         items: [
-          { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Getting started", link: "/guide/getting-started" },
           { text: "Installation", link: "/guide/installation" },
           { text: "Initialization", link: "/guide/initialization" },
           { text: "Updating Mago", link: "/guide/self-update" },
@@ -82,11 +81,11 @@ export default defineConfig({
               { text: "Overview", link: "/tools/formatter/overview" },
               { text: "Usage", link: "/tools/formatter/usage" },
               {
-                text: "Configuration Reference",
+                text: "Configuration reference",
                 link: "/tools/formatter/configuration-reference",
               },
               {
-                text: "Command Reference",
+                text: "Command reference",
                 link: "/tools/formatter/command-reference",
               },
             ],
@@ -137,12 +136,12 @@ export default defineConfig({
               },
               { text: "Integrations", link: "/tools/linter/integrations" },
               {
-                text: "Command Reference",
-                link: "/tools/linter/command-reference",
+                text: "Configuration reference",
+                link: "/tools/linter/configuration-reference",
               },
               {
-                text: "Configuration Reference",
-                link: "/tools/linter/configuration-reference",
+                text: "Command reference",
+                link: "/tools/linter/command-reference",
               },
             ],
           },
@@ -153,23 +152,23 @@ export default defineConfig({
               { text: "Overview", link: "/tools/analyzer/overview" },
               { text: "Usage", link: "/tools/analyzer/usage" },
               {
-                text: "Configuration Reference",
+                text: "Configuration reference",
                 link: "/tools/analyzer/configuration-reference",
               },
               {
-                text: "Command Reference",
+                text: "Command reference",
                 link: "/tools/analyzer/command-reference",
               },
             ],
           },
           {
-            text: "Lexer & Parser",
+            text: "Lexer & parser",
             collapsed: true,
             items: [
               { text: "Overview", link: "/tools/lexer-parser/overview" },
               { text: "Usage", link: "/tools/lexer-parser/usage" },
               {
-                text: "Command Reference",
+                text: "Command reference",
                 link: "/tools/lexer-parser/command-reference",
               },
             ],
@@ -188,7 +187,7 @@ export default defineConfig({
       },
       { text: "🤝 Contributing", link: "/contributing" },
       { text: "⚡️ Benchmarks", link: "/benchmarks" },
-      { text: "⭐ Projects Using Mago", link: "/projects-using-mago" },
+      { text: "⭐ Projects using Mago", link: "/projects-using-mago" },
     ],
 
     socialLinks: [

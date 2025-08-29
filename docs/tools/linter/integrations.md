@@ -1,18 +1,24 @@
 ---
-title: Integrations
+title: Linter integrations
 ---
 
 # Integrations
 
-**Mago** includes specialized sets of linting rules designed for popular PHP frameworks and libraries. These "integrations" allow Mago to provide more intelligent and context-aware feedback for your specific stack.
+**Mago** includes specialized sets of linting rules designed for popular PHP frameworks and libraries. These integrations allow Mago to provide more intelligent and context-aware feedback for your specific stack.
 
 When an integration is enabled, Mago will automatically activate all the rules associated with it. You can still configure or disable individual rules from an integration in your `[linter.rules]` table if needed.
 
-## Available Integrations
+## Available integrations
 
-Mago is built with the broader PHP ecosystem in mind and includes support for a wide range of tools.
+Mago is built with the broader PHP ecosystem in mind and includes support for a wide range of tools. Currently, the linter has rules dedicated to:
+- Laravel
+- PHPUnit
+- PSL
+- Symfony
 
-> **Note:** While many integrations are listed below for future support, only **Laravel**, **PHPUnit**, **PSL**, and **Symfony** currently have specialized rules. Rules for other integrations are planned for future releases.
+## Future integrations
+
+The following integrations are planned for future releases:
 
 ### Frameworks
 
@@ -34,7 +40,7 @@ Mago is built with the broader PHP ecosystem in mind and includes support for a 
 - PSL (PHP Standard Library)
 - ReactPHP
 
-### Testing Frameworks
+### Testing frameworks
 
 - Behat
 - Codeception
@@ -53,7 +59,7 @@ Mago is built with the broader PHP ecosystem in mind and includes support for a 
 - Cycle
 - Doctrine
 
-## Enabling Integrations
+## Enabling integrations
 
 You can enable integrations in your `mago.toml` file under the `[linter]` table.
 

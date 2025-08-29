@@ -1,13 +1,13 @@
 ---
 sidebar_position: 3
-title: Rules & Categories
+title: Rules & categories
 ---
 
-# Rules & Categories
+# Rules & categories
 
-The **Mago** Linter comes with a wide variety of rules, each designed to catch a specific type of issue.
+**Mago**'s linter comes with a wide variety of rules, each designed to catch a specific type of issue.
 
-## Rule Categories
+## Rule categories
 
 - [BestPractices](./rules/best-practices)
 - [Clarity](./rules/clarity)
@@ -19,7 +19,7 @@ The **Mago** Linter comes with a wide variety of rules, each designed to catch a
 - [Safety](./rules/safety)
 - [Security](./rules/security)
 
-## Integration-Specific Rules
+## Integration-specific rules
 
 
 ### Laravel

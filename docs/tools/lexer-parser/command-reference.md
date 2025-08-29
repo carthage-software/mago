@@ -1,8 +1,9 @@
 ---
-title: Command Reference
+title: Lexer and parser command reference
+outline: deep
 ---
 
-# Command Reference
+# Command reference
 
 The `mago ast` command is a powerful inspection tool that tokenizes and parses a single PHP file, giving you insight into its lexical and syntactical structure.
 

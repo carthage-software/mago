@@ -1,12 +1,11 @@
 ---
-title: Redundancy Rules
+title: Redundancy rules
+outline: [2, 3]
 ---
 
-# Redundancy Rules
+# Redundancy rules
 
 This document details the rules available in the `Redundancy` category.
-
-## Available Rules
 
 | Rule | Code |
 | :--- | :---------- |
@@ -27,7 +26,6 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant String Concat | [`no-redundant-string-concat`](#no-redundant-string-concat) |
 | No Redundant Write Visibility | [`no-redundant-write-visibility`](#no-redundant-write-visibility) |
 
----
 
 ## <a id="constant-condition"></a>`constant-condition`
 
@@ -49,7 +47,7 @@ and can be removed or refactored.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -58,7 +56,7 @@ if ($variable > 10) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -87,7 +85,7 @@ Detects redundant closing tags ( `?>` ) at the end of a file.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -95,7 +93,7 @@ Detects redundant closing tags ( `?>` ) at the end of a file.
 echo "Hello, world!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -123,7 +121,7 @@ to keep the codebase clean and maintainable.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -135,7 +133,7 @@ to keep the codebase clean and maintainable.
  */
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -162,7 +160,7 @@ loop body does not perform any actions and is likely a mistake or redundant code
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -172,7 +170,7 @@ foreach ($items as $item) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -198,7 +196,7 @@ Detects redundant `noop` statements.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -206,7 +204,7 @@ Detects redundant `noop` statements.
 echo "Hello, world!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -230,7 +228,7 @@ Detects redundant blocks around statements.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -238,7 +236,7 @@ Detects redundant blocks around statements.
 echo "Hello, world!";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -264,7 +262,7 @@ Detects redundant `continue` statements in loops.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -274,7 +272,7 @@ while (true) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -301,7 +299,7 @@ Detects redundant files that contain no executable code or declarations.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -313,7 +311,7 @@ function foo(): void {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -338,7 +336,7 @@ Detects redundant `final` modifiers on methods in final classes or enum methods.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -350,7 +348,7 @@ final class Foo {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -378,7 +376,7 @@ Detects redundant `goto` labels that are declared but not used.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -388,7 +386,7 @@ echo "Hello, world!";
 end:
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -414,7 +412,7 @@ Includes operations like multiplying by 1/-1, adding 0, modulo 1/-1, etc.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -425,7 +423,7 @@ $difference = $value - 1;
 $remainder = $x % 2;
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -453,7 +451,7 @@ Detects methods that override a parent method but only call the parent method wi
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -477,7 +475,7 @@ class Child extends Parent
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -522,7 +520,7 @@ making the `?->` operator superfluous and the code unnecessarily verbose.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -534,7 +532,7 @@ if (isset($user->profile)) {
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -562,7 +560,7 @@ Detects redundant parentheses around expressions.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -570,7 +568,7 @@ Detects redundant parentheses around expressions.
 $foo = 42;
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -594,7 +592,7 @@ Detects redundant string concatenation expressions.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -602,7 +600,7 @@ Detects redundant string concatenation expressions.
 $foo = "Hello World";
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php
@@ -626,7 +624,7 @@ Detects redundant write visibility modifiers on properties.
 
 ### Examples
 
-#### Correct Code
+#### Correct code
 
 ```php
 <?php
@@ -637,7 +635,7 @@ final class User
 }
 ```
 
-#### Incorrect Code
+#### Incorrect code
 
 ```php
 <?php

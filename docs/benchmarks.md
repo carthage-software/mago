@@ -8,7 +8,7 @@ Performance is a core feature of **Mago**. Every component, from the parser to t
 
 We regularly benchmark Mago against other popular tools in the PHP ecosystem to ensure it remains the fastest toolchain available. The benchmarks below were run against the full `wordpress-develop` codebase.
 
-## Our Performance Promise
+## Our performance promise
 
 At its core, Mago is built on a simple philosophy: **it must be the fastest.**
 
@@ -25,7 +25,7 @@ This benchmark measures the time it takes to check the formatting of an entire c
 | **Mago**   | **362.3ms ± 4.6ms** | **1x**         |
 | Pretty PHP | 35.62s ± 0.06s      | 98.32x slower  |
 
-### Resource Usage
+### Resource usage
 
 | Tool       | Peak Memory (RSS) | CPU Cycles       |
 | :--------- | :---------------- | :--------------- |
@@ -44,7 +44,7 @@ This benchmark measures the time it takes to lint an entire codebase.
 | Pint         | 34.23s ± 0.05s      | 45.89x slower  |
 | PHP-CS-Fixer | 41.81s ± 0.13s      | 56.07x slower  |
 
-### Resource Usage
+### Resource usage
 
 | Tool         | Peak Memory (RSS) | CPU Cycles       |
 | :----------- | :---------------- | :--------------- |
@@ -64,7 +64,7 @@ This benchmark measures the time it takes to perform a full static analysis.
 | Psalm    | 45.42s ± 1.16s    | 11.77x slower  |
 | PHPStan  | 111.43s ± 0.45s   | 28.88x slower  |
 
-### Resource Usage
+### Resource usage
 
 | Tool     | Peak Memory (RSS) | CPU Cycles       |
 | :------- | :---------------- | :--------------- |
@@ -78,7 +78,7 @@ This benchmark measures the time it takes to perform a full static analysis.
 - **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM)
 - **PHP:** 8.4.11 (Zend v4.4.11, Zend OPcache v8.4.11)
 
-## A Note on Memory Usage
+## A note on memory usage
 
 You might notice that Mago sometimes uses more memory than other tools, especially on large codebases. This is a
 deliberate and fundamental design choice.

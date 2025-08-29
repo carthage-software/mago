@@ -1,5 +1,6 @@
 ---
 title: Initialization
+outline: deep
 ---
 
 # Initialization
@@ -12,20 +13,20 @@ When you run it, Mago will guide you through a series of steps:
 mago init
 ```
 
-### Configuration Paths
+## Configuration paths
 
-1.  **Auto-detection (`composer.json`):** If a `composer.json` file is present, Mago will offer to automatically configure your project paths, PHP version, and linter integrations based on its contents. This is the recommended approach for most projects.
+1.  If a `composer.json` file is present, Mago will offer to automatically configure your project paths, PHP version, and linter integrations based on its contents. This is the recommended approach for most projects.
 
-2.  **Manual Setup:** If no `composer.json` is found, or if you prefer to set things up manually, the command will prompt you for:
+2.  If no `composer.json` is found, or if you prefer to set things up manually, the command will prompt you for:
     - Source code paths (`src`, `tests`, etc.)
     - Dependency paths (`vendor`)
     - Paths to exclude
     - PHP version
     - Linter integrations (Symfony, Laravel, etc.)
 
-### Interactive Walkthrough
+## Interactive walkthrough
 
-The command also includes an interactive setup for the Formatter and Analyzer, allowing you to enable powerful features and customize settings right from the start.
+The command also includes an interactive setup for the formatter and analyzer, allowing you to enable powerful features and customize settings right from the start.
 
 Here's an example of what the process looks like:
 
