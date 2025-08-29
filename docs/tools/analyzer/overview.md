@@ -25,7 +25,7 @@ If your code were an essay, the **linter** would be the grammar and style checke
 - **Comprehensive checks** — Catches a wide range of issues, from simple null pointer risks to complex logical errors.
 - **Heuristic engine** — Provides advice on code quality issues that aren't strict errors but could indicate potential bugs.
 
-## Dive Iin
+## Dive in
 
 - **[Usage](./usage.md)**: learn how to run the analyzer.
 - **[Configuration reference](./configuration-reference.md)**: see all the available options to customize the analysis.
