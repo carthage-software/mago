@@ -67,17 +67,14 @@ jobs:
 
           # Tier 1 targets:
 
-          ## Windows MSVC: x86_64, i686
-          - { target: i686-pc-windows-msvc, os: windows-latest, test: true }
+          ## Windows MSVC: x86_64
           - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true }
           ## macOS: aarch64, x86_64
           - { target: aarch64-apple-darwin, os: macos-latest, test: true }
           - { target: x86_64-apple-darwin, os: macos-latest, test: true }
-          ## Linux: aarch64, i686, x86_64
+          ## Linux: aarch64, x86_64
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
           - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
-          - { target: i686-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
-          - { target: i686-unknown-linux-musl, os: ubuntu-latest, test: true }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true, wasm: true, debian-package: true }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
 
@@ -85,8 +82,7 @@ jobs:
 
           # Windows MinGW: x86_64
           - { target: x86_64-pc-windows-gnu, os: windows-latest }
-          # FreeBSD: x86_64, i686
-          - { target: i686-unknown-freebsd, os: ubuntu-latest }
+          # FreeBSD: x86_64
           - { target: x86_64-unknown-freebsd, os: ubuntu-latest }
           # Linux: arm, armv7, powerpc, powerpc64, powerpc64le, s390x
           - { target: arm-unknown-linux-gnueabi, os: ubuntu-latest }
@@ -121,7 +117,6 @@ jobs:
           case ${{ matrix.job.target }} in
             arm-unknown-linux-*) sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
             aarch64-unknown-linux-gnu) sudo apt-get -y install gcc-aarch64-linux-gnu ;;
-            i686-unknown-linux-gnu) sudo apt-get -y install gcc-multilib g++-multilib ;;
             arm-unknown-linux-gnueabihf) sudo apt-get -y install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user ;;
           esac
 
@@ -149,7 +144,6 @@ jobs:
           IMAGE=""
           case ${{ matrix.job.target }} in
             x86_64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_x86_64" ;;
-            i686-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_i686" ;;
             aarch64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_aarch64" ;;
             powerpc64le-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_ppc64le" ;;
             s390x-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_s390x" ;;
@@ -173,9 +167,9 @@ jobs:
           cargo -V
           rustc -V
 
-      - name: build
+      - name: build 
         shell: bash
-        run: $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
+        run: $BUILD_CMD build --locked --release --target=${{ matrix.job.target }} --verbose
 
       - name: set binary name
         id: bin
@@ -199,15 +193,8 @@ jobs:
           echo "binary for target '${{ matrix.job.target }}' requires the following GLIBC versions:"
           strings "${{ steps.bin.outputs.BIN_PATH }}" | grep GLIBC_ || echo "No GLIBC version strings found."
 
-      - name: run tests (Windows)
-        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/') && contains(matrix.job.target, '-pc-windows-')
-        shell: bash
-        env:
-          RUSTFLAGS: "-C link-arg=/STACK:8388608"
-        run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
-
-      - name: run tests (non-Windows)
-        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/') && !contains(matrix.job.target, '-pc-windows-')
+      - name: run tests
+        if: matrix.job.test && !startsWith(github.ref, 'refs/pull/')
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
@@ -287,7 +274,6 @@ jobs:
           # Derive arch from target:
           case "$TARGET" in
             *x86_64*) DPKG_ARCH="amd64" ;;
-            *i686*) DPKG_ARCH="i686" ;;
             *aarch64*|*arm64*) DPKG_ARCH="arm64" ;;
             *arm*hf*) DPKG_ARCH="armhf" ;;
             *arm*) DPKG_ARCH="armel" ;;

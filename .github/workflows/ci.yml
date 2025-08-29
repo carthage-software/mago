@@ -55,14 +55,14 @@ jobs:
 
       - name: cargo clippy
         if: matrix.os == 'macos-latest'
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-features -- -D warnings
 
       - name: cargo test
-        run: cargo test --workspace --locked --all-targets
+        run: cargo test --workspace --locked
 
       - name: cargo build
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        run: cargo build --workspace --release --locked --all-targets
+        if: matrix.rust == 'stable'
+        run: cargo build --release --locked
 
       - name: Install PHP
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'

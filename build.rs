@@ -12,8 +12,16 @@ pub fn main() -> io::Result<()> {
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
     let prelude_file = Path::new(&out_dir).join("prelude.bin");
 
-    let prelude = Prelude::build();
-    let prelude_bin = prelude.encode().expect("Failed to encode the prelude");
+    let prelude_bin = std::thread::Builder::new()
+        .stack_size(36 * 1024 * 1024)
+        .name("prelude_builder".into())
+        .spawn(|| {
+            let prelude = Prelude::build();
+
+            prelude.encode().expect("Failed to encode the prelude")
+        })?
+        .join()
+        .expect("Failed to join prelude thread");
 
     fs::write(prelude_file, prelude_bin)?;
 
