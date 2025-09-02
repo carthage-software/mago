@@ -28,8 +28,10 @@ You only need to add a few lines to your Helix `languages.toml` file.
     [[language]]
     name = "php"
 
-    # Set Mago as the formatter.
-    formatter = { command = "mago", args = ["format", "--stdin-input"] }
+    # Set Mago as the formatter (this assumes your configuration file is in your current working directory).
+    # If you work on multiple projects and each of them have different location for mago.toml,
+    # Make sure to use the .helix/languages.toml configuration file in your project directory
+    formatter = { command = "mago", args = ["--config", "%sh{pwd}/mago.toml", "format", "--stdin-input"] }
 
     # Set to true to format automatically on save.
     auto-format = true
