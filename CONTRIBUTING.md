@@ -37,6 +37,7 @@ Here is a small checklist to get you going:
    - Install [Rust](https://www.rust-lang.org/tools/install)
    - Install [Just](https://github.com/casey/just)
    - Run `just build` to set up the project.
+   - If you use [Nix](https://nixos.org): Run `nix develop` and `just build`.
 
 5. **Create a branch**:
    Create a new branch with a descriptive name:

@@ -22,6 +22,7 @@ Contributing to open-source can be intimidating, but don't worry! We're here to 
     - Install [Rust](https://www.rust-lang.org/tools/install)
     - Install [Just](https://github.com/casey/just)
     - Run `just build` to set up the project and install dependencies.
+    - If you use [Nix](https://nixos.org): Run `nix develop` and `just build`.
 
 4.  **Create a branch**. Create a new branch with a descriptive name:
 
