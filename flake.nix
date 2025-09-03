@@ -1,5 +1,5 @@
 {
-  description = "Mago - devshell using rustup (stable 1.89.0 + nightly)";
+  description = "Mago - devshell using rustup (stable 1.89.0 + nightly) and php 8.4 + composer";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,6 +11,8 @@
       let
         pkgs = import nixpkgs { inherit system; };
         isDarwin = pkgs.stdenv.isDarwin;
+        php = pkgs.php84;
+        composer = pkgs.php84Packages.composer;
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = [
@@ -20,6 +22,8 @@
             pkgs.openssl
             pkgs.just
             pkgs.wasm-pack
+            php
+            composer
           ] ++ pkgs.lib.optionals isDarwin [
             pkgs.libiconv
           ];
@@ -40,8 +44,10 @@
               rustup toolchain install nightly --profile minimal
               rustup default 1.89.0
             fi
-            echo "[mago] rustc: $(rustc --version)"
-            echo "[mago] nightly: $(rustup run nightly rustc --version)"
+            echo "[mago] rustc:     $(rustc --version)"
+            echo "[mago] nightly:   $(rustup run nightly rustc --version)"
+            echo "[mago] php:       $(php -v | head -n1)"
+            echo "[mago] composer:  $(composer --version)"
             echo "[mago] Run: just build | just test | just lint | just fix | just build-wasm"
           '';
         };
