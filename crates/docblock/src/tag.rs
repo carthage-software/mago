@@ -110,6 +110,70 @@ pub struct VarTag {
     pub variable_name: Option<String>,
 }
 
+/// Parses a PHPDoc var and returns the identifier token.
+///
+/// Accepts `$name`, `...$name` and `&$name`
+/// ASCII character after the name (e.g., `,`, `)`, whitespace), so trailing
+///
+/// ## Examples
+///
+/// - `"$foo"`        → `Some("$foo")`
+/// - `"&$foo"`       → `Some("$foo")`
+/// - `"...$ids)"`    → `Some("...$ids")`
+/// - `"$bar,"`       → `Some("$bar")`
+/// - `"$"`           → `None`
+/// - `"...$"`        → `None`
+/// - `"$1x"`         → `None`
+///
+/// # Arguments
+///
+/// * `raw` - Raw token starting at the variable position.
+///
+/// # Returns
+///
+/// `Some(&str)` with a subslice contains the `$`/`...$` prefix
+/// and the identifier, or `None` if the token does not start with `$`/`...$`
+///
+/// # Notes
+///
+/// - Identifier rules are ASCII-only: `[_A-Za-z][_A-Za-z0-9]*`.
+/// - The returned slice length can be used to anchor any trailing description.
+#[inline]
+fn parse_var_ident(raw: &str) -> Option<&str> {
+    // tolerate "&$x" in docblocks
+    let raw = raw.strip_prefix('&').unwrap_or(raw);
+
+    // accept "$name" or "...$name"
+    let (prefix_len, rest) = if let Some(r) = raw.strip_prefix("...$") {
+        (4usize, r)
+    } else if let Some(r) = raw.strip_prefix('$') {
+        (1usize, r)
+    } else {
+        return None;
+    };
+
+    // PHP identifier rules (ASCII + underscore): [_A-Za-z][_A-Za-z0-9]*
+    let bytes = rest.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+
+    let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
+    let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
+
+    if !is_start(bytes[0]) {
+        return None;
+    }
+
+    let mut len = 1usize;
+    while len < bytes.len() && is_cont(bytes[len]) {
+        len += 1;
+    }
+
+    // Some from ...$ OR $ until ascii
+    Some(&raw[..prefix_len + len])
+}
+
 /// Parses the content string of a `@template` or `@template-covariant` tag.
 ///
 /// Extracts the template name, an optional modifier (`as`, `of`, `super`),
@@ -270,21 +334,12 @@ pub fn parse_param_tag(content: &str, span: Span) -> Option<ParameterTag> {
     }
 
     let mut rest_parts = rest_slice.split_whitespace();
+    let raw_name = rest_parts.next()?;
+    let name_token = parse_var_ident(raw_name)?;
+    let name = name_token.to_owned();
 
-    let name_part = rest_parts.next()?;
-    if name_part.len() <= 1 || (!name_part.starts_with('$') && !name_part.starts_with("...$")) {
-        return None;
-    }
-
-    let name = name_part.to_owned();
-    let description = if rest_parts.peekable().peek().is_some() {
-        let desc_start_byte = rest_slice.find(name_part).map_or(0, |i| i + name_part.len());
-        let desc_slice = rest_slice[desc_start_byte..].trim_start();
-
-        desc_slice.to_owned()
-    } else {
-        String::new()
-    };
+    let desc_start = rest_slice.find(name_token).map_or(0, |i| i + name_token.len());
+    let description = rest_slice[desc_start..].trim_start().to_owned();
 
     Some(ParameterTag { span, name, type_string, description })
 }
@@ -314,11 +369,9 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Option<ParameterOutTag>
         return None;
     }
 
-    let name_part = rest_slice.split_whitespace().next()?;
-    if !name_part.starts_with('$') || name_part.len() <= 1 {
-        return None;
-    }
-    let name = name_part.to_owned();
+    let raw_name = rest_slice.split_whitespace().next()?;
+    let name_token = parse_var_ident(raw_name)?;
+    let name = name_token.to_owned();
 
     Some(ParameterOutTag { span, name, type_string })
 }
@@ -402,12 +455,10 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Option<AssertionTag> {
 
     let mut rest_parts = rest_slice.split_whitespace();
 
-    let name_part = rest_parts.next()?;
-    if !name_part.starts_with('$') || name_part.len() <= 1 {
-        return None;
-    }
+    let raw_name = rest_parts.next()?;
+    let name_token = parse_var_ident(raw_name)?;
 
-    let param_name = name_part.to_owned();
+    let param_name = name_token.to_owned();
 
     Some(AssertionTag { span, parameter_name: param_name, type_string })
 }
@@ -437,7 +488,7 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
         None
     } else {
         let var_part = rest_slice.split_whitespace().next()?;
-        if var_part.starts_with('$') && var_part.len() > 1 { Some(var_part.to_owned()) } else { None }
+        parse_var_ident(var_part).map(|s| s.to_owned())
     };
 
     Some(VarTag { span, type_string, variable_name })
@@ -684,6 +735,27 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_var_ident() {
+        let cases: &[(&str, Option<&str>)] = &[
+            // valid basics
+            ("$x", Some("$x")),
+            ("&$refVar", Some("$refVar")),     // ref drop '&'
+            ("$foo,", Some("$foo")),           // trailing excluded
+            ("...$ids)", Some("...$ids")),     // variadic with trailing ')'
+            ("...$items,", Some("...$items")), // variadic with trailing ','
+            // invalid tokens
+            ("$", None),    // no identifier
+            ("...$", None), // no identifier
+            ("$1x", None),  // cannot start with digit
+            ("foo", None),  // no '$'
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(parse_var_ident(input), *expected, "input={}", input);
+        }
+    }
+
+    #[test]
     fn test_splitter_brackets() {
         let input = "array<int, (string|bool)> desc";
         let span = test_span_for(input);
@@ -888,5 +960,57 @@ mod tests {
         assert_eq!(result.from, "\\My\\Namespace\\Class");
         assert_eq!(result.alias, Some("Alias".to_owned()));
         assert_eq!(result.span, span);
+    }
+
+    #[test]
+    fn test_param_trailing_comma_is_ignored_in_name() {
+        let content = " string $foo, desc";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.name, "$foo");
+        assert_eq!(result.description, ", desc");
+    }
+
+    #[test]
+    fn test_param_variadic_trailing_paren_is_ignored_in_name() {
+        let content = " list<int> ...$items) rest";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.name, "...$items");
+        assert_eq!(result.description, ") rest");
+    }
+
+    #[test]
+    fn test_param_out_trailing_comma() {
+        let content = " int $out,";
+        let span = test_span_for(content);
+        let result = parse_param_out_tag(content, span).unwrap();
+        assert_eq!(result.name, "$out");
+    }
+
+    #[test]
+    fn test_assertion_trailing_comma() {
+        let content = " int $x,";
+        let span = test_span_for(content);
+        let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.parameter_name, "$x");
+    }
+
+    #[test]
+    fn test_param_trailing_without_space() {
+        let content = " string $foo,desc";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.name, "$foo");
+        assert_eq!(result.description, ",desc");
+    }
+
+    #[test]
+    fn test_param_variadic_trailing_paren_without_space() {
+        let content = " list<int> ...$items)more";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.name, "...$items");
+        assert_eq!(result.description, ")more");
     }
 }
