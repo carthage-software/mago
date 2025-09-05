@@ -1,5 +1,16 @@
 <?php
 
+namespace {
+    class Attribute
+    {
+    }
+
+    #[Attribute]
+    class Deprecated
+    {
+    }
+}
+
 namespace Fixture {
     class NotATrait
     {
@@ -11,6 +22,11 @@ namespace Fixture {
 
     /** @deprecated */
     trait DeprecatedTrait
+    {
+    }
+
+    #[\Deprecated]
+    trait DeprecatedTraitFromAttribute
     {
     }
 
@@ -91,6 +107,18 @@ namespace UsesDeprecated {
     class UsesDeprecated
     {
         use DeprecatedTrait;
+    }
+}
+
+/**
+ * @mago-expect analysis:deprecated-trait
+ */
+namespace UsesDeprecatedFromAttribute {
+    use Fixture\DeprecatedTraitFromAttribute;
+
+    class UsesDeprecatedFromAttribute
+    {
+        use DeprecatedTraitFromAttribute;
     }
 }
 
