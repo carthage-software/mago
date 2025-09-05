@@ -1,4 +1,5 @@
 use std::env::home_dir;
+use std::fmt::Debug;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -6,7 +7,6 @@ use config::Case;
 use config::Config;
 use config::Environment;
 use config::File;
-use config::FileFormat;
 use config::Value;
 use config::ValueKind;
 use serde::Deserialize;
@@ -103,7 +103,7 @@ impl Configuration {
         allow_unsupported_php_version: bool,
     ) -> Result<Configuration, Error> {
         let workspace_dir = workspace.clone().unwrap_or_else(|| CURRENT_DIR.to_path_buf());
-        let workspace_config_path = workspace_dir.join(CONFIGURATION_FILE);
+        let workspace_config_path = workspace_dir.join(CONFIGURATION_FILE_NAME);
 
         let mut configuration = Configuration::from_workspace(workspace_dir);
         let mut builder = Config::builder().add_source(Config::try_from(&configuration)?);
@@ -111,7 +111,7 @@ impl Configuration {
         if let Some(file) = file {
             tracing::debug!("Sourcing configuration from {}.", file.display());
 
-            builder = builder.add_source(File::from(file).required(true).format(FileFormat::Toml));
+            builder = builder.add_source(File::from(file).required(true));
         } else {
             let global_config_roots = [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()];
             for global_config_root in global_config_roots {
@@ -119,16 +119,19 @@ impl Configuration {
                     continue;
                 };
 
-                let global_config_path = global_config_root.join(CONFIGURATION_FILE);
+                let global_config_path = global_config_root.join(CONFIGURATION_FILE_NAME);
 
                 tracing::debug!("Sourcing global configuration from {}.", global_config_path.display());
 
-                builder = builder.add_source(File::from(global_config_path).required(false).format(FileFormat::Toml));
+                match global_config_path.to_str() {
+                    Some(s) => builder = builder.add_source(File::with_name(s).required(false)),
+                    None => {}
+                }
             }
 
             tracing::debug!("Sourcing workspace configuration from {}.", workspace_config_path.display());
 
-            builder = builder.add_source(File::from(workspace_config_path).required(false).format(FileFormat::Toml));
+            builder = builder.add_source(File::with_name(workspace_config_path.to_str().unwrap()).required(false));
         }
 
         configuration = builder
@@ -240,6 +243,7 @@ impl Configuration {
 
 #[cfg(all(test, not(target_os = "windows")))]
 mod tests {
+    use core::str;
     use std::fs;
 
     use pretty_assertions::assert_eq;
@@ -273,8 +277,8 @@ mod tests {
         std::fs::create_dir_all(&workspace_path).unwrap();
         std::fs::create_dir_all(&config_path).unwrap();
 
-        let config_file_path = create_tmp_file("threads = 1", &config_path);
-        create_tmp_file("threads = 2", &workspace_path);
+        let config_file_path = create_tmp_file("threads = 1", &config_path, "toml");
+        create_tmp_file("threads = 2", &workspace_path, "toml");
 
         let config = temp_env::with_vars(
             [
@@ -297,9 +301,9 @@ mod tests {
         std::fs::create_dir_all(&workspace_path).unwrap();
         std::fs::create_dir_all(&config_path).unwrap();
 
-        create_tmp_file("threads = 2\nphp-version = \"7.4.0\"", &workspace_path);
+        create_tmp_file("threads = 2\nphp-version = \"7.4.0\"", &workspace_path, "toml");
 
-        let config_file_path = create_tmp_file("threads = 1", &config_path);
+        let config_file_path = create_tmp_file("threads = 1", &config_path, "toml");
         let config = temp_env::with_vars(
             [
                 ("HOME", None::<&str>),
@@ -324,9 +328,9 @@ mod tests {
         std::fs::create_dir_all(&xdg_config_home_path).unwrap();
         std::fs::create_dir_all(&workspace_path).unwrap();
 
-        create_tmp_file("threads = 3\nphp-version = \"7.4.0\"", &home_path);
-        create_tmp_file("threads = 2", &workspace_path);
-        create_tmp_file("source.excludes = [\"yes\"]", &xdg_config_home_path);
+        create_tmp_file("threads = 3\nphp-version = \"7.4.0\"", &home_path, "toml");
+        create_tmp_file("threads: 2", &workspace_path, "yaml");
+        create_tmp_file("source.excludes = [\"yes\"]", &xdg_config_home_path, "toml");
 
         let config = temp_env::with_vars(
             [
@@ -344,9 +348,9 @@ mod tests {
         assert_eq!(config.source.excludes, vec!["yes".to_string()]);
     }
 
-    fn create_tmp_file(config_content: &str, folder: &PathBuf) -> PathBuf {
+    fn create_tmp_file(config_content: &str, folder: &PathBuf, extension: &str) -> PathBuf {
         fs::create_dir_all(folder).unwrap();
-        let config_path = folder.join(CONFIGURATION_FILE);
+        let config_path = folder.join(CONFIGURATION_FILE_NAME).with_extension(extension);
         fs::write(&config_path, config_content).unwrap();
         config_path
     }

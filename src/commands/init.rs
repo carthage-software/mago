@@ -19,7 +19,7 @@ use mago_php_version::PHPVersion;
 
 use crate::config::Configuration;
 use crate::consts::COMPOSER_JSON_FILE;
-use crate::consts::CONFIGURATION_FILE;
+use crate::consts::CONFIGURATION_FILE_NAME;
 use crate::consts::DEFAULT_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::version::extract_minimum_php_version;
@@ -71,7 +71,7 @@ pub fn execute(
     };
 
     let configuration_file =
-        configuration_file.unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE));
+        configuration_file.unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE_NAME));
 
     print_welcome_banner();
     if configuration_file.exists() {
