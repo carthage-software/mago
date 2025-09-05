@@ -54,7 +54,12 @@ fn run_test_case_inner(config: TestCase) {
         &source_file,
         &resolved_names,
         &codebase,
-        Settings { find_unused_expressions: true, check_throws: true, ..Default::default() },
+        Settings {
+            find_unused_expressions: true,
+            check_throws: true,
+            allow_possibly_undefined_array_keys: false,
+            ..Default::default()
+        },
     );
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);

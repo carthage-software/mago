@@ -2,10 +2,12 @@ use ahash::HashMap;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::get_class_like;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -66,7 +68,11 @@ pub fn scrape_assertions(
                 // If the function does not have any, try collecting
                 // assertions for special functions.
                 Call::Function(function_call) if if_types.is_empty() => {
-                    if_types.extend(scrape_special_function_call_assertions(assertion_context, function_call));
+                    if_types.extend(scrape_special_function_call_assertions(
+                        assertion_context,
+                        artifacts,
+                        function_call,
+                    ));
                 }
                 // If its a null-safe method call, assert that
                 // the lhs is non-null.
@@ -250,6 +256,7 @@ fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifact
 
 fn scrape_special_function_call_assertions(
     assertion_context: AssertionContext<'_, '_>,
+    artifacts: &AnalysisArtifacts,
     function_call: &FunctionCall,
 ) -> HashMap<String, AssertionSet> {
     let mut if_types = HashMap::default();
@@ -259,39 +266,66 @@ fn scrape_special_function_call_assertions(
     };
 
     let resolved_function_name = assertion_context.resolved_names.get(function_identifier);
-    let function_name = if resolved_function_name.starts_with("is_") || resolved_function_name.starts_with("ctype_") {
-        resolved_function_name
-    } else if function_identifier.is_local() {
-        function_identifier.value()
-    } else {
-        return if_types;
-    };
 
-    let function_assertion = match function_name {
-        "is_countable" => Assertion::Countable,
-        "ctype_digit" => {
-            Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(true, false, false, false))))
+    let (argument_variable_id_position, function_assertion) = match ascii_lowercase_atom(resolved_function_name)
+        .as_str()
+    {
+        "psl\\iter\\contains_key" => {
+            if let Some(array_key) = function_call
+                .argument_list
+                .arguments
+                .get(1)
+                .map(|argument| argument.value())
+                .and_then(|array_key| get_expression_array_key(artifacts, array_key))
+            {
+                (0, Assertion::HasArrayKey(array_key))
+            } else {
+                return if_types;
+            }
         }
-        "ctype_lower" => {
-            Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(false, false, true, true))))
+        "array_key_exists" | "key_exists" => {
+            if let Some(array_key) = function_call
+                .argument_list
+                .arguments
+                .first()
+                .map(|argument| argument.value())
+                .and_then(|array_key| get_expression_array_key(artifacts, array_key))
+            {
+                (1, Assertion::HasArrayKey(array_key))
+            } else {
+                return if_types;
+            }
         }
+        "is_countable" => (0, Assertion::Countable),
+        "ctype_digit" => (
+            0,
+            Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(true, false, false, false)))),
+        ),
+        "ctype_lower" => (
+            0,
+            Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(false, false, true, true)))),
+        ),
         _ => return if_types,
     };
 
-    let Some(first_argument_variable_id) =
-        function_call.argument_list.arguments.get(0).map(|argument| argument.value()).and_then(|argument_expression| {
-            get_expression_id(
-                argument_expression,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            )
-        })
-    else {
-        return if_types;
+    let extract_expression_id = |argument_expression| {
+        get_expression_id(
+            argument_expression,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )
     };
 
-    if_types.insert(first_argument_variable_id, vec![vec![function_assertion]]);
+    if let Some(first_argument_variable_id) = function_call
+        .argument_list
+        .arguments
+        .get(argument_variable_id_position)
+        .map(|argument| argument.value())
+        .and_then(extract_expression_id)
+    {
+        if_types.insert(first_argument_variable_id, vec![vec![function_assertion]]);
+    }
 
     if_types
 }
@@ -1225,6 +1259,10 @@ fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expr
         .get_expression_type(expression)
         .and_then(|t| t.get_single_int())
         .filter(|integer| !integer.is_unspecified())
+}
+
+fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<ArrayKey> {
+    artifacts.get_expression_type(expression).and_then(|t| t.get_single_array_key())
 }
 
 fn is_count_or_size_of_call(expression: &Expression) -> bool {
