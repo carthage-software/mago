@@ -123,9 +123,8 @@ impl Configuration {
 
                 tracing::debug!("Sourcing global configuration from {}.", global_config_path.display());
 
-                match global_config_path.to_str() {
-                    Some(s) => builder = builder.add_source(File::with_name(s).required(false)),
-                    None => {}
+                if let Some(s) = global_config_path.to_str() {
+                    builder = builder.add_source(File::with_name(s).required(false))
                 }
             }
 

@@ -70,8 +70,8 @@ pub fn execute(
         ..Default::default()
     };
 
-    let configuration_file =
-        configuration_file.unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE_NAME));
+    let configuration_file = configuration_file
+        .unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE_NAME).with_extension("toml"));
 
     print_welcome_banner();
     if configuration_file.exists() {
