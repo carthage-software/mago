@@ -5185,7 +5185,7 @@ function count(Countable|array $value, int $mode = COUNT_NORMAL): int
  *
  * @param object|array<T> $array
  *
- * @return T|false
+ * @return ($array is non-empty-array|non-empty-list ? T : false)
  */
 function end(object|array &$array): mixed
 {
