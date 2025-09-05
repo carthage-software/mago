@@ -130,7 +130,7 @@ impl Configuration {
 
             tracing::debug!("Sourcing workspace configuration from {}.", workspace_config_path.display());
 
-            builder = builder.add_source(File::with_name(workspace_config_path.to_str().unwrap()).required(false));
+            builder = builder.add_source(File::from(workspace_config_path).required(false));
         }
 
         configuration = builder
