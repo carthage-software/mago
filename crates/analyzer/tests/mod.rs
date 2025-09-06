@@ -160,4 +160,5 @@ test_case!(iterator_to_array);
 // Github Issues
 test_case!(issue_306);
 test_case!(issue_359);
+test_case!(issue_390);
 test_case!(issue_391);

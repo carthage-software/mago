@@ -616,7 +616,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             }
 
             if !in_assignment {
-                if has_value_parameter {
+                if context.settings.allow_possibly_undefined_array_keys && has_value_parameter {
                     *has_possibly_undefined = true;
 
                     return value_parameter.into_owned();
