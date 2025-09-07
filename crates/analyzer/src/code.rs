@@ -3,6 +3,7 @@
 pub enum IssueCode {
     AbstractClassUsedAsAttribute,
     AbstractInstantiation,
+    AllPathsMustReturn,
     AlwaysMatchingSwitchCase,
     AmbiguousClassLikeConstantAccess,
     AmbiguousInstantiationTarget,
@@ -248,6 +249,7 @@ pub enum IssueCode {
 impl IssueCode {
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::AllPathsMustReturn => "all-paths-must-return",
             Self::AbstractClassUsedAsAttribute => "abstract-class-used-as-attribute",
             Self::AbstractInstantiation => "abstract-instantiation",
             Self::AlwaysMatchingSwitchCase => "always-matching-switch-case",
@@ -1003,8 +1005,9 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_codes() -> [Self; 11] {
+    pub const fn get_method_issue_codes() -> [Self; 12] {
         [
+            Self::AllPathsMustReturn,
             Self::AmbiguousObjectMethodAccess,
             Self::DeprecatedMethod,
             Self::InvalidMethodAccess,
@@ -1019,8 +1022,9 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_code_values() -> [&'static str; 11] {
+    pub const fn get_method_issue_code_values() -> [&'static str; 12] {
         [
+            "all-paths-must-return",
             "ambiguous-object-method-access",
             "deprecated-method",
             "invalid-method-access",
@@ -1073,6 +1077,7 @@ impl std::str::FromStr for IssueCode {
         match s {
             "abstract-class-used-as-attribute" => Ok(Self::AbstractClassUsedAsAttribute),
             "abstract-instantiation" => Ok(Self::AbstractInstantiation),
+            "all-paths-must-return" => Ok(Self::AllPathsMustReturn),
             "always-matching-switch-case" => Ok(Self::AlwaysMatchingSwitchCase),
             "ambiguous-class-like-constant-access" => Ok(Self::AmbiguousClassLikeConstantAccess),
             "ambiguous-instantiation-target" => Ok(Self::AmbiguousInstantiationTarget),

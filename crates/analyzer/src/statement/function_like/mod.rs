@@ -133,6 +133,25 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         }
     }
 
+    if let Some(function_metadata) = block_context.scope.get_function_like()
+        && !block_context.has_returned
+        && let Some(return_type) = &function_metadata.return_type_metadata
+        && !return_type.type_union.is_void()
+        && !return_type.type_union.is_never()
+        && !function_like_metadata.flags.has_yield()
+    {
+        context.collector.report_with_code(
+            IssueCode::AllPathsMustReturn,
+            Issue::error("Function must return a value.")
+                .with_annotation(
+                    Annotation::primary(function_metadata.span)
+                        .with_message("This function does not return a value from all paths."),
+                )
+                .with_note("This function does not provide a return value in all paths")
+                .with_help("provide a return value from all paths"),
+        );
+    }
+
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata)?;
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
@@ -555,3 +574,4 @@ fn check_thrown_types<'ctx, 'arena>(
 
     Ok(())
 }
+
