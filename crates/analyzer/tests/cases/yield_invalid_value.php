@@ -1,11 +1,11 @@
 <?php
 
 /**
- * @return iterable<int, string>
+ * @return Generator<int, string>
  *
  * @mago-expect analysis:invalid-yield-value-type
  */
-function generator(): iterable
+function generator(): Generator
 {
     yield 1 => 42;
 }

@@ -75,3 +75,4 @@ function get_c_switch(A|B|C $aOrBOrC): C
             return C::fromB($aOrBOrC);
     }
 }
+

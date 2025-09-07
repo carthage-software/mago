@@ -9,9 +9,9 @@
   * @param iterable<KLeft, VLeft> $lhs
   * @param iterable<KRight, VRight> $rhs
   *
-  * @return iterable<KLeft|KRight, VLeft|VRight>
+  * @return Generator<KLeft|KRight, VLeft|VRight>
   */
- function merge_iterable(iterable $lhs, iterable $rhs): iterable
+ function merge_iterable(iterable $lhs, iterable $rhs): Generator
  {
      foreach ($lhs as $key => $value) {
          yield $key => $value;
