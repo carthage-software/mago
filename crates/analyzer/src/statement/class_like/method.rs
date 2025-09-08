@@ -4,6 +4,7 @@ use mago_codex::context::ScopeContext;
 use mago_codex::get_method_by_id;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::is_method_overriding;
+use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -71,7 +72,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             &mut BlockContext::new(scope),
             method_metadata,
             &self.parameter_list,
-            FunctionLikeBody::Statements(concrete_body.statements.as_slice()),
+            FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
             None,
         )?;
 
@@ -79,7 +80,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             heuristic::check_function_like(
                 method_metadata,
                 self.parameter_list.parameters.as_slice(),
-                FunctionLikeBody::Statements(concrete_body.statements.as_slice()),
+                FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
                 context,
             );
         }

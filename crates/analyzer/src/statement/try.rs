@@ -71,7 +71,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         block_context.inside_try = true;
         analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
         block_context.inside_try = was_inside_try;
-        block_context.has_returned = false;
+        if !self.catch_clauses.is_empty() {
+            block_context.has_returned = false;
+        }
 
         let try_block_control_actions = ControlAction::from_statements(
             self.block.statements.iter().collect::<Vec<_>>(),

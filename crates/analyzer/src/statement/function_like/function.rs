@@ -53,14 +53,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             &mut BlockContext::new(scope),
             function_metadata,
             &self.parameter_list,
-            FunctionLikeBody::Statements(self.body.statements.as_slice()),
+            FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             None,
         )?;
 
         heuristic::check_function_like(
             function_metadata,
             self.parameter_list.parameters.as_slice(),
-            FunctionLikeBody::Statements(self.body.statements.as_slice()),
+            FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             context,
         );
 

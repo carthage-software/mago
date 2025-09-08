@@ -22,7 +22,7 @@ pub fn check_unused_params<'ctx, 'ast, 'arena>(
     ctx: &mut Context<'ctx, 'arena>,
 ) {
     match body {
-        FunctionLikeBody::Statements(statements) => {
+        FunctionLikeBody::Statements(statements, _) => {
             if utils::potentially_contains_function_call(statements, FUNC_GET_ARGS, ctx) {
                 // `func_get_args` is used, so we can't determine if the parameters are unused in this case
                 return;

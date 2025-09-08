@@ -3,7 +3,6 @@
 pub enum IssueCode {
     AbstractClassUsedAsAttribute,
     AbstractInstantiation,
-    AllPathsMustReturn,
     AlwaysMatchingSwitchCase,
     AmbiguousClassLikeConstantAccess,
     AmbiguousInstantiationTarget,
@@ -126,6 +125,7 @@ pub enum IssueCode {
     MissingOverrideAttribute,
     MissingRequiredInterface,
     MissingRequiredParent,
+    MissingReturnStatement,
     MissingTemplateParameter,
     MixedArgument,
     MixedArrayAccess,
@@ -249,7 +249,6 @@ pub enum IssueCode {
 impl IssueCode {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::AllPathsMustReturn => "all-paths-must-return",
             Self::AbstractClassUsedAsAttribute => "abstract-class-used-as-attribute",
             Self::AbstractInstantiation => "abstract-instantiation",
             Self::AlwaysMatchingSwitchCase => "always-matching-switch-case",
@@ -374,6 +373,7 @@ impl IssueCode {
             Self::MissingOverrideAttribute => "missing-override-attribute",
             Self::MissingRequiredInterface => "missing-required-interface",
             Self::MissingRequiredParent => "missing-required-parent",
+            Self::MissingReturnStatement => "missing-return-statement",
             Self::MissingTemplateParameter => "missing-template-parameter",
             Self::MixedArgument => "mixed-argument",
             Self::MixedArrayAccess => "mixed-array-access",
@@ -977,7 +977,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_return_issue_codes() -> [Self; 9] {
+    pub const fn get_return_issue_codes() -> [Self; 10] {
         [
             Self::FalsableReturnStatement,
             Self::HiddenGeneratorReturn,
@@ -985,13 +985,14 @@ impl IssueCode {
             Self::InvalidReturnStatement,
             Self::LessSpecificNestedReturnStatement,
             Self::LessSpecificReturnStatement,
+            Self::MissingReturnStatement,
             Self::MixedReturnStatement,
             Self::NeverReturn,
             Self::NullableReturnStatement,
         ]
     }
 
-    pub const fn get_return_issue_code_values() -> [&'static str; 9] {
+    pub const fn get_return_issue_code_values() -> [&'static str; 10] {
         [
             "falsable-return-statement",
             "hidden-generator-return",
@@ -999,15 +1000,15 @@ impl IssueCode {
             "invalid-return-statement",
             "less-specific-nested-return-statement",
             "less-specific-return-statement",
+            "missing-return-statement",
             "mixed-return-statement",
             "never-return",
             "nullable-return-statement",
         ]
     }
 
-    pub const fn get_method_issue_codes() -> [Self; 12] {
+    pub const fn get_method_issue_codes() -> [Self; 11] {
         [
-            Self::AllPathsMustReturn,
             Self::AmbiguousObjectMethodAccess,
             Self::DeprecatedMethod,
             Self::InvalidMethodAccess,
@@ -1022,9 +1023,8 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_code_values() -> [&'static str; 12] {
+    pub const fn get_method_issue_code_values() -> [&'static str; 11] {
         [
-            "all-paths-must-return",
             "ambiguous-object-method-access",
             "deprecated-method",
             "invalid-method-access",
@@ -1077,7 +1077,6 @@ impl std::str::FromStr for IssueCode {
         match s {
             "abstract-class-used-as-attribute" => Ok(Self::AbstractClassUsedAsAttribute),
             "abstract-instantiation" => Ok(Self::AbstractInstantiation),
-            "all-paths-must-return" => Ok(Self::AllPathsMustReturn),
             "always-matching-switch-case" => Ok(Self::AlwaysMatchingSwitchCase),
             "ambiguous-class-like-constant-access" => Ok(Self::AmbiguousClassLikeConstantAccess),
             "ambiguous-instantiation-target" => Ok(Self::AmbiguousInstantiationTarget),
@@ -1200,6 +1199,7 @@ impl std::str::FromStr for IssueCode {
             "missing-override-attribute" => Ok(Self::MissingOverrideAttribute),
             "missing-required-interface" => Ok(Self::MissingRequiredInterface),
             "missing-required-parent" => Ok(Self::MissingRequiredParent),
+            "missing-return-statement" => Ok(Self::MissingReturnStatement),
             "missing-template-parameter" => Ok(Self::MissingTemplateParameter),
             "mixed-argument" => Ok(Self::MixedArgument),
             "mixed-array-access" => Ok(Self::MixedArrayAccess),
