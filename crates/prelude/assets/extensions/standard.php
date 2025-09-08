@@ -4456,7 +4456,7 @@ function array_count_values(array $array): array
  * @template K as array-key
  * @template V
  *
- * @param array<array-key, array<K, V>> $array
+ * @param array<array-key, array<K, V>|object>|list<array<K,V>|object> $array
  * @param K|null $column_key
  * @param K|null $index_key
  *

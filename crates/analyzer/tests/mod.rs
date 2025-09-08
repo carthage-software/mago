@@ -160,6 +160,7 @@ test_case!(arrow_function_inherits_method_templates);
 test_case!(all_paths_return_value);
 
 // Github Issues
+test_case!(issue_275);
 test_case!(issue_306);
 test_case!(issue_355);
 test_case!(issue_357);
