@@ -1,16 +1,13 @@
 use mago_span::Span;
-use std::fmt;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Variable {
     pub name: String,          // normalized: includes `$`, excludes `...` and `&`
     pub is_variadic: bool,     // true if `...` was present
     pub is_by_reference: bool, // true if `&` was present
-}
-
-impl Variable {
 }
 
 impl fmt::Display for Variable {
@@ -775,13 +772,7 @@ mod tests {
 
     #[test]
     fn test_variable_display_and_raw() {
-        let cases = vec![
-            ("$x", "$x"),
-            ("&$x", "&$x"),
-            ("...$x", "...$x"),
-            ("...$x)", "...$x"),
-            ("...$x,", "...$x"),
-        ];
+        let cases = vec![("$x", "$x"), ("&$x", "&$x"), ("...$x", "...$x"), ("...$x)", "...$x"), ("...$x,", "...$x")];
 
         for (input, expected_raw) in cases {
             let v = parse_var_ident(input).expect("should parse variable");
