@@ -277,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn test_toml_has_presedence_when_multiple_configs_present() {
+    fn test_toml_has_precedence_when_multiple_configs_present() {
         let workspace_path = temp_dir().join("workspace-with-multiple-configs");
         std::fs::create_dir_all(&workspace_path).unwrap();
 
