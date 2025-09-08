@@ -267,6 +267,21 @@ mod tests {
     }
 
     #[test]
+    fn test_toml_has_presedence_when_multiple_configs_present() {
+        let workspace_path = temp_dir().join("workspace-with-multiple-configs");
+        std::fs::create_dir_all(&workspace_path).unwrap();
+
+        create_tmp_file("threads = 3", &workspace_path, "toml");
+        create_tmp_file("threads: 2\nphp-version: \"7.4.0\"", &workspace_path, "yaml");
+        create_tmp_file("{\"threads\": 1,\"php-version\":\"8.1.0\"}", &workspace_path, "json");
+
+        let config = Configuration::load(Some(workspace_path), None, None, None, false).unwrap();
+
+        assert_eq!(config.threads, 3);
+        assert_eq!(config.php_version.to_string(), DEFAULT_PHP_VERSION.to_string())
+    }
+
+    #[test]
     fn test_env_config_override_all_others() {
         let workspace_path = temp_dir().join("workspace-1");
         let config_path = temp_dir().join("config-1");
