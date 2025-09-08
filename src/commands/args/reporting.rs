@@ -81,6 +81,19 @@ pub struct ReportingArgs {
     #[arg(long, default_value_t, help = "Choose reporting format (e.g., rich, medium, short)", ignore_case = true, value_parser = enum_variants!(ReportingFormat), conflicts_with = "fix")]
     pub reporting_format: ReportingFormat,
 
+    /// Do not use colors in the output.
+    #[arg(long, help = "Do not use colors in the output", default_value_t = false, alias = "no-colors")]
+    pub no_color: bool,
+
+    /// Use a pager when printing output.
+    #[arg(
+        long,
+        help = "Use a pager when printing output",
+        num_args(0..=1),
+        default_missing_value = "true",
+    )]
+    pub pager: Option<bool>,
+
     /// Set the minimum issue level that will cause the command to fail.
     ///
     /// For example, if set to `Error`, warnings or notices will not cause a failure exit code.
@@ -128,7 +141,7 @@ impl ReportingArgs {
         if self.fix {
             self.handle_fix_mode(issues, configuration, database)
         } else {
-            self.handle_report_mode(issues, database)
+            self.handle_report_mode(issues, &configuration, database)
         }
     }
 
@@ -170,7 +183,12 @@ impl ReportingArgs {
     }
 
     /// Handles the logic for reporting issues (when `--fix` is not enabled).
-    fn handle_report_mode(self, mut issues: IssueCollection, database: Database) -> Result<ExitCode, Error> {
+    fn handle_report_mode(
+        self,
+        mut issues: IssueCollection,
+        configuration: &Configuration,
+        database: Database,
+    ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
 
         if self.sort {
@@ -216,9 +234,6 @@ impl ReportingArgs {
         }
 
         let has_issues_above_threshold = issues.has_minimum_level(self.minimum_fail_level);
-
-        let reporter = Reporter::new(read_database, self.reporting_target);
-
         let issues_to_report = if self.fixable_only { issues.only_fixable().collect() } else { issues };
 
         if issues_to_report.is_empty() {
@@ -228,6 +243,15 @@ impl ReportingArgs {
                 tracing::info!("No issues found.");
             }
         } else {
+            let use_pager = self.pager.unwrap_or(configuration.use_pager);
+            let reporter = Reporter::new(
+                read_database,
+                self.reporting_target,
+                !self.no_color,
+                use_pager,
+                configuration.pager.clone(),
+            );
+
             reporter.report(issues_to_report, self.reporting_format)?;
         }
 

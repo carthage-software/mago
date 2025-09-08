@@ -119,7 +119,7 @@ pub fn analyze<'ctx, 'arena>(
             } else {
                 if let Some(value_span) = assigned_value_span {
                     issue = Issue::error(format!(
-                        "Invalid type for property `${property_name}`: expected `{property_type_str}`, but got `{assigned_type_str}`."
+                        "Invalid type for property `{property_name}`: expected `{property_type_str}`, but got `{assigned_type_str}`."
                     ))
                     .with_annotation(
                         Annotation::primary(value_span)
@@ -127,7 +127,7 @@ pub fn analyze<'ctx, 'arena>(
                     );
                 } else {
                     issue = Issue::error(format!(
-                        "Invalid assignment to property `${property_name}`: cannot assign value of type `{assigned_type_str}` to expected type `{property_type_str}`."
+                        "Invalid assignment to property `{property_name}`: cannot assign value of type `{assigned_type_str}` to expected type `{property_type_str}`."
                     ))
                     .with_annotation(
                         Annotation::primary(property_access.span())
@@ -137,7 +137,7 @@ pub fn analyze<'ctx, 'arena>(
 
                 if let Some(property_span) = resolved_property.property_span {
                     issue = issue.with_annotation(Annotation::secondary(property_span).with_message(format!(
-                        "This property `${property_name}` is declared with type `{property_type_str}`"
+                        "This property `{property_name}` is declared with type `{property_type_str}`"
                     )));
                 }
 

@@ -773,19 +773,37 @@ final class SensitiveParameterValue
     }
 }
 
-#[Attribute(Attribute::TARGET_METHOD)]
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY)]
 final class Override
 {
     public function __construct() {}
 }
 
-#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION | Attribute::TARGET_CLASS_CONSTANT)]
+/**
+ * @strict-properties
+ */
+#[Attribute(
+    Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION | Attribute::TARGET_CLASS_CONSTANT | Attribute::TARGET_CONSTANT | Attribute::TARGET_CLASS
+)]
 final class Deprecated
 {
     public readonly null|string $message;
     public readonly null|string $since;
 
     public function __construct(null|string $message = null, null|string $since = null) {}
+}
+
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
+final class NoDiscard
+{
+    public readonly null|string $message;
+
+    public function __construct(null|string $message = null) {}
+}
+
+#[Attribute(Attribute::TARGET_ALL)]
+final class DelayedTargetValidation
+{
 }
 
 /**

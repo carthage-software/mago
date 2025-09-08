@@ -1,11 +1,5 @@
 <?php
 
-/** @return ($value is int ? true : false) */
-function is_int($value): bool
-{
-    return is_int($value);
-}
-
 /**
  * @mago-expect analysis:always-matching-switch-case
  * @mago-expect analysis:unreachable-switch-case

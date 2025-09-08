@@ -1,17 +1,5 @@
 <?php
 
-/**
- * @assert-if-true string $value
- *
- * @return ($value is string ? true : false)
- *
- * @pure
- */
-function is_string(mixed $value): bool
-{
-    return is_string($value);
-}
-
 function foo(string $_x): void
 {
 }

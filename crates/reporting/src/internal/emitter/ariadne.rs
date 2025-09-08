@@ -14,9 +14,7 @@ pub fn ariadne_format(
     mut writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     for issue in issues {
         let kind = match issue.level {
             Level::Help | Level::Note => ReportKind::Advice,
@@ -83,5 +81,5 @@ pub fn ariadne_format(
         report.finish().write(ariadne_sources(relevant_sources), &mut writer).unwrap();
     }
 
-    Ok(highest_level)
+    Ok(())
 }

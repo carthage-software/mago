@@ -1,10 +1,5 @@
 <?php
 
-function iterator_to_array(iterable $items): array
-{
-    return iterator_to_array($items);
-}
-
 /**
  * @template Tk of array-key
  * @template Tv

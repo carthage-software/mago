@@ -1,16 +1,5 @@
 <?php
 
-namespace {
-    class Attribute
-    {
-    }
-
-    #[Attribute]
-    class NoDiscard
-    {
-    }
-}
-
 namespace Fixture {
     const SOME_CONST = 1;
 

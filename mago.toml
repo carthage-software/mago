@@ -6,8 +6,11 @@ includes = ["vendor"]
 excludes = ["scripts/local"]
 
 [linter.rules]
-cyclomatic-complexity = { threshold = 20 }
+cyclomatic-complexity = { threshold = 6 }
 kan-defect = { threshold = 1.9 }
 halstead = { effort-threshold = 7000 }
 literal-named-argument = { enabled = false }
 too-many-enum-cases = { threshold = 30 }
+
+[analyzer]
+allow-possibly-undefined-array-keys = false

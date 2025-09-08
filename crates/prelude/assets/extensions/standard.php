@@ -4805,7 +4805,7 @@ function pos(object|array $array): mixed
 }
 
 /**
- * @return int<0, max>
+ * @return ($value is non-empty-array|non-empty-list ? int<1, max> : int<0, max>)
  *
  * @pure
  */
@@ -5185,7 +5185,7 @@ function count(Countable|array $value, int $mode = COUNT_NORMAL): int
  *
  * @param object|array<T> $array
  *
- * @return T|false
+ * @return ($array is non-empty-array|non-empty-list ? T : false)
  */
 function end(object|array &$array): mixed
 {
@@ -5294,7 +5294,7 @@ function in_array(mixed $needle, array $haystack, bool $strict = false): bool
  * @template K of array-key
  * @template V
  *
- * @param K $needle
+ * @param V $needle
  * @param array<K, V> $haystack
  *
  * @return K|false

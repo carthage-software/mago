@@ -3,16 +3,6 @@
 /**
  * @param int<0, max> $offset
  *
- * @return false|int<0, max>
- */
-function strpos(string $haystack, string $needle, int $offset = 0): false|int
-{
-    return strpos($haystack, $needle, $offset);
-}
-
-/**
- * @param int<0, max> $offset
- *
  * @return null|int<0, max>
  */
 function search1(string $haystack, string $needle, int $offset = 0): null|int

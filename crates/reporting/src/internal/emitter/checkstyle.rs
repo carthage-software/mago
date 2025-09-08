@@ -16,9 +16,7 @@ pub fn checkstyle_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     // Group issues by file
     let mut issues_by_file: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -65,5 +63,5 @@ pub fn checkstyle_format(
     // Close Checkstyle XML
     writeln!(writer, "</checkstyle>")?;
 
-    Ok(highest_level)
+    Ok(())
 }

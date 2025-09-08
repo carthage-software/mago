@@ -1,13 +1,5 @@
 <?php
 
-interface Throwable
-{
-}
-
-class Exception implements Throwable
-{
-}
-
 /**
  * @throws Exception
  */

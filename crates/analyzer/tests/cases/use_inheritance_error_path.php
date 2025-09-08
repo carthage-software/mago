@@ -14,6 +14,11 @@ namespace Fixture {
     {
     }
 
+    #[\Deprecated]
+    trait DeprecatedTraitFromAttribute
+    {
+    }
+
     interface RequiredInterface
     {
     }
@@ -91,6 +96,18 @@ namespace UsesDeprecated {
     class UsesDeprecated
     {
         use DeprecatedTrait;
+    }
+}
+
+/**
+ * @mago-expect analysis:deprecated-trait
+ */
+namespace UsesDeprecatedFromAttribute {
+    use Fixture\DeprecatedTraitFromAttribute;
+
+    class UsesDeprecatedFromAttribute
+    {
+        use DeprecatedTraitFromAttribute;
     }
 }
 

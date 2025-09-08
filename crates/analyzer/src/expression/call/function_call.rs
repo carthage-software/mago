@@ -64,7 +64,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
             None
         };
 
-        let target = get_function_like_target(context, identifier, alternative, expression.span())?;
+        let target = get_function_like_target(context, identifier, alternative, expression.span(), None)?;
 
         return Ok(if let Some(t) = target { (vec![t], false) } else { (vec![], false) });
     }
@@ -84,22 +84,27 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
         if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, Some(template_result)) {
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {
-                    if let Some(id) = callable_signature.get_source() {
-                        if let Some(t) = get_function_like_target(context, id, None, expression.span())? {
-                            targets.push(t);
-                        } else {
-                            encountered_invalid_targets = true;
-                        }
-                    } else {
-                        targets.push(InvocationTarget::Callable {
-                            signature: callable_signature.clone(),
-                            span: expression.span(),
-                            source: callable_signature.get_source(),
-                        });
+                    if let Some(id) = callable_signature.get_source()
+                        && let Some(target) = get_function_like_target(
+                            context,
+                            id,
+                            None,
+                            expression.span(),
+                            callable_signature.return_type.clone(),
+                        )?
+                    {
+                        targets.push(target);
+                        continue;
                     }
+
+                    targets.push(InvocationTarget::Callable {
+                        signature: callable_signature.clone(),
+                        span: expression.span(),
+                        source: callable_signature.get_source(),
+                    });
                 }
                 TCallable::Alias(id) => {
-                    if let Some(t) = get_function_like_target(context, *id, None, expression.span())? {
+                    if let Some(t) = get_function_like_target(context, *id, None, expression.span(), None)? {
                         targets.push(t);
                     } else {
                         encountered_invalid_targets = true;

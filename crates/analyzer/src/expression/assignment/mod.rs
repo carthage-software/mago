@@ -5,7 +5,10 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_codex::assertion::Assertion;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_literal_int;
@@ -90,6 +93,14 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         block_context.possibly_assigned_variable_ids.insert(target_variable_id.clone());
 
         existing_target_type = block_context.locals.get(target_variable_id).cloned();
+    }
+
+    if let (Some(source_expression), Some(target_variable_id)) = (source_expression, &target_variable_id)
+        && matches!(target_expression, Expression::Variable(_))
+        && is_closure_expression(source_expression)
+        && let Some(preliminary_type) = get_closure_expression_type(source_expression)
+    {
+        block_context.locals.insert(target_variable_id.clone(), Rc::new(preliminary_type));
     }
 
     if let Some(source_expression) = source_expression {
@@ -231,19 +242,17 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         } else {
             context.collector.report_with_code(
                 IssueCode::InvalidAssignment,
-                Issue::error(
-                    "Invalid target for assignment."
-                )
-                .with_annotation(
-                    Annotation::primary(target_expression.span())
-                        .with_message("This expression cannot be assigned to.")
-                )
-                .with_note(
-                    "Assignments require a valid variable, array element, or object property on the left-hand side."
-                )
-                .with_help(
-                    "Ensure the left side of the assignment is a valid target (e.g., `$variable`, `$array[key]`, `$object->property`)."
-                ),
+                Issue::error("Invalid target for assignment.")
+                    .with_annotation(
+                        Annotation::primary(target_expression.span())
+                            .with_message("This expression cannot be assigned to."),
+                    )
+                    .with_note(
+                        "Assignments require a valid variable, array element, or object property on the left-hand side."
+                    )
+                    .with_help(
+                        "Ensure the left side of the assignment is a valid target (e.g., `$variable`, `$array[key]`, `$object->property`)."
+                    ),
             );
         }
     }
@@ -920,6 +929,31 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
         .into_iter()
         .map(Rc::new),
     );
+}
+
+const fn is_closure_expression<'arena>(expression: &'arena Expression<'arena>) -> bool {
+    if let Expression::Parenthesized(parenthesized) = expression {
+        return is_closure_expression(parenthesized.expression);
+    }
+
+    matches!(expression, Expression::Closure(_))
+}
+
+fn get_closure_expression_span<'arena>(expression: &'arena Expression<'arena>) -> Option<Span> {
+    if let Expression::Parenthesized(parenthesized) = expression {
+        return get_closure_expression_span(parenthesized.expression);
+    }
+
+    if matches!(expression, Expression::Closure(_)) { Some(expression.span()) } else { None }
+}
+
+fn get_closure_expression_type<'arena>(expression: &'arena Expression<'arena>) -> Option<TUnion> {
+    let span = get_closure_expression_span(expression)?;
+
+    Some(TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Closure(
+        span.file_id,
+        span.start,
+    )))))
 }
 
 #[cfg(test)]

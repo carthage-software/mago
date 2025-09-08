@@ -1,19 +1,5 @@
 <?php
 
-interface Throwable
-{
-}
-
-class Exception implements Throwable
-{
-}
-
-/** @assert-if-true iterable $val */
-function is_iterable(mixed $val): bool
-{
-    return is_iterable($val);
-}
-
 /**
  * @template T
  */

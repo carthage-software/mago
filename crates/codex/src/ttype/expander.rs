@@ -21,7 +21,6 @@ use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
-use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -141,8 +140,8 @@ pub(crate) fn expand_atomic(
                 }
             }
         },
-        TAtomic::Object(TObject::Named(named_object)) => {
-            expand_named_object(named_object, codebase, options);
+        TAtomic::Object(object) => {
+            expand_object(object, codebase, options);
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
@@ -377,41 +376,60 @@ pub(crate) fn expand_atomic(
     }
 }
 
-fn expand_named_object(named_object: &mut TNamedObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
-    let name_str_lc = ascii_lowercase_atom(named_object.name.as_str());
+fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    let Some(name) = named_object.get_name().copied() else {
+        return;
+    };
 
-    if named_object.is_this() || name_str_lc == "static" || name_str_lc == "$this" {
+    let is_this = if let TObject::Named(named_object) = named_object { named_object.is_this() } else { false };
+    let name_str_lc = ascii_lowercase_atom(&name);
+
+    if is_this || name_str_lc == "static" || name_str_lc == "$this" {
         match &options.static_class_type {
+            StaticClassType::Object(TObject::Enum(static_enum)) => {
+                *named_object = TObject::Enum(static_enum.clone());
+            }
             StaticClassType::Object(TObject::Named(static_object)) => {
-                if let Some(static_object_intersections) = &static_object.intersection_types {
-                    let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
-                    intersections.extend(static_object_intersections.iter().cloned());
-                }
+                if let TObject::Named(named_object) = named_object {
+                    if let Some(static_object_intersections) = &static_object.intersection_types {
+                        let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
+                        intersections.extend(static_object_intersections.iter().cloned());
+                    }
 
-                if named_object.type_parameters.is_none() {
-                    named_object.type_parameters = static_object.type_parameters.clone();
-                }
+                    if named_object.type_parameters.is_none() {
+                        named_object.type_parameters = static_object.type_parameters.clone();
+                    }
 
-                named_object.name = static_object.name;
-                named_object.is_this = true;
+                    named_object.name = static_object.name;
+                    named_object.is_this = true;
+                }
             }
             StaticClassType::Name(static_class_name) => {
-                named_object.name = *static_class_name;
-                named_object.is_this = options.function_is_final;
+                if let TObject::Named(named_object) = named_object {
+                    named_object.name = *static_class_name;
+                    named_object.is_this = options.function_is_final;
+                }
             }
             _ => {}
         }
     } else if name_str_lc == "self" {
-        if let Some(self_class_name) = options.self_class {
+        if let Some(self_class_name) = options.self_class
+            && let TObject::Named(named_object) = named_object
+        {
             named_object.name = self_class_name;
         }
     } else if name_str_lc == "parent"
         && let Some(self_class_name) = options.self_class
         && let Some(class_metadata) = get_class_like(codebase, &self_class_name)
         && let Some(parent_name) = class_metadata.direct_parent_class
+        && let TObject::Named(named_object) = named_object
     {
         named_object.name = parent_name;
     }
+
+    let TObject::Named(named_object) = named_object else {
+        return;
+    };
 
     if named_object.type_parameters.is_none()
         && let Some(class_like_metadata) = get_class_like(codebase, &named_object.name)

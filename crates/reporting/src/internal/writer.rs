@@ -9,7 +9,7 @@ use crate::reporter::ReportingTarget;
 
 /// A thread-safe wrapper around `StandardStream`, enabling colorized and styled output to
 /// either `stdout` or `stderr`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct ReportWriter {
     /// Inner `StandardStream` wrapped in an `Arc<Mutex>` to ensure thread-safe access.
     inner: Arc<Mutex<StandardStream>>,
@@ -21,14 +21,19 @@ impl ReportWriter {
     /// # Parameters
     ///
     /// - `target`: The output target, either `Target::Stdout` or `Target::Stderr`.
+    /// - `with_colors`: A boolean indicating whether to enable colored output.
     ///
     /// # Returns
     ///
     /// A new `ReportWriter` instance configured for the specified target.
-    pub fn new(target: ReportingTarget) -> Self {
+    pub fn new(target: ReportingTarget, with_colors: bool) -> Self {
         let stream = match target {
-            ReportingTarget::Stdout => StandardStream::stdout(ColorChoice::Auto),
-            ReportingTarget::Stderr => StandardStream::stderr(ColorChoice::Auto),
+            ReportingTarget::Stdout => {
+                StandardStream::stdout(if with_colors { ColorChoice::Auto } else { ColorChoice::Never })
+            }
+            ReportingTarget::Stderr => {
+                StandardStream::stderr(if with_colors { ColorChoice::Auto } else { ColorChoice::Never })
+            }
         };
 
         Self { inner: Arc::new(Mutex::new(stream)) }

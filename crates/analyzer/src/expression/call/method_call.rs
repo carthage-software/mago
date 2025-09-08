@@ -139,6 +139,7 @@ pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
                 *method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
+            inferred_return_type: None,
             method_context: Some(method_target_context),
             span,
         },
@@ -204,6 +205,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
                 *resolved_method.method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
+            inferred_return_type: None,
             method_context: Some(method_target_context),
             span,
         });

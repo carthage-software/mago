@@ -42,6 +42,14 @@ pub struct Configuration {
     /// Whether to allow unsupported PHP versions.
     pub allow_unsupported_php_version: bool,
 
+    /// Whether to use the pager when printing output.
+    #[serde(default)]
+    pub use_pager: bool,
+
+    /// The pager to use when printing output.
+    #[serde(default)]
+    pub pager: Option<String>,
+
     /// Configuration options for source discovery.
     pub source: SourceConfiguration,
 
@@ -180,6 +188,8 @@ impl Configuration {
             stack_size: DEFAULT_STACK_SIZE,
             php_version: DEFAULT_PHP_VERSION,
             allow_unsupported_php_version: false,
+            use_pager: false,
+            pager: None,
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
             formatter: FormatterConfiguration::default(),

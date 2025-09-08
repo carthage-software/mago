@@ -1,46 +1,6 @@
  <?php
 
  /**
-  * @assert-if-true array<array-key, mixed> $value
-  *
-  * @return ($value is array ? true : false)
-  */
- function is_array(mixed $value): bool
- {
-     return is_array($value);
- }
-
- /**
-  * @template K as array-key
-  * @template V
-  *
-  * @param array<K, V> $array
-  *
-  * @return list<V>
-  */
- function array_values(array $array): array
- {
-     return array_values($array);
- }
-
- /**
-  * @template K as array-key
-  * @template V
-  * @template S
-  * @template U
-  *
-  * @param (callable(V, S): U)|null $callback
-  * @param array<K, V> $array
-  * @param array<array-key, S> ...$arrays
-  *
-  * @return array<K, U>
-  */
- function array_map(null|callable $callback, array $array, array ...$arrays): array
- {
-     return array_map($callback, $array, ...$arrays);
- }
-
- /**
   * @template Tk
   * @template Tv
   * @template T

@@ -27,7 +27,7 @@ pub fn rich_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
+) -> Result<(), ReportingError> {
     codespan_format_with_config(
         writer,
         database,
@@ -40,7 +40,7 @@ pub fn medium_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
+) -> Result<(), ReportingError> {
     codespan_format_with_config(
         writer,
         database,
@@ -53,7 +53,7 @@ pub fn short_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
+) -> Result<(), ReportingError> {
     codespan_format_with_config(
         writer,
         database,
@@ -67,7 +67,7 @@ fn codespan_format_with_config(
     database: &ReadDatabase,
     issues: IssueCollection,
     config: Config,
-) -> Result<Option<Level>, ReportingError> {
+) -> Result<(), ReportingError> {
     let files = DatabaseFiles(database);
 
     let highest_level = issues.get_highest_level();
@@ -134,7 +134,7 @@ fn codespan_format_with_config(
         term::emit(writer, &config, &files, &diagnostic)?;
     }
 
-    Ok(highest_level)
+    Ok(())
 }
 
 struct DatabaseFiles<'a>(&'a ReadDatabase);

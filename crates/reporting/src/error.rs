@@ -14,6 +14,18 @@ pub enum ReportingError {
     InvalidFormat(String),
 }
 
+impl ReportingError {
+    pub fn is_broken_pipe(&self) -> bool {
+        let err = match self {
+            Self::IoError(err) => err,
+            Self::FilesError(FilesError::Io(err)) => err,
+            _ => return false,
+        };
+
+        err.raw_os_error() == Some(32) || err.kind() == std::io::ErrorKind::BrokenPipe
+    }
+}
+
 impl std::fmt::Display for ReportingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

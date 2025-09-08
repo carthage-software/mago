@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use pager::Pager;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
@@ -45,15 +46,37 @@ pub enum ReportingFormat {
     Emacs,
 }
 
+impl ReportingFormat {
+    /// Returns `true` if the reporting format supports being displayed in a pager.
+    pub fn supports_paging(&self) -> bool {
+        match self {
+            // These formats are meant for human consumption in a terminal.
+            Self::Rich | Self::Medium | Self::Short | Self::Ariadne | Self::Emacs => true,
+
+            // These formats are for CI/CD, machine-readable, or produce short summaries.
+            Self::Github | Self::Gitlab | Self::Json | Self::Count | Self::CodeCount | Self::Checkstyle => false,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Reporter {
     database: ReadDatabase,
     target: ReportingTarget,
-    writer: ReportWriter,
+    with_colors: bool,
+    use_pager: bool,
+    pager: Option<String>,
 }
 
 impl Reporter {
-    pub fn new(manager: ReadDatabase, target: ReportingTarget) -> Self {
-        Self { database: manager, target, writer: ReportWriter::new(target) }
+    pub fn new(
+        manager: ReadDatabase,
+        target: ReportingTarget,
+        with_colors: bool,
+        use_pager: bool,
+        pager: Option<String>,
+    ) -> Self {
+        Self { database: manager, target, with_colors, use_pager, pager }
     }
 
     pub fn report(
@@ -61,19 +84,30 @@ impl Reporter {
         issues: impl IntoIterator<Item = Issue>,
         format: ReportingFormat,
     ) -> Result<Option<Level>, ReportingError> {
-        format.emit(&mut self.writer.lock(), &self.database, IssueCollection::from(issues))
-    }
-}
+        let issues = IssueCollection::from(issues);
+        if issues.is_empty() {
+            return Ok(None);
+        }
 
-unsafe impl Send for Reporter {}
-unsafe impl Sync for Reporter {}
+        let highest_level = issues.get_highest_level();
 
-impl std::fmt::Debug for Reporter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Reporter")
-            .field("manager", &self.database)
-            .field("target", &self.target)
-            .finish_non_exhaustive()
+        let mut pager =
+            if let Some(pager_name) = &self.pager { Pager::with_default_pager(pager_name) } else { Pager::new() };
+
+        if self.use_pager && self.target == ReportingTarget::Stdout && format.supports_paging() {
+            pager.setup();
+        }
+
+        let writer = ReportWriter::new(self.target, self.with_colors);
+        match format.emit(&mut writer.lock(), &self.database, issues) {
+            Ok(_) => Ok(highest_level),
+            Err(error) if pager.is_on() && error.is_broken_pipe() => {
+                // Silently ignore broken pipe errors when using a pager.
+                // This usually means the user quit the pager before reading all the output.
+                Ok(highest_level)
+            }
+            Err(error) => Err(error),
+        }
     }
 }
 

@@ -43,12 +43,16 @@ pub struct Annotation {
 #[strum(serialize_all = "lowercase")]
 pub enum Level {
     /// A note, providing additional information or context.
+    #[serde(alias = "note")]
     Note,
     /// A help message, suggesting possible solutions or further actions.
+    #[serde(alias = "help")]
     Help,
     /// A warning, indicating a potential problem that may need attention.
+    #[serde(alias = "warning", alias = "warn")]
     Warning,
     /// An error, indicating a problem that prevents the code from functioning correctly.
+    #[serde(alias = "error", alias = "err")]
     Error,
 }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use ahash::HashSet;
@@ -17,14 +18,17 @@ use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_empty_keyed_array;
 use mago_codex::ttype::get_int;
+use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -479,7 +483,7 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
                     }
 
                     match keyed_data.get_generic_parameters() {
-                        Some(parameters) => (Some(parameters.0), parameters.1),
+                        Some(parameters) => (Some(Cow::Borrowed(parameters.0)), Cow::Borrowed(parameters.1)),
                         None => {
                             continue;
                         }
@@ -534,32 +538,43 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
                         all_non_empty = false;
                     }
 
-                    (None, list_data.get_element_type())
+                    (None, Cow::Borrowed(list_data.get_element_type()))
                 }
             },
-            _ => {
-                // TODO(azjezz): handle iterable types..
-                // ref: https://github.com/vimeo/psalm/blob/6.x/src/Psalm/Internal/Analyzer/Statements/Expression/ArrayAnalyzer.php#L564
+            atomic => {
+                all_non_empty = false;
+
+                let Some((iterable_key, iterable_value)) = get_iterable_parameters(atomic, context.codebase) else {
+                    array_creation_info.can_create_objectlike = false;
+                    array_creation_info.item_key_atomic_types.push(TAtomic::Scalar(TScalar::ArrayKey));
+                    array_creation_info.item_value_atomic_types.push(TAtomic::Mixed(TMixed::new()));
+
+                    context.collector.report_with_code(
+                        IssueCode::InvalidArrayElement,
+                        Issue::error(format!(
+                            "Cannot use spread operator on non-iterable type `{}`.",
+                            atomic.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(variadic_array_element.span())
+                                .with_message("Spread operator requires an iterable type.")
+                        )
+                        .with_note(
+                            "The spread operator (`...`) can only be used with arrays or objects implementing the `Traversable` interface."
+                        )
+                        .with_help("Consider using an array or a traversable object."),
+                    );
+
+                    continue;
+                };
+
+                if iterable_value.is_never() {
+                    continue;
+                }
+
                 array_creation_info.can_create_objectlike = false;
-                array_creation_info.item_key_atomic_types.push(TAtomic::Scalar(TScalar::ArrayKey));
-                array_creation_info.item_value_atomic_types.push(TAtomic::Mixed(TMixed::new()));
 
-                context.collector.report_with_code(
-                    IssueCode::InvalidArrayElement,
-                    Issue::error(
-                        "Cannot use spread operator on non-iterable type."
-                    )
-                    .with_annotation(
-                        Annotation::primary(variadic_array_element.span())
-                            .with_message("Spread operator requires an iterable type.")
-                    )
-                    .with_note(
-                        "The spread operator (`...`) can only be used with arrays or objects implementing the `Traversable` interface."
-                    )
-                    .with_help("Consider using an array or a traversable object."),
-                );
-
-                continue;
+                (Some(Cow::Owned(iterable_key)), Cow::Owned(iterable_value))
             }
         };
 
@@ -572,57 +587,90 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
                 continue;
             }
 
-            if !is_contained_by(
+            let is_string_key = union_comparator::is_contained_by(
                 context.codebase,
-                key_type,
-                &get_arraykey(),
-                key_type.ignore_nullable_issues,
-                key_type.ignore_falsable_issues,
+                &key_type,
+                &get_string(),
+                false,
+                false,
                 false,
                 &mut ComparisonResult::new(),
-            ) {
+            );
+
+            let is_array_key_key = is_string_key
+                || union_comparator::is_contained_by(
+                    context.codebase,
+                    &key_type,
+                    &get_arraykey(),
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                );
+
+            if is_string_key {
+                array_creation_info.is_list = false;
+
+                if !context.settings.version.is_at_least(0, 0, 0) {
+                    context.collector.report_with_code(
+                        IssueCode::InvalidArrayElementKey,
+                        Issue::error("String keys are not supported in unpacked arrays")
+                            .with_annotation(
+                                Annotation::primary(variadic_array_element.span())
+                                    .with_message("Spread operator requires an iterable type with array-key keys."),
+                            )
+                            .with_note(
+                                "In PHP versions prior to 8.1, using string keys in unpacked arrays is not supported.",
+                            )
+                            .with_help("Consider using an array or a traversable object with integer keys."),
+                    );
+
+                    continue;
+                }
+            }
+
+            if !is_array_key_key {
                 context.collector.report_with_code(
-                    IssueCode::InvalidArrayElement,
-                    Issue::error(
-                        "Cannot use spread operator on iterable with key type."
-                    )
+                    IssueCode::InvalidArrayElementKey,
+                    Issue::error(format!(
+                        "Cannot use spread operator on an iterable with key type `{}`.",
+                        key_type.get_id()
+                    ))
                     .with_annotation(
                         Annotation::primary(variadic_array_element.span())
-                            .with_message("Spread operator requires an iterable type.")
+                            .with_message("Spread operator requires an iterable type with array-key keys.")
                     )
                     .with_note(
-                        "The spread operator (`...`) can only be used with arrays or objects implementing the `Traversable` interface."
+                        "The spread operator (`...`) can only be used with arrays or objects implementing the `Traversable` interface that have keys of type `array-key`."
                     )
-                    .with_help("Consider using an array or a traversable object."),
+                    .with_help("Consider using an array or a traversable object with appropriate key types.")
                 );
 
                 continue;
             }
 
             for (k, v) in array_creation_info.property_types.iter_mut() {
-                if let ArrayKey::Integer(_) = k {
-                    continue;
-                }
+                let prop_key = k.to_union();
 
-                if !is_contained_by(
+                if is_contained_by(
                     context.codebase,
-                    &k.to_union(),
-                    key_type,
-                    key_type.ignore_nullable_issues,
-                    key_type.ignore_falsable_issues,
+                    &prop_key,
+                    &key_type,
+                    false,
+                    false,
                     false,
                     &mut ComparisonResult::new(),
                 ) {
-                    continue;
-                }
+                    let new_prop_val = combine_union_types(&v.1, &value_type, context.codebase, false);
 
-                *v = (false, combine_union_types(&v.1, value_type, context.codebase, false))
+                    *v = (v.0, new_prop_val);
+                }
             }
 
-            array_creation_info.item_key_atomic_types.extend(key_type.types.clone().into_owned());
+            array_creation_info.item_key_atomic_types.extend(key_type.into_owned().types.into_owned());
         }
 
-        array_creation_info.item_value_atomic_types.extend(value_type.types.clone().into_owned());
+        array_creation_info.item_value_atomic_types.extend(value_type.into_owned().types.into_owned());
     }
 
     if all_non_empty {

@@ -15,9 +15,7 @@ pub fn count_format(
     writer: &mut dyn WriteColor,
     _database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     // Count occurrences of each issue level
     let mut counts = HashMap::default();
     issues.iter().for_each(|issue| {
@@ -42,7 +40,7 @@ pub fn count_format(
         writer.reset()?;
     }
 
-    Ok(highest_level)
+    Ok(())
 }
 
 fn level_color(level: &Level) -> Color {

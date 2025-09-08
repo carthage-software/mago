@@ -15,6 +15,7 @@ use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::HasSpan;
@@ -183,6 +184,15 @@ fn update_atomic_given_key(
         );
     }
 
+    if atomic_type.is_null() || atomic_type.is_void() {
+        atomic_type = TAtomic::Array(TArray::List(TList {
+            element_type: Box::new(get_never()),
+            known_elements: None,
+            known_count: None,
+            non_empty: false,
+        }));
+    }
+
     if !key_values.is_empty() {
         for key_value in key_values {
             if let TAtomic::Array(array) = &mut atomic_type {
@@ -287,7 +297,7 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     key_type: Option<Rc<TUnion>>,
     value_type: TUnion,
-    root_type: TUnion,
+    mut root_type: TUnion,
 ) -> TUnion {
     let mut collection_types = Vec::new();
 
@@ -295,8 +305,8 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
         let key_type = if key_type.is_mixed() { Rc::new(get_arraykey()) } else { key_type.clone() };
 
         for original_type in root_type.types.as_ref() {
-            if let TAtomic::Array(array_type) = original_type {
-                match array_type {
+            match original_type {
+                TAtomic::Array(array_type) => match array_type {
                     TArray::List(list) => {
                         collection_types.push(TAtomic::Array(TArray::List(TList {
                             element_type: Box::new(value_type.clone()),
@@ -317,13 +327,21 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
                             non_empty: true,
                         })));
                     }
+                },
+                TAtomic::Null | TAtomic::Void => {
+                    collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                        parameters: Some((Box::new((*key_type).clone()), Box::new(value_type.clone()))),
+                        known_items: None,
+                        non_empty: true,
+                    })));
                 }
+                _ => (),
             }
         }
     } else {
         for original_type in root_type.types.as_ref() {
-            if let TAtomic::Array(array) = original_type {
-                match array {
+            match original_type {
+                TAtomic::Array(array) => match array {
                     TArray::List(list) => {
                         if !block_context.inside_loop && list.element_type.is_never() {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
@@ -387,11 +405,21 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
                             })));
                         }
                     }
+                },
+                TAtomic::Null | TAtomic::Void => {
+                    collection_types.push(TAtomic::Array(TArray::List(TList {
+                        element_type: Box::new(value_type.clone()),
+                        known_elements: None,
+                        known_count: None,
+                        non_empty: true,
+                    })));
                 }
+                _ => (),
             }
         }
     }
 
+    root_type.types.to_mut().retain(|t| !t.is_null() && !t.is_void());
     if collection_types.is_empty() {
         return root_type;
     }
@@ -472,7 +500,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             array_expression_type = scoped_type;
         }
 
-        let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_int()));
+        let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_non_negative_int()));
 
         block_context.inside_assignment = true;
 

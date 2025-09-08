@@ -20,20 +20,12 @@ function get_bool(): bool
 }
 
 /**
- * @assert-if-true string $value
- */
-function is_string(mixed $value): bool
-{
-    return is_string($value);
-}
-
-/**
  * @mago-expect analysis:empty-match-expression
  * @mago-expect analysis:unhandled-thrown-type
  */
 function test_empty_match(Status $status): never
 {
-    match ($status) {};
+    match ($status) { };
 }
 
 /**
@@ -41,9 +33,7 @@ function test_empty_match(Status $status): never
  */
 function test_only_default(string $value): string
 {
-    return match ($value) {
-        default => 'default value',
-    };
+    return match ($value) { default => 'default value' };
 }
 
 /**

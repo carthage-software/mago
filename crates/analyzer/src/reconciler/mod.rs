@@ -6,12 +6,12 @@ use std::sync::LazyLock;
 use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use regex::Regex;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::class_like_exists;
 use mago_codex::class_or_interface_exists;

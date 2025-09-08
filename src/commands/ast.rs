@@ -76,7 +76,9 @@ pub fn execute(command: AstCommand, configuration: Configuration) -> Result<Exit
     if let Some(error) = error {
         let issue = Into::<Issue>::into(&error);
         let database = ReadDatabase::single(file);
-        Reporter::new(database, ReportingTarget::Stdout).report([issue], ReportingFormat::Rich)?;
+
+        Reporter::new(database, ReportingTarget::Stdout, true, true, None).report([issue], ReportingFormat::Rich)?;
+
         return Ok(ExitCode::FAILURE);
     }
 
@@ -93,7 +95,8 @@ fn print_tokens(arena: &Bump, file: File, as_json: bool) -> Result<ExitCode, Err
             Some(Err(err)) => {
                 let issue = Into::<Issue>::into(&err);
                 let database = ReadDatabase::single(file);
-                Reporter::new(database, ReportingTarget::Stdout).report([issue], ReportingFormat::Rich)?;
+                Reporter::new(database, ReportingTarget::Stdout, true, true, None)
+                    .report([issue], ReportingFormat::Rich)?;
                 return Ok(ExitCode::FAILURE);
             }
             None => break,

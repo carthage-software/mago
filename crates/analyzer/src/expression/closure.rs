@@ -161,31 +161,32 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
         let function_identifier = FunctionLikeIdentifier::Closure(s.file_id, s.start);
 
-        let resulting_closure = if function_metadata.template_types.is_empty() {
-            let mut signature = get_signature_of_function_like_metadata(
-                &function_identifier,
-                function_metadata,
-                context.codebase,
-                &TypeExpansionOptions::default(),
-            );
-
-            let mut inferred_return_type = None;
-            for inferred_return in inner_artifacts.inferred_return_types {
-                inferred_return_type = Some(add_optional_union_type(
-                    (*inferred_return).clone(),
-                    inferred_return_type.as_ref(),
+        let resulting_closure =
+            if function_metadata.template_types.is_empty() && !inner_artifacts.inferred_return_types.is_empty() {
+                let mut signature = get_signature_of_function_like_metadata(
+                    &function_identifier,
+                    function_metadata,
                     context.codebase,
-                ));
-            }
+                    &TypeExpansionOptions::default(),
+                );
 
-            if let Some(inferred_return_type) = inferred_return_type {
-                signature.return_type = Some(Box::new(inferred_return_type));
-            }
+                let mut inferred_return_type = None;
+                for inferred_return in inner_artifacts.inferred_return_types {
+                    inferred_return_type = Some(add_optional_union_type(
+                        (*inferred_return).clone(),
+                        inferred_return_type.as_ref(),
+                        context.codebase,
+                    ));
+                }
 
-            TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
-        } else {
-            TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(function_identifier)))
-        };
+                if let Some(inferred_return_type) = inferred_return_type {
+                    signature.return_type = Some(Box::new(inferred_return_type));
+                }
+
+                TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
+            } else {
+                TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(function_identifier)))
+            };
 
         artifacts.set_expression_type(self, resulting_closure);
 

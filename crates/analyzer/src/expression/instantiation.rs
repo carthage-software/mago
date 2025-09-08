@@ -279,6 +279,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                     *constructor_declraing_id.get_method_name(),
                 ),
                 metadata: constructor,
+                inferred_return_type: None,
                 method_context: Some(MethodTargetContext {
                     declaring_method_id: Some(constructor_declraing_id),
                     class_like_metadata: metadata,

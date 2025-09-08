@@ -24,3 +24,4 @@ termcolor = { workspace = true }
 strum = { workspace = true }
 blake3 = { workspace = true }
 ariadne = { workspace = true }
+pager = { workspace = true }

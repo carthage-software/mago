@@ -83,6 +83,11 @@ pub enum InvocationTarget<'ctx> {
         identifier: FunctionLikeIdentifier,
         /// Metadata (parameters, return type, etc.) for the resolved function or method.
         metadata: &'ctx FunctionLikeMetadata,
+        /// The inferred return type for this function-like.
+        ///
+        /// This type is usually set for closures and arrow functions, and
+        /// contains a more precise return type than the declared one.
+        inferred_return_type: Option<Box<TUnion>>,
         /// If this is a method call, this provides context about the calling class
         /// (e.g., type of `$this`, resolved `static::class`). `None` for function calls.
         method_context: Option<MethodTargetContext<'ctx>>,
@@ -280,9 +285,9 @@ impl<'ctx> InvocationTarget<'ctx> {
     pub fn get_return_type(&self) -> Option<&TUnion> {
         match self {
             InvocationTarget::Callable { signature, .. } => signature.get_return_type(),
-            InvocationTarget::FunctionLike { metadata, .. } => {
-                metadata.return_type_metadata.as_ref().map(|type_metadata| &type_metadata.type_union)
-            }
+            InvocationTarget::FunctionLike { metadata, inferred_return_type, .. } => inferred_return_type
+                .as_deref()
+                .or_else(|| metadata.return_type_metadata.as_ref().map(|type_metadata| &type_metadata.type_union)),
         }
     }
 }

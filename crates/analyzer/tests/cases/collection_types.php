@@ -1,34 +1,6 @@
 <?php
 
 /**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- * @param V $filter_value
- * @param bool $strict
- *
- * @return ($array is non-empty-array ? non-empty-list<K> : list<K>)
- */
-function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array
-{
-    return array_keys($array, $filter_value, $strict);
-}
-
-/**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- *
- * @return ($array is non-empty-array ? non-empty-list<V> : list<V>)
- */
-function array_values(array $array): array
-{
-    return array_values($array);
-}
-
-/**
  * @template Tk
  * @template Tv
  * @template T

@@ -35,4 +35,5 @@ either = { workspace = true }
 bumpalo = { workspace = true }
 
 [dev-dependencies]
+mago-prelude = { workspace = true, features = ["build"] }
 indoc = { workspace = true }

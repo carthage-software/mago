@@ -12,9 +12,7 @@ pub fn emacs_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     for issue in issues.iter() {
         let (file_path, line, column) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
             Some(annotation) => {
@@ -44,5 +42,5 @@ pub fn emacs_format(
         writeln!(writer, "{file_path}:{line}:{column}:{severity} - {issue_type}: {message}")?;
     }
 
-    Ok(highest_level)
+    Ok(())
 }

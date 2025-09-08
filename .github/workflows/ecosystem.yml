@@ -1,0 +1,50 @@
+name: Ecosystem Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Run against downstream projects
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Mago
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Mago
+        run: cargo build --release --locked
+
+      - name: Install PHP and Composer
+        uses: shivammathur/setup-php@master
+        with:
+          php-version: "8.4"
+          tools: "composer:v2"
+
+      - name: Test against azjezz/psl
+        run: |
+          set -e
+
+          echo "::group::Cloning and setting up azjezz/psl"
+          git clone --branch next --depth 1 https://github.com/azjezz/psl.git psl-project
+          cd psl-project
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          echo "::endgroup::"
+
+          echo "::group::Running Mago analyze on azjezz/psl"
+          ${{ github.workspace }}/target/release/mago --config config/mago.toml analyze --reporting-format=count
+          echo "::endgroup::"

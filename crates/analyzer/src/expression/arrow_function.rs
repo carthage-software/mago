@@ -82,31 +82,32 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         let function_identifier = FunctionLikeIdentifier::Closure(s.file_id, s.start);
 
-        let resulting_closure = if function_metadata.template_types.is_empty() {
-            let mut signature = get_signature_of_function_like_metadata(
-                &function_identifier,
-                function_metadata,
-                context.codebase,
-                &TypeExpansionOptions::default(),
-            );
-
-            let mut inferred_return_type = None;
-            for inferred_return in inner_artifacts.inferred_return_types {
-                inferred_return_type = Some(add_optional_union_type(
-                    (*inferred_return).clone(),
-                    inferred_return_type.as_ref(),
+        let resulting_closure =
+            if function_metadata.template_types.is_empty() && !inner_artifacts.inferred_return_types.is_empty() {
+                let mut signature = get_signature_of_function_like_metadata(
+                    &function_identifier,
+                    function_metadata,
                     context.codebase,
-                ));
-            }
+                    &TypeExpansionOptions::default(),
+                );
 
-            if let Some(inferred_return_type) = inferred_return_type {
-                signature.return_type = Some(Box::new(inferred_return_type));
-            }
+                let mut inferred_return_type = None;
+                for inferred_return in inner_artifacts.inferred_return_types {
+                    inferred_return_type = Some(add_optional_union_type(
+                        (*inferred_return).clone(),
+                        inferred_return_type.as_ref(),
+                        context.codebase,
+                    ));
+                }
 
-            TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
-        } else {
-            TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(function_identifier)))
-        };
+                if let Some(inferred_return_type) = inferred_return_type {
+                    signature.return_type = Some(Box::new(inferred_return_type));
+                }
+
+                TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
+            } else {
+                TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(function_identifier)))
+            };
 
         artifacts.set_expression_type(self, resulting_closure);
 
@@ -293,136 +294,6 @@ mod tests {
             foreach ($mapper($integers, fn(int $i): string => (string) $i) as $item) {
                 i_take_int($item['before']);
                 i_take_string($item['after']);
-            }
-        "#}
-    }
-
-    test_analysis! {
-        name = arrow_function_inherits_method_templates,
-        code = indoc! {r#"
-            <?php
-
-            namespace {
-                /**
-                 * @template K
-                 * @template-covariant V
-                 *
-                 * @inheritors IteratorAggregate|Generator|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
-                 */
-                interface Traversable
-                {
-                }
-
-                /**
-                 * @template TKey
-                 * @template-covariant TValue
-                 * @template TSend
-                 * @template-covariant TReturn
-                 *
-                 * @template-implements Traversable<TKey, TValue>
-                 */
-                class Generator implements Traversable
-                {
-                }
-
-                final class Closure
-                {
-                    private function __construct() {}
-
-                    /**
-                     * @no-named-arguments
-                     */
-                    public function __invoke(...$_)
-                    {
-                    }
-                }
-            }
-
-            namespace Psl\Iter {
-                use Closure;
-                use Generator;
-
-                /**
-                 * @template Tk
-                 * @template Tv
-                 */
-                final class Iterator
-                {
-                    /**
-                     * @var null|Generator<Tk, Tv, mixed, mixed>
-                     */
-                    public null|Generator $generator;
-
-                    /**
-                     * @var array<int, array{0: Tk, 1: Tv}>
-                     */
-                    public array $entries = [];
-
-                    /**
-                     *  Whether the current value/key pair has been added to the local entries.
-                     */
-                    public bool $saved = true;
-
-                    /**
-                     * Current cursor position for the local entries.
-                     */
-                    public int $position = 0;
-
-                    /**
-                     * The size of the generator.
-                     *
-                     * @var null|int<0, max>
-                     */
-                    public null|int $count = null;
-
-                    /**
-                     * @param Generator<Tk, Tv, mixed, mixed> $generator
-                     */
-                    public function __construct(Generator $generator)
-                    {
-                        $this->generator = $generator;
-                    }
-
-                    /**
-                     * Create an iterator from a factory.
-                     *
-                     * @template Tsk
-                     * @template Tsv
-                     *
-                     * @param (Closure(): iterable<Tsk, Tsv>) $factory
-                     *
-                     * @return Iterator<Tsk, Tsv>
-                     */
-                    public static function from(Closure $factory): Iterator
-                    {
-                        return self::create($factory());
-                    }
-
-                    /**
-                     * Create an iterator from an iterable.
-                     *
-                     * @template Tsk
-                     * @template Tsv
-                     *
-                     * @param iterable<Tsk, Tsv> $iterable
-                     *
-                     * @return Iterator<Tsk, Tsv>
-                     */
-                    public static function create(iterable $iterable): Iterator
-                    {
-                        if ($iterable instanceof Generator) {
-                            return new self($iterable);
-                        }
-
-                        $factory =
-                            /**
-                             * @return Generator<Tsk, Tsv, mixed, mixed>
-                             */
-                            static fn(): Generator => yield from $iterable;
-
-                        return new self($factory());
-                    }
-                }
             }
         "#}
     }

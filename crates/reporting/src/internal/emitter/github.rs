@@ -13,9 +13,7 @@ pub fn github_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     for issue in issues.iter() {
         let level = match &issue.level {
             Level::Note => "notice",
@@ -53,5 +51,5 @@ pub fn github_format(
         writeln!(writer, "::{level} {properties}::{message}")?;
     }
 
-    Ok(highest_level)
+    Ok(())
 }

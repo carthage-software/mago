@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use ahash::HashSet;
 
@@ -10,11 +11,14 @@ use mago_analyzer::settings::Settings;
 use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
-use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
+use mago_database::DatabaseReader;
 use mago_database::file::File;
 use mago_names::resolver::NameResolver;
+use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
+
+static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 
 #[derive(Debug, Clone)]
 pub struct TestCase<'a> {
@@ -33,28 +37,37 @@ impl<'a> TestCase<'a> {
 }
 
 fn run_test_case_inner(config: TestCase) {
-    let arena = Bump::new();
-    let source_file = File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string()));
+    let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
-    let (program, parse_issues) = parse_file(&arena, &source_file);
+    let file = File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string()));
+    let file_id = database.add(file);
+    let source_file = database.get_ref(&file_id).expect("File just added should exist");
+
+    let arena = Bump::new();
+    let (program, parse_issues) = parse_file(&arena, source_file);
     if parse_issues.is_some() {
         panic!("Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
     }
 
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
-    let mut codebase = scan_program(&arena, &source_file, program, &resolved_names);
-    let mut symbol_references = SymbolReferences::new();
 
-    populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names));
+
+    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(
         &arena,
-        &source_file,
+        source_file,
         &resolved_names,
-        &codebase,
-        Settings { find_unused_expressions: true, check_throws: true, ..Default::default() },
+        &metadata,
+        Settings {
+            find_unused_expressions: true,
+            check_throws: true,
+            allow_possibly_undefined_array_keys: false,
+            ..Default::default()
+        },
     );
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
@@ -63,7 +76,7 @@ fn run_test_case_inner(config: TestCase) {
         panic!("Test '{}': Expected analysis to succeed, but it failed with an error: {}", config.name, err);
     }
 
-    verify_reported_issues(config.name, analysis_result, codebase);
+    verify_reported_issues(config.name, analysis_result, metadata);
 }
 
 fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, mut codebase: CodebaseMetadata) {

@@ -35,9 +35,7 @@ pub fn gitlab_format(
     writer: &mut dyn WriteColor,
     database: &ReadDatabase,
     issues: IssueCollection,
-) -> Result<Option<Level>, ReportingError> {
-    let highest_level = issues.get_highest_level();
-
+) -> Result<(), ReportingError> {
     let code_quality_issues = issues
         .iter()
         .map(|issue| {
@@ -82,5 +80,5 @@ pub fn gitlab_format(
 
     serde_json::to_writer_pretty(writer, &code_quality_issues)?;
 
-    Ok(highest_level)
+    Ok(())
 }

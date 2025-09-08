@@ -1,17 +1,5 @@
 <?php
 
-/**
- * @assert-if-true open-resource $value
- *
- * @return ($value is open-resource ? true : false)
- *
- * @pure
- */
-function is_resource(mixed $value): bool
-{
-    return is_resource($value);
-}
-
 /** @return resource */
 function get_resource(): mixed
 {

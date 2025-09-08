@@ -234,11 +234,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 has_valid_expected_index = true;
             }
             TAtomic::Null => {
-                if array_like_type.ignore_nullable_issues {
-                    continue;
-                }
-
-                if !in_assignment {
+                if !array_like_type.ignore_nullable_issues && !in_assignment {
                     if !block_context.inside_isset {
                         context.collector.report_with_code(
                             IssueCode::PossiblyNullArrayAccess,
@@ -395,7 +391,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
         context.codebase,
         dim_type,
         &expected_key_type,
-        false,
+        true,
         false,
         false,
         &mut union_comparison_result,
@@ -559,15 +555,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     };
 
     let mut union_comparison_result = ComparisonResult::new();
-    let index_type_contained_by_expected = is_contained_by(
-        context.codebase,
-        index_type,
-        &key_parameter,
-        false,
-        false,
-        false,
-        &mut union_comparison_result,
-    );
+    let index_type_contained_by_expected =
+        is_contained_by(context.codebase, index_type, &key_parameter, true, false, false, &mut union_comparison_result);
 
     if index_type_contained_by_expected {
         *has_valid_expected_index = true;
@@ -577,8 +566,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
 
     if let Some(known_items) = keyed_array.get_known_items() {
         if let Some(array_key) = index_type.get_single_array_key() {
-            let possible_value = known_items.get(&array_key).cloned();
-            if let Some((actual_possibly_undefined, actual_value)) = possible_value {
+            if let Some((actual_possibly_undefined, actual_value)) = known_items.get(&array_key).cloned() {
                 *has_valid_expected_index = true;
                 *has_matching_dict_key = true;
 
@@ -613,10 +601,15 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                 }
 
                 return expression_type;
-            }
+            } else {
+                if in_assignment && !has_value_parameter {
+                    // In an assignment to a non-existent key, the value before assignment is effectively null.
+                    // This allows upstream logic to promote it to an array.
+                    return get_null();
+                }
 
-            if !in_assignment {
-                if has_value_parameter {
+                // This is a read access to a non-existent key.
+                if context.settings.allow_possibly_undefined_array_keys && has_value_parameter {
                     *has_possibly_undefined = true;
 
                     return value_parameter.into_owned();
@@ -736,7 +729,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             }
 
             value_parameter.into_owned()
-        } else if block_context.inside_assignment {
+        } else if in_assignment {
             get_never()
         } else {
             get_null()

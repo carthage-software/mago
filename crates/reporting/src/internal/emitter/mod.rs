@@ -3,7 +3,6 @@ use termcolor::WriteColor;
 use mago_database::ReadDatabase;
 
 use crate::IssueCollection;
-use crate::Level;
 use crate::error::ReportingError;
 use crate::reporter::ReportingFormat;
 
@@ -25,19 +24,19 @@ pub trait Emitter {
         writer: &mut dyn WriteColor,
         database: &ReadDatabase,
         issues: IssueCollection,
-    ) -> Result<Option<Level>, ReportingError>;
+    ) -> Result<(), ReportingError>;
 }
 
 impl<T> Emitter for T
 where
-    T: Fn(&mut dyn WriteColor, &ReadDatabase, IssueCollection) -> Result<Option<Level>, ReportingError>,
+    T: Fn(&mut dyn WriteColor, &ReadDatabase, IssueCollection) -> Result<(), ReportingError>,
 {
     fn emit(
         &self,
         writer: &mut dyn WriteColor,
         database: &ReadDatabase,
         issues: IssueCollection,
-    ) -> Result<Option<Level>, ReportingError> {
+    ) -> Result<(), ReportingError> {
         self(writer, database, issues)
     }
 }
@@ -48,7 +47,7 @@ impl Emitter for ReportingFormat {
         writer: &mut dyn WriteColor,
         database: &ReadDatabase,
         issues: IssueCollection,
-    ) -> Result<Option<Level>, ReportingError> {
+    ) -> Result<(), ReportingError> {
         match self {
             ReportingFormat::Rich => codespan::rich_format.emit(writer, database, issues),
             ReportingFormat::Medium => codespan::medium_format.emit(writer, database, issues),

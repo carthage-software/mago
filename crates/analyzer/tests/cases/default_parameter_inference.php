@@ -1,14 +1,5 @@
 <?php
 
-final class Closure
-{
-    /**
-     * @no-named-arguments
-     */
-    public function __invoke(...$_)
-    {
-    }
-}
 
 /**
  * @param 'foo'|'bar'|'baz'|'default' $y

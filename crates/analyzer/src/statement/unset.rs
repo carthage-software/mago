@@ -116,13 +116,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                             let TList { element_type, known_elements, known_count, non_empty } = array;
 
                             let Some(mut known_elements) = known_elements else {
-                                atomics.push(TAtomic::Array(TArray::List(TList {
-                                    known_elements: None,
-                                    element_type,
-                                    known_count,
-                                    // We don't have any known elements, so we can't unset anything.
-                                    // Mark the list as potentially empty.
-                                    non_empty: false,
+                                atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                                    known_items: None,
+                                    parameters: Some((Box::new(get_int()), element_type)),
+                                    non_empty: if let Some(known_count) = known_count {
+                                        known_count > 1 // we removed 1, so we are non-empty if we had more than 1
+                                    } else {
+                                        false
+                                    },
                                 })));
 
                                 continue;

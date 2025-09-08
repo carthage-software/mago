@@ -7,6 +7,7 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -179,6 +180,7 @@ fn get_function_like_target<'ctx, 'arena>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
+    inferred_return_type: Option<Box<TUnion>>,
 ) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
     let mut identifier = function_like;
 
@@ -222,7 +224,7 @@ fn get_function_like_target<'ctx, 'arena>(
         return Ok(None);
     };
 
-    Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, method_context: None, span }))
+    Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context: None, span }))
 }
 
 fn inspect_arguments<'ctx, 'ast, 'arena>(

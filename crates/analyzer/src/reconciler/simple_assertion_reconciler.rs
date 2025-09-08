@@ -277,6 +277,7 @@ pub(crate) fn reconcile(
     }
 
     match assertion {
+        Assertion::Any => Some(existing_var_type.clone()),
         Assertion::Truthy | Assertion::NonEmpty => {
             Some(reconcile_truthy_or_non_empty(context, assertion, existing_var_type, key, negated, span))
         }
@@ -1364,9 +1365,8 @@ fn reconcile_exactly_countable(
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
             let min_under_count = if let Some(known_count) = known_count { known_count < count } else { false };
             if !non_empty || min_under_count {
-                if element_type.is_never() {
-                    existing_var_type.remove_type(atomic);
-                } else {
+                existing_var_type.remove_type(atomic);
+                if !element_type.is_never() {
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
                         element_type: element_type.clone(),
                         known_elements: known_elements.clone(),
@@ -1378,24 +1378,16 @@ fn reconcile_exactly_countable(
                 did_remove_type = true;
             }
         } else if let TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items })) = atomic {
-            if !non_empty {
-                if parameters.is_none() {
-                    existing_var_type.remove_type(atomic);
-                } else {
-                    existing_var_type.types.to_mut().push(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                        known_items: known_items.clone(),
-                        parameters: parameters.clone(),
-                        non_empty: true,
-                    })));
-                }
+            did_remove_type = true;
 
-                did_remove_type = true;
-            } else if let Some(known_items) = known_items {
-                for (u, _) in known_items.values() {
-                    if *u {
-                        did_remove_type = true;
-                    }
-                }
+            if !non_empty {
+                existing_var_type.remove_type(atomic);
+
+                existing_var_type.types.to_mut().push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: known_items.clone(),
+                    parameters: parameters.clone(),
+                    non_empty: true,
+                })));
             }
         }
     }

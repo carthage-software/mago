@@ -153,13 +153,14 @@ pub fn handle_return_value<'ctx, 'arena>(
 
     let function_name = function_like_identifier.as_string();
 
-    if let Some(return_value) = return_value {
-        if function_like_metadata.flags.is_by_reference() {
-            let is_referenceable = return_value.is_referenceable(false)
-                || (return_value.is_referenceable(true) && inferred_return_type.by_reference);
+    if let Some(return_value) = return_value
+        && function_like_metadata.flags.is_by_reference()
+    {
+        let is_referenceable = return_value.is_referenceable(false)
+            || (return_value.is_referenceable(true) && inferred_return_type.by_reference);
 
-            if !is_referenceable {
-                context.collector.report_with_code(
+        if !is_referenceable {
+            context.collector.report_with_code(
                     IssueCode::InvalidReturnStatement,
                     Issue::error(format!(
                         "Cannot return a non-referenceable value from function `{function_name}`.",
@@ -178,10 +179,7 @@ pub fn handle_return_value<'ctx, 'arena>(
                         "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
                     ),
                 );
-            }
         }
-
-        artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 
     let require_return_value;
@@ -264,6 +262,8 @@ pub fn handle_return_value<'ctx, 'arena>(
                 // ignore this, it will be handled by the `yield` analyzer
             }
         }
+    } else if return_value.is_some() {
+        artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 
     if let Some(return_value) = return_value {

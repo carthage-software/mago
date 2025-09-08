@@ -74,14 +74,17 @@ impl Database {
     }
 
     /// Adds a file to the database, overwriting any existing file with the same name.
-    pub fn add(&mut self, file: File) {
+    pub fn add(&mut self, file: File) -> FileId {
         let name = file.name.clone();
         let id = file.id;
 
         if let Some(old_file) = self.files.insert(name.clone(), Arc::new(file)) {
             self.id_to_name.remove(&old_file.id);
         }
+
         self.id_to_name.insert(id, name);
+
+        id
     }
 
     /// Updates a file's content in-place using its stable `FileId`.

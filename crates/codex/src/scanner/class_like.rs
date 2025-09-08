@@ -320,6 +320,10 @@ fn scan_class_like<'ctx, 'arena>(
             codebase.symbols.add_enum_name(name);
         }
         SymbolKind::Trait => {
+            if class_like_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+                class_like_metadata.flags |= MetadataFlags::DEPRECATED;
+            }
+
             codebase.symbols.add_trait_name(name);
         }
         SymbolKind::Interface => {

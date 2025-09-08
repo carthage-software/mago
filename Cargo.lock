@@ -740,12 +740,33 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "errno"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
+dependencies = [
+ "errno-dragonfly",
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "errno"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "errno-dragonfly"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
@@ -1390,7 +1411,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "mago"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1436,7 +1457,7 @@ dependencies = [
 
 [[package]]
 name = "mago-algebra"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "indexmap",
@@ -1448,7 +1469,7 @@ dependencies = [
 
 [[package]]
 name = "mago-analyzer"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1465,6 +1486,7 @@ dependencies = [
  "mago-fixer",
  "mago-names",
  "mago-php-version",
+ "mago-prelude",
  "mago-reporting",
  "mago-span",
  "mago-syntax",
@@ -1475,21 +1497,21 @@ dependencies = [
 
 [[package]]
 name = "mago-atom"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ustr",
 ]
 
 [[package]]
 name = "mago-casing"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "cruet",
 ]
 
 [[package]]
 name = "mago-codex"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bitflags",
@@ -1512,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "mago-collector"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1525,7 +1547,7 @@ dependencies = [
 
 [[package]]
 name = "mago-composer"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "serde",
@@ -1534,7 +1556,7 @@ dependencies = [
 
 [[package]]
 name = "mago-database"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "glob",
  "globset",
@@ -1547,7 +1569,7 @@ dependencies = [
 
 [[package]]
 name = "mago-docblock"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1558,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "mago-fixer"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -1568,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "mago-formatter"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bitflags",
@@ -1585,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "mago-linter"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1606,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "mago-names"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1618,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "mago-php-version"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "serde",
  "serde_json",
@@ -1626,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "mago-prelude"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "bincode",
  "bumpalo",
@@ -1640,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "mago-reporting"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "ahash",
  "ariadne",
@@ -1649,6 +1671,7 @@ dependencies = [
  "mago-database",
  "mago-fixer",
  "mago-span",
+ "pager",
  "serde",
  "serde_json",
  "strum",
@@ -1657,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "mago-semantics"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "mago-database",
  "mago-names",
@@ -1669,7 +1692,7 @@ dependencies = [
 
 [[package]]
 name = "mago-span"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "mago-database",
  "serde",
@@ -1677,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "bumpalo",
  "either",
@@ -1695,7 +1718,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax-core"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1705,7 +1728,7 @@ dependencies = [
 
 [[package]]
 name = "mago-type-syntax"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "mago-database",
  "mago-span",
@@ -1717,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "mago-wasm"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.12"
 dependencies = [
  "bumpalo",
  "mago-analyzer",
@@ -1954,6 +1977,16 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
+name = "pager"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2599211a5c97fbbb1061d3dc751fa15f404927e4846e07c643287d6d1f462880"
+dependencies = [
+ "errno 0.2.8",
+ "libc",
+]
 
 [[package]]
 name = "parking_lot"
@@ -2479,7 +2512,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11181fbabf243db407ef8df94a6ce0b2f9a733bd8be4ad02b4eda9602296cac8"
 dependencies = [
  "bitflags",
- "errno",
+ "errno 0.3.13",
  "libc",
  "linux-raw-sys",
  "windows-sys 0.60.2",

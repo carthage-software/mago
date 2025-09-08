@@ -45,6 +45,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                     *resolved_method.method_identifier.get_method_name(),
                 ),
                 metadata: method_metadata,
+                inferred_return_type: None,
                 method_context: Some(method_target_context),
                 span: self.span(),
             });
