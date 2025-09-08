@@ -8,7 +8,7 @@ Integrate Mago directly into the [Zed editor](https://zed.dev) for seamless, hig
 
 ## Prerequisites
 
-1.  **Mago Installed**: Ensure you have installed Mago. If not, please follow the [Installation Guide](./../guide/installation.md).
+1.  **Mago Installed**: Ensure you have installed Mago. If not, please follow the [Installation Guide](/guide/installation.md).
 2.  **`PATH` configured**: The `mago` executable must be in your system's `$PATH`. The recommended installation methods handle this automatically. You can verify this by running `which mago` in your terminal, which should return a path to the executable.
 
 ## Configuration

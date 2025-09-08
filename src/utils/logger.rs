@@ -14,11 +14,12 @@ use crate::utils::progress::GLOBAL_PROGRESS_MANAGER;
 ///
 /// * `directive` - A logging directive that controls the log level and filtering rules.
 /// * `env_var` - The environment variable used to override log filtering rules.
-pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>) {
+pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>, use_colors: bool) {
     let logger = fmt()
         .with_env_filter(
             EnvFilter::builder().with_default_directive(directive.into()).with_env_var(env_var.into()).from_env_lossy(),
         )
+        .with_ansi(use_colors)
         .with_writer(LoggerWriter::stderr);
 
     if cfg!(debug_assertions) {

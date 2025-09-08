@@ -58,76 +58,74 @@ halstead = { effort-threshold = 7000 }
 )]
 pub struct InitCommand;
 
-pub fn execute(
-    _: InitCommand,
-    configuration: Configuration,
-    configuration_file: Option<PathBuf>,
-) -> Result<ExitCode, Error> {
-    let theme = ColorfulTheme {
-        prompt_prefix: style("".to_string()),
-        success_prefix: style("".to_string()),
-        error_prefix: style("".to_string()),
-        ..Default::default()
-    };
+impl InitCommand {
+    pub fn execute(self, configuration: Configuration, configuration_file: Option<PathBuf>) -> Result<ExitCode, Error> {
+        let theme = ColorfulTheme {
+            prompt_prefix: style("".to_string()),
+            success_prefix: style("".to_string()),
+            error_prefix: style("".to_string()),
+            ..Default::default()
+        };
 
-    let configuration_file = configuration_file
-        .unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE_NAME).with_extension("toml"));
+        let configuration_file = configuration_file
+            .unwrap_or_else(|| configuration.source.workspace.join(CONFIGURATION_FILE_NAME).with_extension("toml"));
 
-    print_welcome_banner();
-    if configuration_file.exists() {
-        println!("  ⚠️  {}", "Mago is already configured!".bold().yellow());
-        println!("      {}", format!("Found mago.toml at: {}", configuration_file.display()).bright_black());
-        println!();
-
-        if Confirm::with_theme(&theme)
-            .with_prompt("    Do you want to back up the existing file and start over?")
-            .default(false)
-            .interact()?
-        {
-            let backup_path = configuration_file.with_extension("toml.bkp");
-            std::fs::rename(&configuration_file, &backup_path).map_err(Error::WritingConfiguration)?;
-
-            println!();
-            println!("  ✅ {}", "Backed up existing configuration.".bold().green());
-            println!("      {}", format!("Moved to: {}", backup_path.display()).bright_black());
-        } else {
-            println!();
-            println!("  ❌ {}", "Initialization cancelled.".yellow());
+        print_welcome_banner();
+        if configuration_file.exists() {
+            println!("  ⚠️  {}", "Mago is already configured!".bold().yellow());
+            println!("      {}", format!("Found mago.toml at: {}", configuration_file.display()).bright_black());
             println!();
 
-            return Ok(ExitCode::SUCCESS);
+            if Confirm::with_theme(&theme)
+                .with_prompt("    Do you want to back up the existing file and start over?")
+                .default(false)
+                .interact()?
+            {
+                let backup_path = configuration_file.with_extension("toml.bkp");
+                std::fs::rename(&configuration_file, &backup_path).map_err(Error::WritingConfiguration)?;
+
+                println!();
+                println!("  ✅ {}", "Backed up existing configuration.".bold().green());
+                println!("      {}", format!("Moved to: {}", backup_path.display()).bright_black());
+            } else {
+                println!();
+                println!("  ❌ {}", "Initialization cancelled.".yellow());
+                println!();
+
+                return Ok(ExitCode::SUCCESS);
+            }
         }
+
+        let InitializationProjectSettings { php_version, paths, includes, excludes } = setup_project(&theme)?;
+
+        let integrations = setup_linter(&theme)?;
+        let (print_width, tab_width, use_tabs) = setup_formatter(&theme)?;
+        let analyzer_settings = setup_analyzer(&theme)?;
+
+        print_step_header(5, "Review & Confirm");
+        let config_content = CONFIGURATION_TEMPLATE
+            .replace("{php_version}", &php_version)
+            .replace("{paths}", &quote_format_strings(&paths))
+            .replace("{includes}", &quote_format_strings(&includes))
+            .replace("{excludes}", &quote_format_strings(&excludes))
+            .replace(
+                "{integrations}",
+                &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
+            )
+            .replace("{print_width}", &print_width.to_string())
+            .replace("{tab_width}", &tab_width.to_string())
+            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{analyzer_settings}", &build_analyzer_settings_string(&analyzer_settings));
+
+        if write_configuration_if_confirmed(&theme, &configuration_file, &config_content)? {
+            print_final_summary();
+        } else {
+            println!("  ❌ {}", "Initialization cancelled. No file was written.".yellow());
+            println!();
+        }
+
+        Ok(ExitCode::SUCCESS)
     }
-
-    let InitializationProjectSettings { php_version, paths, includes, excludes } = setup_project(&theme)?;
-
-    let integrations = setup_linter(&theme)?;
-    let (print_width, tab_width, use_tabs) = setup_formatter(&theme)?;
-    let analyzer_settings = setup_analyzer(&theme)?;
-
-    print_step_header(5, "Review & Confirm");
-    let config_content = CONFIGURATION_TEMPLATE
-        .replace("{php_version}", &php_version)
-        .replace("{paths}", &quote_format_strings(&paths))
-        .replace("{includes}", &quote_format_strings(&includes))
-        .replace("{excludes}", &quote_format_strings(&excludes))
-        .replace(
-            "{integrations}",
-            &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
-        )
-        .replace("{print_width}", &print_width.to_string())
-        .replace("{tab_width}", &tab_width.to_string())
-        .replace("{use_tabs}", &use_tabs.to_string())
-        .replace("{analyzer_settings}", &build_analyzer_settings_string(&analyzer_settings));
-
-    if write_configuration_if_confirmed(&theme, &configuration_file, &config_content)? {
-        print_final_summary();
-    } else {
-        println!("  ❌ {}", "Initialization cancelled. No file was written.".yellow());
-        println!();
-    }
-
-    Ok(ExitCode::SUCCESS)
 }
 
 #[derive(Debug)]

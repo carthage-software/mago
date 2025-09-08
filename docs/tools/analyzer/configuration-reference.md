@@ -17,10 +17,10 @@ ignore = ["mixed-argument"]
 
 ## General options
 
-| Option     | Type       | Default | Description                                        |
-| :--------- | :--------- | :------ | :------------------------------------------------- |
-| `excludes` | `string[]` | `[]`    | A list of glob patterns to exclude from analysis.  |
-| `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally. |
+| Option     | Type       | Default | Description                                                |
+| :--------- | :--------- | :------ | :--------------------------------------------------------- |
+| `excludes` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from analysis. |
+| `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally.         |
 
 ## Issue categories
 

@@ -36,7 +36,7 @@ Cyclomatic complexity is a measure of the number of linearly independent paths t
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
-| `threshold` | `integer` | `20` |
+| `threshold` | `integer` | `6` |
 
 
 

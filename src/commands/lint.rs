@@ -92,60 +92,62 @@ pub struct LintCommand {
     pub reporting: ReportingArgs,
 }
 
-pub fn execute(command: LintCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
-    configuration.source.excludes.extend(std::mem::take(&mut configuration.linter.excludes));
+impl LintCommand {
+    pub fn execute(self, mut configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+        configuration.source.excludes.extend(std::mem::take(&mut configuration.linter.excludes));
 
-    let database = if !command.path.is_empty() {
-        database::load_from_paths(&mut configuration.source, command.path, None)?
-    } else {
-        database::load_from_configuration(&mut configuration.source, false, None)?
-    };
+        let database = if !self.path.is_empty() {
+            database::load_from_paths(&mut configuration.source, self.path, None)?
+        } else {
+            database::load_from_configuration(&mut configuration.source, false, None)?
+        };
 
-    let registry = if command.pedantic {
-        RuleRegistry::build(
-            Settings {
-                php_version: configuration.php_version,
-                integrations: IntegrationSet::all(),
-                rules: RulesSettings::default(),
-            },
-            None,
-            true, // Include disabled rules.
-        )
-    } else {
-        RuleRegistry::build(
-            Settings {
-                php_version: configuration.php_version,
-                integrations: IntegrationSet::from_slice(&configuration.linter.integrations),
-                rules: configuration.linter.rules.clone(),
-            },
-            if command.only.is_empty() { None } else { Some(&command.only) },
-            false,
-        )
-    };
+        let registry = if self.pedantic {
+            RuleRegistry::build(
+                Settings {
+                    php_version: configuration.php_version,
+                    integrations: IntegrationSet::all(),
+                    rules: RulesSettings::default(),
+                },
+                None,
+                true, // Include disabled rules.
+            )
+        } else {
+            RuleRegistry::build(
+                Settings {
+                    php_version: configuration.php_version,
+                    integrations: IntegrationSet::from_slice(&configuration.linter.integrations),
+                    rules: configuration.linter.rules.clone(),
+                },
+                if self.only.is_empty() { None } else { Some(&self.only) },
+                false,
+            )
+        };
 
-    if let Some(explain_code) = command.explain {
-        return explain_rule(&registry, &explain_code);
+        if let Some(explain_code) = self.explain {
+            return explain_rule(&registry, &explain_code);
+        }
+
+        if self.list_rules {
+            return list_rules(registry.rules(), self.json);
+        }
+
+        if database.is_empty() {
+            tracing::info!("No files found to lint.");
+
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        let shared_context = LintContext {
+            registry: Arc::new(registry),
+            php_version: configuration.php_version,
+            mode: if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
+        };
+
+        let issues = run_lint_pipeline(database.read_only(), shared_context)?;
+
+        self.reporting.process_issues(issues, configuration, should_use_colors, database)
     }
-
-    if command.list_rules {
-        return list_rules(registry.rules(), command.json);
-    }
-
-    if database.is_empty() {
-        tracing::info!("No files found to lint.");
-
-        return Ok(ExitCode::SUCCESS);
-    }
-
-    let shared_context = LintContext {
-        registry: Arc::new(registry),
-        php_version: configuration.php_version,
-        mode: if command.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
-    };
-
-    let issues = run_lint_pipeline(database.read_only(), shared_context)?;
-
-    command.reporting.process_issues(issues, configuration, database)
 }
 
 pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Error> {

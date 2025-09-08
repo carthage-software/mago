@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
-use pager::Pager;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 use strum::VariantNames;
 
 use mago_database::ReadDatabase;
+use mago_pager::Pager;
 
 use crate::Issue;
 use crate::IssueCollection;
@@ -65,7 +65,7 @@ pub struct Reporter {
     target: ReportingTarget,
     with_colors: bool,
     use_pager: bool,
-    pager: Option<String>,
+    pager_command: Option<String>,
 }
 
 impl Reporter {
@@ -76,7 +76,7 @@ impl Reporter {
         use_pager: bool,
         pager: Option<String>,
     ) -> Self {
-        Self { database: manager, target, with_colors, use_pager, pager }
+        Self { database: manager, target, with_colors, use_pager, pager_command: pager }
     }
 
     pub fn report(
@@ -91,23 +91,22 @@ impl Reporter {
 
         let highest_level = issues.get_highest_level();
 
-        let mut pager =
-            if let Some(pager_name) = &self.pager { Pager::with_default_pager(pager_name) } else { Pager::new() };
-
-        if self.use_pager && self.target == ReportingTarget::Stdout && format.supports_paging() {
-            pager.setup();
-        }
-
         let writer = ReportWriter::new(self.target, self.with_colors);
-        match format.emit(&mut writer.lock(), &self.database, issues) {
-            Ok(_) => Ok(highest_level),
-            Err(error) if pager.is_on() && error.is_broken_pipe() => {
-                // Silently ignore broken pipe errors when using a pager.
-                // This usually means the user quit the pager before reading all the output.
-                Ok(highest_level)
+        if self.use_pager && self.target == ReportingTarget::Stdout && format.supports_paging() {
+            let mut pager = Pager::default();
+            if let Some(pager_command) = &self.pager_command {
+                pager = pager.command(pager_command);
             }
-            Err(error) => Err(error),
+
+            return pager.page(|_| match format.emit(&mut writer.lock(), &self.database, issues) {
+                Ok(_) => Ok(highest_level),
+                Err(err) => Err(err),
+            })?;
         }
+
+        format.emit(&mut writer.lock(), &self.database, issues)?;
+
+        Ok(highest_level)
     }
 }
 

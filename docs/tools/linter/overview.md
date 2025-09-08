@@ -46,8 +46,8 @@ This makes it a faster and more powerful replacement for `php -l`, allowing you 
 
 ## Dive In
 
-- **[Usage](./usage.md)**: learn how to run the linter from the command line.
-- **[Integrations](./integrations.md)**: enable framework-specific checks.
-- **[Rules & categories](./rules-and-categories.md)**: discover all available rules.
-- **[Configuration reference](./configuration-reference.md)**: see all the available settings.
-- **[Command reference](./command-reference.md)**: a detailed guide to the `mago lint` command.
+- **[Usage](/tools/linter/usage.md)**: learn how to run the linter from the command line.
+- **[Integrations](/tools/linter/integrations.md)**: enable framework-specific checks.
+- **[Rules & categories](/tools/linter/rules-and-categories.md)**: discover all available rules.
+- **[Configuration reference](/tools/linter/configuration-reference.md)**: see all the available settings.
+- **[Command reference](/tools/linter/command-reference.md)**: a detailed guide to the `mago lint` command.

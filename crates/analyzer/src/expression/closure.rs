@@ -140,7 +140,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             &mut inner_block_context,
             function_metadata,
             &self.parameter_list,
-            FunctionLikeBody::Statements(self.body.statements.as_slice()),
+            FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             inferred_parameter_types,
         )?;
 
@@ -193,7 +193,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         heuristic::check_function_like(
             function_metadata,
             self.parameter_list.parameters.as_slice(),
-            FunctionLikeBody::Statements(self.body.statements.as_slice()),
+            FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             context,
         );
 

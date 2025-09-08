@@ -27,6 +27,5 @@ If your code were an essay, the **linter** would be the grammar and style checke
 
 ## Dive in
 
-- **[Usage](./usage.md)**: learn how to run the analyzer.
-- **[Configuration reference](./configuration-reference.md)**: see all the available options to customize the analysis.
-- **[Command reference](./command-reference.md)**: a detailed guide to the `mago analyze` command and its flags.
+- **[Configuration reference](/tools/analyzer/configuration-reference.md)**: see all the available options to customize the analysis.
+- **[Command reference](/tools/analyzer/command-reference.md)**: a detailed guide to the `mago analyze` command and its flags.

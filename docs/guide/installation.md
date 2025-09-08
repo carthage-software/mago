@@ -34,7 +34,7 @@ You can always download a pre-compiled binary directly from our GitHub Releases 
 
 ## Package managers
 
-These methods are convenient but may be managed by the community or experience slight publishing delays. If you use Homebrew or Cargo, it is **crucial to run [`mago self-update`](./self-update.md)** immediately after installation.
+These methods are convenient but may be managed by the community or experience slight publishing delays. If you use Homebrew or Cargo, it is **crucial to run [`mago self-update`](/guide/upgrading)** immediately after installation.
 
 ### Composer (PHP project)
 
@@ -47,7 +47,7 @@ composer require --dev carthage-software/mago:1.0.0-beta.12
 ### Homebrew (macOS)
 
 :::warning
- The Homebrew formula for Mago is community-managed and often lags significantly behind official releases. This method is **not recommended** unless you follow it with a [self-update](./self-update.md).
+The Homebrew formula for Mago is community-managed and often lags significantly behind official releases. This method is **not recommended** unless you follow it with a [self-update](/guide/upgrading).
 :::
 
 1.  Install the potentially outdated version from Homebrew:
@@ -69,7 +69,7 @@ Publishing to crates.io can sometimes be delayed after a new release.
     ```sh
     cargo install mago
     ```
-2.  Run [`mago self-update`](./self-update.md) to ensure you have the absolute latest version:
+2.  Run [`mago self-update`](/guide/upgrading) to ensure you have the absolute latest version:
     ```sh
     mago self-update
     ```

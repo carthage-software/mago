@@ -43,6 +43,7 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::analyze_statements;
 use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_root_expression_id;
 use crate::utils::misc::check_for_paradox;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Switch<'arena> {
@@ -100,33 +101,19 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
     }
 
-    pub fn analyze<'ast>(mut self, switch: &'ast Switch<'arena>) -> Result<(), AnalysisError> {
+    pub fn analyze(mut self, switch: &Switch<'arena>) -> Result<(), AnalysisError> {
         let was_inside_conditional = self.block_context.inside_conditional;
         self.block_context.inside_conditional = true;
         switch.expression.analyze(self.context, self.block_context, self.artifacts)?;
         self.block_context.inside_conditional = was_inside_conditional;
 
-        let switch_var_id = if let Some(switch_var_id) = get_expression_id(
-            switch.expression,
-            self.block_context.scope.get_class_like_name(),
-            self.context.resolved_names,
-            Some(self.context.codebase),
-        ) {
-            switch_var_id
-        } else {
-            let switch_var_id = switch.expression.span();
-            let switch_var_id = format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch_var_id.start.offset);
-
-            self.block_context.locals.insert(
-                switch_var_id.clone(),
-                self.artifacts
-                    .get_rc_expression_type(&switch.expression)
-                    .cloned()
-                    .unwrap_or_else(|| Rc::new(get_mixed())),
-            );
-
-            switch_var_id
+        let subject_type = match self.artifacts.get_rc_expression_type(&switch.expression).cloned() {
+            Some(t) => t,
+            None => Rc::new(get_mixed()),
         };
+
+        let (is_synthetic, subject_id, root_subject_id, subject_for_conditions) =
+            self.get_subject_info(switch, &subject_type);
 
         let original_context = self.block_context.clone();
 
@@ -151,17 +138,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
 
         let mut all_options_returned = true;
-
-        let mut condition_is_synthetic = false;
-
-        let synthetic_switch_condition = if switch_var_id.starts_with(Self::SYNTHETIC_SWITCH_VAR_PREFIX) {
-            condition_is_synthetic = true;
-
-            Some(new_synthetic_variable(self.context.arena, &switch_var_id, switch.expression.span()))
-        } else {
-            None
-        };
-
         let mut previous_empty_cases = vec![];
 
         let mut previously_matching_case = None;
@@ -182,9 +158,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
 
             let is_matching = self.analyze_case(
                 switch,
-                synthetic_switch_condition.as_ref().unwrap_or(switch.expression),
-                condition_is_synthetic,
-                &switch_var_id,
+                &subject_for_conditions,
+                is_synthetic,
+                &subject_id,
                 case,
                 &previous_empty_cases,
                 &original_context,
@@ -220,9 +196,38 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             }
         }
 
+        let is_exhaustive = self.has_default_case || {
+            let mut final_else_context = original_context.clone();
+            let final_else_clauses: Vec<_> =
+                final_else_context.clauses.iter().map(|c| (**c).clone()).chain(self.negated_clauses).collect();
+
+            let mut final_else_referenced_ids = HashSet::default();
+            let (reconcilable_types, _) =
+                mago_algebra::find_satisfying_assignments(&final_else_clauses, None, &mut final_else_referenced_ids);
+
+            if !reconcilable_types.is_empty() {
+                reconcile_keyed_types(
+                    self.context,
+                    &reconcilable_types,
+                    Default::default(),
+                    &mut final_else_context,
+                    &mut HashSet::default(),
+                    &final_else_referenced_ids,
+                    &switch.span(),
+                    false,
+                    false,
+                );
+            }
+
+            final_else_context.locals.get(&subject_id).is_some_and(|t| t.is_never())
+                || root_subject_id
+                    .as_ref()
+                    .is_some_and(|id| final_else_context.locals.get(id).is_some_and(|t| t.is_never()))
+        };
+
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
-        self.block_context.has_returned = all_options_returned && self.has_default_case;
+        self.block_context.has_returned = all_options_returned && is_exhaustive;
 
         Ok(())
     }
@@ -685,6 +690,28 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
 
         Ok(())
+    }
+
+    fn get_subject_info(
+        &mut self,
+        switch: &Switch<'arena>,
+        subject_type: &Rc<TUnion>,
+    ) -> (bool, String, Option<String>, Expression<'arena>) {
+        if let Some(id) = get_expression_id(
+            switch.expression,
+            self.block_context.scope.get_class_like_name(),
+            self.context.resolved_names,
+            Some(self.context.codebase),
+        ) {
+            (false, id, get_root_expression_id(switch.expression), switch.expression.clone())
+        } else {
+            let subject_id = format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
+            self.block_context.locals.insert(subject_id.clone(), subject_type.clone());
+            let subject_for_conditions =
+                new_synthetic_variable(self.context.arena, &subject_id, switch.expression.span());
+
+            (true, subject_id, None, subject_for_conditions)
+        }
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {

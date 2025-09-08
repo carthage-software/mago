@@ -75,3 +75,28 @@ function get_c_switch(A|B|C $aOrBOrC): C
             return C::fromB($aOrBOrC);
     }
 }
+
+/**
+ * @mago-expect analysis:missing-return-statement
+ */
+function get_c_switch2(A|B|C $aOrBOrC): C
+{
+    switch ($aOrBOrC::class) {
+        case C::class:
+            return $aOrBOrC;
+        case A::class:
+            return C::fromA($aOrBOrC);
+    }
+}
+
+/**
+ * @mago-expect analysis:missing-return-statement
+ */
+function get_c_match2(A|B|C $aOrBOrC): C
+{
+    match ($aOrBOrC::class) {
+        C::class => $aOrBOrC,
+        A::class => C::fromA($aOrBOrC),
+        B::class => C::fromB($aOrBOrC),
+    };
+}

@@ -9,6 +9,7 @@ use clap::builder::styling::Effects;
 use mago_php_version::PHPVersion;
 
 use crate::commands::analyze::AnalyzeCommand;
+use crate::commands::args::colors::ColorArgs;
 use crate::commands::ast::AstCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::format::FormatCommand;
@@ -115,6 +116,9 @@ pub struct CliArguments {
         default_value_t = false
     )]
     pub allow_unsupported_php_version: bool,
+
+    #[clap(flatten)]
+    pub colors: ColorArgs,
 
     /// The subcommand to execute.
     #[clap(subcommand)]

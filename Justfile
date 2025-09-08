@@ -31,6 +31,7 @@ test:
 # Publishes all crates to crates.io in the correct order.
 publish:
     # Note: the order of publishing is important, as some crates depend on others.
+    cargo publish -p mago-pager
     cargo publish -p mago-casing
     cargo publish -p mago-php-version
     cargo publish -p mago-fixer

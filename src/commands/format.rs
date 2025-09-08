@@ -45,6 +45,7 @@ pub struct FormatCommand {
         short = 'd',
         help = "Print a diff of changes without modifying files",
         conflicts_with_all = ["check", "stdin_input"],
+        alias = "diff"
     )]
     pub dry_run: bool,
 
@@ -70,79 +71,82 @@ pub struct FormatCommand {
     pub stdin_input: bool,
 }
 
-/// Executes the format command with the provided configuration and options.
-///
-/// # Arguments
-///
-/// * `command` - The `FormatCommand` structure containing user-specified options.
-/// * `configuration` - The application configuration loaded from file or defaults.
-///
-/// # Returns
-///
-/// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
-pub fn execute(command: FormatCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
-    configuration.source.excludes.extend(std::mem::take(&mut configuration.formatter.excludes));
+impl FormatCommand {
+    /// Executes the format command with the provided configuration and options.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The application configuration loaded from file or defaults.
+    /// * `use_colors` - Whether to use colored output for diffs in dry-run mode.
+    ///
+    /// # Returns
+    ///
+    /// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
+    pub fn execute(self, mut configuration: Configuration, use_colors: bool) -> Result<ExitCode, Error> {
+        configuration.source.excludes.extend(std::mem::take(&mut configuration.formatter.excludes));
 
-    if command.stdin_input {
-        let arena = Bump::new();
-        let file = create_file_from_stdin()?;
-        let formatter = Formatter::new(&arena, configuration.php_version, configuration.formatter.settings);
-        return Ok(match formatter.format_file(&file) {
-            Ok(formatted) => {
-                print!("{formatted}");
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                tracing::error!("Failed to format input: {}", error);
-                ExitCode::FAILURE
-            }
-        });
-    }
+        if self.stdin_input {
+            let arena = Bump::new();
+            let file = Self::create_file_from_stdin()?;
+            let formatter = Formatter::new(&arena, configuration.php_version, configuration.formatter.settings);
+            return Ok(match formatter.format_file(&file) {
+                Ok(formatted) => {
+                    print!("{formatted}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    tracing::error!("Failed to format input: {}", error);
+                    ExitCode::FAILURE
+                }
+            });
+        }
 
-    let mut database = if !command.path.is_empty() {
-        database::load_from_paths(&mut configuration.source, command.path, None)?
-    } else {
-        database::load_from_configuration(&mut configuration.source, false, None)?
-    };
-
-    // 1. Create the shared ChangeLog and context for the pipeline.
-    let change_log = ChangeLog::new();
-    let shared_context = FormatContext {
-        php_version: configuration.php_version,
-        settings: configuration.formatter.settings,
-        mode: if command.dry_run {
-            FormatMode::DryRun
-        } else if command.check {
-            FormatMode::Check
+        let mut database = if !self.path.is_empty() {
+            database::load_from_paths(&mut configuration.source, self.path, None)?
         } else {
-            FormatMode::Format
-        },
-        change_log: change_log.clone(),
-    };
+            database::load_from_configuration(&mut configuration.source, false, None)?
+        };
 
-    let changed_count = run_format_pipeline(database.read_only(), shared_context)?;
-    if !command.dry_run {
-        database.commit(change_log, true)?;
+        // 1. Create the shared ChangeLog and context for the pipeline.
+        let change_log = ChangeLog::new();
+        let shared_context = FormatContext {
+            php_version: configuration.php_version,
+            settings: configuration.formatter.settings,
+            mode: if self.dry_run {
+                FormatMode::DryRun
+            } else if self.check {
+                FormatMode::Check
+            } else {
+                FormatMode::Format
+            },
+            change_log: change_log.clone(),
+        };
+
+        let changed_count = run_format_pipeline(database.read_only(), shared_context, use_colors)?;
+
+        if !self.dry_run {
+            database.commit(change_log, true)?;
+        }
+
+        if changed_count == 0 {
+            tracing::info!("All files are already formatted.");
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        Ok(if self.dry_run || self.check {
+            tracing::info!("Found {} file(s) that need formatting.", changed_count);
+            ExitCode::FAILURE
+        } else {
+            tracing::info!("Formatted {} file(s) successfully.", changed_count);
+            ExitCode::SUCCESS
+        })
     }
 
-    if changed_count == 0 {
-        tracing::info!("All files are already formatted.");
-        return Ok(ExitCode::SUCCESS);
+    /// Creates an ephemeral file from standard input.
+    fn create_file_from_stdin() -> Result<File, Error> {
+        let mut content = String::new();
+        std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+        Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content)))
     }
-
-    Ok(if command.dry_run || command.check {
-        tracing::info!("Found {} file(s) that need formatting.", changed_count);
-        ExitCode::FAILURE
-    } else {
-        tracing::info!("Formatted {} file(s) successfully.", changed_count);
-        ExitCode::SUCCESS
-    })
-}
-
-/// Creates an ephemeral file from standard input.
-fn create_file_from_stdin() -> Result<File, Error> {
-    let mut content = String::new();
-    std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
-
-    Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content)))
 }

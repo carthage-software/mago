@@ -2,9 +2,11 @@
 title: Projects using Mago
 ---
 
+# Projects using Mago
+
 **Mago** is proud to be used by innovative projects in the PHP ecosystem. Here are a few of them:
 
-- **[Tempest](https://github.com/tempestphp/tempest-framework/)** — a PHP framework designed to get out of your way. Its core philosophy is to help you focus on your application code, without being bothered hand-holding the framework.
+- **[Tempest](https://github.com/tempestphp/tempest-framework/)** — a PHP framework designed to get out of your way. Its core philosophy is to help you focus on your application code, without being bothered by hand-holding the framework.
 
 - **[PHP Standard Library (PSL)](https://github.com/azjezz/psl/)** — a modern, consistent, centralized, well-typed, non-blocking set of APIs for PHP programmers.
 

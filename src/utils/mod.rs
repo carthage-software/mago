@@ -34,6 +34,7 @@ pub fn apply_update(
     modified_contents: &str,
     dry_run: bool,
     check: bool,
+    use_colors: bool,
 ) -> Result<bool, Error> {
     if file.contents == modified_contents {
         return Ok(false);
@@ -45,13 +46,13 @@ pub fn apply_update(
 
     if dry_run {
         let patch = diffy::create_patch(&file.contents, modified_contents);
+        let mut formatter = PatchFormatter::new();
+        if use_colors {
+            formatter = formatter.with_color();
+        };
 
-        progress::GLOBAL_PROGRESS_MANAGER.suspend(|| {
-            let formatter = PatchFormatter::new().with_color();
-
-            println!("diff of '{}':", file.name);
-            println!("{}", formatter.fmt_patch(&patch));
-        });
+        println!("diff of '{}':", file.name);
+        println!("{}", formatter.fmt_patch(&patch));
     } else {
         change_log.update(file.id, Cow::Owned(modified_contents.to_owned()))?;
     }

@@ -133,6 +133,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
             );
         }
 
+        let infinite_loop = artifacts.get_expression_type(self.condition).is_some_and(|c| c.is_always_truthy());
+
         r#loop::inherit_loop_block_context(
             context,
             block_context,
@@ -140,7 +142,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
             inner_loop_block_context,
             loop_scope,
             /* always_enters_loop = */ true,
-            /* infinite_loop = */ false,
+            infinite_loop,
         );
 
         Ok(())

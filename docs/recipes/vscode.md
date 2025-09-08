@@ -10,7 +10,7 @@ This guide uses the [Custom Local Formatters](https://marketplace.visualstudio.c
 
 ## Prerequisites
 
-1.  **Mago Installed**: Ensure you have installed Mago by following the [Installation Guide](./../guide/installation.md).
+1.  **Mago Installed**: Ensure you have installed Mago by following the [Installation Guide](/guide/installation.md).
 2.  **`PATH` Configured**: The `mago` executable must be available in your system's `PATH`. The recommended installation methods configure this for you.
 
 ## Configuration
@@ -59,4 +59,4 @@ Next, you'll configure the extension to use Mago and tell VS Code to use it for 
 Your setup is now complete.
 
 - With `editor.formatOnSave` enabled, your PHP files will be automatically formatted by Mago every time you save.
-- You can also manually format a file at any time by opening the command palette (`Ctrl+Shift+P`) and running the **Format document** command.
+- You can also manually format a file at any time by opening the command palette (`Ctrl+Shift+P`) and running the **Format Document** command.

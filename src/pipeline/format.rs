@@ -55,11 +55,12 @@ pub struct FormatContext {
 ///
 /// * `database`: The read-only database containing the files to format.
 /// * `context`: The shared [`FormatContext`] for the formatting run.
+/// * `use_colors`: Whether to use colorized output for diffs in dry-run mode.
 ///
 /// # Returns
 ///
 /// A `Result` containing the total number of files that were changed, or an [`Error`].
-pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext) -> Result<usize, Error> {
+pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext, use_colors: bool) -> Result<usize, Error> {
     StatelessParallelPipeline::new("✨ Formatting", database, context, Box::new(FormatReducer)).run(
         |context, arena, file| {
             let formatter = Formatter::new(arena, context.php_version, context.settings);
@@ -71,6 +72,7 @@ pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext) -> Re
                     formatted_content,
                     matches!(context.mode, FormatMode::DryRun),
                     matches!(context.mode, FormatMode::Check),
+                    use_colors,
                 ),
                 Err(parse_error) => {
                     tracing::error!("Formatting failed for '{}': {}.", file.name, parse_error);

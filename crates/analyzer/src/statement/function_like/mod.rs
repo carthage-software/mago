@@ -31,6 +31,7 @@ use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -52,8 +53,17 @@ pub mod function;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FunctionLikeBody<'ast, 'arena> {
-    Statements(&'ast [Statement<'arena>]),
+    Statements(&'ast [Statement<'arena>], Span),
     Expression(&'ast Expression<'arena>),
+}
+
+impl HasSpan for FunctionLikeBody<'_, '_> {
+    fn span(&self) -> Span {
+        match self {
+            FunctionLikeBody::Statements(_, span) => *span,
+            FunctionLikeBody::Expression(expr) => expr.span(),
+        }
+    }
 }
 
 pub fn analyze_function_like<'ctx, 'ast, 'arena>(
@@ -90,7 +100,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         );
     }
 
-    if let FunctionLikeBody::Statements(statements) = body {
+    if let FunctionLikeBody::Statements(statements, _) = body {
         for statement in statements {
             let Statement::Global(global) = statement else {
                 if statement.is_noop() {
@@ -116,7 +126,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
     if !function_like_metadata.flags.is_unchecked() {
         match body {
-            FunctionLikeBody::Statements(statements) => {
+            FunctionLikeBody::Statements(statements, _) => {
                 analyze_statements(statements, context, block_context, &mut artifacts)?;
             }
             FunctionLikeBody::Expression(value) => {
@@ -131,6 +141,43 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 handle_return_value(context, block_context, &mut artifacts, Some(value), value_type, value.span())?;
             }
         }
+    }
+
+    if let Some(function_metadata) = block_context.scope.get_function_like()
+        && !block_context.has_returned
+        && let Some(return_type) = &function_metadata.return_type_metadata
+        && !return_type.type_union.is_void()
+        && !function_like_metadata.flags.has_yield()
+    {
+        let expanded_type =
+            expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);
+        let expected_return_type_id = expanded_type.get_id();
+
+        let help_message = if expanded_type.is_nullable() {
+            "Ensure all code paths end with a `return` statement. You may need to add `return null;` to the paths that currently don't return a value.".to_string()
+        } else {
+            format!(
+                "Add a `return` statement that provides a value of type '{}' to all paths, or change the function's return type to '{}|null' and return `null` explicitly.",
+                expected_return_type_id, expected_return_type_id
+            )
+        };
+
+        context.collector.report_with_code(
+            IssueCode::MissingReturnStatement,
+            Issue::error(match function_metadata.name {
+                Some(name) => format!("Missing return statement in function '{name}'"),
+                None => "Missing return statement in closure".to_string(),
+            })
+            .with_annotation(
+                Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
+                    .with_message(format!("This function is declared to return '{}'...", expected_return_type_id)),
+            )
+            .with_annotation(
+                Annotation::secondary(body.span()).with_message("...but this path can exit without returning a value."),
+            )
+            .with_note("A function that does not explicitly return a value will implicitly return `null`.")
+            .with_help(help_message),
+        );
     }
 
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata)?;

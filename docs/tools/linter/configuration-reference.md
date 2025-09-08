@@ -27,7 +27,7 @@ cyclomatic-complexity = { threshold = 20 }
 
 | Option         | Type       | Default | Description                                                                  |
 | :------------- | :--------- | :------ | :--------------------------------------------------------------------------- |
-| `excludes`     | `string[]` | `[]`    | A list of glob patterns to exclude from linting.                             |
+| `excludes`     | `string[]` | `[]`    | A list of paths or glob patterns to exclude from linting.                    |
 | `integrations` | `string[]` | `[]`    | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
 
 ## `[linter.rules]`
@@ -42,6 +42,7 @@ All rules accept two common options:
 - `level`: A string to set the issue severity. Options are `"error"`, `"warning"`, `"help"`, and `"note"`.
 
 ### Rule-specific options
+
 Some rules have additional configuration options. For example, `cyclomatic-complexity` has a `threshold`:
 
 ```toml

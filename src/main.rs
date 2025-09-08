@@ -33,8 +33,6 @@ pub fn main() -> ExitCode {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    initialize_logger(if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO }, "MAGO_LOG");
-
     let result = run();
 
     result.unwrap_or_else(|error| {
@@ -48,6 +46,13 @@ pub fn main() -> ExitCode {
 #[inline(always)]
 pub fn run() -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
+
+    initialize_logger(
+        if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },
+        "MAGO_LOG",
+        arguments.colors.should_use_colors(),
+    );
+
     if let MagoCommand::SelfUpdate(cmd) = arguments.command {
         return commands::self_update::execute(cmd);
     }
@@ -74,13 +79,20 @@ pub fn run() -> Result<ExitCode, Error> {
         .stack_size(configuration.stack_size)
         .build_global()?;
 
+    #[cfg(not(unix))]
+    if configuration.use_pager {
+        tracing::warn!("The pager is only supported on unix-like systems. Ignoring the `use-pager` configuration.");
+    }
+
+    let use_colors = arguments.colors.should_use_colors();
+
     match command {
-        MagoCommand::Init(cmd) => commands::init::execute(cmd, configuration, config),
-        MagoCommand::Config(cmd) => commands::config::execute(cmd, configuration),
-        MagoCommand::Lint(cmd) => commands::lint::execute(cmd, configuration),
-        MagoCommand::Format(cmd) => commands::format::execute(cmd, configuration),
-        MagoCommand::Ast(cmd) => commands::ast::execute(cmd, configuration),
-        MagoCommand::Analyze(cmd) => commands::analyze::execute(cmd, configuration),
+        MagoCommand::Init(cmd) => cmd.execute(configuration, None),
+        MagoCommand::Config(cmd) => cmd.execute(configuration),
+        MagoCommand::Lint(cmd) => cmd.execute(configuration, use_colors),
+        MagoCommand::Format(cmd) => cmd.execute(configuration, use_colors),
+        MagoCommand::Ast(cmd) => cmd.execute(configuration, use_colors),
+        MagoCommand::Analyze(cmd) => cmd.execute(configuration, use_colors),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

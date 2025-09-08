@@ -73,6 +73,17 @@ impl Database {
         Self::default()
     }
 
+    /// Creates a new `Database` containing only a single file.
+    ///
+    /// This is a convenience constructor for situations, such as testing or
+    /// single-file tools, where an operation requires a [`Database`]
+    /// implementation but only needs to be aware of one file.
+    pub fn single(file: File) -> Self {
+        let mut db = Self::new();
+        db.add(file);
+        db
+    }
+
     /// Adds a file to the database, overwriting any existing file with the same name.
     pub fn add(&mut self, file: File) -> FileId {
         let name = file.name.clone();

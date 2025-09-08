@@ -11,6 +11,8 @@ namespace Psl\Iter {
      *
      * @param iterable<Tk, Tv> $iterable
      * @param Tk $key
+     *
+     * @mago-expect analysis:missing-return-statement
      */
     function contains_key(iterable $iterable, mixed $key): bool
     {

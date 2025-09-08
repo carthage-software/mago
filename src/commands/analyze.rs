@@ -43,54 +43,60 @@ pub struct AnalyzeCommand {
     pub reporting: ReportingArgs,
 }
 
-/// Executes the analyze command.
-///
-/// This function orchestrates the process of:
-///
-/// 1. Loading source files.
-/// 2. Compiling a codebase model from these files (with progress).
-/// 3. Analyzing the user-defined sources against the compiled codebase (with progress).
-/// 4. Reporting any found issues.
-pub fn execute(command: AnalyzeCommand, mut configuration: Configuration) -> Result<ExitCode, Error> {
-    configuration.source.excludes.extend(std::mem::take(&mut configuration.analyzer.excludes));
+impl AnalyzeCommand {
+    /// Executes the analyze command.
+    ///
+    /// This function orchestrates the process of:
+    ///
+    /// 1. Loading source files.
+    /// 2. Compiling a codebase model from these files (with progress).
+    /// 3. Analyzing the user-defined sources against the compiled codebase (with progress).
+    /// 4. Reporting any found issues.
+    pub fn execute(self, mut configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+        configuration.source.excludes.extend(std::mem::take(&mut configuration.analyzer.excludes));
 
-    // 1. Establish the base prelude data. We deconstruct the prelude to get the
-    //    database and the already-analyzed metadata separately.
-    let (base_db, codebase_metadata, symbol_references) = if command.no_stubs {
-        (Default::default(), Default::default(), Default::default())
-    } else {
-        const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.bin"));
+        // 1. Establish the base prelude data. We deconstruct the prelude to get the
+        //    database and the already-analyzed metadata separately.
+        let (base_db, codebase_metadata, symbol_references) = if self.no_stubs {
+            (Default::default(), Default::default(), Default::default())
+        } else {
+            const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.bin"));
 
-        let prelude = Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude");
+            let prelude = Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude");
 
-        (prelude.database, prelude.metadata, prelude.symbol_references)
-    };
+            (prelude.database, prelude.metadata, prelude.symbol_references)
+        };
 
-    // 2. Load the user's codebase, passing the `base_db` to be extended.
-    let final_database = if !command.paths.is_empty() {
-        database::load_from_paths(&mut configuration.source, command.paths, Some(base_db))?
-    } else {
-        database::load_from_configuration(&mut configuration.source, /* include externals */ true, Some(base_db))?
-    };
+        // 2. Load the user's codebase, passing the `base_db` to be extended.
+        let final_database = if !self.paths.is_empty() {
+            database::load_from_paths(&mut configuration.source, self.paths, Some(base_db))?
+        } else {
+            database::load_from_configuration(
+                &mut configuration.source,
+                /* include externals */ true,
+                Some(base_db),
+            )?
+        };
 
-    // Check if any user-specified files were actually added to the database.
-    if !final_database.files().any(|f| f.file_type == FileType::Host) {
-        tracing::warn!("No files found to analyze.");
+        // Check if any user-specified files were actually added to the database.
+        if !final_database.files().any(|f| f.file_type == FileType::Host) {
+            tracing::warn!("No files found to analyze.");
 
-        return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        // 3. Run the analysis pipeline with the combined database and the prelude's metadata.
+        let analysis_results = run_analysis_pipeline(
+            final_database.read_only(),
+            codebase_metadata,
+            symbol_references,
+            configuration.analyzer.to_settings(configuration.php_version),
+        )?;
+
+        // 4. Filter and report any found issues.
+        let mut issues = analysis_results.issues;
+        issues.filter_out_ignored(&configuration.analyzer.ignore);
+
+        self.reporting.process_issues(issues, configuration, should_use_colors, final_database)
     }
-
-    // 3. Run the analysis pipeline with the combined database and the prelude's metadata.
-    let analysis_results = run_analysis_pipeline(
-        final_database.read_only(),
-        codebase_metadata,
-        symbol_references,
-        configuration.analyzer.to_settings(configuration.php_version),
-    )?;
-
-    // 4. Filter and report any found issues.
-    let mut issues = analysis_results.issues;
-    issues.filter_out_ignored(&configuration.analyzer.ignore);
-
-    command.reporting.process_issues(issues, configuration, final_database)
 }

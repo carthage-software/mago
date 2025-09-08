@@ -7,6 +7,10 @@ outline: deep
 
 The `mago ast` command is a powerful inspection tool that tokenizes and parses a single PHP file, giving you insight into its lexical and syntactical structure.
 
+:::tip
+For global options that can be used with any command, see the [Command-Line Interface overview](/fundamentals/command-line-interface.md). Remember to specify global options **before** the `ast` command.
+:::
+
 ```sh
 Usage: mago ast [OPTIONS] <FILE>
 ```
@@ -31,6 +35,18 @@ Display the output (either the AST or the token stream) in a machine-readable, p
 
 After parsing the AST, this flag runs the name resolver and prints a list of all symbols (classes, functions, etc.) and their fully qualified names. This is useful for debugging namespace and import resolution.
 
-### `-h`, `--help`
+### Shared Reporting Options
 
-Print the help summary for the command.
+The `ast` command uses a shared set of options for reporting parsing errors.
+
+[**See the Shared Reporting and Fixing Options documentation.**](/fundamentals/shared-reporting-options.md)
+
+:::tip
+The `ast` command only reports parsing errors. Auto-fixing and baseline features are not applicable to this command.
+:::
+
+### Help
+
+| Flag, Alias(es) | Description                             |
+| :-------------- | :-------------------------------------- | --------------- |
+| `--help`, `-h`  | Print the help summary for the command. | or the command. |

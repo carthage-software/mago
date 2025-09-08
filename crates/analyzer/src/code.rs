@@ -125,6 +125,7 @@ pub enum IssueCode {
     MissingOverrideAttribute,
     MissingRequiredInterface,
     MissingRequiredParent,
+    MissingReturnStatement,
     MissingTemplateParameter,
     MixedArgument,
     MixedArrayAccess,
@@ -372,6 +373,7 @@ impl IssueCode {
             Self::MissingOverrideAttribute => "missing-override-attribute",
             Self::MissingRequiredInterface => "missing-required-interface",
             Self::MissingRequiredParent => "missing-required-parent",
+            Self::MissingReturnStatement => "missing-return-statement",
             Self::MissingTemplateParameter => "missing-template-parameter",
             Self::MixedArgument => "mixed-argument",
             Self::MixedArrayAccess => "mixed-array-access",
@@ -975,7 +977,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_return_issue_codes() -> [Self; 9] {
+    pub const fn get_return_issue_codes() -> [Self; 10] {
         [
             Self::FalsableReturnStatement,
             Self::HiddenGeneratorReturn,
@@ -983,13 +985,14 @@ impl IssueCode {
             Self::InvalidReturnStatement,
             Self::LessSpecificNestedReturnStatement,
             Self::LessSpecificReturnStatement,
+            Self::MissingReturnStatement,
             Self::MixedReturnStatement,
             Self::NeverReturn,
             Self::NullableReturnStatement,
         ]
     }
 
-    pub const fn get_return_issue_code_values() -> [&'static str; 9] {
+    pub const fn get_return_issue_code_values() -> [&'static str; 10] {
         [
             "falsable-return-statement",
             "hidden-generator-return",
@@ -997,6 +1000,7 @@ impl IssueCode {
             "invalid-return-statement",
             "less-specific-nested-return-statement",
             "less-specific-return-statement",
+            "missing-return-statement",
             "mixed-return-statement",
             "never-return",
             "nullable-return-statement",
@@ -1195,6 +1199,7 @@ impl std::str::FromStr for IssueCode {
             "missing-override-attribute" => Ok(Self::MissingOverrideAttribute),
             "missing-required-interface" => Ok(Self::MissingRequiredInterface),
             "missing-required-parent" => Ok(Self::MissingRequiredParent),
+            "missing-return-statement" => Ok(Self::MissingReturnStatement),
             "missing-template-parameter" => Ok(Self::MissingTemplateParameter),
             "mixed-argument" => Ok(Self::MixedArgument),
             "mixed-array-access" => Ok(Self::MixedArrayAccess),

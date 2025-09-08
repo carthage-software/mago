@@ -28,6 +28,7 @@ pub enum Error {
     CreatingBaselineFile(std::io::Error),
     ParsingComposerJson(serde_json::Error),
     ThreadPoolBuildError(ThreadPoolBuildError),
+    Pager(std::io::Error),
     Analysis(AnalysisError),
 }
 
@@ -58,6 +59,7 @@ impl std::fmt::Display for Error {
             Self::ParsingComposerJson(error) => write!(f, "Failed to parse the `composer.json` file: {error}"),
             Self::ReadingBaselineFile(error) => write!(f, "Failed to read the baseline file: {error}"),
             Self::CreatingBaselineFile(error) => write!(f, "Failed to create the baseline file: {error}"),
+            Self::Pager(error) => write!(f, "Failed to launch the pager: {error}"),
             Self::Analysis(error) => write!(f, "Failed to analyze the source code: {error}"),
             Self::ThreadPoolBuildError(error) => {
                 write!(f, "Failed to build the thread pool: {error}")
@@ -83,6 +85,11 @@ impl std::error::Error for Error {
             Self::WritingConfiguration(error) => Some(error),
             Self::ReadingComposerJson(error) => Some(error),
             Self::ParsingComposerJson(error) => Some(error),
+            Self::ReadingBaselineFile(error) => Some(error),
+            Self::CreatingBaselineFile(error) => Some(error),
+            Self::Pager(error) => Some(error),
+            Self::Analysis(error) => Some(error),
+            Self::ThreadPoolBuildError(error) => Some(error),
             _ => None,
         }
     }

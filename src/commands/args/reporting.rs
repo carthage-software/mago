@@ -23,6 +23,7 @@ use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 
 use crate::baseline;
+use crate::commands::args::pager::PagerArgs;
 use crate::config::Configuration;
 use crate::enum_variants;
 use crate::error::Error;
@@ -70,7 +71,13 @@ pub struct ReportingArgs {
     /// Preview fixes without writing any changes to disk.
     ///
     /// This option shows what changes would be made if fixes were applied.
-    #[arg(long, short = 'd', help = "Preview fixes without applying them (requires --fix)", requires = "fix")]
+    #[arg(
+        long,
+        short = 'd',
+        help = "Preview fixes without applying them (requires --fix)",
+        requires = "fix",
+        alias = "diff"
+    )]
     pub dry_run: bool,
 
     /// Specify where the results should be reported (e.g., stdout, stderr).
@@ -80,19 +87,6 @@ pub struct ReportingArgs {
     /// Choose the format for reporting issues (e.g., human-readable, JSON).
     #[arg(long, default_value_t, help = "Choose reporting format (e.g., rich, medium, short)", ignore_case = true, value_parser = enum_variants!(ReportingFormat), conflicts_with = "fix")]
     pub reporting_format: ReportingFormat,
-
-    /// Do not use colors in the output.
-    #[arg(long, help = "Do not use colors in the output", default_value_t = false, alias = "no-colors")]
-    pub no_color: bool,
-
-    /// Use a pager when printing output.
-    #[arg(
-        long,
-        help = "Use a pager when printing output",
-        num_args(0..=1),
-        default_missing_value = "true",
-    )]
-    pub pager: Option<bool>,
 
     /// Set the minimum issue level that will cause the command to fail.
     ///
@@ -116,6 +110,9 @@ pub struct ReportingArgs {
     /// Specify a baseline file to ignore issues listed within it.
     #[arg(long, help = "Specify a baseline file to ignore issues", value_name = "PATH", conflicts_with = "fix")]
     pub baseline: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub pager_args: PagerArgs,
 }
 
 impl ReportingArgs {
@@ -136,12 +133,13 @@ impl ReportingArgs {
         self,
         issues: IssueCollection,
         configuration: Configuration,
+        should_use_colors: bool,
         database: Database,
     ) -> Result<ExitCode, Error> {
         if self.fix {
-            self.handle_fix_mode(issues, configuration, database)
+            self.handle_fix_mode(issues, configuration, should_use_colors, database)
         } else {
-            self.handle_report_mode(issues, &configuration, database)
+            self.handle_report_mode(issues, &configuration, should_use_colors, database)
         }
     }
 
@@ -150,10 +148,11 @@ impl ReportingArgs {
         self,
         issues: IssueCollection,
         configuration: Configuration,
+        should_use_colors: bool,
         mut database: Database,
     ) -> Result<ExitCode, Error> {
         let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
-            self.apply_fixes(issues, &configuration, &mut database)?;
+            self.apply_fixes(issues, &configuration, should_use_colors, &mut database)?;
 
         if skipped_unsafe > 0 {
             tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
@@ -187,6 +186,7 @@ impl ReportingArgs {
         self,
         mut issues: IssueCollection,
         configuration: &Configuration,
+        should_use_colors: bool,
         database: Database,
     ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
@@ -243,12 +243,11 @@ impl ReportingArgs {
                 tracing::info!("No issues found.");
             }
         } else {
-            let use_pager = self.pager.unwrap_or(configuration.use_pager);
             let reporter = Reporter::new(
                 read_database,
                 self.reporting_target,
-                !self.no_color,
-                use_pager,
+                should_use_colors,
+                self.pager_args.should_use_pager(configuration),
                 configuration.pager.clone(),
             );
 
@@ -270,6 +269,7 @@ impl ReportingArgs {
         &self,
         issues: IssueCollection,
         configuration: &Configuration,
+        should_use_colors: bool,
         database: &mut Database,
     ) -> Result<(usize, usize, usize), Error> {
         let read_database = Arc::new(database.read_only());
@@ -302,7 +302,14 @@ impl ReportingArgs {
                     Cow::Owned(fixed_content)
                 };
 
-                let changed = utils::apply_update(&change_log, file, final_content.as_ref(), self.dry_run, false)?;
+                let changed = utils::apply_update(
+                    &change_log,
+                    file,
+                    final_content.as_ref(),
+                    self.dry_run,
+                    false,
+                    should_use_colors,
+                )?;
                 progress_bar.inc(1);
                 Ok(changed)
             })
@@ -318,6 +325,7 @@ impl ReportingArgs {
 
         Ok((applied_fix_count, skipped_unsafe, skipped_potentially_unsafe))
     }
+
     /// Filters fix operations from issues based on safety settings.
     ///
     /// # Returns

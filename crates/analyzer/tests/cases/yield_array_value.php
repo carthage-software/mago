@@ -2,9 +2,9 @@
 
  /**
   * @param array<string, string> $array
-  * @return iterable<string>
+  * @return Generator<string>
   */
- function generator(array $array): iterable
+ function generator(array $array): Generator
  {
      yield $array['key'] ?? 'default';
  }

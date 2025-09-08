@@ -63,3 +63,5 @@ cat src/Service.php | mago fmt --stdin-input
 
 This will read the code from `src/Service.php`, format it, and print the formatted code to standard
 output.
+
+For more details on the available command-line options, see the [Command Reference](/tools/formatter/command-reference.md).

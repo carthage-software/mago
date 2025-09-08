@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: "Mago"
-  tagline: Blazing fast linter, formatter, and static analyzer for PHP, written in Rust.
+  tagline: The Oxidized PHP Toolchain. A blazing fast linter, formatter, and static analyzer for PHP, written in Rust.
   image:
     src: /assets/logo.svg
     alt: Mago

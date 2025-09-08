@@ -21,3 +21,8 @@ If you're building your own tools in Rust and need a high-performance PHP parser
 
 - **[`mago-syntax`](https://crates.io/crates/mago-syntax):** the crate containing the lexer, parser, and all AST node definitions, along with utilities for working with the AST.
 - **[`mago-names`](https://crates.io/crates/mago-names):** the crate for resolving symbol names (e.g., turning a local class name into its fully qualified name).
+
+## Dive In
+
+- **[Usage](/tools/lexer-parser/usage.md)**: learn how to run the lexer and parser from the command line.
+- **[Command reference](/tools/lexer-parser/command-reference.md)**: a detailed guide to the `mago ast` command and its flags.

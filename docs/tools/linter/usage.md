@@ -38,3 +38,5 @@ If you want to run only a specific set of rules, use the `--only` flag. This is 
 # Run only these two rules
 mago lint --only no-empty,use-compound-assignment
 ```
+
+For more details on the available command-line options, see the [Command Reference](./command-reference.md).

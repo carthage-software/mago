@@ -59,6 +59,7 @@ export default defineConfig({
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Tools", link: "/tools/overview" },
       { text: "Benchmarks", link: "/benchmarks" },
+      { text: "FAQ", link: "/faq" },
       { text: "Sponsor", link: "https://github.com/sponsors/azjezz" },
     ],
     sidebar: [
@@ -67,19 +68,44 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: "Getting started", link: "/guide/getting-started" },
-          { text: "Installation", link: "/guide/installation" },
+          {
+            text: "Installation",
+            link: "/guide/installation",
+            items: [{ text: "Upgrading", link: "/guide/upgrading" }],
+          },
           { text: "Initialization", link: "/guide/initialization" },
-          { text: "Updating Mago", link: "/guide/self-update" },
+          { text: "Configuration", link: "/guide/configuration" },
+          {
+            text: "Environment Variables",
+            link: "/guide/environment-variables",
+          },
+        ],
+      },
+      {
+        text: "💡 Fundamentals",
+        collapsed: true,
+        items: [
+          {
+            text: "Command-Line Interface",
+            link: "/fundamentals/command-line-interface",
+          },
+          {
+            text: "Shared Options",
+            link: "/fundamentals/shared-reporting-options",
+          },
+          {
+            text: "Suppressing Issues",
+            link: "/fundamentals/suppressing-issues",
+          },
+          { text: "Baseline", link: "/fundamentals/baseline" },
+          { text: "Pager Support", link: "/fundamentals/pager-support" },
         ],
       },
       {
         text: "🛠️ Tools",
-        collapsed: false,
+        collapsed: true,
         items: [
-          {
-            text: "Overview",
-            link: "/tools/overview",
-          },
+          { text: "Overview", link: "/tools/overview" },
           {
             text: "Formatter",
             collapsed: true,
@@ -104,41 +130,7 @@ export default defineConfig({
               { text: "Usage", link: "/tools/linter/usage" },
               {
                 text: "Rules",
-                collapsed: true,
-                items: [
-                  {
-                    text: "Overview",
-                    link: "/tools/linter/rules-and-categories",
-                  },
-                  {
-                    text: "Best Practices",
-                    link: "/tools/linter/rules/best-practices",
-                  },
-                  { text: "Clarity", link: "/tools/linter/rules/clarity" },
-                  {
-                    text: "Consistency",
-                    link: "/tools/linter/rules/consistency",
-                  },
-                  {
-                    text: "Correctness",
-                    link: "/tools/linter/rules/correctness",
-                  },
-                  {
-                    text: "Deprecation",
-                    link: "/tools/linter/rules/deprecation",
-                  },
-                  {
-                    text: "Maintainability",
-                    link: "/tools/linter/rules/maintainability",
-                  },
-                  { text: "Migration", link: "/tools/linter/rules/migration" },
-                  {
-                    text: "Redundancy",
-                    link: "/tools/linter/rules/redundancy",
-                  },
-                  { text: "Safety", link: "/tools/linter/rules/safety" },
-                  { text: "Security", link: "/tools/linter/rules/security" },
-                ],
+                link: "/tools/linter/rules-and-categories",
               },
               { text: "Integrations", link: "/tools/linter/integrations" },
               {
@@ -156,7 +148,6 @@ export default defineConfig({
             collapsed: true,
             items: [
               { text: "Overview", link: "/tools/analyzer/overview" },
-              { text: "Usage", link: "/tools/analyzer/usage" },
               {
                 text: "Configuration reference",
                 link: "/tools/analyzer/configuration-reference",
@@ -183,7 +174,7 @@ export default defineConfig({
       },
       {
         text: "🧩 Recipes",
-        collapsed: false,
+        collapsed: true,
         items: [
           { text: "GitHub Actions", link: "/recipes/github-actions" },
           { text: "Zed", link: "/recipes/zed" },
@@ -191,6 +182,7 @@ export default defineConfig({
           { text: "Visual Studio Code", link: "/recipes/vscode" },
         ],
       },
+      { text: "🤔 FAQ", link: "/faq" },
       { text: "🤝 Contributing", link: "/contributing" },
       { text: "⚡️ Benchmarks", link: "/benchmarks" },
       { text: "⭐ Projects using Mago", link: "/projects-using-mago" },

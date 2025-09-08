@@ -2,6 +2,8 @@
 title: Contributing to Mago
 ---
 
+# Contributing to Mago
+
 Thank you for your interest in contributing to **Mago**! We're excited to build the future of PHP tooling with you. Whether you're fixing bugs, improving documentation, or proposing new features, your help is invaluable.
 
 ---
@@ -50,8 +52,6 @@ Contributing to open-source can be intimidating, but don't worry! We're here to 
     ```
 
 8.  **Submit a pull request**. Go to the main [Mago repository](https://github.com/carthage-software/mago) and open a new pull request with your changes.
-
----
 
 ## Submitting pull requests
 

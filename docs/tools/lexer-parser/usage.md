@@ -89,3 +89,5 @@ This will produce a detailed JSON object representing the full AST.
   }
 }
 ```
+
+For more details on the available command-line options, see the [Command Reference](/tools/lexer-parser/command-reference.md).

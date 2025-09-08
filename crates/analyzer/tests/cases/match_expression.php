@@ -172,7 +172,7 @@ function test_happy_path_complex_logic_no_default(): string
 
 function test_happy_path_instance(string|Tag|null $tag): string
 {
-    match (true) {
+    return match (true) {
         is_string($tag) => $tag,
         $tag instanceof Tag => $tag->name,
         default => 'default',

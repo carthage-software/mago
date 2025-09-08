@@ -14,11 +14,11 @@ class B
 /**
  * @param list{true, A}|list{false, Exception} $data
  *
- * @return iterable<int, A>
+ * @return Generator<int, A>
  *
  * @throws Exception
  */
-function foo(array $data): iterable
+function foo(array $data): Generator
 {
     [$success, $object_or_exception] = $data;
 

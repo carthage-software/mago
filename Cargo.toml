@@ -51,6 +51,7 @@ mago-prelude = { path = "crates/prelude", version = "1.0.0-beta.12" }
 mago-semantics = { path = "crates/semantics", version = "1.0.0-beta.12" }
 mago-collector = { path = "crates/collector", version = "1.0.0-beta.12" }
 mago-database = { path = "crates/database", version = "1.0.0-beta.12" }
+mago-pager = { path = "crates/pager", version = "1.0.0-beta.12" }
 tracing = { version = "0.1.40" }
 ahash = { version = "0.8", default-features = false, features = ["compile-time-rng", "std"] }
 serde_json = { version = "1.0.138" }
@@ -101,7 +102,8 @@ dhat = "0.3"
 ustr = { version = "1.1.0", features = ["serde"] }
 rust-embed = { version = "8.7.2", features = ["interpolate-folder-path", "include-exclude"] }
 bincode = { version = "2.0.1", features = ["serde"] }
-pager = "0.16.1"
+libc = "0.2.175"
+shell-words = "1.1.0"
 
 [dependencies]
 mago-syntax = { workspace = true }

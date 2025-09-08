@@ -27,5 +27,6 @@ This process guarantees that the output is always 100% consistent, regardless of
 
 ## Dive in
 
-- **[Usage](./usage.md)**: learn how to run the formatter from the command line.
-- **[Configuration reference](./configuration-reference.md)**: see all the available options to customize the formatter's behavior.
+- **[Usage](/tools/formatter/usage.md)**: learn how to run the formatter from the command line.
+- **[Configuration reference](/tools/formatter/configuration-reference.md)**: see all the available options to customize the formatter's behavior.
+- **[Command reference](/tools/formatter/command-reference.md)**: a detailed guide to the `mago format` command and its flags.

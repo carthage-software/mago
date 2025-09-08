@@ -4,7 +4,8 @@ use std::process::ExitCode;
 use bumpalo::Bump;
 use clap::Parser;
 use colored::Colorize;
-use mago_database::ReadDatabase;
+use mago_database::Database;
+use mago_reporting::IssueCollection;
 use serde_json::json;
 use termtree::Tree;
 
@@ -12,15 +13,13 @@ use mago_database::file::File;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
-use mago_reporting::reporter::Reporter;
-use mago_reporting::reporter::ReportingFormat;
-use mago_reporting::reporter::ReportingTarget;
 use mago_syntax::ast::*;
 use mago_syntax::error::ParseError;
 use mago_syntax::lexer::Lexer;
 use mago_syntax::parser::parse_file;
 use mago_syntax_core::input::Input;
 
+use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::error::Error;
 
@@ -52,78 +51,94 @@ pub struct AstCommand {
         conflicts_with = "tokens"
     )]
     pub names: bool,
+
+    #[clap(flatten)]
+    pub reporting: ReportingArgs,
 }
 
-/// Executes the AST inspection command.
-pub fn execute(command: AstCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    let arena = Bump::new();
-    let file = File::read(&configuration.source.workspace, &command.file, FileType::Host)?;
+impl AstCommand {
+    /// Executes the AST inspection command.
+    pub fn execute(self, configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+        let arena = Bump::new();
+        let file = File::read(&configuration.source.workspace, &self.file, FileType::Host)?;
 
-    if command.tokens {
-        return print_tokens(&arena, file, command.json);
+        if self.tokens {
+            return self.print_tokens(configuration, should_use_colors, &arena, file);
+        }
+
+        let (program, error) = parse_file(&arena, &file);
+
+        if self.json {
+            print_ast_json(program, error.as_ref())?;
+        } else if self.names {
+            print_names(&arena, program)?;
+        } else {
+            print_ast_tree(program);
+        }
+
+        if let Some(error) = error {
+            let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
+            let database = Database::single(file);
+
+            return self.reporting.process_issues(issues, configuration, should_use_colors, database);
+        }
+
+        Ok(ExitCode::SUCCESS)
     }
 
-    let (program, error) = parse_file(&arena, &file);
+    /// Prints the list of tokens from a file, either as a table or as JSON.
+    fn print_tokens(
+        self,
+        configuration: Configuration,
+        should_use_colors: bool,
+        arena: &Bump,
+        file: File,
+    ) -> Result<ExitCode, Error> {
+        let mut lexer = Lexer::new(arena, Input::from_file(&file));
+        let mut tokens = Vec::new();
+        loop {
+            match lexer.advance() {
+                Some(Ok(token)) => tokens.push(token),
+                Some(Err(err)) => {
+                    let issue = Into::<Issue>::into(&err);
+                    let database = Database::single(file);
 
-    if command.json {
-        print_ast_json(program, error.as_ref())?;
-    } else if command.names {
-        print_names(&arena, program)?;
-    } else {
-        print_ast_tree(program);
-    }
+                    self.reporting.process_issues(
+                        IssueCollection::from([issue]),
+                        configuration,
+                        should_use_colors,
+                        database,
+                    )?;
 
-    if let Some(error) = error {
-        let issue = Into::<Issue>::into(&error);
-        let database = ReadDatabase::single(file);
-
-        Reporter::new(database, ReportingTarget::Stdout, true, true, None).report([issue], ReportingFormat::Rich)?;
-
-        return Ok(ExitCode::FAILURE);
-    }
-
-    Ok(ExitCode::SUCCESS)
-}
-
-/// Prints the list of tokens from a file, either as a table or as JSON.
-fn print_tokens(arena: &Bump, file: File, as_json: bool) -> Result<ExitCode, Error> {
-    let mut lexer = Lexer::new(arena, Input::from_file(&file));
-    let mut tokens = Vec::new();
-    loop {
-        match lexer.advance() {
-            Some(Ok(token)) => tokens.push(token),
-            Some(Err(err)) => {
-                let issue = Into::<Issue>::into(&err);
-                let database = ReadDatabase::single(file);
-                Reporter::new(database, ReportingTarget::Stdout, true, true, None)
-                    .report([issue], ReportingFormat::Rich)?;
-                return Ok(ExitCode::FAILURE);
+                    return Ok(ExitCode::FAILURE);
+                }
+                None => break,
             }
-            None => break,
         }
-    }
 
-    if as_json {
-        println!("{}", serde_json::to_string_pretty(&tokens)?);
-    } else {
-        println!();
-        println!("  {}", "Tokens".bold().underline());
-        println!();
-        println!("  {: <25} {: <50} {}", "Kind".bold(), "Value".bold(), "Span".bold());
-        println!("  {0:─<25} {0:─<50} {0:─<20}", "");
-        for token in tokens {
-            let value_str = format!("{:?}", token.value).bright_black();
-            let kind_str = format!("{:?}", token.kind).cyan();
-            println!(
-                "  {: <25} {: <50} {}",
-                kind_str,
-                &value_str[..value_str.len().min(48)],
-                format!("[{}..{}]", token.span.start, token.span.end).dimmed()
-            );
+        if self.json {
+            println!("{}", serde_json::to_string_pretty(&tokens)?);
+        } else {
+            println!();
+            println!("  {}", "Tokens".bold().underline());
+            println!();
+            println!("  {: <25} {: <50} {}", "Kind".bold(), "Value".bold(), "Span".bold());
+            println!("  {0:─<25} {0:─<50} {0:─<20}", "");
+            for token in tokens {
+                let value_str = format!("{:?}", token.value).bright_black();
+                let kind_str = format!("{:?}", token.kind).cyan();
+                println!(
+                    "  {: <25} {: <50} {}",
+                    kind_str,
+                    &value_str[..value_str.len().min(48)],
+                    format!("[{}..{}]", token.span.start, token.span.end).dimmed()
+                );
+            }
+            println!();
         }
-        println!();
+
+        Ok(ExitCode::SUCCESS)
     }
-    Ok(ExitCode::SUCCESS)
 }
 
 /// Prints the AST as a rich, human-readable tree.
@@ -140,7 +155,9 @@ fn print_ast_json(program: &Program, error: Option<&ParseError>) -> Result<(), E
         "program": program,
         "error": error.map(Into::<Issue>::into),
     });
+
     println!("{}", serde_json::to_string_pretty(&result)?);
+
     Ok(())
 }
 
@@ -206,5 +223,6 @@ fn node_to_tree(node: Node) -> Tree<String> {
     for child in node.children() {
         tree.push(node_to_tree(child));
     }
+
     tree
 }

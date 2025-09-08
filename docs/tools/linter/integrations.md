@@ -54,12 +54,12 @@ Mago is built with the broader PHP ecosystem in mind and includes support for a 
 :::info
 While Mago supports a wide range of integrations, please note that not all of them have specific linter rules yet. Many are included as placeholders for future development.
 
-For a complete list of integrations that currently have specific rules, please see the [Integration-specific rules list](./rules-and-categories.md#integration-specific-rules).
+For a complete list of integrations that currently have specific rules, please see the [Integration-specific rules list](/tools/linter/rules-and-categories.md#integration-specific-rules).
 :::
 
 ## Enabling integrations
 
-You can enable integrations in your `mago.toml` file under the `[linter]` table.
+You can enable integrations in your `mago.toml` file under the `[linter]` table. See the [Configuration Reference](/tools/linter/configuration-reference.md) for more details. for more details.
 
 ```toml
 [linter]

@@ -8,7 +8,7 @@ Integrate Mago directly with the [Helix editor](https://helix-editor.com/) for f
 
 ## Prerequisites
 
-1.  **Mago Installed**: Ensure you have installed Mago. If not, please follow the [Installation Guide](./../guide/installation.md).
+1.  **Mago Installed**: Ensure you have installed Mago. If not, please follow the [Installation Guide](/guide/installation.md).
 2.  **`PATH` Configured**: The `mago` executable must be available in your system's `PATH`. The recommended installation scripts handle this for you. You can verify this by running `which mago` in your terminal.
 
 ## Configuration
@@ -28,10 +28,10 @@ You only need to add a few lines to your Helix `languages.toml` file.
     [[language]]
     name = "php"
 
-    # Set Mago as the formatter (this assumes your configuration file is in your current working directory).
-    # If you work on multiple projects and each of them have different location for mago.toml,
-    # Make sure to use the .helix/languages.toml configuration file in your project directory
-    formatter = { command = "mago", args = ["--config", "%sh{pwd}/mago.toml", "format", "--stdin-input"] }
+    # Set Mago as the formatter.
+    # This assumes your mago.toml file is in your current working directory.
+    # If you work on multiple projects, consider using a .helix/languages.toml file in your project directory.
+    formatter = { command = "mago", args = ["format", "--stdin-input"] }
 
     # Set to true to format automatically on save.
     auto-format = true

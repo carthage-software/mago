@@ -18,7 +18,7 @@ use-tabs = true
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `excludes` | `string[]` | `[]` | A list of glob patterns to exclude from formatting. |
+| `excludes` | `string[]` | `[]` | A list of paths or glob patterns to exclude from formatting. |
 | `print-width` | `integer` | `120` | Maximum line length that the printer will wrap on. |
 | `tab-width` | `integer` | `4` | Number of spaces per indentation level. |
 | `use-tabs` | `boolean` | `false` | Use tabs instead of spaces for indentation. |

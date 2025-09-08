@@ -28,19 +28,21 @@ pub struct ConfigCommand {
     show: Option<ConfigSection>,
 }
 
-pub fn execute(command: ConfigCommand, configuration: Configuration) -> Result<ExitCode, Error> {
-    let json = if let Some(section) = command.show {
-        match section {
-            ConfigSection::Source => serde_json::to_string_pretty(&configuration.source)?,
-            ConfigSection::Linter => serde_json::to_string_pretty(&configuration.linter)?,
-            ConfigSection::Formatter => serde_json::to_string_pretty(&configuration.formatter)?,
-            ConfigSection::Analyzer => serde_json::to_string_pretty(&configuration.analyzer)?,
-        }
-    } else {
-        serde_json::to_string_pretty(&configuration)?
-    };
+impl ConfigCommand {
+    pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
+        let json = if let Some(section) = self.show {
+            match section {
+                ConfigSection::Source => serde_json::to_string_pretty(&configuration.source)?,
+                ConfigSection::Linter => serde_json::to_string_pretty(&configuration.linter)?,
+                ConfigSection::Formatter => serde_json::to_string_pretty(&configuration.formatter)?,
+                ConfigSection::Analyzer => serde_json::to_string_pretty(&configuration.analyzer)?,
+            }
+        } else {
+            serde_json::to_string_pretty(&configuration)?
+        };
 
-    println!("{}", json);
+        println!("{}", json);
 
-    Ok(ExitCode::SUCCESS)
+        Ok(ExitCode::SUCCESS)
+    }
 }
