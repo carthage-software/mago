@@ -369,7 +369,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                     .with_code(ScanningIssueKind::InvalidParamTag)
                     .with_annotation(Annotation::primary(parameter_tag.span).with_message(format!(
                         "Parameter `{}` is not defined in this function",
-                        parameter_tag.variable.raw_name()
+                        parameter_tag.variable
                     )))
                     .with_note(
                         "Each `@param` tag in a docblock must correspond to a parameter in the function's signature.",
@@ -440,10 +440,8 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                 Issue::error("@param-out tag references an unknown parameter.")
                     .with_code(ScanningIssueKind::InvalidParamOutTag)
                     .with_annotation(
-                        Annotation::primary(param_out.span).with_message(format!(
-                            "Parameter `{}` does not exist",
-                            param_out.variable.raw_name()
-                        )),
+                        Annotation::primary(param_out.span)
+                            .with_message(format!("Parameter `{}` does not exist", param_out.variable)),
                     )
                     .with_note("The `@param-out` tag specifies the type of a by-reference parameter after the function has executed.")
                     .with_help("Check for typos or ensure this parameter exists in the function signature."),

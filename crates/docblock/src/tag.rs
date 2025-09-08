@@ -1,4 +1,5 @@
 use mago_span::Span;
+use std::fmt;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -10,17 +11,17 @@ pub struct Variable {
 }
 
 impl Variable {
-    #[inline]
-    pub fn raw_name(&self) -> String {
-        let mut raw_name = String::with_capacity(self.name.len() + 4);
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_by_reference {
-            raw_name.push('&');
+            f.write_str("&")?;
         }
         if self.is_variadic {
-            raw_name.push_str("...");
+            f.write_str("...")?;
         }
-        raw_name.push_str(&self.name);
-        raw_name
+        f.write_str(&self.name)
     }
 }
 
@@ -133,14 +134,14 @@ pub struct VarTag {
 
 /// Parses a PHPDoc variable token and returns a structured `Variable`.
 ///
-/// Supports `$name`, `...$name`, and `&$name`. The returned `Variable`
-/// preserves the `$` and optional `...` prefix in `name`, and sets flags
-/// for `is_variadic` and `is_by_reference` for downstream consumers.
+/// Supports `$name`, `...$name`, and `&$name`.
+/// The returned `Variable` stores a normalized `name` (with `$`, without leading `...` or `&`),
+/// and sets flags `is_variadic` and `is_by_reference` that can be used for display/rendering.
 ///
 /// Examples:
 /// - "$foo"       → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: false })
 /// - "&$foo"      → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: true })
-/// - "...$ids)"   → Some(Variable { name: "...$ids", is_variadic: true, is_by_reference: false })
+/// - "...$ids)"   → Some(Variable { name: "$ids", is_variadic: true, is_by_reference: false })
 /// - "$"          → None
 /// - "...$"       → None
 /// - "$1x"        → None
@@ -769,6 +770,22 @@ mod tests {
                 }
                 _ => panic!("mismatch for input={}", input),
             }
+        }
+    }
+
+    #[test]
+    fn test_variable_display_and_raw() {
+        let cases = vec![
+            ("$x", "$x"),
+            ("&$x", "&$x"),
+            ("...$x", "...$x"),
+            ("...$x)", "...$x"),
+            ("...$x,", "...$x"),
+        ];
+
+        for (input, expected_raw) in cases {
+            let v = parse_var_ident(input).expect("should parse variable");
+            assert_eq!(v.to_string(), expected_raw);
         }
     }
 
