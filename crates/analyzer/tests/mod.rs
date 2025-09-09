@@ -1,3 +1,5 @@
+use std::fs;
+
 mod framework;
 
 /// A macro to automatically generate a test case from a corresponding PHP file.
@@ -95,6 +97,7 @@ test_case!(switch_always_matching_case);
 test_case!(switch_case_after_default_is_unreachable);
 test_case!(switch_logically_unreachable_case);
 test_case!(switch_on_literal);
+test_case!(switch_redundant_condition);
 test_case!(conditional_always_truthy);
 test_case!(conditional_always_falsy);
 test_case!(conditional_mixed_types);
@@ -170,8 +173,29 @@ test_case!(issue_361);
 test_case!(issue_362);
 test_case!(issue_366);
 test_case!(issue_368);
+test_case!(issue_388);
 test_case!(issue_390);
 test_case!(issue_391);
 test_case!(issue_393);
 test_case!(issue_396);
 test_case!(issue_400);
+
+#[test]
+fn test_all_test_cases_are_ran() {
+    let test_case_file = include_str!("mod.rs");
+    let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();
+
+    for entry in test_cases_dir {
+        let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let file_name = path.file_stem().unwrap().to_str().unwrap();
+        assert!(
+            test_case_file.contains(&format!("test_case!({})", file_name)),
+            "File '{}' was not found as a test case",
+            file_name
+        );
+    }
+}
