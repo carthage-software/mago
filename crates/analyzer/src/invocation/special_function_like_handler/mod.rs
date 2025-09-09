@@ -10,6 +10,7 @@ use crate::invocation::special_function_like_handler::psl::str_component::StrCom
 use crate::invocation::special_function_like_handler::psl::type_component::TypeComponentFunctionsHandler;
 use crate::invocation::special_function_like_handler::random::RandomFunctionsHandler;
 use crate::invocation::special_function_like_handler::spl::iterator::IteratorFunctionsHandler;
+use crate::invocation::special_function_like_handler::standard::array::ArrayFunctionsHandler;
 use crate::invocation::special_function_like_handler::standard::string::StringFunctionsHandler;
 
 mod core;
@@ -41,6 +42,7 @@ pub fn handle_special_functions<'ctx, 'ast, 'arena>(
         &GetCurrentClosureMethodHandler,
         // Standard PHP function handlers
         &StringFunctionsHandler,
+        &ArrayFunctionsHandler,
         // SPL function handlers
         &IteratorFunctionsHandler,
         // Random extension function handlers

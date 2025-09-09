@@ -1,6 +1,6 @@
-use std::borrow::Cow;
-
 use bumpalo::Bump;
+use std::borrow::Cow;
+use std::fs;
 
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
@@ -88,6 +88,7 @@ test_case!(single_quote_string);
 test_case!(double_quote_string);
 test_case!(inline_if_statement);
 test_case!(top_level_inline_if);
+test_case!(trailing_comma_in_array_destructuring);
 test_case!(inline_control_structures);
 test_case!(aligned_inline_control_structures);
 test_case!(html_template);
@@ -112,6 +113,7 @@ test_case!(breaking_named_arguments);
 test_case!(break_fn_args);
 test_case!(member_access_chain);
 test_case!(return_wrapping);
+test_case!(shebang);
 test_case!(arrow_return);
 test_case!(match_breaking);
 test_case!(array_alignment);
@@ -131,6 +133,7 @@ test_case!(preserve_breaking_attribute_list);
 test_case!(preserve_breaking_attribute_list_disabled);
 test_case!(preserve_breaking_conditional_expression);
 test_case!(preserve_breaking_conditional_expression_disabled);
+test_case!(preserve_breaking_parameter_list_promoted_properties);
 test_case!(hooks_always_break);
 test_case!(comments_are_preserved);
 test_case!(array_comment);
@@ -216,3 +219,28 @@ test_case!(issue_332);
 test_case!(issue_334);
 test_case!(issue_336);
 test_case!(issue_346);
+
+#[test]
+fn test_all_test_cases_are_ran() {
+    let test_case_file = include_str!("mod.rs");
+    let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();
+
+    for entry in test_cases_dir {
+        let path = entry.unwrap().path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let file_name = path.file_stem().unwrap().to_str().unwrap();
+
+        if file_name == "-template" {
+            continue;
+        }
+
+        assert!(
+            test_case_file.contains(&format!("test_case!({}", file_name)),
+            "Directory '{}' was not found as a test case",
+            file_name
+        );
+    }
+}

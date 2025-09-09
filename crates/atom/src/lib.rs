@@ -70,7 +70,7 @@ pub fn empty_atom() -> Atom {
 ///
 /// # Panics
 ///
-/// Panics at compile time if called with 0, 1, or more than 16 arguments.
+/// Panics at compile time if called with 0, 1, or more than 12 arguments.
 #[macro_export]
 macro_rules! concat_atom {
     ($s1:expr, $s2:expr $(,)?) => {
