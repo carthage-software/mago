@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use mago_codex::class_or_interface_exists;
+use mago_codex::trait_exists;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -51,7 +52,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                         invalid_clone_atomics.push(atomic_type);
                     }
                     TObject::Named(named_object) => {
-                        if !class_or_interface_exists(context.codebase, &named_object.name) {
+                        if !trait_exists(context.codebase, &named_object.name)
+                            && !class_or_interface_exists(context.codebase, &named_object.name)
+                        {
                             invalid_clone_atomics.push(atomic_type);
                         } else {
                             has_cloneable_object = true;

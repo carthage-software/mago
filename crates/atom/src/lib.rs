@@ -32,7 +32,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
-use std::io::Write;
 
 use ustr::IdentityHasher;
 
@@ -71,7 +70,7 @@ pub fn empty_atom() -> Atom {
 ///
 /// # Panics
 ///
-/// Panics at compile time if called with 0, 1, or more than 16 arguments.
+/// Panics at compile time if called with 0, 1, or more than 12 arguments.
 #[macro_export]
 macro_rules! concat_atom {
     ($s1:expr, $s2:expr $(,)?) => {
@@ -195,8 +194,8 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
     atom(&s.to_lowercase())
 }
 
-/// A helper macro to generate the specialized `*_atom` functions for number types.
-macro_rules! number_to_atom_fns {
+/// A helper macro to generate the specialized `*_atom` functions for integer types.
+macro_rules! integer_to_atom_fns {
     ( $( $func_name:ident($num_type:ty) ),+ $(,)? ) => {
         $(
             #[doc = "Creates an `Atom` from a `"]
@@ -205,19 +204,27 @@ macro_rules! number_to_atom_fns {
             #[inline]
             #[must_use]
             pub fn $func_name(n: $num_type) -> Atom {
-                // A 64-byte buffer is large enough to hold any standard number.
-                let mut buffer = [0u8; 64];
-                let mut writer = &mut buffer[..];
-                let initial_len = writer.len();
+                let mut buffer = itoa::Buffer::new();
+                let s = buffer.format(n);
 
-                // SAFETY: This is safe because the buffer is guaranteed to be large
-                // enough for any standard number's string representation.
-                unsafe { write!(writer, "{}", n).unwrap_unchecked() };
+                atom(s)
+            }
+        )+
+    };
+}
 
-                let written_len = initial_len - writer.len();
-                let s =
-                    // SAFETY: The `write!` macro for numbers only produces valid UTF-8.
-                    unsafe { std::str::from_utf8_unchecked(&buffer[..written_len]) };
+/// A helper macro to generate the specialized `*_atom` functions for float types.
+macro_rules! float_to_atom_fns {
+    ( $( $func_name:ident($num_type:ty) ),+ $(,)? ) => {
+        $(
+            #[doc = "Creates an `Atom` from a `"]
+            #[doc = stringify!($num_type)]
+            #[doc = "` value with zero heap allocations."]
+            #[inline]
+            #[must_use]
+            pub fn $func_name(n: $num_type) -> Atom {
+                let mut buffer = ryu::Buffer::new();
+                let s = buffer.format(n);
 
                 atom(s)
             }
@@ -257,23 +264,8 @@ macro_rules! concat_fns {
     };
 }
 
-concat_fns!(
-    concat_atom2(2, s1, s2),
-    concat_atom3(3, s1, s2, s3),
-    concat_atom4(4, s1, s2, s3, s4),
-    concat_atom5(5, s1, s2, s3, s4, s5),
-    concat_atom6(6, s1, s2, s3, s4, s5, s6),
-    concat_atom7(7, s1, s2, s3, s4, s5, s6, s7),
-    concat_atom8(8, s1, s2, s3, s4, s5, s6, s7, s8),
-    concat_atom9(9, s1, s2, s3, s4, s5, s6, s7, s8, s9),
-    concat_atom10(10, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10),
-    concat_atom11(11, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11),
-    concat_atom12(12, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12),
-);
-
-number_to_atom_fns!(
-    f32_atom(f32),
-    f64_atom(f64),
+// Generate functions for integer types
+integer_to_atom_fns!(
     i8_atom(i8),
     i16_atom(i16),
     i32_atom(i32),
@@ -286,4 +278,20 @@ number_to_atom_fns!(
     u64_atom(u64),
     u128_atom(u128),
     usize_atom(usize),
+);
+
+float_to_atom_fns!(f32_atom(f32), f64_atom(f64),);
+
+concat_fns!(
+    concat_atom2(2, s1, s2),
+    concat_atom3(3, s1, s2, s3),
+    concat_atom4(4, s1, s2, s3, s4),
+    concat_atom5(5, s1, s2, s3, s4, s5),
+    concat_atom6(6, s1, s2, s3, s4, s5, s6),
+    concat_atom7(7, s1, s2, s3, s4, s5, s6, s7),
+    concat_atom8(8, s1, s2, s3, s4, s5, s6, s7, s8),
+    concat_atom9(9, s1, s2, s3, s4, s5, s6, s7, s8, s9),
+    concat_atom10(10, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10),
+    concat_atom11(11, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11),
+    concat_atom12(12, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12),
 );

@@ -40,7 +40,16 @@ pub fn generate_baseline_from_issues(issues: IssueCollection, database: &ReadDat
 
     for issue in issues {
         let Some(code) = issue.code else { continue };
-        let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) else { continue };
+        let Some(annotation) = issue
+            .annotations
+            .iter()
+            .find(|a| a.is_primary())
+            .or_else(|| issue.annotations.iter().find(|a| !a.is_primary()))
+        else {
+            tracing::warn!("Issue with code '{code}' has no annotations, it will not be included in the baseline.");
+
+            continue;
+        };
 
         let start = annotation.span.start;
         let end = annotation.span.end;
@@ -109,7 +118,12 @@ pub fn filter_issues(
     let mut seen_baseline_issues: HashMap<Cow<'static, str>, HashSet<BaselineSourceIssue>> = HashMap::new();
 
     for issue in issues {
-        let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
+        let Some(annotation) = issue
+            .annotations
+            .iter()
+            .find(|a| a.is_primary())
+            .or_else(|| issue.annotations.iter().find(|a| !a.is_primary()))
+        else {
             filtered_issues.push(issue);
             continue;
         };

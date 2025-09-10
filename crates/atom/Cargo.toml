@@ -14,3 +14,5 @@ workspace = true
 
 [dependencies]
 ustr = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }

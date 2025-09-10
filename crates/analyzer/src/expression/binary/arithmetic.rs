@@ -378,8 +378,15 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             Issue::error("Invalid type for left operand.".to_string())
         };
 
+        let mut is_first = true;
         for (msg, span) in invalid_left_messages {
-            issue = issue.with_annotation(Annotation::secondary(span).with_message(msg));
+            issue = issue.with_annotation(if is_first {
+                Annotation::primary(span).with_message(msg)
+            } else {
+                Annotation::secondary(span).with_message(msg)
+            });
+
+            is_first = false;
         }
 
         context.collector.report_with_code(
@@ -405,8 +412,15 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             Issue::error("Invalid type for right operand.".to_string())
         };
 
+        let mut is_first = true;
         for (msg, span) in invalid_right_messages {
-            issue = issue.with_annotation(Annotation::secondary(span).with_message(msg));
+            issue = issue.with_annotation(if is_first {
+                Annotation::primary(span).with_message(msg)
+            } else {
+                Annotation::secondary(span).with_message(msg)
+            });
+
+            is_first = false;
         }
 
         context.collector.report_with_code(

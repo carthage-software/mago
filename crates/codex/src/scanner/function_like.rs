@@ -359,27 +359,18 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     for parameter_tag in docblock.parameters {
-        let parameter_name;
-        let parameter_name_str;
-        let is_variadic = parameter_tag.name.starts_with("...");
-        if is_variadic {
-            parameter_name_str = &parameter_tag.name[3..];
-            parameter_name = atom(parameter_name_str);
-        } else {
-            parameter_name_str = &parameter_tag.name;
-            parameter_name = atom(parameter_name_str);
-        }
-
+        let parameter_name = atom(&parameter_tag.variable.name);
         let param_type_string = &parameter_tag.type_string;
+        let is_variadic = parameter_tag.variable.is_variadic;
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
             metadata.issues.push(
                 Issue::error("The @param tag references an unknown parameter.")
                     .with_code(ScanningIssueKind::InvalidParamTag)
-                    .with_annotation(
-                        Annotation::primary(parameter_tag.span)
-                            .with_message(format!("Parameter `{parameter_name_str}` is not defined in this function")),
-                    )
+                    .with_annotation(Annotation::primary(parameter_tag.span).with_message(format!(
+                        "Parameter `{}` is not defined in this function",
+                        parameter_tag.variable
+                    )))
                     .with_note(
                         "Each `@param` tag in a docblock must correspond to a parameter in the function's signature.",
                     )
@@ -442,7 +433,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     for param_out in docblock.parameters_out {
-        let param_name = atom(&param_out.name);
+        let param_name = atom(&param_out.variable.name);
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
             metadata.issues.push(
@@ -450,7 +441,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                     .with_code(ScanningIssueKind::InvalidParamOutTag)
                     .with_annotation(
                         Annotation::primary(param_out.span)
-                            .with_message(format!("Parameter `{}` does not exist", param_out.name)),
+                            .with_message(format!("Parameter `{}` does not exist", param_out.variable)),
                     )
                     .with_note("The `@param-out` tag specifies the type of a by-reference parameter after the function has executed.")
                     .with_help("Check for typos or ensure this parameter exists in the function signature."),
@@ -576,7 +567,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     for assertion_tag in docblock.assertions {
-        let assertion_param_name = atom(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.variable.name);
 
         let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 
@@ -586,7 +577,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     for assertion_tag in docblock.if_true_assertions {
-        let assertion_param_name = atom(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.variable.name);
 
         let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 
@@ -596,7 +587,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     for assertion_tag in docblock.if_false_assertions {
-        let assertion_param_name = atom(&assertion_tag.parameter_name);
+        let assertion_param_name = atom(&assertion_tag.variable.name);
 
         let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
 

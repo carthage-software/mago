@@ -104,6 +104,8 @@ rust-embed = { version = "8.7.2", features = ["interpolate-folder-path", "includ
 bincode = { version = "2.0.1", features = ["serde"] }
 libc = "0.2.175"
 shell-words = "1.1.0"
+ryu = "1.0"
+itoa = "1.0"
 
 [dependencies]
 mago-syntax = { workspace = true }

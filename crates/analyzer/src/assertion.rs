@@ -347,7 +347,7 @@ pub(super) fn scrape_equality_assertions(
         return assertions;
     }
 
-    match resolve_count_comparison(left, right, artifacts) {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -430,7 +430,7 @@ fn scrape_inequality_assertions(
         return assertions;
     }
 
-    match resolve_count_comparison(left, right, artifacts) {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -835,7 +835,7 @@ fn scrape_lesser_than_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts) {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -992,7 +992,7 @@ fn scrape_greater_than_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<HashMap<String, AssertionSet>> {
-    match resolve_count_comparison(left, right, artifacts) {
+    match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = HashMap::default();
 
@@ -1242,10 +1242,11 @@ fn resolve_count_comparison(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_>,
 ) -> (Option<i64>, Option<i64>) {
-    if is_count_or_size_of_call(left) {
+    if is_count_or_size_of_call(left, assertion_context) {
         (None, get_expression_integer_value(artifacts, right).and_then(|integer| integer.get_literal_value()))
-    } else if is_count_or_size_of_call(right) {
+    } else if is_count_or_size_of_call(right, assertion_context) {
         (get_expression_integer_value(artifacts, left).and_then(|integer| integer.get_literal_value()), None)
     } else {
         (None, None)
@@ -1271,7 +1272,7 @@ fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expressi
     artifacts.get_expression_type(expression).and_then(|t| t.get_single_array_key())
 }
 
-fn is_count_or_size_of_call(expression: &Expression) -> bool {
+fn is_count_or_size_of_call(expression: &Expression, assertion_context: AssertionContext<'_, '_>) -> bool {
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
     };
@@ -1284,9 +1285,9 @@ fn is_count_or_size_of_call(expression: &Expression) -> bool {
         return false;
     };
 
-    let func_name = function_identifier.value();
+    let resolved_function_name = assertion_context.resolved_names.get(function_identifier);
 
-    func_name.eq_ignore_ascii_case("count") || func_name.eq_ignore_ascii_case("sizeof")
+    resolved_function_name.eq_ignore_ascii_case("count") || resolved_function_name.eq_ignore_ascii_case("sizeof")
 }
 
 fn get_true_equality_assertions(

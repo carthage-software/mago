@@ -134,7 +134,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                         },
                         Issue::error("Attempting to call a method on `null`.")
                             .with_annotation(
-                                Annotation::secondary(object.span()).with_message("This expression can be `null`"),
+                                Annotation::primary(object.span()).with_message("This expression can be `null`"),
                             )
                             .with_help("Use the nullsafe operator (`?->`) if `null` is an expected value."),
                     );

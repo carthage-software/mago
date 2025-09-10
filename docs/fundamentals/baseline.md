@@ -15,7 +15,7 @@ The `mago lint` and `mago analyze` commands each use their own separate baseline
 It is conventional to name the baseline files accordingly:
 
 - For the linter: `lint-baseline.toml`
-- For the analyzer: `analyze-baseline.toml`
+- For the analyzer: `analysis-baseline.toml`
 
 :::tip
 The `mago ast` command reports parsing errors but does not support using a baseline to ignore them.
@@ -30,7 +30,7 @@ You can generate a baseline file by running `lint` or `analyze` with the `--gene
 mago lint --generate-baseline --baseline lint-baseline.toml
 
 # Generate a baseline for the analyzer
-mago analyze --generate-baseline --baseline analyze-baseline.toml
+mago analyze --generate-baseline --baseline analysis-baseline.toml
 ```
 
 This will execute the command, collect all found issues, and serialize them into the specified TOML file.
@@ -44,7 +44,7 @@ Once you have a baseline file, instruct Mago to use it by passing the `--baselin
 mago lint --baseline lint-baseline.toml
 
 # Run the analyzer using its baseline
-mago analyze --baseline analyze-baseline.toml
+mago analyze --baseline analysis-baseline.toml
 ```
 
 When you run a command with a baseline, Mago will:

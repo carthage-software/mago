@@ -1478,6 +1478,8 @@ dependencies = [
 name = "mago-atom"
 version = "1.0.0-beta.12"
 dependencies = [
+ "itoa",
+ "ryu",
  "ustr",
 ]
 

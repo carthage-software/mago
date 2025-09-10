@@ -964,16 +964,16 @@ impl TUnion {
         if self.is_single() { self.get_single().to_array_key() } else { None }
     }
 
-    pub fn get_single_key_of_array_like(self) -> Option<TUnion> {
+    pub fn get_single_key_of_array_like(&self) -> Option<TUnion> {
         if !self.is_single() {
             return None;
         }
 
-        match self.get_single_owned() {
+        match self.get_single() {
             TAtomic::Array(array) => match array {
                 TArray::List(_) => Some(get_int()),
-                TArray::Keyed(keyed_array) => match keyed_array.parameters {
-                    Some((k, _)) => Some(*k),
+                TArray::Keyed(keyed_array) => match &keyed_array.parameters {
+                    Some((k, _)) => Some(*k.clone()),
                     None => Some(get_arraykey()),
                 },
             },

@@ -1,7 +1,26 @@
+use mago_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt;
 
-use mago_span::Span;
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct Variable {
+    pub name: String,          // normalized: includes `$`, excludes `...` and `&`
+    pub is_variadic: bool,     // true if `...` was present
+    pub is_by_reference: bool, // true if `&` was present
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_by_reference {
+            f.write_str("&")?;
+        }
+        if self.is_variadic {
+            f.write_str("...")?;
+        }
+        f.write_str(&self.name)
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TypeString {
@@ -34,7 +53,7 @@ pub struct ImportTypeTag {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ParameterTag {
     pub span: Span,
-    pub name: String,
+    pub variable: Variable,
     pub type_string: TypeString,
     pub description: String,
 }
@@ -42,7 +61,7 @@ pub struct ParameterTag {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ParameterOutTag {
     pub span: Span,
-    pub name: String,
+    pub variable: Variable,
     pub type_string: TypeString,
 }
 
@@ -100,54 +119,40 @@ pub struct WhereTag {
 pub struct AssertionTag {
     pub span: Span,
     pub type_string: TypeString,
-    pub parameter_name: String,
+    pub variable: Variable,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct VarTag {
     pub span: Span,
     pub type_string: TypeString,
-    pub variable_name: Option<String>,
+    pub variable: Option<Variable>,
 }
 
-/// Parses a PHPDoc var and returns the identifier token.
+/// Parses a PHPDoc variable token and returns a structured `Variable`.
 ///
-/// Accepts `$name`, `...$name` and `&$name`
-/// ASCII character after the name (e.g., `,`, `)`, whitespace), so trailing
+/// Supports `$name`, `...$name`, and `&$name`.
+/// The returned `Variable` stores a normalized `name` (with `$`, without leading `...` or `&`),
+/// and sets flags `is_variadic` and `is_by_reference` that can be used for display/rendering.
 ///
-/// ## Examples
-///
-/// - `"$foo"`        → `Some("$foo")`
-/// - `"&$foo"`       → `Some("$foo")`
-/// - `"...$ids)"`    → `Some("...$ids")`
-/// - `"$bar,"`       → `Some("$bar")`
-/// - `"$"`           → `None`
-/// - `"...$"`        → `None`
-/// - `"$1x"`         → `None`
-///
-/// # Arguments
-///
-/// * `raw` - Raw token starting at the variable position.
-///
-/// # Returns
-///
-/// `Some(&str)` with a subslice contains the `$`/`...$` prefix
-/// and the identifier, or `None` if the token does not start with `$`/`...$`
-///
-/// # Notes
-///
-/// - Identifier rules are ASCII-only: `[_A-Za-z][_A-Za-z0-9]*`.
-/// - The returned slice length can be used to anchor any trailing description.
+/// Examples:
+/// - "$foo"       → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: false })
+/// - "&$foo"      → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: true })
+/// - "...$ids)"   → Some(Variable { name: "$ids", is_variadic: true, is_by_reference: false })
+/// - "$"          → None
+/// - "...$"       → None
+/// - "$1x"        → None
 #[inline]
-fn parse_var_ident(raw: &str) -> Option<&str> {
+fn parse_var_ident(raw: &str) -> Option<Variable> {
+    let is_by_reference = raw.starts_with('&');
     // tolerate "&$x" in docblocks
     let raw = raw.strip_prefix('&').unwrap_or(raw);
 
     // accept "$name" or "...$name"
-    let (prefix_len, rest) = if let Some(r) = raw.strip_prefix("...$") {
-        (4usize, r)
+    let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix("...$") {
+        (4usize, r, true)
     } else if let Some(r) = raw.strip_prefix('$') {
-        (1usize, r)
+        (1usize, r, false)
     } else {
         return None;
     };
@@ -170,8 +175,10 @@ fn parse_var_ident(raw: &str) -> Option<&str> {
         len += 1;
     }
 
-    // Some from ...$ OR $ until ascii
-    Some(&raw[..prefix_len + len])
+    let token = &raw[..prefix_len + len];
+    // normalized: remove variadic prefix if present, keep `$`
+    let normalized = if is_variadic { &token[3..] } else { token };
+    Some(Variable { name: normalized.to_owned(), is_variadic, is_by_reference })
 }
 
 /// Parses the content string of a `@template` or `@template-covariant` tag.
@@ -335,13 +342,12 @@ pub fn parse_param_tag(content: &str, span: Span) -> Option<ParameterTag> {
 
     let mut rest_parts = rest_slice.split_whitespace();
     let raw_name = rest_parts.next()?;
-    let name_token = parse_var_ident(raw_name)?;
-    let name = name_token.to_owned();
+    let variable = parse_var_ident(raw_name)?;
 
-    let desc_start = rest_slice.find(name_token).map_or(0, |i| i + name_token.len());
+    let desc_start = rest_slice.find(&variable.name).map_or(0, |i| i + variable.name.len());
     let description = rest_slice[desc_start..].trim_start().to_owned();
 
-    Some(ParameterTag { span, name, type_string, description })
+    Some(ParameterTag { span, variable, type_string, description })
 }
 
 /// Parses the content string of a `@param-out` tag.
@@ -370,10 +376,9 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Option<ParameterOutTag>
     }
 
     let raw_name = rest_slice.split_whitespace().next()?;
-    let name_token = parse_var_ident(raw_name)?;
-    let name = name_token.to_owned();
+    let variable = parse_var_ident(raw_name)?;
 
-    Some(ParameterOutTag { span, name, type_string })
+    Some(ParameterOutTag { span, variable, type_string })
 }
 
 /// Parses the content string of a `@return` tag.
@@ -456,11 +461,9 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Option<AssertionTag> {
     let mut rest_parts = rest_slice.split_whitespace();
 
     let raw_name = rest_parts.next()?;
-    let name_token = parse_var_ident(raw_name)?;
+    let variable = parse_var_ident(raw_name)?;
 
-    let param_name = name_token.to_owned();
-
-    Some(AssertionTag { span, parameter_name: param_name, type_string })
+    Some(AssertionTag { span, variable, type_string })
 }
 
 /// Parses the content string of a `@var` tag.
@@ -484,14 +487,14 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
         return None;
     }
 
-    let variable_name = if rest_slice.is_empty() {
+    let variable = if rest_slice.is_empty() {
         None
     } else {
         let var_part = rest_slice.split_whitespace().next()?;
-        parse_var_ident(var_part).map(|s| s.to_owned())
+        parse_var_ident(var_part)
     };
 
-    Some(VarTag { span, type_string, variable_name })
+    Some(VarTag { span, type_string, variable })
 }
 
 /// Parses the content string of a `@type` tag.
@@ -736,22 +739,44 @@ mod tests {
 
     #[test]
     fn test_parse_var_ident() {
-        let cases: &[(&str, Option<&str>)] = &[
-            // valid basics
-            ("$x", Some("$x")),
-            ("&$refVar", Some("$refVar")),     // ref drop '&'
-            ("$foo,", Some("$foo")),           // trailing excluded
-            ("...$ids)", Some("...$ids")),     // variadic with trailing ')'
-            ("...$items,", Some("...$items")), // variadic with trailing ','
-            // invalid tokens
-            ("$", None),    // no identifier
-            ("...$", None), // no identifier
-            ("$1x", None),  // cannot start with digit
-            ("foo", None),  // no '$'
+        struct Expect<'a> {
+            s: &'a str,
+            variadic: bool,
+            by_ref: bool,
+        }
+        let cases: &[(&str, Option<Expect>)] = &[
+            ("$x", Some(Expect { s: "$x", variadic: false, by_ref: false })),
+            ("&$refVar", Some(Expect { s: "$refVar", variadic: false, by_ref: true })),
+            ("$foo,", Some(Expect { s: "$foo", variadic: false, by_ref: false })),
+            ("...$ids)", Some(Expect { s: "$ids", variadic: true, by_ref: false })),
+            ("...$items,", Some(Expect { s: "$items", variadic: true, by_ref: false })),
+            ("$", None),
+            ("...$", None),
+            ("$1x", None),
+            ("foo", None),
         ];
 
         for (input, expected) in cases {
-            assert_eq!(parse_var_ident(input), *expected, "input={}", input);
+            let got = parse_var_ident(input);
+            match (got, expected) {
+                (None, None) => {}
+                (Some(v), Some(e)) => {
+                    assert_eq!(v.name, e.s, "input={}", input);
+                    assert_eq!(v.is_variadic, e.variadic, "input={}", input);
+                    assert_eq!(v.is_by_reference, e.by_ref, "input={}", input);
+                }
+                _ => panic!("mismatch for input={}", input),
+            }
+        }
+    }
+
+    #[test]
+    fn test_variable_display_and_raw() {
+        let cases = vec![("$x", "$x"), ("&$x", "&$x"), ("...$x", "...$x"), ("...$x)", "...$x"), ("...$x,", "...$x")];
+
+        for (input, expected_raw) in cases {
+            let v = parse_var_ident(input).expect("should parse variable");
+            assert_eq!(v.to_string(), expected_raw);
         }
     }
 
@@ -850,7 +875,7 @@ mod tests {
         assert_eq!(result.type_string.value, "string|int"); // Check owned string value
         assert_eq!(result.type_string.span.start.offset, offset + 1); // Span of type part
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "string|int".len() as u32);
-        assert_eq!(result.name, "$myVar");
+        assert_eq!(result.variable.name, "$myVar");
         assert_eq!(result.description, "Description here");
         assert_eq!(result.span, span); // Check overall span
     }
@@ -864,7 +889,7 @@ mod tests {
         assert_eq!(result.type_string.value, "array<int, string>"); // Check owned string
         assert_eq!(result.type_string.span.start.offset, offset + 1);
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "array<int, string>".len() as u32);
-        assert_eq!(result.name, "$param");
+        assert_eq!(result.variable.name, "$param");
         assert_eq!(result.description, "");
     }
 
@@ -877,7 +902,7 @@ mod tests {
         assert_eq!(result.type_string.value, "(string // comment \n | int)");
         assert_eq!(result.type_string.span.start.offset, offset + 1);
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "(string // comment \n | int)".len() as u32);
-        assert_eq!(result.name, "$var");
+        assert_eq!(result.variable.name, "$var");
         assert_eq!(result.description, "desc");
     }
 
@@ -967,7 +992,7 @@ mod tests {
         let content = " string $foo, desc";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.name, "$foo");
+        assert_eq!(result.variable.name, "$foo");
         assert_eq!(result.description, ", desc");
     }
 
@@ -976,7 +1001,7 @@ mod tests {
         let content = " list<int> ...$items) rest";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.name, "...$items");
+        assert_eq!(result.variable.name, "$items");
         assert_eq!(result.description, ") rest");
     }
 
@@ -985,7 +1010,7 @@ mod tests {
         let content = " int $out,";
         let span = test_span_for(content);
         let result = parse_param_out_tag(content, span).unwrap();
-        assert_eq!(result.name, "$out");
+        assert_eq!(result.variable.name, "$out");
     }
 
     #[test]
@@ -993,7 +1018,7 @@ mod tests {
         let content = " int $x,";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
-        assert_eq!(result.parameter_name, "$x");
+        assert_eq!(result.variable.name, "$x");
     }
 
     #[test]
@@ -1001,7 +1026,7 @@ mod tests {
         let content = " string $foo,desc";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.name, "$foo");
+        assert_eq!(result.variable.name, "$foo");
         assert_eq!(result.description, ",desc");
     }
 
@@ -1010,7 +1035,7 @@ mod tests {
         let content = " list<int> ...$items)more";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.name, "...$items");
+        assert_eq!(result.variable.name, "$items");
         assert_eq!(result.description, ")more");
     }
 }
