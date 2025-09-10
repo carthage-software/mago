@@ -13,6 +13,7 @@ This document details the rules available in the `BestPractices` category.
 | Final Controller | [`final-controller`](#final-controller) |
 | Loop Does Not Iterate | [`loop-does-not-iterate`](#loop-does-not-iterate) |
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
+| No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
@@ -213,6 +214,46 @@ class UserController extends Controller
         $this->middleware('auth');
     }
 }
+```
+
+
+## <a id="no-ini-set"></a>`no-ini-set`
+
+Enforces that ini_set is not used.
+
+Runtime configuration changes via ini_set make application behavior unpredictable and environment-dependent. They can mask misconfigured servers, introduce subtle bugs, and lead to inconsistent behavior between development, testing, and production environments.
+
+Modern applications should rely on well-defined configuration through php.ini or framework specific configuration. This ensures that configuration is explicit, consistent, and controlled across all environments.
+
+If a setting truly needs to vary between contexts, it should be handled at the infrastructure or framework configuration level, never by calling ini_set within the application code.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+// In framework config files (e.g., wp-config.php), use constants.
+define( 'WP_DEBUG', true );
+
+// Use framework-provided functions where available.
+wp_raise_memory_limit( 'admin' );
+```
+
+#### Incorrect code
+
+```php
+// This can override server settings in an unpredictable way.
+ini_set( 'display_errors', 1 );
+ini_set( 'memory_limit', '256M' );
 ```
 
 

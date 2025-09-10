@@ -235,6 +235,7 @@ define_rules! {
     TraitName(trait_name @ TraitNameRule),
     ValidDocblock(valid_docblock @ ValidDocblockRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
+    NoIniSet(no_ini_set @ NoIniSetRule),
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),
     NoLiteralPassword(no_literal_password @ NoLiteralPasswordRule),
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),

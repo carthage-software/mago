@@ -125,6 +125,7 @@ pub struct RulesSettings {
     pub trait_name: RuleSettings<TraitNameConfig>,
     pub valid_docblock: RuleSettings<ValidDocblockConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
+    pub no_ini_set: RuleSettings<NoIniSetConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,
