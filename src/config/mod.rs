@@ -143,6 +143,7 @@ impl Configuration {
                 }
                 None
             }) {
+                tracing::debug!("Sourcing configuration from {}.", found_config.display());
                 builder = builder.add_source(File::from(found_config).format(format).required(false));
             }
         }
