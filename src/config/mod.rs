@@ -137,7 +137,6 @@ impl Configuration {
                             continue;
                         }
 
-                        tracing::debug!("Sourcing configuration from {}.", config_file.display());
                         return Some((config_file, format));
                     }
                 }
@@ -145,6 +144,8 @@ impl Configuration {
             }) {
                 tracing::debug!("Sourcing configuration from {}.", found_config.display());
                 builder = builder.add_source(File::from(found_config).format(format).required(false));
+            } else {
+                tracing::debug!("No configuration file found, using defaults and environment variables.");
             }
         }
 
