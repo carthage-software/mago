@@ -14,6 +14,8 @@ use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::function_like::FunctionLikeKind;
+use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
@@ -396,6 +398,48 @@ fn scan_class_like<'ctx, 'arena>(
 
         class_like_metadata.has_sealed_methods = docblock.has_sealed_methods;
         class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
+
+        // Process @method tags to create pseudo methods
+        for method_tag in &docblock.methods {
+            let method_name = ascii_lowercase_atom(&method_tag.name);
+            class_like_metadata.pseudo_methods.insert(method_name);
+
+            // Create FunctionLikeMetadata for the pseudo method
+            let method_id = (name, method_name);
+            let mut function_like_metadata =
+                FunctionLikeMetadata::new(FunctionLikeKind::Method, method_tag.span, MetadataFlags::empty());
+
+            function_like_metadata.name = Some(method_name);
+            function_like_metadata.original_name = Some(atom(&method_tag.name));
+
+            if let Some(method_metadata) = function_like_metadata.method_metadata.as_mut() {
+                method_metadata.is_static = false;
+                method_metadata.visibility = Visibility::Public;
+            }
+
+            codebase.function_likes.insert(method_id, function_like_metadata);
+        }
+
+        // Process static @method tags
+        for method_tag in &docblock.static_methods {
+            let method_name = ascii_lowercase_atom(&method_tag.name);
+            class_like_metadata.static_pseudo_methods.insert(method_name);
+
+            // Create FunctionLikeMetadata for the static pseudo method
+            let method_id = (name, method_name);
+            let mut function_like_metadata =
+                FunctionLikeMetadata::new(FunctionLikeKind::Method, method_tag.span, MetadataFlags::empty());
+
+            function_like_metadata.name = Some(method_name);
+            function_like_metadata.original_name = Some(atom(&method_tag.name));
+
+            if let Some(method_metadata) = function_like_metadata.method_metadata.as_mut() {
+                method_metadata.is_static = true;
+                method_metadata.visibility = Visibility::Public;
+            }
+
+            codebase.function_likes.insert(method_id, function_like_metadata);
+        }
 
         for (i, template) in docblock.templates.iter().enumerate() {
             let template_name = atom(&template.name);

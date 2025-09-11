@@ -129,6 +129,15 @@ pub struct VarTag {
     pub variable: Option<Variable>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct MethodTag {
+    pub span: Span,
+    pub name: String,
+    pub type_string: TypeString,
+    pub description: String,
+    pub is_static: bool,
+}
+
 /// Parses a PHPDoc variable token and returns a structured `Variable`.
 ///
 /// Supports `$name`, `...$name`, and `&$name`.
@@ -568,6 +577,61 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag>
     }
 
     Some(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
+}
+
+/// Parses the content string of a `@method` tag.
+///
+/// # Arguments
+///
+/// * `content` - The string slice content following `@method`.
+/// * `span` - The original `Span` of the `content` slice.
+///
+/// # Returns
+///
+/// `Some(MethodTag)` if parsing is successful, `None` otherwise.
+pub fn parse_method_tag(content: &str, span: Span) -> Option<MethodTag> {
+    let content = content.trim();
+    if content.is_empty() {
+        return None;
+    }
+
+    let mut is_static = false;
+    let mut parts = content.split_whitespace();
+
+    // Check for static keyword
+    let first_part = parts.next()?;
+    let (return_type, remaining_content) = if first_part == "static" {
+        is_static = true;
+        let return_type = parts.next()?;
+        let start_pos = content.find(return_type)?;
+        (return_type, &content[start_pos + return_type.len()..])
+    } else {
+        (first_part, &content[first_part.len()..])
+    };
+
+    // Parse method name (should start with method name after return type)
+    let remaining_content = remaining_content.trim_start();
+    let method_name_end = remaining_content.find('(').unwrap_or(remaining_content.len());
+    let method_name = remaining_content[..method_name_end].trim();
+
+    if method_name.is_empty() {
+        return None;
+    }
+
+    // Everything after method name is description
+    let description_start = remaining_content
+        .find('(')
+        .map(|pos| pos + remaining_content[pos..].find(')').unwrap_or(0) + 1)
+        .unwrap_or(method_name.len());
+    let description = remaining_content[description_start..].trim().to_string();
+
+    Some(MethodTag {
+        span,
+        name: method_name.to_string(),
+        type_string: TypeString { value: return_type.to_string(), span },
+        description,
+        is_static,
+    })
 }
 
 /// Splits tag content into the type string part and the rest, respecting brackets/quotes.

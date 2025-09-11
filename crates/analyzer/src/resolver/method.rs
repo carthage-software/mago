@@ -306,6 +306,16 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         }
 
         ids.push((class_metadata, method_id, outer_object, *name));
+    } else {
+        // Check if it's a pseudo method from @method docblock
+        let lowercase_method_name = ascii_lowercase_atom(method_id.get_method_name());
+        if class_metadata.pseudo_methods.contains(&lowercase_method_name)
+            || class_metadata.static_pseudo_methods.contains(&lowercase_method_name)
+        {
+            // It's a pseudo method, treat it as existing but don't add to resolved methods
+            // since we don't have full metadata for analysis
+            ids.push((class_metadata, method_id, outer_object, *name));
+        }
     }
 
     if let Some(intersection_types) = object_type.get_intersection_types() {

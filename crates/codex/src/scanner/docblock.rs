@@ -28,6 +28,8 @@ pub struct ClassLikeDocblockComment {
     pub require_extends: Vec<TypeString>,
     pub require_implements: Vec<TypeString>,
     pub inheritors: Option<TypeString>,
+    pub methods: Vec<MethodTag>,
+    pub static_methods: Vec<MethodTag>,
     pub unchecked: bool,
 }
 
@@ -104,6 +106,8 @@ impl ClassLikeDocblockComment {
         let mut inheritors = None;
         let mut is_enum_interface = false;
         let mut unchecked = false;
+        let mut methods = Vec::new();
+        let mut static_methods = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -149,6 +153,15 @@ impl ClassLikeDocblockComment {
 
                     if let Some((inheritors_tag, _)) = split_tag_content(description_str, description_span) {
                         inheritors = Some(inheritors_tag);
+                    }
+                }
+                TagKind::Method | TagKind::PsalmMethod => {
+                    if let Some(method_tag) = parse_method_tag(tag.description, tag.description_span) {
+                        if method_tag.is_static {
+                            static_methods.push(method_tag);
+                        } else {
+                            methods.push(method_tag);
+                        }
                     }
                 }
                 TagKind::PhpstanTemplate
@@ -240,6 +253,8 @@ impl ClassLikeDocblockComment {
             require_implements,
             inheritors,
             unchecked,
+            methods,
+            static_methods,
         }))
     }
 }

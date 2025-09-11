@@ -143,10 +143,11 @@ pub fn method_exists(codebase: &CodebaseMetadata, fqcn: &str, method_name: &str)
     let lowercase_fqcn = ascii_lowercase_atom(fqcn);
     let lowercase_method_name = ascii_lowercase_atom(method_name);
 
-    codebase
-        .class_likes
-        .get(&lowercase_fqcn)
-        .is_some_and(|meta| meta.appearing_method_ids.contains_key(&lowercase_method_name))
+    codebase.class_likes.get(&lowercase_fqcn).is_some_and(|meta| {
+        meta.appearing_method_ids.contains_key(&lowercase_method_name)
+            || meta.pseudo_methods.contains(&lowercase_method_name)
+            || meta.static_pseudo_methods.contains(&lowercase_method_name)
+    })
 }
 
 pub fn method_identifier_exists(codebase: &CodebaseMetadata, method_identifier: &MethodIdentifier) -> bool {
