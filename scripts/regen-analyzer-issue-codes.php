@@ -297,6 +297,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-override-attribute',
         'unused-parameter',
         'reference-reused-from-confusing-scope',
+        'non-documented-method',
     ];
 
     /**

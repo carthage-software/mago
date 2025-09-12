@@ -11,6 +11,30 @@ pub struct Variable {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum Visibility {
+    Public,
+    Protected,
+    Private,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct Method {
+    pub visibility: Visibility,
+    pub is_static: bool,
+    pub name: String,
+    pub argument_list: Vec<Argument>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct Argument {
+    pub type_hint: Option<TypeString>,
+    pub variable: Variable,
+    pub has_default: bool,
+    pub argument_span: Span,
+    pub variable_span: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct PropertyTag {
     pub span: Span,
     pub type_string: Option<TypeString>,
@@ -27,6 +51,12 @@ impl fmt::Display for Variable {
         if self.is_variadic {
             f.write_str("...")?;
         }
+        f.write_str(&self.name)
+    }
+}
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.name)
     }
 }
@@ -136,6 +166,14 @@ pub struct VarTag {
     pub span: Span,
     pub type_string: TypeString,
     pub variable: Option<Variable>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct MethodTag {
+    pub span: Span,
+    pub method: Method,
+    pub type_string: TypeString,
+    pub description: String,
 }
 
 /// Parses a PHPDoc variable token and returns a structured `Variable`.
@@ -737,6 +775,238 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
             Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, ""))
         }
     }
+}
+
+/// Parses the content string of a `@method` tag.
+///
+/// # Arguments
+///
+/// * `content` - The string slice content following `@method`.
+/// * `span` - The original `Span` of the `content` slice.
+///
+/// # Returns
+///
+/// `Some(MethodTag)` if parsing is successful, `None` otherwise.
+pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
+    let mut is_static = false;
+    let mut visibility = None;
+
+    let mut acc_len = 0;
+
+    loop {
+        if let Some((new_content, char_count)) = try_consume(content, "static ") {
+            if is_static {
+                return None;
+            }
+
+            is_static = true;
+            acc_len += char_count;
+            content = new_content;
+        } else if let Some((new_content, char_count)) = try_consume(content, "public ") {
+            if visibility.is_some() {
+                return None;
+            }
+
+            visibility = Some(Visibility::Public);
+            acc_len += char_count;
+            content = new_content;
+        } else if let Some((new_content, char_count)) = try_consume(content, "protected ") {
+            if visibility.is_some() {
+                return None;
+            }
+
+            visibility = Some(Visibility::Protected);
+            acc_len += char_count;
+            content = new_content;
+        } else if let Some((new_content, char_count)) = try_consume(content, "private ") {
+            if visibility.is_some() {
+                return None;
+            }
+
+            visibility = Some(Visibility::Private);
+            acc_len += char_count;
+            content = new_content;
+        } else {
+            break;
+        }
+    }
+
+    let rest_span = span.subspan(acc_len as u32, span.length());
+
+    let (type_string, _) = split_tag_content(content, rest_span)?;
+
+    let (rest_slice, whitespace_count) = consume_whitespace(&content[type_string.span.length() as usize..]);
+    let rest_slice_span = rest_span.subspan(type_string.span.length() + whitespace_count as u32, rest_span.length());
+
+    // Type must exist and be valid
+    if type_string.value.is_empty()
+        || type_string.value.starts_with('{')
+        || (type_string.value.starts_with('$') && type_string.value != "$this")
+    {
+        return None;
+    }
+
+    if rest_slice.is_empty() {
+        // Method definition is mandatory
+        return None;
+    }
+
+    let mut chars = rest_slice.char_indices().peekable();
+
+    let mut name_end = None;
+
+    for (i, ch) in &mut chars {
+        if ch == '(' {
+            name_end = Some(i);
+            break;
+        }
+    }
+
+    let name_end = name_end?;
+
+    let name = rest_slice[..name_end].trim();
+
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut depth = 1;
+    let mut args_end = None;
+
+    for (i, ch) in &mut chars {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    args_end = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let args_end = args_end?;
+    let (args_str, whitespace_count) = consume_whitespace(&rest_slice[name_end + 1..args_end]);
+    let args_span = rest_slice_span.subspan((whitespace_count + name_end) as u32 + 1, args_end as u32);
+
+    let description = rest_slice[args_end..].trim();
+    let arguments_split = split_args(args_str, args_span);
+    let arguments = arguments_split.iter().flat_map(|(arg, span)| parse_argument(arg, span)).collect::<Vec<_>>();
+
+    let method = Method {
+        name: name.into(),
+        argument_list: arguments,
+        visibility: visibility.unwrap_or(Visibility::Public),
+        is_static,
+    };
+
+    Some(MethodTag { span, type_string, method, description: description.into() })
+}
+
+fn consume_whitespace(input: &str) -> (&str, usize) {
+    let mut iter = input.chars().peekable();
+    let mut count = 0;
+
+    while let Some(ch) = iter.peek() {
+        if ch.is_whitespace() {
+            iter.next();
+            count += 1;
+        } else {
+            break;
+        }
+    }
+
+    (&input[count..], count)
+}
+
+fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
+    let (input, whitespace_count) = consume_whitespace(input);
+
+    if !input.starts_with(token) {
+        return None;
+    }
+
+    let len = token.len() + whitespace_count;
+    let input = &input[len..];
+
+    let (input, whitespace_count) = consume_whitespace(input);
+
+    Some((input, len + whitespace_count))
+}
+
+fn split_args(args_str: &str, span: Span) -> Vec<(&str, Span)> {
+    let mut args = Vec::new();
+
+    let mut start = 0;
+    let mut depth = 0;
+    for (i, ch) in args_str.char_indices() {
+        match ch {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                let (arg, whitespace_count) = consume_whitespace(&args_str[start..i]);
+                if !arg.is_empty() {
+                    args.push((arg, span.subspan((whitespace_count + start) as u32, i as u32)));
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    if start < args_str.len() {
+        let (arg, whitespace_count) = consume_whitespace(&args_str[start..]);
+        let arg_trimmed = arg.trim_end();
+        if !arg.is_empty() {
+            args.push((
+                arg_trimmed,
+                span.subspan(
+                    (whitespace_count + start) as u32,
+                    (args_str.len() - arg.len() + arg_trimmed.len()) as u32,
+                ),
+            ));
+        }
+    }
+
+    args
+}
+
+fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
+    let default_value_split = arg_str.rsplit_once('=');
+
+    let ((arg_type, raw_name), default_value): ((_, _), Option<&str>) =
+        if let Some((variable_definition, default_value)) = default_value_split {
+            let arg = variable_definition.trim();
+            if let Some((arg_type, raw_name)) = arg.rsplit_once(' ') {
+                ((Some(arg_type), raw_name), Some(default_value.trim()))
+            } else {
+                ((None, arg), Some(default_value))
+            }
+        } else {
+            let arg = arg_str.trim();
+            if let Some((arg_type, raw_name)) = arg.rsplit_once(' ') {
+                ((Some(arg_type), raw_name), None)
+            } else {
+                ((None, arg), None)
+            }
+        };
+
+    let type_string =
+        arg_type.map(|arg_type| TypeString { value: arg_type.into(), span: span.subspan(0, arg_type.len() as u32) });
+
+    let variable_span = span.subspan(arg_type.map(|t| 1 + t.len() as u32).unwrap_or(0), span.length());
+
+    let variable = parse_var_ident(raw_name)?;
+
+    Some(Argument {
+        type_hint: type_string,
+        variable,
+        has_default: default_value.is_some(),
+        argument_span: *span,
+        variable_span,
+    })
 }
 
 /// Checks if an opening bracket matches a closing one.

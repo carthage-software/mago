@@ -148,6 +148,7 @@ pub enum IssueCode {
     NoValidCatchTypeFound,
     NoValue,
     NonClassUsedAsAttribute,
+    NonDocumentedMethod,
     NonExistentAttributeClass,
     NonExistentCatchType,
     NonExistentClass,
@@ -396,6 +397,7 @@ impl IssueCode {
             Self::NoValidCatchTypeFound => "no-valid-catch-type-found",
             Self::NoValue => "no-value",
             Self::NonClassUsedAsAttribute => "non-class-used-as-attribute",
+            Self::NonDocumentedMethod => "non-documented-method",
             Self::NonExistentAttributeClass => "non-existent-attribute-class",
             Self::NonExistentCatchType => "non-existent-catch-type",
             Self::NonExistentClass => "non-existent-class",
@@ -1007,7 +1009,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_codes() -> [Self; 11] {
+    pub const fn get_method_issue_codes() -> [Self; 12] {
         [
             Self::AmbiguousObjectMethodAccess,
             Self::DeprecatedMethod,
@@ -1016,6 +1018,7 @@ impl IssueCode {
             Self::InvalidStaticMethodCall,
             Self::MethodAccessOnNull,
             Self::MixedMethodAccess,
+            Self::NonDocumentedMethod,
             Self::NonExistentMethod,
             Self::PossibleMethodAccessOnNull,
             Self::UnimplementedAbstractMethod,
@@ -1023,7 +1026,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_code_values() -> [&'static str; 11] {
+    pub const fn get_method_issue_code_values() -> [&'static str; 12] {
         [
             "ambiguous-object-method-access",
             "deprecated-method",
@@ -1032,6 +1035,7 @@ impl IssueCode {
             "invalid-static-method-call",
             "method-access-on-null",
             "mixed-method-access",
+            "non-documented-method",
             "non-existent-method",
             "possible-method-access-on-null",
             "unimplemented-abstract-method",
@@ -1222,6 +1226,7 @@ impl std::str::FromStr for IssueCode {
             "no-valid-catch-type-found" => Ok(Self::NoValidCatchTypeFound),
             "no-value" => Ok(Self::NoValue),
             "non-class-used-as-attribute" => Ok(Self::NonClassUsedAsAttribute),
+            "non-documented-method" => Ok(Self::NonDocumentedMethod),
             "non-existent-attribute-class" => Ok(Self::NonExistentAttributeClass),
             "non-existent-catch-type" => Ok(Self::NonExistentCatchType),
             "non-existent-class" => Ok(Self::NonExistentClass),

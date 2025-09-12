@@ -14,6 +14,9 @@ use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::function_like::FunctionLikeKind;
+use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
@@ -817,6 +820,66 @@ fn scan_class_like<'ctx, 'arena>(
                     );
                 }
             };
+        }
+
+        for method_tag in &docblock.methods {
+            let method_name = ascii_lowercase_atom(&method_tag.method.name);
+            class_like_metadata.pseudo_methods.insert(method_name);
+
+            let method_id = (name, method_name);
+
+            let mut function_like_metadata =
+                FunctionLikeMetadata::new(FunctionLikeKind::Method, method_tag.span, MetadataFlags::empty());
+
+            function_like_metadata.name = Some(method_name);
+            function_like_metadata.original_name = Some(atom(&method_tag.method.name));
+
+            let Some(method_metadata) = function_like_metadata.method_metadata.as_mut() else {
+                continue;
+            };
+
+            method_metadata.is_static = method_tag.method.is_static;
+            method_metadata.visibility = match method_tag.method.visibility {
+                mago_docblock::tag::Visibility::Public => Visibility::Public,
+                mago_docblock::tag::Visibility::Protected => Visibility::Protected,
+                mago_docblock::tag::Visibility::Private => Visibility::Private,
+            };
+
+            function_like_metadata.flags.set(MetadataFlags::STATIC, method_tag.method.is_static);
+
+            for argument in &method_tag.method.argument_list {
+                let mut function_parameter_metadata = FunctionLikeParameterMetadata::new(
+                    VariableIdentifier(ascii_lowercase_atom(&argument.variable.name)),
+                    argument.argument_span,
+                    argument.variable_span,
+                    MetadataFlags::empty(),
+                );
+
+                if let Some(type_hint) = &argument.type_hint {
+                    function_parameter_metadata.set_type_signature(
+                        get_type_metadata_from_type_string(type_hint, Some(name), &type_context, scope).ok(),
+                    );
+                }
+
+                if argument.variable.is_variadic {
+                    function_parameter_metadata.flags.set(MetadataFlags::VARIADIC, true);
+                }
+
+                if argument.variable.is_by_reference {
+                    function_parameter_metadata.flags.set(MetadataFlags::BY_REFERENCE, true);
+                }
+
+                if argument.has_default {
+                    function_parameter_metadata.flags.set(MetadataFlags::HAS_DEFAULT, true);
+                }
+
+                function_like_metadata.parameters.push(function_parameter_metadata);
+            }
+
+            function_like_metadata.return_type_metadata =
+                get_type_metadata_from_type_string(&method_tag.type_string, Some(name), &type_context, scope).ok();
+
+            codebase.function_likes.insert(method_id, function_like_metadata);
         }
 
         for property in &docblock.properties {
