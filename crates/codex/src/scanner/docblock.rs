@@ -29,6 +29,7 @@ pub struct ClassLikeDocblockComment {
     pub require_implements: Vec<TypeString>,
     pub inheritors: Option<TypeString>,
     pub unchecked: bool,
+    pub methods: Vec<MethodTag>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -104,6 +105,7 @@ impl ClassLikeDocblockComment {
         let mut inheritors = None;
         let mut is_enum_interface = false;
         let mut unchecked = false;
+        let mut methods = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -217,6 +219,11 @@ impl ClassLikeDocblockComment {
                     require_implements
                         .push(TypeString { value: tag.description.to_string(), span: tag.description_span });
                 }
+                TagKind::Method | TagKind::PsalmMethod => {
+                    if let Some(method) = parse_method_tag(tag.description, tag.description_span) {
+                        methods.push(method);
+                    }
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -240,6 +247,7 @@ impl ClassLikeDocblockComment {
             require_implements,
             inheritors,
             unchecked,
+            methods,
         }))
     }
 }
