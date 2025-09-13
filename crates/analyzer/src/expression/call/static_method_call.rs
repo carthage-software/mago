@@ -23,7 +23,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let method_resolution =
-            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method)?;
+            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
 
         let mut invocation_targets = vec![];
         for resolved_method in method_resolution.resolved_methods {

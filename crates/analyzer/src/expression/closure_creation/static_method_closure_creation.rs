@@ -4,6 +4,7 @@ use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::get_mixed_closure;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
+use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -21,7 +22,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodClosureCreation<'are
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let method_resolution =
-            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method)?;
+            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
 
         let mut callables = vec![];
         for resolved_method in method_resolution.resolved_methods {

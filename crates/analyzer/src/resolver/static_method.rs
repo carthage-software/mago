@@ -34,6 +34,7 @@ use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::selector::resolve_member_selector;
+use crate::visibility::check_method_visibility;
 
 /// Resolves all possible static method targets from a class expression and a member selector.
 ///
@@ -48,6 +49,7 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     class_expr: &'ast Expression<'arena>,
     method_selector: &'ast ClassLikeMemberSelector<'arena>,
+    access_span: Span,
 ) -> Result<MethodResolutionResult, AnalysisError> {
     let mut result = MethodResolutionResult::default();
 
@@ -79,12 +81,15 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
         for method_name in &method_names {
             let resolved_methods = resolve_method_from_classname(
                 context,
+                block_context,
                 block_context.scope.get_class_like(),
                 *method_name,
                 class_expr.span(),
                 method_selector.span(),
                 resolved_classname,
                 &mut result,
+                method_selector,
+                access_span,
             );
 
             result.resolved_methods.extend(resolved_methods);
@@ -96,12 +101,15 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
 
 fn resolve_method_from_classname<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Atom,
     class_span: Span,
     method_span: Span,
     classname: &ResolvedClassname,
     result: &mut MethodResolutionResult,
+    selector: &ClassLikeMemberSelector<'arena>,
+    access_span: Span,
 ) -> Vec<ResolvedMethod> {
     let mut resolve_method_from_class_id =
         |fq_class_id: Atom,
@@ -129,11 +137,15 @@ fn resolve_method_from_classname<'ctx, 'arena>(
 
             let Some(method) = resolve_method_from_metadata(
                 context,
+                block_context,
                 current_class_metadata,
                 method_name,
                 &fq_class_id,
                 defining_class_metadata,
                 classname,
+                result,
+                selector,
+                access_span,
             ) else {
                 return (false, None);
             };
@@ -221,15 +233,30 @@ fn resolve_method_from_classname<'ctx, 'arena>(
 
 fn resolve_method_from_metadata<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Atom,
     fq_class_id: &Atom,
     defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
+    result: &mut MethodResolutionResult,
+    selector: &ClassLikeMemberSelector<'arena>,
+    access_span: Span,
 ) -> Option<ResolvedMethod> {
     let method_id = get_method_identifier(&defining_class_metadata.original_name, &method_name);
     let declaring_method_id = get_declaring_method_identifier(context.codebase, &method_id);
     let function_like = get_method_by_id(context.codebase, &declaring_method_id)?;
+
+    if !check_method_visibility(
+        context,
+        block_context,
+        method_id.get_class_name(),
+        method_id.get_method_name(),
+        access_span,
+        Some(selector.span()),
+    ) {
+        result.has_invalid_target = true;
+    }
 
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata
         && classname.is_relative()

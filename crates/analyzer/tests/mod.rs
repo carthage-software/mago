@@ -163,6 +163,7 @@ test_case!(arrow_function_inherits_method_templates);
 test_case!(all_paths_return_value);
 test_case!(reconcile_scalars);
 test_case!(static_anonymous_class);
+test_case!(private_static_method);
 
 // Github Issues
 test_case!(issue_275);
