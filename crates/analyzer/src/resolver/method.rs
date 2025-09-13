@@ -1,5 +1,6 @@
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_method_by_id;
@@ -154,6 +155,17 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 continue;
             };
 
+            let resolved_call = resolve_method_from_object(
+                context,
+                block_context,
+                object,
+                selector,
+                obj_type,
+                atom("__call"),
+                access_span,
+                &mut result,
+            );
+
             for method_name in &method_names {
                 let resolved_methods = resolve_method_from_object(
                     context,
@@ -168,8 +180,19 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
                 if resolved_methods.is_empty() {
                     if let Some(classname) = obj_type.get_name() {
+                        if resolved_call.is_empty() {
+                            report_non_existent_method(context, object.span(), selector.span(), classname, method_name);
+                        } else {
+                            report_non_documented_method(
+                                context,
+                                object.span(),
+                                selector.span(),
+                                classname,
+                                method_name,
+                            );
+                        }
+
                         result.has_invalid_target = true;
-                        report_non_existent_method(context, object.span(), selector.span(), classname, method_name);
                     } else {
                         // ambiguous
                     }
@@ -471,5 +494,23 @@ pub(super) fn report_non_existent_method(
                 Annotation::secondary(obj_span).with_message(format!("This expression has type `{classname}`")),
             )
             .with_help(format!("Ensure the `{method_name}` method is defined in the `{classname}` class-like.")),
+    );
+}
+
+pub(super) fn report_non_documented_method(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: &Atom,
+    method_name: &Atom,
+) {
+    context.collector.report_with_code(
+        IssueCode::NonDocumentedMethod,
+        Issue::warning(format!("Method `{method_name}` may not exist on type `{classname}`."))
+            .with_annotation(Annotation::primary(selector_span).with_message("This method may not exist"))
+            .with_annotation(
+                Annotation::secondary(obj_span).with_message(format!("This expression has type `{classname}`")),
+            )
+            .with_help(format!("If you know the `{method_name}` method is defined in the `{classname}` class-like, document it with @method annotations.")),
     );
 }

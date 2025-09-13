@@ -1,4 +1,5 @@
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_method_identifier;
 use mago_codex::get_interface;
@@ -32,6 +33,7 @@ use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
+use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::selector::resolve_member_selector;
 use crate::visibility::check_method_visibility;
@@ -116,7 +118,8 @@ fn resolve_method_from_classname<'ctx, 'arena>(
          is_relative: bool,
          from_instance: bool,
          from_class_string: bool,
-         result: &mut MethodResolutionResult| {
+         method_name: Atom,
+         result: Option<&mut MethodResolutionResult>| {
             let Some(defining_class_metadata) = get_class_like(context.codebase, &fq_class_id) else {
                 return (false, None);
             };
@@ -130,7 +133,9 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 );
 
                 if !from_class_string {
-                    result.has_invalid_target = true;
+                    if let Some(result) = result {
+                        result.has_invalid_target = true;
+                    }
                     return (true, None);
                 }
             }
@@ -176,13 +181,27 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     let mut resolved_methods = vec![];
     let mut could_method_ever_exist = false;
     let mut first_class_id = None;
+    let mut call_static_could_exist = false;
+
     if let Some(fq_class_id) = classname.fqcn {
+        let (_, call_static_resolved) = resolve_method_from_class_id(
+            fq_class_id,
+            classname.is_relative(),
+            classname.is_object_instance(),
+            classname.is_from_class_string(),
+            atom("__callStatic"),
+            None,
+        );
+
+        call_static_could_exist |= call_static_resolved.is_some();
+
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
             classname.is_relative(),
             classname.is_object_instance(),
             classname.is_from_class_string(),
-            result,
+            method_name,
+            Some(result),
         );
 
         if let Some(resolved_method) = resolved_method {
@@ -198,12 +217,24 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             continue;
         };
 
+        let (_, call_static_resolved) = resolve_method_from_class_id(
+            fq_class_id,
+            intersection.is_relative() || classname.is_relative(),
+            intersection.is_object_instance() || classname.is_object_instance(),
+            intersection.is_from_class_string(),
+            atom("__callStatic"),
+            None,
+        );
+
+        call_static_could_exist |= call_static_resolved.is_some();
+
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
             intersection.is_relative() || classname.is_relative(),
             intersection.is_object_instance() || classname.is_object_instance(),
             intersection.is_from_class_string(),
-            result,
+            method_name,
+            Some(result),
         );
 
         if let Some(resolved_method) = resolved_method {
@@ -221,7 +252,11 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             result.has_invalid_target = true;
 
             if !could_method_ever_exist {
-                report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
+                if !call_static_could_exist {
+                    report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
+                } else {
+                    report_non_documented_method(context, class_span, method_span, &fq_class_id, &method_name);
+                }
             }
         } else {
             result.has_ambiguous_target = true;
@@ -239,7 +274,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     fq_class_id: &Atom,
     defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
-    result: &mut MethodResolutionResult,
+    result: Option<&mut MethodResolutionResult>,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
 ) -> Option<ResolvedMethod> {
@@ -247,14 +282,16 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     let declaring_method_id = get_declaring_method_identifier(context.codebase, &method_id);
     let function_like = get_method_by_id(context.codebase, &declaring_method_id)?;
 
-    if !check_method_visibility(
-        context,
-        block_context,
-        method_id.get_class_name(),
-        method_id.get_method_name(),
-        access_span,
-        Some(selector.span()),
-    ) {
+    if let Some(result) = result
+        && !check_method_visibility(
+            context,
+            block_context,
+            method_id.get_class_name(),
+            method_id.get_method_name(),
+            access_span,
+            Some(selector.span()),
+        )
+    {
         result.has_invalid_target = true;
     }
 
