@@ -29,6 +29,7 @@ pub struct ClassLikeDocblockComment {
     pub require_implements: Vec<TypeString>,
     pub inheritors: Option<TypeString>,
     pub unchecked: bool,
+    pub properties: Vec<PropertyTag>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -104,6 +105,7 @@ impl ClassLikeDocblockComment {
         let mut inheritors = None;
         let mut is_enum_interface = false;
         let mut unchecked = false;
+        let mut properties = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -217,6 +219,30 @@ impl ClassLikeDocblockComment {
                     require_implements
                         .push(TypeString { value: tag.description.to_string(), span: tag.description_span });
                 }
+                TagKind::Property | TagKind::PsalmProperty => {
+                    if let Some(mut property_tag) = parse_property_tag(tag.description, tag.description_span) {
+                        property_tag.is_read = true;
+                        property_tag.is_write = true;
+
+                        properties.push(property_tag);
+                    }
+                }
+                TagKind::PropertyRead | TagKind::PsalmPropertyRead => {
+                    if let Some(mut property_tag) = parse_property_tag(tag.description, tag.description_span) {
+                        property_tag.is_read = true;
+                        property_tag.is_write = false;
+
+                        properties.push(property_tag);
+                    }
+                }
+                TagKind::PropertyWrite | TagKind::PsalmPropertyWrite => {
+                    if let Some(mut property_tag) = parse_property_tag(tag.description, tag.description_span) {
+                        property_tag.is_read = false;
+                        property_tag.is_write = true;
+
+                        properties.push(property_tag);
+                    }
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -240,6 +266,7 @@ impl ClassLikeDocblockComment {
             require_implements,
             inheritors,
             unchecked,
+            properties,
         }))
     }
 }

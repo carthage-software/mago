@@ -164,6 +164,7 @@ test_case!(all_paths_return_value);
 test_case!(reconcile_scalars);
 test_case!(static_anonymous_class);
 test_case!(private_static_method);
+test_case!(property_docblock);
 
 // Github Issues
 test_case!(issue_275);

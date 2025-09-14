@@ -10,6 +10,15 @@ pub struct Variable {
     pub is_by_reference: bool, // true if `&` was present
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct PropertyTag {
+    pub span: Span,
+    pub type_string: TypeString,
+    pub variable: Variable,
+    pub is_read: bool,
+    pub is_write: bool,
+}
+
 impl fmt::Display for Variable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_by_reference {
@@ -568,6 +577,27 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag>
     }
 
     Some(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
+}
+
+pub fn parse_property_tag(content: &str, span: Span) -> Option<PropertyTag> {
+    let (type_string, rest_slice) = split_tag_content(content, span)?;
+
+    // Type must exist and be valid
+    if type_string.value.is_empty()
+        || type_string.value.starts_with('{')
+        || (type_string.value.starts_with('$') && type_string.value != "$this")
+    {
+        return None;
+    }
+
+    if rest_slice.is_empty() {
+        return None;
+    }
+
+    let var_part = rest_slice.split_whitespace().next()?;
+    let variable = parse_var_ident(var_part)?;
+
+    Some(PropertyTag { span, type_string, variable, is_read: false, is_write: false })
 }
 
 /// Splits tag content into the type string part and the rest, respecting brackets/quotes.

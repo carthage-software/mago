@@ -27,6 +27,7 @@ use crate::scanner::docblock::ClassLikeDocblockComment;
 use crate::scanner::docblock::TraitUseDocblockComment;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
+use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -817,6 +818,32 @@ fn scan_class_like<'ctx, 'arena>(
                 }
             };
         }
+
+        for property in &docblock.properties {
+            let property_name = atom(&property.variable.name);
+            let type_metadata =
+                get_type_metadata_from_type_string(&property.type_string, Some(name), &type_context, scope).ok();
+            let mut new_property = PropertyMetadata::new(VariableIdentifier(property_name), MetadataFlags::empty());
+            if property.is_read {
+                new_property.read_visibility = Visibility::Public;
+            }
+
+            if property.is_write {
+                new_property.write_visibility = Visibility::Public;
+            }
+
+            if property.is_read && !property.is_write {
+                new_property.flags.set(MetadataFlags::READONLY, true);
+            }
+
+            if let Some(type_metadata) = type_metadata {
+                new_property.type_metadata.replace(type_metadata);
+            }
+
+            new_property.flags.set(MetadataFlags::VIRTUAL_PROPERTY, true);
+
+            class_like_metadata.add_property_metadata(new_property);
+        }
     }
 
     for member in members.iter() {
@@ -1112,7 +1139,15 @@ fn scan_class_like<'ctx, 'arena>(
                 let properties =
                     scan_properties(property, &mut class_like_metadata, Some(name), &type_context, context, scope);
 
-                for property_metadata in properties {
+                for mut property_metadata in properties {
+                    if let Some(existing_property) = class_like_metadata.properties.get_mut(&property_metadata.name.0) {
+                        property_metadata.read_visibility = existing_property.read_visibility;
+                        property_metadata.write_visibility = existing_property.read_visibility;
+
+                        property_metadata.flags.set(MetadataFlags::VIRTUAL_PROPERTY, false);
+                        property_metadata.flags.set(MetadataFlags::READONLY, existing_property.flags.is_readonly());
+                    }
+
                     class_like_metadata.add_property_metadata(property_metadata);
                 }
             }
