@@ -16,6 +16,8 @@
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = [
+            pkgs.cargo
+            pkgs.rustc
             pkgs.rustup
             pkgs.rust-analyzer
             pkgs.pkg-config
