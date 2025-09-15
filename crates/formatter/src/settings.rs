@@ -726,6 +726,15 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_within_grouping_parenthesis: bool,
 
+    /// Whether to add spaces within call arguments.
+    ///
+    /// When enabled: `foo( $arg1, $arg2 )`
+    /// When disabled: `foo($arg1, $arg2)`
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub space_within_call_arguments: bool,
+
     /// Whether to add an empty line after control structures (if, for, foreach, while, do, switch).
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
@@ -892,6 +901,7 @@ impl Default for FormatSettings {
             space_before_closure_use_clause_parenthesis: true,
             space_around_assignment_in_declare: false,
             space_within_grouping_parenthesis: false,
+            space_within_call_arguments: false,
             space_before_hook_parameter_list_parenthesis: false,
             space_around_concatenation_binary_operator: true,
             space_after_cast_unary_prefix_operators: true,

@@ -84,6 +84,12 @@ pub(super) fn print_argument_list<'arena>(
 
     let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
+    if  f.settings.space_within_call_arguments {
+        contents.push(Document::Space(Space {
+            soft: true,
+        }));
+    }
+
     // First, run all the decision functions with unformatted arguments
     let should_break_all = force_break || should_break_all_arguments(f, argument_list, for_attribute);
     let should_inline = !force_break && should_inline_breaking_arguments(f, argument_list);
@@ -317,6 +323,13 @@ pub(super) fn print_argument_list<'arena>(
     if f.settings.trailing_comma {
         contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
     }
+
+    if  f.settings.space_within_call_arguments {
+        contents.push(Document::Space(Space {
+            soft: true,
+        }));
+    }
+
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
 
     Document::Group(Group::new(contents).with_id(group_id))
