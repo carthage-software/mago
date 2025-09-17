@@ -137,7 +137,7 @@ impl LintRule for ParameterTypeRule {
 
 impl ParameterTypeRule {
     fn check_function_like_parameter(&self, function_like_parameter: &FunctionLikeParameter, ctx: &mut LintContext) {
-        if function_like_parameter.hint.is_some() {
+        if function_like_parameter.hint.is_some() || function_like_parameter.variable.name.starts_with("$_") {
             return;
         }
 
