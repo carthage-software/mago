@@ -724,4 +724,53 @@ mod tests {
             " \u{a0} └─ comment 2\n        *    \u{a0}\u{a0} └─ comment 4\n        *  \u{a0} └─ comment 3"
         );
     }
+
+    #[test]
+    fn test_issue_456() {
+        let arena = Bump::new();
+        let phpdoc = "/**
+             * \u{3000}(イベント日数をもとに計算)\u{3000}
+             * @return\u{3000}int
+             * @throws\u{3000}Exception
+             */";
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        assert_eq!(document.elements.len(), 3);
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        assert_eq!(text.segments.len(), 1);
+        let TextSegment::Paragraph { span, content } = &text.segments[0] else {
+            panic!("Expected TextSegment::Paragraph, got {:?}", text.segments[0]);
+        };
+
+        assert_eq!(*content, "　(イベント日数をもとに計算)");
+        assert_eq!(&phpdoc[span.start.offset as usize..span.end.offset as usize], "\u{3000}(イベント日数をもとに計算)");
+
+        let Element::Tag(tag) = &document.elements[1] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[1]);
+        };
+
+        let name = tag.name;
+        let description = tag.description;
+        assert_eq!(name, "return");
+        assert_eq!(tag.kind, TagKind::Return);
+        assert_eq!(description, "int");
+        assert_eq!(&phpdoc[tag.span.start.offset as usize..tag.span.end.offset as usize], "@return\u{3000}int");
+
+        let Element::Tag(tag) = &document.elements[2] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[2]);
+        };
+
+        let name = tag.name;
+        let description = tag.description;
+        assert_eq!(name, "throws");
+        assert_eq!(tag.kind, TagKind::Throws);
+        assert_eq!(description, "Exception");
+        assert_eq!(&phpdoc[tag.span.start.offset as usize..tag.span.end.offset as usize], "@throws\u{3000}Exception");
+    }
 }

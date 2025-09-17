@@ -77,15 +77,25 @@ fn parse_tag<'arena>(
         return Err(ParseError::ExpectedLine(tokens[i].span()));
     };
 
-    let next_whitespace = content[1..].find(char::is_whitespace);
+    let mut next_whitespace_char_pos = None;
+    let mut next_whitespace_byte_pos = None;
+    for (byte_pos, ch) in content[1..].char_indices() {
+        if ch.is_whitespace() {
+            next_whitespace_char_pos = Some(byte_pos);
+            next_whitespace_byte_pos = Some(1 + byte_pos);
+            break;
+        }
+    }
 
     let tag_name;
     let description_part;
     let description_start;
-    if let Some(position) = next_whitespace {
-        tag_name = &content[1..position + 1];
-        description_part = &content[position + 2..];
-        description_start = span.start.forward(2 + position as u32); // 1 for '@' and 1 for whitespace
+    if let (Some(char_pos), Some(byte_pos)) = (next_whitespace_char_pos, next_whitespace_byte_pos) {
+        tag_name = &content[1..1 + char_pos];
+        let whitespace_char = content.chars().nth(byte_pos).unwrap();
+        let after_whitespace_byte_pos = byte_pos + whitespace_char.len_utf8();
+        description_part = &content[after_whitespace_byte_pos..];
+        description_start = span.start.forward(after_whitespace_byte_pos as u32);
     } else {
         tag_name = &content[1..];
         description_part = "";
