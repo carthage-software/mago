@@ -30,6 +30,7 @@ use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgument;
 use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::InvocationTarget;
 use crate::invocation::InvocationTargetParameter;
 use crate::invocation::arguments::analyze_and_store_argument_type;
 use crate::invocation::arguments::get_unpacked_argument_type;
@@ -323,7 +324,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                 ))
                 .with_annotation(
                     Annotation::primary(named_argument.name.span())
-                        .with_message("Unknown argument name `${argument_name}`"),
+                        .with_message(format!("Unknown argument name `${argument_name}`")),
                 )
                 .with_annotation(
                     Annotation::secondary(invocation.target.span())
@@ -458,20 +459,60 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     );
                 }
             } else {
-                context.collector.report_with_code(
-                    IssueCode::TooManyArguments,
-                    Issue::error(format!(
-                        "Cannot unpack arguments into non-variadic {} `{}`.",
-                        invocation.target.guess_kind(),
-                        invocation.target.guess_name(),
-                    ))
-                    .with_annotation(
-                        Annotation::primary(unpacked_arguments[0].span())
-                            .with_message("Argument unpacking requires a variadic parameter"),
-                    )
-                    .with_note(format!("Function expects exactly {} arguments.", parameter_refs.len()))
-                    .with_help("Remove the argument unpacking (`...`) or make the last parameter variadic."),
-                );
+                let all_arguments = invocation.arguments_source.get_arguments();
+                let mut current_parameter_position = 0;
+
+                for argument in all_arguments.into_iter() {
+                    if argument.is_unpacked() {
+                        let argument_expression = argument.value();
+                        if artifacts.get_expression_type(argument_expression).is_none() {
+                            analyze_and_store_argument_type(
+                                context,
+                                block_context,
+                                artifacts,
+                                &invocation.target,
+                                argument_expression,
+                                usize::MAX,
+                                &mut analyzed_argument_types,
+                                false,
+                                None,
+                            )?;
+                        }
+
+                        let argument_value_type =
+                            artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
+
+                        // Count the number of elements that would be unpacked
+                        let mut sizes = vec![];
+                        for argument_atomic in argument_value_type.types.as_ref() {
+                            let TAtomic::Array(array) = argument_atomic else {
+                                sizes.push(0);
+                                continue;
+                            };
+                            sizes.push(array.get_minimum_size());
+                        }
+
+                        let unpacked_count = sizes.into_iter().min().unwrap_or(0);
+                        number_of_provided_parameters += unpacked_count;
+
+                        validate_unpacked_argument_elements(
+                            context,
+                            &argument_value_type,
+                            argument_expression,
+                            &parameter_refs,
+                            base_class_metadata,
+                            calling_class_like_metadata,
+                            calling_class_like.and_then(|(_, atomic)| atomic),
+                            &invocation.target,
+                            template_result,
+                            current_parameter_position,
+                        );
+
+                        current_parameter_position += unpacked_count;
+                    } else {
+                        current_parameter_position += 1;
+                    }
+                }
             }
         } else if !unpacked_arguments.is_empty() {
             context.collector.report_with_code(
@@ -632,4 +673,223 @@ fn get_parameter_type<'ctx, 'arena>(
     );
 
     resolved_parameter_type
+}
+
+/// Validates individual elements within unpacked arrays against their corresponding parameters.
+///
+/// This function extracts individual element types from unpacked arrays and validates each one
+/// against its corresponding parameter type, enabling proper type checking for unpacked arguments.
+fn validate_unpacked_argument_elements<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    argument_value_type: &TUnion,
+    argument_expression: &Expression<'arena>,
+    parameter_refs: &[InvocationTargetParameter<'_>],
+    base_class_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_instance_type: Option<&TAtomic>,
+    invocation_target: &InvocationTarget<'_>,
+    template_result: &TemplateResult,
+    starting_parameter_position: usize,
+) {
+    use mago_codex::ttype::atomic::array::TArray;
+    use mago_codex::ttype::template::inferred_type_replacer;
+
+    for argument_atomic in argument_value_type.types.as_ref() {
+        let TAtomic::Array(array) = argument_atomic else {
+            continue;
+        };
+
+        match array {
+            TArray::List(list) => {
+                if let Some(known_elements) = &list.known_elements {
+                    for (array_index, (_, element_type)) in known_elements.iter() {
+                        let parameter_position = starting_parameter_position + array_index;
+                        if parameter_position >= parameter_refs.len() {
+                            break;
+                        }
+
+                        if let Some(parameter_ref) = parameter_refs.get(parameter_position) {
+                            let base_parameter_type = get_parameter_type(
+                                context,
+                                Some(*parameter_ref),
+                                base_class_metadata,
+                                calling_class_like_metadata,
+                                calling_instance_type,
+                            );
+
+                            let final_parameter_type = if template_result.has_template_types() {
+                                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                            } else {
+                                base_parameter_type
+                            };
+
+                            verify_argument_type(
+                                context,
+                                element_type,
+                                &final_parameter_type,
+                                parameter_position,
+                                argument_expression,
+                                invocation_target,
+                            );
+                        }
+                    }
+                } else {
+                    let element_type = list.get_element_type();
+                    let min_size = list.known_count.unwrap_or(0);
+                    let max_parameters_to_check =
+                        std::cmp::min(min_size, parameter_refs.len().saturating_sub(starting_parameter_position));
+
+                    for i in 0..max_parameters_to_check {
+                        let parameter_position = starting_parameter_position + i;
+                        if let Some(parameter_ref) = parameter_refs.get(parameter_position) {
+                            let base_parameter_type = get_parameter_type(
+                                context,
+                                Some(*parameter_ref),
+                                base_class_metadata,
+                                calling_class_like_metadata,
+                                calling_instance_type,
+                            );
+
+                            let final_parameter_type = if template_result.has_template_types() {
+                                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                            } else {
+                                base_parameter_type
+                            };
+
+                            verify_argument_type(
+                                context,
+                                element_type,
+                                &final_parameter_type,
+                                parameter_position,
+                                argument_expression,
+                                invocation_target,
+                            );
+                        }
+                    }
+                }
+            }
+            TArray::Keyed(keyed_array) => {
+                validate_keyed_array_elements(
+                    context,
+                    keyed_array,
+                    argument_expression,
+                    parameter_refs,
+                    base_class_metadata,
+                    calling_class_like_metadata,
+                    calling_instance_type,
+                    invocation_target,
+                    template_result,
+                );
+            }
+        }
+    }
+}
+
+fn validate_keyed_array_elements<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    keyed_array: &mago_codex::ttype::atomic::array::keyed::TKeyedArray,
+    argument_expression: &Expression<'arena>,
+    parameter_refs: &[InvocationTargetParameter<'_>],
+    base_class_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_instance_type: Option<&TAtomic>,
+    invocation_target: &InvocationTarget<'_>,
+    template_result: &TemplateResult,
+) {
+    use mago_atom::concat_atom;
+    use mago_codex::ttype::atomic::array::key::ArrayKey;
+    use mago_codex::ttype::template::inferred_type_replacer;
+
+    let Some(known_items) = &keyed_array.known_items else {
+        return;
+    };
+
+    for (array_key, (_, element_type)) in known_items.iter() {
+        let parameter_name = match array_key {
+            ArrayKey::String(key_str) => {
+                concat_atom!("$", key_str)
+            }
+            ArrayKey::Integer(key_int) => {
+                if let Some(parameter_ref) = parameter_refs.get(*key_int as usize) {
+                    if let Some(param_name) = parameter_ref.get_name() {
+                        param_name.0
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+        };
+
+        if let Some(parameter_ref) = parameter_refs
+            .iter()
+            .find(|p| if let Some(param_name) = p.get_name() { param_name.0 == parameter_name } else { false })
+        {
+            let base_parameter_type = get_parameter_type(
+                context,
+                Some(*parameter_ref),
+                base_class_metadata,
+                calling_class_like_metadata,
+                calling_instance_type,
+            );
+
+            let final_parameter_type = if template_result.has_template_types() {
+                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+            } else {
+                base_parameter_type
+            };
+
+            let parameter_position = parameter_refs
+                .iter()
+                .position(|p| if let Some(param_name) = p.get_name() { param_name.0 == parameter_name } else { false })
+                .unwrap_or(0);
+
+            verify_argument_type(
+                context,
+                element_type,
+                &final_parameter_type,
+                parameter_position,
+                argument_expression,
+                invocation_target,
+            );
+        } else if let ArrayKey::String(key_str) = array_key {
+            let argument_name = key_str.as_str();
+            let target_kind_str = invocation_target.guess_kind();
+            let target_name_str = invocation_target.guess_name();
+
+            context.collector.report_with_code(
+                IssueCode::InvalidNamedArgument,
+                Issue::error(format!(
+                    "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
+                ))
+                .with_annotation(
+                    Annotation::primary(argument_expression.span())
+                        .with_message(format!("Unknown argument name `${argument_name}` in unpacked array")),
+                )
+                .with_annotation(
+                    Annotation::secondary(invocation_target.span())
+                        .with_message(format!("Call to {target_kind_str} is here")),
+                )
+                .with_help(if !invocation_target.allows_named_arguments() {
+                    format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
+                } else if !parameter_refs.is_empty() {
+                    let available_params: Vec<String> = parameter_refs
+                        .iter()
+                        .filter_map(|p| {
+                            p.get_name().map(|name| format!("${}", name.0.as_str().trim_start_matches('$')))
+                        })
+                        .collect();
+
+                    if available_params.is_empty() {
+                        format!("The {target_kind_str} `{target_name_str}` does not accept any named arguments.")
+                    } else {
+                        format!("Available named arguments are: {}.", available_params.join(", "))
+                    }
+                } else {
+                    format!("The {target_kind_str} `{target_name_str}` does not accept any arguments.")
+                }),
+            );
+        }
+    }
 }
