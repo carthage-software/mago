@@ -100,6 +100,10 @@ pub struct ReportingArgs {
     #[arg(long, help = "Set minimum issue level to be reported (e.g., error, warning)", value_parser = enum_variants!(Level))]
     pub minimum_report_level: Option<Level>,
 
+    /// Specify a baseline file to ignore issues listed within it.
+    #[arg(long, help = "Specify a baseline file to ignore issues", value_name = "PATH", conflicts_with = "fix")]
+    pub baseline: Option<PathBuf>,
+
     /// Generate a baseline file to ignore existing issues.
     #[arg(
         long,
@@ -113,9 +117,26 @@ pub struct ReportingArgs {
     #[arg(long, help = "Backup the old baseline file when generating a new one", requires = "generate_baseline")]
     pub backup_baseline: bool,
 
-    /// Specify a baseline file to ignore issues listed within it.
-    #[arg(long, help = "Specify a baseline file to ignore issues", value_name = "PATH", conflicts_with = "fix")]
-    pub baseline: Option<PathBuf>,
+    /// Verify if the baseline file is up to date with current issues.
+    #[arg(
+        long,
+        help = "Verify if the baseline file is up to date",
+        conflicts_with = "fix",
+        conflicts_with = "generate_baseline",
+        requires = "baseline"
+    )]
+    pub verify_baseline: bool,
+
+    /// Fail when baseline is out-of-sync, even if no issues are found.
+    #[arg(
+        long,
+        help = "Fail when baseline is out-of-sync, even if no issues are found",
+        conflicts_with = "fix",
+        conflicts_with = "generate_baseline",
+        conflicts_with = "verify_baseline",
+        requires = "baseline"
+    )]
+    pub fail_on_out_of_sync_baseline: bool,
 
     #[clap(flatten)]
     pub pager_args: PagerArgs,
@@ -212,6 +233,7 @@ impl ReportingArgs {
             issues = issues.sorted();
         }
 
+        let mut should_fail = false;
         if let Some(baseline_path) = &self.baseline {
             if self.generate_baseline {
                 tracing::info!("Generating baseline file...");
@@ -220,6 +242,10 @@ impl ReportingArgs {
                 tracing::info!("Baseline file successfully generated at `{}`.", baseline_path.display());
 
                 return Ok(ExitCode::SUCCESS);
+            }
+
+            if self.verify_baseline {
+                return self.handle_baseline_verification(issues, baseline_path, &read_database);
             }
 
             if !baseline_path.exists() {
@@ -236,6 +262,10 @@ impl ReportingArgs {
                     tracing::warn!(
                         "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
                     );
+
+                    if self.fail_on_out_of_sync_baseline {
+                        should_fail = true;
+                    }
                 }
 
                 if filtered_out_count > 0 {
@@ -250,7 +280,7 @@ impl ReportingArgs {
             }
         }
 
-        let has_issues_above_threshold = issues.has_minimum_level(self.minimum_fail_level);
+        should_fail |= issues.has_minimum_level(self.minimum_fail_level);
         let issues_to_report = if self.fixable_only { issues.only_fixable().collect() } else { issues };
 
         if issues_to_report.is_empty() {
@@ -271,7 +301,7 @@ impl ReportingArgs {
             reporter.report(issues_to_report, self.reporting_format)?;
         }
 
-        Ok(if has_issues_above_threshold { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+        Ok(if should_fail { ExitCode::FAILURE } else { ExitCode::SUCCESS })
     }
 
     /// Applies fixes to the issues provided using a parallel pipeline.
@@ -404,5 +434,48 @@ impl ReportingArgs {
         }
 
         (applicable_plans, skipped_unsafe_count, skipped_potentially_unsafe_count)
+    }
+
+    /// Handles baseline verification logic.
+    ///
+    /// Compares the current issues against the baseline to determine if it's up to date.
+    /// Returns ExitCode::SUCCESS (0) if baseline is up to date, ExitCode::FAILURE (1) if not.
+    fn handle_baseline_verification(
+        &self,
+        issues: IssueCollection,
+        baseline_path: &std::path::Path,
+        read_database: &ReadDatabase,
+    ) -> Result<ExitCode, Error> {
+        if !baseline_path.exists() {
+            tracing::info!("Baseline file `{}` does not exist.", baseline_path.display());
+            return Ok(ExitCode::FAILURE);
+        }
+
+        tracing::info!("Verifying baseline file at `{}`...", baseline_path.display());
+
+        let baseline = baseline::unserialize_baseline(baseline_path)?;
+        let comparison = baseline::compare_baseline_with_issues(&baseline, issues, read_database)?;
+
+        if comparison.is_up_to_date {
+            tracing::info!("Baseline is up to date.");
+
+            Ok(ExitCode::SUCCESS)
+        } else {
+            if comparison.new_issues_count > 0 {
+                tracing::info!("Found {} new issues not in the baseline.", comparison.new_issues_count);
+            }
+
+            if comparison.removed_issues_count > 0 {
+                tracing::info!(
+                    "Found {} issues in the baseline that no longer exist.",
+                    comparison.removed_issues_count
+                );
+            }
+
+            tracing::info!("Baseline is outdated. {} files have changes.", comparison.files_with_changes_count);
+            tracing::info!("Run with `--generate-baseline` to update the baseline file.");
+
+            Ok(ExitCode::FAILURE)
+        }
     }
 }
