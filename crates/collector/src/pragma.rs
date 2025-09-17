@@ -78,8 +78,7 @@ impl<'arena> Pragma<'arena> {
     ///
     /// - `file`: The source file being analyzed.
     /// - `trivias`: The slice of trivia (comments and whitespace) to scan.
-    /// - `category`: The category of pragmas to collect (e.g., "lint", "analysis"), or
-    ///   `None` to collect all pragmas regardless of category.
+    /// - `categories`: An iterator of category strings to filter pragmas by.
     ///
     /// # Returns
     ///
@@ -88,12 +87,12 @@ impl<'arena> Pragma<'arena> {
         arena: &'arena Bump,
         file: &File,
         trivias: &[Trivia<'arena>],
-        category: Option<&'static str>,
+        categories: &'static [&'static str],
     ) -> Vec<'arena, Pragma<'arena>> {
         trivias
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
-            .flat_map(|trivia| parse_pragmas_in_trivia(arena, file, trivia, category))
+            .flat_map(|trivia| parse_pragmas_in_trivia(arena, file, trivia, categories))
             .collect_in(arena)
     }
 }
@@ -103,7 +102,7 @@ fn parse_pragmas_in_trivia<'arena>(
     arena: &'arena Bump,
     file: &File,
     trivia: &Trivia<'arena>,
-    category_filter: Option<&'static str>,
+    categories: &'static [&'static str],
 ) -> Vec<'arena, Pragma<'arena>> {
     let mut pragmas: Vec<'arena, Pragma<'arena>> = Vec::new_in(arena);
     let base_offset = trivia.span.start;
@@ -133,8 +132,8 @@ fn parse_pragmas_in_trivia<'arena>(
             continue; // Invalid category format.
         }
 
-        if category_filter.is_some_and(|category_filter| category_filter != category) {
-            continue; // Skip if category does not match the filter.
+        if !categories.contains(&category) {
+            continue; // Skip if category is not recognized.
         }
 
         let rest = rest.trim_start();

@@ -8,8 +8,8 @@ Both pragmas require you to specify the exact issue you intend to suppress, usin
 
 There are two issue categories available:
 
-- `lint`: For issues reported by the linter.
-- `analysis`: For issues reported by the static analyzer.
+- `lint` ( alias: `linter` ): For issues reported by the linter.
+- `analysis` ( alias: `analyzer`, `analyser`): For issues reported by the static analyzer.
 
 ## Asserting an Issue (`@mago-expect`)
 

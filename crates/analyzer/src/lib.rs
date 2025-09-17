@@ -38,7 +38,7 @@ mod statement;
 mod utils;
 mod visibility;
 
-const COLLECTOR_CATEGORY: &str = "analysis";
+const COLLECTOR_CATEGORIES: &[&str] = &["analysis", "analyzer", "analyser"];
 
 #[derive(Clone, Debug)]
 pub struct Analyzer<'ctx, 'ast, 'arena> {
@@ -75,7 +75,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         let statements = program.statements.as_slice();
 
-        let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORY);
+        let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
         if !self.settings.mixed_issues {
             collector.add_disabled_codes(IssueCode::get_mixed_issue_code_values());
         }

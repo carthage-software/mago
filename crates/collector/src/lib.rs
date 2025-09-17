@@ -52,16 +52,23 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// This is the primary constructor. It pre-parses the given trivia to find pragmas
     /// relevant to the specified category. This is useful when the full program AST is not
     /// needed or available.
+    ///
+    /// # Parameters
+    ///
+    /// - `arena`: The memory arena for allocations.
+    /// - `file`: The source file associated with this collector.
+    /// - `program`: The AST of the entire program, used to attach pragma scopes.
+    /// - `categories`: The categories of pragmas to extract (e.g., "lint", "analysis").
     pub fn new<'ast>(
         arena: &'arena Bump,
         file: &'ctx File,
         program: &'ast Program<'arena>,
-        category: &'static str,
+        categories: &'static [&'static str],
     ) -> Self {
         let mut collector = Self {
             arena,
             file,
-            pragmas: Pragma::extract(arena, file, program.trivia.as_slice(), Some(category)),
+            pragmas: Pragma::extract(arena, file, program.trivia.as_slice(), categories),
             issues: IssueCollection::new(),
             recordings: Vec::new_in(arena),
             disabled_codes: Vec::new_in(arena),

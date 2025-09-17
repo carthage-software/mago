@@ -27,7 +27,7 @@ pub mod rule_meta;
 pub mod scope;
 pub mod settings;
 
-const COLLECTOR_CATEGORY: &str = "lint";
+const COLLECTOR_CATEGORIES: &[&str] = &["lint", "linter"];
 
 #[derive(Debug, Clone)]
 pub struct Linter<'arena> {
@@ -75,7 +75,7 @@ impl<'arena> Linter<'arena> {
         program: &'ast Program<'arena>,
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> IssueCollection {
-        let mut collector = Collector::new(self.arena, source_file, program, COLLECTOR_CATEGORY);
+        let mut collector = Collector::new(self.arena, source_file, program, COLLECTOR_CATEGORIES);
 
         // Set legacy rule code mappings for compatibility with the old linter.
         collector.set_aliases(LEGACY_RULE_CODE_MAPPINGS);
