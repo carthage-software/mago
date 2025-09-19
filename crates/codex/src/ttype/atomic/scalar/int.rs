@@ -770,7 +770,7 @@ impl TType for TInteger {
                     concat_atom!("int<min, ", i64_atom(*value), ">")
                 }
             }
-            TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), i64_atom(*to), ">"),
+            TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), ", ", i64_atom(*to), ">"),
             TInteger::Unspecified => atom("int"),
         }
     }
