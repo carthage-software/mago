@@ -317,35 +317,40 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         } else if let Some(named_argument) = argument.get_named_argument() {
             let argument_name = named_argument.name.value;
 
-            context.collector.report_with_code(
-                IssueCode::InvalidNamedArgument,
-                Issue::error(format!(
-                    "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
-                ))
-                .with_annotation(
-                    Annotation::primary(named_argument.name.span())
-                        .with_message(format!("Unknown argument name `${argument_name}`")),
-                )
-                .with_annotation(
-                    Annotation::secondary(invocation.target.span())
-                        .with_message(format!("Call to {target_kind_str} is here")),
-                )
-                .with_help(if !invocation.target.allows_named_arguments() {
-                    format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
-                } else if !parameter_refs.is_empty() {
-                    format!(
-                        "Available parameters are: `{}`.",
-                        parameter_refs
-                            .iter()
-                            .filter_map(|p| p.get_name())
-                            .map(|n| n.0.trim_start_matches('$'))
-                            .collect::<Vec<_>>()
-                            .join("`, `")
+            // For variadic functions, allow extra named arguments
+            let has_variadic_parameter = parameter_refs.last().is_some_and(|p| p.is_variadic());
+
+            if !has_variadic_parameter {
+                context.collector.report_with_code(
+                    IssueCode::InvalidNamedArgument,
+                    Issue::error(format!(
+                        "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
+                    ))
+                    .with_annotation(
+                        Annotation::primary(named_argument.name.span())
+                            .with_message(format!("Unknown argument name `${argument_name}`")),
                     )
-                } else {
-                    format!("The {target_kind_str} `{target_name_str}` has no parameters.")
-                }),
-            );
+                    .with_annotation(
+                        Annotation::secondary(invocation.target.span())
+                            .with_message(format!("Call to {target_kind_str} is here")),
+                    )
+                    .with_help(if !invocation.target.allows_named_arguments() {
+                        format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
+                    } else if !parameter_refs.is_empty() {
+                        format!(
+                            "Available parameters are: `{}`.",
+                            parameter_refs
+                                .iter()
+                                .filter_map(|p| p.get_name())
+                                .map(|n| n.0.trim_start_matches('$'))
+                                .collect::<Vec<_>>()
+                                .join("`, `")
+                        )
+                    } else {
+                        format!("The {target_kind_str} `{target_name_str}` has no parameters.")
+                    }),
+                );
+            }
 
             break;
         } else if *argument_offset >= parameter_refs.len() {
@@ -434,6 +439,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                         artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed); // Get type of the iterable
 
                     let mut sizes = vec![];
+                    let mut has_keyed_array_with_named_args = false;
                     for argument_atomic in argument_value_type.types.as_ref() {
                         let TAtomic::Array(array) = argument_atomic else {
                             sizes.push(0);
@@ -442,21 +448,37 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                         };
 
                         sizes.push(array.get_minimum_size());
+
+                        // Check if this is a keyed array with named arguments
+                        if let mago_codex::ttype::atomic::array::TArray::Keyed(keyed_array) = array {
+                            if let Some(known_items) = &keyed_array.known_items {
+                                for (array_key, _) in known_items.iter() {
+                                    if let mago_codex::ttype::atomic::array::key::ArrayKey::String(_) = array_key {
+                                        has_keyed_array_with_named_args = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     number_of_provided_parameters += sizes.into_iter().min().unwrap_or(0);
 
-                    let unpacked_element_type =
-                        get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
+                    // Skip union-based validation for keyed arrays with named arguments.
+                    // Individual elements are properly validated in validate_keyed_array_elements.
+                    if !has_keyed_array_with_named_args {
+                        let unpacked_element_type =
+                            get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
 
-                    verify_argument_type(
-                        context,
-                        &unpacked_element_type,
-                        &final_variadic_parameter_type,
-                        parameter_refs.len() - 1,
-                        argument_expression,
-                        &invocation.target,
-                    );
+                        verify_argument_type(
+                            context,
+                            &unpacked_element_type,
+                            &final_variadic_parameter_type,
+                            parameter_refs.len() - 1,
+                            argument_expression,
+                            &invocation.target,
+                        );
+                    }
                 }
             } else {
                 let all_arguments = invocation.arguments_source.get_arguments();
@@ -858,38 +880,43 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
             let target_kind_str = invocation_target.guess_kind();
             let target_name_str = invocation_target.guess_name();
 
-            context.collector.report_with_code(
-                IssueCode::InvalidNamedArgument,
-                Issue::error(format!(
-                    "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
-                ))
-                .with_annotation(
-                    Annotation::primary(argument_expression.span())
-                        .with_message(format!("Unknown argument name `${argument_name}` in unpacked array")),
-                )
-                .with_annotation(
-                    Annotation::secondary(invocation_target.span())
-                        .with_message(format!("Call to {target_kind_str} is here")),
-                )
-                .with_help(if !invocation_target.allows_named_arguments() {
-                    format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
-                } else if !parameter_refs.is_empty() {
-                    let available_params: Vec<String> = parameter_refs
-                        .iter()
-                        .filter_map(|p| {
-                            p.get_name().map(|name| format!("${}", name.0.as_str().trim_start_matches('$')))
-                        })
-                        .collect();
+            // For variadic functions, allow extra named arguments
+            let has_variadic_parameter = parameter_refs.last().is_some_and(|p| p.is_variadic());
 
-                    if available_params.is_empty() {
-                        format!("The {target_kind_str} `{target_name_str}` does not accept any named arguments.")
+            if !has_variadic_parameter {
+                context.collector.report_with_code(
+                    IssueCode::InvalidNamedArgument,
+                    Issue::error(format!(
+                        "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
+                    ))
+                    .with_annotation(
+                        Annotation::primary(argument_expression.span())
+                            .with_message(format!("Unknown argument name `${argument_name}` in unpacked array")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(invocation_target.span())
+                            .with_message(format!("Call to {target_kind_str} is here")),
+                    )
+                    .with_help(if !invocation_target.allows_named_arguments() {
+                        format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
+                    } else if !parameter_refs.is_empty() {
+                        let available_params: Vec<String> = parameter_refs
+                            .iter()
+                            .filter_map(|p| {
+                                p.get_name().map(|name| format!("${}", name.0.as_str().trim_start_matches('$')))
+                            })
+                            .collect();
+
+                        if available_params.is_empty() {
+                            format!("The {target_kind_str} `{target_name_str}` does not accept any named arguments.")
+                        } else {
+                            format!("Available named arguments are: {}.", available_params.join(", "))
+                        }
                     } else {
-                        format!("Available named arguments are: {}.", available_params.join(", "))
-                    }
-                } else {
-                    format!("The {target_kind_str} `{target_name_str}` does not accept any arguments.")
-                }),
-            );
+                        format!("The {target_kind_str} `{target_name_str}` does not accept any arguments.")
+                    }),
+                );
+            }
         }
     }
 }

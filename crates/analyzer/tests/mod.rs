@@ -175,6 +175,7 @@ test_case!(magic_methods_args);
 test_case!(array_shape_access);
 test_case!(closure_wrap);
 test_case!(arguments_unpacking);
+test_case!(unknown_named_args);
 
 // Github Issues
 test_case!(issue_275);
@@ -197,6 +198,7 @@ test_case!(issue_400);
 test_case!(issue_415);
 test_case!(issue_417);
 test_case!(issue_451);
+test_case!(issue_461);
 
 #[test]
 fn test_all_test_cases_are_ran() {
