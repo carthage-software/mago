@@ -22,27 +22,13 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::invocation::InvocationTarget;
 
-/// Analyzes a single argument expression and stores its inferred type and span.
-///
-/// This function ensures an argument expression is analyzed within the correct
-/// context (temporarily setting `inside_general_use` to true) and stores the
-/// resulting type and the expression's span in the provided map for later use,
-/// unless the argument is unpacked (indicated by `argument_offset == usize::MAX`).
-/// It avoids re-analyzing if the argument type is already present in the map.
-///
-/// # Arguments
-///
-/// * `context` - The overall analysis context.
-/// * `block_context` - Mutable context for the current code block.
-/// * `artifacts` - Mutable store for analysis results, including expression types.
-/// * `argument_expression` - The AST node for the argument's value expression.
-/// * `argument_offset` - The zero-based index of the argument. Use `usize::MAX` to skip storing (e.g., for unpacked arguments analyzed just for side effects).
-/// * `analyzed_argument_types` - The map where the inferred type and span are stored, keyed by argument offset.
-///
-/// # Returns
-///
-/// * `Ok(())` if analysis completes successfully.
-/// * `Err(AnalysisError)` if an error occurs during the analysis of the argument's value.
+/// Checks if an argument can be passed by reference.
+fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
+    argument_expression.is_referenceable(false)
+        || (argument_expression.is_referenceable(true) && argument_type.by_reference)
+}
+
+/// Analyzes an argument expression and stores its inferred type.
 pub fn analyze_and_store_argument_type<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
@@ -58,31 +44,33 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
         return Ok(());
     }
 
-    let mut inferred_parameter_types: Option<HashMap<usize, TUnion>> = None;
-    if let Some(closure_parameter_type) = closure_parameter_type {
+    let inferred_parameter_types = closure_parameter_type.map(|closure_parameter_type| {
         let mut inferred_parameters = HashMap::default();
-        for closure_parameter_atomic in closure_parameter_type.types.as_ref() {
-            let TAtomic::Callable(TCallable::Signature(callable)) = closure_parameter_atomic else {
-                continue;
-            };
 
-            for (parameter_index, parameter) in callable.parameters.iter().enumerate() {
-                let Some(parameter_type) = parameter.get_type_signature() else {
-                    continue;
-                };
+        closure_parameter_type
+            .types
+            .as_ref()
+            .iter()
+            .filter_map(|atomic| match atomic {
+                TAtomic::Callable(TCallable::Signature(callable)) => Some(callable),
+                _ => None,
+            })
+            .flat_map(|callable| callable.parameters.iter().enumerate())
+            .filter_map(|(parameter_index, parameter)| {
+                parameter
+                    .get_type_signature()
+                    .filter(|param_type| param_type.is_array() || param_type.has_object())
+                    .map(|param_type| (parameter_index, param_type.clone()))
+            })
+            .for_each(|(parameter_index, parameter_type)| {
+                inferred_parameters.insert(parameter_index, parameter_type);
+            });
 
-                if !parameter_type.is_array() && !parameter_type.has_object() {
-                    continue;
-                }
-
-                inferred_parameters.insert(parameter_index, parameter_type.clone());
-            }
-        }
-
-        inferred_parameter_types = Some(inferred_parameters);
-    }
+        inferred_parameters
+    });
 
     let inferred_parameter_types = std::mem::replace(&mut artifacts.inferred_parameter_types, inferred_parameter_types);
+
     let was_inside_general_use = block_context.inside_general_use;
     let was_inside_call = block_context.inside_call;
     let was_inside_variable_reference = block_context.inside_variable_reference;
@@ -93,39 +81,34 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
 
     argument_expression.analyze(context, block_context, artifacts)?;
 
-    artifacts.inferred_parameter_types = inferred_parameter_types;
     block_context.inside_general_use = was_inside_general_use;
     block_context.inside_call = was_inside_call;
     block_context.inside_variable_reference = was_inside_variable_reference;
+    artifacts.inferred_parameter_types = inferred_parameter_types;
 
     let argument_type = artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
 
-    if referenced_parameter {
-        let is_referenceable = argument_expression.is_referenceable(false)
-            || (argument_expression.is_referenceable(true) && argument_type.by_reference);
+    if referenced_parameter && !is_argument_referenceable(argument_expression, &argument_type) {
+        let target_kind_str = invocation_target.guess_kind();
+        let target_name_str = invocation_target.guess_name();
 
-        if !is_referenceable {
-            let target_kind_str = invocation_target.guess_kind();
-            let target_name_str = invocation_target.guess_name();
-
-            context.collector.report_with_code(
-                IssueCode::InvalidPassByReference,
-                Issue::error(format!(
-                    "Invalid argument for by-reference parameter #{} in call to {} `{}`.",
-                    argument_offset + 1,
-                    target_kind_str,
-                    target_name_str,
-                ))
-                .with_annotation(
-                    Annotation::primary(argument_expression.span())
-                        .with_message("This expression cannot be passed by reference."),
-                )
-                .with_note(
-                    "You can only pass variables, properties, array elements, or the result of another function that itself returns a reference."
-                )
-                .with_help("To fix this, assign this value to a variable first, and then pass that variable to the function."),
-            );
-        }
+        context.collector.report_with_code(
+            IssueCode::InvalidPassByReference,
+            Issue::error(format!(
+                "Invalid argument for by-reference parameter #{} in call to {} `{}`.",
+                argument_offset + 1,
+                target_kind_str,
+                target_name_str,
+            ))
+            .with_annotation(
+                Annotation::primary(argument_expression.span())
+                    .with_message("This expression cannot be passed by reference."),
+            )
+            .with_note(
+                "You can only pass variables, properties, array elements, or the result of another function that itself returns a reference."
+            )
+            .with_help("To fix this, assign this value to a variable first, and then pass that variable to the function."),
+        );
     }
 
     if argument_offset != usize::MAX {
@@ -135,13 +118,7 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
     Ok(())
 }
 
-/// Verifies a single argument's type against the resolved parameter type for a function/method/callable call.
-///
-/// This function compares the `input_type` (actual argument type) against the `parameter_type`
-/// (expected type after template resolution). It reports various type mismatch errors
-/// (e.g., invalid type, possibly invalid, mixed argument, less specific argument)
-/// with appropriate severity and context. It also adds data flow edges from the argument
-/// sources to the parameter representation in the data flow graph.
+/// Verifies an argument's type against the expected parameter type.
 pub fn verify_argument_type<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     input_type: &TUnion,
@@ -371,25 +348,7 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
     }
 }
 
-/// Determines the resulting element type when an argument is unpacked using the spread operator (`...`).
-///
-/// Iterates through the atomic types of the `$argument_value_type` (the variable being unpacked).
-/// - For known iterable array types (`list`, `array`), it extracts the value type parameter.
-/// - For `mixed` or `any`, it reports an error as iterability cannot be guaranteed and returns `mixed`/`any`.
-/// - For `never`, it returns `never`.
-/// - For any other non-iterable type, it reports an error and returns `mixed`.
-///
-/// The function combines the potential element types derived from all parts of the input union.
-///
-/// # Arguments
-///
-/// * `context` - Analysis context, used for reporting issues and accessing codebase.
-/// * `argument_value_type` - The inferred type union of the expression being unpacked.
-/// * `span` - The span of the unpacked argument expression (`...$arg`) for error reporting.
-///
-/// # Returns
-///
-/// A `TUnion` representing the combined type of the elements within the unpacked iterable.
+/// Gets the element type when unpacking an argument with the spread operator.
 pub fn get_unpacked_argument_type<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     argument_value_type: &TUnion,
@@ -441,22 +400,15 @@ pub fn get_unpacked_argument_type<'ctx, 'arena>(
                         .with_note("Argument unpacking `...` requires an `iterable` (e.g., `array` or `Traversable`).")
                         .with_help("Ensure the value being unpacked is an `iterable`."),
                     );
-
                     reported_an_error = true;
                 }
-
                 potential_element_types.push(get_mixed());
             }
         }
     }
 
-    if let Some(mut combined_type) = potential_element_types.pop() {
-        for element_type in potential_element_types {
-            combined_type = add_union_type(combined_type, &element_type, context.codebase, false);
-        }
-
-        combined_type
-    } else {
-        get_never()
-    }
+    potential_element_types
+        .into_iter()
+        .reduce(|acc, element_type| add_union_type(acc, &element_type, context.codebase, false))
+        .unwrap_or_else(get_never)
 }

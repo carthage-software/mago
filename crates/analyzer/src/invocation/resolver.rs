@@ -24,8 +24,7 @@ use mago_codex::ttype::union::TUnion;
 use crate::context::Context;
 use crate::invocation::Invocation;
 
-/// Resolve a type that resulting from an invocation, this could be the
-/// return type of a function, a `@param-out` type, an assertion type, etc.
+/// Resolves a type resulting from an invocation.
 pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,

@@ -24,75 +24,51 @@ pub mod post_process;
 pub mod return_type_fetcher;
 pub mod template_result;
 
-/// Represents a resolved invocation of a function, method, or any callable expression.
-///
-/// This struct captures all necessary information about a call site, including
-/// what is being called (`target`), the arguments passed (`arguments`), and the
-/// source span of the entire invocation.
+/// Represents a resolved function, method, or callable invocation.
 #[derive(Debug, Clone)]
 pub struct Invocation<'ctx, 'ast, 'arena> {
-    /// The resolved target of the call, which could be a named function/method
-    /// or a dynamic callable expression (e.g., a closure, an invocable object).
+    /// The target being called (function, method, or callable).
     pub target: InvocationTarget<'ctx>,
-    /// The arguments provided to the call, either as a standard argument list
-    /// or as the input from a pipe operator.
+    /// The arguments passed to the call.
     pub arguments_source: InvocationArgumentsSource<'ast, 'arena>,
-    /// The source code span covering the entire invocation expression (e.g., `func(arg)` or `$val |> func`).
+    /// The source span of the entire invocation.
     pub span: Span,
 }
 
-/// Holds contextual information specific to a method call resolution.
-///
-/// When a method is invoked (e.g., `$obj->method()` or `ParentClass::method()`),
-/// this struct provides details about the class context in which the call occurs
-/// and how the method was resolved.
+/// Context information for method call resolution.
 #[derive(Debug, Clone)]
 pub struct MethodTargetContext<'ctx> {
-    /// The specific `MethodIdentifier` (class name + method name) of the method
-    /// that will be invoked, if statically resolved. This points to the method's
-    /// declaration, which might be in a parent class or trait.
+    /// The method identifier, if statically resolved.
     pub declaring_method_id: Option<MethodIdentifier>,
-    /// Metadata for the class context (`self_fq_class_like_name`).
+    /// Metadata for the class context.
     pub class_like_metadata: &'ctx ClassLikeMetadata,
-    /// The type of the class context, which is used to resolve `static::class` and
+    /// The class type for resolving static references.
     pub class_type: StaticClassType,
 }
 
-/// Represents the target of an invocation, distinguishing between statically known
-/// functions/methods and dynamic callable expressions.
-///
-/// This allows the analyzer to use specific metadata for known functions/methods
-/// or rely on the `TCallableSignature` for dynamic callables.
+/// The target of an invocation (function, method, or callable).
 #[derive(Debug, Clone)]
 pub enum InvocationTarget<'ctx> {
-    /// The invocation target is a dynamic callable whose exact identity isn't known
-    /// until runtime, but its signature (parameters, return type) is known.
-    /// Examples include closures, invocable objects, or variables holding callables.
+    /// A dynamic callable (closure, invocable object, etc.).
     Callable {
-        /// If the callable expression could be traced back to an original named function
-        /// or method (e.g., `$callable = strlen(...); $callable()`), this might hold its identifier.
+        /// The original function/method identifier, if traceable.
         source: Option<FunctionLikeIdentifier>,
-        /// The type signature (`(param_types) => return_type`) of the callable.
+        /// The callable's type signature.
         signature: TCallableSignature,
-        /// The span of the expression that evaluates to this callable (e.g., span of `$var` in `$var()`).
+        /// The span of the callable expression.
         span: Span,
     },
-    /// The invocation target is a statically resolved function or method.
+    /// A statically resolved function or method.
     FunctionLike {
-        /// The unique identifier for the statically resolved function or method.
+        /// The function/method identifier.
         identifier: FunctionLikeIdentifier,
-        /// Metadata (parameters, return type, etc.) for the resolved function or method.
+        /// Function/method metadata.
         metadata: &'ctx FunctionLikeMetadata,
-        /// The inferred return type for this function-like.
-        ///
-        /// This type is usually set for closures and arrow functions, and
-        /// contains a more precise return type than the declared one.
+        /// Inferred return type (used for closures/arrow functions).
         inferred_return_type: Option<Box<TUnion>>,
-        /// If this is a method call, this provides context about the calling class
-        /// (e.g., type of `$this`, resolved `static::class`). `None` for function calls.
+        /// Method call context, if applicable.
         method_context: Option<MethodTargetContext<'ctx>>,
-        /// The span of the callable part of the invocation expression
-        /// (e.g., `my_function` in `my_function(...)` or `$obj->myMethod` in `$obj->myMethod(...)`).
+        /// The span of the callable part.
         span: Span,
     },
 }
