@@ -4,7 +4,7 @@ use clap::Parser;
 #[derive(Parser, Debug, Clone)]
 pub struct ColorArgs {
     /// Do not use colors in the output.
-    #[arg(long, help = "Do not use colors in the output", default_value_t = false, alias = "no-colors")]
+    #[arg(long, default_value_t = false, alias = "no-colors")]
     pub no_color: bool,
 }
 

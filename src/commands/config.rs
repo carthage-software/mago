@@ -26,15 +26,34 @@ enum ConfigSection {
 /// configuration, showing the combined result of your `mago.toml` file, any
 /// environment variables, and the built-in default values.
 #[derive(Parser, Debug)]
-#[command(name = "config", about, long_about)]
+#[command(
+    name = "config",
+    about = "Display the current configuration that Mago is using.",
+    long_about = "Display the final, merged configuration that Mago is using for this project.\n\n\
+                  This command is invaluable for debugging your setup. It shows you the\n\
+                  complete configuration that results from combining:\n\
+                  • Built-in default values\n\
+                  • Global configuration from ~/.mago.toml or $XDG_CONFIG_HOME/mago.toml\n\
+                  • Project configuration from ./mago.toml\n\
+                  • Environment variables (MAGO_*)\n\
+                  • Command-line overrides\n\n\
+                  Use --show to focus on a specific section, or --default to see\n\
+                  what the defaults would be without any configuration files."
+)]
 pub struct ConfigCommand {
     /// Display only a specific section of the configuration.
+    ///
+    /// Instead of showing the entire configuration, focus on just one section.
+    ///
+    /// Available sections: source, linter, formatter, analyzer.
     #[arg(long, value_enum)]
     show: Option<ConfigSection>,
 
     /// Show the default configuration values instead of the current ones.
     ///
-    /// This ignores any `mago.toml` file or environment variables.
+    /// This ignores any configuration files and environment variables,
+    /// showing only the built-in defaults that Mago would use if no
+    /// configuration was provided.
     #[arg(long, default_value_t = false)]
     default: bool,
 }

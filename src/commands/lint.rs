@@ -13,6 +13,7 @@ use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings;
 use mago_reporting::Level;
 
+use crate::commands::args::baseline::BaselineArgs;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::database;
@@ -45,51 +46,72 @@ use crate::pipeline::lint::run_lint_pipeline;
     "}
 )]
 pub struct LintCommand {
-    /// Lint specific files or directories, overriding the source configuration.
-    #[arg(help = "Lint specific files or directories, overriding the source configuration")]
+    /// Specific files or directories to lint instead of using configuration.
+    ///
+    /// When provided, these paths override the source configuration in mago.toml.
+    /// You can specify individual files or entire directories to lint.
+    #[arg()]
     pub path: Vec<PathBuf>,
 
-    /// Perform only parsing and semantic checks.
-    #[arg(
-        long,
-        short = 's',
-        help = "Perform only parsing and semantic checks",
-        conflicts_with_all = ["list_rules", "explain", "only"],
-    )]
+    /// Skip linter rules and only perform basic syntax and semantic validation.
+    ///
+    /// This mode only checks that your PHP code parses correctly and has valid
+    /// semantic structure, without applying any style or quality rules.
+    /// Useful for quick syntax validation.
+    #[arg(long, short = 's', conflicts_with_all = ["list_rules", "explain", "only"])]
     pub semantics: bool,
 
-    #[arg(
-        long,
-        help = "Enable all linter rules for the most exhaustive analysis possible. This overrides your configuration, ignores PHP version constraints, and enables rules that are disabled by default. It is extremely noisy and not recommended for general use."
-    )]
+    /// Enable every available linter rule for maximum thoroughness.
+    ///
+    /// This overrides your configuration and enables all rules, including those
+    /// disabled by default. The output will be extremely verbose and is not
+    /// recommended for regular use. Useful for comprehensive code audits.
+    #[arg(long)]
     pub pedantic: bool,
 
+    /// Show detailed documentation for a specific linter rule.
+    ///
+    /// Displays the rule's description, examples of good and bad code,
+    /// and available configuration options. Use the rule's code name,
+    /// such as 'no-empty' or 'prefer-while-loop'.
     #[arg(
         long,
-        help = "Provide documentation for a specific linter rule, e.g. 'prefer-while-loop'",
         conflicts_with_all = ["list_rules", "sort", "fixable_only", "semantics", "reporting_target", "reporting_format"]
     )]
     pub explain: Option<String>,
 
+    /// Show all currently enabled linter rules and their descriptions.
+    ///
+    /// This displays a table of all rules that are active for your current
+    /// configuration, along with their severity levels and categories.
+    /// Combine with --json for machine-readable output.
     #[arg(
         long,
-        help = "List all the enabled rules alongside their descriptions",
         conflicts_with_all = ["explain", "sort", "fixable_only", "semantics", "reporting_target", "reporting_format"]
     )]
     pub list_rules: bool,
 
-    #[arg(
-        long,
-        help = "Output rule information in JSON format for documentation purposes, requires --list-rules",
-        requires = "list_rules"
-    )]
+    /// Output rule information in JSON format.
+    ///
+    /// When combined with --list-rules, outputs rule information as JSON
+    /// instead of a human-readable table. Useful for generating documentation
+    /// or integrating with other tools.
+    #[arg(long, requires = "list_rules")]
     pub json: bool,
 
-    #[arg(short, long, help = "Specify rules to run, overriding the configuration file", conflicts_with = "semantics")]
+    /// Run only specific rules, ignoring the configuration file.
+    ///
+    /// Provide a comma-separated list of rule codes to run only those rules.
+    /// This overrides your mago.toml configuration and is useful for targeted
+    /// analysis or testing specific rules.
+    #[arg(short, long, conflicts_with = "semantics")]
     pub only: Vec<String>,
 
     #[clap(flatten)]
     pub reporting: ReportingArgs,
+
+    #[clap(flatten)]
+    pub baseline: BaselineArgs,
 }
 
 impl LintCommand {
@@ -147,12 +169,24 @@ impl LintCommand {
         let issues = run_lint_pipeline(database.read_only(), shared_context)?;
 
         let config_baseline = configuration.linter.baseline.clone();
-        self.reporting.process_issues_with_baseline(
-            issues,
+        let read_database = database.read_only();
+
+        // Process baseline first
+        let (filtered_issues, should_fail_from_baseline, early_exit) =
+            self.baseline.process_baseline(issues, config_baseline.as_deref(), &read_database)?;
+
+        // Handle early exits (baseline generation/verification)
+        if let Some(exit_code) = early_exit {
+            return Ok(exit_code);
+        }
+
+        // Process issues with reporting
+        self.reporting.process_issues_with_baseline_result(
+            filtered_issues,
             configuration,
             should_use_colors,
             database,
-            config_baseline.as_deref(),
+            should_fail_from_baseline,
         )
     }
 }

@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -22,7 +21,6 @@ use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 
-use crate::baseline;
 use crate::commands::args::pager::PagerArgs;
 use crate::config::Configuration;
 use crate::enum_variants;
@@ -39,148 +37,117 @@ use crate::utils::progress::remove_progress_bar;
 #[derive(Parser, Debug, Clone)]
 pub struct ReportingArgs {
     /// Filter the output to only show issues that can be automatically fixed.
-    #[arg(long, short = 'f', help = "Filter output to show only fixable issues", default_value_t = false)]
+    ///
+    /// When enabled, only issues that have available automatic fixes will be displayed.
+    /// This is useful when you want to focus on issues that can be resolved immediately.
+    #[arg(long, short = 'f')]
     pub fixable_only: bool,
 
-    /// Sort reported issues by level, code, and location.
-    #[arg(long, help = "Sort reported issues by level, code, and location")]
+    /// Sort reported issues by severity level, rule code, and file location.
+    ///
+    /// By default, issues are reported in the order they appear in files.
+    /// This option provides a more organized view for reviewing large numbers of issues.
+    #[arg(long)]
     pub sort: bool,
 
-    /// Apply fixes to the source code where possible.
-    #[arg(long, help = "Apply fixes to the source code", conflicts_with = "fixable_only")]
+    /// Apply automatic fixes to the source code where possible.
+    ///
+    /// This will modify your files to fix issues that have automatic solutions.
+    /// Only safe fixes are applied by default. Use --unsafe or --potentially-unsafe
+    /// to enable riskier fixes. Cannot be used with --fixable-only.
+    #[arg(long, conflicts_with = "fixable_only")]
     pub fix: bool,
 
     /// Apply fixes that are marked as unsafe.
     ///
-    /// Unsafe fixes might have unintended consequences or alter the code's behavior
-    /// in a way that requires manual verification.
-    #[arg(long, help = "Apply fixes marked as unsafe (requires --fix)", requires = "fix")]
+    /// Unsafe fixes might change code behavior or have unintended consequences.
+    /// Always review changes carefully after applying unsafe fixes.
+    /// Requires --fix to be enabled.
+    #[arg(long, requires = "fix")]
     pub r#unsafe: bool,
 
     /// Apply fixes that are marked as potentially unsafe.
     ///
-    /// Potentially unsafe fixes are less risky than unsafe ones but may still
-    /// require manual review after application.
-    #[arg(long, help = "Apply fixes marked as potentially unsafe (requires --fix)", requires = "fix")]
+    /// These fixes are less risky than unsafe ones but may still require
+    /// manual review to ensure they don't break your code's intended behavior.
+    /// Requires --fix to be enabled.
+    #[arg(long, requires = "fix")]
     pub potentially_unsafe: bool,
 
     /// Format the fixed files after applying changes.
-    #[arg(long, help = "Format fixed files after applying changes (requires --fix)", alias = "fmt", requires = "fix")]
+    ///
+    /// This runs the formatter on any files that were modified by fixes
+    /// to ensure consistent code style. Requires --fix to be enabled.
+    #[arg(long, alias = "fmt", requires = "fix")]
     pub format_after_fix: bool,
 
     /// Preview fixes without writing any changes to disk.
     ///
-    /// This option shows what changes would be made if fixes were applied.
-    #[arg(
-        long,
-        short = 'd',
-        help = "Preview fixes without applying them (requires --fix)",
-        requires = "fix",
-        alias = "diff"
-    )]
+    /// Shows exactly what changes would be made if fixes were applied,
+    /// but doesn't modify any files. Useful for reviewing fixes before applying them.
+    /// Requires --fix to be enabled.
+    #[arg(long, short = 'd', requires = "fix", alias = "diff")]
     pub dry_run: bool,
 
-    /// Specify where the results should be reported (e.g., stdout, stderr).
-    #[arg(long, default_value_t, help = "Specify reporting target (e.g., stdout, stderr)", ignore_case = true, value_parser = enum_variants!(ReportingTarget), conflicts_with = "fix")]
+    /// Specify where to send the output.
+    ///
+    /// Choose stdout for normal output or stderr for error streams.
+    /// Not available when using --fix mode.
+    #[arg(
+        long,
+        default_value_t,
+        ignore_case = true,
+        value_parser = enum_variants!(ReportingTarget),
+        conflicts_with = "fix"
+    )]
     pub reporting_target: ReportingTarget,
 
-    /// Choose the format for reporting issues (e.g., human-readable, JSON).
-    #[arg(long, default_value_t, help = "Choose reporting format (e.g., rich, medium, short)", ignore_case = true, value_parser = enum_variants!(ReportingFormat), conflicts_with = "fix")]
+    /// Choose the output format for issue reports.
+    ///
+    /// Available formats: rich (colorful, detailed), medium (balanced),
+    /// short (compact), json (machine-readable), and others.
+    ///
+    /// Not available when using --fix mode.
+    #[arg(
+        long,
+        default_value_t,
+        ignore_case = true,
+        value_parser = enum_variants!(ReportingFormat),
+        conflicts_with = "fix"
+    )]
     pub reporting_format: ReportingFormat,
 
-    /// Set the minimum issue level that will cause the command to fail.
+    /// Set the minimum issue severity that causes the command to fail.
     ///
-    /// For example, if set to `Error`, warnings or notices will not cause a failure exit code.
-    #[arg(long, short = 'm', help = "Set minimum issue level for failure (e.g., error, warning)", default_value_t = Level::Error, value_parser = enum_variants!(Level), conflicts_with = "fix")]
+    /// The command will exit with a non-zero status if any issues at or above
+    /// this level are found. For example, setting this to 'warning' means
+    /// the command fails on warnings and errors, but not on notes or help suggestions.
+    #[arg(
+        long,
+        short = 'm',
+        default_value_t = Level::Error,
+        value_parser = enum_variants!(Level),
+        conflicts_with = "fix"
+    )]
     pub minimum_fail_level: Level,
 
-    /// Set the minimum issue level to be reported.
+    /// Set the minimum issue severity to be shown in the report.
     ///
-    /// Issues below this level will be ignored in the report.
-    #[arg(long, help = "Set minimum issue level to be reported (e.g., error, warning)", value_parser = enum_variants!(Level))]
+    /// Issues below this level will be completely ignored and not displayed.
+    /// This is different from --minimum-fail-level which only affects exit status.
+    /// Useful for filtering out low-priority suggestions.
+    #[arg(
+        long,
+        value_parser = enum_variants!(Level)
+    )]
     pub minimum_report_level: Option<Level>,
-
-    /// Specify a baseline file to ignore issues listed within it.
-    #[arg(long, help = "Specify a baseline file to ignore issues", value_name = "PATH", conflicts_with = "fix")]
-    pub baseline: Option<PathBuf>,
-
-    /// Generate a baseline file to ignore existing issues.
-    #[arg(
-        long,
-        help = "Generate a baseline file to ignore existing issues",
-        conflicts_with = "fix",
-        requires = "baseline"
-    )]
-    pub generate_baseline: bool,
-
-    /// Create a backup of the old baseline file (`.bkp`) when generating a new one.
-    #[arg(long, help = "Backup the old baseline file when generating a new one", requires = "generate_baseline")]
-    pub backup_baseline: bool,
-
-    /// Verify if the baseline file is up to date with current issues.
-    #[arg(
-        long,
-        help = "Verify if the baseline file is up to date",
-        conflicts_with = "fix",
-        conflicts_with = "generate_baseline",
-        requires = "baseline"
-    )]
-    pub verify_baseline: bool,
-
-    /// Fail when baseline is out-of-sync, even if no issues are found.
-    #[arg(
-        long,
-        help = "Fail when baseline is out-of-sync, even if no issues are found",
-        conflicts_with = "fix",
-        conflicts_with = "generate_baseline",
-        conflicts_with = "verify_baseline",
-        requires = "baseline"
-    )]
-    pub fail_on_out_of_sync_baseline: bool,
 
     #[clap(flatten)]
     pub pager_args: PagerArgs,
 }
 
 impl ReportingArgs {
-    /// Resolves the baseline path by taking the command-line argument if provided,
-    /// otherwise falling back to the configuration default for the specified component.
-    ///
-    /// # Arguments
-    ///
-    /// * `config_baseline`: The baseline path from the configuration (linter or analyzer).
-    ///
-    /// # Returns
-    ///
-    /// The effective baseline path, prioritizing command-line arguments over configuration defaults.
-    fn resolve_baseline(&self, config_baseline: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
-        self.baseline.clone().or_else(|| config_baseline.map(|p| p.to_path_buf()))
-    }
-
     /// Orchestrates the entire issue processing pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `self`: The configured reporting arguments from the command line.
-    /// * `issues`: The collection of issues detected by the preceding command.
-    /// * `configuration`: The application's global configuration.
-    /// * `database`: The mutable database containing all source files.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
-    /// or an `Error` if an unrecoverable problem occurs.
-    pub fn process_issues(
-        self,
-        issues: IssueCollection,
-        configuration: Configuration,
-        should_use_colors: bool,
-        database: Database,
-    ) -> Result<ExitCode, Error> {
-        self.process_issues_with_baseline(issues, configuration, should_use_colors, database, None)
-    }
-
-    /// Extended version of process_issues that accepts a configuration baseline.
     ///
     /// # Arguments
     ///
@@ -189,39 +156,33 @@ impl ReportingArgs {
     /// * `configuration`: The application's global configuration.
     /// * `should_use_colors`: Whether to use colors in output.
     /// * `database`: The mutable database containing all source files.
-    /// * `config_baseline`: Optional baseline from configuration to use as default.
     ///
     /// # Returns
     ///
     /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
     /// or an `Error` if an unrecoverable problem occurs.
-    pub fn process_issues_with_baseline(
-        mut self,
+    pub fn process_issues(
+        self,
         mut issues: IssueCollection,
         configuration: Configuration,
         should_use_colors: bool,
         database: Database,
-        config_baseline: Option<&std::path::Path>,
     ) -> Result<ExitCode, Error> {
-        // Override baseline with resolved value (command-line takes precedence over config)
-        if self.baseline.is_none() {
-            self.baseline = self.resolve_baseline(config_baseline);
-        }
         if let Some(min_level) = self.minimum_report_level {
             let unfiltered_count = issues.len();
             issues = issues.with_minimum_level(min_level);
 
             tracing::debug!(
-                "Filtered out {} issues below the minimum report level of {:?}.",
+                "Filtered out {} issues below the minimum report level of `{}`.",
                 unfiltered_count - issues.len(),
-                min_level
+                min_level.to_string(),
             );
         }
 
         if self.fix {
             self.handle_fix_mode(issues, configuration, should_use_colors, database)
         } else {
-            self.handle_report_mode(issues, &configuration, should_use_colors, database)
+            self.handle_report_mode(issues, &configuration, should_use_colors, database, false)
         }
     }
 
@@ -270,6 +231,7 @@ impl ReportingArgs {
         configuration: &Configuration,
         should_use_colors: bool,
         database: Database,
+        should_fail_from_baseline: bool,
     ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
 
@@ -277,54 +239,7 @@ impl ReportingArgs {
             issues = issues.sorted();
         }
 
-        let mut should_fail = false;
-        if let Some(baseline_path) = &self.baseline {
-            if self.generate_baseline {
-                tracing::info!("Generating baseline file...");
-                let baseline = baseline::generate_baseline_from_issues(issues, &read_database)?;
-                baseline::serialize_baseline(baseline_path, &baseline, self.backup_baseline)?;
-                tracing::info!("Baseline file successfully generated at `{}`.", baseline_path.display());
-
-                return Ok(ExitCode::SUCCESS);
-            }
-
-            if self.verify_baseline {
-                return self.handle_baseline_verification(issues, baseline_path, &read_database);
-            }
-
-            if !baseline_path.exists() {
-                tracing::warn!(
-                    "Baseline file `{}` does not exist. Issues will not be filtered.",
-                    baseline_path.display()
-                );
-            } else {
-                let baseline = baseline::unserialize_baseline(baseline_path)?;
-                let (filtered_issues, filtered_out_count, has_dead_issues) =
-                    baseline::filter_issues(&baseline, issues, &read_database)?;
-
-                if has_dead_issues {
-                    tracing::warn!(
-                        "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
-                    );
-
-                    if self.fail_on_out_of_sync_baseline {
-                        should_fail = true;
-                    }
-                }
-
-                if filtered_out_count > 0 {
-                    tracing::info!(
-                        "Filtered out {} issues based on the baseline file at `{}`.",
-                        filtered_out_count,
-                        baseline_path.display()
-                    );
-                }
-
-                issues = filtered_issues;
-            }
-        }
-
-        should_fail |= issues.has_minimum_level(self.minimum_fail_level);
+        let should_fail = should_fail_from_baseline || issues.has_minimum_level(self.minimum_fail_level);
         let issues_to_report = if self.fixable_only { issues.only_fixable().collect() } else { issues };
 
         if issues_to_report.is_empty() {
@@ -480,46 +395,47 @@ impl ReportingArgs {
         (applicable_plans, skipped_unsafe_count, skipped_potentially_unsafe_count)
     }
 
-    /// Handles baseline verification logic.
+    /// Extended version of process_issues that works with baseline functionality.
     ///
-    /// Compares the current issues against the baseline to determine if it's up to date.
-    /// Returns ExitCode::SUCCESS (0) if baseline is up to date, ExitCode::FAILURE (1) if not.
-    fn handle_baseline_verification(
-        &self,
-        issues: IssueCollection,
-        baseline_path: &std::path::Path,
-        read_database: &ReadDatabase,
+    /// This method accepts pre-processed issues (already filtered through baseline)
+    /// and an indicator if the baseline processing determined the command should fail.
+    ///
+    /// # Arguments
+    ///
+    /// * `self`: The configured reporting arguments from the command line.
+    /// * `issues`: The collection of issues (potentially already filtered by baseline).
+    /// * `configuration`: The application's global configuration.
+    /// * `should_use_colors`: Whether to use colors in output.
+    /// * `database`: The mutable database containing all source files.
+    /// * `should_fail_from_baseline`: Whether the baseline processing indicated failure.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
+    /// or an `Error` if an unrecoverable problem occurs.
+    pub fn process_issues_with_baseline_result(
+        self,
+        mut issues: IssueCollection,
+        configuration: Configuration,
+        should_use_colors: bool,
+        database: Database,
+        should_fail_from_baseline: bool,
     ) -> Result<ExitCode, Error> {
-        if !baseline_path.exists() {
-            tracing::info!("Baseline file `{}` does not exist.", baseline_path.display());
-            return Ok(ExitCode::FAILURE);
+        if let Some(min_level) = self.minimum_report_level {
+            let unfiltered_count = issues.len();
+            issues = issues.with_minimum_level(min_level);
+
+            tracing::debug!(
+                "Filtered out {} issues below the minimum report level of {:?}.",
+                unfiltered_count - issues.len(),
+                min_level
+            );
         }
 
-        tracing::info!("Verifying baseline file at `{}`...", baseline_path.display());
-
-        let baseline = baseline::unserialize_baseline(baseline_path)?;
-        let comparison = baseline::compare_baseline_with_issues(&baseline, issues, read_database)?;
-
-        if comparison.is_up_to_date {
-            tracing::info!("Baseline is up to date.");
-
-            Ok(ExitCode::SUCCESS)
+        if self.fix {
+            self.handle_fix_mode(issues, configuration, should_use_colors, database)
         } else {
-            if comparison.new_issues_count > 0 {
-                tracing::info!("Found {} new issues not in the baseline.", comparison.new_issues_count);
-            }
-
-            if comparison.removed_issues_count > 0 {
-                tracing::info!(
-                    "Found {} issues in the baseline that no longer exist.",
-                    comparison.removed_issues_count
-                );
-            }
-
-            tracing::info!("Baseline is outdated. {} files have changes.", comparison.files_with_changes_count);
-            tracing::info!("Run with `--generate-baseline` to update the baseline file.");
-
-            Ok(ExitCode::FAILURE)
+            self.handle_report_mode(issues, &configuration, should_use_colors, database, should_fail_from_baseline)
         }
     }
 }

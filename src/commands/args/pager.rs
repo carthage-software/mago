@@ -5,13 +5,12 @@ use crate::config::Configuration;
 /// Defines command-line options for pager functionality.
 #[derive(Parser, Debug, Clone)]
 pub struct PagerArgs {
-    /// Use a pager when printing output.
-    #[arg(
-        long,
-        help = "Use a pager when printing output",
-        num_args(0..=1),
-        default_missing_value = "true",
-    )]
+    /// Control whether to use a pager for long output.
+    ///
+    /// A pager (like 'less') allows you to scroll through long output instead of
+    /// having it all scroll past in the terminal. Use --pager=true to force enable,
+    /// --pager=false to disable, or just --pager to enable with default settings.
+    #[arg(long, num_args(0..=1), default_missing_value = "true")]
     pub pager: Option<bool>,
 }
 

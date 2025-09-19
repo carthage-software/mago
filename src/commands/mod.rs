@@ -86,41 +86,45 @@ Get started by exploring the commands below!
 "#
 )]
 pub struct CliArguments {
-    #[arg(
-        long,
-        help = "The path to the workspace directory. This is the root directory of your project. If not specified, defaults to the current working directory."
-    )]
+    /// The path to the workspace directory.
+    ///
+    /// This is the root directory of your project. If not specified, defaults to the current working directory.
+    #[arg(long)]
     pub workspace: Option<PathBuf>,
 
-    #[arg(
-        long,
-        help = "The path to the configuration file. If not specified, Mago will search for a `mago.toml` file in the workspace directory."
-    )]
+    /// The path to the configuration file.
+    ///
+    /// This is the path to your `mago.toml` configuration file. If not specified, Mago will search for a `mago.toml` file in the workspace directory.
+    /// If no configuration file is found, Mago will use default settings.
+    #[arg(long)]
     pub config: Option<PathBuf>,
 
-    #[arg(
-        long,
-        help = "The PHP version to use for parsing and analysis. This should be a valid PHP version number (e.g., 8.0, 8.1). This value overrides the `php_version` setting in the configuration file and the `MAGO_PHP_VERSION` environment variable."
-    )]
+    /// The PHP version to use for parsing and analysis.
+    ///
+    /// This should be a valid PHP version number (e.g., 8.0, 8.1).
+    /// This value overrides the `php-version` setting in the configuration file and the `MAGO_PHP_VERSION` environment variable.
+    #[arg(long)]
     pub php_version: Option<String>,
 
-    #[arg(
-        long,
-        help = "The number of threads to use for linting and formatting. If not specified, Mago will use all available logical CPUs. This value overrides the `threads` setting in the configuration file and the `MAGO_THREADS` environment variable."
-    )]
+    /// The number of threads to use for linting, formatting, and analysis.
+    ///
+    /// If not specified, Mago will use all available logical CPUs.
+    /// This value overrides the `threads` setting in the configuration file and the `MAGO_THREADS` environment variable.
+    #[arg(long)]
     pub threads: Option<usize>,
 
-    #[arg(
-        long,
-        help = "Allow using an unsupported PHP version. This is not recommended, as it may lead to unexpected behavior. This value overrides the `allow_unsupported_php_version` setting in the configuration file and the `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION` environment variable.",
-        default_value_t = false
-    )]
+    /// Allow using an unsupported PHP version.
+    ///
+    /// Use this flag to bypass the check for supported PHP versions. This is not recommended, as it may lead to unexpected behavior.
+    #[arg(long, default_value_t = false)]
     pub allow_unsupported_php_version: bool,
 
     #[clap(flatten)]
     pub colors: ColorArgs,
 
     /// The subcommand to execute.
+    ///
+    /// Use `mago <command> --help` to see detailed usage information for each command.
     #[clap(subcommand)]
     pub command: MagoCommand,
 }

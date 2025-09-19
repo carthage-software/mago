@@ -33,20 +33,14 @@ This command helps maintain a consistent codebase style, improving readability a
 )]
 pub struct FormatCommand {
     /// Format specific files or directories, overriding the source configuration.
-    #[arg(help = "Format specific files or directories, overriding the source configuration")]
+    #[arg()]
     pub path: Vec<PathBuf>,
 
     /// Perform a dry run, printing a diff without modifying files.
     ///
     /// This will calculate and print a diff of any changes that would be made.
     /// No files will be modified on disk.
-    #[arg(
-        long,
-        short = 'd',
-        help = "Print a diff of changes without modifying files",
-        conflicts_with_all = ["check", "stdin_input"],
-        alias = "diff"
-    )]
+    #[arg(long, short = 'd', conflicts_with_all = ["check", "stdin_input"], alias = "diff")]
     pub dry_run: bool,
 
     /// Check if the source files are formatted.
@@ -54,20 +48,18 @@ pub struct FormatCommand {
     /// This flag is ideal for CI environments. The command will exit with a
     /// success code (`0`) if all files are formatted, and a failure code (`1`)
     /// if any files would be changed. No output is printed to `stdout`.
-    #[arg(
-        long,
-        short = 'c',
-        help = "Check if files are formatted, exiting with a non-zero status code on changes",
-        conflicts_with_all = ["dry_run", "stdin_input"],
-    )]
+    #[arg(long, short = 'c', conflicts_with_all = ["dry_run", "stdin_input"])]
     pub check: bool,
 
-    #[arg(
-        long,
-        short = 'i',
-        help = "Read input from STDIN, format it, and write to STDOUT",
-        conflicts_with_all = ["dry_run", "check", "path"],
-    )]
+    /// Read input from STDIN, format it, and write to STDOUT.
+    ///
+    /// This flag allows you to pipe PHP code directly into the formatter.
+    ///
+    /// When using this option, the formatter reads from standard input,
+    /// formats the code according to the configuration, and outputs the
+    /// formatted code to standard output. This is useful for integrating
+    /// with other tools or for quick formatting tasks without modifying files.
+    #[arg(long, short = 'i', conflicts_with_all = ["dry_run", "check", "path"])]
     pub stdin_input: bool,
 }
 

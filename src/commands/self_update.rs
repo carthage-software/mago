@@ -37,15 +37,25 @@ This command ensures you are always using the most recent version of Mago with t
 )]
 pub struct SelfUpdateCommand {
     /// Check for updates but do not install them.
-    #[arg(long, short, help = "Check for updates without installing them")]
+    ///
+    /// This option allows you to see if a new version is available without making any changes.
+    /// The command will exit with code `0` if you are up-to-date, or `1` if an update is available.
+    #[arg(long, short)]
     pub check: bool,
 
     /// Skip confirmation prompts during updates.
-    #[arg(long, help = "Skip confirmation prompts")]
+    ///
+    /// When this flag is set, the update process will proceed without asking for user confirmation.
+    /// Use this option for automated scripts or CI environments where no user interaction is possible.
+    #[arg(long)]
     pub no_confirm: bool,
 
     /// Update to a specific version by providing the version tag.
-    #[arg(long, help = "Update to a specific version", value_name = "VERSION_TAG")]
+    ///
+    /// This option allows you to specify a particular version of Mago to update to, rather than the latest version.
+    /// The version tag should match the format used in the release tags (e.g., `1.0.0-beta.10`).
+    /// If the specified version is not found, an error will be returned.
+    #[arg(long, value_name = "VERSION_TAG")]
     pub tag: Option<String>,
 }
 

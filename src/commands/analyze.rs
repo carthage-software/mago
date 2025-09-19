@@ -7,40 +7,60 @@ use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_prelude::Prelude;
 
+use crate::commands::args::baseline::BaselineArgs;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::database;
 use crate::error::Error;
 use crate::pipeline::analysis::run_analysis_pipeline;
 
-/// Command to perform static type analysis on PHP source code.
+/// Perform static type analysis to find type errors and code issues.
 ///
-/// This command identifies potential type errors, unused code, and other
-/// type-related issues within the specified PHP project or files.
+/// The `analyze` command performs comprehensive static type analysis on your PHP codebase.
+/// It builds a complete model of your code's symbols and types, then identifies potential
+/// issues including:
+///
+/// • Type mismatches and errors
+/// • Unused variables, functions, and classes
+/// • Unreachable or dead code
+/// • Missing or incorrect type annotations
+/// • Null safety violations
+///
+/// The analysis includes built-in PHP functions and popular library stubs for accurate
+/// type checking. You can configure analysis depth and specific issue categories in your
+/// `mago.toml` file.
 #[derive(Parser, Debug)]
 #[command(
     name = "analyze",
     // Alias for the British
     alias = "analyse",
-    about = "Find typing issues in the project source code using configurable type checker settings.",
-    long_about = "The `analyze` command is a fast type checker for PHP. It scans your codebase, \
-                  builds a model of its symbols and types, and then analyzes it to find \
-                  potential type errors, unused code, and other configurable checks."
 )]
 pub struct AnalyzeCommand {
-    /// Specific files or directories to analyze.
-    /// If provided, this overrides the source configuration from `mago.toml`.
-    #[arg(help = "Analyze specific files or directories, overriding source configuration")]
+    /// Specific files or directories to analyze instead of using configuration.
+    ///
+    /// When provided, these paths override the source configuration in mago.toml.
+    /// The analyzer will focus only on the specified files or directories.
+    ///
+    /// This is useful for targeted analysis, testing changes, or integrating
+    /// with development workflows and CI systems.
+    #[arg()]
     pub paths: Vec<PathBuf>,
 
-    /// Disable the use of stubs (e.g., for built-in PHP functions or popular libraries).
-    /// Disabling stubs might lead to more reported issues if type information for external symbols is missing.
-    #[arg(long, help = "Disable stubs, potentially leading to more issues", default_value_t = false)]
+    /// Disable built-in PHP and library stubs for analysis.
+    ///
+    /// By default, the analyzer uses stubs for built-in PHP functions and popular
+    /// libraries to provide accurate type information. Disabling this may result
+    /// in more reported issues when external symbols can't be resolved.
+    #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
     /// Arguments related to reporting and fixing issues.
     #[clap(flatten)]
     pub reporting: ReportingArgs,
+
+    /// Arguments related to baseline functionality.
+    #[clap(flatten)]
+    pub baseline: BaselineArgs,
 }
 
 impl AnalyzeCommand {
@@ -98,12 +118,24 @@ impl AnalyzeCommand {
         issues.filter_out_ignored(&configuration.analyzer.ignore);
 
         let config_baseline = configuration.analyzer.baseline.clone();
-        self.reporting.process_issues_with_baseline(
-            issues,
+        let read_database = final_database.read_only();
+
+        // Process baseline first
+        let (filtered_issues, should_fail_from_baseline, early_exit) =
+            self.baseline.process_baseline(issues, config_baseline.as_deref(), &read_database)?;
+
+        // Handle early exits (baseline generation/verification)
+        if let Some(exit_code) = early_exit {
+            return Ok(exit_code);
+        }
+
+        // Process issues with reporting
+        self.reporting.process_issues_with_baseline_result(
+            filtered_issues,
             configuration,
             should_use_colors,
             final_database,
-            config_baseline.as_deref(),
+            should_fail_from_baseline,
         )
     }
 }

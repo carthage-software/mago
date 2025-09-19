@@ -29,27 +29,45 @@ use crate::error::Error;
 /// and display the results in various formats. It's an essential utility for
 /// debugging the parser, understanding code structure, or for integration with other tools.
 #[derive(Parser, Debug)]
-#[command(name = "ast", about = "Inspect the lexical and syntactical structure of a PHP file.", long_about)]
+#[command(
+    name = "ast",
+    about = "Inspect the lexical and syntactical structure of a PHP file.",
+    long_about = "Analyze and display the internal structure of PHP code.\n\n\
+                  This command helps you understand how Mago parses your PHP code by showing:\n\
+                  - The Abstract Syntax Tree (AST) structure (default)\n\
+                  - Token stream from the lexer (--tokens)\n\
+                  - Resolved symbol names (--names)\n\n\
+                  Use this for debugging parsing issues, understanding code structure,\n\
+                  or integrating with other development tools."
+)]
 pub struct AstCommand {
-    /// The PHP file to inspect.
+    /// The PHP file to analyze and display.
+    ///
+    /// This should be a valid PHP file that you want to inspect.
+    /// The file will be parsed and its structure displayed according to the selected options.
     #[arg(required = true)]
     pub file: PathBuf,
 
-    /// Display the stream of lexer tokens. Combine with --json for JSON output.
-    #[arg(long, help = "Display the stream of lexer tokens instead of the AST")]
+    /// Show the token stream instead of the AST.
+    ///
+    /// This displays the sequence of tokens (keywords, operators, identifiers, etc.)
+    /// that the lexer generates from your PHP code. Useful for understanding
+    /// how the code is broken down into basic elements.
+    #[arg(long)]
     pub tokens: bool,
 
-    /// Display the output in a machine-readable JSON format.
-    #[arg(long, help = "Display the output in a machine-readable JSON format")]
+    /// Output in machine-readable JSON format.
+    ///
+    /// Instead of the human-readable tree format, output structured JSON
+    /// that can be processed by other tools or scripts.
+    #[arg(long)]
     pub json: bool,
 
-    /// Display the list of resolved symbol names.
-    #[arg(
-        long,
-        help = "Display the list of resolved symbol names",
-        // Tokens and Names are fundamentally different views
-        conflicts_with = "tokens"
-    )]
+    /// Show resolved symbol names and their scope information.
+    ///
+    /// This displays how Mago resolves symbol names (classes, functions, constants)
+    /// within their proper namespaces and scope contexts. Cannot be used with --tokens.
+    #[arg(long, conflicts_with = "tokens")]
     pub names: bool,
 
     #[clap(flatten)]
