@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
@@ -594,32 +595,27 @@ fn get_shape_from_ast(
 
                 let array_key = match field.key.as_ref() {
                     Some(field_key) => {
-                        let field_key_type = get_union_from_type_ast(&field_key.name, scope, type_context, classname)?;
-
-                        let single_key_type = field_key_type.get_single_owned();
-                        let array_key = match single_key_type.to_array_key() {
-                            Some(array_key) => array_key,
-                            None => match single_key_type {
-                                TAtomic::Reference(TReference::Symbol {
-                                    name,
-                                    parameters,
-                                    intersection_types: None,
-                                }) if parameters.is_none() => {
-                                    let last_part = name.split("\\").last().unwrap_or(name.as_str());
-
-                                    ArrayKey::from(last_part)
-                                }
-                                _ => {
-                                    return Err(TypeError::InvalidType(
-                                        shape.to_string(),
-                                        format!(
-                                            "Shape key must be a literal string or int, found `{}`",
-                                            single_key_type.get_id()
-                                        ),
-                                        field_key.span(),
-                                    ));
-                                }
+                        let array_key = match field_key.name.as_ref() {
+                            Type::LiteralInt(lit) => ArrayKey::Integer(lit.value as i64),
+                            Type::LiteralString(lit) => ArrayKey::String(atom(lit.value)),
+                            Type::Negated(negated) => match negated.number {
+                                LiteralIntOrFloatType::Int(lit) => ArrayKey::Integer(-(lit.value as i64)),
+                                LiteralIntOrFloatType::Float(f) => ArrayKey::String(concat_atom!("-", f.raw)),
                             },
+                            Type::Posited(posited) => match posited.number {
+                                LiteralIntOrFloatType::Int(lit) => ArrayKey::Integer(lit.value as i64),
+                                LiteralIntOrFloatType::Float(f) => ArrayKey::String(concat_atom!("+", f.raw)),
+                            },
+                            Type::Reference(reference) if reference.parameters.is_none() => {
+                                ArrayKey::String(atom(reference.identifier.value))
+                            }
+                            _ => {
+                                return Err(TypeError::InvalidType(
+                                    shape.to_string(),
+                                    format!("Shape key must be a literal string or int, found `{}`", field_key.name),
+                                    field_key.name.span(),
+                                ));
+                            }
                         };
 
                         if let ArrayKey::Integer(offset) = array_key
