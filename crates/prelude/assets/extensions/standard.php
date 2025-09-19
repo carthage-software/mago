@@ -1228,12 +1228,11 @@ function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|
 }
 
 /**
- * @param string $filename
- * @param array &$image_info
+ * @param-out array $image_info
  *
  * @return false|array{0: int, 1: int, 2: int, 3: string, bits: int, channels: int, mime: string}
  */
-function getimagesize(string $filename, &$image_info): array|false
+function getimagesize(string $filename, null|array &$image_info = null): array|false
 {
 }
 
@@ -2090,11 +2089,18 @@ function unlink(string $filename, mixed $context = null): bool
 {
 }
 
-function exec(string $command, &$output, &$result_code): string|false
+/**
+ * @param-out list<string> $output
+ * @param-out int $result_code
+ */
+function exec(string $command, array|null &$output = null, int|int &$result_code = null): string|false
 {
 }
 
-function system(string $command, &$result_code): string|false
+/**
+ * @param-out int $result_code
+ */
+function system(string $command, null|int &$result_code = null): string|false
 {
 }
 
