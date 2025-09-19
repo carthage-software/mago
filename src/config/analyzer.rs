@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,6 +15,9 @@ pub struct AnalyzerConfiguration {
 
     /// Ignore specific issues based on their code.
     pub ignore: Vec<String>,
+
+    /// Path to a baseline file to ignore listed issues.
+    pub baseline: Option<PathBuf>,
 
     /// Report all issues related to the use of `mixed` types.
     pub mixed_issues: bool,
@@ -135,6 +140,7 @@ impl Default for AnalyzerConfiguration {
         Self {
             excludes: vec![],
             ignore: vec![],
+            baseline: None,
             mixed_issues: defaults.mixed_issues,
             falsable_issues: defaults.falsable_issues,
             nullable_issues: defaults.nullable_issues,

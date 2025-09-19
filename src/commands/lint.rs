@@ -146,7 +146,14 @@ impl LintCommand {
 
         let issues = run_lint_pipeline(database.read_only(), shared_context)?;
 
-        self.reporting.process_issues(issues, configuration, should_use_colors, database)
+        let config_baseline = configuration.linter.baseline.clone();
+        self.reporting.process_issues_with_baseline(
+            issues,
+            configuration,
+            should_use_colors,
+            database,
+            config_baseline.as_deref(),
+        )
     }
 }
 

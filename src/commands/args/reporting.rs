@@ -143,6 +143,20 @@ pub struct ReportingArgs {
 }
 
 impl ReportingArgs {
+    /// Resolves the baseline path by taking the command-line argument if provided,
+    /// otherwise falling back to the configuration default for the specified component.
+    ///
+    /// # Arguments
+    ///
+    /// * `config_baseline`: The baseline path from the configuration (linter or analyzer).
+    ///
+    /// # Returns
+    ///
+    /// The effective baseline path, prioritizing command-line arguments over configuration defaults.
+    fn resolve_baseline(&self, config_baseline: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        self.baseline.clone().or_else(|| config_baseline.map(|p| p.to_path_buf()))
+    }
+
     /// Orchestrates the entire issue processing pipeline.
     ///
     /// # Arguments
@@ -158,11 +172,41 @@ impl ReportingArgs {
     /// or an `Error` if an unrecoverable problem occurs.
     pub fn process_issues(
         self,
-        mut issues: IssueCollection,
+        issues: IssueCollection,
         configuration: Configuration,
         should_use_colors: bool,
         database: Database,
     ) -> Result<ExitCode, Error> {
+        self.process_issues_with_baseline(issues, configuration, should_use_colors, database, None)
+    }
+
+    /// Extended version of process_issues that accepts a configuration baseline.
+    ///
+    /// # Arguments
+    ///
+    /// * `self`: The configured reporting arguments from the command line.
+    /// * `issues`: The collection of issues detected by the preceding command.
+    /// * `configuration`: The application's global configuration.
+    /// * `should_use_colors`: Whether to use colors in output.
+    /// * `database`: The mutable database containing all source files.
+    /// * `config_baseline`: Optional baseline from configuration to use as default.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
+    /// or an `Error` if an unrecoverable problem occurs.
+    pub fn process_issues_with_baseline(
+        mut self,
+        mut issues: IssueCollection,
+        configuration: Configuration,
+        should_use_colors: bool,
+        database: Database,
+        config_baseline: Option<&std::path::Path>,
+    ) -> Result<ExitCode, Error> {
+        // Override baseline with resolved value (command-line takes precedence over config)
+        if self.baseline.is_none() {
+            self.baseline = self.resolve_baseline(config_baseline);
+        }
         if let Some(min_level) = self.minimum_report_level {
             let unfiltered_count = issues.len();
             issues = issues.with_minimum_level(min_level);

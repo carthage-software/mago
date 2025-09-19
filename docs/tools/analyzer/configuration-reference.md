@@ -13,6 +13,9 @@ redundancy-issues = false
 
 # Ignore a specific error code across the whole project
 ignore = ["mixed-argument"]
+
+# Use a baseline file to ignore existing issues
+baseline = "analyzer-baseline.toml"
 ```
 
 ## General options
@@ -21,6 +24,7 @@ ignore = ["mixed-argument"]
 | :--------- | :--------- | :------ | :--------------------------------------------------------- |
 | `excludes` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from analysis. |
 | `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally.         |
+| `baseline` | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 
 ## Issue categories
 

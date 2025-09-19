@@ -97,6 +97,13 @@ impl AnalyzeCommand {
         let mut issues = analysis_results.issues;
         issues.filter_out_ignored(&configuration.analyzer.ignore);
 
-        self.reporting.process_issues(issues, configuration, should_use_colors, final_database)
+        let config_baseline = configuration.analyzer.baseline.clone();
+        self.reporting.process_issues_with_baseline(
+            issues,
+            configuration,
+            should_use_colors,
+            final_database,
+            config_baseline.as_deref(),
+        )
     }
 }

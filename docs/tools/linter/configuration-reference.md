@@ -11,6 +11,7 @@ title: Linter configuration reference
 [linter]
 integrations = ["symfony", "phpunit"]
 excludes = ["src/Generated/"]
+baseline = "linter-baseline.toml"
 
 [linter.rules]
 # Disable a rule completely
@@ -29,6 +30,7 @@ cyclomatic-complexity = { threshold = 20 }
 | :------------- | :--------- | :------ | :--------------------------------------------------------------------------- |
 | `excludes`     | `string[]` | `[]`    | A list of paths or glob patterns to exclude from linting.                    |
 | `integrations` | `string[]` | `[]`    | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
+| `baseline`     | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the linter will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 
 ## `[linter.rules]`
 

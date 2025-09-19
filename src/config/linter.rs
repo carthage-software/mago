@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,4 +17,7 @@ pub struct LinterConfiguration {
 
     /// Settings for various linting rules.
     pub rules: RulesSettings,
+
+    /// Path to a baseline file to ignore listed issues.
+    pub baseline: Option<PathBuf>,
 }
