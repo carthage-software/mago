@@ -218,6 +218,16 @@ pub fn populate_codebase(
             symbol_references.add_symbol_reference_to_symbol(*name, attribute_metadata.name, true);
         }
 
+        if let Some(type_metadata) = &mut constant.type_metadata {
+            populate_union_type(
+                &mut type_metadata.type_union,
+                &codebase.symbols,
+                Some(&ReferenceSource::Symbol(true, *name)),
+                symbol_references,
+                !safe_symbols.contains(name),
+            );
+        }
+
         if let Some(inferred_type) = &mut constant.inferred_type {
             populate_union_type(
                 inferred_type,

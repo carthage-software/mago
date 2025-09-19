@@ -30,14 +30,17 @@ use crate::ttype::get_float;
 use crate::ttype::get_int;
 use crate::ttype::get_int_or_float;
 use crate::ttype::get_literal_int;
+use crate::ttype::get_mixed_keyed_array;
 use crate::ttype::get_never;
 use crate::ttype::get_non_empty_string;
 use crate::ttype::get_non_negative_int;
 use crate::ttype::get_null;
+use crate::ttype::get_object;
 use crate::ttype::get_open_resource;
 use crate::ttype::get_positive_int;
 use crate::ttype::get_string;
 use crate::ttype::get_true;
+use crate::ttype::get_void;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::utils::str_is_numeric;
@@ -116,6 +119,20 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
                         operand_type
                     })
                 }
+                UnaryPrefixOperator::ArrayCast(_, _) => Some(get_mixed_keyed_array()),
+                UnaryPrefixOperator::BoolCast(_, _) => Some(get_bool()),
+                UnaryPrefixOperator::BooleanCast(_, _) => Some(get_bool()),
+                UnaryPrefixOperator::DoubleCast(_, _) => Some(get_float()),
+                UnaryPrefixOperator::RealCast(_, _) => Some(get_float()),
+                UnaryPrefixOperator::FloatCast(_, _) => Some(get_float()),
+                UnaryPrefixOperator::IntCast(_, _) => Some(get_int()),
+                UnaryPrefixOperator::IntegerCast(_, _) => Some(get_int()),
+                UnaryPrefixOperator::ObjectCast(_, _) => Some(get_object()),
+                UnaryPrefixOperator::UnsetCast(_, _) => Some(get_null()),
+                UnaryPrefixOperator::StringCast(_, _) => Some(get_string()),
+                UnaryPrefixOperator::BinaryCast(_, _) => Some(get_string()),
+                UnaryPrefixOperator::VoidCast(_, _) => Some(get_void()),
+                UnaryPrefixOperator::Not(_) => Some(get_bool()),
                 _ => None,
             }
         }

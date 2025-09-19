@@ -301,6 +301,7 @@ final class AnalyzerCodeModuleGenerator
         'reference-reused-from-confusing-scope',
         'non-documented-method',
         'non-documented-property',
+        'non-documented-constant',
     ];
 
     /**

@@ -60,7 +60,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
             );
         }
 
-        let mut constant_type = constant_metadata.inferred_type.clone().unwrap_or_else(get_mixed);
+        let mut constant_type = match &constant_metadata.type_metadata {
+            Some(t) => t.type_union.clone(),
+            None => match &constant_metadata.inferred_type {
+                Some(t) => t.clone(),
+                _ => get_mixed(),
+            },
+        };
 
         expander::expand_union(context.codebase, &mut constant_type, &TypeExpansionOptions::default());
 

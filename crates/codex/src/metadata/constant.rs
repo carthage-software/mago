@@ -8,6 +8,7 @@ use mago_span::Span;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::ttype::TypeMetadata;
 use crate::ttype::union::TUnion;
 
 /// Contains metadata associated with a global constant defined using `const`.
@@ -19,6 +20,7 @@ pub struct ConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
     pub name: Atom,
     pub span: Span,
+    pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TUnion>,
     pub flags: MetadataFlags,
     pub issues: Vec<Issue>,
@@ -33,7 +35,7 @@ impl ConstantMetadata {
     /// * `span`: The source code location of this specific constant's definition item (`NAME = value`).
     #[inline]
     pub fn new(name: Atom, span: Span, flags: MetadataFlags) -> Self {
-        Self { attributes: Vec::new(), name, span, flags, inferred_type: None, issues: Vec::new() }
+        Self { attributes: Vec::new(), name, span, flags, type_metadata: None, inferred_type: None, issues: Vec::new() }
     }
 
     /// Returns a mutable slice of docblock issues.

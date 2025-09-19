@@ -236,8 +236,10 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_in_constant(&mut self, constant: &'arena Constant<'arena>, context: &mut Context<'ctx, 'arena>) {
-        for metadata in scan_constant(constant, context) {
-            self.codebase.constants.insert(metadata.name, metadata);
+        let constants = scan_constant(constant, context, self.get_current_type_resolution_context(), &self.scope);
+
+        for constant_metadata in constants {
+            self.codebase.constants.insert(constant_metadata.name, constant_metadata);
         }
     }
 
@@ -247,9 +249,13 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         function_call: &'arena FunctionCall<'arena>,
         context: &mut Context<'ctx, 'arena>,
     ) {
-        if let Some(metadata) = scan_defined_constant(function_call, context) {
-            self.codebase.constants.insert(metadata.name, metadata);
-        }
+        let Some(constant_metadata) =
+            scan_defined_constant(function_call, context, self.get_current_type_resolution_context(), &self.scope)
+        else {
+            return;
+        };
+
+        self.codebase.constants.insert(constant_metadata.name, constant_metadata);
     }
 
     #[inline]

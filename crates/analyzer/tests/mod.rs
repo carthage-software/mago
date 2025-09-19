@@ -176,6 +176,7 @@ test_case!(array_shape_access);
 test_case!(closure_wrap);
 test_case!(arguments_unpacking);
 test_case!(unknown_named_args);
+test_case!(constant_type);
 
 // Github Issues
 test_case!(issue_275);
