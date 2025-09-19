@@ -44,7 +44,7 @@ class CURLFile
     }
 }
 
-function curl_init(null|string $url): CurlHandle|false
+function curl_init(null|string $url = null): CurlHandle|false
 {
 }
 
