@@ -48,5 +48,5 @@ The `ast` command only reports parsing errors. Auto-fixing and baseline features
 ### Help
 
 | Flag, Alias(es) | Description                             |
-| :-------------- | :-------------------------------------- | --------------- |
-| `--help`, `-h`  | Print the help summary for the command. | or the command. |
+| :-------------- | :-------------------------------------- |
+| `--help`, `-h`  | Print the help summary for the command. |
