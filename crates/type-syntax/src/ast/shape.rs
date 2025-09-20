@@ -29,8 +29,14 @@ pub struct ShapeType<'input> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum ShapeKey<'input> {
+    String { value: &'input str, span: Span },
+    Integer { value: i64, span: Span },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ShapeFieldKey<'input> {
-    pub name: Box<Type<'input>>,
+    pub key: ShapeKey<'input>,
     pub question_mark: Option<Span>,
     pub colon: Span,
 }
@@ -90,9 +96,18 @@ impl HasSpan for ShapeType<'_> {
     }
 }
 
+impl HasSpan for ShapeKey<'_> {
+    fn span(&self) -> Span {
+        match self {
+            ShapeKey::String { span, .. } => *span,
+            ShapeKey::Integer { span, .. } => *span,
+        }
+    }
+}
+
 impl HasSpan for ShapeFieldKey<'_> {
     fn span(&self) -> Span {
-        self.name.span().join(self.colon)
+        self.key.span().join(self.colon)
     }
 }
 
@@ -117,9 +132,18 @@ impl HasSpan for ShapeAdditionalFields<'_> {
     }
 }
 
+impl std::fmt::Display for ShapeKey<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShapeKey::String { value, .. } => write!(f, "{}", value),
+            ShapeKey::Integer { value, .. } => write!(f, "{}", value),
+        }
+    }
+}
+
 impl std::fmt::Display for ShapeFieldKey<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}:", self.name, self.question_mark.as_ref().map_or("", |_| "?"))
+        write!(f, "{}{}:", self.key, self.question_mark.as_ref().map_or("", |_| "?"))
     }
 }
 

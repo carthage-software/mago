@@ -12,6 +12,13 @@
  *  list: list<int>,
  *  int: int,
  *  float?: float,
+ *  self: int,
+ *  static: int,
+ *  parent: int,
+ *  true: int,
+ *  false: int,
+ *  null: int,
+ *  0b1010: int,
  * }
  */
 function example(): array
@@ -26,5 +33,12 @@ function example(): array
         'unquoted-key' => 'value',
         'list' => [1, 2, 3],
         'int' => 100,
+        'self' => 1,
+        'static' => 2,
+        'parent' => 3,
+        'true' => 1,
+        'false' => 0,
+        'null' => 0,
+        0b1010 => 10,
     ]; // no `float` key as it is optional
 }

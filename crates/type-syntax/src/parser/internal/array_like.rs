@@ -1,5 +1,7 @@
 use mago_database::file::HasFileId;
+use mago_span::Position;
 use mago_span::Span;
+use mago_syntax_core::utils::parse_literal_integer;
 
 use crate::ast::*;
 use crate::error::ParseError;
@@ -133,7 +135,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                 let field = ShapeField {
                     key: if has_key {
                         Some(ShapeFieldKey {
-                            name: Box::new(parse_shape_field_key(stream)?),
+                            key: parse_shape_field_key(stream)?,
                             question_mark: if stream.is_at(TypeTokenKind::Question)? {
                                 Some(stream.consume()?.span)
                             } else {
@@ -172,29 +174,59 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
     }))
 }
 
-pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
-    let (is_next_literal_int, is_next_colon, is_next_question_mark) = if let Some(next) = stream.lookahead(1)? {
-        (
-            next.kind == TypeTokenKind::LiteralInteger,
-            next.kind == TypeTokenKind::Colon,
-            next.kind == TypeTokenKind::Question,
-        )
-    } else {
-        (false, false, false)
-    };
+pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<ShapeKey<'input>, ParseError> {
+    if stream.is_at(TypeTokenKind::LiteralString)? {
+        let token = stream.consume()?;
+        let value = &token.value[1..token.value.len() - 1];
 
-    let is_negated_or_posited = stream.is_at(TypeTokenKind::Plus)? || stream.is_at(TypeTokenKind::Minus)?;
-
-    let is_literal_string = stream.is_at(TypeTokenKind::LiteralString)? && (is_next_colon || is_next_question_mark);
-    let is_literal_integer = stream.is_at(TypeTokenKind::LiteralInteger)? && (is_next_colon || is_next_question_mark);
-    let is_negated_or_posited_integer = is_negated_or_posited && is_next_literal_int;
-
-    if is_literal_integer || is_literal_string || is_negated_or_posited_integer {
-        return parse_type(stream);
+        return Ok(ShapeKey::String { value, span: token.span });
     }
 
-    let mut starting_position = None;
-    let mut ending_position = None;
+    if stream.is_at(TypeTokenKind::LiteralInteger)? {
+        let token = stream.consume()?;
+        let value = parse_literal_integer(token.value).unwrap_or_else(|| {
+            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
+        }) as i64;
+
+        return Ok(ShapeKey::Integer { value, span: token.span });
+    }
+
+    if (stream.is_at(TypeTokenKind::Plus)? || stream.is_at(TypeTokenKind::Minus)?)
+        && stream
+            .lookahead(1)?
+            .is_some_and(|t| t.kind == TypeTokenKind::LiteralInteger || t.kind == TypeTokenKind::LiteralFloat)
+    {
+        let sign_token = stream.consume()?;
+        let is_negative = sign_token.kind == TypeTokenKind::Minus;
+
+        if stream.is_at(TypeTokenKind::LiteralInteger)? {
+            let token = stream.consume()?;
+            let value = parse_literal_integer(token.value).unwrap_or_else(|| {
+                unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
+            }) as i64;
+
+            return Ok(ShapeKey::Integer {
+                value: if is_negative { -value } else { value },
+                span: Span::new(stream.file_id(), sign_token.span.start, token.span.end),
+            });
+        } else if stream.is_at(TypeTokenKind::LiteralFloat)? {
+            let token = stream.consume()?;
+            return Ok(ShapeKey::String {
+                value: stream.lexer.slice_in_range(sign_token.span.start.offset, token.span.end.offset),
+                span: Span::new(stream.file_id(), sign_token.span.start, token.span.end),
+            });
+        }
+    }
+
+    if stream.is_at(TypeTokenKind::LiteralFloat)? {
+        let token = stream.consume()?;
+        return Ok(ShapeKey::String { value: token.value, span: token.span });
+    }
+
+    let mut key_parts = Vec::new();
+    let mut start_offset = None;
+    let mut end_offset = None;
+
     loop {
         let current = stream.peek()?;
 
@@ -202,47 +234,48 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             || (current.kind == TypeTokenKind::Question
                 && stream.lookahead(1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon))
         {
-            if starting_position.is_none() {
-                return Err(ParseError::UnexpectedToken(
-                    vec![TypeTokenKind::LiteralString, TypeTokenKind::LiteralInteger],
-                    current.kind,
-                    current.span,
-                ));
-            }
-
             break;
+        }
+
+        match current.kind {
+            TypeTokenKind::Comma
+            | TypeTokenKind::RightBrace
+            | TypeTokenKind::LeftBrace
+            | TypeTokenKind::LeftParenthesis
+            | TypeTokenKind::RightParenthesis
+            | TypeTokenKind::LeftBracket
+            | TypeTokenKind::RightBracket
+            | TypeTokenKind::Ellipsis => {
+                break;
+            }
+            _ => {}
         }
 
         let token = stream.consume()?;
 
-        if starting_position.is_none() {
-            starting_position = Some(token.span.start);
+        if start_offset.is_none() {
+            start_offset = Some(token.span.start.offset);
         }
+        end_offset = Some(token.span.end.offset);
 
-        ending_position = Some(token.span.end);
+        key_parts.push(token.value);
     }
 
-    let Some(start) = starting_position else {
+    if key_parts.is_empty() {
         return Err(ParseError::UnexpectedToken(
-            vec![TypeTokenKind::LiteralString, TypeTokenKind::LiteralInteger],
-            TypeTokenKind::Colon,
+            vec![TypeTokenKind::LiteralString, TypeTokenKind::LiteralInteger, TypeTokenKind::Identifier],
+            stream.peek()?.kind,
             stream.peek()?.span,
         ));
-    };
+    }
 
-    let Some(end) = ending_position else {
-        return Err(ParseError::UnexpectedToken(
-            vec![TypeTokenKind::LiteralString, TypeTokenKind::LiteralInteger],
-            TypeTokenKind::Colon,
-            stream.peek()?.span,
-        ));
-    };
+    // Combine all parts into a single string key
+    let start = start_offset.unwrap();
+    let end = end_offset.unwrap();
+    let key_value = stream.lexer.slice_in_range(start, end);
 
-    Ok(Type::Reference(ReferenceType {
-        identifier: Identifier {
-            span: Span::new(stream.file_id(), start, end),
-            value: stream.lexer.slice_in_range(start.offset, end.offset),
-        },
-        parameters: None,
-    }))
+    Ok(ShapeKey::String {
+        value: key_value,
+        span: Span::new(stream.file_id(), Position::new(start), Position::new(end)),
+    })
 }

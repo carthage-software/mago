@@ -41,6 +41,7 @@ pub fn parse_str(span: Span, input: &str) -> Result<Type<'_>, ParseError> {
 #[cfg(test)]
 mod tests {
     use mago_database::file::FileId;
+    use mago_span::HasSpan;
     use mago_span::Position;
     use mago_span::Span;
 
@@ -251,10 +252,7 @@ mod tests {
         assert!(shape.additional_fields.is_none());
 
         let field = &shape.fields[0];
-        assert!(matches!(
-            field.key.as_ref().map(|k| k.name.as_ref()),
-            Some(Type::LiteralString(LiteralStringType { raw: "'name'", value: "name", .. }))
-        ));
+        assert!(matches!(field.key.as_ref().map(|k| &k.key), Some(ShapeKey::String { value: "name", .. })));
         assert!(matches!(field.value.as_ref(), Type::String(_)));
     }
 
@@ -264,16 +262,10 @@ mod tests {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 2);
                 let first_field = &shape.fields[0];
-                assert!(matches!(
-                    first_field.key.as_ref().map(|k| k.name.as_ref()),
-                    Some(Type::LiteralInt(LiteralIntType { value: 0, .. }))
-                ));
+                assert!(matches!(first_field.key.as_ref().map(|k| &k.key), Some(ShapeKey::Integer { value: 0, .. })));
                 assert!(matches!(first_field.value.as_ref(), Type::String(_)));
                 let second_field = &shape.fields[1];
-                assert!(matches!(
-                    second_field.key.as_ref().map(|k| k.name.as_ref()),
-                    Some(Type::LiteralInt(LiteralIntType { value: 1, .. }))
-                ));
+                assert!(matches!(second_field.key.as_ref().map(|k| &k.key), Some(ShapeKey::Integer { value: 1, .. })));
                 assert!(matches!(second_field.value.as_ref(), Type::Bool(_)));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -311,16 +303,16 @@ mod tests {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 2);
 
-                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "key-with-dash");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[0].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "key-with-dash");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
 
-                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "key-with---multiple-dashes");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[1].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "key-with---multiple-dashes");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -333,28 +325,28 @@ mod tests {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 4);
 
-                if let Some(Type::Reference(r)) = shape.fields[0].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "list");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[0].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "list");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
 
-                if let Some(Type::Reference(r)) = shape.fields[1].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "int");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[1].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "int");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
 
-                if let Some(Type::Reference(r)) = shape.fields[2].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "string");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[2].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "string");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
 
-                if let Some(Type::Reference(r)) = shape.fields[3].key.as_ref().map(|k| k.name.as_ref()) {
-                    assert_eq!(r.identifier.value, "bool");
+                if let Some(ShapeKey::String { value: s, .. }) = shape.fields[3].key.as_ref().map(|k| &k.key) {
+                    assert_eq!(*s, "bool");
                 } else {
-                    panic!("Expected key to be a Type::Reference");
+                    panic!("Expected key to be a ShapeKey::String");
                 }
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1097,18 +1089,352 @@ mod tests {
                 let first_field = &shape.fields[0];
                 assert!(first_field.is_optional());
                 assert!(matches!(
-                    first_field.key.as_ref().map(|k| k.name.as_ref()),
-                    Some(Type::LiteralString(LiteralStringType { raw: "'salt'", value: "salt", .. }))
+                    first_field.key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "salt", .. })
                 ));
                 assert!(matches!(first_field.value.as_ref(), Type::Int(_)));
 
                 let second_field = &shape.fields[1];
                 assert!(second_field.is_optional());
                 assert!(matches!(
-                    second_field.key.as_ref().map(|k| k.name.as_ref()),
-                    Some(Type::LiteralString(LiteralStringType { raw: "'cost'", value: "cost", .. }))
+                    second_field.key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "cost", .. })
                 ));
                 assert!(matches!(second_field.value.as_ref(), Type::Int(_)));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_keyword_keys() {
+        match do_parse("array{string: int, bool: string, int: float, mixed: object}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 4);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "string", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "bool", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "int", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[3].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "mixed", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_negated_integer_keys() {
+        match do_parse("array{-1: string, -42: int, +5: bool}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 3);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: -1, .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: -42, .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: 5, .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_float_keys() {
+        match do_parse("array{123.4: string, -1.2: int, +0.5: bool}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 3);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "123.4", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "-1.2", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "+0.5", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_complex_identifier_keys() {
+        match do_parse(
+            "array{key_with_underscore: int, key-with-dash: string, key\\with\\backslash: bool, +key: mixed, -key: object, \\leading_backslash: int}",
+        ) {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 6);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "key_with_underscore", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "key-with-dash", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "key\\with\\backslash", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[3].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "+key", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[4].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "-key", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[5].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "\\leading_backslash", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_optional_keys_with_question_mark_in_name() {
+        match do_parse("array{key?name: int, regular?: string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 2);
+
+                assert!(!shape.fields[0].is_optional());
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "key?name", .. })
+                ));
+
+                assert!(shape.fields[1].is_optional());
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "regular", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_integer_formats() {
+        match do_parse("array{42: string, 0x2A: int, 0b101010: bool, 0o52: mixed}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 4);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: 42, .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: 42, .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: 42, .. })
+                ));
+                assert!(matches!(
+                    shape.fields[3].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::Integer { value: 42, .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_quoted_vs_unquoted_keys() {
+        match do_parse("array{'string': int, \"double\": bool, unquoted: mixed}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 3);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "string", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "double", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "unquoted", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_all_keyword_types() {
+        let keywords = vec![
+            "list", "int", "integer", "string", "float", "double", "real", "bool", "boolean", "false", "true",
+            "object", "callable", "array", "iterable", "null", "mixed", "resource", "void", "scalar", "numeric",
+            "never", "nothing", "as", "is", "not", "min", "max",
+        ];
+
+        for keyword in keywords {
+            let input = format!("array{{{}: string}}", keyword);
+            match do_parse(&input) {
+                Ok(Type::Shape(shape)) => {
+                    assert_eq!(shape.fields.len(), 1);
+                    assert!(
+                        matches!(
+                            shape.fields[0].key.as_ref().map(|k| &k.key),
+                            Some(ShapeKey::String { value, .. }) if *value == keyword
+                        ),
+                        "Failed for keyword: {}",
+                        keyword
+                    );
+                }
+                res => panic!("Expected Ok(Type::Shape) for keyword '{}', got {res:?}", keyword),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_php_specific_keywords() {
+        match do_parse("array{self: string, static: int, parent: bool, class: mixed, __CLASS__: object}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 5);
+
+                assert!(matches!(
+                    shape.fields[0].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "self", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[1].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "static", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[2].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "parent", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[3].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "class", .. })
+                ));
+                assert!(matches!(
+                    shape.fields[4].key.as_ref().map(|k| &k.key),
+                    Some(ShapeKey::String { value: "__CLASS__", .. })
+                ));
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_shape_key_spans() {
+        match do_parse("array{test: string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let field = &shape.fields[0];
+
+                if let Some(key) = &field.key {
+                    let span = key.key.span();
+                    assert!(span.start.offset < span.end.offset, "Span should have valid start/end");
+
+                    assert_eq!(span.end.offset - span.start.offset, 4, "Span should cover 'test' (4 characters)");
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_shape_key_spans_quoted() {
+        match do_parse("array{'hello': string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let field = &shape.fields[0];
+
+                if let Some(key) = &field.key {
+                    let span = key.key.span();
+                    assert_eq!(span.end.offset - span.start.offset, 7, "Span should cover 'hello' including quotes");
+
+                    assert!(matches!(&key.key, ShapeKey::String { value: "hello", .. }));
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_shape_key_spans_integer() {
+        match do_parse("array{42: string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let field = &shape.fields[0];
+
+                if let Some(key) = &field.key {
+                    let span = key.key.span();
+                    assert_eq!(span.end.offset - span.start.offset, 2, "Span should cover '42' (2 characters)");
+
+                    assert!(matches!(&key.key, ShapeKey::Integer { value: 42, .. }));
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_shape_key_spans_negated_integer() {
+        match do_parse("array{-123: string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let field = &shape.fields[0];
+
+                if let Some(key) = &field.key {
+                    let span = key.key.span();
+                    assert_eq!(span.end.offset - span.start.offset, 4, "Span should cover '-123' (4 characters)");
+
+                    assert!(matches!(&key.key, ShapeKey::Integer { value: -123, .. }));
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_shape_key_spans_complex_identifiers() {
+        match do_parse("array{complex-key_name: string}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let field = &shape.fields[0];
+
+                if let Some(key) = &field.key {
+                    let span = key.key.span();
+                    assert_eq!(
+                        span.end.offset - span.start.offset,
+                        16,
+                        "Span should cover 'complex-key_name' (16 characters)"
+                    );
+
+                    assert!(matches!(&key.key, ShapeKey::String { value: "complex-key_name", .. }));
+                }
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
         }
