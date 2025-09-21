@@ -30,7 +30,6 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::expression::get_expression_id;
-use crate::utils::expression::get_root_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Match<'arena> {
     fn analyze<'ctx>(
@@ -118,7 +117,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             return Ok(());
         }
 
-        let (is_synthetic, subject_id, root_subject_id, subject_for_conditions) = self.get_subject_info(&subject_type);
+        let (is_synthetic, subject_id, subject_for_conditions) = self.get_subject_info(&subject_type);
 
         let mut arm_body_types: Vec<Rc<TUnion>> = Vec::new();
         let mut arm_exit_contexts: Vec<BlockContext<'ctx>> = Vec::new();
@@ -126,16 +125,25 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         let last_expression_arm_index = expression_arms.len().saturating_sub(1);
         let mut previous_arms_executed = ArmExecutionStatus::Never;
 
+        let mut changed_variables = HashSet::default();
+        let mut is_exhaustive = false;
         for (i, expression_arm) in expression_arms.iter().enumerate() {
+            is_exhaustive = is_exhaustive || {
+                running_else_context.locals.get(&subject_id).is_some_and(|t| t.is_never())
+                    || changed_variables
+                        .iter()
+                        .any(|var_id| running_else_context.locals.get(var_id).is_some_and(|t| t.is_never()))
+            };
+
             let is_last_arm = i == last_expression_arm_index && first_default_arm.is_none();
             let arm_status = self.analyze_expression_arm(
                 &subject_for_conditions,
-                &subject_id,
                 expression_arm,
                 &mut running_else_context,
                 &mut arm_body_types,
                 &mut arm_exit_contexts,
                 is_last_arm,
+                is_exhaustive,
             )?;
 
             if arm_status != ArmExecutionStatus::Never {
@@ -159,7 +167,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                     &reconcilable_else_types,
                     Default::default(),
                     &mut running_else_context,
-                    &mut HashSet::default(),
+                    &mut changed_variables,
                     &else_referenced_ids,
                     &expression_arm.span(),
                     false,
@@ -168,26 +176,27 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             }
         }
 
+        is_exhaustive = is_exhaustive || {
+            running_else_context.locals.get(&subject_id).is_some_and(|t| t.is_never())
+                || changed_variables
+                    .iter()
+                    .any(|var_id| running_else_context.locals.get(var_id).is_some_and(|t| t.is_never()))
+        };
+
         if let Some(default_arm) = first_default_arm {
             self.analyze_default_arm(
-                &subject_id,
-                root_subject_id.as_deref(),
                 default_arm,
                 &mut running_else_context,
                 &mut arm_body_types,
                 &mut arm_exit_contexts,
                 previous_arms_executed,
+                is_exhaustive,
             )?;
+
+            is_exhaustive = true;
         }
 
         if first_default_arm.is_none() {
-            let is_exhaustive = {
-                running_else_context.locals.get(&subject_id).is_some_and(|t| t.is_never())
-                    || root_subject_id.is_some_and(|root_subject_id| {
-                        running_else_context.locals.get(&root_subject_id).is_some_and(|t| t.is_never())
-                    })
-            };
-
             if !is_exhaustive {
                 let unhandled_type =
                     running_else_context.locals.get(&subject_id).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
@@ -215,14 +224,14 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         Ok(())
     }
 
-    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, String, Option<String>, Expression<'arena>) {
+    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, String, Expression<'arena>) {
         if let Some(id) = get_expression_id(
             self.stmt.expression,
             self.block_context.scope.get_class_like_name(),
             self.context.resolved_names,
             Some(self.context.codebase),
         ) {
-            (false, id, get_root_expression_id(self.stmt.expression), self.stmt.expression.clone())
+            (false, id, self.stmt.expression.clone())
         } else {
             let subject_id =
                 format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);
@@ -230,27 +239,26 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             let subject_for_conditions =
                 new_synthetic_variable(self.context.arena, &subject_id, self.stmt.expression.span());
 
-            (true, subject_id, None, subject_for_conditions)
+            (true, subject_id, subject_for_conditions)
         }
     }
 
     fn analyze_expression_arm(
         &mut self,
         subject_expr: &Expression<'arena>,
-        subject_id: &str,
         expression_arm: &MatchExpressionArm<'arena>,
         running_else_context: &mut BlockContext<'ctx>,
         arm_body_types: &mut Vec<Rc<TUnion>>,
         arm_exit_contexts: &mut Vec<BlockContext<'ctx>>,
         is_last: bool,
+        is_exhaustive: bool,
     ) -> Result<ArmExecutionStatus, AnalysisError> {
-        let subject_type = running_else_context.locals.get(subject_id).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
-
-        if subject_type.is_never() {
+        if is_exhaustive {
             self.report_unreachable_arm(
                 expression_arm,
                 "All possible types for the subject have been handled by previous arms.",
             );
+
             return Ok(ArmExecutionStatus::Never);
         }
 
@@ -352,26 +360,18 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
 
     fn analyze_default_arm(
         &mut self,
-        subject_id: &str,
-        root_subject_id: Option<&str>,
         default_arm: &'ast MatchDefaultArm<'arena>,
         running_else_context: &mut BlockContext<'ctx>,
         arm_body_types: &mut Vec<Rc<TUnion>>,
         arm_exit_contexts: &mut Vec<BlockContext<'ctx>>,
         previous_arms_executed: ArmExecutionStatus,
+        is_exhaustive: bool,
     ) -> Result<(), AnalysisError> {
         if previous_arms_executed == ArmExecutionStatus::Never {
             self.report_default_always_executed(default_arm);
         }
 
-        let is_unreachable = {
-            running_else_context.locals.get(subject_id).is_some_and(|t| t.is_never())
-                || root_subject_id.is_some_and(|root_subject_id| {
-                    running_else_context.locals.get(root_subject_id).is_some_and(|t| t.is_never())
-                })
-        };
-
-        if is_unreachable {
+        if is_exhaustive {
             self.report_unreachable_default_arm(default_arm);
 
             return Ok(());

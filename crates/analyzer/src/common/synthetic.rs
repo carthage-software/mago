@@ -45,7 +45,12 @@ pub fn new_synthetic_disjunctive_identity<'ast, 'arena>(
     left: &'ast Expression<'arena>,
     right: Vec<&'ast Expression<'arena>>,
 ) -> Expression<'arena> {
-    let mut expr = new_synthetic_identical(arena, subject, left);
+    let mut expr = match subject {
+        Expression::Literal(Literal::False(_)) => new_synthetic_negation(arena, left),
+        Expression::Literal(Literal::True(_)) => left.clone(),
+        _ => new_synthetic_identical(arena, subject, left),
+    };
+
     for r in right {
         expr = new_synthetic_or(arena, &expr, &new_synthetic_identical(arena, subject, r));
     }
