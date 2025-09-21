@@ -177,6 +177,8 @@ test_case!(closure_wrap);
 test_case!(arguments_unpacking);
 test_case!(unknown_named_args);
 test_case!(constant_type);
+test_case!(match_true_and_false);
+test_case!(array_reconcile);
 
 // Github Issues
 test_case!(issue_275);

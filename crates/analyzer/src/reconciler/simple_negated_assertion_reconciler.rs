@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
@@ -11,6 +13,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
@@ -314,6 +317,16 @@ fn subtract_list_array(
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
+    let assertion_type = assertion.get_type();
+    let list_to_subtract = if let Some(TAtomic::Array(TArray::List(list))) = assertion_type
+        && list.element_type.is_never()
+        && list.known_elements.is_some()
+    {
+        Some(list)
+    } else {
+        None
+    };
+
     for atomic in new_var_type.types.to_mut().drain(..) {
         if let TAtomic::GenericParameter(generic_parameter) = &atomic {
             if !is_equality && !generic_parameter.constraint.is_mixed() {
@@ -327,10 +340,21 @@ fn subtract_list_array(
             }
 
             did_remove_type = true;
-        } else if let TAtomic::Array(TArray::List(_)) = atomic {
+        } else if let TAtomic::Array(TArray::List(existing_list)) = &atomic
+            && existing_list.element_type.is_never()
+            && existing_list.known_elements.is_some()
+        {
             did_remove_type = true;
 
-            if is_equality {
+            if let Some(list_to_subtract) = list_to_subtract {
+                if let Some(subtracted_lists) = subtract_list_elements(existing_list, list_to_subtract) {
+                    for subtracted_list in subtracted_lists {
+                        acceptable_types.push(TAtomic::Array(TArray::List(subtracted_list)));
+                    }
+                } else {
+                    acceptable_types.push(atomic);
+                }
+            } else {
                 acceptable_types.push(atomic);
             }
         } else if let TAtomic::Array(TArray::Keyed(_)) = atomic {
@@ -1383,4 +1407,202 @@ fn reconcile_no_nonnull_entry_for_key(existing_var_type: &TUnion, key_name: &Arr
     }
 
     existing_var_type
+}
+
+/// Subtracts a specific list type from an existing list type by generating all possible
+/// combinations and removing the specific combination being subtracted.
+///
+/// This function handles cases like `list{bool, bool} - list{true, true}` by:
+///
+/// 1. Expanding `list{bool, bool}` to all concrete combinations: `[true,true]`, `[true,false]`, `[false,true]`, `[false,false]`
+/// 2. Removing the specific combination `[true,true]`
+/// 3. Returning the remaining combinations as separate TList objects
+///
+/// # Arguments
+///
+/// * `existing_list` - The list type to subtract from (e.g., `list{bool, bool}`)
+/// * `list_to_subtract` - The specific list type to subtract (e.g., `list{true, true}`)
+///
+/// # Returns
+///
+/// * `Some(Vec<TList>)` - Vector of remaining list combinations after subtraction
+/// * `None` - If subtraction cannot be performed (e.g., different sizes or no known elements)
+fn subtract_list_elements(existing_list: &TList, list_to_subtract: &TList) -> Option<Vec<TList>> {
+    if let (Some(existing_elements), Some(subtract_elements)) =
+        (&existing_list.known_elements, &list_to_subtract.known_elements)
+    {
+        let existing_size = existing_elements.len();
+        let subtract_size = subtract_elements.len();
+
+        if existing_size == subtract_size {
+            let all_combinations = generate_all_combinations(existing_elements);
+
+            let subtract_combination = extract_specific_combination(subtract_elements);
+
+            let mut remaining_combinations: Vec<Vec<TAtomic>> = Vec::with_capacity(all_combinations.len());
+
+            for current_combination in all_combinations {
+                if !combinations_are_equal(&current_combination, &subtract_combination) {
+                    remaining_combinations.push(current_combination);
+                }
+            }
+
+            // Step 4: Convert remaining combinations to TList objects
+            let mut result_lists = Vec::with_capacity(remaining_combinations.len());
+            for atomic_combination in remaining_combinations {
+                let mut known_elements = BTreeMap::new();
+                for (element_index, atomic_type) in atomic_combination.into_iter().enumerate() {
+                    let single_element_union = TUnion::from_atomic(atomic_type);
+                    known_elements.insert(element_index, (false, single_element_union));
+                }
+
+                let mut result_list = TList::new(Box::new(get_never()));
+                result_list.known_elements = Some(known_elements);
+                result_list.known_count = Some(existing_size);
+                result_list.non_empty = existing_list.non_empty || existing_size > 0;
+                if result_lists.iter().any(|existing_list| existing_list == &result_list) {
+                    continue;
+                }
+
+                result_lists.push(result_list);
+            }
+
+            return Some(result_lists);
+        }
+    }
+
+    // For other cases, fall back to the old behavior
+    None
+}
+
+/// Generates all possible combinations from a list's elements by expanding union types
+/// to their concrete atomic components.
+///
+/// For example, if given elements `[bool, bool]`, this will expand to:
+/// `[[true, true], [true, false], [false, true], [false, false]]`
+///
+/// # Arguments
+/// * `existing_elements` - Map of element positions to their union types
+///
+/// # Returns
+/// * `Vec<Vec<TAtomic>>` - All possible combinations as vectors of atomic types
+fn generate_all_combinations(existing_elements: &BTreeMap<usize, (bool, TUnion)>) -> Vec<Vec<TAtomic>> {
+    let element_count = existing_elements.len();
+    if element_count == 0 {
+        return vec![];
+    }
+
+    // Extract and expand element types in order
+    let mut element_types = Vec::with_capacity(element_count);
+    for i in 0..element_count {
+        if let Some((_, element_type)) = existing_elements.get(&i) {
+            let expanded_atomics = expand_union_to_concrete_types(element_type);
+            element_types.push(expanded_atomics);
+        }
+    }
+
+    let expected_combinations = element_types.iter().map(|types| types.len()).product::<usize>();
+    let mut all_combinations = Vec::with_capacity(expected_combinations);
+
+    // Generate cartesian product of all possible element combinations
+    generate_cartesian_product(&element_types, 0, Vec::with_capacity(element_count), &mut all_combinations);
+
+    all_combinations
+}
+
+/// Expands a union type to its concrete atomic components.
+///
+/// For example, a general `bool` type is expanded to `[true, false]`.
+/// Other atomic types are kept as-is.
+///
+/// # Arguments
+///
+/// * `union_type` - The union type to expand
+///
+/// # Returns
+///
+/// * `Vec<TAtomic>` - Vector of concrete atomic types
+fn expand_union_to_concrete_types(union_type: &TUnion) -> Vec<TAtomic> {
+    let mut expanded_atomics = Vec::new();
+
+    for atomic in union_type.types.as_ref() {
+        match atomic {
+            // General bool type expands to true and false
+            TAtomic::Scalar(TScalar::Bool(bool_type)) if bool_type.value.is_none() => {
+                expanded_atomics.push(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) })));
+                expanded_atomics.push(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })));
+            }
+            // For specific values or other types, keep as-is
+            _ => expanded_atomics.push(atomic.clone()),
+        }
+    }
+
+    expanded_atomics
+}
+
+/// Recursively generates the cartesian product of multiple sets of atomic types.
+///
+/// This is a helper function that builds all possible combinations by selecting
+/// one element from each set and combining them.
+///
+/// # Arguments
+/// * `element_types` - Array of sets, where each set contains possible atomic types for that position
+/// * `current_index` - Current position being processed (for recursion)
+/// * `current_combination` - Partial combination being built (for recursion)
+/// * `result_combinations` - Output vector to store all complete combinations
+fn generate_cartesian_product(
+    element_types: &[Vec<TAtomic>],
+    current_index: usize,
+    current_combination: Vec<TAtomic>,
+    result_combinations: &mut Vec<Vec<TAtomic>>,
+) {
+    if current_index >= element_types.len() {
+        result_combinations.push(current_combination);
+        return;
+    }
+
+    for atomic in &element_types[current_index] {
+        let mut new_combination = current_combination.clone();
+        new_combination.push(atomic.clone());
+
+        generate_cartesian_product(element_types, current_index + 1, new_combination, result_combinations);
+    }
+}
+
+/// Extracts the specific combination of atomic types from the elements to be subtracted.
+///
+/// This function assumes that each element in the subtract list contains exactly one
+/// atomic type (i.e., specific values like `true` rather than union types like `bool`).
+///
+/// # Arguments
+/// * `subtract_elements` - Map of element positions to their union types (should contain single atomics)
+///
+/// # Returns
+/// * `Vec<TAtomic>` - Vector of atomic types representing the specific combination to subtract
+fn extract_specific_combination(subtract_elements: &BTreeMap<usize, (bool, TUnion)>) -> Vec<TAtomic> {
+    let element_count = subtract_elements.len();
+    let mut combination = Vec::with_capacity(element_count);
+
+    for i in 0..element_count {
+        if let Some((_, element_type)) = subtract_elements.get(&i)
+            && let Some(first_atomic) = element_type.types.as_ref().first()
+        {
+            combination.push(first_atomic.clone());
+        }
+    }
+
+    combination
+}
+
+/// Checks if two combinations of atomic types are equal by comparing each element.
+///
+/// # Arguments
+/// * `first_combination` - First combination to compare
+/// * `second_combination` - Second combination to compare
+///
+/// # Returns
+/// * `bool` - `true` if combinations are equal (same length and all elements match), `false` otherwise
+fn combinations_are_equal(first_combination: &[TAtomic], second_combination: &[TAtomic]) -> bool {
+    first_combination.len() == second_combination.len()
+        && first_combination.iter().zip(second_combination.iter()).all(|(a, b)| a == b)
 }

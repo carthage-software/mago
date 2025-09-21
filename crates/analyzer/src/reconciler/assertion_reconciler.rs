@@ -134,6 +134,103 @@ pub(crate) fn refine_atomic_with_union(
     new_type: &TAtomic,
     existing_var_type: &TUnion,
 ) -> TUnion {
+    if new_type.is_mixed() {
+        return existing_var_type.clone();
+    }
+
+    if let TAtomic::Array(TArray::Keyed(TKeyedArray {
+        known_items: Some(known_items),
+        non_empty: new_type_non_empty,
+        ..
+    })) = new_type
+    {
+        let mut acceptable_atomic_types = vec![];
+
+        for existing_var_type_part in existing_var_type.types.as_ref() {
+            let TAtomic::Array(TArray::Keyed(existing_keyed_array)) = existing_var_type_part else {
+                continue;
+            };
+
+            let Some(existing_known_items) = &existing_keyed_array.known_items else {
+                continue;
+            };
+
+            if !known_items.keys().any(|k| existing_known_items.contains_key(k)) {
+                continue;
+            }
+
+            let mut new_known_items = existing_known_items.clone();
+            let mut has_non_optional = false;
+            for (key, (new_is_optional, new_item_type)) in known_items {
+                if let Some((is_optional, existing_item_type)) = new_known_items.get_mut(key) {
+                    *is_optional = *new_is_optional;
+                    *existing_item_type = new_item_type.clone();
+
+                    if !*new_is_optional {
+                        has_non_optional = true;
+                    }
+                }
+            }
+
+            acceptable_atomic_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                known_items: Some(new_known_items),
+                parameters: existing_keyed_array.parameters.clone(),
+                non_empty: has_non_optional || existing_keyed_array.non_empty || *new_type_non_empty,
+            })));
+        }
+
+        if !acceptable_atomic_types.is_empty() {
+            return TUnion::from_vec(acceptable_atomic_types);
+        }
+    }
+
+    if let TAtomic::Array(TArray::List(TList {
+        known_elements: Some(known_elements),
+        non_empty: new_type_non_empty,
+        ..
+    })) = new_type
+    {
+        let mut acceptable_atomic_types = vec![];
+
+        for existing_var_type_part in existing_var_type.types.as_ref() {
+            let TAtomic::Array(TArray::List(existing_list)) = existing_var_type_part else {
+                continue;
+            };
+
+            let Some(existing_known_elements) = &existing_list.known_elements else {
+                continue;
+            };
+
+            if !known_elements.keys().any(|k| existing_known_elements.contains_key(k)) {
+                continue;
+            }
+
+            let mut new_known_elements = existing_known_elements.clone();
+            let mut has_non_optional = false;
+            for (key, (new_is_optional, new_item_type)) in known_elements {
+                if let Some((is_optional, existing_item_type)) = new_known_elements.get_mut(key) {
+                    *is_optional = *new_is_optional;
+                    *existing_item_type = new_item_type.clone();
+
+                    if !*new_is_optional {
+                        has_non_optional = true;
+                    }
+                }
+            }
+
+            acceptable_atomic_types.push(TAtomic::Array(TArray::List(TList {
+                known_elements: Some(new_known_elements),
+                element_type: existing_list.element_type.clone(),
+                non_empty: has_non_optional || existing_list.non_empty || *new_type_non_empty,
+                known_count: existing_list.known_count,
+            })));
+        }
+
+        if !acceptable_atomic_types.is_empty() {
+            return TUnion::from_vec(acceptable_atomic_types);
+        }
+    }
+
     let intersection_type = intersect_union_with_atomic(context, existing_var_type, new_type);
     if let Some(mut intersection_type) = intersection_type {
         for intersection_atomic_type in intersection_type.types.to_mut() {
