@@ -31,6 +31,7 @@ use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combination::TypeCombination;
 use crate::ttype::combine_union_types;
 use crate::ttype::comparator::ComparisonResult;
+use crate::ttype::comparator::array_comparator::is_array_contained_by_array;
 use crate::ttype::comparator::object_comparator;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
@@ -120,11 +121,10 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         }
     }
 
-    let mut added_array = false;
-    if combination.has_keyed_array {
-        added_array = true;
+    let mut arrays = vec![];
 
-        new_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+    if combination.has_keyed_array {
+        arrays.push(TArray::Keyed(TKeyedArray {
             known_items: if combination.keyed_array_entries.is_empty() {
                 None
             } else {
@@ -136,13 +136,11 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
                 None
             },
             non_empty: combination.keyed_array_always_filled,
-        })));
+        }));
     }
 
     if let Some(list_parameter) = combination.list_array_parameter {
-        added_array = true;
-
-        new_types.push(TAtomic::Array(TArray::List(TList {
+        arrays.push(TArray::List(TList {
             known_elements: if combination.list_array_entries.is_empty() {
                 None
             } else {
@@ -151,16 +149,18 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
             element_type: Box::new(list_parameter),
             non_empty: combination.list_array_always_filled,
             known_count: None,
-        })));
+        }));
     }
 
-    if !added_array && combination.has_empty_array {
-        new_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
-            known_items: None,
-            parameters: None,
-            non_empty: false,
-        })));
+    for array in combination.sealed_arrays {
+        arrays.push(array);
     }
+
+    if arrays.is_empty() && combination.has_empty_array {
+        arrays.push(TArray::Keyed(TKeyedArray { known_items: None, parameters: None, non_empty: false }));
+    }
+
+    new_types.extend(arrays.into_iter().map(TAtomic::Array));
 
     for (_, (generic_type, generic_type_parameters)) in combination.object_type_params {
         let generic_object = TAtomic::Object(TObject::Named(
@@ -436,206 +436,233 @@ fn scrape_type_properties(
             return;
         }
 
-        match array {
-            TArray::List(TList { element_type, known_elements, non_empty, known_count }) => {
-                if non_empty {
-                    if let Some(ref mut existing_counts) = combination.list_array_counts {
-                        if let Some(known_count) = known_count {
-                            existing_counts.insert(known_count);
+        if !array.is_empty()
+            && array.is_sealed()
+            && combination.list_array_parameter.is_some()
+            && !combination.has_keyed_array
+        {
+            // If any of the existing arrays fully contains this one, skip adding it
+            if combination.sealed_arrays.iter().any(|existing_array| {
+                is_array_contained_by_array(codebase, &array, existing_array, false, &mut ComparisonResult::new())
+            }) {
+                return;
+            }
+
+            // Remove any arrays that are fully contained by this one
+            combination.sealed_arrays.retain(|existing_array| {
+                !is_array_contained_by_array(codebase, existing_array, &array, false, &mut ComparisonResult::new())
+            });
+
+            combination.sealed_arrays.push(array);
+
+            return;
+        }
+
+        for array in std::iter::once(array).chain(combination.sealed_arrays.drain(..)) {
+            match array {
+                TArray::List(TList { element_type, known_elements, non_empty, known_count }) => {
+                    if non_empty {
+                        if let Some(ref mut existing_counts) = combination.list_array_counts {
+                            if let Some(known_count) = known_count {
+                                existing_counts.insert(known_count);
+                            } else {
+                                combination.list_array_counts = None;
+                            }
+                        }
+
+                        combination.list_array_sometimes_filled = true;
+                    } else {
+                        combination.list_array_always_filled = false;
+                    }
+
+                    if let Some(known_elements) = known_elements {
+                        let mut has_defined_keys = false;
+
+                        for (candidate_element_index, (candidate_optional, candidate_element_type)) in known_elements {
+                            let existing_entry = combination.list_array_entries.get(&candidate_element_index);
+
+                            let new_entry = if let Some((existing_optional, existing_type)) = existing_entry {
+                                (
+                                    *existing_optional || candidate_optional,
+                                    combine_union_types(
+                                        existing_type,
+                                        &candidate_element_type,
+                                        codebase,
+                                        overwrite_empty_array,
+                                    ),
+                                )
+                            } else {
+                                (
+                                    candidate_optional,
+                                    if let Some(ref mut existing_value_parameter) = combination.list_array_parameter {
+                                        if !existing_value_parameter.is_never() {
+                                            *existing_value_parameter = combine_union_types(
+                                                existing_value_parameter,
+                                                &candidate_element_type,
+                                                codebase,
+                                                overwrite_empty_array,
+                                            );
+
+                                            continue;
+                                        }
+
+                                        candidate_element_type
+                                    } else {
+                                        candidate_element_type
+                                    },
+                                )
+                            };
+
+                            combination.list_array_entries.insert(candidate_element_index, new_entry);
+
+                            if !candidate_optional {
+                                has_defined_keys = true;
+                            }
+                        }
+
+                        if !has_defined_keys {
+                            combination.list_array_always_filled = false;
+                        }
+                    } else if !overwrite_empty_array {
+                        if element_type.is_never() {
+                            for (_, (pu, _)) in combination.list_array_entries.iter_mut() {
+                                *pu = true;
+                            }
                         } else {
-                            combination.list_array_counts = None;
+                            for (_, entry_type) in combination.list_array_entries.values() {
+                                if let Some(ref mut existing_value_param) = combination.list_array_parameter {
+                                    *existing_value_param = combine_union_types(
+                                        existing_value_param,
+                                        entry_type,
+                                        codebase,
+                                        overwrite_empty_array,
+                                    );
+                                }
+                            }
+
+                            combination.list_array_entries = BTreeMap::new();
                         }
                     }
 
-                    combination.list_array_sometimes_filled = true;
-                } else {
-                    combination.list_array_always_filled = false;
+                    combination.list_array_parameter = if let Some(ref existing_type) = combination.list_array_parameter
+                    {
+                        Some(combine_union_types(existing_type, &element_type, codebase, overwrite_empty_array))
+                    } else {
+                        Some((*element_type).clone())
+                    };
                 }
+                TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
+                    let had_previous_keyed_array = combination.has_keyed_array;
+                    combination.has_keyed_array = true;
 
-                if let Some(known_elements) = known_elements {
-                    let mut has_defined_keys = false;
+                    if non_empty {
+                        combination.keyed_array_sometimes_filled = true;
+                    } else {
+                        combination.keyed_array_always_filled = false;
+                    }
 
-                    for (candidate_element_index, (candidate_optional, candidate_element_type)) in known_elements {
-                        let existing_entry = combination.list_array_entries.get(&candidate_element_index);
+                    if let Some(known_items) = known_items {
+                        let has_existing_entries =
+                            !combination.keyed_array_entries.is_empty() || had_previous_keyed_array;
+                        let mut possibly_undefined_entries =
+                            combination.keyed_array_entries.keys().cloned().collect::<HashSet<_>>();
 
-                        let new_entry = if let Some((existing_optional, existing_type)) = existing_entry {
-                            (
-                                *existing_optional || candidate_optional,
-                                combine_union_types(
-                                    existing_type,
-                                    &candidate_element_type,
-                                    codebase,
-                                    overwrite_empty_array,
-                                ),
-                            )
-                        } else {
-                            (
-                                candidate_optional,
-                                if let Some(ref mut existing_value_parameter) = combination.list_array_parameter {
-                                    if !existing_value_parameter.is_never() {
-                                        *existing_value_parameter = combine_union_types(
-                                            existing_value_parameter,
-                                            &candidate_element_type,
+                        let mut has_defined_keys = false;
+
+                        for (candidate_item_name, (cu, candidate_item_type)) in known_items {
+                            if let Some((eu, existing_type)) =
+                                combination.keyed_array_entries.get_mut(&candidate_item_name)
+                            {
+                                if cu {
+                                    *eu = true;
+                                }
+                                if &candidate_item_type != existing_type {
+                                    *existing_type = combine_union_types(
+                                        existing_type,
+                                        &candidate_item_type,
+                                        codebase,
+                                        overwrite_empty_array,
+                                    );
+                                }
+                            } else {
+                                let new_item_value_type =
+                                    if let Some((ref mut existing_key_param, ref mut existing_value_param)) =
+                                        combination.keyed_array_parameters
+                                    {
+                                        adjust_keyed_array_parameters(
+                                            existing_value_param,
+                                            &candidate_item_type,
                                             codebase,
                                             overwrite_empty_array,
+                                            &candidate_item_name,
+                                            existing_key_param,
                                         );
 
                                         continue;
-                                    }
+                                    } else {
+                                        let new_type = candidate_item_type.clone();
+                                        (has_existing_entries || cu, new_type)
+                                    };
 
-                                    candidate_element_type
-                                } else {
-                                    candidate_element_type
-                                },
-                            )
-                        };
+                                combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
+                            };
 
-                        combination.list_array_entries.insert(candidate_element_index, new_entry);
+                            possibly_undefined_entries.remove(&candidate_item_name);
 
-                        if !candidate_optional {
-                            has_defined_keys = true;
-                        }
-                    }
-
-                    if !has_defined_keys {
-                        combination.list_array_always_filled = false;
-                    }
-                } else if !overwrite_empty_array {
-                    if element_type.is_never() {
-                        for (_, (pu, _)) in combination.list_array_entries.iter_mut() {
-                            *pu = true;
-                        }
-                    } else {
-                        for (_, entry_type) in combination.list_array_entries.values() {
-                            if let Some(ref mut existing_value_param) = combination.list_array_parameter {
-                                *existing_value_param = combine_union_types(
-                                    existing_value_param,
-                                    entry_type,
-                                    codebase,
-                                    overwrite_empty_array,
-                                );
+                            if !cu {
+                                has_defined_keys = true;
                             }
                         }
 
-                        combination.list_array_entries = BTreeMap::new();
-                    }
-                }
+                        if !has_defined_keys {
+                            combination.keyed_array_always_filled = false;
+                        }
 
-                combination.list_array_parameter = if let Some(ref existing_type) = combination.list_array_parameter {
-                    Some(combine_union_types(existing_type, &element_type, codebase, overwrite_empty_array))
-                } else {
-                    Some((*element_type).clone())
-                };
-            }
-            TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
-                let had_previous_keyed_array = combination.has_keyed_array;
-                combination.has_keyed_array = true;
-
-                if non_empty {
-                    combination.keyed_array_sometimes_filled = true;
-                } else {
-                    combination.keyed_array_always_filled = false;
-                }
-
-                if let Some(known_items) = known_items {
-                    let has_existing_entries = !combination.keyed_array_entries.is_empty() || had_previous_keyed_array;
-                    let mut possibly_undefined_entries =
-                        combination.keyed_array_entries.keys().cloned().collect::<HashSet<_>>();
-
-                    let mut has_defined_keys = false;
-
-                    for (candidate_item_name, (cu, candidate_item_type)) in known_items {
-                        if let Some((eu, existing_type)) = combination.keyed_array_entries.get_mut(&candidate_item_name)
-                        {
-                            if cu {
-                                *eu = true;
+                        for possibly_undefined_type_key in possibly_undefined_entries {
+                            let possibly_undefined_type =
+                                combination.keyed_array_entries.get_mut(&possibly_undefined_type_key);
+                            if let Some((pu, _)) = possibly_undefined_type {
+                                *pu = true;
                             }
-                            if &candidate_item_type != existing_type {
-                                *existing_type = combine_union_types(
-                                    existing_type,
-                                    &candidate_item_type,
-                                    codebase,
-                                    overwrite_empty_array,
-                                );
+                        }
+                    } else if !overwrite_empty_array {
+                        if match &parameters {
+                            Some((_, value_param)) => value_param.is_never(),
+                            None => true,
+                        } {
+                            for (_, (tu, _)) in combination.keyed_array_entries.iter_mut() {
+                                *tu = true;
                             }
                         } else {
-                            let new_item_value_type =
+                            for (key, (_, entry_type)) in &combination.keyed_array_entries {
                                 if let Some((ref mut existing_key_param, ref mut existing_value_param)) =
                                     combination.keyed_array_parameters
                                 {
                                     adjust_keyed_array_parameters(
                                         existing_value_param,
-                                        &candidate_item_type,
+                                        entry_type,
                                         codebase,
                                         overwrite_empty_array,
-                                        &candidate_item_name,
+                                        key,
                                         existing_key_param,
                                     );
-
-                                    continue;
-                                } else {
-                                    let new_type = candidate_item_type.clone();
-                                    (has_existing_entries || cu, new_type)
-                                };
-
-                            combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
-                        };
-
-                        possibly_undefined_entries.remove(&candidate_item_name);
-
-                        if !cu {
-                            has_defined_keys = true;
-                        }
-                    }
-
-                    if !has_defined_keys {
-                        combination.keyed_array_always_filled = false;
-                    }
-
-                    for possibly_undefined_type_key in possibly_undefined_entries {
-                        let possibly_undefined_type =
-                            combination.keyed_array_entries.get_mut(&possibly_undefined_type_key);
-                        if let Some((pu, _)) = possibly_undefined_type {
-                            *pu = true;
-                        }
-                    }
-                } else if !overwrite_empty_array {
-                    if match &parameters {
-                        Some((_, value_param)) => value_param.is_never(),
-                        None => true,
-                    } {
-                        for (_, (tu, _)) in combination.keyed_array_entries.iter_mut() {
-                            *tu = true;
-                        }
-                    } else {
-                        for (key, (_, entry_type)) in &combination.keyed_array_entries {
-                            if let Some((ref mut existing_key_param, ref mut existing_value_param)) =
-                                combination.keyed_array_parameters
-                            {
-                                adjust_keyed_array_parameters(
-                                    existing_value_param,
-                                    entry_type,
-                                    codebase,
-                                    overwrite_empty_array,
-                                    key,
-                                    existing_key_param,
-                                );
+                                }
                             }
+
+                            combination.keyed_array_entries = BTreeMap::new();
                         }
-
-                        combination.keyed_array_entries = BTreeMap::new();
                     }
-                }
 
-                combination.keyed_array_parameters = match (&combination.keyed_array_parameters, parameters) {
-                    (None, None) => None,
-                    (Some(existing_types), None) => Some(existing_types.clone()),
-                    (None, Some(params)) => Some(((*params.0).clone(), (*params.1).clone())),
-                    (Some(existing_types), Some(params)) => Some((
-                        combine_union_types(&existing_types.0, &params.0, codebase, overwrite_empty_array),
-                        combine_union_types(&existing_types.1, &params.1, codebase, overwrite_empty_array),
-                    )),
-                };
+                    combination.keyed_array_parameters = match (&combination.keyed_array_parameters, parameters) {
+                        (None, None) => None,
+                        (Some(existing_types), None) => Some(existing_types.clone()),
+                        (None, Some(params)) => Some(((*params.0).clone(), (*params.1).clone())),
+                        (Some(existing_types), Some(params)) => Some((
+                            combine_union_types(&existing_types.0, &params.0, codebase, overwrite_empty_array),
+                            combine_union_types(&existing_types.1, &params.1, codebase, overwrite_empty_array),
+                        )),
+                    };
+                }
             }
         }
 
@@ -961,4 +988,153 @@ fn combine_integers(types: HashSet<TInteger>) -> Vec<TAtomic> {
     let types = types.into_iter().collect::<Vec<_>>();
 
     TInteger::combine(&types).into_iter().map(|tint| TAtomic::Scalar(TScalar::Integer(tint))).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    use crate::ttype::atomic::TAtomic;
+    use crate::ttype::atomic::array::list::TList;
+    use crate::ttype::atomic::scalar::TScalar;
+
+    #[test]
+    fn test_combine_scalars() {
+        let types = vec![
+            TAtomic::Scalar(TScalar::string()),
+            TAtomic::Scalar(TScalar::int()),
+            TAtomic::Scalar(TScalar::float()),
+            TAtomic::Scalar(TScalar::bool()),
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        assert_eq!(combined.len(), 1);
+        assert!(matches!(combined[0], TAtomic::Scalar(TScalar::Generic)));
+    }
+
+    #[test]
+    fn test_combine_boolean_lists() {
+        let types = vec![
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::r#false())))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::r#true())))),
+            ])))),
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::r#true())))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::r#false())))),
+            ])))),
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        assert_eq!(combined.len(), 2);
+        assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
+        assert!(matches!(combined[1], TAtomic::Array(TArray::List(_))));
+    }
+
+    #[test]
+    fn test_combine_integer_lists() {
+        let types = vec![
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(1)))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(2)))))),
+            ])))),
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(2)))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(1)))))),
+            ])))),
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        assert_eq!(combined.len(), 2);
+        assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
+        assert!(matches!(combined[1], TAtomic::Array(TArray::List(_))));
+    }
+
+    #[test]
+    fn test_combine_string_lists() {
+        let types = vec![
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("a".into())))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("b".into())))))),
+            ])))),
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("b".into())))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("a".into())))))),
+            ])))),
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        assert_eq!(combined.len(), 2);
+        assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
+        assert!(matches!(combined[1], TAtomic::Array(TArray::List(_))));
+    }
+
+    #[test]
+    fn test_combine_mixed_literal_lists() {
+        let types = vec![
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(1)))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("a".into())))))),
+            ])))),
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal("b".into())))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(2)))))),
+            ])))),
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        assert_eq!(combined.len(), 2);
+        assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
+        assert!(matches!(combined[1], TAtomic::Array(TArray::List(_))));
+    }
+
+    #[test]
+    fn test_combine_list_with_generic_list() {
+        let types = vec![
+            TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(1)))))),
+                (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(2)))))),
+            ])))),
+            TAtomic::Array(TArray::List(TList::new(Box::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::int())))))), // list<int>
+        ];
+
+        let combined = combine(types, &CodebaseMetadata::default(), true);
+
+        // Expecting list{1,2} and list<int> = list<int>
+        assert_eq!(combined.len(), 1);
+
+        let TAtomic::Array(TArray::List(list_type)) = &combined[0] else {
+            panic!("Expected a list type");
+        };
+
+        let Some(known_elements) = &list_type.known_elements else {
+            panic!("Expected known elements");
+        };
+
+        assert!(!list_type.is_non_empty());
+        assert!(list_type.known_count.is_none());
+        assert!(list_type.element_type.is_int());
+
+        assert_eq!(known_elements.len(), 2);
+        assert!(known_elements.contains_key(&0));
+        assert!(known_elements.contains_key(&1));
+
+        let Some(first_element) = known_elements.get(&0) else {
+            panic!("Expected first element");
+        };
+
+        let Some(second_element) = known_elements.get(&1) else {
+            panic!("Expected second element");
+        };
+
+        assert!(first_element.1.is_int());
+        assert!(second_element.1.is_int());
+    }
 }

@@ -859,19 +859,23 @@ mod tests {
             }
 
             /**
-             * @return string[][]|int|(Foo&Bar)|Bar[]
+             * @return string[][]|int|(Foo&Bar)|Bar[]|list{Bar, list<string>}
              */
             function foo(): mixed {
                 if (get_bool()) {
-                    return 42;
+                    return 42; // int
                 }
 
                 if (get_bool()) {
-                    return new Baz();
+                    return new Baz(); // Foo&Bar
                 }
 
                 if (get_bool()) {
-                    return [new BarImpl(), ['f']];
+                    return [new BarImpl(), ['f']]; // list{Bar, list<string>}
+                }
+
+                if (get_bool()) {
+                    return [new BarImpl()]; // Bar[]
                 }
 
                 return [
@@ -879,7 +883,7 @@ mod tests {
                     ['a', 'b', 'c'],
                     ['a', 'b', 'c'],
                     ['a', 'b', 'c'],
-                ];
+                ]; // string[][]
             }
         "#},
     }

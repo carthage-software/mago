@@ -9,6 +9,7 @@ use mago_atom::concat_atom;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
+use crate::ttype::get_never;
 use crate::ttype::union::TUnion;
 
 /// Metadata for a PHP array analyzed as a list (vector-like).
@@ -35,6 +36,27 @@ impl TList {
     #[inline]
     pub fn new(element_type: Box<TUnion>) -> Self {
         Self { element_type, known_elements: None, known_count: None, non_empty: false }
+    }
+
+    /// Creates new metadata for a list type with specified known elements.
+    ///
+    /// If all known elements are non-optional, sets known_count accordingly.
+    /// Sets non_empty to true if any known element is non-optional.
+    ///
+    /// # Arguments
+    ///
+    /// * `known_elements`: A BTreeMap mapping indices to (is_optional, TUnion) tuples.
+    pub fn from_known_elements(known_elements: BTreeMap<usize, (bool, TUnion)>) -> Self {
+        Self {
+            element_type: Box::new(get_never()),
+            known_count: if known_elements.values().all(|(optional, _)| !*optional) {
+                Some(known_elements.len())
+            } else {
+                None
+            },
+            non_empty: known_elements.values().any(|(optional, _)| !*optional),
+            known_elements: Some(known_elements),
+        }
     }
 
     #[inline]

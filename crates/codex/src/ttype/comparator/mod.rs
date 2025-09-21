@@ -4,7 +4,6 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::union::TUnion;
 
-mod array_comparator;
 mod callable_comparator;
 mod class_string_comparator;
 mod derived_comparator;
@@ -14,6 +13,7 @@ mod iterable_comparator;
 mod resource_comparator;
 mod scalar_comparator;
 
+pub(super) mod array_comparator;
 pub(super) mod object_comparator;
 
 pub mod atomic_comparator;

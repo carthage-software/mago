@@ -41,7 +41,7 @@ class Data
         ];
 
         foreach ($this->items as $item) {
-            $items = $params['items']; // @mago-expect analysis:possibly-undefined-string-array-index
+            $items = $params['items'];
             $items[] = $item;
             $params['items'] = $items;
         }

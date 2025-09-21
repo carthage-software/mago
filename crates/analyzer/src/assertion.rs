@@ -145,7 +145,8 @@ pub fn scrape_assertions(
                         }
 
                         if let Some(root_array_id) = root_array_id {
-                            if_types.insert(root_array_id, vec![vec![Assertion::IsEqualIsset]]);
+                            if_types
+                                .insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
                         }
                     }
                 }

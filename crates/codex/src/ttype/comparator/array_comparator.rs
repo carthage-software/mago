@@ -22,6 +22,16 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
+    is_array_contained_by_array(codebase, input_array, container_array, inside_assertion, atomic_comparison_result)
+}
+
+pub(crate) fn is_array_contained_by_array(
+    codebase: &CodebaseMetadata,
+    input_array: &TArray,
+    container_array: &TArray,
+    inside_assertion: bool,
+    atomic_comparison_result: &mut ComparisonResult,
+) -> bool {
     if input_array.is_empty() {
         return !container_array.is_non_empty();
     }

@@ -8,6 +8,7 @@ use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::scalar::int::TInteger;
@@ -31,6 +32,7 @@ pub struct TypeCombination {
     pub list_array_entries: BTreeMap<usize, (bool, TUnion)>,
     pub keyed_array_parameters: Option<(TUnion, TUnion)>,
     pub list_array_parameter: Option<TUnion>,
+    pub sealed_arrays: Vec<TArray>,
     pub falsy_mixed: Option<bool>,
     pub truthy_mixed: Option<bool>,
     pub nonnull_mixed: Option<bool>,
@@ -71,6 +73,7 @@ impl TypeCombination {
             list_array_entries: BTreeMap::new(),
             keyed_array_parameters: None,
             list_array_parameter: None,
+            sealed_arrays: Vec::new(),
             falsy_mixed: None,
             truthy_mixed: None,
             nonnull_mixed: None,
@@ -92,6 +95,7 @@ impl TypeCombination {
     #[inline]
     pub fn is_simple(&self) -> bool {
         if self.value_types.len() == 1
+            && self.sealed_arrays.is_empty()
             && !self.has_keyed_array
             && !self.has_empty_array
             && !self.resource
@@ -99,9 +103,7 @@ impl TypeCombination {
             && !self.closed_resource
             && let (None, None) = (&self.keyed_array_parameters, &self.list_array_parameter)
         {
-            return self.keyed_array_entries.is_empty()
-                && self.list_array_entries.is_empty()
-                && self.object_type_params.is_empty()
+            return self.object_type_params.is_empty()
                 && self.enum_names.is_empty()
                 && self.literal_strings.is_empty()
                 && self.class_string_types.is_empty()
