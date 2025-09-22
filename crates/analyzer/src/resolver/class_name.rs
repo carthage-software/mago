@@ -400,6 +400,15 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                         is_enum_or_final_class(codebase, &named_object.name),
                     )
                 }
+                TObject::Shaped(_) => {
+                    let origin = if let Some(class_string) = active_class_string {
+                        ResolutionOrigin::SpecificClassLikeString(class_string.clone())
+                    } else {
+                        ResolutionOrigin::AnyObject
+                    };
+
+                    ResolvedClassname::new(None, origin, false)
+                }
             },
             TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
                 match class_string {

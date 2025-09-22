@@ -180,6 +180,7 @@ test_case!(constant_type);
 test_case!(match_true_and_false);
 test_case!(array_reconcile);
 test_case!(sealed_array_combine);
+test_case!(object_shape);
 
 // Github Issues
 test_case!(issue_275);

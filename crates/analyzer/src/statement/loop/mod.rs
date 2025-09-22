@@ -1011,7 +1011,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
             }
             TAtomic::Object(object) => {
                 let (obj_key_type, obj_value_type) = match object {
-                    TObject::Any => {
+                    TObject::Any | TObject::Shaped(_) => {
                         context.collector.report_with_code(
                             IssueCode::GenericObjectIteration,
                             Issue::warning("Iterating over a generic `object`. This will iterate its public properties.")

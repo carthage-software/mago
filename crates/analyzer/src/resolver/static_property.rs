@@ -199,7 +199,7 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     Ok(Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: *property_name,
-        declaring_class_id,
+        declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: false,
     }))

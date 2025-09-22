@@ -1346,7 +1346,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
             }
             TAtomic::Object(object) => {
                 let class_like_name = match object {
-                    TObject::Any => {
+                    TObject::Any | TObject::Shaped(_) => {
                         context.collector.report_with_code(
                             IssueCode::InvalidTypeCast,
                             Issue::error("Cannot reliably cast generic `object` to `string`.")

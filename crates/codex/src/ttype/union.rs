@@ -910,7 +910,7 @@ impl TUnion {
 
     #[inline]
     pub fn has_object(&self) -> bool {
-        self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Any)))
+        self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Any) | TAtomic::Object(TObject::Shaped(_))))
     }
 
     #[inline]

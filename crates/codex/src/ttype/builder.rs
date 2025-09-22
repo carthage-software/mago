@@ -24,6 +24,7 @@ use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::object::shaped::TShapedObject;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -540,7 +541,7 @@ fn get_shape_from_ast(
         list.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::List(list)))
-    } else {
+    } else if !shape.kind.is_object() {
         let mut keyed_array = TKeyedArray::new();
 
         keyed_array.parameters = match &shape.additional_fields {
@@ -604,6 +605,51 @@ fn get_shape_from_ast(
         keyed_array.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::Keyed(keyed_array)))
+    } else {
+        let mut shaped_object = TShapedObject::new();
+
+        shaped_object.known_items = Some({
+            let mut tree = BTreeMap::new();
+            let mut next_offset = 0;
+
+            for field in &shape.fields {
+                let field_is_optional = field.is_optional();
+
+                let key = match field.key.as_ref() {
+                    Some(field_key) => {
+                        let key = match field_key.key {
+                            ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
+                            ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                        };
+
+                        if let ArrayKey::Integer(offset) = key
+                            && offset >= next_offset
+                        {
+                            next_offset = offset + 1;
+                        }
+
+                        key
+                    }
+                    None => {
+                        let key = ArrayKey::Integer(next_offset);
+
+                        next_offset += 1;
+
+                        key
+                    }
+                };
+
+                let field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+
+                tree.insert(key, (field_is_optional, field_value_type));
+            }
+
+            tree
+        });
+
+        shaped_object.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
+
+        Ok(TAtomic::Object(TObject::Shaped(shaped_object)))
     }
 }
 
