@@ -110,7 +110,7 @@ pub(crate) fn is_array_contained_by_array(
         None
     };
 
-    if let Some(input_known_items) = input_known_items_cow {
+    if let Some(input_known_items) = &input_known_items_cow {
         for (input_key, (input_is_optional, input_item_value_type)) in input_known_items.iter() {
             if let Some((container_is_optional, container_item_value_type)) =
                 container_known_items.as_ref().and_then(|items| items.get(input_key))
@@ -118,6 +118,7 @@ pub(crate) fn is_array_contained_by_array(
                 if *input_is_optional && !*container_is_optional {
                     return false;
                 }
+
                 if !union_comparator::is_contained_by(
                     codebase,
                     input_item_value_type,
@@ -153,8 +154,39 @@ pub(crate) fn is_array_contained_by_array(
                 return false;
             }
         }
-    } else if container_known_items.is_some_and(|i| !i.iter().filter(|i| !i.1.0).count() >= 1) {
-        return false;
+    }
+
+    // Check if container has optional properties that input doesn't explicitly have
+    // but input is unsealed (has parameters), we need to ensure the input's
+    // parameter value type is compatible with any missing optional properties
+    if let Some(container_known_items) = &container_known_items
+        && !input_value_type.is_never()
+    {
+        // Input is unsealed (has parameters)
+        for (container_key, (container_is_optional, container_item_value_type)) in container_known_items.iter() {
+            // If container has an optional property that input doesn't explicitly have
+            if *container_is_optional {
+                let input_has_explicit_key =
+                    input_known_items_cow.as_ref().is_some_and(|items| items.contains_key(container_key));
+
+                if !input_has_explicit_key {
+                    // Input doesn't have this key explicitly, but since input is unsealed,
+                    // it could have this key with input_value_type.
+                    // We need to check if input_value_type is compatible with container_item_value_type
+                    if !union_comparator::is_contained_by(
+                        codebase,
+                        &input_value_type,
+                        container_item_value_type,
+                        false,
+                        false,
+                        inside_assertion,
+                        atomic_comparison_result,
+                    ) {
+                        return false;
+                    }
+                }
+            }
+        }
     }
 
     if let (Some(input_key_type), Some(container_key_type)) = (input_key_type, container_key_type)

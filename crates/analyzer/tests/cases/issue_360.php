@@ -113,6 +113,12 @@ class Data
             $params['items'][] = $item;
         }
 
+        /**
+         * @mago-expect analysis:less-specific-nested-return-statement
+         *
+         * If `$this->items` is empty, then `$params` might still have `items` since the input
+         * is unsealed. Mago can't verify that if `items` exists in `$params`, it is a `non-empty-list<Item>`.
+         */
         return $params;
     }
 }
