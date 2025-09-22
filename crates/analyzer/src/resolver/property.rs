@@ -14,7 +14,6 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::expander::StaticClassType;
@@ -161,8 +160,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 
                 continue;
             }
-            TObject::Shaped(shaped_object) => {
-                let Some(known_items) = shaped_object.get_known_items() else {
+            TObject::WithProperties(shaped_object) => {
+                let Some(known_properties) = shaped_object.get_known_properties() else {
                     result.has_ambiguous_path = true;
 
                     if !block_context.inside_isset {
@@ -173,8 +172,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                 };
 
                 for prop_name in &property_names {
-                    let key = ArrayKey::String(atom(prop_name.trim_start_matches('$')));
-                    let Some((_, value)) = known_items.get_key_value(&key) else {
+                    let key = atom(prop_name.trim_start_matches('$'));
+                    let Some((_, value)) = known_properties.get_key_value(&key) else {
                         if !block_context.inside_isset {
                             report_ambiguous_access(context, property_selector, object_expression.span());
                         }

@@ -13,10 +13,12 @@ use mago_codex::get_method;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::with_properties::TObjectWithProperties;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
@@ -1251,6 +1253,23 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
             TAtomic::Object(_) => {
                 possibilities.push(t.clone());
             }
+            TAtomic::Array(TArray::Keyed(keyed_array)) => {
+                let mut known_properties = BTreeMap::new();
+                if let Some(known_items) = &keyed_array.known_items {
+                    for (key, item) in known_items {
+                        let property_name = match key {
+                            ArrayKey::Integer(value) => atom(&value.to_string()),
+                            ArrayKey::String(value) => *value,
+                        };
+
+                        known_properties.insert(property_name, item.clone());
+                    }
+
+                    possibilities.push(TAtomic::Object(TObject::WithProperties(TObjectWithProperties {
+                        known_properties: Some(known_properties),
+                    })));
+                }
+            }
             _ => {}
         }
     }
@@ -1346,7 +1365,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
             }
             TAtomic::Object(object) => {
                 let class_like_name = match object {
-                    TObject::Any | TObject::Shaped(_) => {
+                    TObject::Any | TObject::WithProperties(_) => {
                         context.collector.report_with_code(
                             IssueCode::InvalidTypeCast,
                             Issue::error("Cannot reliably cast generic `object` to `string`.")

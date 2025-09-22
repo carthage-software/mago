@@ -60,7 +60,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                             has_cloneable_object = true;
                         }
                     }
-                    TObject::Shaped(_) => {
+                    TObject::WithProperties(_) => {
                         has_cloneable_object = true;
                     }
                 },

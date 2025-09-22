@@ -6,7 +6,6 @@ use mago_syntax_core::utils::parse_literal_integer;
 use crate::ast::object::ObjectType;
 use crate::ast::*;
 use crate::error::ParseError;
-use crate::parser::internal::generic::parse_generic_parameters_or_none;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
@@ -109,16 +108,7 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
 
             fields
         },
-        additional_fields: {
-            if !stream.is_at(TypeTokenKind::Ellipsis)? {
-                None
-            } else {
-                Some(ShapeAdditionalFields {
-                    ellipsis: stream.consume()?.span,
-                    parameters: parse_generic_parameters_or_none(stream)?,
-                })
-            }
-        },
+        additional_fields: None,
         right_brace: stream.eat(TypeTokenKind::RightBrace)?.span,
     }))
 }
