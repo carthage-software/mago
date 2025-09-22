@@ -90,11 +90,13 @@ impl LintRule for NoNestedTernaryRule {
             return;
         };
 
-        self.check_for_nested(ctx, expr.question_mark.span(), expr.condition);
-        if let Some(then) = expr.then {
-            self.check_for_nested(ctx, expr.question_mark.span(), then);
-        }
+        let Some(then) = expr.then else {
+            // we don't care about elvis operator
+            return;
+        };
 
+        self.check_for_nested(ctx, expr.question_mark.span(), expr.condition);
+        self.check_for_nested(ctx, expr.question_mark.span(), then);
         self.check_for_nested(ctx, expr.question_mark.span(), expr.r#else);
     }
 }
@@ -110,7 +112,12 @@ impl NoNestedTernaryRule {
             Expression::Parenthesized(Parenthesized { expression, .. }) => {
                 self.check_for_nested(ctx, outer_op_span, expression);
             }
-            Expression::Conditional(_) => {
+            Expression::Conditional(nested) => {
+                // If the nested is an elvis operator, we ignore it
+                if nested.then.is_none() {
+                    return;
+                }
+
                 self.report_issue(ctx, outer_op_span, expr.span());
             }
             _ => {}
