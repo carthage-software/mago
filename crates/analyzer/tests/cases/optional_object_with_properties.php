@@ -53,7 +53,7 @@ function log_user_action3(string $action, object $user): void
     // @mago-expect analysis:ambiguous-object-property-access - email could exist, we don't know!
     $_email = $user->email;
 
-    // @mago-expect analysis:possibly-invalid-argument - becaue our user is unsealed
+    // @mago-expect analysis:possibly-invalid-argument - because our user is unsealed
     log_user_action($action, $user);
 }
 
