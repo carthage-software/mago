@@ -155,37 +155,66 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                 result.has_ambiguous_path = true;
 
                 if !block_context.inside_isset {
-                    report_ambiguous_access(context, property_selector, object_expression.span());
+                    report_ambiguous_access(context, property_selector, object_expression.span(), atom("object"));
                 }
 
                 continue;
             }
-            TObject::WithProperties(shaped_object) => {
-                let Some(known_properties) = shaped_object.get_known_properties() else {
-                    result.has_ambiguous_path = true;
-
-                    if !block_context.inside_isset {
-                        report_ambiguous_access(context, property_selector, object_expression.span());
-                    }
-
-                    continue;
-                };
-
+            TObject::WithProperties(object) => {
                 for prop_name in &property_names {
                     let key = atom(prop_name.trim_start_matches('$'));
-                    let Some((_, value)) = known_properties.get_key_value(&key) else {
+                    let Some((_, value)) = object.known_properties.get_key_value(&key) else {
+                        if object.sealed {
+                            result.has_invalid_path = true;
+
+                            report_non_existent_property(
+                                context,
+                                &object_type.get_id(),
+                                prop_name,
+                                property_selector.span(),
+                                object_expression.span(),
+                                true,
+                            );
+
+                            continue;
+                        }
+
+                        result.has_ambiguous_path = true;
+
                         if !block_context.inside_isset {
-                            report_ambiguous_access(context, property_selector, object_expression.span());
+                            report_ambiguous_access(
+                                context,
+                                property_selector,
+                                object_expression.span(),
+                                object_type.get_id(),
+                            );
                         }
 
                         continue;
                     };
 
+                    let is_optional = value.0;
+                    let mut property_type = value.1.clone();
+
+                    if is_optional {
+                        if !block_context.inside_isset {
+                            report_possibly_non_existent_property(
+                                context,
+                                &object_type,
+                                prop_name,
+                                property_selector.span(),
+                                object_expression.span(),
+                            );
+                        }
+
+                        property_type = property_type.as_nullable();
+                    }
+
                     let resolved_property = ResolvedProperty {
                         property_span: None,
                         property_name: *prop_name,
                         declaring_class_id: None,
-                        property_type: value.1.clone(),
+                        property_type,
                         is_magic: false,
                     };
 
@@ -308,7 +337,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             result.has_possibly_defined_property = true;
         }
 
-        report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span());
+        report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span(), false);
         return Ok(None);
     };
 
@@ -601,15 +630,43 @@ fn report_access_on_non_object(
     );
 }
 
-fn report_ambiguous_access(context: &mut Context, selector: &ClassLikeMemberSelector, object_span: Span) {
+fn report_ambiguous_access(
+    context: &mut Context,
+    selector: &ClassLikeMemberSelector,
+    object_span: Span,
+    object_type: Atom,
+) {
     context.collector.report_with_code(
         IssueCode::AmbiguousObjectPropertyAccess,
-        Issue::warning("Cannot statically verify property access on a generic `object` type.")
+        Issue::warning(format!("Cannot statically verify property access on a generic `{}` type.", object_type))
             .with_annotation(Annotation::primary(selector.span()).with_message("Accessing property here"))
             .with_annotation(
-                Annotation::secondary(object_span).with_message("This expression has the general type `object`"),
+                Annotation::secondary(object_span).with_message(format!("This expression has type `{}`", object_type)),
             )
             .with_help("Provide a more specific type hint for the object (e.g., `MyClass`) for robust analysis."),
+    );
+}
+
+fn report_possibly_non_existent_property(
+    context: &mut Context,
+    object_type: &TUnion,
+    prop_name: &Atom,
+    selector_span: Span,
+    object_span: Span,
+) {
+    context.collector.report_with_code(
+        IssueCode::PossiblyNonExistentProperty,
+        Issue::error(format!("Property `{prop_name}` might not exist on object `{}`.", object_type.get_id()))
+            .with_annotation(Annotation::primary(selector_span).with_message("Property might not exist here"))
+            .with_annotation(
+                Annotation::secondary(object_span).with_message(format!("On instance of `{}`", object_type.get_id())),
+            )
+            .with_note(
+                "If this property does not exist at runtime, PHP will raise a warning and the expression will evaluate to `null`.",
+            )
+            .with_help(
+                "To avoid this, ensure the property is defined on the object or check for its existence before accessing it.",
+            ),
     );
 }
 
@@ -619,14 +676,25 @@ fn report_non_existent_property(
     prop_name: &Atom,
     selector_span: Span,
     object_span: Span,
+    is_sealed_object: bool, // `true` if we are accessing undefined prop on `object{foo: string}` type, not an actual class
 ) {
     let class_kind_str = get_class_like(context.codebase, classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
-        Issue::error(format!("Property `{prop_name}` does not exist on {class_kind_str} `{classname}`."))
-            .with_annotation(Annotation::primary(selector_span).with_message("Property not found here"))
-            .with_annotation(Annotation::secondary(object_span).with_message(format!("On instance of `{classname}`"))),
+        Issue::error(if is_sealed_object {
+            format!("Property `{prop_name}` does not exist on sealed object type `{classname}`.")
+        } else {
+            format!("Property `{prop_name}` does not exist on {class_kind_str} `{classname}`.")
+        })
+        .with_annotation(Annotation::primary(selector_span).with_message("Property not found here"))
+        .with_annotation(Annotation::secondary(object_span).with_message(format!("On instance of `{classname}`")))
+        .with_note(if is_sealed_object {
+            format!("The type `{classname}` is a sealed object type and does not define the property `{prop_name}`.")
+        } else {
+            format!("The {class_kind_str} `{classname}` does not define the property `{prop_name}`.")
+        })
+        .with_help("Define the property in the class or check for its existence before accessing it."),
     );
 }
 

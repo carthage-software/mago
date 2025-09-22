@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -60,7 +59,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 Issue::error("Invalid property assignment value").with_annotation(
                     Annotation::primary(property_access.class.span()).with_message(format!(
                         "{}::{} with declared type {}, cannot be assigned type {}",
-                        resolved_property.declaring_class_id.unwrap_or(atom("")),
+                        resolved_property.declaring_class_id.as_deref().unwrap_or("<object>"),
                         resolved_property.property_name,
                         resolved_property.property_type.get_id(),
                         assigned_value_type.get_id(),

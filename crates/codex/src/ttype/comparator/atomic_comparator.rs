@@ -1,3 +1,7 @@
+use mago_atom::atom;
+use mago_atom::concat_atom;
+
+use crate::get_class_like;
 use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
@@ -11,6 +15,8 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::r#enum::TEnum;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator;
@@ -255,6 +261,118 @@ pub fn is_contained_by(
         && let TAtomic::Object(_) = input_type_part
     {
         return true;
+    }
+
+    if let TAtomic::Object(TObject::WithProperties(container_object_with_properties)) = container_type_part
+        && let TAtomic::Object(input_object) = input_type_part
+    {
+        return match input_object {
+            TObject::Any => {
+                !container_object_with_properties.sealed && container_object_with_properties.known_properties.is_empty()
+            }
+            TObject::WithProperties(input_object_with_properties) => {
+                if container_object_with_properties.sealed && !input_object_with_properties.sealed {
+                    return false;
+                }
+
+                for (container_property_name, (container_property_indefinite, container_property_type)) in
+                    &container_object_with_properties.known_properties
+                {
+                    let Some((input_property_indefinite, input_property_type)) =
+                        input_object_with_properties.known_properties.get(container_property_name)
+                    else {
+                        if *container_property_indefinite && input_object_with_properties.sealed {
+                            continue;
+                        }
+
+                        return false;
+                    };
+
+                    if !*container_property_indefinite && *input_property_indefinite {
+                        return false;
+                    }
+
+                    if !union_comparator::is_contained_by(
+                        codebase,
+                        input_property_type,
+                        container_property_type,
+                        false,
+                        false,
+                        inside_assertion,
+                        atomic_comparison_result,
+                    ) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            TObject::Named(TNamedObject { name: input_object_name, .. })
+            | TObject::Enum(TEnum { name: input_object_name, .. }) => {
+                let Some(class_like_metadata) = get_class_like(codebase, input_object_name) else {
+                    return false;
+                };
+
+                for (container_property_name, (container_property_indefinite, container_property_type)) in
+                    &container_object_with_properties.known_properties
+                {
+                    let property_name = concat_atom!("$", container_property_name);
+
+                    let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(&property_name) else {
+                        if !*container_property_indefinite {
+                            return false;
+                        } else {
+                            continue;
+                        }
+                    };
+
+                    let Some(declaring_class_metadata) = get_class_like(codebase, declaring_class) else {
+                        return false; // should not happen
+                    };
+
+                    let Some(declared_property) = declaring_class_metadata.properties.get(&property_name) else {
+                        return false; // should not happen
+                    };
+
+                    match declared_property.type_metadata.as_ref() {
+                        Some(property_type_metadata) => {
+                            if !union_comparator::is_contained_by(
+                                codebase,
+                                container_property_type,
+                                &property_type_metadata.type_union,
+                                false,
+                                false,
+                                inside_assertion,
+                                atomic_comparison_result,
+                            ) {
+                                return false;
+                            }
+                        }
+                        None => {
+                            if !container_property_type.is_mixed() {
+                                return false;
+                            }
+                        }
+                    };
+                }
+
+                if container_object_with_properties.sealed {
+                    // For sealed objects, we need to ensure the input object doesn't have
+                    // properties that aren't in the container type
+                    for property_name in class_like_metadata.declaring_property_ids.keys() {
+                        let actual_property_name =
+                            atom(property_name.as_str().strip_prefix('$').unwrap_or(property_name.as_str()));
+
+                        // Check if this property exists in our container's known properties
+                        if !container_object_with_properties.known_properties.contains_key(&actual_property_name) {
+                            return false; // Input object has a property not allowed in sealed container
+                        }
+                    }
+                }
+
+                true
+            }
+        };
     }
 
     if let TAtomic::Object(TObject::Any) = input_type_part

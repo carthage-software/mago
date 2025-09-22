@@ -180,6 +180,7 @@ pub enum IssueCode {
     PossiblyInvalidClone,
     PossiblyInvalidIterator,
     PossiblyInvalidOperand,
+    PossiblyNonExistentProperty,
     PossiblyNullArgument,
     PossiblyNullArrayAccess,
     PossiblyNullArrayIndex,
@@ -433,6 +434,7 @@ impl IssueCode {
             Self::PossiblyInvalidClone => "possibly-invalid-clone",
             Self::PossiblyInvalidIterator => "possibly-invalid-iterator",
             Self::PossiblyInvalidOperand => "possibly-invalid-operand",
+            Self::PossiblyNonExistentProperty => "possibly-non-existent-property",
             Self::PossiblyNullArgument => "possibly-null-argument",
             Self::PossiblyNullArrayAccess => "possibly-null-array-access",
             Self::PossiblyNullArrayIndex => "possibly-null-array-index",
@@ -747,7 +749,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_existence_issue_codes() -> [Self; 9] {
+    pub const fn get_existence_issue_codes() -> [Self; 10] {
         [
             Self::NonExistentAttributeClass,
             Self::NonExistentCatchType,
@@ -758,10 +760,11 @@ impl IssueCode {
             Self::NonExistentFunction,
             Self::NonExistentMethod,
             Self::NonExistentProperty,
+            Self::PossiblyNonExistentProperty,
         ]
     }
 
-    pub const fn get_existence_issue_code_values() -> [&'static str; 9] {
+    pub const fn get_existence_issue_code_values() -> [&'static str; 10] {
         [
             "non-existent-attribute-class",
             "non-existent-catch-type",
@@ -772,6 +775,7 @@ impl IssueCode {
             "non-existent-function",
             "non-existent-method",
             "non-existent-property",
+            "possibly-non-existent-property",
         ]
     }
 
@@ -867,7 +871,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_property_issue_codes() -> [Self; 15] {
+    pub const fn get_property_issue_codes() -> [Self; 16] {
         [
             Self::AmbiguousObjectPropertyAccess,
             Self::IncompatiblePropertyType,
@@ -882,12 +886,13 @@ impl IssueCode {
             Self::NonExistentProperty,
             Self::NullPropertyAccess,
             Self::OverriddenPropertyAccess,
+            Self::PossiblyNonExistentProperty,
             Self::PossiblyNullPropertyAccess,
             Self::PropertyTypeCoercion,
         ]
     }
 
-    pub const fn get_property_issue_code_values() -> [&'static str; 15] {
+    pub const fn get_property_issue_code_values() -> [&'static str; 16] {
         [
             "ambiguous-object-property-access",
             "incompatible-property-type",
@@ -902,6 +907,7 @@ impl IssueCode {
             "non-existent-property",
             "null-property-access",
             "overridden-property-access",
+            "possibly-non-existent-property",
             "possibly-null-property-access",
             "property-type-coercion",
         ]
@@ -1272,6 +1278,7 @@ impl std::str::FromStr for IssueCode {
             "possibly-invalid-clone" => Ok(Self::PossiblyInvalidClone),
             "possibly-invalid-iterator" => Ok(Self::PossiblyInvalidIterator),
             "possibly-invalid-operand" => Ok(Self::PossiblyInvalidOperand),
+            "possibly-non-existent-property" => Ok(Self::PossiblyNonExistentProperty),
             "possibly-null-argument" => Ok(Self::PossiblyNullArgument),
             "possibly-null-array-access" => Ok(Self::PossiblyNullArrayAccess),
             "possibly-null-array-index" => Ok(Self::PossiblyNullArrayIndex),

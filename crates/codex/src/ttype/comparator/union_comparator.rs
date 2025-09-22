@@ -1,12 +1,9 @@
 use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::concat_atom;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::generic::TGenericParameter;
-use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
@@ -81,43 +78,6 @@ pub fn is_contained_by(
         let mut all_type_coerced_from_as_mixed = None;
         let mut some_type_coerced = false;
         let mut some_type_coerced_from_nested_mixed = false;
-
-        if let TAtomic::Object(TObject::Named(named_object)) = input_type_part
-            && let Some(shaped_object) = container_type.get_single_shaped_object()
-            && let Some(known_items) = &shaped_object.known_properties
-            && let Some(class_like) = codebase.class_likes.get(&ascii_lowercase_atom(&named_object.name))
-        {
-            let mut required_count = 0;
-            let mut matched_required_count = 0;
-            let mut unmatched_type_union = false;
-
-            for (key, item) in known_items {
-                if !item.0 {
-                    required_count += 1;
-                }
-
-                let Some(property) = class_like.properties.get(&concat_atom!("$", &key)) else {
-                    continue;
-                };
-
-                let Some(type_metadata) = &property.type_metadata else {
-                    continue;
-                };
-
-                if type_metadata.type_union != item.1 {
-                    unmatched_type_union = true;
-                    continue;
-                }
-
-                if !item.0 {
-                    matched_required_count += 1;
-                }
-            }
-
-            if matched_required_count == required_count && !unmatched_type_union {
-                type_match_found = true;
-            }
-        }
 
         if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
             if container_type.has_int_and_string() {

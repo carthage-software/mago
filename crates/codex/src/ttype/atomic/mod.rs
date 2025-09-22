@@ -1031,10 +1031,8 @@ pub fn populate_atomic_type(
             }
         }
         TAtomic::Object(TObject::WithProperties(keyed_array)) => {
-            if let Some(known_items) = keyed_array.known_properties.as_mut() {
-                for (_, item_type) in known_items.values_mut() {
-                    populate_union_type(item_type, codebase_symbols, reference_source, symbol_references, force);
-                }
+            for (_, item_type) in keyed_array.known_properties.values_mut() {
+                populate_union_type(item_type, codebase_symbols, reference_source, symbol_references, force);
             }
         }
         TAtomic::Iterable(iterable) => {

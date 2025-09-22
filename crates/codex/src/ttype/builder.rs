@@ -3,11 +3,13 @@ use std::collections::BTreeMap;
 
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::i64_atom;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_type_syntax;
+use mago_type_syntax::ast::object::ObjectType;
 use mago_type_syntax::ast::*;
 
 use crate::misc::GenericParent;
@@ -24,7 +26,6 @@ use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
-use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -55,7 +56,6 @@ use crate::ttype::get_nullable_scalar;
 use crate::ttype::get_nullable_string;
 use crate::ttype::get_numeric;
 use crate::ttype::get_numeric_string;
-use crate::ttype::get_object;
 use crate::ttype::get_open_resource;
 use crate::ttype::get_positive_int;
 use crate::ttype::get_resource;
@@ -321,6 +321,7 @@ pub fn get_union_from_type_ast<'i>(
 
             wrap_atomic(TAtomic::Reference(TReference::Member { class_like_name, member_selector }))
         }
+        Type::Object(object_type) => wrap_atomic(get_object_from_ast(object_type, scope, type_context, classname)?),
         Type::Shape(shape_type) => wrap_atomic(get_shape_from_ast(shape_type, scope, type_context, classname)?),
         Type::Callable(callable_type) => {
             wrap_atomic(get_callable_from_ast(callable_type, scope, type_context, classname)?)
@@ -346,7 +347,6 @@ pub fn get_union_from_type_ast<'i>(
         Type::Int(_) => get_int(),
         Type::String(_) => get_string(),
         Type::ArrayKey(_) => get_arraykey(),
-        Type::Object(_) => get_object(),
         Type::Numeric(_) => get_numeric(),
         Type::Scalar(_) => get_scalar(),
         Type::NumericString(_) => get_numeric_string(),
@@ -468,6 +468,38 @@ pub fn get_union_from_type_ast<'i>(
 }
 
 #[inline]
+fn get_object_from_ast(
+    object: &ObjectType<'_>,
+    scope: &NamespaceScope,
+    type_context: &TypeResolutionContext,
+    classname: Option<Atom>,
+) -> Result<TAtomic, TypeError> {
+    let Some(properties) = object.properties.as_ref() else {
+        return Ok(TAtomic::Object(TObject::Any));
+    };
+
+    let mut known_properties = BTreeMap::new();
+    for property in &properties.fields {
+        let property_is_optional = property.is_optional();
+
+        let Some(field_key) = property.key.as_ref() else {
+            continue;
+        };
+
+        let key = match field_key.key {
+            ShapeKey::String { value, .. } => atom(value),
+            ShapeKey::Integer { value, .. } => i64_atom(value),
+        };
+
+        let property_type = get_union_from_type_ast(&property.value, scope, type_context, classname)?;
+
+        known_properties.insert(key, (property_is_optional, property_type));
+    }
+
+    Ok(TAtomic::Object(TObject::new_with_properties(properties.ellipsis.is_none(), known_properties)))
+}
+
+#[inline]
 fn get_shape_from_ast(
     shape: &ShapeType<'_>,
     scope: &NamespaceScope,
@@ -541,7 +573,7 @@ fn get_shape_from_ast(
         list.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::List(list)))
-    } else if !shape.kind.is_object() {
+    } else {
         let mut keyed_array = TKeyedArray::new();
 
         keyed_array.parameters = match &shape.additional_fields {
@@ -605,33 +637,6 @@ fn get_shape_from_ast(
         keyed_array.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::Keyed(keyed_array)))
-    } else {
-        let mut shaped_object = TObjectWithProperties::new();
-
-        shaped_object.known_properties = Some({
-            let mut tree = BTreeMap::new();
-
-            for field in &shape.fields {
-                let field_is_optional = field.is_optional();
-
-                let Some(field_key) = field.key.as_ref() else {
-                    continue;
-                };
-
-                let key = match field_key.key {
-                    ShapeKey::String { value, .. } => atom(value),
-                    ShapeKey::Integer { value, .. } => atom(&value.to_string()),
-                };
-
-                let field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
-
-                tree.insert(key, (field_is_optional, field_value_type));
-            }
-
-            tree
-        });
-
-        Ok(TAtomic::Object(TObject::WithProperties(shaped_object)))
     }
 }
 

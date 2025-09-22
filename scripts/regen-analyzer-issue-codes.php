@@ -118,6 +118,7 @@ final class AnalyzerCodeModuleGenerator
         'non-existent-function',
         'non-existent-method',
         'non-existent-property',
+        'possibly-non-existent-property',
         'never-return',
         'null-array-index',
         'nullable-return-statement',

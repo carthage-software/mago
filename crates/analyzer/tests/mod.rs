@@ -181,6 +181,7 @@ test_case!(match_true_and_false);
 test_case!(array_reconcile);
 test_case!(sealed_array_combine);
 test_case!(object_shape);
+test_case!(optional_object_with_properties);
 
 // Github Issues
 test_case!(issue_275);

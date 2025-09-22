@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -36,6 +38,16 @@ impl TObject {
     #[inline]
     pub const fn new_any() -> Self {
         TObject::Any
+    }
+
+    /// Creates a new `Object` representing an object with specific known properties.
+    ///
+    /// The `sealed` flag indicates whether the object is sealed (no additional properties will exist beyond those known).
+    ///
+    /// The `known_properties` map defines specific types for certain keys (`Atom`), where the `bool` indicates if the property is optional.
+    #[inline]
+    pub const fn new_with_properties(sealed: bool, known_properties: BTreeMap<Atom, (bool, TUnion)>) -> Self {
+        TObject::WithProperties(TObjectWithProperties { sealed, known_properties })
     }
 
     /// Creates a new `Object` representing a specific named object type (default flags).

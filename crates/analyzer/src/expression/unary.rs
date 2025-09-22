@@ -18,7 +18,6 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
-use mago_codex::ttype::atomic::object::with_properties::TObjectWithProperties;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
@@ -1246,7 +1245,6 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
                 return get_never();
             }
             TAtomic::Never => return get_never(),
-
             TAtomic::Callable(callable) if callable.get_signature().is_none_or(|signature| signature.is_closure()) => {
                 possibilities.push(t.clone());
             }
@@ -1258,16 +1256,17 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
                 if let Some(known_items) = &keyed_array.known_items {
                     for (key, item) in known_items {
                         let property_name = match key {
-                            ArrayKey::Integer(value) => atom(&value.to_string()),
+                            ArrayKey::Integer(value) => i64_atom(*value),
                             ArrayKey::String(value) => *value,
                         };
 
                         known_properties.insert(property_name, item.clone());
                     }
 
-                    possibilities.push(TAtomic::Object(TObject::WithProperties(TObjectWithProperties {
-                        known_properties: Some(known_properties),
-                    })));
+                    possibilities.push(TAtomic::Object(TObject::new_with_properties(
+                        keyed_array.parameters.is_none(),
+                        known_properties,
+                    )));
                 }
             }
             _ => {}
