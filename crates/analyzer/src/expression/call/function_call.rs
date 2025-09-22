@@ -39,6 +39,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             invocation_targets,
             InvocationArgumentsSource::ArgumentList(&self.argument_list),
             self.span(),
+            None,
             encountered_invalid_targets,
             false,
             false,

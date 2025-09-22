@@ -18,6 +18,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::unary::cast_type_to_string;
+use crate::utils::expression::get_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
     fn analyze<'ctx>(
@@ -32,7 +33,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
         let mut impossible = false;
 
         for part in self.parts().as_slice() {
-            let part_type = match part {
+            let (part_type, part_expression_id) = match part {
                 StringPart::Literal(literal_string_part) => {
                     non_empty = non_empty || !literal_string_part.value.is_empty();
                     if let Some(resulting_string) = resulting_string.as_mut() {
@@ -47,7 +48,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                     expression.analyze(context, block_context, artifacts)?;
                     block_context.inside_general_use = was_inside_general_use;
 
-                    artifacts.get_rc_expression_type(expression).cloned()
+                    (
+                        artifacts.get_rc_expression_type(expression).cloned(),
+                        get_expression_id(
+                            expression,
+                            block_context.scope.get_class_like_name(),
+                            context.resolved_names,
+                            Some(context.codebase),
+                        ),
+                    )
                 }
                 StringPart::BracedExpression(braced_expression) => {
                     let was_inside_general_use = block_context.inside_general_use;
@@ -55,7 +64,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                     braced_expression.expression.analyze(context, block_context, artifacts)?;
                     block_context.inside_general_use = was_inside_general_use;
 
-                    artifacts.get_rc_expression_type(&braced_expression.expression).cloned()
+                    (
+                        artifacts.get_rc_expression_type(&braced_expression.expression).cloned(),
+                        get_expression_id(
+                            braced_expression.expression,
+                            block_context.scope.get_class_like_name(),
+                            context.resolved_names,
+                            Some(context.codebase),
+                        ),
+                    )
                 }
             };
 
@@ -67,7 +84,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                 continue;
             };
 
-            let casted_part_type = cast_type_to_string(&part_type, context, block_context, artifacts, part.span())?;
+            let casted_part_type = cast_type_to_string(
+                &part_type,
+                part_expression_id.as_deref(),
+                context,
+                block_context,
+                artifacts,
+                part.span(),
+            )?;
+
             if casted_part_type.is_never() {
                 impossible = true;
 

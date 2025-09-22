@@ -263,7 +263,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        cast_type_to_string(&t, context, block_context, artifacts, self.span())?
+                        let operand_expression_id = get_expression_id(
+                            self.operand,
+                            block_context.scope.get_class_like_name(),
+                            context.resolved_names,
+                            Some(context.codebase),
+                        );
+
+                        cast_type_to_string(
+                            &t,
+                            operand_expression_id.as_deref(),
+                            context,
+                            block_context,
+                            artifacts,
+                            self.span(),
+                        )?
                     }
                     None => get_string(),
                 };
@@ -1250,6 +1264,7 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
 
 pub fn cast_type_to_string<'ctx, 'arena>(
     operand_type: &TUnion,
+    operand_expression_id: Option<&str>,
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -1434,6 +1449,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                     block_context,
                     artifacts,
                     object,
+                    operand_expression_id,
                     declaring_method_id,
                     class_metadata,
                     to_string_metadata,

@@ -175,57 +175,139 @@ pub struct MethodTag {
     pub type_string: TypeString,
     pub description: String,
 }
-
 /// Parses a PHPDoc variable token and returns a structured `Variable`.
 ///
-/// Supports `$name`, `...$name`, and `&$name`.
+/// If `allow_property_access` is false:
+/// - Supports `$name`, `...$name`, and `&$name`.
+///
+/// If `allow_property_access` is true:
+/// - Supports `$name` with optional property/array access like `$foo->bar` or `$foo['key']`
+/// - Can be recursive: `$foo->bar->baz['key']->qux`
+/// - Does NOT support `...` (variadic) or `&` (reference) prefixes
+///
 /// The returned `Variable` stores a normalized `name` (with `$`, without leading `...` or `&`),
 /// and sets flags `is_variadic` and `is_by_reference` that can be used for display/rendering.
 ///
-/// Examples:
+/// Examples (allow_property_access = false):
 /// - "$foo"       → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: false })
 /// - "&$foo"      → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: true })
-/// - "...$ids)"   → Some(Variable { name: "$ids", is_variadic: true, is_by_reference: false })
+/// - "...$ids"    → Some(Variable { name: "$ids", is_variadic: true, is_by_reference: false })
 /// - "$"          → None
 /// - "...$"       → None
 /// - "$1x"        → None
+///
+/// Examples (allow_property_access = true):
+/// - "$foo->bar"     → Some(Variable { name: "$foo->bar", is_variadic: false, is_by_reference: false })
+/// - "$foo['key']"   → Some(Variable { name: "$foo['key']", is_variadic: false, is_by_reference: false })
+/// - "$foo->bar->baz['key']" → Some(Variable { name: "$foo->bar->baz['key']", is_variadic: false, is_by_reference: false })
+/// - "&$foo->bar"    → None (reference not allowed with property access)
+/// - "...$foo->bar"  → None (variadic not allowed with property access)
 #[inline]
-fn parse_var_ident(raw: &str) -> Option<Variable> {
-    let is_by_reference = raw.starts_with('&');
-    // tolerate "&$x" in docblocks
-    let raw = raw.strip_prefix('&').unwrap_or(raw);
+fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
+    if allow_property_access {
+        // When property access is allowed, we don't support & or ...
+        if raw.starts_with('&') || raw.starts_with("...") {
+            return None;
+        }
 
-    // accept "$name" or "...$name"
-    let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix("...$") {
-        (4usize, r, true)
-    } else if let Some(r) = raw.strip_prefix('$') {
-        (1usize, r, false)
+        // Must start with $
+        if !raw.starts_with('$') {
+            return None;
+        }
+
+        let rest = &raw[1..]; // Skip the $
+        let bytes = rest.as_bytes();
+
+        if bytes.is_empty() {
+            return None;
+        }
+
+        // Parse the initial identifier
+        let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
+        let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
+
+        if !is_start(bytes[0]) {
+            return None;
+        }
+
+        let mut pos = 1;
+        while pos < bytes.len() && is_cont(bytes[pos]) {
+            pos += 1;
+        }
+
+        // Now parse any property/array access chains
+        while pos < bytes.len() {
+            if pos + 1 < bytes.len() && &bytes[pos..pos + 2] == b"->" {
+                // Object property access: ->identifier
+                pos += 2; // Skip ->
+
+                if pos >= bytes.len() || !is_start(bytes[pos]) {
+                    return None; // Invalid: -> must be followed by valid identifier
+                }
+
+                pos += 1;
+                while pos < bytes.len() && is_cont(bytes[pos]) {
+                    pos += 1;
+                }
+            } else if bytes[pos] == b'[' {
+                // Array access: [...]
+                pos += 1; // Skip [
+                let mut bracket_depth = 1;
+
+                while pos < bytes.len() && bracket_depth > 0 {
+                    if bytes[pos] == b'[' {
+                        bracket_depth += 1;
+                    } else if bytes[pos] == b']' {
+                        bracket_depth -= 1;
+                    }
+                    pos += 1;
+                }
+
+                if bracket_depth != 0 {
+                    return None; // Unmatched brackets
+                }
+            } else {
+                // End of valid property access chain
+                break;
+            }
+        }
+
+        // The full token should be consumed for a valid property access chain
+        let token = &raw[..1 + pos]; // Include the initial $
+
+        Some(Variable { name: token.to_owned(), is_variadic: false, is_by_reference: false })
     } else {
-        return None;
-    };
-
-    // PHP identifier rules (ASCII + underscore): [_A-Za-z][_A-Za-z0-9]*
-    let bytes = rest.as_bytes();
-    if bytes.is_empty() {
-        return None;
+        // Original logic for when property access is not allowed
+        let is_by_reference = raw.starts_with('&');
+        // tolerate "&$x" in docblocks
+        let raw = raw.strip_prefix('&').unwrap_or(raw);
+        // accept "$name" or "...$name"
+        let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix("...$") {
+            (4usize, r, true)
+        } else if let Some(r) = raw.strip_prefix('$') {
+            (1usize, r, false)
+        } else {
+            return None;
+        };
+        // PHP identifier rules (ASCII + underscore): [_A-Za-z][_A-Za-z0-9]*
+        let bytes = rest.as_bytes();
+        if bytes.is_empty() {
+            return None;
+        }
+        let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
+        let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
+        if !is_start(bytes[0]) {
+            return None;
+        }
+        let mut len = 1usize;
+        while len < bytes.len() && is_cont(bytes[len]) {
+            len += 1;
+        }
+        let token = &raw[..prefix_len + len];
+        // normalized: remove variadic prefix if present, keep `$`
+        let normalized = if is_variadic { &token[3..] } else { token };
+        Some(Variable { name: normalized.to_owned(), is_variadic, is_by_reference })
     }
-
-    let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
-    let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
-
-    if !is_start(bytes[0]) {
-        return None;
-    }
-
-    let mut len = 1usize;
-    while len < bytes.len() && is_cont(bytes[len]) {
-        len += 1;
-    }
-
-    let token = &raw[..prefix_len + len];
-    // normalized: remove variadic prefix if present, keep `$`
-    let normalized = if is_variadic { &token[3..] } else { token };
-    Some(Variable { name: normalized.to_owned(), is_variadic, is_by_reference })
 }
 
 /// Parses the content string of a `@template` or `@template-covariant` tag.
@@ -389,7 +471,7 @@ pub fn parse_param_tag(content: &str, span: Span) -> Option<ParameterTag> {
 
     let mut rest_parts = rest_slice.split_whitespace();
     let raw_name = rest_parts.next()?;
-    let variable = parse_var_ident(raw_name)?;
+    let variable = parse_var_ident(raw_name, false)?;
 
     let desc_start = rest_slice.find(&variable.name).map_or(0, |i| i + variable.name.len());
     let description = rest_slice[desc_start..].trim_start().to_owned();
@@ -423,7 +505,7 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Option<ParameterOutTag>
     }
 
     let raw_name = rest_slice.split_whitespace().next()?;
-    let variable = parse_var_ident(raw_name)?;
+    let variable = parse_var_ident(raw_name, false)?;
 
     Some(ParameterOutTag { span, variable, type_string })
 }
@@ -508,7 +590,7 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Option<AssertionTag> {
     let mut rest_parts = rest_slice.split_whitespace();
 
     let raw_name = rest_parts.next()?;
-    let variable = parse_var_ident(raw_name)?;
+    let variable = parse_var_ident(raw_name, true)?;
 
     Some(AssertionTag { span, variable, type_string })
 }
@@ -538,7 +620,7 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
         None
     } else {
         let var_part = rest_slice.split_whitespace().next()?;
-        parse_var_ident(var_part)
+        parse_var_ident(var_part, true)
     };
 
     Some(VarTag { span, type_string, variable })
@@ -622,7 +704,7 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
     let (type_string, variable) = if content.trim_start().starts_with('$') && !content.trim_start().starts_with("$this")
     {
         let var_part = content.split_whitespace().next()?;
-        let variable = parse_var_ident(var_part)?;
+        let variable = parse_var_ident(var_part, false)?;
 
         (None, variable)
     } else {
@@ -641,7 +723,7 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
         }
 
         let var_part = rest_slice.split_whitespace().next()?;
-        let variable = parse_var_ident(var_part)?;
+        let variable = parse_var_ident(var_part, false)?;
 
         (Some(type_string), variable)
     };
@@ -998,7 +1080,7 @@ fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
 
     let variable_span = span.subspan(arg_type.map(|t| 1 + t.len() as u32).unwrap_or(0), span.length());
 
-    let variable = parse_var_ident(raw_name)?;
+    let variable = parse_var_ident(raw_name, false)?;
 
     Some(Argument {
         type_hint: type_string,
@@ -1068,7 +1150,7 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let got = parse_var_ident(input);
+            let got = parse_var_ident(input, false);
             match (got, expected) {
                 (None, None) => {}
                 (Some(v), Some(e)) => {
@@ -1086,7 +1168,7 @@ mod tests {
         let cases = vec![("$x", "$x"), ("&$x", "&$x"), ("...$x", "...$x"), ("...$x)", "...$x"), ("...$x,", "...$x")];
 
         for (input, expected_raw) in cases {
-            let v = parse_var_ident(input).expect("should parse variable");
+            let v = parse_var_ident(input, false).expect("should parse variable");
             assert_eq!(v.to_string(), expected_raw);
         }
     }

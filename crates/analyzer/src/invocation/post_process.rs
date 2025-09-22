@@ -51,7 +51,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invoication: &Invocation<'ctx, 'ast, 'arena>,
-    this_variable: Option<String>,
+    this_variable: Option<&str>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
     apply_assertions: bool,
@@ -164,7 +164,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
         block_context,
         artifacts,
         invoication,
-        &this_variable,
+        this_variable,
         &metadata.if_true_assertions,
         template_result,
         parameters,
@@ -179,7 +179,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
         block_context,
         artifacts,
         invoication,
-        &this_variable,
+        this_variable,
         &metadata.if_false_assertions,
         template_result,
         parameters,
@@ -194,7 +194,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
         block_context,
         artifacts,
         invoication,
-        &this_variable,
+        this_variable,
         &metadata.assertions,
         template_result,
         parameters,
@@ -208,7 +208,7 @@ fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    this_variable: &Option<String>,
+    this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
@@ -320,7 +320,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    this_variable: &Option<String>,
+    this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Disjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
@@ -501,7 +501,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     parameter_name: &Atom,
-    this_variable: &Option<String>,
+    this_variable: Option<&str>,
 ) -> (Option<&'ast Expression<'arena>>, Option<String>) {
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
@@ -531,7 +531,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 fn resolve_special_assertion_target<'ctx>(
     block_context: &BlockContext<'ctx>,
     target_name: &Atom,
-    this_variable: &Option<String>,
+    this_variable: Option<&str>,
 ) -> Option<String> {
     if let Some(this_variable) = this_variable
         && target_name.starts_with("$this")

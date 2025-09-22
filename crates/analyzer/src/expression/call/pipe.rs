@@ -31,6 +31,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
             invocation_targets,
             InvocationArgumentsSource::PipeInput(self),
             self.span(),
+            None,
             encountered_invalid_targets,
             false,
             false,

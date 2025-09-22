@@ -28,6 +28,7 @@ use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::resolver::method::resolve_method_targets;
+use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
@@ -107,6 +108,7 @@ pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object_type: &TObject,
+    object_variable: Option<&str>,
     method_identifier: MethodIdentifier,
     class_like_metadata: &'ctx ClassLikeMetadata,
     method_metadata: &'ctx FunctionLikeMetadata,
@@ -163,7 +165,7 @@ pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
         block_context,
         artifacts,
         &invocation,
-        None,
+        object_variable,
         &template_result,
         &AtomMap::default(),
         false,
@@ -211,6 +213,13 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         });
     }
 
+    let this_variable = get_expression_id(
+        object,
+        block_context.scope.get_class_like_name(),
+        context.resolved_names,
+        Some(context.codebase),
+    );
+
     analyze_invocation_targets(
         context,
         block_context,
@@ -219,6 +228,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         invocation_targets,
         InvocationArgumentsSource::ArgumentList(argument_list),
         span,
+        this_variable.as_deref(),
         method_resolution.has_invalid_target,
         method_resolution.encountered_mixed,
         is_null_safe && method_resolution.encountered_null,
