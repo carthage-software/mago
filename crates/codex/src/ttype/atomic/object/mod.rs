@@ -212,12 +212,30 @@ impl TType for TObject {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        match self {
+            TObject::Any => false,
+            TObject::Enum(enum_object) => enum_object.is_complex(),
+            TObject::Named(named_object) => named_object.is_complex(),
+            TObject::WithProperties(shaped_object) => shaped_object.is_complex(),
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TObject::Any => atom("object"),
             TObject::Enum(enum_object) => enum_object.get_id(),
             TObject::Named(named_object) => named_object.get_id(),
             TObject::WithProperties(shaped_object) => shaped_object.get_id(),
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TObject::Any => atom("object"),
+            TObject::Enum(enum_object) => enum_object.get_pretty_id_with_indent(indent),
+            TObject::Named(named_object) => named_object.get_pretty_id_with_indent(indent),
+            TObject::WithProperties(shaped_object) => shaped_object.get_pretty_id_with_indent(indent),
         }
     }
 }

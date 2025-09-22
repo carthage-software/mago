@@ -62,6 +62,7 @@ pub struct WasmAnalyzerSettings {
     pub allow_possibly_undefined_array_keys: bool,
     pub check_throws: bool,
     pub perform_heuristic_checks: bool,
+    pub use_colors: bool,
 }
 
 impl WasmLinterSettings {
@@ -105,6 +106,7 @@ impl WasmAnalyzerSettings {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             perform_heuristic_checks: self.perform_heuristic_checks,
+            use_colors: self.use_colors,
             diff: false, // Not applicable in wasm context
         }
     }

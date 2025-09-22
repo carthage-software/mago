@@ -162,6 +162,16 @@ impl TType for TList {
         self.element_type.is_expandable()
     }
 
+    fn is_complex(&self) -> bool {
+        if let Some(elements) = &self.known_elements
+            && !elements.is_empty()
+        {
+            return true;
+        }
+
+        self.element_type.is_complex()
+    }
+
     fn get_id(&self) -> Atom {
         if let Some(elements) = &self.known_elements {
             // Format as list{...} shape
@@ -208,6 +218,78 @@ impl TType for TList {
                 if self.is_non_empty() { "non-empty-list" } else { "list" },
                 "<",
                 self.element_type.get_id().as_str(),
+                ">"
+            )
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        if let Some(elements) = &self.known_elements {
+            if elements.is_empty() && self.element_type.is_never() {
+                return atom("list{}");
+            }
+
+            let mut string = String::new();
+            string += "list{\n";
+            let element_indent = indent + 2;
+            let element_spaces = " ".repeat(element_indent);
+            let has_optional = self.has_known_optional_elements();
+            let mut include_index = false;
+
+            for (i, (optional, element_type)) in elements {
+                if *i == 0 {
+                    include_index = elements.len() > 1 || has_optional;
+                }
+
+                string += &element_spaces;
+                if has_optional || include_index {
+                    string += &i.to_string();
+                    if *optional {
+                        string += "?";
+                    }
+                    string += ": ";
+                }
+                string += &element_type.get_pretty_id_with_indent(element_indent);
+                string += ",\n";
+            }
+
+            if !self.element_type.is_never() {
+                string += &element_spaces;
+                string += "...";
+                if self.element_type.is_complex() {
+                    string += "<\n";
+                    string += &" ".repeat(element_indent + 2);
+                    string += &self.element_type.get_pretty_id_with_indent(element_indent + 2);
+                    string += ",\n";
+                    string += &element_spaces;
+                    string += ">";
+                } else {
+                    string += "<";
+                    string += &self.element_type.get_pretty_id_with_indent(element_indent);
+                    string += ">";
+                }
+                string += ",\n";
+            }
+
+            string += &" ".repeat(indent);
+            string += "}";
+
+            atom(&string)
+        } else if self.element_type.is_complex() {
+            let mut string = String::new();
+            string += if self.is_non_empty() { "non-empty-list" } else { "list" };
+            string += "<\n";
+            string += &" ".repeat(indent + 2);
+            string += &self.element_type.get_pretty_id_with_indent(indent + 2);
+            string += ",\n";
+            string += &" ".repeat(indent);
+            string += ">";
+            atom(&string)
+        } else {
+            concat_atom!(
+                if self.is_non_empty() { "non-empty-list" } else { "list" },
+                "<",
+                self.element_type.get_pretty_id_with_indent(indent).as_str(),
                 ">"
             )
         }

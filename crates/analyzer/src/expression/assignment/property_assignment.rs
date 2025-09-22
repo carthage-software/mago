@@ -20,6 +20,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
 use crate::utils::expression::get_property_access_expression_id;
+use crate::utils::get_type_diff;
 
 #[inline]
 pub fn analyze<'ctx, 'arena>(
@@ -110,6 +111,10 @@ pub fn analyze<'ctx, 'arena>(
                     )));
                 }
 
+                if let Some(type_diff) = get_type_diff(context, &resolved_property.property_type, assigned_value_type) {
+                    issue = issue.with_note(type_diff);
+                }
+
                 context.collector.report_with_code(
                     issue_kind,
                     issue.with_help(
@@ -139,6 +144,10 @@ pub fn analyze<'ctx, 'arena>(
                     issue = issue.with_annotation(Annotation::secondary(property_span).with_message(format!(
                         "This property `{property_name}` is declared with type `{property_type_str}`"
                     )));
+                }
+
+                if let Some(type_diff) = get_type_diff(context, &resolved_property.property_type, assigned_value_type) {
+                    issue = issue.with_note(type_diff);
                 }
 
                 context.collector.report_with_code(

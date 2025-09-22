@@ -110,7 +110,7 @@ impl AnalyzeCommand {
             final_database.read_only(),
             codebase_metadata,
             symbol_references,
-            configuration.analyzer.to_settings(configuration.php_version),
+            configuration.analyzer.to_settings(configuration.php_version, should_use_colors),
         )?;
 
         // 4. Filter and report any found issues.

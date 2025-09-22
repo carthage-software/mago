@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use derivative::Derivative;
+use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_atom::empty_atom;
 use serde::Deserialize;
@@ -1104,6 +1105,10 @@ impl TType for TUnion {
         self.types.iter().any(|t| t.is_expandable())
     }
 
+    fn is_complex(&self) -> bool {
+        self.types.len() > 3 || self.types.iter().any(|t| t.is_complex())
+    }
+
     fn get_id(&self) -> Atom {
         let len = self.types.len();
 
@@ -1128,6 +1133,63 @@ impl TType for TUnion {
         }
 
         result
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        let len = self.types.len();
+
+        if len <= 1 {
+            return self
+                .types
+                .first()
+                .map(|atomic| atomic.get_pretty_id_with_indent(indent))
+                .unwrap_or_else(empty_atom);
+        }
+
+        // Use multiline format for unions with more than 3 types
+        if len > 3 {
+            let mut atomic_ids: Vec<Atom> = self
+                .types
+                .as_ref()
+                .iter()
+                .map(|atomic| {
+                    let id = atomic.get_pretty_id_with_indent(indent + 2);
+                    if atomic.has_intersection_types() { concat_atom!("(", id.as_str(), ")") } else { id }
+                })
+                .collect();
+
+            atomic_ids.sort_unstable();
+
+            let mut result = String::new();
+            result += &atomic_ids[0];
+            for id in &atomic_ids[1..] {
+                result += "\n";
+                result += &" ".repeat(indent);
+                result += "| ";
+                result += id.as_str();
+            }
+
+            atom(&result)
+        } else {
+            // Use inline format for smaller unions
+            let mut atomic_ids: Vec<Atom> = self
+                .types
+                .as_ref()
+                .iter()
+                .map(|atomic| {
+                    let id = atomic.get_pretty_id_with_indent(indent);
+                    if atomic.has_intersection_types() && len > 1 { concat_atom!("(", id.as_str(), ")") } else { id }
+                })
+                .collect();
+
+            atomic_ids.sort_unstable();
+            let mut result = atomic_ids[0];
+            for id in &atomic_ids[1..] {
+                result = concat_atom!(result.as_str(), " | ", id.as_str());
+            }
+
+            result
+        }
     }
 }
 

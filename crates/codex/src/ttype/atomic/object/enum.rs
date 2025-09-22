@@ -65,10 +65,18 @@ impl TType for TEnum {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         match self.case {
             Some(case) => concat_atom!("enum(", self.name, "::", case, ")"),
             None => concat_atom!("enum(", self.name, ")"),
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }

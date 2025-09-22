@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_atom::concat_atom;
 
 use crate::ttype::TType;
@@ -157,6 +158,13 @@ impl TType for TNamedObject {
         true
     }
 
+    fn is_complex(&self) -> bool {
+        if let Some(parameters) = &self.type_parameters {
+            return parameters.iter().any(|param| param.is_complex());
+        }
+        false
+    }
+
     fn get_id(&self) -> Atom {
         let mut result = self.name;
         if let Some(parameters) = self.get_type_parameters() {
@@ -175,6 +183,55 @@ impl TType for TNamedObject {
         if let Some(intersection_types) = self.get_intersection_types() {
             for atomic in intersection_types {
                 let atomic_id = atomic.get_id();
+
+                result = if atomic.has_intersection_types() {
+                    concat_atom!(result, "&(", atomic_id, ")")
+                } else {
+                    concat_atom!(result, "&", atomic_id)
+                };
+            }
+        }
+
+        if self.is_this { concat_atom!(result, "&static") } else { result }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        let mut result = self.name;
+        if let Some(parameters) = self.get_type_parameters() {
+            if parameters.iter().any(|param| param.is_complex()) {
+                // Use multiline format for complex type parameters
+                let param_indent = indent + 2;
+                let param_spaces = " ".repeat(param_indent);
+                let mut multiline_result = String::new();
+                multiline_result += &self.name;
+                multiline_result += "<\n";
+                for (i, atomic) in parameters.iter().enumerate() {
+                    if i > 0 {
+                        multiline_result += ",\n";
+                    }
+                    multiline_result += &param_spaces;
+                    multiline_result += &atomic.get_pretty_id_with_indent(param_indent);
+                }
+                multiline_result += ",\n";
+                multiline_result += &" ".repeat(indent);
+                multiline_result += ">";
+                result = atom(&multiline_result);
+            } else {
+                // Use inline format for simple type parameters
+                result = concat_atom!(result, "<");
+                for (i, atomic) in parameters.iter().enumerate() {
+                    if i > 0 {
+                        result = concat_atom!(result, ", ");
+                    }
+                    result = concat_atom!(result, atomic.get_pretty_id_with_indent(indent));
+                }
+                result = concat_atom!(result, ">");
+            }
+        }
+
+        if let Some(intersection_types) = self.get_intersection_types() {
+            for atomic in intersection_types {
+                let atomic_id = atomic.get_pretty_id_with_indent(indent);
 
                 result = if atomic.has_intersection_types() {
                     concat_atom!(result, "&(", atomic_id, ")")

@@ -136,6 +136,10 @@ impl TType for TGenericParameter {
         true
     }
 
+    fn is_complex(&self) -> bool {
+        self.constraint.is_complex()
+    }
+
     fn get_id(&self) -> Atom {
         let base_id = concat_atom!(
             "'",
@@ -162,5 +166,9 @@ impl TType for TGenericParameter {
         }
 
         result
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }

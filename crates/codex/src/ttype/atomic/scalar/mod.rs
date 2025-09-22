@@ -553,6 +553,17 @@ impl TType for TScalar {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        match self {
+            TScalar::Bool(ttype) => ttype.is_complex(),
+            TScalar::Integer(ttype) => ttype.is_complex(),
+            TScalar::Float(ttype) => ttype.is_complex(),
+            TScalar::String(ttype) => ttype.is_complex(),
+            TScalar::ClassLikeString(ttype) => ttype.is_complex(),
+            _ => false,
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TScalar::Bool(t) => t.get_id(),
@@ -560,6 +571,19 @@ impl TType for TScalar {
             TScalar::String(t) => t.get_id(),
             TScalar::ClassLikeString(t) => t.get_id(),
             TScalar::Integer(t) => t.get_id(),
+            TScalar::Generic => atom("scalar"),
+            TScalar::ArrayKey => atom("array-key"),
+            TScalar::Numeric => atom("numeric"),
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TScalar::Bool(t) => t.get_pretty_id_with_indent(indent),
+            TScalar::Float(t) => t.get_pretty_id_with_indent(indent),
+            TScalar::String(t) => t.get_pretty_id_with_indent(indent),
+            TScalar::ClassLikeString(t) => t.get_pretty_id_with_indent(indent),
+            TScalar::Integer(t) => t.get_pretty_id_with_indent(indent),
             TScalar::Generic => atom("scalar"),
             TScalar::ArrayKey => atom("array-key"),
             TScalar::Numeric => atom("numeric"),

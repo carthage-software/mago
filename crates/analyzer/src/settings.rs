@@ -96,6 +96,12 @@ pub struct Settings {
     /// Defaults to `true`.
     pub perform_heuristic_checks: bool,
 
+    /// Enable colored output in terminal environments that support it. Defaults to `true`.
+    ///
+    /// This setting is primarily used for enabling/disabling colored diffs in
+    /// issue reports.
+    pub use_colors: bool,
+
     /// **Internal use only.**
     ///
     /// Enables a diffing mode for incremental analysis, used by integrations like LSPs.
@@ -138,6 +144,7 @@ impl Settings {
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
+            use_colors: true,
             // TODO(azjezz): enable heuristic checks in the future,
             // need optimizations first
             perform_heuristic_checks: false,

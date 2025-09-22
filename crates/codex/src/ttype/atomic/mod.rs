@@ -908,6 +908,31 @@ impl TType for TAtomic {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        if let Some(intersection) = self.get_intersection_types() {
+            for intersection_type in intersection {
+                if intersection_type.is_complex() {
+                    return true;
+                }
+            }
+        }
+
+        match self {
+            TAtomic::Object(ttype) => ttype.is_complex(),
+            TAtomic::Reference(ttype) => ttype.is_complex(),
+            TAtomic::GenericParameter(ttype) => ttype.is_complex(),
+            TAtomic::Iterable(ttype) => ttype.is_complex(),
+            TAtomic::Array(ttype) => ttype.is_complex(),
+            TAtomic::Callable(ttype) => ttype.is_complex(),
+            TAtomic::Conditional(ttype) => ttype.is_complex(),
+            TAtomic::Derived(ttype) => ttype.is_complex(),
+            TAtomic::Scalar(ttype) => ttype.is_complex(),
+            TAtomic::Mixed(ttype) => ttype.is_complex(),
+            TAtomic::Resource(ttype) => ttype.is_complex(),
+            _ => false,
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_id(),
@@ -921,6 +946,27 @@ impl TType for TAtomic {
             TAtomic::GenericParameter(parameter) => parameter.get_id(),
             TAtomic::Conditional(conditional) => conditional.get_id(),
             TAtomic::Derived(derived) => derived.get_id(),
+            TAtomic::Variable(name) => *name,
+            TAtomic::Never => atom("never"),
+            TAtomic::Null => atom("null"),
+            TAtomic::Void => atom("void"),
+            TAtomic::Placeholder => atom("_"),
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TAtomic::Scalar(scalar) => scalar.get_pretty_id_with_indent(indent),
+            TAtomic::Array(array) => array.get_pretty_id_with_indent(indent),
+            TAtomic::Callable(callable) => callable.get_pretty_id_with_indent(indent),
+            TAtomic::Object(object) => object.get_pretty_id_with_indent(indent),
+            TAtomic::Reference(reference) => reference.get_pretty_id_with_indent(indent),
+            TAtomic::Mixed(mixed) => mixed.get_pretty_id_with_indent(indent),
+            TAtomic::Resource(resource) => resource.get_pretty_id_with_indent(indent),
+            TAtomic::Iterable(iterable) => iterable.get_pretty_id_with_indent(indent),
+            TAtomic::GenericParameter(parameter) => parameter.get_pretty_id_with_indent(indent),
+            TAtomic::Conditional(conditional) => conditional.get_pretty_id_with_indent(indent),
+            TAtomic::Derived(derived) => derived.get_pretty_id_with_indent(indent),
             TAtomic::Variable(name) => *name,
             TAtomic::Never => atom("never"),
             TAtomic::Null => atom("null"),

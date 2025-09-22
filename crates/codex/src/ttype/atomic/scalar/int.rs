@@ -747,6 +747,10 @@ impl TType for TInteger {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TInteger::Literal(value) => {
@@ -773,6 +777,10 @@ impl TType for TInteger {
             TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), ", ", i64_atom(*to), ">"),
             TInteger::Unspecified => atom("int"),
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }
 

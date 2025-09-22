@@ -1474,6 +1474,7 @@ version = "1.0.0-beta.18"
 dependencies = [
  "ahash",
  "bumpalo",
+ "diffy",
  "either",
  "indexmap",
  "indoc",

@@ -78,10 +78,18 @@ impl TType for TFloat {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         match self.value {
             Some(value) => concat_atom!("float(", f64_atom(*value), ")"),
             None => atom("float"),
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }

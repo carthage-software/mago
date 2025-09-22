@@ -288,10 +288,24 @@ impl TType for TArray {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        match self {
+            TArray::Keyed(keyed_array) => keyed_array.is_complex(),
+            TArray::List(list) => list.is_complex(),
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TArray::List(list_data) => list_data.get_id(),
             TArray::Keyed(keyed_data) => keyed_data.get_id(),
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TArray::List(list_data) => list_data.get_pretty_id_with_indent(indent),
+            TArray::Keyed(keyed_data) => keyed_data.get_pretty_id_with_indent(indent),
         }
     }
 }

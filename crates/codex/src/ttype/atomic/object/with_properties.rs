@@ -67,6 +67,10 @@ impl TType for TObjectWithProperties {
         self.known_properties.iter().any(|(_, (_, item_type))| item_type.is_expandable())
     }
 
+    fn is_complex(&self) -> bool {
+        !self.known_properties.is_empty()
+    }
+
     fn get_id(&self) -> Atom {
         let mut string = String::new();
         string += "object{";
@@ -95,6 +99,38 @@ impl TType for TObjectWithProperties {
             string += "...";
         }
 
+        string += "}";
+
+        atom(&string)
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        if self.known_properties.is_empty() {
+            return if self.sealed { atom("object{}") } else { atom("object{...}") };
+        }
+
+        let mut string = String::new();
+        string += "object{\n";
+        let property_indent = indent + 2;
+        let property_spaces = " ".repeat(property_indent);
+
+        for (key, (indefinite, item_type)) in &self.known_properties {
+            string += &property_spaces;
+            string += key.as_ref();
+            if *indefinite {
+                string += "?";
+            }
+            string += ": ";
+            string += &item_type.get_pretty_id_with_indent(property_indent);
+            string += ",\n";
+        }
+
+        if !self.sealed {
+            string += &property_spaces;
+            string += "...,\n";
+        }
+
+        string += &" ".repeat(indent);
         string += "}";
 
         atom(&string)

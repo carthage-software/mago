@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_atom::concat_atom;
 
 use crate::ttype::TType;
@@ -120,6 +121,10 @@ impl TType for TIterable {
         self.key_type.is_expandable() || self.value_type.is_expandable()
     }
 
+    fn is_complex(&self) -> bool {
+        self.key_type.is_complex() || self.value_type.is_complex()
+    }
+
     fn get_id(&self) -> Atom {
         let base_id = concat_atom!("iterable<", self.key_type.get_id(), ", ", self.value_type.get_id(), ">");
 
@@ -133,5 +138,43 @@ impl TType for TIterable {
         }
 
         result
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        if self.is_complex() {
+            let param_indent = indent + 2;
+            let param_spaces = " ".repeat(param_indent);
+            let mut result = String::new();
+            result += "iterable<\n";
+            result += &param_spaces;
+            result += &self.key_type.get_pretty_id_with_indent(param_indent);
+            result += ",\n";
+            result += &param_spaces;
+            result += &self.value_type.get_pretty_id_with_indent(param_indent);
+            result += ",\n";
+            result += &" ".repeat(indent);
+            result += ">";
+
+            let base_id = atom(&result);
+
+            let Some(intersection_types) = self.intersection_types.as_deref() else {
+                return base_id;
+            };
+
+            let mut result = concat_atom!("(", base_id.as_str(), ")");
+
+            for atomic in intersection_types {
+                let atomic_id = atomic.get_pretty_id_with_indent(indent);
+                if atomic.has_intersection_types() {
+                    result = concat_atom!(result.as_str(), "&(", atomic_id.as_str(), ")");
+                } else {
+                    result = concat_atom!(result.as_str(), "&", atomic_id.as_str());
+                }
+            }
+
+            result
+        } else {
+            self.get_id()
+        }
     }
 }

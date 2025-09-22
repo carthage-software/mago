@@ -146,6 +146,20 @@ impl TType for TKeyedArray {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        if let Some(known_items) = &self.known_items
+            && !known_items.is_empty()
+        {
+            return true;
+        }
+
+        if let Some(parameters) = &self.parameters {
+            return parameters.0.is_complex() || parameters.1.is_complex();
+        }
+
+        false
+    }
+
     fn get_id(&self) -> Atom {
         if let Some(items) = &self.known_items {
             let mut string = String::new();
@@ -194,6 +208,86 @@ impl TType for TKeyedArray {
                 value_type.get_id().as_str(),
                 ">",
             )
+        } else {
+            atom("array{}")
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        if let Some(items) = &self.known_items {
+            if items.is_empty() && self.parameters.is_none() {
+                return atom("array{}");
+            }
+
+            let mut string = String::new();
+            string += "array{\n";
+            let item_indent = indent + 2;
+            let item_spaces = " ".repeat(item_indent);
+
+            for (key, (indefinite, item_type)) in items {
+                string += &item_spaces;
+                string += &key.to_string();
+                if *indefinite {
+                    string += "?";
+                }
+                string += ": ";
+                string += &item_type.get_pretty_id_with_indent(item_indent);
+                string += ",\n";
+            }
+
+            if let Some((key_type, value_type)) = &self.parameters {
+                string += &item_spaces;
+                string += "...";
+                if !key_type.is_array_key() || !value_type.is_mixed() {
+                    if key_type.is_complex() || value_type.is_complex() {
+                        string += "<\n";
+                        string += &" ".repeat(item_indent + 2);
+                        string += &key_type.get_pretty_id_with_indent(item_indent + 2);
+                        string += ",\n";
+                        string += &" ".repeat(item_indent + 2);
+                        string += &value_type.get_pretty_id_with_indent(item_indent + 2);
+                        string += ",\n";
+                        string += &item_spaces;
+                        string += ">";
+                    } else {
+                        string += "<";
+                        string += &key_type.get_pretty_id_with_indent(item_indent);
+                        string += ", ";
+                        string += &value_type.get_pretty_id_with_indent(item_indent);
+                        string += ">";
+                    }
+                }
+                string += ",\n";
+            }
+
+            string += &" ".repeat(indent);
+            string += "}";
+
+            atom(&string)
+        } else if let Some((key_type, value_type)) = &self.parameters {
+            if key_type.is_complex() || value_type.is_complex() {
+                let mut string = String::new();
+                string += if self.is_non_empty() { "non-empty-array" } else { "array" };
+                string += "<\n";
+                string += &" ".repeat(indent + 2);
+                string += &key_type.get_pretty_id_with_indent(indent + 2);
+                string += ",\n";
+                string += &" ".repeat(indent + 2);
+                string += &value_type.get_pretty_id_with_indent(indent + 2);
+                string += ",\n";
+                string += &" ".repeat(indent);
+                string += ">";
+                atom(&string)
+            } else {
+                concat_atom!(
+                    if self.is_non_empty() { "non-empty-array" } else { "array" },
+                    "<",
+                    key_type.get_pretty_id_with_indent(indent).as_str(),
+                    ", ",
+                    value_type.get_pretty_id_with_indent(indent).as_str(),
+                    ">",
+                )
+            }
         } else {
             atom("array{}")
         }

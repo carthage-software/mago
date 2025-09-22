@@ -77,11 +77,19 @@ impl TType for TDerived {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TDerived::KeyOf(key_of) => key_of.get_id(),
             TDerived::ValueOf(value_of) => value_of.get_id(),
             TDerived::PropertiesOf(properties_of) => properties_of.get_id(),
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }

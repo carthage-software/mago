@@ -141,7 +141,15 @@ impl TType for TValueOf {
         true
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         concat_atom!("value-of<", self.0.get_id().as_str(), ">")
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }

@@ -104,12 +104,22 @@ pub trait TType {
 
     fn is_expandable(&self) -> bool;
 
+    /// Returns true if this type has complex structure that benefits from
+    /// multiline formatting when used as a generic parameter.
+    fn is_complex(&self) -> bool;
+
     /// Return a human-readable atom for this type, which is
     /// suitable for use in error messages or debugging.
     ///
     /// The resulting identifier must be unique for the type,
     /// but it does not have to be globally unique.
     fn get_id(&self) -> Atom;
+
+    fn get_pretty_id(&self) -> Atom {
+        self.get_pretty_id_with_indent(0)
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom;
 }
 
 /// Implements the `TType` trait for `TypeRef`.
@@ -156,10 +166,24 @@ impl<'a> TType for TypeRef<'a> {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        match self {
+            TypeRef::Union(ttype) => ttype.is_complex(),
+            TypeRef::Atomic(ttype) => ttype.is_complex(),
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TypeRef::Union(ttype) => ttype.get_id(),
             TypeRef::Atomic(ttype) => ttype.get_id(),
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TypeRef::Union(ttype) => ttype.get_pretty_id_with_indent(indent),
+            TypeRef::Atomic(ttype) => ttype.get_pretty_id_with_indent(indent),
         }
     }
 }

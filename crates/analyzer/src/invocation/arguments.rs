@@ -21,6 +21,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::invocation::InvocationTarget;
+use crate::utils::get_type_diff;
 
 /// Checks if an argument can be passed by reference.
 fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
@@ -295,56 +296,76 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
                 .to_string();
         }
 
-        context.collector.report_with_code(
-            issue_kind,
-            Issue::error(format!(
-                "Argument type mismatch for argument #{} of `{}`: expected `{}`, but provided type `{}` is less specific.",
-                argument_offset + 1, target_name_str, parameter_type_str, input_type_str
-            ))
-            .with_annotation(Annotation::primary(input_expression.span()).with_message(annotation_msg))
-            .with_annotation(call_site)
-            .with_note(note_msg)
-            .with_help(format!("Provide a value that more precisely matches `{parameter_type_str}` or adjust the parameter type.")),
-        );
+        let mut issue = Issue::error(format!(
+            "Argument type mismatch for argument #{} of `{}`: expected `{}`, but provided type `{}` is less specific.",
+            argument_offset + 1,
+            target_name_str,
+            parameter_type_str,
+            input_type_str
+        ))
+        .with_annotation(Annotation::primary(input_expression.span()).with_message(annotation_msg))
+        .with_annotation(call_site)
+        .with_note(note_msg)
+        .with_help(format!(
+            "Provide a value that more precisely matches `{parameter_type_str}` or adjust the parameter type."
+        ));
+
+        if let Some(type_diff) = get_type_diff(context, parameter_type, input_type) {
+            issue = issue.with_note(type_diff);
+        }
+
+        context.collector.report_with_code(issue_kind, issue);
     } else if !union_comparison_result.type_coerced.unwrap_or(false) {
         let types_can_be_identical =
             can_expression_types_be_identical(context.codebase, input_type, parameter_type, false, false);
 
+        let kind;
+        let mut issue;
         if types_can_be_identical {
-            context.collector.report_with_code(
-                IssueCode::PossiblyInvalidArgument,
-                Issue::error(format!(
-                    "Possible argument type mismatch for argument #{} of `{}`: expected `{}`, but possibly received `{}`.",
-                    argument_offset + 1, target_name_str, parameter_type_str, input_type_str
-                ))
-                .with_annotation(Annotation::primary(input_expression.span()).with_message(format!("This might not be type `{parameter_type_str}`")))
-                .with_annotation(call_site)
-                .with_note(format!("The provided type `{input_type_str}` overlaps with `{parameter_type_str}` but is not fully contained."))
-                .with_help("Ensure the argument always has the expected type using checks or assertions."),
-            );
+            kind = IssueCode::PossiblyInvalidArgument;
+
+            issue = Issue::error(format!(
+                "Possible argument type mismatch for argument #{} of `{}`: expected `{}`, but possibly received `{}`.",
+                argument_offset + 1,
+                target_name_str,
+                parameter_type_str,
+                input_type_str
+            ))
+            .with_annotation(
+                Annotation::primary(input_expression.span())
+                    .with_message(format!("This might not be type `{parameter_type_str}`")),
+            )
+            .with_annotation(call_site)
+            .with_note(format!(
+                "The provided type `{input_type_str}` overlaps with `{parameter_type_str}` but is not fully contained."
+            ))
+            .with_help("Ensure the argument always has the expected type using checks or assertions.");
         } else {
-            context.collector.report_with_code(
-                IssueCode::InvalidArgument,
-                Issue::error(format!(
-                    "Invalid argument type for argument #{} of `{}`: expected `{}`, but found `{}`.",
-                    argument_offset + 1,
-                    target_name_str,
-                    parameter_type_str,
-                    input_type_str
-                ))
-                .with_annotation(
-                    Annotation::primary(input_expression.span())
-                        .with_message(format!("This has type `{input_type_str}`")),
-                )
-                .with_annotation(call_site)
-                .with_note(format!(
-                    "The provided type `{input_type_str}` is not compatible with the expected type `{parameter_type_str}`."
-                ))
-                .with_help(
-                    format!("Change the argument value to match `{parameter_type_str}`, or update the parameter's type declaration.")
-                ),
-            );
+            kind = IssueCode::InvalidArgument;
+            issue = Issue::error(format!(
+                "Invalid argument type for argument #{} of `{}`: expected `{}`, but found `{}`.",
+                argument_offset + 1,
+                target_name_str,
+                parameter_type_str,
+                input_type_str
+            ))
+            .with_annotation(
+                Annotation::primary(input_expression.span()).with_message(format!("This has type `{input_type_str}`")),
+            )
+            .with_annotation(call_site)
+            .with_note(format!(
+                "The provided type `{input_type_str}` is not compatible with the expected type `{parameter_type_str}`."
+            ))
+            .with_help(format!(
+                "Change the argument value to match `{parameter_type_str}`, or update the parameter's type declaration."
+            ));
         }
+
+        if let Some(type_diff) = get_type_diff(context, parameter_type, input_type) {
+            issue = issue.with_note(type_diff);
+        }
+
+        context.collector.report_with_code(kind, issue);
     }
 }
 

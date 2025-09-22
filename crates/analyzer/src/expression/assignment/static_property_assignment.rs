@@ -18,6 +18,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::static_property::resolve_static_properties;
+use crate::utils::get_type_diff;
 
 pub(crate) fn analyze<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
@@ -54,18 +55,21 @@ pub(crate) fn analyze<'ctx, 'arena>(
         );
 
         if !type_match_found && union_comparison_result.type_coerced.is_none() {
-            context.collector.report_with_code(
-                IssueCode::InvalidPropertyAssignmentValue,
-                Issue::error("Invalid property assignment value").with_annotation(
-                    Annotation::primary(property_access.class.span()).with_message(format!(
-                        "{}::{} with declared type {}, cannot be assigned type {}",
-                        resolved_property.declaring_class_id.as_deref().unwrap_or("<object>"),
-                        resolved_property.property_name,
-                        resolved_property.property_type.get_id(),
-                        assigned_value_type.get_id(),
-                    )),
-                ),
+            let mut issue = Issue::error("Invalid property assignment value").with_annotation(
+                Annotation::primary(property_access.class.span()).with_message(format!(
+                    "{}::{} with declared type {}, cannot be assigned type {}",
+                    resolved_property.declaring_class_id.as_deref().unwrap_or("<object>"),
+                    resolved_property.property_name,
+                    resolved_property.property_type.get_id(),
+                    assigned_value_type.get_id(),
+                )),
             );
+
+            if let Some(type_diff) = get_type_diff(context, &resolved_property.property_type, assigned_value_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidPropertyAssignmentValue, issue);
         }
 
         if union_comparison_result.type_coerced.is_some() {

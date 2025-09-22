@@ -66,12 +66,20 @@ impl TType for TBool {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         match self.value {
             Some(true) => atom("true"),
             Some(false) => atom("false"),
             None => atom("bool"),
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }
 

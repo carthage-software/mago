@@ -27,6 +27,7 @@ use crate::context::scope::control_action::ControlAction;
 use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
+use crate::utils::get_type_diff;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
     fn analyze<'ctx>(
@@ -399,67 +400,76 @@ pub fn handle_return_value<'ctx, 'arena>(
             }
 
             if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
-                context.collector.report_with_code(
-                    IssueCode::LessSpecificNestedReturnStatement,
-                    Issue::error(format!(
-                        "Returned type `{inferred_return_type_str}` is less specific than the declared return type `{expected_return_type_str}` for function `{function_name}` due to nested 'mixed'."
-                    ))
-                    .with_annotation(
-                        Annotation::primary(return_value.span())
-                            .with_message("Returned value's type is too general here due to nested mixed")
-                    )
-                    .with_note(
-                        "The analysis detected 'mixed' within the structure of the returned value, making the overall type less specific than what the function declared."
-                    )
-                    .with_help(
-                        format!(
-                            "Ensure the structure returned by `{function_name}` strictly adheres to the types specified in the `{expected_return_type_str}` return type declaration."
-                        )
-                    ),
-                );
-            } else {
-                context.collector.report_with_code(
-                    IssueCode::LessSpecificReturnStatement,
-                    Issue::error(format!(
-                        "Returned type `{inferred_return_type_str}` is less specific than the declared return type `{expected_return_type_str}` for function `{function_name}`."
-                    ))
-                    .with_annotation(
-                        Annotation::primary(return_value.span())
-                            .with_message("Returned type is too general.")
-                    )
-                    .with_note(
-                        format!(
-                            "The inferred type `{inferred_return_type_str}` could be assigned to the declared type `{expected_return_type_str}`, but is wider (less specific)."
-                        )
-                    )
-                    .with_help(
-                        format!(
-                            "Consider returning a value that more precisely matches the declared `{expected_return_type_str}` type, or adjust the function's return type declaration if the broader type is intended."
-                        )
-                   ),
-                );
-            }
-        } else {
-            context.collector.report_with_code(
-                IssueCode::InvalidReturnStatement,
-                Issue::error(format!(
-                    "Invalid return type for function `{function_name}`: expected `{expected_return_type_str}`, but found `{inferred_return_type_str}`."
+                let mut issue = Issue::error(format!(
+                    "Returned type `{inferred_return_type_str}` is less specific than the declared return type `{expected_return_type_str}` for function `{function_name}` due to nested 'mixed'."
                 ))
                 .with_annotation(
                     Annotation::primary(return_value.span())
-                        .with_message(format!("This has type `{inferred_return_type_str}`"))
+                        .with_message("Returned value's type is too general here due to nested mixed")
+                )
+                .with_note(
+                    "The analysis detected 'mixed' within the structure of the returned value, making the overall type less specific than what the function declared."
+                )
+                .with_help(
+                    format!(
+                        "Ensure the structure returned by `{function_name}` strictly adheres to the types specified in the `{expected_return_type_str}` return type declaration."
+                    )
+                );
+
+                if let Some(type_diff) = get_type_diff(context, &expected_return_type, &inferred_return_type) {
+                    issue = issue.with_note(type_diff);
+                }
+
+                context.collector.report_with_code(IssueCode::LessSpecificNestedReturnStatement, issue);
+            } else {
+                let mut issue = Issue::error(format!(
+                    "Returned type `{inferred_return_type_str}` is less specific than the declared return type `{expected_return_type_str}` for function `{function_name}`."
+                ))
+                .with_annotation(
+                    Annotation::primary(return_value.span())
+                        .with_message("Returned type is too general.")
                 )
                 .with_note(
                     format!(
-                        "The type `{inferred_return_type_str}` returned here is not compatible with the declared return type `{expected_return_type_str}`."
+                        "The inferred type `{inferred_return_type_str}` could be assigned to the declared type `{expected_return_type_str}`, but is wider (less specific)."
                     )
                 )
                 .with_help(
                     format!(
-                        "Change the return value to match `{expected_return_type_str}`, or update the function's return type declaration."
+                        "Consider returning a value that more precisely matches the declared `{expected_return_type_str}` type, or adjust the function's return type declaration if the broader type is intended."
                     )
-                ),
+               );
+
+                if let Some(type_diff) = get_type_diff(context, &expected_return_type, &inferred_return_type) {
+                    issue = issue.with_note(type_diff);
+                }
+
+                context.collector.report_with_code(IssueCode::LessSpecificReturnStatement, issue);
+            }
+        } else {
+            let mut issue = Issue::error(format!(
+                "Invalid return type for function `{function_name}`: expected `{expected_return_type_str}`, but found `{inferred_return_type_str}`."
+            ))
+            .with_annotation(
+                Annotation::primary(return_value.span())
+                    .with_message(format!("This has type `{inferred_return_type_str}`"))
+            )
+            .with_note(
+                format!(
+                    "The type `{inferred_return_type_str}` returned here is not compatible with the declared return type `{expected_return_type_str}`."
+                )
+            )
+            .with_help(
+                format!(
+                    "Change the return value to match `{expected_return_type_str}`, or update the function's return type declaration."
+                )
             );
+
+            if let Some(type_diff) = get_type_diff(context, &expected_return_type, &inferred_return_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidReturnStatement, issue);
         }
     } else if require_return_value
         && !function_like_metadata.flags.has_yield()

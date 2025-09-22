@@ -99,7 +99,7 @@ pub struct AnalyzerConfiguration {
 }
 
 impl AnalyzerConfiguration {
-    pub fn to_settings(&self, php_version: PHPVersion) -> Settings {
+    pub fn to_settings(&self, php_version: PHPVersion, use_colors: bool) -> Settings {
         Settings {
             version: php_version,
             mixed_issues: self.mixed_issues,
@@ -128,6 +128,7 @@ impl AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             perform_heuristic_checks: self.perform_heuristic_checks,
+            use_colors,
             diff: false,
         }
     }

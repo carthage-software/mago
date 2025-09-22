@@ -246,6 +246,20 @@ impl TType for TCallable {
         }
     }
 
+    fn is_complex(&self) -> bool {
+        match self {
+            TCallable::Alias(_) => false,
+            TCallable::Signature(signature) => {
+                signature.parameters.len() > 2
+                    || signature.return_type.as_ref().is_some_and(|ty| ty.is_complex())
+                    || signature
+                        .parameters
+                        .iter()
+                        .any(|param| param.get_type_signature().is_some_and(|ty| ty.is_complex()))
+            }
+        }
+    }
+
     fn get_id(&self) -> Atom {
         match self {
             TCallable::Signature(signature) => {
@@ -304,6 +318,63 @@ impl TType for TCallable {
                     )
                 }
             },
+        }
+    }
+
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+        match self {
+            TCallable::Signature(signature) => {
+                let parameters = signature.get_parameters();
+
+                // Use multiline format if there are more than 2 parameters
+                if parameters.len() > 2 {
+                    let mut string = String::new();
+                    string += "(";
+                    if signature.is_pure() {
+                        string += "pure-";
+                    }
+                    string += if signature.is_closure() { "closure(\n" } else { "callable(\n" };
+
+                    let param_indent = indent + 2;
+                    let param_spaces = " ".repeat(param_indent);
+
+                    for (i, parameter) in parameters.iter().enumerate() {
+                        if i > 0 {
+                            string += ",\n";
+                        }
+
+                        string += &param_spaces;
+                        if parameter.is_variadic() {
+                            string += "...";
+                        }
+
+                        if let Some(parameter_type) = parameter.get_type_signature() {
+                            string += &parameter_type.get_pretty_id_with_indent(param_indent);
+                        } else {
+                            string += "mixed";
+                        }
+
+                        if parameter.has_default() {
+                            string += "=";
+                        }
+                    }
+
+                    string += "\n";
+                    string += &" ".repeat(indent);
+                    string += "): ";
+                    if let Some(return_type) = signature.get_return_type() {
+                        string += &return_type.get_pretty_id_with_indent(indent);
+                    } else {
+                        string += "mixed";
+                    }
+                    string += ")";
+
+                    atom(&string)
+                } else {
+                    self.get_id()
+                }
+            }
+            TCallable::Alias(_) => self.get_id(),
         }
     }
 }

@@ -282,6 +282,10 @@ impl TType for TString {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         let s = match &self.literal {
             Some(TStringLiteral::Value(s)) => return concat_atom!("string('", s, "')"),
@@ -326,6 +330,10 @@ impl TType for TString {
         };
 
         atom(s)
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }
 

@@ -19,6 +19,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::utils::get_type_diff;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Yield<'arena> {
     fn analyze<'ctx>(
@@ -67,20 +68,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
             false,
             &mut ComparisonResult::new(),
         ) {
-            context.collector.report_with_code(
-                IssueCode::InvalidYieldValueType,
-                Issue::error(format!(
-                    "Invalid value type yielded; expected `{}`, but found `{}`.",
-                    v.get_id(),
-                    value_type.get_id()
-                ))
-                .with_annotation(
-                    Annotation::primary(self.value.as_ref().map_or_else(|| self.span(), |val| val.span()))
-                        .with_message(format!("This expression yields type `{}`", value_type.get_id())),
-                )
-                .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
-                .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint."),
-            );
+            let mut issue = Issue::error(format!(
+                "Invalid value type yielded; expected `{}`, but found `{}`.",
+                v.get_id(),
+                value_type.get_id()
+            ))
+            .with_annotation(
+                Annotation::primary(self.value.as_ref().map_or_else(|| self.span(), |val| val.span()))
+                    .with_message(format!("This expression yields type `{}`", value_type.get_id())),
+            )
+            .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
+            .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint.");
+
+            if let Some(type_diff) = get_type_diff(context, &v, &value_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidYieldValueType, issue);
         }
 
         if !union_comparator::is_contained_by(
@@ -92,20 +96,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
             false,
             &mut ComparisonResult::new(),
         ) {
-            context.collector.report_with_code(
-                IssueCode::InvalidYieldKeyType,
-                Issue::error(format!(
-                    "Invalid key type yielded implicitly; expected `{}`, but implicit key is `{}`.",
-                    k.get_id(),
-                    key_type.get_id()
-                ))
-                .with_annotation(
-                    Annotation::primary(self.span())
-                        .with_message(format!("Implicitly yields key of type `{}`", key_type.get_id())),
-                )
-                .with_note("When `yield $value` is used, an implicit integer key is generated. This key must be assignable to the key type declared in the Generator's return type hint.")
-                .with_help("Use `yield $key => $value;` to specify a key of the correct type, or adjust the Generator's key type hint."),
-            );
+            let mut issue = Issue::error(format!(
+                "Invalid key type yielded implicitly; expected `{}`, but implicit key is `{}`.",
+                k.get_id(),
+                key_type.get_id()
+            ))
+            .with_annotation(
+                Annotation::primary(self.span())
+                    .with_message(format!("Implicitly yields key of type `{}`", key_type.get_id())),
+            )
+            .with_note("When `yield $value` is used, an implicit integer key is generated. This key must be assignable to the key type declared in the Generator's return type hint.")
+            .with_help("Use `yield $key => $value;` to specify a key of the correct type, or adjust the Generator's key type hint.");
+
+            if let Some(type_diff) = get_type_diff(context, &k, &key_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidYieldKeyType, issue);
         }
 
         artifacts.set_expression_type(self, s);
@@ -152,20 +159,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
             false,
             &mut ComparisonResult::new(),
         ) {
-            context.collector.report_with_code(
-               IssueCode::InvalidYieldValueType,
-               Issue::error(format!(
-                   "Invalid value type yielded; expected `{}`, but found `{}`.",
-                   v.get_id(),
-                   value_type.get_id()
-               ))
-               .with_annotation(
-                   Annotation::primary(self.value.span())
-                       .with_message(format!("This expression yields type `{}`", value_type.get_id())),
-               )
-               .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
-               .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint."),
-            );
+            let mut issue = Issue::error(format!(
+                "Invalid value type yielded; expected `{}`, but found `{}`.",
+                v.get_id(),
+                value_type.get_id()
+            ))
+            .with_annotation(
+                Annotation::primary(self.value.span())
+                    .with_message(format!("This expression yields type `{}`", value_type.get_id())),
+            )
+            .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
+            .with_help("Ensure the yielded value matches the expected type, or adjust the Generator's return type hint.");
+
+            if let Some(type_diff) = get_type_diff(context, &v, &value_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidYieldValueType, issue);
         }
 
         if !union_comparator::is_contained_by(
@@ -177,20 +187,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
             false,
             &mut ComparisonResult::new(),
         ) {
-            context.collector.report_with_code(
-                IssueCode::InvalidYieldKeyType,
-                Issue::error(format!(
-                    "Invalid key type yielded; expected `{}`, but found `{}`.",
-                    k.get_id(),
-                    key_type.get_id()
-                ))
-                .with_annotation(
-                    Annotation::primary(self.key.span())
-                        .with_message(format!("This key has type `{}`", key_type.get_id())),
-                )
-                .with_note("The type of the key yielded must be assignable to the key type declared in the Generator's return type hint.")
-                .with_help("Ensure the yielded key matches the expected type, or adjust the Generator's key type hint."),
-            );
+            let mut issue = Issue::error(format!(
+                "Invalid key type yielded; expected `{}`, but found `{}`.",
+                k.get_id(),
+                key_type.get_id()
+            ))
+            .with_annotation(
+                Annotation::primary(self.key.span())
+                    .with_message(format!("This key has type `{}`", key_type.get_id())),
+            )
+            .with_note("The type of the key yielded must be assignable to the key type declared in the Generator's return type hint.")
+            .with_help("Ensure the yielded key matches the expected type, or adjust the Generator's key type hint.");
+
+            if let Some(type_diff) = get_type_diff(context, &k, &key_type) {
+                issue = issue.with_note(type_diff);
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidYieldKeyType, issue);
         }
 
         artifacts.set_expression_type(self, s);
@@ -297,20 +310,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                 false,
                 &mut ComparisonResult::new(),
             ) {
-                context.collector.report_with_code(
-                    IssueCode::YieldFromInvalidValueType,
-                    Issue::error(format!(
-                        "Invalid value type from `yield from`: current generator expects to yield `{}`, but the inner iterable yields `{}`.",
-                        v.get_id(),
-                        value.get_id()
-                    ))
-                    .with_annotation(
-                        Annotation::primary(self.iterator.span())
-                            .with_message(format!("This iterable yields values of type `{}`", value.get_id())),
-                    )
-                    .with_note("The value type yielded by the inner iterable (Tv') must be assignable to the value type of the current generator (Tv). This means `Tv' <: Tv`.")
-                    .with_help("Ensure the inner iterable yields compatible value types, or adjust the current Generator's type hint."),
-                );
+                let mut issue = Issue::error(format!(
+                    "Invalid value type from `yield from`: current generator expects to yield `{}`, but the inner iterable yields `{}`.",
+                    v.get_id(),
+                    value.get_id()
+                ))
+                .with_annotation(
+                    Annotation::primary(self.iterator.span())
+                        .with_message(format!("This iterable yields values of type `{}`", value.get_id())),
+                )
+                .with_note("The value type yielded by the inner iterable (Tv') must be assignable to the value type of the current generator (Tv). This means `Tv' <: Tv`.")
+                .with_help("Ensure the inner iterable yields compatible value types, or adjust the current Generator's type hint.");
+
+                if let Some(type_diff) = get_type_diff(context, &v, &value) {
+                    issue = issue.with_note(type_diff);
+                }
+
+                context.collector.report_with_code(IssueCode::YieldFromInvalidValueType, issue);
             }
 
             if !union_comparator::is_contained_by(
@@ -322,20 +338,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
                 false,
                 &mut ComparisonResult::new(),
             ) {
-                context.collector.report_with_code(
-                   IssueCode::YieldFromInvalidKeyType,
-                   Issue::error(format!(
-                       "Invalid key type from `yield from`: current generator expects to yield keys of type `{}`, but the inner iterable yields keys of type `{}`.",
-                       k.get_id(),
-                       key.get_id()
-                   ))
-                   .with_annotation(
-                       Annotation::primary(self.iterator.span())
-                           .with_message(format!("This iterable yields keys of type `{}`", key.get_id())),
-                   )
-                   .with_note("The key type yielded by the inner iterable (Tk') must be assignable to the key type of the current generator (Tk). This means `Tk' <: Tk`.")
-                   .with_help("Ensure the inner iterable yields compatible key types, or adjust the current Generator's type hint."),
-                );
+                let mut issue = Issue::error(format!(
+                    "Invalid key type from `yield from`: current generator expects to yield keys of type `{}`, but the inner iterable yields keys of type `{}`.",
+                    k.get_id(),
+                    key.get_id()
+                ))
+                .with_annotation(
+                    Annotation::primary(self.iterator.span())
+                        .with_message(format!("This iterable yields keys of type `{}`", key.get_id())),
+                )
+                .with_note("The key type yielded by the inner iterable (Tk') must be assignable to the key type of the current generator (Tk). This means `Tk' <: Tk`.")
+                .with_help("Ensure the inner iterable yields compatible key types, or adjust the current Generator's type hint.");
+
+                if let Some(type_diff) = get_type_diff(context, &k, &key) {
+                    issue = issue.with_note(type_diff);
+                }
+
+                context.collector.report_with_code(IssueCode::YieldFromInvalidKeyType, issue);
             }
         }
 

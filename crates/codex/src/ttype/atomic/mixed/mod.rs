@@ -177,6 +177,10 @@ impl TType for TMixed {
         false
     }
 
+    fn is_complex(&self) -> bool {
+        false
+    }
+
     fn get_id(&self) -> Atom {
         if self.is_empty {
             atom(match self.truthiness {
@@ -193,6 +197,10 @@ impl TType for TMixed {
                 TMixedTruthiness::Undetermined => "mixed",
             })
         }
+    }
+
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+        self.get_id()
     }
 }
 
