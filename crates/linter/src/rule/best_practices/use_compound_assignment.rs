@@ -91,6 +91,10 @@ impl LintRule for UseCompoundAssignmentRule {
             return;
         };
 
+        if !assignment.operator.is_assign() {
+            return;
+        }
+
         let Expression::Binary(binary) = assignment.rhs else {
             return;
         };
