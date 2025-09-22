@@ -24,6 +24,7 @@ use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -540,7 +541,7 @@ fn get_shape_from_ast(
         list.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::List(list)))
-    } else {
+    } else if !shape.kind.is_object() {
         let mut keyed_array = TKeyedArray::new();
 
         keyed_array.parameters = match &shape.additional_fields {
@@ -604,6 +605,33 @@ fn get_shape_from_ast(
         keyed_array.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
 
         Ok(TAtomic::Array(TArray::Keyed(keyed_array)))
+    } else {
+        let mut shaped_object = TObjectWithProperties::new();
+
+        shaped_object.known_properties = Some({
+            let mut tree = BTreeMap::new();
+
+            for field in &shape.fields {
+                let field_is_optional = field.is_optional();
+
+                let Some(field_key) = field.key.as_ref() else {
+                    continue;
+                };
+
+                let key = match field_key.key {
+                    ShapeKey::String { value, .. } => atom(value),
+                    ShapeKey::Integer { value, .. } => atom(&value.to_string()),
+                };
+
+                let field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+
+                tree.insert(key, (field_is_optional, field_value_type));
+            }
+
+            tree
+        });
+
+        Ok(TAtomic::Object(TObject::WithProperties(shaped_object)))
     }
 }
 

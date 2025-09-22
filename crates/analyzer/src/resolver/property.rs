@@ -3,6 +3,7 @@ use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::get_class_like;
 use mago_codex::get_declaring_class_for_property;
@@ -47,7 +48,7 @@ use crate::visibility::check_property_write_visibility;
 #[derive(Debug)]
 pub struct ResolvedProperty {
     pub property_name: Atom,
-    pub declaring_class_id: Atom,
+    pub declaring_class_id: Option<Atom>,
     pub property_span: Option<Span>,
     pub property_type: TUnion,
     pub is_magic: bool,
@@ -149,17 +150,56 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             continue;
         };
 
-        let Some(classname) = object.get_name() else {
-            result.has_ambiguous_path = true;
-            if !block_context.inside_isset {
-                report_ambiguous_access(context, property_selector, object_expression.span());
-            }
+        let classname = match object {
+            TObject::Any => {
+                result.has_ambiguous_path = true;
 
-            continue;
+                if !block_context.inside_isset {
+                    report_ambiguous_access(context, property_selector, object_expression.span());
+                }
+
+                continue;
+            }
+            TObject::WithProperties(shaped_object) => {
+                let Some(known_properties) = shaped_object.get_known_properties() else {
+                    result.has_ambiguous_path = true;
+
+                    if !block_context.inside_isset {
+                        report_ambiguous_access(context, property_selector, object_expression.span());
+                    }
+
+                    continue;
+                };
+
+                for prop_name in &property_names {
+                    let key = atom(prop_name.trim_start_matches('$'));
+                    let Some((_, value)) = known_properties.get_key_value(&key) else {
+                        if !block_context.inside_isset {
+                            report_ambiguous_access(context, property_selector, object_expression.span());
+                        }
+
+                        continue;
+                    };
+
+                    let resolved_property = ResolvedProperty {
+                        property_span: None,
+                        property_name: *prop_name,
+                        declaring_class_id: None,
+                        property_type: value.1.clone(),
+                        is_magic: false,
+                    };
+
+                    result.properties.push(resolved_property);
+                }
+
+                continue;
+            }
+            TObject::Named(named_object) => named_object.get_name(),
+            TObject::Enum(r#enum) => r#enum.get_name(),
         };
 
         let magic_method_name = if for_assignment { "__set" } else { "__get" };
-        let mut magic_method_identifier = get_method_identifier(classname, magic_method_name);
+        let mut magic_method_identifier = get_method_identifier(&classname, magic_method_name);
         magic_method_identifier = get_declaring_method_identifier(context.codebase, &magic_method_identifier);
         let magic_method = get_method_by_id(context.codebase, &magic_method_identifier);
 
@@ -167,7 +207,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             let resolved_property = find_property_in_class(
                 context,
                 block_context,
-                classname,
+                &classname,
                 prop_name,
                 property_selector,
                 object_expression,
@@ -190,7 +230,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                         context,
                         object_expression.span(),
                         property_selector.span(),
-                        classname,
+                        &classname,
                         prop_name,
                         for_assignment,
                     );
@@ -201,11 +241,13 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                     .add_reference_for_method_call(&block_context.scope, &magic_method_identifier);
             }
 
-            artifacts.symbol_references.add_reference_for_property_access(
-                &block_context.scope,
-                resolved_property.declaring_class_id,
-                resolved_property.property_name,
-            );
+            if let Some(declaring_class_id) = resolved_property.declaring_class_id {
+                artifacts.symbol_references.add_reference_for_property_access(
+                    &block_context.scope,
+                    declaring_class_id,
+                    resolved_property.property_name,
+                );
+            }
 
             result.properties.push(resolved_property);
         }
@@ -251,7 +293,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             return Ok(Some(ResolvedProperty {
                 property_span: None,
                 property_name: *prop_name,
-                declaring_class_id,
+                declaring_class_id: Some(declaring_class_id),
                 property_type: get_mixed(),
                 is_magic: true,
             }));
@@ -333,7 +375,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     Ok(Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: *prop_name,
-        declaring_class_id,
+        declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: property_metadata.flags.is_magic_property(),
     }))

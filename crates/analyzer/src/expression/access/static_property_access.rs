@@ -44,11 +44,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
         let mut resulting_expression_type = None;
         if !resolution_result.has_error_path {
             for resolved_property in resolution_result.properties {
-                artifacts.symbol_references.add_reference_to_class_member(
-                    &block_context.scope,
-                    (resolved_property.declaring_class_id, resolved_property.property_name),
-                    false,
-                );
+                if let Some(declaring_class_id) = resolved_property.declaring_class_id {
+                    artifacts.symbol_references.add_reference_to_class_member(
+                        &block_context.scope,
+                        (declaring_class_id, resolved_property.property_name),
+                        false,
+                    );
+                }
 
                 resulting_expression_type = Some(add_optional_union_type(
                     resolved_property.property_type,

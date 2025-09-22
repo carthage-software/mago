@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -33,11 +34,13 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let mut resolved_property_type = None;
     let mut matched_all_properties = true;
     for resolved_property in property_resolution.properties {
-        artifacts.symbol_references.add_reference_to_class_member(
-            &block_context.scope,
-            (resolved_property.declaring_class_id, resolved_property.property_name),
-            false,
-        );
+        if let Some(declaring_class_id) = resolved_property.declaring_class_id {
+            artifacts.symbol_references.add_reference_to_class_member(
+                &block_context.scope,
+                (declaring_class_id, resolved_property.property_name),
+                false,
+            );
+        }
 
         let mut union_comparison_result = ComparisonResult::new();
 
@@ -57,7 +60,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 Issue::error("Invalid property assignment value").with_annotation(
                     Annotation::primary(property_access.class.span()).with_message(format!(
                         "{}::{} with declared type {}, cannot be assigned type {}",
-                        resolved_property.declaring_class_id,
+                        resolved_property.declaring_class_id.unwrap_or(atom("")),
                         resolved_property.property_name,
                         resolved_property.property_type.get_id(),
                         assigned_value_type.get_id(),

@@ -60,6 +60,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                             has_cloneable_object = true;
                         }
                     }
+                    TObject::WithProperties(_) => {
+                        has_cloneable_object = true;
+                    }
                 },
                 TAtomic::GenericParameter(parameter) => {
                     atomic_types.extend(parameter.constraint.types.iter());

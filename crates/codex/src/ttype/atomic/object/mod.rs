@@ -9,10 +9,12 @@ use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::union::TUnion;
 
 pub mod r#enum;
 pub mod named;
+pub mod with_properties;
 
 /// Represents a PHP object type, distinguishing between the generic `object`
 /// and instances of specific named classes/interfaces/traits (which may include intersections).
@@ -25,6 +27,8 @@ pub enum TObject {
     Named(TNamedObject),
     /// Represents a specific `enum` type (unit or backed).
     Enum(TEnum),
+    /// Represents an object documented via `object{...}` doc comment
+    WithProperties(TObjectWithProperties),
 }
 
 impl TObject {
@@ -113,6 +117,7 @@ impl TObject {
             TObject::Any => None,
             TObject::Enum(enum_object) => Some(&enum_object.name),
             TObject::Named(named_object) => Some(&named_object.name),
+            TObject::WithProperties(_) => None,
         }
     }
 
@@ -141,6 +146,7 @@ impl TType for TObject {
             TObject::Any => vec![],
             TObject::Enum(ttype) => ttype.get_child_nodes(),
             TObject::Named(ttype) => ttype.get_child_nodes(),
+            TObject::WithProperties(ttype) => ttype.get_child_nodes(),
         }
     }
 
@@ -181,6 +187,7 @@ impl TType for TObject {
             TObject::Any => false,
             TObject::Enum(enum_object) => enum_object.needs_population(),
             TObject::Named(named_object) => named_object.needs_population(),
+            TObject::WithProperties(shaped_object) => shaped_object.needs_population(),
         }
     }
 
@@ -189,6 +196,7 @@ impl TType for TObject {
             TObject::Any => false,
             TObject::Enum(enum_object) => enum_object.is_expandable(),
             TObject::Named(named_object) => named_object.is_expandable(),
+            TObject::WithProperties(shaped_object) => shaped_object.is_expandable(),
         }
     }
 
@@ -197,6 +205,7 @@ impl TType for TObject {
             TObject::Any => atom("object"),
             TObject::Enum(enum_object) => enum_object.get_id(),
             TObject::Named(named_object) => named_object.get_id(),
+            TObject::WithProperties(shaped_object) => shaped_object.get_id(),
         }
     }
 }

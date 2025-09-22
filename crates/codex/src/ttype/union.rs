@@ -23,6 +23,7 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::bool::TBool;
@@ -876,6 +877,17 @@ impl TUnion {
     }
 
     #[inline]
+    pub fn get_single_shaped_object(&self) -> Option<&TObjectWithProperties> {
+        if self.is_single()
+            && let TAtomic::Object(TObject::WithProperties(shaped_object)) = &self.types[0]
+        {
+            Some(shaped_object)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
     pub fn get_single(&self) -> &TAtomic {
         &self.types[0]
     }
@@ -910,7 +922,9 @@ impl TUnion {
 
     #[inline]
     pub fn has_object(&self) -> bool {
-        self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Any)))
+        self.types
+            .iter()
+            .any(|t| matches!(t, TAtomic::Object(TObject::Any) | TAtomic::Object(TObject::WithProperties(_))))
     }
 
     #[inline]

@@ -11,12 +11,14 @@ use crate::parser::internal::callable::parse_optional_callable_type_specificatio
 use crate::parser::internal::generic::parse_generic_parameters_or_none;
 use crate::parser::internal::generic::parse_single_generic_parameter;
 use crate::parser::internal::generic::parse_single_generic_parameter_or_none;
+use crate::parser::internal::object::parse_object_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
 
 pub mod array_like;
 pub mod callable;
 pub mod generic;
+pub mod object;
 pub mod stream;
 
 #[inline]
@@ -112,7 +114,7 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::LowercaseString => Type::LowercaseString(Keyword::from(stream.consume()?)),
         TypeTokenKind::TruthyString => Type::TruthyString(Keyword::from(stream.consume()?)),
         TypeTokenKind::NonFalsyString => Type::NonFalsyString(Keyword::from(stream.consume()?)),
-        TypeTokenKind::Object => Type::Object(Keyword::from(stream.consume()?)),
+        TypeTokenKind::Object => parse_object_type(stream)?,
         TypeTokenKind::NoReturn | TypeTokenKind::NeverReturn | TypeTokenKind::NeverReturns | TypeTokenKind::Nothing => {
             Type::Never(Keyword::from(stream.consume()?))
         }

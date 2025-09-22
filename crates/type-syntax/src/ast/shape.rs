@@ -16,6 +16,7 @@ pub enum ShapeTypeKind {
     AssociativeArray,
     List,
     NonEmptyList,
+    Object,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -68,6 +69,11 @@ impl ShapeTypeKind {
     #[inline]
     pub const fn is_non_empty(&self) -> bool {
         matches!(self, ShapeTypeKind::NonEmptyArray | ShapeTypeKind::NonEmptyList)
+    }
+
+    #[inline]
+    pub const fn is_object(&self) -> bool {
+        matches!(self, ShapeTypeKind::Object)
     }
 }
 

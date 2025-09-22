@@ -16,6 +16,7 @@ pub use crate::ast::iterable::*;
 pub use crate::ast::key_of::*;
 pub use crate::ast::keyword::*;
 pub use crate::ast::literal::*;
+use crate::ast::object::ObjectType;
 pub use crate::ast::properties_of::*;
 pub use crate::ast::reference::*;
 pub use crate::ast::shape::*;
@@ -37,6 +38,7 @@ pub mod iterable;
 pub mod key_of;
 pub mod keyword;
 pub mod literal;
+pub mod object;
 pub mod properties_of;
 pub mod reference;
 pub mod shape;
@@ -83,7 +85,7 @@ pub enum Type<'input> {
     String(Keyword<'input>),
     StringableObject(Keyword<'input>),
     ArrayKey(Keyword<'input>),
-    Object(Keyword<'input>),
+    Object(ObjectType<'input>),
     Numeric(Keyword<'input>),
     Scalar(Keyword<'input>),
     NumericString(Keyword<'input>),
