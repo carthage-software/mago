@@ -89,7 +89,11 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         binary.rhs.analyze(context, block_context, artifacts)?;
     } else {
         let non_null_lhs_type = lhs_type.to_non_nullable();
+        let has_returned = block_context.has_returned;
+        block_context.has_returned = false;
         binary.rhs.analyze(context, block_context, artifacts)?;
+        block_context.has_returned &= has_returned;
+
         let rhs_type =
             artifacts.get_expression_type(&binary.rhs).map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
 
