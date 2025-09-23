@@ -112,7 +112,7 @@ impl LintRule for NoRequestAllRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Block];
+        const TARGETS: &[NodeKind] = &[NodeKind::Function, NodeKind::Method, NodeKind::Closure];
 
         TARGETS
     }
@@ -122,7 +122,12 @@ impl LintRule for NoRequestAllRule {
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
-        let Node::Block(block) = node else { return };
+        let block = match node {
+            Node::Function(Function { body: block, .. }) => block,
+            Node::Method(Method { body: MethodBody::Concrete(block), .. }) => block,
+            Node::Closure(Closure { body: block, .. }) => block,
+            _ => return,
+        };
 
         let request_all_references = find_method_references_in_block(block, &|reference| {
             let ClassLikeMemberSelector::Identifier(method) = reference.get_selector() else { return false };
