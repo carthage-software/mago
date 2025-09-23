@@ -66,7 +66,7 @@ impl<'ctx> ScopeContext<'ctx> {
     pub fn get_function_like_identifier(&self) -> Option<FunctionLikeIdentifier> {
         let function_like = self.function_like?;
 
-        let Some(function_name) = function_like.name else {
+        let Some(function_name) = function_like.original_name else {
             return Some(FunctionLikeIdentifier::Closure(function_like.span.file_id, function_like.span.start));
         };
 
@@ -75,7 +75,7 @@ impl<'ctx> ScopeContext<'ctx> {
                 return Some(FunctionLikeIdentifier::Function(function_name));
             };
 
-            FunctionLikeIdentifier::Method(class_like.name, function_name)
+            FunctionLikeIdentifier::Method(class_like.original_name, function_name)
         } else {
             FunctionLikeIdentifier::Function(function_name)
         })

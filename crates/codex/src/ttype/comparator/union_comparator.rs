@@ -37,6 +37,8 @@ pub fn is_contained_by(
     let mut input_atomic_types = input_type.types.iter().collect::<Vec<_>>();
     input_atomic_types.reverse();
 
+    let mut all_matched = true;
+
     'outer: while let Some(input_type_part) = input_atomic_types.pop() {
         match input_type_part {
             TAtomic::Null => {
@@ -262,11 +264,11 @@ pub fn is_contained_by(
                 }
             }
 
-            return false;
+            all_matched = false;
         }
     }
 
-    true
+    all_matched
 }
 
 pub(crate) fn can_be_contained_by(
