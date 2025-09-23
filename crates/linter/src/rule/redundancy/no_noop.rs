@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_fixer::SafetyClassification;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -60,7 +61,6 @@ impl LintRule for NoNoopRule {
                 ;
             "#},
             category: Category::Redundancy,
-
             requirements: RuleRequirements::None,
         };
 
@@ -68,7 +68,20 @@ impl LintRule for NoNoopRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Statement];
+        const TARGETS: &[NodeKind] = &[
+            NodeKind::Program,
+            NodeKind::Block,
+            NodeKind::Namespace,
+            NodeKind::DeclareColonDelimitedBody,
+            NodeKind::SwitchExpressionCase,
+            NodeKind::SwitchDefaultCase,
+            NodeKind::ForeachColonDelimitedBody,
+            NodeKind::WhileColonDelimitedBody,
+            NodeKind::ForColonDelimitedBody,
+            NodeKind::IfColonDelimitedBody,
+            NodeKind::IfColonDelimitedBodyElseIfClause,
+            NodeKind::IfColonDelimitedBodyElseClause,
+        ];
 
         TARGETS
     }
@@ -78,13 +91,33 @@ impl LintRule for NoNoopRule {
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
-        if let Node::Statement(Statement::Noop(noop)) = node {
-            let issue = Issue::new(self.cfg.level(), "Redundant noop statement.")
-                .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement"))
-                .with_help("Remove the redundant `;`.");
+        let statements = match node {
+            Node::Program(node) => node.statements.as_slice(),
+            Node::Block(node) => node.statements.as_slice(),
+            Node::Namespace(node) => node.statements().as_slice(),
+            Node::DeclareColonDelimitedBody(node) => node.statements.as_slice(),
+            Node::SwitchExpressionCase(node) => node.statements.as_slice(),
+            Node::SwitchDefaultCase(node) => node.statements.as_slice(),
+            Node::ForeachColonDelimitedBody(node) => node.statements.as_slice(),
+            Node::WhileColonDelimitedBody(node) => node.statements.as_slice(),
+            Node::ForColonDelimitedBody(node) => node.statements.as_slice(),
+            Node::IfColonDelimitedBody(node) => node.statements.as_slice(),
+            Node::IfColonDelimitedBodyElseIfClause(node) => node.statements.as_slice(),
+            Node::IfColonDelimitedBodyElseClause(node) => node.statements.as_slice(),
+            _ => return,
+        };
 
-            ctx.collector.report(issue);
+        for statement in statements {
+            if let Statement::Noop(noop) = statement {
+                let issue = Issue::new(self.cfg.level(), "Redundant noop statement.")
+                    .with_code(self.meta.code)
+                    .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement"))
+                    .with_help("Remove the redundant `;`.");
+
+                ctx.collector.propose(issue, |plan| {
+                    plan.delete(noop.to_range(), SafetyClassification::Safe);
+                });
+            }
         }
     }
 }
