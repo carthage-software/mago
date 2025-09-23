@@ -56,7 +56,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
                 | Statement::Return(_)
                 | Statement::Echo(_)
                 | Statement::Unset(_)
+                | Statement::Inline(_)
+                | Statement::OpeningTag(_)
+                | Statement::Declare(_)
                 | Statement::Noop(_)
+                | Statement::ClosingTag(_)
+                | Statement::HaltCompiler(_)
         );
 
         if should_populate_docblock_variables {
@@ -164,6 +169,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         if let Statement::Expression(expression) = self
             && context.settings.find_unused_expressions
+            && !block_context.is_in_echo_context
         {
             detect_unused_statement_expressions(expression.expression, self, context, artifacts);
         }
@@ -220,7 +226,16 @@ pub fn analyze_statements<'ctx, 'arena>(
             }
         }
 
+        let is_echo_opening_tag = matches!(statement, Statement::OpeningTag(OpeningTag::Echo(_)));
+        if is_echo_opening_tag {
+            block.is_in_echo_context = true;
+        }
+
         statement.analyze(context, block, artifacts)?;
+
+        if !is_echo_opening_tag && block.is_in_echo_context {
+            block.is_in_echo_context = false;
+        }
     }
 
     Ok(())
