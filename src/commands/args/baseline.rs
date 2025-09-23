@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -29,7 +30,7 @@ pub struct BaselineArgs {
     /// This creates a baseline file containing all issues found in the current run.
     /// Use this to establish a starting point for future issue tracking.
     /// Requires --baseline to specify where to save the file.
-    #[arg(long, requires = "baseline")]
+    #[arg(long)]
     pub generate_baseline: bool,
 
     /// Create a backup of the existing baseline file before generating a new one.
@@ -45,7 +46,7 @@ pub struct BaselineArgs {
     /// This compares the baseline against current issues to detect if the baseline
     /// is outdated. Exits with failure if issues have changed since the baseline
     /// was created. Cannot be used with --generate-baseline.
-    #[arg(long, conflicts_with = "generate_baseline", requires = "baseline")]
+    #[arg(long, conflicts_with = "generate_baseline")]
     pub verify_baseline: bool,
 
     /// Fail the command when baseline is out of sync, even with no new issues.
@@ -53,7 +54,7 @@ pub struct BaselineArgs {
     /// Normally, if there are no current issues to report, the command succeeds
     /// even if the baseline is outdated. This flag forces failure when the baseline
     /// contains issues that no longer exist, ensuring baselines stay clean.
-    #[arg(long, conflicts_with = "generate_baseline", conflicts_with = "verify_baseline", requires = "baseline")]
+    #[arg(long, conflicts_with = "generate_baseline", conflicts_with = "verify_baseline")]
     pub fail_on_out_of_sync_baseline: bool,
 }
 
@@ -68,7 +69,7 @@ impl BaselineArgs {
     /// # Returns
     ///
     /// The effective baseline path, prioritizing command-line arguments over configuration defaults.
-    pub fn resolve_baseline(&self, config_baseline: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+    pub fn resolve_baseline(&self, config_baseline: Option<&Path>) -> Option<std::path::PathBuf> {
         self.baseline.clone().or_else(|| config_baseline.map(|p| p.to_path_buf()))
     }
 
@@ -89,7 +90,7 @@ impl BaselineArgs {
     pub fn process_baseline(
         &self,
         mut issues: IssueCollection,
-        config_baseline: Option<&std::path::Path>,
+        config_baseline: Option<&Path>,
         read_database: &ReadDatabase,
     ) -> Result<(IssueCollection, bool, Option<ExitCode>), Error> {
         let baseline_path = self.resolve_baseline(config_baseline);
@@ -143,6 +144,28 @@ impl BaselineArgs {
 
                 issues = filtered_issues;
             }
+        } else {
+            if self.generate_baseline {
+                tracing::warn!("Cannot generate baseline file because no baseline path was specified.");
+                tracing::warn!("Use the `--baseline <PATH>` option to specify where to save the baseline file.");
+                tracing::warn!("Or set a default baseline path in the configuration file.");
+
+                return Ok((issues, false, Some(ExitCode::FAILURE)));
+            }
+
+            if self.verify_baseline {
+                tracing::warn!("Cannot verify baseline file because no baseline path was specified.");
+                tracing::warn!("Use the `--baseline <PATH>` option to specify the baseline file to verify.");
+                tracing::warn!("Or set a default baseline path in the configuration file.");
+
+                return Ok((issues, false, Some(ExitCode::FAILURE)));
+            }
+
+            if self.fail_on_out_of_sync_baseline {
+                tracing::warn!("Cannot fail on out-of-sync baseline because no baseline path was specified.");
+                tracing::warn!("Use the `--baseline <PATH>` option to specify the baseline file.");
+                tracing::warn!("Or set a default baseline path in the configuration file.");
+            }
         }
 
         Ok((issues, should_fail, None))
@@ -155,7 +178,7 @@ impl BaselineArgs {
     fn handle_baseline_verification(
         &self,
         issues: IssueCollection,
-        baseline_path: &std::path::Path,
+        baseline_path: &Path,
         read_database: &ReadDatabase,
     ) -> Result<ExitCode, Error> {
         if !baseline_path.exists() {
