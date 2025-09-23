@@ -7,6 +7,7 @@ use strum::VariantNames;
 
 use mago_database::ReadDatabase;
 use mago_pager::Pager;
+use termcolor::ColorChoice;
 
 use crate::Issue;
 use crate::IssueCollection;
@@ -63,7 +64,7 @@ impl ReportingFormat {
 pub struct Reporter {
     database: ReadDatabase,
     target: ReportingTarget,
-    with_colors: bool,
+    color_choice: ColorChoice,
     use_pager: bool,
     pager_command: Option<String>,
 }
@@ -72,11 +73,11 @@ impl Reporter {
     pub fn new(
         manager: ReadDatabase,
         target: ReportingTarget,
-        with_colors: bool,
+        color_choice: ColorChoice,
         use_pager: bool,
         pager: Option<String>,
     ) -> Self {
-        Self { database: manager, target, with_colors, use_pager, pager_command: pager }
+        Self { database: manager, target, color_choice, use_pager, pager_command: pager }
     }
 
     pub fn report(
@@ -91,7 +92,7 @@ impl Reporter {
 
         let highest_level = issues.get_highest_level();
 
-        let writer = ReportWriter::new(self.target, self.with_colors);
+        let writer = ReportWriter::new(self.target, self.color_choice);
         if self.use_pager && self.target == ReportingTarget::Stdout && format.supports_paging() {
             let mut pager = Pager::default();
             if let Some(pager_command) = &self.pager_command {

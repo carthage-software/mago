@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use clap::ColorChoice;
 use clap::Parser;
 
 use mago_database::DatabaseReader;
@@ -72,7 +73,7 @@ impl AnalyzeCommand {
     /// 2. Compiling a codebase model from these files (with progress).
     /// 3. Analyzing the user-defined sources against the compiled codebase (with progress).
     /// 4. Reporting any found issues.
-    pub fn execute(self, mut configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         configuration.source.excludes.extend(std::mem::take(&mut configuration.analyzer.excludes));
 
         // 1. Establish the base prelude data. We deconstruct the prelude to get the
@@ -110,7 +111,7 @@ impl AnalyzeCommand {
             final_database.read_only(),
             codebase_metadata,
             symbol_references,
-            configuration.analyzer.to_settings(configuration.php_version, should_use_colors),
+            configuration.analyzer.to_settings(configuration.php_version, color_choice),
         )?;
 
         // 4. Filter and report any found issues.
@@ -133,7 +134,7 @@ impl AnalyzeCommand {
         self.reporting.process_issues_with_baseline_result(
             filtered_issues,
             configuration,
-            should_use_colors,
+            color_choice,
             final_database,
             should_fail_from_baseline,
         )

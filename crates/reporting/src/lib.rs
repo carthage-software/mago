@@ -13,6 +13,8 @@ use mago_database::file::FileId;
 use mago_fixer::FixPlan;
 use mago_span::Span;
 
+pub use termcolor::ColorChoice;
+
 mod internal;
 
 pub mod error;

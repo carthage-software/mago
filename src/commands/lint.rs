@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
 
@@ -115,7 +116,7 @@ pub struct LintCommand {
 }
 
 impl LintCommand {
-    pub fn execute(self, mut configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         configuration.source.excludes.extend(std::mem::take(&mut configuration.linter.excludes));
 
         let database = if !self.path.is_empty() {
@@ -184,7 +185,7 @@ impl LintCommand {
         self.reporting.process_issues_with_baseline_result(
             filtered_issues,
             configuration,
-            should_use_colors,
+            color_choice,
             database,
             should_fail_from_baseline,
         )

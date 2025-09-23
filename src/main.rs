@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+use clap::ColorChoice;
 use clap::Parser;
 use tracing::level_filters::LevelFilter;
 
@@ -47,11 +48,19 @@ pub fn main() -> ExitCode {
 pub fn run() -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
 
+    let color_choice = if arguments.no_color { ColorChoice::Never } else { arguments.colors };
+
     initialize_logger(
         if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },
         "MAGO_LOG",
-        arguments.colors.should_use_colors(),
+        color_choice,
     );
+
+    if arguments.no_color {
+        tracing::warn!(
+            "The `--no-color` option is deprecated and will be removed in a future release. Please use `--colors never` instead."
+        );
+    }
 
     if let MagoCommand::SelfUpdate(cmd) = arguments.command {
         return commands::self_update::execute(cmd);
@@ -84,15 +93,13 @@ pub fn run() -> Result<ExitCode, Error> {
         tracing::warn!("The pager is only supported on unix-like systems. Ignoring the `use-pager` configuration.");
     }
 
-    let use_colors = arguments.colors.should_use_colors();
-
     match command {
         MagoCommand::Init(cmd) => cmd.execute(configuration, None),
         MagoCommand::Config(cmd) => cmd.execute(configuration),
-        MagoCommand::Lint(cmd) => cmd.execute(configuration, use_colors),
-        MagoCommand::Format(cmd) => cmd.execute(configuration, use_colors),
-        MagoCommand::Ast(cmd) => cmd.execute(configuration, use_colors),
-        MagoCommand::Analyze(cmd) => cmd.execute(configuration, use_colors),
+        MagoCommand::Lint(cmd) => cmd.execute(configuration, color_choice),
+        MagoCommand::Format(cmd) => cmd.execute(configuration, color_choice),
+        MagoCommand::Ast(cmd) => cmd.execute(configuration, color_choice),
+        MagoCommand::Analyze(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

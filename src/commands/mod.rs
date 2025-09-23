@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use clap::ColorChoice;
 use clap::Parser;
 use clap::builder::Styles;
 use clap::builder::styling::AnsiColor;
@@ -9,7 +10,6 @@ use clap::builder::styling::Effects;
 use mago_php_version::PHPVersion;
 
 use crate::commands::analyze::AnalyzeCommand;
-use crate::commands::args::colors::ColorArgs;
 use crate::commands::ast::AstCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::format::FormatCommand;
@@ -119,8 +119,20 @@ pub struct CliArguments {
     #[arg(long, default_value_t = false)]
     pub allow_unsupported_php_version: bool,
 
-    #[clap(flatten)]
-    pub colors: ColorArgs,
+    /// Do not use colors in the output.
+    ///
+    /// This flag has been deprecated in favor of `--colors=never`.
+    /// It will be removed in a future release.
+    #[arg(long, default_value_t = false, alias = "no-colors")]
+    pub no_color: bool,
+
+    /// When to use colored output. Can be "auto", "always", or "never".
+    ///
+    /// - "auto": Use colors if the output is a terminal (default).
+    /// - "always": Always use colors, even if the output is not a terminal.
+    /// - "never": Never use colors.
+    #[arg(long, default_value_t = ColorChoice::Auto, conflicts_with = "no_color")]
+    pub colors: ColorChoice,
 
     /// The subcommand to execute.
     ///

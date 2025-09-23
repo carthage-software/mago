@@ -1,5 +1,7 @@
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
+use clap::ColorChoice;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -99,7 +101,7 @@ pub struct AnalyzerConfiguration {
 }
 
 impl AnalyzerConfiguration {
-    pub fn to_settings(&self, php_version: PHPVersion, use_colors: bool) -> Settings {
+    pub fn to_settings(&self, php_version: PHPVersion, color_choice: ColorChoice) -> Settings {
         Settings {
             version: php_version,
             mixed_issues: self.mixed_issues,
@@ -128,7 +130,11 @@ impl AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             perform_heuristic_checks: self.perform_heuristic_checks,
-            use_colors,
+            use_colors: match color_choice {
+                ColorChoice::Always => true,
+                ColorChoice::Never => false,
+                ColorChoice::Auto => std::io::stdout().is_terminal(),
+            },
             diff: false,
         }
     }

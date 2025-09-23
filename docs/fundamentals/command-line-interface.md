@@ -12,10 +12,10 @@ Mago follows a standard `[GLOBAL OPTIONS] <SUBCOMMAND>` pattern. Global options 
 
 ```sh
 # Correct: Global option before subcommand
-mago --no-color lint
+mago --colors=never lint
 
 # Incorrect: Global option after subcommand
-mago lint --no-color
+mago lint --colors=never
 ```
 
 ## Global Options
@@ -29,7 +29,8 @@ These options can be used with the main `mago` command and any of its subcommand
 | `--php-version <VERSION>`         | Overrides the PHP version (e.g., `8.2`) specified in the configuration file.                                    |
 | `--threads <NUMBER>`              | Overrides the number of threads Mago will use. Defaults to the number of available logical CPUs.                |
 | `--allow-unsupported-php-version` | Allows Mago to run against a PHP version that is not officially supported. Use with caution.                    |
-| `--no-color`, `--no-colors`       | Disables all color in the output.                                                                               |
+| `--no-color`, `--no-colors`       | Disables all color in the output. This option has been deprecated. Use `--colors never` instead.                |
+| `--colors <WHEN>`                 | Controls when to use colors in the output. Options: `always`, `never`, `auto` (default).                        |
 | `-h`, `--help`                    | Print help information.                                                                                         |
 | `-V`, `--version`                 | Print version information.                                                                                      |
 

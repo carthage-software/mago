@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bumpalo::Bump;
+use clap::ColorChoice;
 use clap::Parser;
 
 use mago_database::change::ChangeLog;
@@ -74,7 +75,7 @@ impl FormatCommand {
     /// # Returns
     ///
     /// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
-    pub fn execute(self, mut configuration: Configuration, use_colors: bool) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         configuration.source.excludes.extend(std::mem::take(&mut configuration.formatter.excludes));
 
         if self.stdin_input {
@@ -114,7 +115,7 @@ impl FormatCommand {
             change_log: change_log.clone(),
         };
 
-        let changed_count = run_format_pipeline(database.read_only(), shared_context, use_colors)?;
+        let changed_count = run_format_pipeline(database.read_only(), shared_context, color_choice)?;
 
         if !self.dry_run {
             database.commit(change_log, true)?;

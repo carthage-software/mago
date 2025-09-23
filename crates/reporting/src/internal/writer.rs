@@ -26,14 +26,10 @@ impl ReportWriter {
     /// # Returns
     ///
     /// A new `ReportWriter` instance configured for the specified target.
-    pub fn new(target: ReportingTarget, with_colors: bool) -> Self {
+    pub fn new(target: ReportingTarget, colors: ColorChoice) -> Self {
         let stream = match target {
-            ReportingTarget::Stdout => {
-                StandardStream::stdout(if with_colors { ColorChoice::Auto } else { ColorChoice::Never })
-            }
-            ReportingTarget::Stderr => {
-                StandardStream::stderr(if with_colors { ColorChoice::Auto } else { ColorChoice::Never })
-            }
+            ReportingTarget::Stdout => StandardStream::stdout(colors),
+            ReportingTarget::Stderr => StandardStream::stderr(colors),
         };
 
         Self { inner: Arc::new(Mutex::new(stream)) }

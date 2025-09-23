@@ -1,5 +1,7 @@
 use std::borrow::Cow;
+use std::io::IsTerminal;
 
+use clap::ColorChoice;
 use diffy::PatchFormatter;
 
 use mago_database::change::ChangeLog;
@@ -34,7 +36,7 @@ pub fn apply_update(
     modified_contents: &str,
     dry_run: bool,
     check: bool,
-    use_colors: bool,
+    color_choice: ColorChoice,
 ) -> Result<bool, Error> {
     if file.contents == modified_contents {
         return Ok(false);
@@ -47,7 +49,14 @@ pub fn apply_update(
     if dry_run {
         let patch = diffy::create_patch(&file.contents, modified_contents);
         let mut formatter = PatchFormatter::new();
-        if use_colors {
+
+        let should_use_colors = match color_choice {
+            ColorChoice::Always => true,
+            ColorChoice::Never => false,
+            ColorChoice::Auto => std::io::stdout().is_terminal(),
+        };
+
+        if should_use_colors {
             formatter = formatter.with_color();
         };
 

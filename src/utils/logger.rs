@@ -1,7 +1,9 @@
+use std::io::IsTerminal;
 use std::io::Result;
 use std::io::Stderr;
 use std::io::Write;
 
+use clap::ColorChoice;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::fmt;
@@ -14,12 +16,16 @@ use crate::utils::progress::GLOBAL_PROGRESS_MANAGER;
 ///
 /// * `directive` - A logging directive that controls the log level and filtering rules.
 /// * `env_var` - The environment variable used to override log filtering rules.
-pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>, use_colors: bool) {
+pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>, color_choice: ColorChoice) {
     let logger = fmt()
         .with_env_filter(
             EnvFilter::builder().with_default_directive(directive.into()).with_env_var(env_var.into()).from_env_lossy(),
         )
-        .with_ansi(use_colors)
+        .with_ansi(match color_choice {
+            ColorChoice::Always => true,
+            ColorChoice::Never => false,
+            ColorChoice::Auto => std::io::stdout().is_terminal(),
+        })
         .with_writer(LoggerWriter::stderr);
 
     if cfg!(debug_assertions) {

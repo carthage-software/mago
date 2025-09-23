@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bumpalo::Bump;
+use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
 use mago_database::Database;
@@ -76,12 +77,12 @@ pub struct AstCommand {
 
 impl AstCommand {
     /// Executes the AST inspection command.
-    pub fn execute(self, configuration: Configuration, should_use_colors: bool) -> Result<ExitCode, Error> {
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let arena = Bump::new();
         let file = File::read(&configuration.source.workspace, &self.file, FileType::Host)?;
 
         if self.tokens {
-            return self.print_tokens(configuration, should_use_colors, &arena, file);
+            return self.print_tokens(configuration, color_choice, &arena, file);
         }
 
         let (program, error) = parse_file(&arena, &file);
@@ -98,7 +99,7 @@ impl AstCommand {
             let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
             let database = Database::single(file);
 
-            return self.reporting.process_issues(issues, configuration, should_use_colors, database);
+            return self.reporting.process_issues(issues, configuration, color_choice, database);
         }
 
         Ok(ExitCode::SUCCESS)
@@ -108,7 +109,7 @@ impl AstCommand {
     fn print_tokens(
         self,
         configuration: Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         arena: &Bump,
         file: File,
     ) -> Result<ExitCode, Error> {
@@ -124,7 +125,7 @@ impl AstCommand {
                     self.reporting.process_issues(
                         IssueCollection::from([issue]),
                         configuration,
-                        should_use_colors,
+                        color_choice,
                         database,
                     )?;
 

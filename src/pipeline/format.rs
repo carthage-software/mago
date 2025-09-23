@@ -1,3 +1,5 @@
+use clap::ColorChoice;
+
 use mago_database::ReadDatabase;
 use mago_database::change::ChangeLog;
 use mago_formatter::Formatter;
@@ -60,7 +62,11 @@ pub struct FormatContext {
 /// # Returns
 ///
 /// A `Result` containing the total number of files that were changed, or an [`Error`].
-pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext, use_colors: bool) -> Result<usize, Error> {
+pub fn run_format_pipeline(
+    database: ReadDatabase,
+    context: FormatContext,
+    color_choice: ColorChoice,
+) -> Result<usize, Error> {
     let progress = !matches!(context.mode, FormatMode::DryRun);
 
     StatelessParallelPipeline::new("✨ Formatting", database, context, Box::new(FormatReducer), progress).run(
@@ -74,7 +80,7 @@ pub fn run_format_pipeline(database: ReadDatabase, context: FormatContext, use_c
                     formatted_content,
                     matches!(context.mode, FormatMode::DryRun),
                     matches!(context.mode, FormatMode::Check),
-                    use_colors,
+                    color_choice,
                 ),
                 Err(parse_error) => {
                     tracing::error!("Formatting failed for '{}': {}.", file.name, parse_error);

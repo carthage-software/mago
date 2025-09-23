@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use bumpalo::Bump;
+use clap::ColorChoice;
 use clap::Parser;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -15,6 +16,7 @@ use mago_database::file::FileId;
 use mago_fixer::FixPlan;
 use mago_fixer::SafetyClassification;
 use mago_formatter::Formatter;
+use mago_reporting::ColorChoice as ReportingColorChoice;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_reporting::reporter::Reporter;
@@ -154,7 +156,7 @@ impl ReportingArgs {
     /// * `self`: The configured reporting arguments from the command line.
     /// * `issues`: The collection of issues detected by the preceding command.
     /// * `configuration`: The application's global configuration.
-    /// * `should_use_colors`: Whether to use colors in output.
+    /// * `color_choice`: Output color choice.
     /// * `database`: The mutable database containing all source files.
     ///
     /// # Returns
@@ -165,7 +167,7 @@ impl ReportingArgs {
         self,
         mut issues: IssueCollection,
         configuration: Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         database: Database,
     ) -> Result<ExitCode, Error> {
         if let Some(min_level) = self.minimum_report_level {
@@ -180,9 +182,9 @@ impl ReportingArgs {
         }
 
         if self.fix {
-            self.handle_fix_mode(issues, configuration, should_use_colors, database)
+            self.handle_fix_mode(issues, configuration, color_choice, database)
         } else {
-            self.handle_report_mode(issues, &configuration, should_use_colors, database, false)
+            self.handle_report_mode(issues, &configuration, color_choice, database, false)
         }
     }
 
@@ -191,11 +193,11 @@ impl ReportingArgs {
         self,
         issues: IssueCollection,
         configuration: Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         mut database: Database,
     ) -> Result<ExitCode, Error> {
         let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
-            self.apply_fixes(issues, &configuration, should_use_colors, &mut database)?;
+            self.apply_fixes(issues, &configuration, color_choice, &mut database)?;
 
         if skipped_unsafe > 0 {
             tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
@@ -229,7 +231,7 @@ impl ReportingArgs {
         self,
         mut issues: IssueCollection,
         configuration: &Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         database: Database,
         should_fail_from_baseline: bool,
     ) -> Result<ExitCode, Error> {
@@ -252,7 +254,11 @@ impl ReportingArgs {
             let reporter = Reporter::new(
                 read_database,
                 self.reporting_target,
-                should_use_colors,
+                match color_choice {
+                    ColorChoice::Auto => ReportingColorChoice::Auto,
+                    ColorChoice::Always => ReportingColorChoice::Always,
+                    ColorChoice::Never => ReportingColorChoice::Never,
+                },
                 self.pager_args.should_use_pager(configuration),
                 configuration.pager.clone(),
             );
@@ -275,7 +281,7 @@ impl ReportingArgs {
         &self,
         issues: IssueCollection,
         configuration: &Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         database: &mut Database,
     ) -> Result<(usize, usize, usize), Error> {
         let read_database = Arc::new(database.read_only());
@@ -308,14 +314,8 @@ impl ReportingArgs {
                     Cow::Owned(fixed_content)
                 };
 
-                let changed = utils::apply_update(
-                    &change_log,
-                    file,
-                    final_content.as_ref(),
-                    self.dry_run,
-                    false,
-                    should_use_colors,
-                )?;
+                let changed =
+                    utils::apply_update(&change_log, file, final_content.as_ref(), self.dry_run, false, color_choice)?;
                 progress_bar.inc(1);
                 Ok(changed)
             })
@@ -405,7 +405,7 @@ impl ReportingArgs {
     /// * `self`: The configured reporting arguments from the command line.
     /// * `issues`: The collection of issues (potentially already filtered by baseline).
     /// * `configuration`: The application's global configuration.
-    /// * `should_use_colors`: Whether to use colors in output.
+    /// * `color_choice`: Output color choice.
     /// * `database`: The mutable database containing all source files.
     /// * `should_fail_from_baseline`: Whether the baseline processing indicated failure.
     ///
@@ -417,7 +417,7 @@ impl ReportingArgs {
         self,
         mut issues: IssueCollection,
         configuration: Configuration,
-        should_use_colors: bool,
+        color_choice: ColorChoice,
         database: Database,
         should_fail_from_baseline: bool,
     ) -> Result<ExitCode, Error> {
@@ -433,9 +433,9 @@ impl ReportingArgs {
         }
 
         if self.fix {
-            self.handle_fix_mode(issues, configuration, should_use_colors, database)
+            self.handle_fix_mode(issues, configuration, color_choice, database)
         } else {
-            self.handle_report_mode(issues, &configuration, should_use_colors, database, should_fail_from_baseline)
+            self.handle_report_mode(issues, &configuration, color_choice, database, should_fail_from_baseline)
         }
     }
 }
