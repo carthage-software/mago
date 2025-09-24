@@ -94,7 +94,7 @@ function main(): void
 {
     $script_dir = dirname(__FILE__);
     $project_root = realpath($script_dir . '/..');
-    if ($project_root === false) {
+    if (false === $project_root) {
         throw new RuntimeException('Failed to determine project root directory.');
     }
 
@@ -108,7 +108,7 @@ function main(): void
     namespace\writeln('🏗️ ', 'Building Mago executable in release mode...');
     $build_result = -1;
     passthru('cargo build --release', $build_result);
-    if ($build_result !== 0) {
+    if (0 !== $build_result) {
         throw new RuntimeException('Failed to build Mago executable.');
     }
     namespace\writeln('✅', 'Mago executable built successfully.');
@@ -148,7 +148,7 @@ function fetch_rules_from_mago(string $mago_executable): array
     $command = "{$mago_executable} lint --pedantic --list-rules --json";
     $json_output = shell_exec($command);
 
-    if ($json_output === null || $json_output === false) {
+    if (null === $json_output || false === $json_output) {
         throw new RuntimeException('Failed to execute Mago command to get rules.');
     }
 
@@ -186,7 +186,7 @@ function fetch_linter_config(string $mago_executable): array
     $command = "{$mago_executable} config --show linter --default";
     $json_output = shell_exec($command);
 
-    if ($json_output === null || $json_output === false) {
+    if (null === $json_output || false === $json_output) {
         throw new RuntimeException('Failed to execute Mago command to get config.');
     }
 
@@ -559,7 +559,7 @@ function generate_rule_docs_section(array $rule, array $config): string
     $config_table .= "| :--- | :--- | :--- |\n";
     foreach ($config as $key => $value) {
         $type = gettype($value);
-        if ($key === 'level' && is_string($value)) {
+        if ('level' === $key && is_string($value)) {
             $value = strtolower($value);
         }
         $default_value = json_encode($value);
@@ -613,7 +613,7 @@ function delete_directory(string $dir): void
     }
 
     $files = scandir($dir);
-    if ($files === false) {
+    if (false === $files) {
         throw new RuntimeException("Failed to read directory: {$dir}");
     }
 

@@ -14,6 +14,7 @@ use crate::ast::ast::control_flow::r#if::If;
 use crate::ast::ast::control_flow::switch::Switch;
 use crate::ast::ast::declare::Declare;
 use crate::ast::ast::echo::Echo;
+use crate::ast::ast::echo::EchoTag;
 use crate::ast::ast::expression::Expression;
 use crate::ast::ast::function_like::function::Function;
 use crate::ast::ast::global::Global;
@@ -82,6 +83,7 @@ pub enum Statement<'arena> {
     Return(Return<'arena>),
     Expression(ExpressionStatement<'arena>),
     Echo(Echo<'arena>),
+    EchoTag(EchoTag<'arena>),
     Global(Global<'arena>),
     Static(Static<'arena>),
     HaltCompiler(HaltCompiler<'arena>),
@@ -130,6 +132,7 @@ impl Statement<'_> {
             Statement::Return(ret) => ret.terminator.is_closing_tag(),
             Statement::Expression(expression_statement) => expression_statement.terminator.is_closing_tag(),
             Statement::Echo(echo) => echo.terminator.is_closing_tag(),
+            Statement::EchoTag(echo) => echo.terminator.is_closing_tag(),
             Statement::Global(global) => global.terminator.is_closing_tag(),
             Statement::Static(r#static) => r#static.terminator.is_closing_tag(),
             Statement::Unset(unset) => unset.terminator.is_closing_tag(),
@@ -213,6 +216,7 @@ impl HasSpan for Statement<'_> {
             Statement::Return(statement) => statement.span(),
             Statement::Expression(statement) => statement.span(),
             Statement::Echo(statement) => statement.span(),
+            Statement::EchoTag(statement) => statement.span(),
             Statement::Global(statement) => statement.span(),
             Statement::Static(statement) => statement.span(),
             Statement::Unset(statement) => statement.span(),

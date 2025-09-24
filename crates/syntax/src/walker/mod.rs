@@ -183,6 +183,7 @@ generate_ast_walker! {
             Statement::If(r#if) => walker.walk_if(r#if, context),
             Statement::Return(r#return) => walker.walk_return(r#return, context),
             Statement::Expression(expression) => walker.walk_statement_expression(expression, context),
+            Statement::EchoTag(echo) => walker.walk_echo_tag(echo, context),
             Statement::Echo(echo) => walker.walk_echo(echo, context),
             Statement::Global(global) => walker.walk_global(global, context),
             Statement::Static(r#static) => walker.walk_static(r#static, context),
@@ -198,7 +199,6 @@ generate_ast_walker! {
         match opening_tag {
             OpeningTag::Full(full_opening_tag) => walker.walk_full_opening_tag(full_opening_tag, context),
             OpeningTag::Short(short_opening_tag) => walker.walk_short_opening_tag(short_opening_tag, context),
-            OpeningTag::Echo(echo_opening_tag) => walker.walk_echo_opening_tag(echo_opening_tag, context),
         }
     }
 
@@ -207,10 +207,6 @@ generate_ast_walker! {
     }
 
     _ ShortOpeningTag as short_opening_tag => {
-        // Do nothing by default
-    }
-
-    _ EchoOpeningTag as echo_opening_tag => {
         // Do nothing by default
     }
 
@@ -1262,6 +1258,14 @@ generate_ast_walker! {
     'arena ExpressionStatement as statement_expression => {
         walker.walk_expression(statement_expression.expression, context);
         walker.walk_terminator(&statement_expression.terminator, context);
+    }
+
+    'arena EchoTag as echo_tag => {
+        for expression in echo_tag.values.iter() {
+            walker.walk_expression(expression, context);
+        }
+
+        walker.walk_terminator(&echo_tag.terminator, context);
     }
 
     'arena Echo as echo => {

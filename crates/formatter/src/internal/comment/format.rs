@@ -11,6 +11,7 @@ use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
 use crate::document::Separator;
+use crate::document::Space;
 use crate::internal::FormatterState;
 use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
@@ -199,7 +200,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
                     Document::Array(vec![in self.arena; self.print_comment(comment), Document::Line(Line::default())])
                 }
             } else {
-                Document::Array(vec![in self.arena; self.print_comment(comment), Document::space()])
+                Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
             }
         } else {
             Document::Array(
@@ -247,12 +248,12 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         }
 
         if comment.is_inline_comment() || previous.is_some_and(|c| c.has_line_suffix) {
-            parts.push(Document::LineSuffix(vec![in self.arena; Document::space(), printed]));
+            parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
             return comment.with_line_suffix(true);
         }
 
-        parts.push(Document::Array(vec![in self.arena; Document::space(), printed]));
+        parts.push(Document::Array(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
         comment.with_line_suffix(false)
     }

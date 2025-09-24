@@ -9,7 +9,6 @@ pub fn parse_opening_tag<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result
 
     Ok(match token.kind {
         T!["<?php"] => OpeningTag::Full(FullOpeningTag { span: token.span, value: token.value }),
-        T!["<?="] => OpeningTag::Echo(EchoOpeningTag { span: token.span }),
         T!["<?"] => OpeningTag::Short(ShortOpeningTag { span: token.span }),
         _ => unreachable!(),
     })

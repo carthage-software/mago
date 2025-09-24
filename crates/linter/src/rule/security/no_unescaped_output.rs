@@ -94,6 +94,14 @@ impl LintRule for NoUnescapedOutputRule {
                     }
                 }
             }
+            Node::EchoTag(echo_tag) => {
+                // Check each expression in the echo statement
+                for expression in echo_tag.values.iter() {
+                    if needs_escaping_with_context(expression, Some(ctx)) {
+                        self.report_unescaped_output(ctx, expression.span(), "echo tag");
+                    }
+                }
+            }
             Node::PrintConstruct(print_construct) => {
                 // Check the print construct expression
                 if needs_escaping_with_context(print_construct.value, Some(ctx)) {

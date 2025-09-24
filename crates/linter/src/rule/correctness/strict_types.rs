@@ -194,25 +194,25 @@ impl LintRule for StrictTypesRule {
 
                         plan.insert(inline.span.start.offset, content, SafetyClassification::PotentiallyUnsafe);
                     }
-                    Statement::OpeningTag(opening_tag) => match opening_tag {
-                        OpeningTag::Full(FullOpeningTag { span, .. }) | OpeningTag::Short(ShortOpeningTag { span }) => {
-                            // If the first statement is an opening tag, insert the declare statement after it.
-                            plan.insert(
-                                span.end.offset,
-                                "\n\ndeclare(strict_types=1);\n",
-                                SafetyClassification::PotentiallyUnsafe,
-                            );
-                        }
-                        OpeningTag::Echo(echo_opening_tag) => {
-                            // If the first statement is an echo opening tag, insert an opening tag and declare statement
-                            // and a closing tag before it.
-                            plan.insert(
-                                echo_opening_tag.span.start.offset,
-                                "<?php\n\ndeclare(strict_types=1);\n\n?>\n",
-                                SafetyClassification::PotentiallyUnsafe,
-                            );
-                        }
-                    },
+                    Statement::OpeningTag(
+                        OpeningTag::Full(FullOpeningTag { span, .. }) | OpeningTag::Short(ShortOpeningTag { span }),
+                    ) => {
+                        // If the first statement is an opening tag, insert the declare statement after it.
+                        plan.insert(
+                            span.end.offset,
+                            "\n\ndeclare(strict_types=1);\n",
+                            SafetyClassification::PotentiallyUnsafe,
+                        );
+                    }
+                    Statement::EchoTag(echo_tag) => {
+                        // If the first statement is an echo opening tag, insert an opening tag and declare statement
+                        // and a closing tag before it.
+                        plan.insert(
+                            echo_tag.tag.start.offset,
+                            "<?php\n\ndeclare(strict_types=1);\n\n?>\n",
+                            SafetyClassification::PotentiallyUnsafe,
+                        );
+                    }
                     _ => unreachable!(),
                 }
             });

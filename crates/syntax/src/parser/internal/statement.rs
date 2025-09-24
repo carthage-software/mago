@@ -13,6 +13,7 @@ use crate::parser::internal::control_flow::r#if::parse_if;
 use crate::parser::internal::control_flow::switch::parse_switch;
 use crate::parser::internal::declare::parse_declare;
 use crate::parser::internal::echo::parse_echo;
+use crate::parser::internal::echo::parse_echo_tag;
 use crate::parser::internal::expression::parse_expression;
 use crate::parser::internal::function_like::arrow_function::parse_arrow_function_with_attributes;
 use crate::parser::internal::function_like::closure::parse_closure_with_attributes;
@@ -43,7 +44,8 @@ use crate::parser::internal::utils;
 pub fn parse_statement<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Statement<'arena>, ParseError> {
     Ok(match utils::peek(stream)?.kind {
         T![InlineText | InlineShebang] => Statement::Inline(parse_inline(stream)?),
-        T!["<?php"] | T!["<?="] | T!["<?"] => Statement::OpeningTag(parse_opening_tag(stream)?),
+        T!["<?php"] | T!["<?"] => Statement::OpeningTag(parse_opening_tag(stream)?),
+        T!["<?="] => Statement::EchoTag(parse_echo_tag(stream)?),
         T!["?>"] => Statement::ClosingTag(parse_closing_tag(stream)?),
         T!["declare"] => Statement::Declare(parse_declare(stream)?),
         T!["namespace"] => Statement::Namespace(parse_namespace(stream)?),

@@ -136,6 +136,7 @@ impl<'arena> Format<'arena> for Statement<'arena> {
                 Statement::Return(r) => r.format(f),
                 Statement::Expression(e) => e.format(f),
                 Statement::Echo(e) => e.format(f),
+                Statement::EchoTag(e) => e.format(f),
                 Statement::Global(g) => g.format(f),
                 Statement::Static(s) => s.format(f),
                 Statement::HaltCompiler(h) => h.format(f),
@@ -158,7 +159,6 @@ impl<'arena> Format<'arena> for OpeningTag<'arena> {
             match &self {
                 OpeningTag::Full(tag) => tag.format(f),
                 OpeningTag::Short(tag) => tag.format(f),
-                OpeningTag::Echo(tag) => tag.format(f),
             }
         })
     }
@@ -173,12 +173,6 @@ impl<'arena> Format<'arena> for FullOpeningTag<'arena> {
 impl<'arena> Format<'arena> for ShortOpeningTag {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ShortOpeningTag, { Document::String("<?") })
-    }
-}
-
-impl<'arena> Format<'arena> for EchoOpeningTag {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, EchoOpeningTag, { Document::String("<?=") })
     }
 }
 
@@ -1004,7 +998,9 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
         wrap!(f, self, Terminator, {
             match self {
                 Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(";"),
-                Terminator::ClosingTag(t) => Document::Array(vec![in f.arena; Document::space(), t.format(f)]),
+                Terminator::ClosingTag(t) => {
+                    Document::Array(vec![in f.arena; Document::Space(Space::soft()), t.format(f)])
+                }
             }
         })
     }
@@ -1229,20 +1225,49 @@ impl<'arena> Format<'arena> for Block<'arena> {
 impl<'arena> Format<'arena> for Echo<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Echo, {
-            let mut contents = vec![in f.arena; self.echo.format(f), Document::Indent(vec![in f.arena; Document::Line(Line::default())])];
+            let echo_keyword = self.echo.format(f);
 
-            if !self.values.is_empty() {
-                contents.push(Document::Indent(Document::join(
-                    f.arena,
-                    self.values.iter().map(|v| v.format(f)),
-                    Separator::CommaLine,
-                )));
-                contents.push(Document::Line(Line::soft()));
-            }
+            let values_group_id = f.next_id();
+            let values_group = Document::Group(
+                Group::new(Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine))
+                    .with_id(values_group_id),
+            );
 
-            contents.push(self.terminator.format(f));
+            Document::Group(Group::new(vec![
+                in f.arena;
+                echo_keyword,
+                Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec![
+                    in f.arena;
+                    Document::Line(Line::default()),
+                    values_group
+                ])),
+                Document::Line(Line::soft()),
+                self.terminator.format(f),
+            ]))
+        })
+    }
+}
 
-            Document::Group(Group::new(contents))
+impl<'arena> Format<'arena> for EchoTag<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, EchoTag, {
+            let values_group_id = f.next_id();
+            let values_group = Document::Group(
+                Group::new(Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine))
+                    .with_id(values_group_id),
+            );
+
+            Document::Group(Group::new(vec![
+                in f.arena;
+                Document::String("<?="),
+                Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec![
+                    in f.arena;
+                    Document::Line(Line::default()),
+                    values_group
+                ])),
+                Document::Line(Line::soft()),
+                self.terminator.format(f),
+            ]))
         })
     }
 }

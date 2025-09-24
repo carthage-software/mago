@@ -32,3 +32,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Echo<'arena> {
         Ok(())
     }
 }
+
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for EchoTag<'arena> {
+    fn analyze<'ctx>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena>,
+        block_context: &mut BlockContext<'ctx>,
+        artifacts: &mut AnalysisArtifacts,
+    ) -> Result<(), AnalysisError> {
+        analyze_construct_inputs(
+            context,
+            block_context,
+            artifacts,
+            "echo",
+            self.tag,
+            ConstructInput::ExpressionList(self.values.as_slice()),
+            get_nullable_scalar(),
+            true,
+            false,
+            true,
+        )?;
+
+        Ok(())
+    }
+}

@@ -132,7 +132,7 @@ impl Line {
 
 impl Space {
     /// Specify a space that is "soft" and will only be printed if the preceding
-    /// character is not whitespace.
+    /// character is not whitespace or a line break.
     pub fn soft() -> Self {
         Self { soft: true }
     }

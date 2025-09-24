@@ -96,6 +96,11 @@ impl LintRule for TaintedDataToSinkRule {
                     self.check_tainted_data_to_sink(ctx, echo.echo.span, value);
                 }
             }
+            Node::EchoTag(echo) => {
+                for value in echo.values.iter() {
+                    self.check_tainted_data_to_sink(ctx, echo.tag, value);
+                }
+            }
             Node::PrintConstruct(print_construct) => {
                 self.check_tainted_data_to_sink(ctx, print_construct.print.span, print_construct.value);
             }

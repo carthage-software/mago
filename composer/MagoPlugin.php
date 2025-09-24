@@ -109,7 +109,7 @@ final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Cap
             $package = $operation->getPackage();
         }
 
-        if ($package === null) {
+        if (null === $package) {
             return false;
         }
 

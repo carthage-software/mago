@@ -10,7 +10,6 @@ use mago_span::Span;
 pub enum OpeningTag<'arena> {
     Full(FullOpeningTag<'arena>),
     Short(ShortOpeningTag),
-    Echo(EchoOpeningTag),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -25,11 +24,6 @@ pub struct ShortOpeningTag {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct EchoOpeningTag {
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ClosingTag {
     pub span: Span,
 }
@@ -39,7 +33,6 @@ impl HasSpan for OpeningTag<'_> {
         match &self {
             OpeningTag::Full(t) => t.span(),
             OpeningTag::Short(t) => t.span(),
-            OpeningTag::Echo(t) => t.span(),
         }
     }
 }
@@ -51,12 +44,6 @@ impl HasSpan for FullOpeningTag<'_> {
 }
 
 impl HasSpan for ShortOpeningTag {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for EchoOpeningTag {
     fn span(&self) -> Span {
         self.span
     }

@@ -126,6 +126,7 @@ pub enum NodeKind {
     DeclareBody,
     DeclareColonDelimitedBody,
     DeclareItem,
+    EchoTag,
     Echo,
     Expression,
     Binary,
@@ -215,7 +216,6 @@ pub enum NodeKind {
     CompositeString,
     StringPart,
     ClosingTag,
-    EchoOpeningTag,
     FullOpeningTag,
     OpeningTag,
     ShortOpeningTag,
@@ -350,6 +350,7 @@ pub enum Node<'ast, 'arena> {
     DeclareBody(&'ast DeclareBody<'arena>),
     DeclareColonDelimitedBody(&'ast DeclareColonDelimitedBody<'arena>),
     DeclareItem(&'ast DeclareItem<'arena>),
+    EchoTag(&'ast EchoTag<'arena>),
     Echo(&'ast Echo<'arena>),
     Expression(&'ast Expression<'arena>),
     Binary(&'ast Binary<'arena>),
@@ -438,7 +439,6 @@ pub enum Node<'ast, 'arena> {
     CompositeString(&'ast CompositeString<'arena>),
     StringPart(&'ast StringPart<'arena>),
     ClosingTag(&'ast ClosingTag),
-    EchoOpeningTag(&'ast EchoOpeningTag),
     FullOpeningTag(&'ast FullOpeningTag<'arena>),
     OpeningTag(&'ast OpeningTag<'arena>),
     ShortOpeningTag(&'ast ShortOpeningTag),
@@ -497,7 +497,6 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             self,
             Self::Statement(_)
                 | Self::OpeningTag(_)
-                | Self::EchoOpeningTag(_)
                 | Self::FullOpeningTag(_)
                 | Self::ShortOpeningTag(_)
                 | Self::ClosingTag(_)
@@ -526,6 +525,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 | Self::Return(_)
                 | Self::ExpressionStatement(_)
                 | Self::Echo(_)
+                | Self::EchoTag(_)
                 | Self::Global(_)
                 | Self::Static(_)
                 | Self::HaltCompiler(_)
@@ -737,7 +737,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::CompositeString(_) => NodeKind::CompositeString,
             Self::StringPart(_) => NodeKind::StringPart,
             Self::ClosingTag(_) => NodeKind::ClosingTag,
-            Self::EchoOpeningTag(_) => NodeKind::EchoOpeningTag,
+            Self::EchoTag(_) => NodeKind::EchoTag,
             Self::FullOpeningTag(_) => NodeKind::FullOpeningTag,
             Self::OpeningTag(_) => NodeKind::OpeningTag,
             Self::ShortOpeningTag(_) => NodeKind::ShortOpeningTag,
@@ -1411,6 +1411,13 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::DeclareItem(node) => {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
+            Node::EchoTag(node) => {
+                let mut children = vec![];
+                children.extend(node.values.iter().map(Node::Expression));
+                children.push(Node::Terminator(&node.terminator));
+
+                children
+            }
             Node::Echo(node) => {
                 let mut children = vec![Node::Keyword(&node.echo)];
                 children.extend(node.values.iter().map(Node::Expression));
@@ -1935,6 +1942,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Statement::If(node) => vec![Node::If(node)],
                 Statement::Return(node) => vec![Node::Return(node)],
                 Statement::Expression(node) => vec![Node::ExpressionStatement(node)],
+                Statement::EchoTag(node) => vec![Node::EchoTag(node)],
                 Statement::Echo(node) => vec![Node::Echo(node)],
                 Statement::Global(node) => vec![Node::Global(node)],
                 Statement::Static(node) => vec![Node::Static(node)],
@@ -1982,12 +1990,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 StringPart::BracedExpression(node) => Node::BracedExpressionStringPart(node),
             }],
             Node::ClosingTag(_) => vec![],
-            Node::EchoOpeningTag(_) => vec![],
             Node::FullOpeningTag(_) => vec![],
             Node::OpeningTag(node) => match node {
                 OpeningTag::Full(node) => vec![Node::FullOpeningTag(node)],
                 OpeningTag::Short(node) => vec![Node::ShortOpeningTag(node)],
-                OpeningTag::Echo(node) => vec![Node::EchoOpeningTag(node)],
             },
             Node::ShortOpeningTag(_) => vec![],
             Node::Terminator(node) => match node {
@@ -2256,7 +2262,7 @@ impl HasSpan for Node<'_, '_> {
             Self::CompositeString(node) => node.span(),
             Self::StringPart(node) => node.span(),
             Self::ClosingTag(node) => node.span(),
-            Self::EchoOpeningTag(node) => node.span(),
+            Self::EchoTag(node) => node.span(),
             Self::FullOpeningTag(node) => node.span(),
             Self::OpeningTag(node) => node.span(),
             Self::ShortOpeningTag(node) => node.span(),
