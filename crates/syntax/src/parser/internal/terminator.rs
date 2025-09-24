@@ -22,7 +22,7 @@ pub fn parse_terminator<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<
         T!["?>"] => {
             let closing_tag = ClosingTag { span: token.span };
 
-            if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["<?php" | "<?=" | "<?"])) {
+            if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
                 Ok(Terminator::TagPair(closing_tag, parse_opening_tag(stream)?))
             } else {
                 Ok(Terminator::ClosingTag(closing_tag))

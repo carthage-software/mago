@@ -8,6 +8,16 @@ mod runner {
     use mago_syntax::ast::*;
     use mago_syntax::parser::parse_file;
 
+    pub fn smoke_test(name: &'static str, code: &'static str) {
+        let arena = Bump::new();
+        let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+
+        let (_program, error) = parse_file(&arena, &file);
+        if let Some(parse_error) = error {
+            panic!("Test case '{}' failed to parse. Error: {}", name, parse_error);
+        }
+    }
+
     pub fn run_expression_test(name: &'static str, expression: &'static str, expected: &'static str) {
         fn format_variable(var: &Variable<'_>) -> String {
             match var {
@@ -217,6 +227,15 @@ mod parser {
             #[test]
             fn $name() {
                 crate::runner::run_expression_test(stringify!($name), $expression, $expected);
+            }
+        };
+    }
+
+    macro_rules! smoke_test {
+        ($name:ident, $expression:expr) => {
+            #[test]
+            fn $name() {
+                crate::runner::smoke_test(stringify!($name), $expression);
             }
         };
     }
@@ -1153,4 +1172,6 @@ mod parser {
         "(((($a **= (-- $b)) and $c) xor (($d & $e) ^ $f)) xor ($g != $h))"
     );
     test_expression!(rand_199, "$a or $b || $c ** $d >= $e", "($a or ($b || (($c ** $d) >= $e)))");
+
+    smoke_test!(closing_tag_echo_tag, "<?= $a ?> <?= $b;");
 }
