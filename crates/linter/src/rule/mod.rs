@@ -246,4 +246,11 @@ define_rules! {
     NoRequestAll(no_request_all @ NoRequestAllRule),
     MiddlewareInRoutes(middleware_in_routes @ MiddlewareInRoutesRule),
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
+    RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
+    YodaConditions(yoda_conditions @ YodaConditionsRule),
+    UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
+    NoDirectDbQuery(no_direct_db_query @ NoDirectDbQueryRule),
+    NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
+    NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
+    NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
 }

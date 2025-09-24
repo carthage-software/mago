@@ -1,13 +1,21 @@
 pub mod disallowed_functions;
+pub mod no_db_schema_change;
 pub mod no_debug_symbols;
 pub mod no_insecure_comparison;
 pub mod no_literal_password;
+pub mod no_roles_as_capabilities;
 pub mod no_short_opening_tag;
+pub mod no_unescaped_output;
+pub mod require_preg_quote_delimiter;
 pub mod tainted_data_to_sink;
 
 pub use disallowed_functions::*;
+pub use no_db_schema_change::*;
 pub use no_debug_symbols::*;
 pub use no_insecure_comparison::*;
 pub use no_literal_password::*;
+pub use no_roles_as_capabilities::*;
 pub use no_short_opening_tag::*;
+pub use no_unescaped_output::*;
+pub use require_preg_quote_delimiter::*;
 pub use tainted_data_to_sink::*;

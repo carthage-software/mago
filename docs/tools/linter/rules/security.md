@@ -10,10 +10,14 @@ This document details the rules available in the `Security` category.
 | Rule | Code |
 | :--- | :---------- |
 | Disallowed Functions | [`disallowed-functions`](#disallowed-functions) |
+| No Database Schema Changes | [`no-db-schema-change`](#no-db-schema-change) |
 | No Debug Symbols | [`no-debug-symbols`](#no-debug-symbols) |
 | No Insecure Comparison | [`no-insecure-comparison`](#no-insecure-comparison) |
 | No Literal Password | [`no-literal-password`](#no-literal-password) |
+| No Roles As Capabilities | [`no-roles-as-capabilities`](#no-roles-as-capabilities) |
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
+| No Unescaped Output | [`no-unescaped-output`](#no-unescaped-output) |
+| Require `preg_quote` Delimiter | [`require-preg-quote-delimiter`](#require-preg-quote-delimiter) |
 | Tainted Data to Sink | [`tainted-data-to-sink`](#tainted-data-to-sink) |
 
 
@@ -56,6 +60,49 @@ allowed_function(); // Not flagged
 <?php
 
 curl_init(); // Error: part of a disallowed extension
+```
+
+
+## <a id="no-db-schema-change"></a>`no-db-schema-change`
+
+This rule flags any attempt to alter the database schema (using `CREATE`, `ALTER`, or `DROP`)
+within a `$wpdb` call. Schema modifications must only occur within a plugin activation hook
+to prevent catastrophic performance issues and data corruption.
+
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function my_plugin_activation_hook() {
+    global $wpdb;
+    $wpdb->query("ALTER TABLE {$wpdb->posts} ADD my_column VARCHAR(255)");
+}
+register_activation_hook(__FILE__, 'my_plugin_activation_hook');
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// This schema change runs on every page load, which is very dangerous.
+global $wpdb;
+$wpdb->query("ALTER TABLE {$wpdb->posts} ADD my_column VARCHAR(255)");
 ```
 
 
@@ -172,6 +219,44 @@ $password = "supersecret";
 ```
 
 
+## <a id="no-roles-as-capabilities"></a>`no-roles-as-capabilities`
+
+This rule flags the use of user roles (e.g., `'administrator'`) in functions that expect a
+granular capability (e.g., `'edit_posts'`). Checking against specific capabilities is a
+core security principle in WordPress.
+
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ( current_user_can( 'edit_posts' ) ) { /* ... */ }
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// This check is brittle and will fail if roles are customized.
+if ( current_user_can( 'editor' ) ) { /* ... */ }
+```
+
+
 ## <a id="no-short-opening-tag"></a>`no-short-opening-tag`
 
 Disallows the use of short opening tags (`<?`).
@@ -207,6 +292,83 @@ echo "Hello, World!";
 <?
 
 echo "Hello, World!";
+```
+
+
+## <a id="no-unescaped-output"></a>`no-unescaped-output`
+
+This rule ensures that any variable or function call that is output directly to the page is
+properly escaped. All data must be escaped before printing to prevent Cross-Site Scripting (XSS)
+vulnerabilities.
+
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+echo esc_html( $user_comment );
+?>
+<a href="<?php echo esc_url( $user_provided_url ); ?>">Link</a>
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// This is a major XSS vulnerability.
+echo $_GET['user_comment'];
+```
+
+
+## <a id="require-preg-quote-delimiter"></a>`require-preg-quote-delimiter`
+
+This rule requires that when using `preg_quote()`, the second `$delimiter` argument is always provided.
+If the string being quoted contains the same character used for your regex delimiter (e.g., `/`),
+failing to provide the second argument will prevent that character from being escaped,
+which can break the regular expression.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// The delimiter is provided, ensuring it gets escaped if necessary.
+$pattern = '/' . preg_quote( $user_input, '/' ) . '/';
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// If $user_input contains '/', the regex will be invalid.
+$pattern = '/' . preg_quote( $user_input ) . '/';
 ```
 
 

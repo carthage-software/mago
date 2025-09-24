@@ -13,6 +13,7 @@ This document details the rules available in the `BestPractices` category.
 | Final Controller | [`final-controller`](#final-controller) |
 | Loop Does Not Iterate | [`loop-does-not-iterate`](#loop-does-not-iterate) |
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
+| No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
@@ -31,6 +32,8 @@ This document details the rules available in the `BestPractices` category.
 | Psl Sleep Functions | [`psl-sleep-functions`](#psl-sleep-functions) |
 | Psl String Functions | [`psl-string-functions`](#psl-string-functions) |
 | Use Compound Assignment | [`use-compound-assignment`](#use-compound-assignment) |
+| Use WordPress API Functions | [`use-wp-functions`](#use-wp-functions) |
+| Yoda Conditions | [`yoda-conditions`](#yoda-conditions) |
 
 
 ## <a id="combine-consecutive-issets"></a>`combine-consecutive-issets`
@@ -214,6 +217,44 @@ class UserController extends Controller
         $this->middleware('auth');
     }
 }
+```
+
+
+## <a id="no-direct-db-query"></a>`no-direct-db-query`
+
+This rule flags all direct method calls on the global `$wpdb` object. Direct database queries
+bypass the WordPress object cache, which can lead to poor performance. Using high-level functions
+like `get_posts()` is safer and more efficient.
+
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$posts = get_posts(['author' => $author_id]);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+global $wpdb;
+$posts = $wpdb->get_results("SELECT * FROM {$wpdb->posts} WHERE post_author = 1");
 ```
 
 
@@ -962,5 +1003,93 @@ $message .= ' Hello';
 
 $count = $count + 1;
 $message = $message . ' Hello';
+```
+
+
+## <a id="use-wp-functions"></a>`use-wp-functions`
+
+This rule encourages using WordPress's wrapper functions instead of native PHP functions for
+common tasks like HTTP requests, filesystem operations, and data handling. The WordPress APIs
+provide a consistent, secure, and reliable abstraction that works across different hosting
+environments.
+
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// For remote requests:
+$response = wp_remote_get('https://example.com/api/data');
+
+// For filesystem operations:
+global $wp_filesystem;
+require_once ABSPATH . 'wp-admin/includes/file.php';
+WP_Filesystem();
+$wp_filesystem->put_contents( '/path/to/my-file.txt', 'data' );
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// For remote requests:
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, 'https://example.com/api/data');
+// ...
+
+// For filesystem operations:
+file_put_contents('/path/to/my-file.txt', 'data');
+```
+
+
+## <a id="yoda-conditions"></a>`yoda-conditions`
+
+This rule enforces the use of "Yoda" conditions for comparisons. The variable should always be
+on the right side of the comparison, while the constant, literal, or function call is on the left.
+This prevents the common bug of accidentally using an assignment (`=`) instead of a comparison (`==`),
+which would cause a fatal error in a Yoda condition instead of a silent logical bug.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ( true === $is_active ) { /* ... */ }
+if ( 5 === $count ) { /* ... */ }
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// Vulnerable to the accidental assignment bug, e.g., if ($is_active = true).
+if ( $is_active === true ) { /* ... */ }
 ```
 

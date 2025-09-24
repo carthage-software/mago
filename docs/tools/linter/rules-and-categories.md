@@ -64,6 +64,14 @@ title: Rules & categories
 
 - [`final-controller`](./rules/best-practices#final-controller)
 
+### WordPress
+
+- [`use-wp-functions`](./rules/best-practices#use-wp-functions)
+- [`no-direct-db-query`](./rules/best-practices#no-direct-db-query)
+- [`no-db-schema-change`](./rules/security#no-db-schema-change)
+- [`no-unescaped-output`](./rules/security#no-unescaped-output)
+- [`no-roles-as-capabilities`](./rules/security#no-roles-as-capabilities)
+
 ### Yii
 
 - [`final-controller`](./rules/best-practices#final-controller)

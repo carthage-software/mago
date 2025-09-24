@@ -136,6 +136,13 @@ pub struct RulesSettings {
     pub no_request_all: RuleSettings<NoRequestAllConfig>,
     pub middleware_in_routes: RuleSettings<MiddlewareInRoutesConfig>,
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,
+    pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
+    pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
+    pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
+    pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
+    pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
+    pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {
