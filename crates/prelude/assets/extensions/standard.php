@@ -1731,7 +1731,7 @@ function explode(string $separator, string $string, int $limit = PHP_INT_MAX): a
 
 /**
  * @param array<string>|string $separator
- * @param array<string>|null $array
+ * @param array<int|string|float|bool|null|Stringable>|null $array
  *
  * @pure
  */
@@ -1741,7 +1741,7 @@ function implode(array|string $separator = '', null|array $array = null): string
 
 /**
  * @param array<string>|string $separator
- * @param array<string>|null $array
+ * @param array<int|string|float|bool|null|Stringable>|null $array
  *
  * @pure
  */
