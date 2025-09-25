@@ -744,7 +744,7 @@ namespace {
          *
          * @param class-string<T>|null $class
          *
-         * @return T|null
+         * @return T|null|false
          *
          * @throws PDOException
          */
