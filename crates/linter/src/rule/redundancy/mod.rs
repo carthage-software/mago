@@ -13,6 +13,7 @@ pub mod no_redundant_method_override;
 pub mod no_redundant_nullsafe;
 pub mod no_redundant_parentheses;
 pub mod no_redundant_string_concat;
+pub mod no_redundant_use;
 pub mod no_redundant_write_visibility;
 
 pub use constant_condition::*;
@@ -30,4 +31,5 @@ pub use no_redundant_method_override::*;
 pub use no_redundant_nullsafe::*;
 pub use no_redundant_parentheses::*;
 pub use no_redundant_string_concat::*;
+pub use no_redundant_use::*;
 pub use no_redundant_write_visibility::*;
