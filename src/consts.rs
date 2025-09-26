@@ -37,7 +37,7 @@ pub const ISSUE_URL: &str = "https://github.com/carthage-software/mago/issues/ne
 pub const ENVIRONMENT_PREFIX: &str = "MAGO";
 
 /// The name of the configuration file for mago.
-pub const CONFIGURATION_FILE: &str = "mago.toml";
+pub const CONFIGURATION_FILE_NAME: &str = "mago";
 
 /// The name of `composer.json` file.
 pub const COMPOSER_JSON_FILE: &str = "composer.json";
