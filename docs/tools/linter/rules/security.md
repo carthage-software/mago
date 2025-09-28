@@ -18,7 +18,7 @@ This document details the rules available in the `Security` category.
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
 | No Unescaped Output | [`no-unescaped-output`](#no-unescaped-output) |
 | Require `preg_quote` Delimiter | [`require-preg-quote-delimiter`](#require-preg-quote-delimiter) |
-| Sensative Parameter | [`sensative-parameter`](#sensative-parameter) |
+| Sensitive Parameter | [`sensitive-parameter`](#sensitive-parameter) |
 | Tainted Data to Sink | [`tainted-data-to-sink`](#tainted-data-to-sink) |
 
 
@@ -373,7 +373,7 @@ $pattern = '/' . preg_quote( $user_input ) . '/';
 ```
 
 
-## <a id="sensative-parameter"></a>`sensative-parameter`
+## <a id="sensitive-parameter"></a>`sensitive-parameter`
 
 Requires that parameters that are likely to contain sensitive information (e.g., passwords)
 are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.

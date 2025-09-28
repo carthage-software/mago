@@ -19,24 +19,24 @@ use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
 #[derive(Debug, Clone)]
-pub struct SensativeParameterRule {
+pub struct SensitiveParameterRule {
     meta: &'static RuleMeta,
-    cfg: SensativeParameterConfig,
+    cfg: SensitiveParameterConfig,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-pub struct SensativeParameterConfig {
+pub struct SensitiveParameterConfig {
     pub level: Level,
 }
 
-impl Default for SensativeParameterConfig {
+impl Default for SensitiveParameterConfig {
     fn default() -> Self {
         Self { level: Level::Error }
     }
 }
 
-impl Config for SensativeParameterConfig {
+impl Config for SensitiveParameterConfig {
     fn default_enabled() -> bool {
         // TODO(azjezz): enable in the next major release
         false
@@ -47,13 +47,13 @@ impl Config for SensativeParameterConfig {
     }
 }
 
-impl LintRule for SensativeParameterRule {
-    type Config = SensativeParameterConfig;
+impl LintRule for SensitiveParameterRule {
+    type Config = SensitiveParameterConfig;
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {
-            name: "Sensative Parameter",
-            code: "sensative-parameter",
+            name: "Sensitive Parameter",
+            code: "sensitive-parameter",
             description: indoc! {r#"
                 Requires that parameters that are likely to contain sensitive information (e.g., passwords)
                 are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.
