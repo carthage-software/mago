@@ -58,15 +58,15 @@ class SessionHandler implements SessionHandlerInterface, SessionIdInterface
     }
 }
 
-function session_name(null|string $name): string|false
+function session_name(null|string $name = null): string|false
 {
 }
 
-function session_module_name(null|string $module): string|false
+function session_module_name(null|string $module = null): string|false
 {
 }
 
-function session_save_path(null|string $path): string|false
+function session_save_path(null|string $path = null): string|false
 {
 }
 
@@ -127,11 +127,11 @@ function session_set_save_handler(SessionHandlerInterface $sessionhandler, bool 
 {
 }
 
-function session_cache_limiter(null|string $value): string|false
+function session_cache_limiter(null|string $value = null): string|false
 {
 }
 
-function session_cache_expire(null|int $value): int|false
+function session_cache_expire(null|int $value = null): int|false
 {
 }
 
