@@ -70,7 +70,7 @@ function session_save_path(null|string $path): string|false
 {
 }
 
-function session_id(null|string $id): string|false
+function session_id(null|string $id = null): string|false
 {
 }
 
