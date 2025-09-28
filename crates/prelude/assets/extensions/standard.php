@@ -2123,7 +2123,7 @@ function escapeshellarg(string $arg): string
  *
  * @pure
  */
-function passthru(string $command, &$result_code): null|false
+function passthru(string $command, &$result_code = null): null|false
 {
 }
 
