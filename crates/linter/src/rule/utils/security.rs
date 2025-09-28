@@ -169,7 +169,7 @@ pub fn is_password(mut str: &str) -> bool {
     if lower.ends_with("password")
         || lower.ends_with("token")
         || lower.ends_with("secret")
-        || lower.ends_with("apiKey")
+        || lower.ends_with("apikey")
         || lower.ends_with("api_key")
     {
         return true;

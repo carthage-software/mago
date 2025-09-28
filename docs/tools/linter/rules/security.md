@@ -18,6 +18,7 @@ This document details the rules available in the `Security` category.
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
 | No Unescaped Output | [`no-unescaped-output`](#no-unescaped-output) |
 | Require `preg_quote` Delimiter | [`require-preg-quote-delimiter`](#require-preg-quote-delimiter) |
+| Sensative Parameter | [`sensative-parameter`](#sensative-parameter) |
 | Tainted Data to Sink | [`tainted-data-to-sink`](#tainted-data-to-sink) |
 
 
@@ -369,6 +370,43 @@ $pattern = '/' . preg_quote( $user_input, '/' ) . '/';
 
 // If $user_input contains '/', the regex will be invalid.
 $pattern = '/' . preg_quote( $user_input ) . '/';
+```
+
+
+## <a id="sensative-parameter"></a>`sensative-parameter`
+
+Requires that parameters that are likely to contain sensitive information (e.g., passwords)
+are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function login(string $username, #[SensitiveParameter] string $password): void {
+   // ...
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function login(string $username, string $password): void {
+   // ...
+}
 ```
 
 

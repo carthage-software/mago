@@ -239,6 +239,7 @@ define_rules! {
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),
     NoLiteralPassword(no_literal_password @ NoLiteralPasswordRule),
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),
+    SensativeParameter(sensative_parameter @ SensativeParameterRule),
     ParameterType(parameter_type @ ParameterTypeRule),
     PropertyType(property_type @ PropertyTypeRule),
     NoUnsafeFinally(no_unsafe_finally @ NoUnsafeFinallyRule),
