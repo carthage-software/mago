@@ -185,6 +185,7 @@ test_case!(optional_object_with_properties);
 test_case!(unsealed_array_overlap);
 test_case!(echo_tag);
 test_case!(var_docblock);
+test_case!(redundant_var_docblock);
 
 // Github Issues
 test_case!(issue_275);

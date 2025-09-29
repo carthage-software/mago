@@ -197,6 +197,7 @@ pub enum IssueCode {
     RedundantCast,
     RedundantComparison,
     RedundantCondition,
+    RedundantDocblockType,
     RedundantIssetCheck,
     RedundantKeyCheck,
     RedundantLogicalOperation,
@@ -451,6 +452,7 @@ impl IssueCode {
             Self::RedundantCast => "redundant-cast",
             Self::RedundantComparison => "redundant-comparison",
             Self::RedundantCondition => "redundant-condition",
+            Self::RedundantDocblockType => "redundant-docblock-type",
             Self::RedundantIssetCheck => "redundant-isset-check",
             Self::RedundantKeyCheck => "redundant-key-check",
             Self::RedundantLogicalOperation => "redundant-logical-operation",
@@ -611,11 +613,12 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_redundancy_issue_codes() -> [Self; 11] {
+    pub const fn get_redundancy_issue_codes() -> [Self; 12] {
         [
             Self::RedundantCast,
             Self::RedundantComparison,
             Self::RedundantCondition,
+            Self::RedundantDocblockType,
             Self::RedundantIssetCheck,
             Self::RedundantKeyCheck,
             Self::RedundantLogicalOperation,
@@ -627,11 +630,12 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_redundancy_issue_code_values() -> [&'static str; 11] {
+    pub const fn get_redundancy_issue_code_values() -> [&'static str; 12] {
         [
             "redundant-cast",
             "redundant-comparison",
             "redundant-condition",
+            "redundant-docblock-type",
             "redundant-isset-check",
             "redundant-key-check",
             "redundant-logical-operation",
@@ -1295,6 +1299,7 @@ impl std::str::FromStr for IssueCode {
             "redundant-cast" => Ok(Self::RedundantCast),
             "redundant-comparison" => Ok(Self::RedundantComparison),
             "redundant-condition" => Ok(Self::RedundantCondition),
+            "redundant-docblock-type" => Ok(Self::RedundantDocblockType),
             "redundant-isset-check" => Ok(Self::RedundantIssetCheck),
             "redundant-key-check" => Ok(Self::RedundantKeyCheck),
             "redundant-logical-operation" => Ok(Self::RedundantLogicalOperation),

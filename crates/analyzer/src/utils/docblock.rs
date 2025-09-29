@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::builder::get_type_from_string;
+use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
+use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::union::populate_union_type;
 use mago_docblock::document::Element;
@@ -250,24 +252,60 @@ pub fn insert_variable_from_docblock<'ctx, 'arena>(
         return;
     }
 
-    if let Some(previous_type) = block_context.locals.remove(&variable_name)
-        && !can_expression_types_be_identical(context.codebase, &previous_type, &variable_type, false, true)
-    {
-        let variable_type_str = variable_type.get_id();
-        let previous_type_str = previous_type.get_id();
-
-        context.collector.report_with_code(
-            IssueCode::DocblockTypeMismatch,
-            Issue::error(format!("Docblock type mismatch for variable `{variable_name}`."))
-                .with_annotation(
-                    Annotation::primary(variable_type_span)
-                        .with_message(format!("This docblock asserts the type should be `{variable_type_str}`, but it was previously defined as `{previous_type_str}`.")),
-                )
-                .with_note("The type of the variable defined in the docblock does not match the previously defined type.")
-                .with_help(format!(
-                    "Change the docblock type to match `{previous_type_str}`, or update the variable definition to a compatible type `{variable_type_str}`."
-                )),
+    if let Some(previous_type) = block_context.locals.remove(&variable_name) {
+        let is_super = is_contained_by(
+            context.codebase,
+            &variable_type,
+            &previous_type,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
         );
+
+        let is_sub = is_contained_by(
+            context.codebase,
+            &previous_type,
+            &variable_type,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        );
+
+        let is_redundant = is_super && is_sub;
+        let is_impossible = !is_redundant
+            && !is_super
+            && !is_sub
+            && !can_expression_types_be_identical(context.codebase, &previous_type, &variable_type, false, false);
+
+        if is_impossible {
+            let variable_type_str = variable_type.get_id();
+            let previous_type_str = previous_type.get_id();
+
+            context.collector.report_with_code(
+                IssueCode::DocblockTypeMismatch,
+                Issue::error(format!("Docblock type mismatch for variable `{variable_name}`."))
+                    .with_annotation(
+                        Annotation::primary(variable_type_span)
+                            .with_message(format!("This docblock asserts the type should be `{variable_type_str}`, but it was previously defined as `{previous_type_str}`.")),
+                    )
+                    .with_note("The type of the variable defined in the docblock does not match the previously defined type.")
+                    .with_help(format!(
+                        "Change the docblock type to match `{previous_type_str}`, or update the variable definition to a compatible type `{variable_type_str}`."
+                    )),
+            );
+        } else if is_redundant {
+            context.collector.report_with_code(
+                IssueCode::RedundantDocblockType,
+                Issue::warning(format!("Redundant docblock type for variable `{variable_name}`."))
+                    .with_annotation(Annotation::primary(variable_type_span).with_message(format!(
+                        "This docblock asserts the type should be `{}`, which is identical to the previously defined type.",
+                        variable_type.get_id(),
+                    )))
+                    .with_help("You can remove this redundant `@var` docblock tag."),
+            );
+        }
     }
 
     block_context.locals.insert(variable_name, Rc::new(variable_type));
@@ -282,8 +320,33 @@ pub fn check_docblock_type_incompatibility<'ctx>(
     dockblock_type_span: Span,
     source_expression: Option<&Expression>,
 ) {
-    if !can_expression_types_be_identical(context.codebase, inferred_type, docblock_type, false, true) {
-        // Get clean string representations of the types for the error message.
+    let is_super = is_contained_by(
+        context.codebase,
+        docblock_type,
+        inferred_type,
+        false,
+        true,
+        false,
+        &mut ComparisonResult::default(),
+    );
+
+    let is_sub = is_contained_by(
+        context.codebase,
+        inferred_type,
+        docblock_type,
+        false,
+        true,
+        false,
+        &mut ComparisonResult::default(),
+    );
+
+    let is_redundant = is_super && is_sub;
+    let is_impossible = !is_redundant
+        && !is_super
+        && !is_sub
+        && !can_expression_types_be_identical(context.codebase, inferred_type, docblock_type, false, true);
+
+    if is_impossible {
         let docblock_type_str = docblock_type.get_id();
         let inferred_type_str = inferred_type.get_id();
 
@@ -330,5 +393,44 @@ pub fn check_docblock_type_incompatibility<'ctx>(
         }
 
         context.collector.report_with_code(IssueCode::DocblockTypeMismatch, issue);
+
+        return;
+    }
+
+    if is_redundant {
+        let docblock_type_str = docblock_type.get_id();
+        let inferred_type_str = inferred_type.get_id();
+
+        let mut issue = if let Some(value_expression_variable_id) = value_expression_variable_id {
+            Issue::warning(format!("Redundant docblock type for variable `{value_expression_variable_id}`."))
+                .with_annotation(Annotation::primary(dockblock_type_span).with_message(format!(
+                    "This docblock asserts the type should be `{docblock_type_str}`, which is identical to the inferred type."
+                )))
+        } else {
+            Issue::warning("Redundant docblock type for expression.".to_string()).with_annotation(
+                Annotation::primary(dockblock_type_span).with_message(format!(
+                    "This docblock asserts the type should be `{docblock_type_str}`, which is identical to the inferred type."
+                )),
+            )
+        };
+
+        if let Some(value_expression_variable_id) = value_expression_variable_id {
+            issue = issue
+                .with_annotation(Annotation::secondary(value_expression_span).with_message(format!(
+                    "The variable `{value_expression_variable_id}` type is known to be `{inferred_type_str}` here."
+                )))
+                .with_note("The type defined in this docblock is identical to the inferred type of the variable.")
+                .with_help("You can remove this redundant `@var` docblock tag.");
+        } else {
+            issue = issue
+                .with_annotation(
+                    Annotation::secondary(value_expression_span)
+                        .with_message(format!("This expression's type is already inferred as `{inferred_type_str}`.")),
+                )
+                .with_note("The type defined in this docblock is identical to the inferred type of the expression.")
+                .with_help("You can remove this redundant `@var` docblock tag.");
+        }
+
+        context.collector.report_with_code(IssueCode::RedundantDocblockType, issue);
     }
 }

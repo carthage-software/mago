@@ -142,6 +142,7 @@ final class AnalyzerCodeModuleGenerator
         'redundant-type-comparison',
         'redundant-comparison',
         'redundant-logical-operation',
+        'redundant-docblock-type',
         'too-few-arguments',
         'too-many-arguments',
         'undefined-int-array-index',
