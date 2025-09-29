@@ -33,8 +33,9 @@ check:
 
 # Fixes linting problems automatically using clippy, cargo fix, and rustfmt.
 fix:
-    cargo run -- fmt
     cargo run -- lint --fix
+    cargo run -- analyze --fix
+    cargo run -- fmt
     cargo +nightly clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
     cargo +nightly fix --allow-dirty --allow-staged
     cargo +nightly fmt --all -- --unstable-features

@@ -129,7 +129,7 @@ pub struct RulesSettings {
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,
-    pub sensative_parameter: RuleSettings<SensativeParameterConfig>,
+    pub sensitive_parameter: RuleSettings<SensitiveParameterConfig>,
     pub parameter_type: RuleSettings<ParameterTypeConfig>,
     pub property_type: RuleSettings<PropertyTypeConfig>,
     pub no_unsafe_finally: RuleSettings<NoUnsafeFinallyConfig>,

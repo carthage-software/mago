@@ -7,7 +7,7 @@ pub mod no_roles_as_capabilities;
 pub mod no_short_opening_tag;
 pub mod no_unescaped_output;
 pub mod require_preg_quote_delimiter;
-pub mod sensative_parameter;
+pub mod sensitive_parameter;
 pub mod tainted_data_to_sink;
 
 pub use disallowed_functions::*;
@@ -19,5 +19,5 @@ pub use no_roles_as_capabilities::*;
 pub use no_short_opening_tag::*;
 pub use no_unescaped_output::*;
 pub use require_preg_quote_delimiter::*;
-pub use sensative_parameter::*;
+pub use sensitive_parameter::*;
 pub use tainted_data_to_sink::*;
