@@ -1,9 +1,9 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
-use mago_php_version::PHPVersion;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_fixer::SafetyClassification;
+use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -109,8 +109,8 @@ impl LintRule for PreferFirstClassCallableRule {
             .with_help("Replace the arrow function with the first-class callable syntax (e.g., `strlen(...)`).");
 
             ctx.collector.propose(issue, |p| {
-                p.delete(span.to_end(call.start_position()).to_range(), SafetyClassification::Safe);
-                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::Safe);
+                p.delete(span.to_end(call.start_position()).to_range(), SafetyClassification::PotentiallyUnsafe);
+                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::PotentiallyUnsafe);
             });
         };
 
@@ -145,9 +145,15 @@ impl LintRule for PreferFirstClassCallableRule {
             ctx.collector.propose(issue, |p| {
                 let closure_end = closure.end_position();
 
-                p.delete(closure.span().to_end(value.start_position()).to_range(), SafetyClassification::Safe);
-                p.delete(return_stmt.terminator.span().to_end(closure_end).to_range(), SafetyClassification::Safe);
-                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::Safe);
+                p.delete(
+                    closure.span().to_end(value.start_position()).to_range(),
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+                p.delete(
+                    return_stmt.terminator.span().to_end(closure_end).to_range(),
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::PotentiallyUnsafe);
             });
         }
     }
