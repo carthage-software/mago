@@ -170,6 +170,10 @@ impl<'arena> MemberAccessChain<'arena> {
             }
         }
 
+        if self.accesses.len() >= 6 {
+            score += 3;
+        }
+
         if f.in_condition {
             // In conditions, we lower the score to avoid breaking chains too eagerly
             score -= 3;
@@ -218,12 +222,12 @@ impl<'arena> MemberAccessChain<'arena> {
                         | MemberAccess::NullSafeMethodCall(NullSafeMethodCall { argument_list, .. }),
                     ) = self.accesses.last()
                     else {
-                        break 'threshold 8;
+                        break 'threshold 6;
                     };
 
                     // Check argument list length
                     if argument_list.arguments.len() > 1 {
-                        break 'threshold 8;
+                        break 'threshold 6;
                     }
 
                     match &self.base {
@@ -352,6 +356,27 @@ impl<'arena> MemberAccessChain<'arena> {
     #[inline]
     fn must_break(&self, f: &FormatterState) -> bool {
         if self.is_first_link_static_method_call() && self.accesses.len() > 3 {
+            return true;
+        }
+
+        if let Expression::Variable(Variable::Direct(variable)) = self.base
+            && variable.name.eq_ignore_ascii_case("$builder")
+            && self.accesses.len() >= 3
+            && self.accesses.iter().all(|access| {
+                let id = match access {
+                    MemberAccess::MethodCall(MethodCall {
+                        method: ClassLikeMemberSelector::Identifier(id), ..
+                    })
+                    | MemberAccess::NullSafeMethodCall(NullSafeMethodCall {
+                        method: ClassLikeMemberSelector::Identifier(id),
+                        ..
+                    }) => id,
+                    _ => return false,
+                };
+
+                id.value.starts_with("add") || id.value.starts_with("with")
+            })
+        {
             return true;
         }
 
