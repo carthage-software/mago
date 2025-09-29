@@ -273,7 +273,13 @@ pub fn insert_variable_from_docblock<'ctx, 'arena>(
             &mut ComparisonResult::default(),
         );
 
-        let is_redundant = is_super && is_sub;
+        let is_redundant = is_super
+            && is_sub
+            && !variable_type.is_mixed()
+            && !previous_type.is_mixed()
+            && !variable_type.is_generic_parameter()
+            && !previous_type.is_generic_parameter();
+
         let is_impossible = !is_redundant
             && !is_super
             && !is_sub
@@ -325,7 +331,7 @@ pub fn check_docblock_type_incompatibility<'ctx>(
         docblock_type,
         inferred_type,
         false,
-        true,
+        false,
         false,
         &mut ComparisonResult::default(),
     );
@@ -335,12 +341,18 @@ pub fn check_docblock_type_incompatibility<'ctx>(
         inferred_type,
         docblock_type,
         false,
-        true,
+        false,
         false,
         &mut ComparisonResult::default(),
     );
 
-    let is_redundant = is_super && is_sub;
+    let is_redundant = is_super
+        && is_sub
+        && !docblock_type.is_mixed()
+        && !inferred_type.is_mixed()
+        && !docblock_type.is_generic_parameter()
+        && !inferred_type.is_generic_parameter();
+
     let is_impossible = !is_redundant
         && !is_super
         && !is_sub
