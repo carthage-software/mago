@@ -138,10 +138,13 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
         Document::Group(Group::new(vec![
             in f.arena;
             base.format(f),
-            Document::Line(Line::hard()),
-            format_access_operator(f, operator, operator_str),
-            selector.format(f),
-            print_call_arguments(f, CallLikeNode::Call(node)),
+            Document::Indent(vec![
+                in f.arena;
+                Document::Line(Line::hard()),
+                format_access_operator(f, operator, operator_str),
+                selector.format(f),
+                print_call_arguments(f, CallLikeNode::Call(node)),
+            ]),
         ]))
     } else {
         Document::Group(Group::new(vec![
