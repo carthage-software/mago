@@ -109,11 +109,11 @@ pub(super) fn print_assignment<'arena>(
                     Document::Group(Group::new(vec![in f.arena; lhs])),
                     Document::space(),
                     operator,
-                    Document::Group(Group::new(vec![in f.arena; Document::IndentIfBreak(IndentIfBreak::new(id, vec![
+                    Document::IndentIfBreak(IndentIfBreak::new(id, vec![
                         in f.arena;
                         Document::Line(Line::default()),
                         rhs,
-                    ]))])),
+                    ])),
                 ])
                 .with_id(id),
             )

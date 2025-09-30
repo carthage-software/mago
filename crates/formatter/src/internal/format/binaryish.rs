@@ -248,16 +248,17 @@ fn print_binaryish_expression_parts<'arena>(
     };
 
     let line_before_operator = f.settings.line_before_binary_operator && !f.has_leading_own_line_comment(right.span());
+    let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::Leading);
 
     let right_document = vec![
         in f.arena;
-        if line_before_operator && !should_inline_this_level {
+        if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
             Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         } else {
             Document::String(if has_space_around { " " } else { "" })
         },
         format_token(f, operator.span(), operator.as_str()),
-        if line_before_operator || should_inline_this_level {
+        if operator_has_leading_comments || line_before_operator || should_inline_this_level {
             Document::String(if has_space_around { " " } else { "" })
         } else {
             Document::Line(if has_space_around { Line::default() } else { Line::soft() })
@@ -270,7 +271,9 @@ fn print_binaryish_expression_parts<'arena>(
     ];
 
     let parent = f.parent_node();
-    let should_group = !is_nested
+
+    let should_group = !operator_has_leading_comments
+        && !is_nested
         && (should_break
             || (!(is_inside_parenthesis && operator.is_logical())
                 && parent.kind() != NodeKind::Binary
