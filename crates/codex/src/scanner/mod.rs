@@ -329,7 +329,15 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             self.codebase.class_likes.remove(&current_class).expect("Expected class-like metadata to be present");
 
         let name = ascii_lowercase_atom(method.name.value);
+
         if class_like_metadata.methods.contains(&name) {
+            if class_like_metadata.pseudo_methods.contains(&name)
+                && let Some(existing_method) = self.codebase.function_likes.get_mut(&(class_like_metadata.name, name))
+            {
+                class_like_metadata.pseudo_methods.remove(&name);
+                existing_method.flags.remove(MetadataFlags::MAGIC_METHOD);
+            }
+
             self.codebase.class_likes.insert(current_class, class_like_metadata);
             self.template_constraints.push(vec![]);
 

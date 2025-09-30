@@ -187,6 +187,7 @@ test_case!(echo_tag);
 test_case!(var_docblock);
 test_case!(redundant_var_docblock);
 test_case!(magic_method_trait);
+test_case!(real_pseudo_method);
 
 // Github Issues
 test_case!(issue_275);
