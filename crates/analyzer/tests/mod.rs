@@ -186,6 +186,7 @@ test_case!(unsealed_array_overlap);
 test_case!(echo_tag);
 test_case!(var_docblock);
 test_case!(redundant_var_docblock);
+test_case!(magic_method_trait);
 
 // Github Issues
 test_case!(issue_275);

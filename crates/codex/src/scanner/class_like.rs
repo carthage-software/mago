@@ -825,7 +825,9 @@ fn scan_class_like<'ctx, 'arena>(
 
         for method_tag in &docblock.methods {
             let method_name = ascii_lowercase_atom(&method_tag.method.name);
+            class_like_metadata.methods.insert(method_name);
             class_like_metadata.pseudo_methods.insert(method_name);
+            class_like_metadata.inheritable_method_ids.insert(method_name, class_like_metadata.name);
 
             let method_id = (name, method_name);
 
