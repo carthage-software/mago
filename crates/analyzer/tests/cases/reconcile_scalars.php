@@ -25,7 +25,6 @@ abstract readonly class Value
     public static function from(mixed $value): Value
     {
         if ($value instanceof Value) {
-            /** @var Value */
             return $value;
         }
 

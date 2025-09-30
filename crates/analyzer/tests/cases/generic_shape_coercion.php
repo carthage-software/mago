@@ -89,7 +89,6 @@ final class ShapeType
             }
         }
 
-        /** @var array<Tk, Tv> */
         return $result;
     }
 }
