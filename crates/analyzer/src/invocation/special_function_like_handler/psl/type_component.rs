@@ -98,7 +98,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                                 .and_then(|type_parameters| type_parameters.first())
                                 .cloned()?;
 
-                            let possibly_undefined = *possibly_undefined || item.possibly_undefined;
+                            let possibly_undefined = *possibly_undefined || inner_type.possibly_undefined;
 
                             known_items.insert(*key, (possibly_undefined, inner_type));
                         }
@@ -119,6 +119,23 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                         ))))
                     }
                 }
+            }
+            "psl\\type\\optional" => {
+                let type_interface = get_argument(invocation.arguments_source, 0, vec!["inner_type"])?;
+                let type_interface_type = artifacts.get_expression_type(type_interface)?;
+
+                let mut inner_type = type_interface_type
+                    .get_single_named_object()?
+                    .get_type_parameters()
+                    .and_then(|type_parameters| type_parameters.first())
+                    .cloned()?;
+
+                inner_type.set_possibly_undefined(true, None);
+
+                Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
+                    atom("Psl\\Type\\TypeInterface"),
+                    Some(vec![inner_type]),
+                )))))
             }
             _ => None,
         }
