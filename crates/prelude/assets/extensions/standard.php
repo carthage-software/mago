@@ -5381,7 +5381,7 @@ function array_pop(array &$array): mixed
  * @param array<K, V> $array
  * @param-out ($array is list<V> ? list<V> : array<K, V>) $array
  *
- * @return ($array is non-empty-array|non-empty-list ? V : V|null)
+ * @return ($array is non-empty-array|non-empty-list ? V : null)
  *
  * @pure
  */
