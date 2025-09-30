@@ -124,6 +124,5 @@ static REGEX_FUNCTION_REPLACEMENTS: LazyLock<HashMap<&'static str, Vec<&'static 
         ("preg_split", vec!["Psl\\Regex\\split"]),
         ("preg_grep", vec!["Psl\\Regex\\every_match"]),
         ("preg_filter", vec!["Psl\\Regex\\every_match"]),
-        ("preg_quote", vec!["Psl\\Regex\\quote"]),
     ])
 });
