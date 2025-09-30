@@ -209,8 +209,14 @@ pub fn could_expand_value<'arena>(
                 return false;
             };
 
-            if arguments.arguments.len() <= 2 {
+            let arguments_len = arguments.arguments.len();
+
+            let Some(first_arg) = arguments.arguments.first() else {
                 return false;
+            };
+
+            if arguments_len == 1 {
+                return could_expand_value(f, first_arg.value(), true);
             }
 
             should_break_all_arguments(f, arguments, false)
@@ -228,6 +234,12 @@ pub fn could_expand_value<'arena>(
         }),
         Expression::Call(call) if !nested_args => {
             let argument_list = call.get_argument_list();
+
+            if let Some(first_arg) = argument_list.arguments.first()
+                && argument_list.arguments.len() == 1
+            {
+                return could_expand_value(f, first_arg.value(), true);
+            }
 
             should_break_all_arguments(f, argument_list, false)
                 || should_expand_first_arg(f, argument_list, true)
