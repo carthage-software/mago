@@ -403,6 +403,16 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         }
     }
 
+    for (template_name, constraints) in invocation.target.get_template_types().into_iter().flatten() {
+        for (generic_parent, type_constraint) in constraints {
+            if template_result.has_lower_bound(template_name, generic_parent) {
+                continue;
+            }
+
+            template_result.add_lower_bound(*template_name, *generic_parent, type_constraint.clone());
+        }
+    }
+
     let max_params = parameter_refs.len();
     let number_of_required_parameters = parameter_refs.iter().filter(|p| !p.has_default() && !p.is_variadic()).count();
     let mut number_of_provided_parameters = non_closure_arguments.len() + closure_arguments.len();

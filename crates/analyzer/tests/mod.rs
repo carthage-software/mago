@@ -188,6 +188,8 @@ test_case!(var_docblock);
 test_case!(redundant_var_docblock);
 test_case!(magic_method_trait);
 test_case!(real_pseudo_method);
+test_case!(chunk);
+test_case!(chunk_with_keys);
 
 // Github Issues
 test_case!(issue_275);
@@ -216,6 +218,7 @@ test_case!(issue_459);
 test_case!(issue_465);
 test_case!(issue_448);
 test_case!(issue_498);
+test_case!(issue_513);
 
 #[test]
 fn test_all_test_cases_are_ran() {

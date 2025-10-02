@@ -1118,7 +1118,11 @@ impl TType for TUnion {
             .iter()
             .map(|atomic| {
                 let id = atomic.get_id();
-                if atomic.has_intersection_types() && len > 1 { concat_atom!("(", id.as_str(), ")") } else { id }
+                if atomic.is_generic_parameter() || atomic.has_intersection_types() && len > 1 {
+                    concat_atom!("(", id.as_str(), ")")
+                } else {
+                    id
+                }
             })
             .collect();
 
