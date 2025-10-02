@@ -1,7 +1,6 @@
 use indoc::indoc;
 use mago_fixer::SafetyClassification;
 use mago_span::HasSpan;
-use mago_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -77,7 +76,7 @@ impl LintRule for NoRedundantUseRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Use];
+        const TARGETS: &[NodeKind] = &[NodeKind::Program];
         TARGETS
     }
 
@@ -86,57 +85,70 @@ impl LintRule for NoRedundantUseRule {
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
-        let Node::Use(use_statement) = node else {
+        let Node::Program(program) = node else {
             return;
         };
 
-        if is_entire_statement_unused(ctx, &use_statement.items) {
-            let issue = Issue::new(self.cfg.level(), "Unused import statement.")
+        let unused_items = utils::get_unused_items(program, ctx);
+
+        for span in unused_items {
+            let issue = Issue::new(self.cfg.level(), "Unused import.")
                 .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(use_statement.span()).with_message("This import is never used"))
-                .with_help("Remove the unused import statement.");
+                .with_annotation(Annotation::primary(span).with_message("Unused import"))
+                .with_help("Remove the unused import");
 
             ctx.collector.propose(issue, |plan| {
-                plan.delete(use_statement.span().to_range(), SafetyClassification::Safe);
+                plan.delete(span.to_range(), SafetyClassification::Safe);
             });
-        } else {
-            for (name, alias, span) in get_unused_items(ctx, &use_statement.items) {
-                let message = if let Some(alias) = alias {
-                    format!("Unused import: `{} as {}`", name, alias)
-                } else {
-                    format!("Unused import: `{}`", name)
-                };
-
-                let issue = Issue::new(self.cfg.level(), "Unused import statement.")
-                    .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(span).with_message(&message))
-                    .with_help("Remove the unused import from the group import statement.");
-
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(span.to_range(), SafetyClassification::Safe);
-                });
-            }
         }
     }
 }
 
-fn is_entire_statement_unused(ctx: &LintContext<'_, '_>, items: &UseItems) -> bool {
-    utils::get_use_items(items).all(|item| !utils::is_name_used(ctx, item))
-}
-
-fn get_unused_items<'arena>(
-    ctx: &LintContext<'_, 'arena>,
-    items: &'arena UseItems<'arena>,
-) -> Vec<(&'arena str, Option<&'arena str>, Span)> {
-    utils::get_use_items(items).filter_map(|item| utils::get_unused_item_info(ctx, item)).collect()
-}
-
 mod utils {
-    use crate::context::LintContext;
-    use mago_span::{HasSpan, Span};
-    use mago_syntax::ast::*;
+    use super::*;
+    use std::collections::HashSet;
 
-    pub fn get_use_items<'arena>(
+    pub(super) fn get_unused_items<'arena>(
+        program: &'arena Program<'arena>,
+        ctx: &LintContext<'_, 'arena>,
+    ) -> Vec<mago_span::Span> {
+        let mut unused_items = Vec::new();
+        let resolved_names = get_resolved_names(ctx);
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::Use(use_stmt) => {
+                    unused_items.push(use_stmt.span());
+                }
+                Statement::Namespace(namespace) => {
+                    for ns_statement in namespace.statements().nodes.iter() {
+                        if let Statement::Use(use_stmt) = ns_statement {
+                            if namespace.name.is_none() {
+                                unused_items.push(use_stmt.span());
+                            } else {
+                                let items: Vec<_> = use_items(&use_stmt.items).collect();
+                                let unused: Vec<_> =
+                                    items.iter().filter(|item| !is_item_used(program, item, &resolved_names)).collect();
+
+                                if unused.len() == items.len() {
+                                    unused_items.push(use_stmt.span());
+                                } else {
+                                    for item in unused {
+                                        unused_items.push(item.span());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        unused_items
+    }
+
+    fn use_items<'arena>(
         items: &'arena UseItems<'arena>,
     ) -> Box<dyn Iterator<Item = &'arena UseItem<'arena>> + 'arena> {
         match items {
@@ -147,39 +159,34 @@ mod utils {
         }
     }
 
-    #[inline]
-    pub fn get_unused_item_info<'arena>(
-        ctx: &LintContext<'_, 'arena>,
-        item: &UseItem<'arena>,
-    ) -> Option<(&'arena str, Option<&'arena str>, Span)> {
-        if is_name_used(ctx, item) {
-            return None;
-        }
-
-        let name = extract_short_name(item.name.value());
-        let alias = item.alias.as_ref().map(|a| a.identifier.value);
-        Some((name, alias, item.span()))
-    }
-
-    #[inline]
-    fn extract_short_name<'a>(name: &'a str) -> &'a str {
+    fn extract_simple_name(name: &str) -> &str {
         name.rsplit('\\').next().unwrap_or(name)
     }
 
-    #[inline]
-    pub fn is_name_used(ctx: &LintContext<'_, '_>, item: &UseItem) -> bool {
-        let identifier = item
-            .alias
-            .as_ref()
-            .map(|alias| alias.identifier.value)
-            .unwrap_or_else(|| extract_short_name(item.name.value()));
+    fn is_item_used(program: &Program, item: &UseItem, resolved_names: &HashSet<String>) -> bool {
+        let identifier =
+            if let Some(alias) = &item.alias { alias.identifier.value } else { extract_simple_name(item.name.value()) };
 
-        for (_position, (resolved_name, _was_imported)) in ctx.resolved_names.all().iter() {
-            if *resolved_name == identifier || extract_short_name(resolved_name) == identifier {
-                return true;
-            }
-        }
+        resolved_names.contains(identifier)
+            || resolved_names.contains(item.name.value())
+            || is_used_in_docblocks(program, identifier)
+            || is_used_in_docblocks(program, item.name.value())
+    }
 
-        false
+    fn is_used_in_docblocks(program: &Program, identifier: &str) -> bool {
+        program.trivia.iter().filter(|trivia| trivia.kind.is_docblock()).any(|trivia| trivia.value.contains(identifier))
+    }
+
+    fn get_resolved_names<'arena>(ctx: &LintContext<'_, 'arena>) -> HashSet<String> {
+        ctx.resolved_names
+            .all()
+            .iter()
+            .flat_map(|(_, (resolved_name, _))| {
+                let full_name = resolved_name.to_string();
+                let simple_name = extract_simple_name(&full_name).to_string();
+                [full_name, simple_name]
+            })
+            .filter(|name| !name.is_empty())
+            .collect()
     }
 }
