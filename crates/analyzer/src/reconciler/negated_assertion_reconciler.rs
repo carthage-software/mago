@@ -4,10 +4,7 @@ use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
-use mago_codex::get_class_like;
-use mago_codex::get_enum;
-use mago_codex::interface_exists;
-use mago_codex::is_instance_of;
+
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
@@ -168,7 +165,7 @@ fn subtract_complex_type(
                 let existing_classlike_name = existing_named_object.get_name_ref();
                 let assertion_classlike_name = assertion_named_object.get_name_ref();
 
-                if let Some(class_like_metadata) = get_class_like(context.codebase, existing_classlike_name) {
+                if let Some(class_like_metadata) = context.codebase.get_class_like(existing_classlike_name) {
                     // handle __Sealed classes, negating where possible
                     if let Some(child_classlikes) = class_like_metadata.child_class_likes.as_ref()
                         && child_classlikes.contains(assertion_classlike_name)
@@ -187,8 +184,8 @@ fn subtract_complex_type(
                     }
                 }
 
-                if (interface_exists(context.codebase, assertion_classlike_name)
-                    || interface_exists(context.codebase, existing_classlike_name))
+                if (context.codebase.interface_exists(assertion_classlike_name)
+                    || context.codebase.interface_exists(existing_classlike_name))
                     && assertion_classlike_name != existing_classlike_name
                 {
                     *can_be_disjunct = true;
@@ -204,10 +201,10 @@ fn subtract_complex_type(
             (
                 TAtomic::Object(TObject::Enum(TEnum { name: existing_enum_name, case: None })),
                 TAtomic::Object(TObject::Enum(TEnum { name: assertion_enum_name, case: Some(assertion_case) })),
-            ) if is_instance_of(context.codebase, assertion_enum_name, existing_enum_name) => {
+            ) if context.codebase.is_instance_of(assertion_enum_name, existing_enum_name) => {
                 *can_be_disjunct = true;
 
-                let Some(enum_metadata) = get_enum(context.codebase, existing_enum_name) else {
+                let Some(enum_metadata) = context.codebase.get_enum(existing_enum_name) else {
                     acceptable_types.push(existing_atomic);
                     continue;
                 };
@@ -259,7 +256,7 @@ fn handle_negated_class(
         if child_classlike != assertion_classlike_name {
             let alternate_class =
                 TAtomic::Object(TObject::Named(TNamedObject::new(*child_classlike).with_type_parameters(
-                    if let Some(child_metadata) = get_class_like(context.codebase, child_classlike) {
+                    if let Some(child_metadata) = context.codebase.get_class_like(child_classlike) {
                         let placeholder_params =
                             child_metadata.template_types.iter().map(|_| get_placeholder()).collect::<Vec<_>>();
 

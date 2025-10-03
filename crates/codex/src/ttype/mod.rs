@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use mago_atom::Atom;
 use mago_atom::atom;
 
-use crate::get_class_like;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::misc::GenericParent;
@@ -778,12 +776,12 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 let name = object.get_name()?;
                 let traversable = atom("traversable");
 
-                let class_metadata = get_class_like(codebase, name)?;
-                if !is_instance_of(codebase, &class_metadata.name, &traversable) {
+                let class_metadata = codebase.get_class_like(name)?;
+                if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                     break 'parameters None;
                 }
 
-                let traversable_metadata = get_class_like(codebase, &traversable)?;
+                let traversable_metadata = codebase.get_class_like(&traversable)?;
                 let key_template = traversable_metadata.template_types.first().map(|(name, _)| name)?;
                 let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
 
@@ -891,12 +889,12 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
             let name = object.get_name()?;
             let traversable = atom("traversable");
 
-            let class_metadata = get_class_like(codebase, name)?;
-            if !is_instance_of(codebase, &class_metadata.name, &traversable) {
+            let class_metadata = codebase.get_class_like(name)?;
+            if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                 return None;
             }
 
-            let traversable_metadata = get_class_like(codebase, &traversable)?;
+            let traversable_metadata = codebase.get_class_like(&traversable)?;
             let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
 
             get_specialized_template_type(
@@ -969,7 +967,7 @@ pub fn get_specialized_template_type(
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let defining_class_metadata = get_class_like(codebase, template_defining_class_id)?;
+    let defining_class_metadata = codebase.get_class_like(template_defining_class_id)?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;

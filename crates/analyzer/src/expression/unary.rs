@@ -7,9 +7,7 @@ use mago_atom::atom;
 use mago_atom::empty_atom;
 use mago_atom::f64_atom;
 use mago_atom::i64_atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_method;
+
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -1388,7 +1386,7 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                     TObject::Enum(enum_instance) => enum_instance.get_name(),
                 };
 
-                let Some(class_metadata) = get_class_like(context.codebase, &class_like_name) else {
+                let Some(class_metadata) = context.codebase.get_class_like(&class_like_name) else {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
@@ -1424,16 +1422,15 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                 }
 
                 let to_string_method_id = atom("__toString");
-                let declaring_method_id = get_declaring_method_identifier(
-                    context.codebase,
-                    &MethodIdentifier::new(class_metadata.original_name, to_string_method_id),
-                );
+                let declaring_method_id = context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(
+                    class_metadata.original_name,
+                    to_string_method_id,
+                ));
 
-                let Some(to_string_metadata) = get_method(
-                    context.codebase,
-                    declaring_method_id.get_class_name(),
-                    declaring_method_id.get_method_name(),
-                ) else {
+                let Some(to_string_metadata) = context
+                    .codebase
+                    .get_method(declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
+                else {
                     let class_name_str = class_metadata.original_name;
 
                     context.collector.report_with_code(

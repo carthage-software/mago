@@ -9,7 +9,7 @@ use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_atom::atom;
-use mago_codex::get_enum;
+
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -1050,7 +1050,9 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         has_at_least_one_entry = true;
 
                         let enum_name = enum_instance.get_name();
-                        let enum_backing_type = get_enum(context.codebase, enum_instance.get_name_ref())
+                        let enum_backing_type = context
+                            .codebase
+                            .get_enum(enum_instance.get_name_ref())
                             .and_then(|class_like| class_like.enum_type.as_ref());
 
                         context.collector.report_with_code(

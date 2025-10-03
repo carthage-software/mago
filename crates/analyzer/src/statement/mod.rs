@@ -1,8 +1,7 @@
 use ahash::HashSet;
 
 use mago_atom::Atom;
-use mago_codex::get_function;
-use mago_codex::get_method_by_id;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_names::kind::NameKind;
@@ -283,8 +282,8 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
             let unqualified_name = function_name.value();
             let name = context.resolved_names.get(function_name);
 
-            let Some(function) = get_function(context.codebase, name).or_else(|| {
-                if !function_name.is_local() { None } else { get_function(context.codebase, unqualified_name) }
+            let Some(function) = context.codebase.get_function(name).or_else(|| {
+                if !function_name.is_local() { None } else { context.codebase.get_function(unqualified_name) }
             }) else {
                 return;
             };
@@ -337,7 +336,7 @@ fn has_unused_must_use<'ctx, 'ast, 'arena>(
 
     match functionlike_id_from_call {
         FunctionLikeIdentifier::Function(function_id) => {
-            let function_metadata = get_function(context.codebase, &function_id)?;
+            let function_metadata = context.codebase.get_function(&function_id)?;
 
             let must_use = function_metadata.flags.must_use()
                 || function_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));
@@ -346,7 +345,7 @@ fn has_unused_must_use<'ctx, 'ast, 'arena>(
         }
         FunctionLikeIdentifier::Method(method_class, method_name) => {
             let method_metadata =
-                get_method_by_id(context.codebase, &MethodIdentifier::new(method_class, method_name))?;
+                context.codebase.get_method_by_id(&MethodIdentifier::new(method_class, method_name))?;
 
             let must_use = method_metadata.flags.must_use()
                 || method_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));

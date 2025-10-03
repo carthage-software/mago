@@ -1,13 +1,9 @@
 use mago_atom::Atom;
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_method_by_id;
-use mago_codex::get_method_identifier;
-use mago_codex::inherits_class;
+
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::method_identifier_exists;
-use mago_codex::uses_trait;
+
 use mago_codex::visibility::Visibility;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -41,12 +37,12 @@ pub fn check_method_visibility<'ctx, 'arena>(
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool {
-    let mut method_id = get_method_identifier(fqcn, method_name);
-    if !method_identifier_exists(context.codebase, &method_id) {
-        method_id = get_declaring_method_identifier(context.codebase, &method_id);
+    let mut method_id = MethodIdentifier::new(atom(fqcn), atom(method_name));
+    if !context.codebase.method_identifier_exists(&method_id) {
+        method_id = context.codebase.get_declaring_method_identifier(&method_id);
     }
 
-    let Some(method_metadata) = get_method_by_id(context.codebase, &method_id) else {
+    let Some(method_metadata) = context.codebase.get_method_by_id(&method_id) else {
         return true;
     };
 
@@ -64,7 +60,9 @@ pub fn check_method_visibility<'ctx, 'arena>(
         is_visible_from_scope(context, visibility, declaring_class_id, block_context.scope.get_class_like_name());
 
     if !is_visible {
-        let declaring_class_name = get_class_like(context.codebase, declaring_class_id)
+        let declaring_class_name = context
+            .codebase
+            .get_class_like(declaring_class_id)
             .map(|metadata| metadata.original_name)
             .unwrap_or_else(|| *declaring_class_id);
 
@@ -101,7 +99,7 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
 ) -> bool {
     let property_name = atom(property_name);
 
-    let Some(class_metadata) = get_class_like(context.codebase, fqcn) else {
+    let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
         return true;
     };
 
@@ -109,7 +107,7 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
         return true;
     };
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, declaring_class_id) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id) else {
         return true;
     };
 
@@ -182,7 +180,7 @@ pub fn check_property_write_visibility<'ctx, 'arena>(
 ) -> bool {
     let property_name = atom(property_name);
 
-    let Some(class_metadata) = get_class_like(context.codebase, fqcn) else {
+    let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
         return true;
     };
 
@@ -190,7 +188,7 @@ pub fn check_property_write_visibility<'ctx, 'arena>(
         return true;
     };
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, declaring_class_name) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_name) else {
         return true;
     };
 
@@ -257,10 +255,10 @@ fn is_visible_from_scope(
         Visibility::Protected => {
             if let Some(current_class_id) = current_class_opt {
                 current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                    || inherits_class(context.codebase, &current_class_id, declaring_class_id)
-                    || inherits_class(context.codebase, declaring_class_id, &current_class_id)
-                    || uses_trait(context.codebase, &current_class_id, declaring_class_id)
-                    || uses_trait(context.codebase, declaring_class_id, &current_class_id)
+                    || context.codebase.class_extends(&current_class_id, declaring_class_id)
+                    || context.codebase.class_extends(declaring_class_id, &current_class_id)
+                    || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
+                    || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
             } else {
                 false
             }
@@ -268,8 +266,8 @@ fn is_visible_from_scope(
         Visibility::Private => {
             if let Some(current_class_id) = current_class_opt {
                 current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                    || uses_trait(context.codebase, &current_class_id, declaring_class_id)
-                    || uses_trait(context.codebase, declaring_class_id, &current_class_id)
+                    || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
+                    || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
             } else {
                 false
             }
@@ -286,10 +284,10 @@ fn can_initialize_readonly_property(
     current_function_opt.and_then(|func| func.method_metadata.as_ref()).is_some_and(|method| method.is_constructor)
         && current_class_opt.is_some_and(|current_class_id| {
             current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                || inherits_class(context.codebase, &current_class_id, declaring_class_id)
-                || inherits_class(context.codebase, declaring_class_id, &current_class_id)
-                || uses_trait(context.codebase, &current_class_id, declaring_class_id)
-                || uses_trait(context.codebase, declaring_class_id, &current_class_id)
+                || context.codebase.class_extends(&current_class_id, declaring_class_id)
+                || context.codebase.class_extends(declaring_class_id, &current_class_id)
+                || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
+                || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
         })
 }
 

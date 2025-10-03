@@ -1,6 +1,6 @@
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
-use mago_codex::get_function;
+
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -36,7 +36,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             return Ok(());
         }
 
-        let Some(function_metadata) = get_function(context.codebase, &function_name) else {
+        let Some(function_metadata) = context.codebase.get_function(&function_name) else {
             return Err(AnalysisError::InternalError(
                 format!("Function metadata for `{function_name}` not found."),
                 self.span(),

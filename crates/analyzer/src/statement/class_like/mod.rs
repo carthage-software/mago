@@ -3,9 +3,7 @@ use indexmap::IndexMap;
 
 use mago_atom::Atom;
 use mago_codex::context::ScopeContext;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_property;
-use mago_codex::get_method;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
@@ -54,7 +52,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
         )?;
 
         let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, name) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Class {} not found in codebase", name);
 
             return Ok(());
@@ -93,7 +91,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
         )?;
 
         let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, name) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Interface {name} not found in codebase");
 
             return Ok(());
@@ -132,7 +130,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
         )?;
 
         let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, name) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Trait {} not found in codebase", name);
 
             return Ok(());
@@ -171,7 +169,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
         )?;
 
         let name = context.resolved_names.get(&self.name);
-        let Some(class_like_metadata) = get_class_like(context.codebase, name) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Enum {} not found in codebase", name);
 
             return Ok(());
@@ -240,7 +238,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     }
 
     if !class_like_metadata.kind.is_trait() && !class_like_metadata.flags.is_abstract() {
-        for (method_name, fqcn) in &class_like_metadata.declaring_method_ids {
+        for (method_name, method_id) in &class_like_metadata.declaring_method_ids {
             if class_like_metadata.kind.is_enum() {
                 if method_name.eq_ignore_ascii_case("cases") {
                     continue;
@@ -253,11 +251,14 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                 }
             }
 
-            let Some(declaring_class_like_metadata) = get_class_like(context.codebase, fqcn) else {
+            let Some(declaring_class_like_metadata) = context.codebase.get_class_like(method_id.get_class_name())
+            else {
                 continue;
             };
 
-            let Some(function_like) = get_method(context.codebase, fqcn, method_name) else {
+            let Some(function_like) =
+                context.codebase.get_method(method_id.get_class_name(), method_id.get_method_name())
+            else {
                 continue;
             };
 
@@ -295,7 +296,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     if !class_like_metadata.template_types.is_empty() {
         for (template_name, _) in &class_like_metadata.template_types {
             let (resolved_template_name, _) = context.scope.resolve(NameKind::Default, template_name);
-            if let Some(conflicting_class) = get_class_like(context.codebase, &resolved_template_name) {
+            if let Some(conflicting_class) = context.codebase.get_class_like(&resolved_template_name) {
                 let conflicting_name = &conflicting_class.name;
                 let conflicting_class_span = conflicting_class.name_span.unwrap_or(conflicting_class.span);
 
@@ -376,7 +377,7 @@ fn check_class_like_extends<'ctx, 'arena>(
 
     for extended_type in extends.types.iter() {
         let extended_type_str = context.resolved_names.get(&extended_type);
-        let extended_class_metadata = get_class_like(context.codebase, extended_type_str);
+        let extended_class_metadata = context.codebase.get_class_like(extended_type_str);
 
         // Case: The extended type does not exist.
         let Some(extended_class_metadata) = extended_class_metadata else {
@@ -542,7 +543,7 @@ fn check_class_like_implements<'ctx, 'arena>(
 
     for implemented_type in implements.types.iter() {
         let implemented_type_str = context.resolved_names.get(&implemented_type);
-        let implemented_interface_metadata = get_class_like(context.codebase, implemented_type_str);
+        let implemented_interface_metadata = context.codebase.get_class_like(implemented_type_str);
 
         match implemented_interface_metadata {
             Some(implemented_metadata) => {
@@ -637,7 +638,7 @@ fn check_class_like_use<'ctx, 'arena>(
 
     for used_type in trait_use.trait_names.iter() {
         let used_type_str = context.resolved_names.get(&used_type);
-        let used_trait_metadata = get_class_like(context.codebase, used_type_str);
+        let used_trait_metadata = context.codebase.get_class_like(used_type_str);
 
         let Some(used_trait_metadata) = used_trait_metadata else {
             let used_name = used_type.value();
@@ -993,13 +994,13 @@ fn check_class_like_properties<'ctx, 'arena>(
     }
 
     for (property, fqcn) in &class_like_metadata.appearing_property_ids {
-        let Some(declaring_property) = get_declaring_property(context.codebase, fqcn, property) else {
+        let Some(declaring_property) = context.codebase.get_declaring_property(fqcn, property) else {
             continue;
         };
 
         if let Some(parents_fqcn) = class_like_metadata.overridden_property_ids.get(property) {
             for parent_fqcn in parents_fqcn {
-                let Some(parent_metadata) = get_class_like(context.codebase, parent_fqcn) else {
+                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn) else {
                     continue;
                 };
 

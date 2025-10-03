@@ -1,4 +1,3 @@
-use mago_codex::get_constant;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
@@ -25,7 +24,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
         let unqualified_name = self.name.value();
 
         let constant_metadata =
-            get_constant(context.codebase, name).or_else(|| get_constant(context.codebase, unqualified_name));
+            context.codebase.get_constant(name).or_else(|| context.codebase.get_constant(unqualified_name));
 
         let Some(constant_metadata) = constant_metadata else {
             context.collector.report_with_code(

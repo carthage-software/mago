@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
-use mago_codex::interface_exists;
-use mago_codex::is_instance_of;
+
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -327,7 +326,7 @@ pub(crate) fn intersect_atomic_with_atomic(
 
     match (first_type, second_type) {
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
-            if is_instance_of(context.codebase, &first_enum.name, &second_enum.name)
+            if context.codebase.is_instance_of(&first_enum.name, &second_enum.name)
                 && first_enum.case == second_enum.case
             {
                 return Some(first_type.clone());
@@ -339,9 +338,9 @@ pub(crate) fn intersect_atomic_with_atomic(
             let first_object_name = first_object.get_name_ref();
             let second_object_name = second_object.get_name_ref();
 
-            if (interface_exists(context.codebase, first_object_name)
+            if (context.codebase.interface_exists(first_object_name)
                 && context.codebase.is_inheritable(second_object_name))
-                || (interface_exists(context.codebase, second_object_name)
+                || (context.codebase.interface_exists(second_object_name)
                     && context.codebase.is_inheritable(first_object_name))
             {
                 let mut first_type = first_type.clone();

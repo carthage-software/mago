@@ -1,8 +1,6 @@
 use mago_atom::atom;
 use mago_atom::concat_atom;
 
-use crate::get_class_like;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::ttype::TType;
@@ -136,7 +134,7 @@ pub fn is_contained_by(
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         return match input_type_part {
             TAtomic::Object(TObject::Enum(enum_input)) => {
-                if !is_instance_of(codebase, enum_input.get_name_ref(), enum_container.get_name_ref()) {
+                if !codebase.is_instance_of(enum_input.get_name_ref(), enum_container.get_name_ref()) {
                     return false;
                 }
 
@@ -151,7 +149,7 @@ pub fn is_contained_by(
                 true
             }
             TAtomic::Object(TObject::Named(named_object)) if enum_container.case.is_none() => {
-                if !is_instance_of(codebase, named_object.get_name_ref(), enum_container.get_name_ref()) {
+                if !codebase.is_instance_of(named_object.get_name_ref(), enum_container.get_name_ref()) {
                     return false;
                 }
 
@@ -309,7 +307,7 @@ pub fn is_contained_by(
             }
             TObject::Named(TNamedObject { name: input_object_name, .. })
             | TObject::Enum(TEnum { name: input_object_name, .. }) => {
-                let Some(class_like_metadata) = get_class_like(codebase, input_object_name) else {
+                let Some(class_like_metadata) = codebase.get_class_like(input_object_name) else {
                     return false;
                 };
 
@@ -326,7 +324,7 @@ pub fn is_contained_by(
                         }
                     };
 
-                    let Some(declaring_class_metadata) = get_class_like(codebase, declaring_class) else {
+                    let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class) else {
                         return false; // should not happen
                     };
 

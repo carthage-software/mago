@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_atom::atom;
-use mago_codex::get_anonymous_class;
+
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_named_object;
 use mago_codex::ttype::get_never;
@@ -94,7 +94,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                     AttributeTarget::ClassLike,
                 )?;
 
-                let Some(class_like_metadata) = get_anonymous_class(context.codebase, self.span()) else {
+                let Some(class_like_metadata) = context.codebase.get_anonymous_class(self.span()) else {
                     return Ok(());
                 };
 

@@ -3,10 +3,6 @@ use std::borrow::Cow;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 
-use crate::get_class_like;
-use crate::get_closure;
-use crate::get_declaring_method;
-use crate::get_function;
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -170,7 +166,7 @@ pub(crate) fn expand_atomic(
 
             match member_selector {
                 TReferenceMemberSelector::Wildcard => {
-                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
+                    let Some(class_like) = codebase.get_class_like(class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -209,7 +205,7 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::StartsWith(prefix) => {
-                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
+                    let Some(class_like) = codebase.get_class_like(class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -256,7 +252,7 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::EndsWith(suffix) => {
-                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
+                    let Some(class_like) = codebase.get_class_like(class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -303,7 +299,7 @@ pub(crate) fn expand_atomic(
                     }
                 }
                 TReferenceMemberSelector::Identifier(member_name) => {
-                    let Some(class_like) = get_class_like(codebase, class_like_name) else {
+                    let Some(class_like) = codebase.get_class_like(class_like_name) else {
                         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
 
                         return;
@@ -420,7 +416,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
         }
     } else if name_str_lc == "parent"
         && let Some(self_class_name) = options.self_class
-        && let Some(class_metadata) = get_class_like(codebase, &self_class_name)
+        && let Some(class_metadata) = codebase.get_class_like(&self_class_name)
         && let Some(parent_name) = class_metadata.direct_parent_class
         && let TObject::Named(named_object) = named_object
     {
@@ -432,7 +428,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
     };
 
     if named_object.type_parameters.is_none()
-        && let Some(class_like_metadata) = get_class_like(codebase, &named_object.name)
+        && let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
         && !class_like_metadata.template_types.is_empty()
     {
         let default_params: Vec<TUnion> = class_like_metadata
@@ -453,7 +449,7 @@ pub fn get_signature_of_function_like_identifier(
 ) -> Option<TCallableSignature> {
     Some(match function_like_identifier {
         FunctionLikeIdentifier::Function(name) => {
-            let function_like_metadata = get_function(codebase, name)?;
+            let function_like_metadata = codebase.get_function(name)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
@@ -463,7 +459,7 @@ pub fn get_signature_of_function_like_identifier(
             )
         }
         FunctionLikeIdentifier::Closure(file_id, position) => {
-            let function_like_metadata = get_closure(codebase, file_id, position)?;
+            let function_like_metadata = codebase.get_closure(file_id, position)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
@@ -473,7 +469,7 @@ pub fn get_signature_of_function_like_identifier(
             )
         }
         FunctionLikeIdentifier::Method(classlike_name, method_name) => {
-            let function_like_metadata = get_declaring_method(codebase, classlike_name, method_name)?;
+            let function_like_metadata = codebase.get_declaring_method(classlike_name, method_name)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,

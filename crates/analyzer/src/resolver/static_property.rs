@@ -1,8 +1,7 @@
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_class_for_property;
+
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::{self};
@@ -127,16 +126,16 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
-    let Some(class_metadata) = get_class_like(context.codebase, class_id) else {
+    let Some(class_metadata) = context.codebase.get_class_like(class_id) else {
         // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
         result.has_invalid_path = true;
         return Ok(None);
     };
 
-    let declaring_class_id = get_declaring_class_for_property(context.codebase, class_id, property_name)
-        .unwrap_or(class_metadata.original_name);
+    let declaring_class_id =
+        context.codebase.get_declaring_property_class(class_id, property_name).unwrap_or(class_metadata.original_name);
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, &declaring_class_id) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
         // Should not happen if declaring_class_id is valid.
         result.has_error_path = true;
         return Ok(None);
@@ -212,7 +211,7 @@ fn report_non_existent_property<'ctx, 'arena>(
     selector_span: Span,
     class_like_name_span: Span,
 ) {
-    let class_kind_str = get_class_like(context.codebase, classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = context.codebase.get_class_like(classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,

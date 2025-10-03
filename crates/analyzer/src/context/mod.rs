@@ -1,6 +1,6 @@
 use bumpalo::Bump;
 use mago_atom::Atom;
-use mago_codex::function_exists;
+
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::resolution::TypeResolutionContext;
 use mago_collector::Collector;
@@ -104,11 +104,11 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         }
 
         let fqfn = self.resolved_names.get(&identifier);
-        if function_exists(self.codebase, fqfn) {
+        if self.codebase.function_exists(fqfn) {
             return fqfn;
         }
 
-        if !name.contains('\\') && function_exists(self.codebase, name) {
+        if !name.contains('\\') && self.codebase.function_exists(name) {
             return name;
         }
 

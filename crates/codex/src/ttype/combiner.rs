@@ -7,10 +7,6 @@ use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 
-use crate::get_class_like;
-use crate::inherits_class;
-use crate::inherits_interface;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
@@ -784,29 +780,29 @@ fn scrape_type_properties(
 
                 if matches!(existing_symbol_kind, SymbolKind::Class) {
                     // remove subclasses
-                    if is_instance_of(codebase, &existing_name, &fq_class_name) {
+                    if codebase.is_instance_of(&existing_name, &fq_class_name) {
                         types_to_remove.push(*key);
                         continue;
                     }
 
                     if is_class {
                         // if covered by a parent class
-                        if inherits_class(codebase, &fq_class_name, &existing_name) {
+                        if codebase.class_extends(&fq_class_name, &existing_name) {
                             return;
                         }
                     } else if is_interface {
                         // if covered by a parent class
-                        if inherits_interface(codebase, &fq_class_name, &existing_name) {
+                        if codebase.class_implements(&fq_class_name, &existing_name) {
                             return;
                         }
                     }
                 } else if matches!(existing_symbol_kind, SymbolKind::Interface) {
-                    if inherits_interface(codebase, &existing_name, &fq_class_name) {
+                    if codebase.class_implements(&existing_name, &fq_class_name) {
                         types_to_remove.push(existing_name);
                         continue;
                     }
 
-                    if (is_class || is_interface) && inherits_interface(codebase, &fq_class_name, &existing_name) {
+                    if (is_class || is_interface) && codebase.class_implements(&fq_class_name, &existing_name) {
                         return;
                     }
                 }
@@ -940,7 +936,7 @@ fn adjust_keyed_array_parameters(
 }
 
 fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
-    let covariants = if let Some(class_like_metadata) = get_class_like(codebase, name) {
+    let covariants = if let Some(class_like_metadata) = codebase.get_class_like(name) {
         &class_like_metadata.template_variance
     } else {
         return *name;

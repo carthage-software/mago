@@ -1,5 +1,5 @@
 use mago_atom::Atom;
-use mago_codex::get_class_like;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -117,7 +117,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
             };
 
             // Handle regular constants and enum cases
-            let Some(metadata) = get_class_like(context.codebase, &fq_class_id) else {
+            let Some(metadata) = context.codebase.get_class_like(&fq_class_id) else {
                 result.has_invalid_path = true;
                 report_non_existent_class(context, &fq_class_id, class_expr.span());
                 continue;

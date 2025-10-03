@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::concat_atom;
-use mago_codex::get_class_like;
+
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
@@ -42,7 +42,7 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                 let array_parameters = get_array_parameters(array, context.codebase);
                 let obj = array_parameters.1.get_single_named_object()?;
 
-                let class_like = get_class_like(context.codebase, &obj.name)?;
+                let class_like = context.codebase.get_class_like(&obj.name)?;
 
                 let column_key_argument = get_argument(invocation.arguments_source, 1, vec!["column_key"])?;
                 let column_key_type = artifacts.get_expression_type(column_key_argument)?;

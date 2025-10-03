@@ -11,6 +11,7 @@ use mago_reporting::Issue;
 use mago_span::Span;
 
 use crate::flags::attribute::AttributeFlags;
+use crate::identifier::method::MethodIdentifier;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
@@ -58,11 +59,11 @@ pub struct ClassLikeMetadata {
     pub methods: AtomSet,
     pub pseudo_methods: AtomSet,
     pub static_pseudo_methods: AtomSet,
-    pub declaring_method_ids: AtomMap<Atom>,
-    pub appearing_method_ids: AtomMap<Atom>,
-    pub overridden_method_ids: AtomMap<AtomSet>,
-    pub inheritable_method_ids: AtomMap<Atom>,
-    pub potential_declaring_method_ids: AtomMap<AtomSet>,
+    pub declaring_method_ids: AtomMap<MethodIdentifier>,
+    pub appearing_method_ids: AtomMap<MethodIdentifier>,
+    pub inheritable_method_ids: AtomMap<MethodIdentifier>,
+    pub overridden_method_ids: AtomMap<HashMap<Atom, MethodIdentifier>>,
+    pub potential_declaring_method_ids: AtomMap<HashMap<String, bool>>,
     pub properties: AtomMap<PropertyMetadata>,
     pub appearing_property_ids: AtomMap<Atom>,
     pub declaring_property_ids: AtomMap<Atom>,
@@ -200,9 +201,9 @@ impl ClassLikeMetadata {
         self.appearing_method_ids.contains_key(method)
     }
 
-    /// Returns a reference to a specific method's potential declaring classes/traits.
+    /// Returns a reference to a specific method's potential declaring method id strings.
     #[inline]
-    pub fn get_potential_declaring_method_id(&self, method: &Atom) -> Option<&AtomSet> {
+    pub fn get_potential_declaring_method_id(&self, method: &Atom) -> Option<&HashMap<String, bool>> {
         self.potential_declaring_method_ids.get(method)
     }
 
@@ -317,29 +318,44 @@ impl ClassLikeMetadata {
         self.template_extended_parameters.entry(parent_fqcn).or_default().insert(parameter_name, parameter_type)
     }
 
-    /// Adds or updates the declaring class FQCN for a method name.
+    /// Adds or updates the declaring method identifier for a method name.
     #[inline]
-    pub fn add_declaring_method_id(&mut self, method: Atom, declaring_fqcn: Atom) -> Option<Atom> {
-        self.add_appearing_method_id(method, declaring_fqcn);
-        self.declaring_method_ids.insert(method, declaring_fqcn)
+    pub fn add_declaring_method_id(
+        &mut self,
+        method: Atom,
+        declaring_method_id: MethodIdentifier,
+    ) -> Option<MethodIdentifier> {
+        self.add_appearing_method_id(method, declaring_method_id);
+        self.declaring_method_ids.insert(method, declaring_method_id)
     }
 
-    /// Adds or updates the appearing class FQCN for a method name.
+    /// Adds or updates the appearing method identifier for a method name.
     #[inline]
-    pub fn add_appearing_method_id(&mut self, method: Atom, appearing_fqcn: Atom) -> Option<Atom> {
-        self.appearing_method_ids.insert(method, appearing_fqcn)
+    pub fn add_appearing_method_id(
+        &mut self,
+        method: Atom,
+        appearing_method_id: MethodIdentifier,
+    ) -> Option<MethodIdentifier> {
+        self.appearing_method_ids.insert(method, appearing_method_id)
     }
 
-    /// Adds a parent FQCN to the set for an overridden method. Initializes set if needed. Returns `true` if added.
+    /// Adds a parent method identifier to the map for an overridden method. Initializes map if needed. Returns the previous value if one existed.
     #[inline]
-    pub fn add_overridden_method_parent(&mut self, method: Atom, parent_fqcn: Atom) -> bool {
-        self.overridden_method_ids.entry(method).or_default().insert(parent_fqcn)
+    pub fn add_overridden_method_parent(
+        &mut self,
+        method: Atom,
+        parent_method_id: MethodIdentifier,
+    ) -> Option<MethodIdentifier> {
+        self.overridden_method_ids
+            .entry(method)
+            .or_default()
+            .insert(*parent_method_id.get_class_name(), parent_method_id)
     }
 
-    /// Adds a potential declaring FQCN to the set for a method. Initializes set if needed. Returns `true` if added.
+    /// Adds a potential declaring method id string to the map for a method. Initializes map if needed.
     #[inline]
-    pub fn add_potential_declaring_method(&mut self, method: Atom, potential_fqcn: Atom) -> bool {
-        self.potential_declaring_method_ids.entry(method).or_default().insert(potential_fqcn)
+    pub fn add_potential_declaring_method(&mut self, method: Atom, potential_method_id_str: String) {
+        self.potential_declaring_method_ids.entry(method).or_default().insert(potential_method_id_str, true);
     }
 
     /// Adds or updates a property's metadata. Returns the previous metadata if the property existed.

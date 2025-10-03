@@ -14,7 +14,7 @@ use mago_algebra::saturate_clauses;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
-use mago_codex::get_function_like_thrown_types;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -130,8 +130,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     }
 
     if context.settings.check_throws {
-        let thrown_types = get_function_like_thrown_types(
-            context.codebase,
+        let thrown_types = context.codebase.get_function_like_thrown_types(
             invoication.target.get_method_context().map(|context| context.class_like_metadata),
             metadata,
         );

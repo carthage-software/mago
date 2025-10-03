@@ -11,8 +11,6 @@ use mago_atom::AtomMap;
 use mago_atom::empty_atom;
 use mago_span::Span;
 
-use crate::class_like_exists;
-use crate::get_class_like;
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -392,7 +390,7 @@ fn replace_atomic(
                         _ => None,
                     };
 
-                    let is_covariant = if let Some(class_like_metadata) = get_class_like(codebase, &object_name) {
+                    let is_covariant = if let Some(class_like_metadata) = codebase.get_class_like(&object_name) {
                         matches!(class_like_metadata.template_variance.get(&offset), Some(Variance::Covariant))
                     } else {
                         false
@@ -956,7 +954,7 @@ fn handle_template_param_class_standin(
 }
 
 pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
-    if class_like_exists(codebase, name) {
+    if codebase.class_like_exists(name) {
         vec![TAtomic::Object(TObject::Named(TNamedObject::new(*name)))]
     } else {
         vec![]
@@ -1003,7 +1001,7 @@ fn find_matching_atomic_types_for_template(
                 if let TAtomic::Object(TObject::Named(constraint_object)) = &**constraint {
                     let base_as_value = &constraint_object.name;
 
-                    if let Some(class_metadata) = get_class_like(codebase, atomic_class_name)
+                    if let Some(class_metadata) = codebase.get_class_like(atomic_class_name)
                         && let Some(extended_parameters) =
                             class_metadata.template_extended_parameters.get(base_as_value)
                     {
@@ -1034,7 +1032,7 @@ fn find_matching_atomic_types_for_template(
                     continue;
                 }
 
-                let class_metadata = if let Some(metadata) = get_class_like(codebase, &input_name) {
+                let class_metadata = if let Some(metadata) = codebase.get_class_like(&input_name) {
                     metadata
                 } else {
                     matching_atomic_types.push(TAtomic::Object(TObject::Any));
@@ -1146,7 +1144,7 @@ pub fn get_mapped_generic_type_parameters(
         }
     };
 
-    let Some(input_class_metadata) = get_class_like(codebase, &input_name) else {
+    let Some(input_class_metadata) = codebase.get_class_like(&input_name) else {
         return vec![];
     };
 

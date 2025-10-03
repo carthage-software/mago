@@ -1,9 +1,7 @@
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::get_interface;
-use mago_codex::is_enum_or_final_class;
+
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
@@ -224,7 +222,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
             possible_types.push(ResolvedClassname::new(
                 Some(fqcn),
                 ResolutionOrigin::Named { is_parent: false, is_self: false },
-                is_enum_or_final_class(context.codebase, &fqcn),
+                context.codebase.is_enum_or_final_class(&fqcn),
             ));
         }
         Expression::Self_(self_keyword) => {
@@ -275,7 +273,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         Expression::Parent(parent_keyword) => {
             if let Some(self_meta) = block_context.scope.get_class_like() {
                 if let Some(parent_metadata) =
-                    self_meta.direct_parent_class.as_ref().and_then(|id| get_class_like(context.codebase, id))
+                    self_meta.direct_parent_class.as_ref().and_then(|id| context.codebase.get_class_like(id))
                 {
                     let origin = ResolutionOrigin::Named { is_parent: true, is_self: false };
                     let mut classname = ResolvedClassname::new(Some(parent_metadata.original_name), origin, false);
@@ -397,7 +395,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     ResolvedClassname::new(
                         Some(named_object.name),
                         origin,
-                        is_enum_or_final_class(codebase, &named_object.name),
+                        codebase.is_enum_or_final_class(&named_object.name),
                     )
                 }
                 TObject::WithProperties(_) => {
@@ -422,7 +420,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     TClassLikeString::Literal { value } => ResolvedClassname::new(
                         Some(*value),
                         ResolutionOrigin::LiteralClassString,
-                        is_enum_or_final_class(codebase, value),
+                        codebase.is_enum_or_final_class(value),
                     ),
                 }
             }
@@ -469,7 +467,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
 
     let mut intersections = vec![];
     for required_interface in &metadata.require_implements {
-        let Some(interface_metadata) = get_interface(context.codebase, required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
             continue;
         };
 
@@ -482,7 +480,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     }
 
     for required_class in &metadata.require_extends {
-        let Some(parent_class_metadata) = get_class_like(context.codebase, required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
             continue;
         };
 

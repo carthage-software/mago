@@ -1,7 +1,7 @@
 use ahash::HashMap;
 
 use mago_codex::flags::attribute::AttributeFlags;
-use mago_codex::get_class_like;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -56,7 +56,7 @@ pub fn analyze_attributes<'ctx, 'arena>(
     for attribute in attributes {
         let attribute_name = context.resolved_names.get(&attribute.name);
 
-        let Some(metadata) = get_class_like(context.codebase, attribute_name) else {
+        let Some(metadata) = context.codebase.get_class_like(attribute_name) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentAttributeClass,
                 Issue::error(format!("Attribute class `{attribute_name}` not found or could not be autoloaded."))

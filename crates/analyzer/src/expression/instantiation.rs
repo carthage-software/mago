@@ -2,12 +2,10 @@ use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::AtomMap;
-use mago_codex::get_all_descendants;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_method_by_id;
-use mago_codex::get_method_identifier;
+use mago_atom::atom;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -146,7 +144,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_object());
     };
 
-    let Some(metadata) = get_class_like(context.codebase, &fq_classname) else {
+    let Some(metadata) = context.codebase.get_class_like(&fq_classname) else {
         context.collector.report_with_code(
             IssueCode::NonExistentClass,
             Issue::error(format!("Class `{fq_classname}` not found."))
@@ -251,8 +249,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut type_parameters = None;
 
-    let constructor_id = get_method_identifier(&metadata.original_name, "__construct");
-    let constructor_declraing_id = get_declaring_method_identifier(context.codebase, &constructor_id);
+    let constructor_id = MethodIdentifier::new(atom(&metadata.original_name), atom("__construct"));
+    let constructor_declraing_id = context.codebase.get_declaring_method_identifier(&constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
 
@@ -266,7 +264,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     );
 
     let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
-    if let Some(constructor) = get_method_by_id(context.codebase, &constructor_declraing_id) {
+    if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
         constructor_span = Some(constructor.name_span.unwrap_or(constructor.span));
@@ -440,7 +438,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     }
 
     if classname.is_from_class_string() || classname.is_from_any_object() {
-        let descendants = get_all_descendants(context.codebase, &metadata.name);
+        let descendants = context.codebase.get_all_descendants(&metadata.name);
 
         for descendant_class in descendants {
             artifacts.symbol_references.add_reference_to_overridden_class_member(

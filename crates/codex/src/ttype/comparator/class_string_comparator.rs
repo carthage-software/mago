@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use mago_atom::atom;
 
-use crate::enum_exists;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
@@ -41,7 +40,7 @@ pub fn is_contained_by(
                 return true;
             }
 
-            if enum_exists(codebase, value) {
+            if codebase.enum_exists(value) {
                 Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
             } else {
                 Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
@@ -57,7 +56,7 @@ pub fn is_contained_by(
                 return false;
             }
 
-            if enum_exists(codebase, string_value) {
+            if codebase.enum_exists(string_value) {
                 Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(atom(string_value)))))
             } else {
                 Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(atom(string_value)))))
@@ -68,7 +67,7 @@ pub fn is_contained_by(
                 return matches!(fake_container_type.as_ref(), TAtomic::Object(TObject::Any));
             }
             TClassLikeString::Literal { value } => {
-                if enum_exists(codebase, value) {
+                if codebase.enum_exists(value) {
                     Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
                 } else {
                     Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))

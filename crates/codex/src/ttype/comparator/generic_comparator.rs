@@ -1,5 +1,3 @@
-use crate::get_class_like;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
@@ -23,15 +21,15 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
-    let Some(container_metadata) = get_class_like(codebase, &container_object.name) else {
+    let Some(container_metadata) = codebase.get_class_like(&container_object.name) else {
         return false;
     };
 
-    let Some(input_metadata) = get_class_like(codebase, &input_object.name) else {
+    let Some(input_metadata) = codebase.get_class_like(&input_object.name) else {
         return false;
     };
 
-    if !is_instance_of(codebase, &input_object.name, &container_object.name) {
+    if !codebase.is_instance_of(&input_object.name, &container_object.name) {
         return false;
     }
 

@@ -13,11 +13,7 @@ use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
-use mago_codex::class_like_exists;
-use mago_codex::class_or_interface_exists;
-use mago_codex::get_class_constant_type;
-use mago_codex::get_declaring_class_for_property;
-use mago_codex::get_property;
+
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -657,11 +653,11 @@ fn get_value_for_key<'ctx>(
             let fq_class_name = &base_key_parts[0];
             let const_name = &base_key_parts[1];
 
-            if !class_like_exists(context.codebase, fq_class_name) {
+            if !context.codebase.class_like_exists(fq_class_name) {
                 return None;
             }
 
-            let class_constant = get_class_constant_type(context.codebase, fq_class_name, const_name);
+            let class_constant = context.codebase.get_class_constant_type(fq_class_name, const_name);
 
             if let Some(class_constant) = class_constant {
                 let class_constant = Rc::new(match class_constant {
@@ -853,7 +849,7 @@ fn get_value_for_key<'ctx>(
                         let fq_class_name = named_object.get_name_ref();
 
                         if fq_class_name.eq_ignore_ascii_case("stdClass")
-                            || !class_or_interface_exists(context.codebase, fq_class_name)
+                            || !context.codebase.class_or_interface_exists(fq_class_name)
                         {
                             class_property_type = get_mixed();
                         } else {
@@ -887,8 +883,8 @@ fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_
     // Add `$` prefix
     let property_name = concat_atom!("$", property_name_str);
 
-    let declaring_property_class = get_declaring_class_for_property(context.codebase, classlike_name, &property_name)?;
-    let property_metadata = get_property(context.codebase, classlike_name, &property_name)?;
+    let declaring_property_class = context.codebase.get_declaring_property_class(classlike_name, &property_name)?;
+    let property_metadata = context.codebase.get_property(classlike_name, &property_name)?;
     let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
 
     let property_type = if let Some(mut property_type) = property_type {

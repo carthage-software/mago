@@ -1,5 +1,3 @@
-use crate::get_class_like;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
@@ -9,7 +7,6 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::wrap_atomic;
-use crate::uses_trait;
 
 pub(crate) fn is_shallowly_contained_by(
     codebase: &CodebaseMetadata,
@@ -84,7 +81,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
                     GenericParent::ClassLike(container_defining_class),
                 ) => {
                     if input_defining_class != container_defining_class
-                        && let Some(input_class_metadata) = get_class_like(codebase, input_defining_class)
+                        && let Some(input_class_metadata) = codebase.get_class_like(input_defining_class)
                         && let Some(defining_entity_params) =
                             &input_class_metadata.template_extended_parameters.get(container_defining_class)
                         && defining_entity_params.get(container_parameter_name).is_some()
@@ -155,11 +152,12 @@ pub(super) fn is_intersection_shallowly_contained_by(
         return false;
     }
 
-    if is_instance_of(codebase, &input_name, &container_name) || uses_trait(codebase, &input_name, &container_name) {
+    if codebase.is_instance_of(&input_name, &container_name) || codebase.class_uses_trait(&input_name, &container_name)
+    {
         return true;
     }
 
-    if is_instance_of(codebase, &container_name, &input_name) {
+    if codebase.is_instance_of(&container_name, &input_name) {
         atomic_comparison_result.type_coerced = Some(true);
     }
 

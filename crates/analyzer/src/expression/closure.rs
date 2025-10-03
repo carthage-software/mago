@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ahash::HashMap;
 
 use mago_codex::context::ScopeContext;
-use mago_codex::get_closure;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
@@ -39,7 +39,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
     ) -> Result<(), AnalysisError> {
         let s = self.span();
 
-        let Some(function_metadata) = get_closure(context.codebase, &s.file_id, &s.start) else {
+        let Some(function_metadata) = context.codebase.get_closure(&s.file_id, &s.start) else {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for closure defined in `{}` at offset {} not found.",

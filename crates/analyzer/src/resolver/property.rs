@@ -5,11 +5,8 @@ use indexmap::IndexMap;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_class_for_property;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_method_by_id;
-use mago_codex::get_method_identifier;
+
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
@@ -228,9 +225,9 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         };
 
         let magic_method_name = if for_assignment { "__set" } else { "__get" };
-        let mut magic_method_identifier = get_method_identifier(&classname, magic_method_name);
-        magic_method_identifier = get_declaring_method_identifier(context.codebase, &magic_method_identifier);
-        let magic_method = get_method_by_id(context.codebase, &magic_method_identifier);
+        let mut magic_method_identifier = MethodIdentifier::new(atom(&classname), atom(magic_method_name));
+        magic_method_identifier = context.codebase.get_declaring_method_identifier(&magic_method_identifier);
+        let magic_method = context.codebase.get_method_by_id(&magic_method_identifier);
 
         for prop_name in &property_names {
             let resolved_property = find_property_in_class(
@@ -299,10 +296,9 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     result: &mut PropertyResolutionResult,
     has_magic_method: bool,
 ) -> Result<Option<ResolvedProperty>, AnalysisError> {
-    let declaring_class_id =
-        get_declaring_class_for_property(context.codebase, class_id, prop_name).unwrap_or(*class_id);
+    let declaring_class_id = context.codebase.get_declaring_property_class(class_id, prop_name).unwrap_or(*class_id);
 
-    let Some(declaring_class_metadata) = get_class_like(context.codebase, &declaring_class_id) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
         report_non_existent_class_like(context, object_expr.span(), &declaring_class_id);
 
         return Ok(None);
@@ -369,7 +365,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             if class_id.eq_ignore_ascii_case(&declaring_class_id) {
                 declaring_class_metadata
             } else {
-                get_class_like(context.codebase, class_id).unwrap_or(declaring_class_metadata)
+                context.codebase.get_class_like(class_id).unwrap_or(declaring_class_metadata)
             },
             declaring_class_metadata,
         );
@@ -678,7 +674,7 @@ fn report_non_existent_property(
     object_span: Span,
     is_sealed_object: bool, // `true` if we are accessing undefined prop on `object{foo: string}` type, not an actual class
 ) {
-    let class_kind_str = get_class_like(context.codebase, classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = context.codebase.get_class_like(classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,

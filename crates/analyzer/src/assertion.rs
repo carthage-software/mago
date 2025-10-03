@@ -5,7 +5,7 @@ use mago_algebra::assertion_set::negate_assertion_set;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
-use mago_codex::get_class_like;
+
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
@@ -1206,7 +1206,7 @@ fn scrape_instanceof_assertions(
             }
             Expression::Parent(_) => {
                 if let Some(self_class) = context.this_class_name
-                    && let Some(self_meta) = get_class_like(context.codebase, &self_class)
+                    && let Some(self_meta) = context.codebase.get_class_like(&self_class)
                     && let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref()
                 {
                     if_types.insert(

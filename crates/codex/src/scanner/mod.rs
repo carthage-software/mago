@@ -19,6 +19,7 @@ use mago_syntax::walker::walk_enum_mut;
 use mago_syntax::walker::walk_interface_mut;
 use mago_syntax::walker::walk_trait_mut;
 
+use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
@@ -377,10 +378,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         }
 
         class_like_metadata.methods.insert(name);
-        class_like_metadata.add_declaring_method_id(name, class_like_metadata.name);
+        let method_identifier = MethodIdentifier::new(class_like_metadata.name, name);
+        class_like_metadata.add_declaring_method_id(name, method_identifier);
         if !method_metadata.visibility.is_private() || is_constructor || is_clone || class_like_metadata.kind.is_trait()
         {
-            class_like_metadata.inheritable_method_ids.insert(name, class_like_metadata.name);
+            class_like_metadata.inheritable_method_ids.insert(name, method_identifier);
         }
 
         if method_metadata.is_final && is_constructor {
@@ -455,8 +457,9 @@ fn finalize_class_like<'ctx, 'arena>(scanner: &mut Scanner, context: &mut Contex
         let constructor_name = atom("__construct");
 
         class_like_metadata.methods.insert(constructor_name);
-        class_like_metadata.add_declaring_method_id(constructor_name, class_like_metadata.name);
-        class_like_metadata.inheritable_method_ids.insert(constructor_name, class_like_metadata.name);
+        let constructor_method_id = MethodIdentifier::new(class_like_metadata.name, constructor_name);
+        class_like_metadata.add_declaring_method_id(constructor_name, constructor_method_id);
+        class_like_metadata.inheritable_method_ids.insert(constructor_name, constructor_method_id);
 
         let mut flags = MetadataFlags::PURE;
         if context.file.file_type.is_host() {

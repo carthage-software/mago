@@ -1,10 +1,6 @@
 use mago_atom::Atom;
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_interface;
-use mago_codex::get_method_by_id;
-use mago_codex::get_method_identifier;
+
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -122,7 +118,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
          method_name: Atom,
          has_magic_static_call: bool,
          result: Option<&mut MethodResolutionResult>| {
-            let Some(defining_class_metadata) = get_class_like(context.codebase, &fq_class_id) else {
+            let Some(defining_class_metadata) = context.codebase.get_class_like(&fq_class_id) else {
                 return (false, None);
             };
 
@@ -288,9 +284,9 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     class_span: Span,
     has_magic_static_call: bool,
 ) -> Option<ResolvedMethod> {
-    let method_id = get_method_identifier(&defining_class_metadata.original_name, &method_name);
-    let declaring_method_id = get_declaring_method_identifier(context.codebase, &method_id);
-    let function_like = get_method_by_id(context.codebase, &declaring_method_id)?;
+    let method_id = MethodIdentifier::new(atom(&defining_class_metadata.original_name), atom(&method_name));
+    let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
+    let function_like = context.codebase.get_method_by_id(&declaring_method_id)?;
 
     if let Some(result) = result
         && !check_method_visibility(
@@ -349,7 +345,7 @@ fn get_metadata_object<'ctx>(
 
     let mut intersections = vec![];
     for required_interface in &class_like_metadata.require_implements {
-        let Some(interface_metadata) = get_interface(context.codebase, required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
             continue;
         };
 
@@ -369,7 +365,7 @@ fn get_metadata_object<'ctx>(
     }
 
     for required_class in &class_like_metadata.require_extends {
-        let Some(parent_class_metadata) = get_class_like(context.codebase, required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
             continue;
         };
 

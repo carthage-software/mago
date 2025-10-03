@@ -4,7 +4,7 @@ use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
-use mago_codex::get_class_like;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::misc::GenericParent;
@@ -98,7 +98,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'ast, 'arena>(
         return;
     };
 
-    let Some(metadata) = get_class_like(context.codebase, identifier.get_class_name()) else {
+    let Some(metadata) = context.codebase.get_class_like(identifier.get_class_name()) else {
         return;
     };
 

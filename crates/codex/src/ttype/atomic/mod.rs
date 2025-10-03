@@ -5,7 +5,6 @@ use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
 use crate::reference::SymbolReferences;
@@ -307,7 +306,7 @@ impl TAtomic {
                 return true;
             }
 
-            if is_instance_of(codebase, object_name, interface) {
+            if codebase.is_instance_of(object_name, interface) {
                 return true;
             }
         }

@@ -4,9 +4,6 @@ use mago_atom::concat_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::get_class_like;
-use crate::get_enum;
-use crate::is_instance_of;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -54,7 +51,7 @@ impl TValueOf {
                     value_types.extend(iterable.get_value_type().types.iter().cloned());
                 }
                 TAtomic::Object(TObject::Enum(TEnum { name: enum_name, case: Some(case_name) })) => {
-                    let Some(metadata) = get_enum(codebase, enum_name) else {
+                    let Some(metadata) = codebase.get_enum(enum_name) else {
                         continue;
                     };
 
@@ -71,7 +68,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(class_like_metadata) = get_class_like(codebase, name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(name) else {
                         continue;
                     };
 
@@ -90,18 +87,18 @@ impl TValueOf {
                     }
 
                     let is_enum_interface = class_like_metadata.flags.is_enum_interface()
-                        || is_instance_of(codebase, &class_like_metadata.name, &atom("unitenum"));
+                        || codebase.is_instance_of(&class_like_metadata.name, &atom("unitenum"));
 
                     if !is_enum_interface {
                         continue;
                     }
 
-                    if is_instance_of(codebase, &class_like_metadata.name, &atom("stringbackedenum")) {
+                    if codebase.is_instance_of(&class_like_metadata.name, &atom("stringbackedenum")) {
                         value_types.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
 
-                    if is_instance_of(codebase, &class_like_metadata.name, &atom("intbackedenum")) {
+                    if codebase.is_instance_of(&class_like_metadata.name, &atom("intbackedenum")) {
                         value_types.push(TAtomic::Scalar(TScalar::int()));
                         continue;
                     }

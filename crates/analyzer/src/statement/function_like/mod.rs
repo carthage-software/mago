@@ -3,9 +3,7 @@ use std::rc::Rc;
 use ahash::HashMap;
 
 use mago_atom::concat_atom;
-use mago_codex::get_class_like;
-use mago_codex::get_function_like_thrown_types;
-use mago_codex::get_interface;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -119,7 +117,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     }
 
     if let Some(calling_class) = block_context.scope.get_class_like_name()
-        && let Some(class_like_metadata) = get_class_like(context.codebase, &calling_class)
+        && let Some(class_like_metadata) = context.codebase.get_class_like(&calling_class)
     {
         add_properties_to_context(context, block_context, class_like_metadata, function_like_metadata)?;
     }
@@ -323,7 +321,7 @@ fn add_properties_to_context<'ctx, 'arena>(
     };
 
     for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
-        let Some(property_class_metadata) = get_class_like(context.codebase, declaring_class) else {
+        let Some(property_class_metadata) = context.codebase.get_class_like(declaring_class) else {
             return Err(AnalysisError::InternalError(
                 format!("Could not load property class metadata for `{}`.", declaring_class),
                 class_like_metadata.span,
@@ -395,7 +393,7 @@ fn get_this_type(
 
     let mut intersections = vec![];
     for required_interface in &class_like_metadata.require_implements {
-        let Some(interface_metadata) = get_interface(context.codebase, required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
             continue;
         };
 
@@ -414,7 +412,7 @@ fn get_this_type(
     }
 
     for required_class in &class_like_metadata.require_extends {
-        let Some(parent_class_metadata) = get_class_like(context.codebase, required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
             continue;
         };
 
@@ -546,13 +544,12 @@ fn check_thrown_types<'ctx, 'arena>(
         false => ("function", *function_name),
     };
 
-    let expected_throw_types =
-        get_function_like_thrown_types(context.codebase, block_context.scope.get_class_like(), function_like_metadata)
-            .iter()
-            .map(|thrown_type| {
-                expand_type_metadata(context, block_context, artifacts, function_like_metadata, thrown_type)
-            })
-            .collect::<Vec<_>>();
+    let expected_throw_types = context
+        .codebase
+        .get_function_like_thrown_types(block_context.scope.get_class_like(), function_like_metadata)
+        .iter()
+        .map(|thrown_type| expand_type_metadata(context, block_context, artifacts, function_like_metadata, thrown_type))
+        .collect::<Vec<_>>();
 
     for (thrown_type, thrown_spans) in &block_context.possibly_thrown_exceptions {
         let thrown_type_union = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));

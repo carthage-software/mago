@@ -6,7 +6,7 @@ use itertools::Itertools;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::concat_atom;
-use mago_codex::get_class_like;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::expander;
@@ -106,7 +106,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         }
     }
 
-    let calling_class_like_metadata = calling_class_like.and_then(|(id, _)| get_class_like(context.codebase, &id));
+    let calling_class_like_metadata = calling_class_like.and_then(|(id, _)| context.codebase.get_class_like(&id));
     let method_call_context = invocation.target.get_method_context();
     let base_class_metadata = method_call_context.map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);

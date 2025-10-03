@@ -11,8 +11,7 @@ use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::is_instance_of;
+
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -174,7 +173,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             for caught_class in caught_classes.iter() {
                 for (possibly_thrown_exception, _) in possibly_thrown_exceptions.iter() {
                     if possibly_thrown_exception.eq_ignore_ascii_case(caught_class)
-                        || is_instance_of(context.codebase, possibly_thrown_exception, caught_class)
+                        || context.codebase.is_instance_of(possibly_thrown_exception, caught_class)
                     {
                         original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                         block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
@@ -439,7 +438,7 @@ pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        let Some(class_like_metadata) = get_class_like(context.codebase, &caught_type) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(&caught_type) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentCatchType,
                 Issue::error(format!("Attempting to catch an undefined class or interface: `{caught_type}`."))
@@ -481,7 +480,7 @@ pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
             continue;
         }
 
-        let is_throwable = is_instance_of(context.codebase, &caught_type, &throwable);
+        let is_throwable = context.codebase.is_instance_of(&caught_type, &throwable);
 
         if !is_throwable {
             context.collector.report_with_code(

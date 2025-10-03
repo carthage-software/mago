@@ -4,8 +4,7 @@ use ahash::HashMap;
 
 use ahash::HashSet;
 use mago_atom::Atom;
-use mago_codex::get_class_like;
-use mago_codex::is_instance_of;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::MethodMetadata;
 use mago_codex::misc::GenericParent;
@@ -550,7 +549,7 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 };
 
-                let Some(container_meta) = get_class_like(context.codebase, &container_obj.name) else {
+                let Some(container_meta) = context.codebase.get_class_like(&container_obj.name) else {
                     continue;
                 };
 
@@ -559,11 +558,11 @@ fn infer_templates_from_input_and_container_types(
                         continue;
                     };
 
-                    let Some(input_meta) = get_class_like(context.codebase, &input_obj.name) else {
+                    let Some(input_meta) = context.codebase.get_class_like(&input_obj.name) else {
                         continue;
                     };
 
-                    if !is_instance_of(context.codebase, &input_obj.name, &container_obj.name) {
+                    if !context.codebase.is_instance_of(&input_obj.name, &container_obj.name) {
                         continue;
                     }
 

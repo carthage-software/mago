@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 
 use mago_atom::Atom;
 
-use crate::get_class_like;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
@@ -199,7 +198,7 @@ fn replace_template_parameter(
         for (_, template_type_map) in inferred_lower_bounds {
             for map_defining_entity in template_type_map.keys() {
                 if let GenericParent::ClassLike(classlike_name) = map_defining_entity
-                    && let Some(metadata) = get_class_like(codebase, classlike_name)
+                    && let Some(metadata) = codebase.get_class_like(classlike_name)
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
                     && let Some(param) = extended_parameter_map.get(key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::atom;
-use mago_codex::function_exists;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -63,11 +63,11 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
         let name = atom(context.resolved_names.get(function_name));
         let unqualified_name = atom(function_name.value());
 
-        let identifier = if function_exists(context.codebase, &name) {
+        let identifier = if context.codebase.function_exists(&name) {
             FunctionLikeIdentifier::Function(name)
         } else if !function_name.is_fully_qualified()
             && unqualified_name != name
-            && function_exists(context.codebase, &unqualified_name)
+            && context.codebase.function_exists(&unqualified_name)
         {
             FunctionLikeIdentifier::Function(unqualified_name)
         } else {

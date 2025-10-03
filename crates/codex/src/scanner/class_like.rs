@@ -11,6 +11,7 @@ use mago_syntax::ast::*;
 
 use crate::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use crate::get_anonymous_class_name;
+use crate::identifier::method::MethodIdentifier;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -307,10 +308,18 @@ fn scan_class_like<'ctx, 'arena>(
                 class_like_metadata.all_parent_interfaces.insert(backed_enum_interface);
                 class_like_metadata.direct_parent_interfaces.insert(backed_enum_interface);
 
-                class_like_metadata.appearing_method_ids.insert(from_method, backed_enum_interface);
-                class_like_metadata.declaring_method_ids.insert(from_method, backed_enum_interface);
-                class_like_metadata.appearing_method_ids.insert(try_from_method, backed_enum_interface);
-                class_like_metadata.declaring_method_ids.insert(try_from_method, backed_enum_interface);
+                class_like_metadata
+                    .appearing_method_ids
+                    .insert(from_method, MethodIdentifier::new(backed_enum_interface, from_method));
+                class_like_metadata
+                    .declaring_method_ids
+                    .insert(from_method, MethodIdentifier::new(backed_enum_interface, from_method));
+                class_like_metadata
+                    .appearing_method_ids
+                    .insert(try_from_method, MethodIdentifier::new(backed_enum_interface, try_from_method));
+                class_like_metadata
+                    .declaring_method_ids
+                    .insert(try_from_method, MethodIdentifier::new(backed_enum_interface, try_from_method));
             }
 
             let unit_enum_interface = atom("unitenum");
@@ -319,8 +328,12 @@ fn scan_class_like<'ctx, 'arena>(
             class_like_metadata.all_parent_interfaces.insert(unit_enum_interface);
             class_like_metadata.direct_parent_interfaces.insert(unit_enum_interface);
 
-            class_like_metadata.appearing_method_ids.insert(cases_method, unit_enum_interface);
-            class_like_metadata.declaring_method_ids.insert(cases_method, unit_enum_interface);
+            class_like_metadata
+                .appearing_method_ids
+                .insert(cases_method, MethodIdentifier::new(unit_enum_interface, cases_method));
+            class_like_metadata
+                .declaring_method_ids
+                .insert(cases_method, MethodIdentifier::new(unit_enum_interface, cases_method));
 
             codebase.symbols.add_enum_name(name);
         }
@@ -827,7 +840,9 @@ fn scan_class_like<'ctx, 'arena>(
             let method_name = ascii_lowercase_atom(&method_tag.method.name);
             class_like_metadata.methods.insert(method_name);
             class_like_metadata.pseudo_methods.insert(method_name);
-            class_like_metadata.inheritable_method_ids.insert(method_name, class_like_metadata.name);
+            class_like_metadata
+                .inheritable_method_ids
+                .insert(method_name, MethodIdentifier::new(class_like_metadata.name, method_name));
 
             let method_id = (name, method_name);
 

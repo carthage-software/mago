@@ -1,14 +1,11 @@
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::get_declaring_method_identifier;
-use mago_codex::get_method_by_id;
-use mago_codex::get_method_identifier;
+
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::method_identifier_exists;
+
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -240,7 +237,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
 
     for (metadata, declaring_method_id, object, classname) in method_ids {
         let declaring_class_metadata =
-            get_class_like(context.codebase, declaring_method_id.get_class_name()).unwrap_or(metadata);
+            context.codebase.get_class_like(declaring_method_id.get_class_name()).unwrap_or(metadata);
 
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
@@ -298,25 +295,18 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
-    let Some(class_metadata) = get_class_like(context.codebase, name) else {
+    let Some(class_metadata) = context.codebase.get_class_like(name) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
         return ids;
     };
 
-    let method_name = class_metadata
-        .trait_alias_map
-        .iter()
-        .find(|(_, original)| *original == &method_name)
-        .map(|(alias, _)| *alias)
-        .unwrap_or(method_name);
-
-    let mut method_id = get_method_identifier(&class_metadata.original_name, &method_name);
-    if !method_identifier_exists(context.codebase, &method_id) {
-        method_id = get_declaring_method_identifier(context.codebase, &method_id);
+    let mut method_id = MethodIdentifier::new(atom(&class_metadata.original_name), atom(&method_name));
+    if !context.codebase.method_identifier_exists(&method_id) {
+        method_id = context.codebase.get_declaring_method_identifier(&method_id);
     }
 
-    if let Some(function_like_metadata) = get_method_by_id(context.codebase, &method_id) {
+    if let Some(function_like_metadata) = context.codebase.get_method_by_id(&method_id) {
         if !check_method_visibility(
             context,
             block_context,

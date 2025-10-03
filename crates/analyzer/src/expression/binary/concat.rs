@@ -4,8 +4,8 @@ use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_atom::f64_atom;
 use mago_atom::i64_atom;
-use mago_codex::get_method_identifier;
-use mago_codex::method_identifier_exists;
+
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -187,9 +187,9 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     continue;
                 };
 
-                let method_identifier = get_method_identifier(class_like_name, "__toString");
+                let method_identifier = MethodIdentifier::new(atom(class_like_name), atom("__toString"));
 
-                if method_identifier_exists(context.codebase, &method_identifier) {
+                if context.codebase.method_identifier_exists(&method_identifier) {
                     current_atomic_is_valid = true;
 
                     context.collector.report_with_code(

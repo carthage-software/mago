@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use mago_atom::atom;
 
-use crate::get_class_like;
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -28,7 +27,7 @@ pub fn cast_atomic_to_callable<'a>(
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {
         if let Some(template_result) = template_result
-            && let Some(class_metadata) = get_class_like(codebase, named_object.get_name_ref())
+            && let Some(class_metadata) = codebase.get_class_like(named_object.get_name_ref())
         {
             for (index, parameter) in named_object.get_type_parameters().unwrap_or_default().iter().enumerate() {
                 let Some(template_name) = class_metadata.get_template_name_for_index(index) else {
@@ -72,7 +71,7 @@ pub fn cast_atomic_to_callable<'a>(
 
         if let TAtomic::Object(TObject::Named(named_object)) = class_or_object {
             if let Some(template_result) = template_result
-                && let Some(class_metadata) = get_class_like(codebase, named_object.get_name_ref())
+                && let Some(class_metadata) = codebase.get_class_like(named_object.get_name_ref())
             {
                 for (index, parameter) in named_object.get_type_parameters().unwrap_or_default().iter().enumerate() {
                     let Some(template_name) = class_metadata.get_template_name_for_index(index) else {

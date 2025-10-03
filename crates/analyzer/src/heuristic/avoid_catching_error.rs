@@ -1,4 +1,3 @@
-use mago_codex::is_instance_of;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -14,7 +13,7 @@ pub fn check_for_caught_error<'ctx, 'ast, 'arena>(r#try: &'ast Try<'arena>, cont
         let caught_classes = get_caught_classes(context, &catch_clause.hint);
 
         for caught in caught_classes {
-            if !is_instance_of(context.codebase, &caught, ERROR_CLASS) {
+            if !context.codebase.is_instance_of(&caught, ERROR_CLASS) {
                 continue;
             }
 

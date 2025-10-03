@@ -1,4 +1,3 @@
-use mago_codex::get_constant;
 use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -32,7 +31,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Constant<'arena> {
         for item in self.items.iter() {
             let name = context.resolved_names.get(&item.name);
 
-            let Some(constant_metadata) = get_constant(context.codebase, name) else {
+            let Some(constant_metadata) = context.codebase.get_constant(name) else {
                 return Err(AnalysisError::InternalError(
                     format!("Constant metadata for `{name}` not found during analysis."),
                     item.name.span(),

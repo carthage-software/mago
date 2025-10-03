@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::atom;
-use mago_codex::get_class_like;
-use mago_codex::is_instance_of;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -756,15 +755,15 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
             };
 
             let array_access = atom("ArrayAccess");
-            if !is_instance_of(context.codebase, &named_object.name, &array_access) {
+            if !context.codebase.is_instance_of(&named_object.name, &array_access) {
                 break 'metadata None;
             }
 
-            let Some(metadata) = get_class_like(context.codebase, &named_object.name) else {
+            let Some(metadata) = context.codebase.get_class_like(&named_object.name) else {
                 break 'metadata None;
             };
 
-            let Some(array_access_metadata) = get_class_like(context.codebase, &array_access) else {
+            let Some(array_access_metadata) = context.codebase.get_class_like(&array_access) else {
                 break 'metadata None;
             };
 

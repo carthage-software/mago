@@ -1,9 +1,9 @@
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
-use mago_codex::get_method_by_id;
+
 use mago_codex::identifier::method::MethodIdentifier;
-use mago_codex::is_method_overriding;
+
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -50,7 +50,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         }
 
         let Some(method_metadata) =
-            get_method_by_id(context.codebase, &MethodIdentifier::new(class_like_metadata.name, lowercase_method_name))
+            context.codebase.get_method_by_id(&MethodIdentifier::new(class_like_metadata.name, lowercase_method_name))
         else {
             tracing::error!(
                 "Failed to find method metadata for `{}` in class `{}`.",
@@ -76,7 +76,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             None,
         )?;
 
-        if !is_method_overriding(context.codebase, &class_like_metadata.name, &method_name) {
+        if !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name) {
             heuristic::check_function_like(
                 method_metadata,
                 self.parameter_list.parameters.as_slice(),

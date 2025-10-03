@@ -1,5 +1,5 @@
 use mago_atom::ascii_lowercase_atom;
-use mago_codex::get_class_like;
+
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_fixer::SafetyClassification;
 use mago_reporting::*;
@@ -88,8 +88,10 @@ pub fn check_override_attribute<'ctx, 'arena>(
             continue;
         }
 
-        let Some(parents_metadata) =
-            parent_class_names.iter().filter_map(|parent_class| get_class_like(context.codebase, parent_class)).next()
+        let Some(parents_metadata) = parent_class_names
+            .values()
+            .filter_map(|parent_method_id| context.codebase.get_class_like(parent_method_id.get_class_name()))
+            .next()
         else {
             continue;
         };
