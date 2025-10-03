@@ -133,20 +133,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         expand_union(
             context.codebase,
             &mut inner_union,
-            &TypeExpansionOptions {
-                self_class: block_context.scope.get_class_like_name(),
-                static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
-                    StaticClassType::Name(calling_class)
-                } else {
-                    StaticClassType::None
-                },
-                function_is_final: if let Some(method_metadata) = &&function_like_metadata.method_metadata {
-                    method_metadata.is_final
-                } else {
-                    false
-                },
-                ..Default::default()
-            },
+            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
         );
 
         inferred_return_type = Rc::new(inner_union);
