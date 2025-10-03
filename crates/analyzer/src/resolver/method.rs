@@ -304,6 +304,13 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
+    let method_name = class_metadata
+        .trait_alias_map
+        .iter()
+        .find(|(_, original)| *original == &method_name)
+        .map(|(alias, _)| *alias)
+        .unwrap_or(method_name);
+
     let mut method_id = get_method_identifier(&class_metadata.original_name, &method_name);
     if !method_identifier_exists(context.codebase, &method_id) {
         method_id = get_declaring_method_identifier(context.codebase, &method_id);

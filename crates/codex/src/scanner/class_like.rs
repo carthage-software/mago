@@ -1038,15 +1038,15 @@ fn scan_class_like<'ctx, 'arena>(
                                 continue;
                             }
                             TraitUseAdaptation::Alias(adaptation) => {
-                                let method_name = match &adaptation.method_reference {
-                                    TraitUseMethodReference::Identifier(local_identifier) => &local_identifier.value,
-                                    TraitUseMethodReference::Absolute(_) => {
-                                        continue;
-                                    }
-                                };
+                                let method_name = ascii_lowercase_atom(match &adaptation.method_reference {
+                                    TraitUseMethodReference::Identifier(local_identifier) => local_identifier.value,
+                                    TraitUseMethodReference::Absolute(reference) => reference.method_name.value,
+                                });
 
                                 if let Some(alias) = &adaptation.alias {
-                                    class_like_metadata.add_trait_alias(atom(method_name), atom(alias.value));
+                                    let lowercase_alias = ascii_lowercase_atom(alias.value);
+
+                                    class_like_metadata.add_trait_alias(method_name, lowercase_alias);
                                 }
 
                                 if let Some(visibility) = &adaptation.visibility {
@@ -1055,7 +1055,7 @@ fn scan_class_like<'ctx, 'arena>(
                                         Modifier::Protected(_) => Visibility::Protected,
                                         Modifier::Private(_) => Visibility::Private,
                                         Modifier::Final(_) => {
-                                            class_like_metadata.trait_final_map.insert(atom(method_name));
+                                            class_like_metadata.trait_final_map.insert(method_name);
 
                                             continue;
                                         }
@@ -1064,7 +1064,7 @@ fn scan_class_like<'ctx, 'arena>(
                                         }
                                     };
 
-                                    class_like_metadata.add_trait_visibility(atom(method_name), visibility);
+                                    class_like_metadata.add_trait_visibility(method_name, visibility);
                                 }
                             }
                         }
