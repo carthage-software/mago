@@ -868,9 +868,7 @@ fn scrape_type_properties(
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
                 *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
             };
-        } else if let Some(value) =
-            string_scalar.get_known_literal_value().filter(|_| combination.literal_strings.len() <= 20)
-        {
+        } else if let Some(value) = string_scalar.get_known_literal_value() {
             combination.literal_strings.insert(atom(value));
         } else {
             if string_scalar.is_truthy || string_scalar.is_non_empty || string_scalar.is_numeric {
@@ -907,7 +905,7 @@ fn scrape_type_properties(
         }
 
         match float_scalar.value.as_ref() {
-            Some(literal_value) if combination.literal_floats.len() <= 20 => {
+            Some(literal_value) => {
                 combination.literal_floats.insert(*literal_value);
             }
             _ => {
