@@ -56,12 +56,10 @@ To get started with Mago and learn how to configure your project, please visit o
 - 🧠 Semantic Checks: Ensure code correctness with robust semantic analysis.
 - 🌳 AST Visualization: Explore your code’s structure with Abstract Syntax Tree (AST) parsing.
 
-<!-- START-SPONSORS -->
 ## Our Sponsors
 
-<p align="center"><a href="https://github.com/jasonrm" title="Jason R. McNeil"><kbd><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=160" width="80" height="80" alt="Jason R. McNeil" /></kbd></a><a href="https://github.com/vvvinceocam" title="Vincent Berset"><kbd><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=160" width="80" height="80" alt="Vincent Berset" /></kbd></a></p><p align="center"><a href="https://github.com/TicketSwap" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=120" width="60" height="60" alt="TicketSwap" /></kbd></a></p>
-
-[See all sponsors](SPONSORS.md)
+<!-- START-SPONSORS -->
+<p align="center"><a href="https://www.jetbrains.com/" title="JetBrains"><kbd><img src="https://avatars.githubusercontent.com/u/60931315?u=f9b545e50cace9e9028f77eaf1e83104d18d4d48&v=4&s=240" width="120" height="120" alt="JetBrains" /></kbd></a></p><p align="center"><a href="https://github.com/jasonrm" title="Jason R. McNeil"><kbd><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=160" width="80" height="80" alt="Jason R. McNeil" /></kbd></a><a href="https://ofcompute.rs/" title="Vincent Berset"><kbd><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=160" width="80" height="80" alt="Vincent Berset" /></kbd></a></p><p align="center"><a href="https://www.ticketswap.com" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=96" width="48" height="48" alt="TicketSwap" /></kbd></a></p>\n\n[See all sponsors](SPONSORS.md)
 <!-- END-SPONSORS -->
 
 ## Contributing

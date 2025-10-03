@@ -8,6 +8,10 @@ list:
 doc-linter-rules:
     php scripts/linter-rules-docs.php
 
+# Update sponsors in docs
+update-sponsors:
+    php scripts/update-sponsors-docs.php
+
 # Regenerate the analyzer issue codes.
 regen-analyzer-issue-codes:
     rm -f crates/analyzer/src/code.rs

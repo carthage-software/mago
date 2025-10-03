@@ -11,10 +11,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Update sponsors files
-        uses: azjezz/azjezz/.github/actions/sponsors-update@develop
-        with:
-          files-to-update: "README.md"
+      - name: Update sponsors in docs
+        run: php scripts/update-sponsors-docs.php
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
