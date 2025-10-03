@@ -256,7 +256,8 @@ final class SponsorsData
         }
 
         if ('' !== $html) {
-            $html .= '\n\n[See all sponsors](SPONSORS.md)';
+            $html .= "\n\n";
+            $html .= '[See all sponsors](SPONSORS.md)';
         }
 
         return $html;
