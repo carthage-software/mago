@@ -46,7 +46,8 @@ pub fn check_method_visibility<'ctx, 'arena>(
         return true;
     };
 
-    let Some(visibility) = method_metadata.method_metadata.as_ref().map(|m| m.visibility) else {
+    // Get the effective visibility, checking trait alias visibility overrides
+    let Some(visibility) = context.codebase.get_method_visibility(fqcn, method_name) else {
         return true;
     };
 

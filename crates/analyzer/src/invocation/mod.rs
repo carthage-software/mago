@@ -40,7 +40,8 @@ pub struct Invocation<'ctx, 'ast, 'arena> {
 pub struct MethodTargetContext<'ctx> {
     /// The method identifier, if statically resolved.
     pub declaring_method_id: Option<MethodIdentifier>,
-    /// Metadata for the class context.
+    /// Metadata for the class the method is being called on (not necessarily where it's declared).
+    /// This is used for resolving `self` types in return values.
     pub class_like_metadata: &'ctx ClassLikeMetadata,
     /// The class type for resolving static references.
     pub class_type: StaticClassType,

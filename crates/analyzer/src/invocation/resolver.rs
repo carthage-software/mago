@@ -9,6 +9,7 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
@@ -114,6 +115,30 @@ fn resolve_union<'ctx, 'ast, 'arena>(
             .get_function_like_metadata()
             .and_then(|metadata| metadata.method_metadata.as_ref())
             .is_some_and(|metadata| metadata.is_final);
+
+        if let Some(declaring_method_id) = &method_context.declaring_method_id {
+            let declaring_class_name = declaring_method_id.get_class_name();
+            if *declaring_class_name != method_context.class_like_metadata.name
+                && let Some(declaring_class_meta) = context.codebase.get_class_like(declaring_class_name)
+                && declaring_class_meta.kind.is_trait()
+            {
+                let mut new_atomics = Vec::with_capacity(resulting_union.types.len());
+                for atomic in resulting_union.types.as_ref() {
+                    match atomic {
+                        TAtomic::Object(TObject::Named(named_object))
+                            if named_object.name.eq_ignore_ascii_case(declaring_class_name) =>
+                        {
+                            let mut new_object = named_object.clone();
+                            new_object.name = method_context.class_like_metadata.name;
+                            new_atomics.push(TAtomic::Object(TObject::Named(new_object)));
+                        }
+                        _ => new_atomics.push(atomic.clone()),
+                    }
+                }
+
+                resulting_union.types = Cow::Owned(new_atomics);
+            }
+        }
     } else {
         static_class_type = Default::default();
         parent_class = None;

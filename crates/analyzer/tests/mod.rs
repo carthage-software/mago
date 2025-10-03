@@ -190,6 +190,7 @@ test_case!(magic_method_trait);
 test_case!(real_pseudo_method);
 test_case!(chunk);
 test_case!(chunk_with_keys);
+test_case!(trait_alias_vis_self);
 
 // Github Issues
 test_case!(issue_275);

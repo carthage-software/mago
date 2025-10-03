@@ -619,6 +619,32 @@ impl CodebaseMetadata {
             .is_some_and(|method_meta| method_meta.is_final)
     }
 
+    /// Gets the effective visibility of a method, taking into account trait alias visibility overrides.
+    ///
+    /// When a trait method is aliased with a visibility modifier (e.g., `use Trait { method as public aliasedMethod; }`),
+    /// the visibility is stored in the class's `trait_visibility_map`. This method checks that map first,
+    /// then falls back to the method's declared visibility.
+    #[inline]
+    pub fn get_method_visibility(&self, class: &str, method: &str) -> Option<crate::visibility::Visibility> {
+        let lowercase_class = ascii_lowercase_atom(class);
+        let lowercase_method = ascii_lowercase_atom(method);
+
+        // First check if there's a trait visibility override for this method
+        if let Some(class_meta) = self.class_likes.get(&lowercase_class)
+            && let Some(overridden_visibility) = class_meta.trait_visibility_map.get(&lowercase_method)
+        {
+            return Some(*overridden_visibility);
+        }
+
+        // Fall back to the method's declared visibility
+        let identifier = (lowercase_class, lowercase_method);
+
+        self.function_likes
+            .get(&identifier)
+            .and_then(|meta| meta.method_metadata.as_ref())
+            .map(|method_meta| method_meta.visibility)
+    }
+
     /// Gets thrown types for a function-like, including inherited throws.
     pub fn get_function_like_thrown_types<'a>(
         &'a self,
