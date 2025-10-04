@@ -318,6 +318,15 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    pub const fn is_false(&self) -> bool {
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_false()
+        } else {
+            matches!(&self, Expression::Literal(Literal::False(_)))
+        }
+    }
+
+    #[inline]
     pub const fn evaluates_to_boolean(&self) -> bool {
         match self {
             Expression::Parenthesized(expression) => expression.expression.evaluates_to_boolean(),

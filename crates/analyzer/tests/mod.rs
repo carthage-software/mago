@@ -191,6 +191,8 @@ test_case!(real_pseudo_method);
 test_case!(chunk);
 test_case!(chunk_with_keys);
 test_case!(trait_alias_vis_self);
+test_case!(true_ident);
+test_case!(eliminate_true_and_false_from_scalar);
 
 // Github Issues
 test_case!(issue_275);
@@ -223,6 +225,7 @@ test_case!(issue_498);
 test_case!(issue_513);
 test_case!(issue_514);
 test_case!(issue_493);
+test_case!(issue_510);
 
 #[test]
 fn test_all_test_cases_are_ran() {

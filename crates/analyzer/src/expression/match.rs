@@ -152,6 +152,10 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 } else {
                     previous_arms_executed = ArmExecutionStatus::Conditional;
                 }
+
+                if arm_status == ArmExecutionStatus::Always {
+                    is_exhaustive = true;
+                }
             }
 
             let mut else_referenced_ids = HashSet::default();

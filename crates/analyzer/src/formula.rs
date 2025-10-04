@@ -6,6 +6,8 @@ use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
 use mago_codex::assertion::Assertion;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::UnaryPrefix;
@@ -16,6 +18,7 @@ use crate::assertion::scrape_assertions;
 use crate::assertion::scrape_equality_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
+use crate::utils::expression::get_expression_id;
 use crate::utils::misc::unwrap_expression;
 
 const FORMULA_SIZE_THRESHOLD: usize = 1000;
@@ -56,7 +59,7 @@ pub fn get_formula(
     creating_object_id: Span,
     conditional: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let expression = unwrap_expression(conditional);
 
@@ -79,6 +82,135 @@ pub fn get_formula(
                 assertion_context,
                 artifacts,
             );
+        }
+
+        if let BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_) = binary.operator {
+            let check_boolean = |expr: &Expression| -> (bool, bool) {
+                if expr.is_true() {
+                    return (true, false);
+                }
+
+                if expr.is_false() {
+                    return (false, true);
+                }
+
+                artifacts
+                    .get_expression_type(expr)
+                    .map(|t| {
+                        if t.is_true() {
+                            (true, false)
+                        } else if t.is_false() {
+                            (false, true)
+                        } else {
+                            (false, false)
+                        }
+                    })
+                    .unwrap_or((false, false))
+            };
+
+            let is_identical = matches!(binary.operator, BinaryOperator::Identical(_));
+            let (left_is_true, left_is_false) = check_boolean(binary.lhs);
+            let (right_is_true, right_is_false) = check_boolean(binary.rhs);
+
+            match (left_is_true || left_is_false, right_is_true || right_is_false) {
+                (true, _) => {
+                    if let Some(var_name) = get_expression_id(
+                        binary.rhs,
+                        assertion_context.this_class_name,
+                        assertion_context.resolved_names,
+                        Some(assertion_context.codebase),
+                    ) {
+                        let type_assertion = if left_is_true {
+                            Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))
+                        } else {
+                            Assertion::IsType(TAtomic::Scalar(TScalar::r#false()))
+                        };
+
+                        let assertion = if is_identical {
+                            type_assertion
+                        } else {
+                            match type_assertion {
+                                Assertion::IsType(t) => Assertion::IsNotType(t),
+                                _ => unreachable!(),
+                            }
+                        };
+
+                        let mut clause_map = IndexMap::new();
+                        let mut type_map = IndexMap::new();
+                        type_map.insert(assertion.to_hash(), assertion);
+                        clause_map.insert(var_name, type_map);
+
+                        return Some(vec![Clause::new(
+                            clause_map,
+                            conditional_object_id,
+                            creating_object_id,
+                            Some(false),
+                            Some(true),
+                            Some(false),
+                        )]);
+                    } else {
+                        let formula = get_formula(
+                            conditional_object_id,
+                            creating_object_id,
+                            binary.rhs,
+                            assertion_context,
+                            artifacts,
+                        )?;
+
+                        let should_negate = if is_identical { left_is_false } else { left_is_true };
+                        return if should_negate { negate_formula(formula) } else { Some(formula) };
+                    }
+                }
+                (_, true) => {
+                    if let Some(var_name) = get_expression_id(
+                        binary.lhs,
+                        assertion_context.this_class_name,
+                        assertion_context.resolved_names,
+                        Some(assertion_context.codebase),
+                    ) {
+                        let type_assertion = if right_is_true {
+                            Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))
+                        } else {
+                            Assertion::IsType(TAtomic::Scalar(TScalar::r#false()))
+                        };
+
+                        let assertion = if is_identical {
+                            type_assertion
+                        } else {
+                            match type_assertion {
+                                Assertion::IsType(t) => Assertion::IsNotType(t),
+                                _ => unreachable!(),
+                            }
+                        };
+
+                        let mut clause_map = IndexMap::new();
+                        let mut type_map = IndexMap::new();
+                        type_map.insert(assertion.to_hash(), assertion);
+                        clause_map.insert(var_name, type_map);
+
+                        return Some(vec![Clause::new(
+                            clause_map,
+                            conditional_object_id,
+                            creating_object_id,
+                            Some(false),
+                            Some(true),
+                            Some(false),
+                        )]);
+                    } else {
+                        let formula = get_formula(
+                            conditional_object_id,
+                            creating_object_id,
+                            binary.lhs,
+                            assertion_context,
+                            artifacts,
+                        )?;
+
+                        let should_negate = if is_identical { right_is_false } else { right_is_true };
+                        return if should_negate { negate_formula(formula) } else { Some(formula) };
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -325,7 +457,7 @@ fn handle_binary_or_operation(
     left: &Expression,
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let left_clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
     let right_clauses = get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?;
@@ -340,7 +472,7 @@ fn handle_binary_and_operation(
     left: &Expression,
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
 ) -> Option<Vec<Clause>> {
     let mut clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
     clauses.extend(get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?);
