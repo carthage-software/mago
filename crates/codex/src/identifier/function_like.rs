@@ -108,3 +108,10 @@ impl FunctionLikeIdentifier {
         }
     }
 }
+
+impl From<MethodIdentifier> for FunctionLikeIdentifier {
+    #[inline]
+    fn from(value: MethodIdentifier) -> Self {
+        FunctionLikeIdentifier::Method(*value.get_class_name(), *value.get_method_name())
+    }
+}
