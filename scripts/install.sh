@@ -208,7 +208,7 @@ else
   fail "Neither 'curl' nor 'wget' are installed. Please install one of these tools to proceed."
 fi
 
-latest_tag=$(echo "$response" | grep '"tag_name":' | cut -d '"' -f 4)
+latest_tag=$(echo "$response" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
 if [ -z "$latest_tag" ]; then
   red "Failed to extract the latest release tag from the GitHub API response."
   fail "Please open an issue on GitHub at ${NEW_ISSUE}."
