@@ -52,6 +52,16 @@ namespace Psl\Type {
     {
         return instance_of($class_name);
     }
+
+    /**
+     * @template T
+     * @param TypeInterface<T> $inner_type
+     * @return TypeInterface<T>
+     */
+    function optional(TypeInterface $inner_type): TypeInterface
+    {
+        return optional($inner_type);
+    }
 }
 
 namespace {
@@ -92,6 +102,7 @@ namespace {
         'address' => Psl\Type\shape([
             'street' => Psl\Type\string(),
             'city' => Psl\Type\string(),
+            'country' => Psl\Type\optional(Psl\Type\string()),
         ]),
     ]);
 
@@ -101,6 +112,7 @@ namespace {
         Psl\Type\shape([
             'street' => Psl\Type\string(),
             'city' => Psl\Type\string(),
+            'country' => Psl\Type\optional(Psl\Type\string()),
         ]),
     ]);
 
@@ -114,11 +126,23 @@ namespace {
     i_take_int($array['age']);
     i_take_string($array['address']['street']);
     i_take_string($array['address']['city']);
+    /** @mago-expect analysis:possibly-undefined-string-array-index */
+    i_take_string($array['address']['country']);
+
+    if (isset($array['address']['country'])) {
+        i_take_string($array['address']['country']);
+    }
 
     i_take_string($list[0]);
     i_take_int($list[1]);
     i_take_string($list[2]['street']);
     i_take_string($list[2]['city']);
+    /** @mago-expect analysis:possibly-undefined-string-array-index */
+    i_take_string($list[2]['country']);
+
+    if (isset($list[2]['country'])) {
+        i_take_string($list[2]['country']);
+    }
 
     i_take_enum($enum);
 }
