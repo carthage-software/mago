@@ -116,6 +116,15 @@ namespace {
         ]),
     ]);
 
+    $flexible_type = Psl\Type\shape([
+        'required_field' => Psl\Type\string(),
+    ], true);
+
+    $flexible = $flexible_type->assert(get_mixed());
+
+    /* @mago-expect analysis:type-confirmation */
+    Mago\confirm($flexible, 'array{required_field: string, ...}');
+
     $enum_type = Psl\Type\instance_of(Example::class);
 
     $array = $array_type->assert(get_mixed());
