@@ -868,7 +868,7 @@ fn scan_class_like<'ctx, 'arena>(
 
             for argument in &method_tag.method.argument_list {
                 let mut function_parameter_metadata = FunctionLikeParameterMetadata::new(
-                    VariableIdentifier(ascii_lowercase_atom(&argument.variable.name)),
+                    VariableIdentifier(atom(&argument.variable.name)),
                     argument.argument_span,
                     argument.variable_span,
                     MetadataFlags::empty(),
