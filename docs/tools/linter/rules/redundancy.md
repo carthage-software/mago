@@ -23,6 +23,7 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant Method Override | [`no-redundant-method-override`](#no-redundant-method-override) |
 | No Redundant Nullsafe | [`no-redundant-nullsafe`](#no-redundant-nullsafe) |
 | No Redundant Parentheses | [`no-redundant-parentheses`](#no-redundant-parentheses) |
+| No Redundant Readonly | [`no-redundant-readonly`](#no-redundant-readonly) |
 | No Redundant String Concat | [`no-redundant-string-concat`](#no-redundant-string-concat) |
 | No Redundant Write Visibility | [`no-redundant-write-visibility`](#no-redundant-write-visibility) |
 
@@ -574,6 +575,42 @@ $foo = 42;
 <?php
 
 $foo = (42);
+```
+
+
+## <a id="no-redundant-readonly"></a>`no-redundant-readonly`
+
+Detects redundant `readonly` modifiers on properties in readonly classes.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+readonly class User {
+    public $name;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+readonly class User {
+    public readonly $name;
+}
 ```
 
 
