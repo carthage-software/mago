@@ -14,8 +14,8 @@ use crate::document::clone_in_arena;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::misc;
+use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
-use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
@@ -225,7 +225,7 @@ fn inline_single_element<'arena>(
     match elements[0] {
         ArrayElement::KeyValue(element) => {
             if (element.key.is_literal() || is_string_word_type(element.key))
-                && should_hug_expression(f, element.value, false)
+                && is_expandable_expression(element.value, true)
             {
                 Some(element.format(f))
             } else {
@@ -233,14 +233,14 @@ fn inline_single_element<'arena>(
             }
         }
         ArrayElement::Value(element) => {
-            if should_hug_expression(f, element.value, false) {
+            if is_expandable_expression(element.value, true) {
                 Some(element.format(f))
             } else {
                 None
             }
         }
         ArrayElement::Variadic(element) => {
-            if should_hug_expression(f, element.value, false) {
+            if is_expandable_expression(element.value, true) {
                 Some(element.format(f))
             } else {
                 None
