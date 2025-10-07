@@ -1,5 +1,6 @@
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -17,6 +18,7 @@ pub fn scan_function_like_parameter<'ctx, 'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     classname: Option<Atom>,
     context: &mut Context<'ctx, 'arena>,
+    scope: &NamespaceScope,
 ) -> FunctionLikeParameterMetadata {
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
@@ -48,7 +50,7 @@ pub fn scan_function_like_parameter<'ctx, 'arena>(
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;
-        metadata.default_type = infer(context.resolved_names, &default_value.value).map(|u| {
+        metadata.default_type = infer(context, scope, &default_value.value).map(|u| {
             let mut type_metadata = TypeMetadata::new(u, default_value.span());
             type_metadata.inferred = true;
             type_metadata

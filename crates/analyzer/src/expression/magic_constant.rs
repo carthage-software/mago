@@ -1,13 +1,17 @@
+use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::get_class_string;
 use mago_codex::ttype::get_empty_string;
+use mago_codex::ttype::get_literal_int;
+use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
-use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_span::HasPosition;
+use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -24,9 +28,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let constant_type = match self {
-            MagicConstant::Line(_) => get_non_negative_int(),
-            MagicConstant::File(_) => get_non_empty_string(),
-            MagicConstant::Directory(_) => get_non_empty_string(),
+            MagicConstant::Line(_) => {
+                get_literal_int(context.source_file.line_number(self.start_position().offset()) as i64 + 1)
+            }
+            MagicConstant::File(_) => {
+                if let Some(path) = context.source_file.path.as_deref().and_then(|p| p.to_str()) {
+                    get_literal_string(atom(path))
+                } else {
+                    get_non_empty_string()
+                }
+            }
+            MagicConstant::Directory(_) => {
+                if let Some(path) =
+                    context.source_file.path.as_deref().and_then(|p| p.parent()).and_then(|p| p.to_str())
+                {
+                    get_literal_string(atom(path))
+                } else {
+                    get_non_empty_string()
+                }
+            }
             MagicConstant::Namespace(_) => {
                 if let Some(namespace_name) = context.scope.namespace_name() {
                     TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::from(namespace_name.to_owned()))))

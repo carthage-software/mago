@@ -62,7 +62,7 @@ pub fn scan_method<'ctx, 'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context))
+        .map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context, scope))
         .collect();
 
     if let Some(return_hint) = method.return_type_hint.as_ref() {
@@ -146,7 +146,7 @@ pub fn scan_function<'ctx, 'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, classname, context))
+        .map(|p| scan_function_like_parameter(p, classname, context, scope))
         .collect();
 
     metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);
@@ -197,7 +197,7 @@ pub fn scan_closure<'ctx, 'arena>(
     }
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span, flags).with_parameters(
-        closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
+        closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context, scope)),
     );
 
     metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context);
@@ -248,7 +248,11 @@ pub fn scan_arrow_function<'ctx, 'arena>(
     }
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, span, flags).with_parameters(
-        arrow_function.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context)),
+        arrow_function
+            .parameter_list
+            .parameters
+            .iter()
+            .map(|p| scan_function_like_parameter(p, classname, context, scope)),
     );
 
     metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context);

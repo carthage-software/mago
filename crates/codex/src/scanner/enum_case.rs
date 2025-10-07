@@ -1,4 +1,5 @@
 use mago_atom::atom;
+use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -12,6 +13,7 @@ use crate::scanner::inference::infer;
 pub fn scan_enum_case<'ctx, 'arena>(
     case: &'arena EnumCase<'arena>,
     context: &mut Context<'ctx, 'arena>,
+    scope: &NamespaceScope,
 ) -> EnumCaseMetadata {
     let span = case.span();
     let attributes = scan_attribute_lists(&case.attribute_lists, context);
@@ -42,7 +44,7 @@ pub fn scan_enum_case<'ctx, 'arena>(
             let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
-            meta.value_type = infer(context.resolved_names, &item.value).map(|u| u.get_single_owned());
+            meta.value_type = infer(context, scope, &item.value).map(|u| u.get_single_owned());
 
             meta
         }

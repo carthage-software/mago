@@ -67,7 +67,7 @@ pub fn scan_class_like_constants<'ctx, 'arena>(
             }
 
             meta.attributes = attributes.clone();
-            meta.inferred_type = infer(context.resolved_names, &item.value).map(|u| u.get_single_owned());
+            meta.inferred_type = infer(context, scope, &item.value).map(|u| u.get_single_owned());
 
             if let Some(ref docblock) = docblock {
                 if docblock.is_deprecated {

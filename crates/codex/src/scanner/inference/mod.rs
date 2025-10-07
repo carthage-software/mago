@@ -5,11 +5,14 @@ use std::sync::LazyLock;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_names::ResolvedNames;
+use mago_names::scope::NamespaceScope;
+use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
@@ -30,6 +33,7 @@ use crate::ttype::get_float;
 use crate::ttype::get_int;
 use crate::ttype::get_int_or_float;
 use crate::ttype::get_literal_int;
+use crate::ttype::get_literal_string;
 use crate::ttype::get_mixed_keyed_array;
 use crate::ttype::get_never;
 use crate::ttype::get_non_empty_string;
@@ -46,8 +50,42 @@ use crate::ttype::wrap_atomic;
 use crate::utils::str_is_numeric;
 
 #[inline]
-pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena Expression<'arena>) -> Option<TUnion> {
+pub fn infer<'arena>(
+    context: &Context<'_, 'arena>,
+    scope: &NamespaceScope,
+    expression: &'arena Expression<'arena>,
+) -> Option<TUnion> {
     match expression {
+        Expression::MagicConstant(magic_constant) => Some(match magic_constant {
+            MagicConstant::Line(_) => {
+                get_literal_int(context.file.line_number(magic_constant.start_position().offset()) as i64 + 1)
+            }
+            MagicConstant::File(_) => {
+                if let Some(path) = context.file.path.as_deref().and_then(|p| p.to_str()) {
+                    get_literal_string(atom(path))
+                } else {
+                    get_non_empty_string()
+                }
+            }
+            MagicConstant::Directory(_) => {
+                if let Some(path) = context.file.path.as_deref().and_then(|p| p.parent()).and_then(|p| p.to_str()) {
+                    get_literal_string(atom(path))
+                } else {
+                    get_non_empty_string()
+                }
+            }
+            MagicConstant::Namespace(_) => {
+                if let Some(namespace_name) = scope.namespace_name() {
+                    get_literal_string(atom(namespace_name))
+                } else {
+                    get_empty_string()
+                }
+            }
+            MagicConstant::Trait(_) => get_string(),
+            MagicConstant::Class(_) => get_string(),
+            MagicConstant::Function(_) | MagicConstant::Method(_) => get_string(),
+            MagicConstant::Property(_) => get_string(),
+        }),
         Expression::Literal(literal) => match literal {
             Literal::String(literal_string) => {
                 Some(match literal_string.value {
@@ -96,7 +134,7 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
             if contains_content { Some(get_non_empty_string()) } else { Some(get_string()) }
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let operand_type = infer(resolved_names, operand)?;
+            let operand_type = infer(context, scope, operand)?;
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
@@ -137,8 +175,8 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
             }
         }
         Expression::Binary(Binary { operator: BinaryOperator::StringConcat(_), lhs, rhs }) => {
-            let Some(lhs_type) = infer(resolved_names, lhs) else { return Some(get_string()) };
-            let Some(rhs_type) = infer(resolved_names, rhs) else { return Some(get_string()) };
+            let Some(lhs_type) = infer(context, scope, lhs) else { return Some(get_string()) };
+            let Some(rhs_type) = infer(context, scope, rhs) else { return Some(get_string()) };
 
             let lhs_string = match lhs_type.get_single_owned() {
                 TAtomic::Scalar(TScalar::String(s)) => s.clone(),
@@ -172,8 +210,8 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_bitwise() => {
-            let lhs = infer(resolved_names, lhs);
-            let rhs = infer(resolved_names, rhs);
+            let lhs = infer(context, scope, lhs);
+            let rhs = infer(context, scope, rhs);
 
             Some(wrap_atomic(
                 match (
@@ -204,14 +242,14 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
             Construct::Print(_) => Some(get_literal_int(1)),
             _ => None,
         },
-        Expression::ConstantAccess(access) => infer_constant(resolved_names, &access.name),
+        Expression::ConstantAccess(access) => infer_constant(context.resolved_names, &access.name),
         Expression::Access(Access::ClassConstant(ClassConstantAccess {
             class,
             constant: ClassLikeConstantSelector::Identifier(identifier),
             ..
         })) => {
             let class_name_str = if let Expression::Identifier(identifier) = class {
-                resolved_names.get(identifier)
+                context.resolved_names.get(identifier)
             } else {
                 return None;
             };
@@ -256,7 +294,7 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
                     return None;
                 };
 
-                entries.insert(i, (false, infer(resolved_names, element.value)?));
+                entries.insert(i, (false, infer(context, scope, element.value)?));
             }
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
@@ -275,8 +313,8 @@ pub fn infer<'arena>(resolved_names: &ResolvedNames<'arena>, expression: &'arena
                     return None;
                 };
 
-                let key_type = infer(resolved_names, element.key).and_then(|v| v.get_single_array_key())?;
-                known_items.insert(key_type, (false, infer(resolved_names, element.value)?));
+                let key_type = infer(context, scope, element.key).and_then(|v| v.get_single_array_key())?;
+                known_items.insert(key_type, (false, infer(context, scope, element.value)?));
 
                 if known_items.len() > 100 {
                     return None;

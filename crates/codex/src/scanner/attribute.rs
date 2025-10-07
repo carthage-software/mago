@@ -1,5 +1,6 @@
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
@@ -32,6 +33,7 @@ pub fn get_attribute_flags<'ctx, 'arena>(
     class_like_name: Atom,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
     context: &mut Context<'ctx, 'arena>,
+    scope: &NamespaceScope,
 ) -> Option<AttributeFlags> {
     if class_like_name.eq_ignore_ascii_case("Attribute") {
         return Some(AttributeFlags::TARGET_CLASS);
@@ -50,7 +52,7 @@ pub fn get_attribute_flags<'ctx, 'arena>(
             return Some(AttributeFlags::TARGET_ALL);
         };
 
-        let inferred_type = infer(context.resolved_names, first_argument.value());
+        let inferred_type = infer(context, scope, first_argument.value());
         let bits = inferred_type.and_then(|i| i.get_single_literal_int_value()).and_then(|value| {
             if !(0..=255).contains(&value) {
                 return None;
