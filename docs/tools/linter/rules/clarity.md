@@ -16,6 +16,7 @@ This document details the rules available in the `Clarity` category.
 | No Multi Assignments | [`no-multi-assignments`](#no-multi-assignments) |
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
+| No Variable Variable | [`no-variable-variable`](#no-variable-variable) |
 | Str Contains | [`str-contains`](#str-contains) |
 | Str Starts With | [`str-starts-with`](#str-starts-with) |
 | Tagged FIXME | [`tagged-fixme`](#tagged-fixme) |
@@ -288,6 +289,45 @@ $value = $foo ? $foo : $default;
 <?php
 $value = $foo ?: $default;
 $value = $foo ? : $default;
+```
+
+
+## <a id="no-variable-variable"></a>`no-variable-variable`
+
+Discourages usage of PHP's variable variables feature.
+
+Variable variables can make code harder to read and maintain, as they introduce a level of indirection that can confuse readers and complicate static analysis.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$foo = 'bar';
+
+echo $foo; // Outputs 'bar'
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$foo = 'bar';
+$varName = 'foo';
+
+echo $$varName; // Outputs 'bar'
 ```
 
 

@@ -80,6 +80,7 @@ pub struct RulesSettings {
     pub no_nested_ternary: RuleSettings<NoNestedTernaryConfig>,
     pub no_hash_emoji: RuleSettings<NoHashEmojiConfig>,
     pub no_hash_comment: RuleSettings<NoHashCommentConfig>,
+    pub no_variable_variable: RuleSettings<NoVariableVariableConfig>,
     pub no_goto: RuleSettings<NoGotoConfig>,
     pub no_global: RuleSettings<NoGlobalConfig>,
     pub no_ffi: RuleSettings<NoFfiConfig>,

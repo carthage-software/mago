@@ -191,6 +191,7 @@ define_rules! {
     NoNestedTernary(no_nested_ternary @ NoNestedTernaryRule),
     NoHashEmoji(no_hash_emoji @ NoHashEmojiRule),
     NoHashComment(no_hash_comment @ NoHashCommentRule),
+    NoVariableVariable(no_variable_variable @ NoVariableVariableRule),
     NoGoto(no_goto @ NoGotoRule),
     NoGlobal(no_global @ NoGlobalRule),
     NoFfi(no_ffi @ NoFfiRule),
