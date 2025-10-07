@@ -1,7 +1,7 @@
 name: "🐛 Bug Report"
 description: "Report a bug or unexpected behavior in Mago."
 labels: ["Type: Bug"]
-assignees: ["azjezz"]
+assignees: []
 body:
   - type: markdown
     attributes:

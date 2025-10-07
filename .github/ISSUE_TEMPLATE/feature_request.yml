@@ -1,7 +1,7 @@
 name: "✨ Feature Request"
 description: "Suggest a new feature or improvement for Mago."
 labels: ["Type: Enhancement"]
-assignees: ["azjezz"]
+assignees: []
 body:
   - type: markdown
     attributes:
