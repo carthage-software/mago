@@ -21,7 +21,7 @@ function takesInt(int $int): void {
     echo $int;
 }
 
-class Test1 implements IFoo
+class Test implements IFoo
 {
     public function method(int $int, callable $callback): string
     {
@@ -39,3 +39,27 @@ class Test1 implements IFoo
         return "bar";
     }
 }
+
+// $test = new Test();
+
+// $test->method(10, function($s) {
+//     takesInt($s); // @mago-expect analysis:invalid-argument
+//     return 10; // @mago-expect analysis:invalid-return-statement
+// });
+
+// $test->methodWithoutTypes(10, function($s) {
+//     takesInt($s); // @mago-expect analysis:invalid-argument
+//     return 10; // @mago-expect analysis:invalid-return-statement
+// });
+
+// $test->methodWithoutTypes(10, function(int $s) { // @mago-expect analysis:invalid-argument
+//     return "bar";
+// });
+
+// $test->method(10, 
+//     function($s) {} // @mago-expect analysis:missing-return-statement
+// );
+
+// $test->methodWithoutTypes(10, 
+//     function($s) {} // @mago-expect analysis:missing-return-statement
+// );
