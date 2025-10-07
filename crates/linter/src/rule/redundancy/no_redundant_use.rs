@@ -36,6 +36,11 @@ impl Default for NoRedundantUseConfig {
 }
 
 impl Config for NoRedundantUseConfig {
+    fn default_enabled() -> bool {
+        // TODO(azjezz): enable this in the next major release.
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
