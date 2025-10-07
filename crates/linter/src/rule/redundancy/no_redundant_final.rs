@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_fixer::SafetyClassification;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -128,7 +129,9 @@ impl LintRule for NoRedundantFinalRule {
                     )
                     .with_help("Remove the redundant `final` modifier.");
 
-                ctx.collector.report(issue);
+                ctx.collector.propose(issue, |plan| {
+                    plan.delete(final_modifier.span().to_range(), SafetyClassification::Safe);
+                });
             }
         }
     }
