@@ -40,6 +40,31 @@ impl TKeyedArray {
         Self { known_items: None, parameters: Some((key_type, value_type)), non_empty: false }
     }
 
+    #[inline]
+    pub fn with_known_items(self, known_items: BTreeMap<ArrayKey, (bool, TUnion)>) -> Self {
+        Self { known_items: Some(known_items), ..self }
+    }
+
+    #[inline]
+    pub fn with_no_known_items(self) -> Self {
+        Self { known_items: None, ..self }
+    }
+
+    #[inline]
+    pub fn with_parameters(self, key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
+        Self { parameters: Some((key_type, value_type)), ..self }
+    }
+
+    #[inline]
+    pub fn with_no_parameters(self) -> Self {
+        Self { parameters: None, ..self }
+    }
+
+    #[inline]
+    pub fn with_non_empty(self, non_empty: bool) -> Self {
+        Self { non_empty, ..self }
+    }
+
     /// Returns a reference to the map of known item types by key, if any.
     #[inline]
     pub fn get_known_items(&self) -> Option<&BTreeMap<ArrayKey, (bool, TUnion)>> {
@@ -86,12 +111,6 @@ impl TKeyedArray {
     #[inline]
     pub fn has_generic_parameters(&self) -> bool {
         self.parameters.is_some()
-    }
-
-    /// Returns a new `TKeyedArray` with the non-empty flag set to true.
-    #[inline]
-    pub fn to_non_empty(self) -> Self {
-        Self { non_empty: true, ..self }
     }
 
     /// Returns a new `TKeyedArray` with the specified non-empty flag.

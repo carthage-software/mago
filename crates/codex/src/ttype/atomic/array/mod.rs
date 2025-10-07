@@ -95,10 +95,6 @@ impl TArray {
     }
 
     pub fn is_sealed(&self) -> bool {
-        if !self.has_known_items() {
-            return false;
-        }
-
         match &self {
             Self::Keyed(keyed_array) => keyed_array.parameters.is_none(),
             Self::List(list) => list.element_type.is_never(),

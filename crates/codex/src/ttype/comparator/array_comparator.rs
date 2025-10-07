@@ -32,12 +32,49 @@ pub(crate) fn is_array_contained_by_array(
     inside_assertion: bool,
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
-    if input_array.is_empty() {
-        return !container_array.is_non_empty();
+    if container_array.is_sealed() && !input_array.is_sealed() {
+        return false;
     }
 
     if container_array.is_non_empty() && !input_array.is_non_empty() {
         return false;
+    }
+
+    if input_array.is_empty() {
+        match container_array {
+            TArray::List(list) => {
+                if list.non_empty {
+                    return false;
+                }
+
+                let Some(known_elements) = &list.known_elements else {
+                    return true;
+                };
+
+                for (_, (is_optional, _)) in known_elements.iter() {
+                    if !*is_optional {
+                        return false;
+                    }
+                }
+            }
+            TArray::Keyed(keyed_array) => {
+                if keyed_array.non_empty {
+                    return false;
+                }
+
+                let Some(known_items) = &keyed_array.known_items else {
+                    return true;
+                };
+
+                for (_, (is_optional, _)) in known_items.iter() {
+                    if !*is_optional {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     let container_key_type;
@@ -156,23 +193,17 @@ pub(crate) fn is_array_contained_by_array(
         }
     }
 
-    // Check if container has optional properties that input doesn't explicitly have
-    // but input is unsealed (has parameters), we need to ensure the input's
-    // parameter value type is compatible with any missing optional properties
-    if let Some(container_known_items) = &container_known_items
-        && !input_value_type.is_never()
-    {
-        // Input is unsealed (has parameters)
+    if let Some(container_known_items) = &container_known_items {
         for (container_key, (container_is_optional, container_item_value_type)) in container_known_items.iter() {
-            // If container has an optional property that input doesn't explicitly have
-            if *container_is_optional {
-                let input_has_explicit_key =
+            if !*container_is_optional {
+                let input_has_key =
                     input_known_items_cow.as_ref().is_some_and(|items| items.contains_key(container_key));
 
-                if !input_has_explicit_key {
-                    // Input doesn't have this key explicitly, but since input is unsealed,
-                    // it could have this key with input_value_type.
-                    // We need to check if input_value_type is compatible with container_item_value_type
+                if !input_has_key {
+                    if input_value_type.is_never() {
+                        return false;
+                    }
+
                     if !union_comparator::is_contained_by(
                         codebase,
                         &input_value_type,
@@ -218,4 +249,272 @@ pub(crate) fn is_array_contained_by_array(
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use mago_atom::atom;
+
+    use crate::ttype::atomic::TAtomic;
+    use crate::ttype::atomic::array::TArray;
+    use crate::ttype::atomic::array::key::ArrayKey;
+    use crate::ttype::atomic::array::keyed::TKeyedArray;
+    use crate::ttype::comparator::ComparisonResult;
+    use crate::ttype::comparator::tests::assert_is_contained_by;
+    use crate::ttype::comparator::tests::create_test_codebase;
+    use crate::ttype::get_arraykey;
+    use crate::ttype::get_int;
+    use crate::ttype::get_literal_string;
+    use crate::ttype::get_mixed;
+    use crate::ttype::get_string;
+    use crate::ttype::union::TUnion;
+
+    fn t_keyed(arr: TKeyedArray) -> TUnion {
+        TUnion::from_atomic(TAtomic::Array(TArray::Keyed(arr)))
+    }
+
+    #[test]
+    fn test_sealed_array_missing_required_key_in_unsealed_container() {
+        let codebase = create_test_codebase("<?php");
+
+        // array{'foo': 'bar'}
+        let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([(
+            ArrayKey::String(atom("foo")),
+            (false, get_literal_string(atom("bar"))),
+        )])));
+
+        // array{'required_field': string, ...<array-key, mixed>}
+        let container = t_keyed(
+            TKeyedArray::new()
+                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("required_field")), (false, get_string()))]))
+                .with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())),
+        );
+
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_subset_contained_in_superset_with_optional() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string}
+        let input = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        // array{'a': string, 'b'?: int}
+        let container = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
+            (ArrayKey::String(atom("a")), (false, get_string())),
+            (ArrayKey::String(atom("b")), (true, get_int())),
+        ])));
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_superset_not_contained_in_subset() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string, 'b'?: int}
+        let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
+            (ArrayKey::String(atom("a")), (false, get_string())),
+            (ArrayKey::String(atom("b")), (true, get_int())),
+        ])));
+        // array{'a': string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_empty_sealed_array_contained_in_optional_shape() {
+        let codebase = create_test_codebase("<?php");
+        // array{}
+        let input = t_keyed(TKeyedArray::new());
+        // array{'a'?: string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (true, get_string()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_empty_sealed_array_not_contained_in_required_shape() {
+        let codebase = create_test_codebase("<?php");
+        // array{}
+        let input = t_keyed(TKeyedArray::new());
+        // array{'a': string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_optional_property_does_not_satisfy_required() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a'?: string}
+        let input = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (true, get_string()))])),
+        );
+        // array{'a': string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_compatible_generics() {
+        let codebase = create_test_codebase("<?php");
+        // array<string, int>
+        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        // array<array-key, mixed>
+        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())));
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_incompatible_value_generic() {
+        let codebase = create_test_codebase("<?php");
+        // array<string, int>
+        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        // array<array-key, string>
+        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_incompatible_key_generic() {
+        let codebase = create_test_codebase("<?php");
+        // array<array-key, int>
+        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_int())));
+        // array<string, int>
+        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_contained_in_compatible_unsealed() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string}
+        let input = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        // array<array-key, mixed>
+        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())));
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_not_contained_in_incompatible_unsealed() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string}
+        let input = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        // array<array-key, int>
+        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_int())));
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_contained_in_compatible_mixed() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string, 'b': int}
+        let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
+            (ArrayKey::String(atom("a")), (false, get_string())),
+            (ArrayKey::String(atom("b")), (false, get_int())),
+        ])));
+        // array{'a': string, ...<array-key, int>}
+        let container = t_keyed(
+            TKeyedArray::new()
+                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_parameters(Box::new(get_arraykey()), Box::new(get_int())),
+        );
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_sealed_not_contained_in_incompatible_mixed() {
+        let codebase = create_test_codebase("<?php");
+        // array{'a': string, 'b': string}
+        let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
+            (ArrayKey::String(atom("a")), (false, get_string())),
+            (ArrayKey::String(atom("b")), (false, get_string())),
+        ])));
+        // array{'a': string, ...<array-key, int>}
+        let container = t_keyed(
+            TKeyedArray::new()
+                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_parameters(Box::new(get_arraykey()), Box::new(get_int())),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_does_not_satisfy_required_sealed() {
+        let codebase = create_test_codebase("<?php");
+        // array<array-key, string>
+        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        // array{'a': string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_does_not_satisfy_incompatible_sealed() {
+        let codebase = create_test_codebase("<?php");
+        // array<array-key, string>
+        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        // array{'a': int}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_int()))])),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_non_empty_array_is_subtype_of_array() {
+        let codebase = create_test_codebase("<?php");
+        // non-empty-array<array-key, mixed>
+        let input = t_keyed(
+            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(true),
+        );
+        // array<array-key, mixed>
+        let container = t_keyed(
+            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+        );
+        assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_array_is_not_subtype_of_non_empty_array() {
+        let codebase = create_test_codebase("<?php");
+        // array<array-key, mixed>
+        let input = t_keyed(
+            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+        );
+        // non-empty-array<array-key, mixed>
+        let container = t_keyed(
+            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(true),
+        );
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_potentially_empty_array_not_contained_in_definitely_non_empty() {
+        let codebase = create_test_codebase("<?php");
+        // array<array-key, mixed>
+        let input = t_keyed(
+            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+        );
+        // array{'a': string}
+        let container = t_keyed(
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+        );
+
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
 }

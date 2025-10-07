@@ -83,7 +83,7 @@ std::thread_local! {
                             ))),
                         ])),
                     )
-                    .to_non_empty(),
+                    .with_non_empty(true),
                 )),
             ])),
         )))));

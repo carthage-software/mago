@@ -65,6 +65,8 @@ mod tests {
     use mago_syntax::parser::parse_file;
 
     use crate::metadata::CodebaseMetadata;
+    use crate::populator::populate_codebase;
+    use crate::reference::SymbolReferences;
     use crate::scanner::scan_program;
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::object::TObject;
@@ -72,7 +74,7 @@ mod tests {
     use crate::ttype::comparator::union_comparator::is_contained_by;
     use crate::ttype::union::TUnion;
 
-    fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
+    pub(crate) fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
         let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
         let database = Database::single(file);
 
@@ -86,7 +88,21 @@ mod tests {
             codebase.extend(program_codebase);
         }
 
+        populate_codebase(&mut codebase, &mut SymbolReferences::new(), Default::default(), Default::default());
+
         codebase
+    }
+
+    pub(crate) fn assert_is_contained_by(
+        codebase: &CodebaseMetadata,
+        input: &TUnion,
+        container: &TUnion,
+        expected: bool,
+        comparison_result: &mut ComparisonResult,
+    ) {
+        let is_contained_by = is_contained_by(codebase, input, container, false, false, false, comparison_result);
+
+        assert_eq!(is_contained_by, expected);
     }
 
     #[test]
