@@ -73,6 +73,7 @@ pub struct RulesSettings {
     pub no_redundant_continue: RuleSettings<NoRedundantContinueConfig>,
     pub no_redundant_block: RuleSettings<NoRedundantBlockConfig>,
     pub no_redundant_use: RuleSettings<NoRedundantUseConfig>,
+    pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,
     pub no_noop: RuleSettings<NoNoopConfig>,
     pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,

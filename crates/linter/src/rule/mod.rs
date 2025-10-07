@@ -184,6 +184,7 @@ define_rules! {
     NoRedundantContinue(no_redundant_continue @ NoRedundantContinueRule),
     NoRedundantBlock(no_redundant_block @ NoRedundantBlockRule),
     NoRedundantUse(no_redundant_use @ NoRedundantUseRule),
+    NoProtectedInFinal(no_protected_in_final @ NoProtectedInFinalRule),
     NoPhpTagTerminator(no_php_tag_terminator @ NoPhpTagTerminatorRule),
     NoNoop(no_noop @ NoNoopRule),
     NoMultiAssignments(no_multi_assignments @ NoMultiAssignmentsRule),
