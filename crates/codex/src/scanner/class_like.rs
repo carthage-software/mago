@@ -1058,10 +1058,11 @@ fn scan_class_like<'ctx, 'arena>(
                                     TraitUseMethodReference::Absolute(reference) => reference.method_name.value,
                                 });
 
-                                if let Some(alias) = &adaptation.alias {
-                                    let lowercase_alias = ascii_lowercase_atom(alias.value);
+                                let method_alias =
+                                    adaptation.alias.as_ref().map(|alias| ascii_lowercase_atom(alias.value));
 
-                                    class_like_metadata.add_trait_alias(method_name, lowercase_alias);
+                                if let Some(alias) = method_alias {
+                                    class_like_metadata.add_trait_alias(method_name, alias);
                                 }
 
                                 if let Some(visibility) = &adaptation.visibility {
@@ -1070,7 +1071,11 @@ fn scan_class_like<'ctx, 'arena>(
                                         Modifier::Protected(_) => Visibility::Protected,
                                         Modifier::Private(_) => Visibility::Private,
                                         Modifier::Final(_) => {
-                                            class_like_metadata.trait_final_map.insert(method_name);
+                                            if let Some(method_alias) = method_alias {
+                                                class_like_metadata.trait_final_map.insert(method_alias);
+                                            } else {
+                                                class_like_metadata.trait_final_map.insert(method_name);
+                                            }
 
                                             continue;
                                         }
@@ -1079,7 +1084,11 @@ fn scan_class_like<'ctx, 'arena>(
                                         }
                                     };
 
-                                    class_like_metadata.add_trait_visibility(method_name, visibility);
+                                    if let Some(method_alias) = method_alias {
+                                        class_like_metadata.add_trait_visibility(method_alias, visibility);
+                                    } else {
+                                        class_like_metadata.add_trait_visibility(method_name, visibility);
+                                    }
                                 }
                             }
                         }

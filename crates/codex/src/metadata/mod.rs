@@ -32,6 +32,7 @@ use crate::symbol::Symbols;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::union::TUnion;
+use crate::visibility::Visibility;
 
 pub mod attribute;
 pub mod class_like;
@@ -531,6 +532,7 @@ impl CodebaseMetadata {
     pub fn get_declaring_method_class(&self, class: &str, method: &str) -> Option<Atom> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
+
         self.class_likes
             .get(&lowercase_class)?
             .declaring_method_ids
@@ -625,7 +627,7 @@ impl CodebaseMetadata {
     /// the visibility is stored in the class's `trait_visibility_map`. This method checks that map first,
     /// then falls back to the method's declared visibility.
     #[inline]
-    pub fn get_method_visibility(&self, class: &str, method: &str) -> Option<crate::visibility::Visibility> {
+    pub fn get_method_visibility(&self, class: &str, method: &str) -> Option<Visibility> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
 
@@ -637,7 +639,8 @@ impl CodebaseMetadata {
         }
 
         // Fall back to the method's declared visibility
-        let identifier = (lowercase_class, lowercase_method);
+        let declaring_class = self.get_declaring_method_class(class, method)?;
+        let identifier = (declaring_class, lowercase_method);
 
         self.function_likes
             .get(&identifier)

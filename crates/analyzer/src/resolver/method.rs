@@ -311,7 +311,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             context,
             block_context,
             &class_metadata.original_name,
-            method_id.get_method_name(),
+            &method_name,
             access_span,
             Some(selector.span()),
         ) {

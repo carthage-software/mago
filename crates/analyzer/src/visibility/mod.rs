@@ -1,7 +1,6 @@
 use mago_atom::Atom;
 use mago_atom::atom;
 
-use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 
 use mago_codex::visibility::Visibility;
@@ -37,12 +36,9 @@ pub fn check_method_visibility<'ctx, 'arena>(
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool {
-    let mut method_id = MethodIdentifier::new(atom(fqcn), atom(method_name));
-    if !context.codebase.method_identifier_exists(&method_id) {
-        method_id = context.codebase.get_declaring_method_identifier(&method_id);
-    }
+    let declaring_class = context.codebase.get_declaring_method_class(fqcn, method_name).unwrap_or_else(|| atom(fqcn));
 
-    let Some(method_metadata) = context.codebase.get_method_by_id(&method_id) else {
+    let Some(method_metadata) = context.codebase.get_declaring_method(fqcn, method_name) else {
         return true;
     };
 
@@ -55,17 +51,15 @@ pub fn check_method_visibility<'ctx, 'arena>(
         return true;
     }
 
-    let declaring_class_id = method_id.get_class_name();
-
     let is_visible =
-        is_visible_from_scope(context, visibility, declaring_class_id, block_context.scope.get_class_like_name());
+        is_visible_from_scope(context, visibility, &declaring_class, block_context.scope.get_class_like_name());
 
     if !is_visible {
         let declaring_class_name = context
             .codebase
-            .get_class_like(declaring_class_id)
+            .get_class_like(&declaring_class)
             .map(|metadata| metadata.original_name)
-            .unwrap_or_else(|| *declaring_class_id);
+            .unwrap_or_else(|| declaring_class);
 
         let issue_title =
             format!("Cannot access {} method `{}::{}`.", visibility.as_str(), declaring_class_name, method_name);
