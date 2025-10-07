@@ -214,6 +214,54 @@ echo "Hello, world!";
 ```
 
 
+## <a id="no-protected-in-final"></a>`no-noop`
+
+Detects `protected` visibility in final classes and enums.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+final class Foo {
+    private string $foo;
+    private(set) string $bar;
+    private string $baz;
+
+    private function fun(): void {
+        // ...
+    }
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+final class Foo {
+    protected string $foo;
+    protected(set) string $bar;
+    protected private(set) string $baz;
+
+    protected function fun(): void {
+        // ...
+    }
+}
+;
+```
+
+
 ## <a id="no-redundant-block"></a>`no-redundant-block`
 
 Detects redundant blocks around statements.
