@@ -17,6 +17,7 @@ use mago_syntax::ast::*;
 
 use crate::category::Category;
 use crate::context::LintContext;
+use crate::integration::Integration;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
@@ -98,6 +99,16 @@ impl LintRule for NoRedundantUseRule {
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let Node::Program(program) = node else { return };
 
+        let mut check_inline_mentions = false;
+
+        // If `tempest` integration is enabled, and this file ends with `.view.php`,
+        // check inline mentions as well.
+        if ctx.integration.contains(Integration::Tempest)
+            && ctx.source_file.path.as_ref().and_then(|p| p.to_str()).is_some_and(|s| s.ends_with(".view.php"))
+        {
+            check_inline_mentions = true;
+        }
+
         let use_declarations = utils::collect_use_declarations(program);
         if use_declarations.is_empty() {
             return;
@@ -105,6 +116,8 @@ impl LintRule for NoRedundantUseRule {
 
         let used_fqns = utils::build_used_fqn_set(ctx);
         let docblocks = utils::get_docblocks(program);
+        let inline_contents =
+            if check_inline_mentions { utils::get_inline_contents(program) } else { Vec::with_capacity(0) };
 
         let grouped_by_parent = use_declarations.into_iter().fold(HashMap::new(), |mut acc, decl| {
             acc.entry(decl.parent_stmt.span()).or_insert_with(Vec::new).push(decl);
@@ -113,8 +126,10 @@ impl LintRule for NoRedundantUseRule {
 
         for (_, decls) in grouped_by_parent.iter() {
             let total_items = decls.len();
-            let unused_items: Vec<_> =
-                decls.iter().filter(|decl| !utils::is_item_used(decl, &used_fqns, &docblocks)).collect();
+            let unused_items: Vec<_> = decls
+                .iter()
+                .filter(|decl| !utils::is_item_used(decl, &used_fqns, &docblocks, &inline_contents))
+                .collect();
 
             if unused_items.is_empty() {
                 continue;
@@ -186,6 +201,7 @@ impl LintRule for NoRedundantUseRule {
 
 mod utils {
     use mago_atom::concat_atom;
+    use mago_syntax::walker::MutWalker;
 
     use super::*;
 
@@ -268,10 +284,19 @@ mod utils {
         }
     }
 
-    pub(super) fn is_item_used(decl: &UseDeclaration<'_>, used_fqns: &AtomSet, docblocks: &Vec<&str>) -> bool {
+    pub(super) fn is_item_used(
+        decl: &UseDeclaration<'_>,
+        used_fqns: &AtomSet,
+        docblocks: &Vec<&str>,
+        inline_contents: &Vec<&str>,
+    ) -> bool {
         let alias = get_alias(decl.item);
 
         if docblocks.iter().any(|doc| doc.contains(alias.as_str())) {
+            return true;
+        }
+
+        if inline_contents.iter().any(|content| content.contains(alias.as_str())) {
             return true;
         }
 
@@ -294,6 +319,22 @@ mod utils {
 
     pub(super) fn get_docblocks<'arena>(program: &Program<'arena>) -> Vec<&'arena str> {
         program.trivia.iter().filter(|t| t.kind.is_docblock()).map(|t| t.value).collect()
+    }
+
+    pub(super) fn get_inline_contents<'arena>(program: &Program<'arena>) -> Vec<&'arena str> {
+        struct InlineWalker<'arena> {
+            contents: Vec<&'arena str>,
+        }
+
+        impl<'arena> MutWalker<'_, 'arena, ()> for InlineWalker<'arena> {
+            fn walk_in_inline(&mut self, inline: &'_ Inline<'arena>, _: &mut ()) {
+                self.contents.push(inline.value);
+            }
+        }
+
+        let mut walker = InlineWalker { contents: Vec::new() };
+        walker.walk_program(program, &mut ());
+        walker.contents
     }
 
     pub(super) fn build_used_fqn_set<'arena>(ctx: &LintContext<'_, 'arena>) -> AtomSet {
