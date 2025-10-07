@@ -195,10 +195,9 @@ pub(crate) fn is_array_contained_by_array(
 
     if let Some(container_known_items) = &container_known_items {
         for (container_key, (container_is_optional, container_item_value_type)) in container_known_items.iter() {
-            if !*container_is_optional {
-                let input_has_key =
-                    input_known_items_cow.as_ref().is_some_and(|items| items.contains_key(container_key));
+            let input_has_key = input_known_items_cow.as_ref().is_some_and(|items| items.contains_key(container_key));
 
+            if !*container_is_optional {
                 if !input_has_key {
                     if input_value_type.is_never() {
                         return false;
@@ -215,6 +214,20 @@ pub(crate) fn is_array_contained_by_array(
                     ) {
                         return false;
                     }
+                }
+            } else if !input_has_key {
+                if !input_value_type.is_never()
+                    && !union_comparator::is_contained_by(
+                        codebase,
+                        &input_value_type,
+                        container_item_value_type,
+                        false,
+                        false,
+                        inside_assertion,
+                        atomic_comparison_result,
+                    )
+                {
+                    return false;
                 }
             }
         }
@@ -515,6 +528,32 @@ mod tests {
             TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
         );
 
+        assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
+    }
+
+    #[test]
+    fn test_unsealed_input_with_conflicting_optional_key_in_container() {
+        let codebase = create_test_codebase("<?php");
+
+        // input: array{'a': string, ...<array-key, string>}
+        let input = t_keyed(
+            TKeyedArray::new()
+                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_parameters(Box::new(get_arraykey()), Box::new(get_string())),
+        );
+
+        // container: array{'a': string, 'b'?: int, ...<array-key, mixed>}
+        let container = t_keyed(
+            TKeyedArray::new()
+                .with_known_items(BTreeMap::from([
+                    (ArrayKey::String(atom("a")), (false, get_string())),
+                    (ArrayKey::String(atom("b")), (true, get_int())),
+                ]))
+                .with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())),
+        );
+
+        // This should be false, because input could have a key 'b' which would be a string,
+        // but the container requires 'b' to be an int.
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
 }
