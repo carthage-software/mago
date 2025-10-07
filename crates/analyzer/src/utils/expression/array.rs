@@ -179,9 +179,6 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     index_type,
                     in_assignment,
                     &mut has_valid_expected_index,
-                    context.settings.allow_possibly_undefined_array_keys
-                        || block_context.inside_isset
-                        || block_context.inside_unset,
                     &mut possibly_undefined,
                     &mut false,
                     &mut expected_index_types,
@@ -414,8 +411,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
                 if *actual_possibly_undefined {
                     resulting_type.set_possibly_undefined(true, None);
 
-                    if !context.settings.allow_possibly_undefined_array_keys
-                        && !block_context.inside_isset
+                    if !block_context.inside_isset
                         && !block_context.inside_unset
                         && !in_assignment
                         && let Some(span) = span
@@ -527,7 +523,6 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     index_type: &TUnion,
     in_assignment: bool,
     has_valid_expected_index: &mut bool,
-    allow_possibly_undefined: bool,
     has_possibly_undefined: &mut bool,
     has_matching_dict_key: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
@@ -572,7 +567,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                 let expression_type = actual_value;
                 if actual_possibly_undefined {
                     *has_possibly_undefined = true;
-                    if !in_assignment && !allow_possibly_undefined {
+                    if !in_assignment && !block_context.inside_isset && !block_context.inside_unset {
                         context.collector.report_with_code(
                             match &array_key {
                                 ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
@@ -702,7 +697,11 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             if !in_assignment {
                 *has_possibly_undefined = true;
 
-                if !allow_possibly_undefined && index_type.get_single_array_key().is_some() {
+                if !context.settings.allow_possibly_undefined_array_keys
+                    && !block_context.inside_isset
+                    && !block_context.inside_unset
+                    && index_type.get_single_array_key().is_some()
+                {
                     let index_type_str = index_type.get_id();
 
                     context.collector.report_with_code(
