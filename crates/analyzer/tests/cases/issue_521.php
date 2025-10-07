@@ -21,7 +21,3 @@ function get_resources(string $path = PATH): array
 
 var_dump(get_resources(PATH));
 var_dump(get_resources(Foo::PATH));
-
-Mago\inspect(__LINE__);
-Mago\inspect(__FILE__);
-Mago\inspect(__DIR__);
