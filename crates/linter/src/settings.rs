@@ -68,6 +68,7 @@ pub struct RulesSettings {
     pub no_redundant_math: RuleSettings<NoRedundantMathConfig>,
     pub no_redundant_label: RuleSettings<NoRedundantLabelConfig>,
     pub no_redundant_final: RuleSettings<NoRedundantFinalConfig>,
+    pub no_redundant_readonly: RuleSettings<NoRedundantReadonlyConfig>,
     pub no_redundant_file: RuleSettings<NoRedundantFileConfig>,
     pub no_redundant_continue: RuleSettings<NoRedundantContinueConfig>,
     pub no_redundant_block: RuleSettings<NoRedundantBlockConfig>,

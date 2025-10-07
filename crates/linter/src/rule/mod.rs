@@ -179,6 +179,7 @@ define_rules! {
     NoRedundantMath(no_redundant_math @ NoRedundantMathRule),
     NoRedundantLabel(no_redundant_label @ NoRedundantLabelRule),
     NoRedundantFinal(no_redundant_final @ NoRedundantFinalRule),
+    NoRedundantReadonly(no_redundant_readonly @ NoRedundantReadonlyRule),
     NoRedundantFile(no_redundant_file @ NoRedundantFileRule),
     NoRedundantContinue(no_redundant_continue @ NoRedundantContinueRule),
     NoRedundantBlock(no_redundant_block @ NoRedundantBlockRule),
