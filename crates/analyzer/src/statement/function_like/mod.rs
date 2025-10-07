@@ -186,6 +186,64 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     Ok(artifacts)
 }
 
+/// Retrieves @param type from parent method docblocks for a specific parameter.
+///
+/// This function supports docblock inheritance: when a child class method doesn't have a type
+/// for a parameter, it will inherit the type from parent class/interface methods.
+///
+/// # Arguments
+///
+/// * `context`: The main analysis context, providing access to the codebase metadata
+/// * `block_context`: The current block context containing scope information
+/// * `parameter_name`: The name of the parameter (e.g., "$callback")
+///
+/// # Returns
+///
+/// An `Option<&TypeMetadata>` containing the inherited type from parent method, if found
+fn get_inherited_parameter_type<'ctx>(
+    context: &Context<'ctx, '_>,
+    block_context: &BlockContext<'ctx>,
+    parameter_name: &str,
+) -> Option<&'ctx TypeMetadata> {
+    // Check if we're in a method context
+    let function_like = block_context.scope.get_function_like()?;
+    let class_like = block_context.scope.get_class_like()?;
+    let method_name = function_like.name?;
+
+    // Get parent methods that this method overrides
+    let parent_method_map = class_like.overridden_method_ids.get(&method_name)?;
+
+    // Prioritize: direct parent class first, then interfaces
+    let mut parent_methods: Vec<_> = parent_method_map.iter().collect();
+    parent_methods.sort_by_key(|(parent_class, _)| {
+        // Direct parent class comes first
+        if Some(**parent_class) == class_like.direct_parent_class { 0 } else { 1 }
+    });
+
+    // Look for the parameter in parent methods
+    for (parent_class, parent_method_id) in parent_methods {
+        let parent_method_name = parent_method_id.get_method_name();
+
+        // Look up parent method metadata
+        let Some(parent_method_metadata) = context.codebase.function_likes.get(&(*parent_class, *parent_method_name))
+        else {
+            continue;
+        };
+
+        // Find the parameter by name
+        for param_metadata in &parent_method_metadata.parameters {
+            if param_metadata.get_name().0 == parameter_name {
+                // Return the type from parent's @param tag if it exists
+                if param_metadata.type_metadata.is_some() {
+                    return param_metadata.type_metadata.as_ref();
+                }
+            }
+        }
+    }
+
+    None
+}
+
 fn add_parameter_types_to_context<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
@@ -197,7 +255,11 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
 
-        let declared_parameter_type = if let Some(type_metadata) = parameter_metadata.get_type_metadata() {
+        let declared_parameter_type = if let Some(inherited_type_metadata) =
+            get_inherited_parameter_type(context, block_context, &parameter_variable_str.to_string())
+        {
+            expand_type_metadata(context, block_context, artifacts, function_like_metadata, inherited_type_metadata)
+        } else if let Some(type_metadata) = parameter_metadata.get_type_metadata() {
             expand_type_metadata(context, block_context, artifacts, function_like_metadata, type_metadata)
         } else {
             get_mixed()
