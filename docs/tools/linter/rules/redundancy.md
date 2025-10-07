@@ -14,6 +14,7 @@ This document details the rules available in the `Redundancy` category.
 | No Empty Comment | [`no-empty-comment`](#no-empty-comment) |
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
 | No Noop | [`no-noop`](#no-noop) |
+| No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
 | No Redundant Block | [`no-redundant-block`](#no-redundant-block) |
 | No Redundant Continue | [`no-redundant-continue`](#no-redundant-continue) |
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
@@ -25,6 +26,7 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant Parentheses | [`no-redundant-parentheses`](#no-redundant-parentheses) |
 | No Redundant Readonly | [`no-redundant-readonly`](#no-redundant-readonly) |
 | No Redundant String Concat | [`no-redundant-string-concat`](#no-redundant-string-concat) |
+| No Redundant Use | [`no-redundant-use`](#no-redundant-use) |
 | No Redundant Write Visibility | [`no-redundant-write-visibility`](#no-redundant-write-visibility) |
 
 
@@ -214,9 +216,9 @@ echo "Hello, world!";
 ```
 
 
-## <a id="no-protected-in-final"></a>`no-noop`
+## <a id="no-protected-in-final"></a>`no-protected-in-final`
 
-Detects `protected` visibility in final classes and enums.
+Detects `protected` items in final classes or enums.
 
 
 
@@ -242,6 +244,7 @@ final class Foo {
     private function fun(): void {
         // ...
     }
+}
 ```
 
 #### Incorrect code
@@ -258,7 +261,6 @@ final class Foo {
         // ...
     }
 }
-;
 ```
 
 
@@ -628,7 +630,7 @@ $foo = (42);
 
 ## <a id="no-redundant-readonly"></a>`no-redundant-readonly`
 
-Detects redundant `readonly` modifiers on properties in readonly classes.
+Detects redundant readonly modifiers on properties.
 
 
 
@@ -646,7 +648,8 @@ Detects redundant `readonly` modifiers on properties in readonly classes.
 ```php
 <?php
 
-readonly class User {
+readonly class User
+{
     public $name;
 }
 ```
@@ -656,7 +659,8 @@ readonly class User {
 ```php
 <?php
 
-readonly class User {
+readonly class User
+{
     public readonly $name;
 }
 ```
@@ -691,6 +695,45 @@ $foo = "Hello World";
 <?php
 
 $foo = "Hello" . " World";
+```
+
+
+## <a id="no-redundant-use"></a>`no-redundant-use`
+
+Detects `use` statements that import items that are never used.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+namespace App;
+
+use App\Helpers\ArrayHelper;
+
+$result = ArrayHelper::combine([]);
+```
+
+#### Incorrect code
+
+```php
+<?php
+namespace App;
+
+use App\Helpers\ArrayHelper;
+use App\Helpers\StringHelper; // StringHelper is not used.
+
+$result = ArrayHelper::combine([]);
 ```
 
 
