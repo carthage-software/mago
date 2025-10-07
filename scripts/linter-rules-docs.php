@@ -15,8 +15,6 @@ use Exception;
 use RuntimeException;
 
 use function array_diff;
-use function array_keys;
-use function array_values;
 use function count;
 use function dirname;
 use function file_put_contents;
@@ -37,13 +35,9 @@ use function rtrim;
 use function scandir;
 use function shell_exec;
 use function sprintf;
-use function str_contains;
-use function str_ends_with;
 use function str_replace;
-use function str_starts_with;
 use function strtolower;
 use function trim;
-use function ucwords;
 use function unlink;
 use function usort;
 

@@ -1,12 +1,18 @@
+use std::collections::HashMap;
+use std::ops::Range;
+
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
-use mago_span::HasSpan;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::Atom;
+use mago_atom::AtomSet;
+use mago_atom::atom;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
+use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
 use crate::category::Category;
@@ -37,7 +43,7 @@ impl Default for NoRedundantUseConfig {
 
 impl Config for NoRedundantUseConfig {
     fn default_enabled() -> bool {
-        // TODO(azjezz): enable this in the next major release.
+        // TODO(azjezz): enable this rule by default in the next major release.
         false
     }
 
@@ -69,7 +75,7 @@ impl LintRule for NoRedundantUseRule {
                 namespace App;
 
                 use App\Helpers\ArrayHelper;
-                use App\Helpers\StringHelper;
+                use App\Helpers\StringHelper; // StringHelper is not used.
 
                 $result = ArrayHelper::combine([]);
             "#},
@@ -90,108 +96,265 @@ impl LintRule for NoRedundantUseRule {
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
-        let Node::Program(program) = node else {
+        let Node::Program(program) = node else { return };
+
+        let use_declarations = utils::collect_use_declarations(program);
+        if use_declarations.is_empty() {
             return;
-        };
+        }
 
-        let unused_items = utils::get_unused_items(program, ctx);
+        let used_fqns = utils::build_used_fqn_set(ctx);
+        let docblocks = utils::get_docblocks(program);
 
-        for span in unused_items {
-            let issue = Issue::new(self.cfg.level(), "Unused import.")
-                .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(span).with_message("Unused import"))
-                .with_help("Remove the unused import");
+        let grouped_by_parent = use_declarations.into_iter().fold(HashMap::new(), |mut acc, decl| {
+            acc.entry(decl.parent_stmt.span()).or_insert_with(Vec::new).push(decl);
+            acc
+        });
 
-            ctx.collector.propose(issue, |plan| {
-                plan.delete(span.to_range(), SafetyClassification::Safe);
-            });
+        for (_, decls) in grouped_by_parent.iter() {
+            let total_items = decls.len();
+            let unused_items: Vec<_> =
+                decls.iter().filter(|decl| !utils::is_item_used(decl, &used_fqns, &docblocks)).collect();
+
+            if unused_items.is_empty() {
+                continue;
+            }
+
+            let parent_stmt = unused_items[0].parent_stmt;
+            let Statement::Use(use_stmt) = parent_stmt else { continue };
+
+            if unused_items.len() == total_items {
+                if total_items == 1 {
+                    let unused_decl = unused_items[0];
+                    let alias = utils::get_alias(unused_decl.item);
+                    let issue = Issue::new(self.cfg.level(), format!("Unused import: `{}`.", alias))
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(unused_decl.item.name.span())
+                                .with_message(format!("`{}` is imported but never used.", alias)),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(use_stmt.r#use.span()).with_message("Unused `use` statement."),
+                        )
+                        .with_help("Remove the entire `use` statement.");
+
+                    ctx.collector.propose(issue, |plan| {
+                        plan.delete(parent_stmt.span().to_range(), SafetyClassification::Safe);
+                    });
+                } else {
+                    let issue = Issue::new(self.cfg.level(), "Redundant `use` statement.")
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(parent_stmt.span())
+                                .with_message("All symbols imported here are unused."),
+                        )
+                        .with_help("Remove the entire `use` statement.");
+
+                    ctx.collector.propose(issue, |plan| {
+                        plan.delete(parent_stmt.span().to_range(), SafetyClassification::Safe);
+                    });
+                }
+            } else {
+                let mut issue = Issue::new(self.cfg.level(), "Unused symbols in `use` statement.")
+                    .with_code(self.meta.code)
+                    .with_help("Remove the unused symbols from the import list.")
+                    .with_annotation(
+                        Annotation::secondary(use_stmt.r#use.span()).with_message("...in this `use` statement."),
+                    );
+
+                for unused_decl in &unused_items {
+                    let alias = utils::get_alias(unused_decl.item);
+                    issue = issue.with_annotation(
+                        Annotation::primary(unused_decl.item.span())
+                            .with_message(format!("`{}` is imported but never used.", alias)),
+                    );
+                }
+
+                ctx.collector.propose(issue, |plan| {
+                    for unused_decl in unused_items.iter().rev() {
+                        if let Some(delete_range) =
+                            utils::calculate_delete_range_for_item(parent_stmt, unused_decl.item)
+                        {
+                            plan.delete(delete_range, SafetyClassification::Safe);
+                        }
+                    }
+                });
+            }
         }
     }
 }
 
 mod utils {
+    use mago_atom::concat_atom;
+
     use super::*;
-    use std::collections::HashSet;
 
-    pub(super) fn get_unused_items<'arena>(
-        program: &'arena Program<'arena>,
-        ctx: &LintContext<'_, 'arena>,
-    ) -> Vec<mago_span::Span> {
-        let mut unused_items = Vec::new();
-        let resolved_names = get_resolved_names(ctx);
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    pub(super) enum ImportType {
+        ClassOrNamespace,
+        Function,
+        Constant,
+    }
 
-        for statement in program.statements.iter() {
-            match statement {
-                Statement::Use(use_stmt) => {
-                    unused_items.push(use_stmt.span());
+    #[derive(Debug, Clone)]
+    pub(super) struct UseDeclaration<'ast> {
+        pub parent_stmt: &'ast Statement<'ast>,
+        pub item: &'ast UseItem<'ast>,
+        pub import_type: ImportType,
+        pub fqn: Atom,
+    }
+
+    pub(super) fn collect_use_declarations<'ast>(program: &'ast Program<'ast>) -> Vec<UseDeclaration<'ast>> {
+        let mut declarations = Vec::new();
+        for stmt in program.statements.iter() {
+            if let Statement::Namespace(ns) = stmt {
+                for ns_stmt in ns.statements().iter() {
+                    collect_from_statement(ns_stmt, &mut declarations);
                 }
-                Statement::Namespace(namespace) => {
-                    for ns_statement in namespace.statements().nodes.iter() {
-                        if let Statement::Use(use_stmt) = ns_statement {
-                            if namespace.name.is_none() {
-                                unused_items.push(use_stmt.span());
-                            } else {
-                                let items: Vec<_> = use_items(&use_stmt.items).collect();
-                                let unused: Vec<_> =
-                                    items.iter().filter(|item| !is_item_used(program, item, &resolved_names)).collect();
+            } else {
+                collect_from_statement(stmt, &mut declarations);
+            }
+        }
+        declarations
+    }
 
-                                if unused.len() == items.len() {
-                                    unused_items.push(use_stmt.span());
-                                } else {
-                                    for item in unused {
-                                        unused_items.push(item.span());
-                                    }
-                                }
-                            }
-                        }
+    fn collect_from_statement<'ast>(stmt: &'ast Statement<'ast>, declarations: &mut Vec<UseDeclaration<'ast>>) {
+        if let Statement::Use(use_stmt) = stmt {
+            match &use_stmt.items {
+                UseItems::Sequence(s) => {
+                    let import_type = ImportType::ClassOrNamespace;
+                    for item in s.items.nodes.iter() {
+                        declarations.push(UseDeclaration {
+                            parent_stmt: stmt,
+                            item,
+                            import_type,
+                            fqn: atom(item.name.value()),
+                        });
                     }
                 }
-                _ => {}
+                UseItems::TypedSequence(s) => {
+                    let import_type = if s.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
+                    for item in s.items.nodes.iter() {
+                        declarations.push(UseDeclaration {
+                            parent_stmt: stmt,
+                            item,
+                            import_type,
+                            fqn: atom(item.name.value()),
+                        });
+                    }
+                }
+                UseItems::MixedList(list) => {
+                    let prefix = list.namespace.value();
+                    for i in list.items.nodes.iter() {
+                        let import_type = match i.r#type.as_ref() {
+                            Some(t) if t.is_function() => ImportType::Function,
+                            Some(t) if t.is_const() => ImportType::Constant,
+                            _ => ImportType::ClassOrNamespace,
+                        };
+                        let fqn = concat_atom!(prefix, "\\", i.item.name.value());
+                        declarations.push(UseDeclaration { parent_stmt: stmt, item: &i.item, import_type, fqn });
+                    }
+                }
+                UseItems::TypedList(list) => {
+                    let prefix = list.namespace.value();
+                    let import_type =
+                        if list.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
+                    for item in list.items.nodes.iter() {
+                        let fqn = concat_atom!(prefix, "\\", item.name.value());
+                        declarations.push(UseDeclaration { parent_stmt: stmt, item, import_type, fqn });
+                    }
+                }
+            };
+        }
+    }
+
+    pub(super) fn is_item_used(decl: &UseDeclaration<'_>, used_fqns: &AtomSet, docblocks: &Vec<&str>) -> bool {
+        let alias = get_alias(decl.item);
+
+        if docblocks.iter().any(|doc| doc.contains(alias.as_str())) {
+            return true;
+        }
+
+        if used_fqns.iter().any(|used| used.eq_ignore_ascii_case(decl.fqn.as_str())) {
+            return true;
+        }
+
+        if decl.import_type == ImportType::ClassOrNamespace {
+            let prefix = concat_atom!(decl.fqn, "\\");
+            if used_fqns
+                .iter()
+                .any(|used| used.as_str().to_ascii_lowercase().starts_with(&prefix.as_str().to_ascii_lowercase()))
+            {
+                return true;
             }
         }
 
-        unused_items
+        false
     }
 
-    fn use_items<'arena>(
-        items: &'arena UseItems<'arena>,
-    ) -> Box<dyn Iterator<Item = &'arena UseItem<'arena>> + 'arena> {
-        match items {
-            UseItems::Sequence(sequence) => Box::new(sequence.items.nodes.iter()),
-            UseItems::TypedSequence(sequence) => Box::new(sequence.items.nodes.iter()),
-            UseItems::TypedList(list) => Box::new(list.items.nodes.iter()),
-            UseItems::MixedList(list) => Box::new(list.items.nodes.iter().map(|typed_item| &typed_item.item)),
+    pub(super) fn get_docblocks<'arena>(program: &Program<'arena>) -> Vec<&'arena str> {
+        program.trivia.iter().filter(|t| t.kind.is_docblock()).map(|t| t.value).collect()
+    }
+
+    pub(super) fn build_used_fqn_set<'arena>(ctx: &LintContext<'_, 'arena>) -> AtomSet {
+        ctx.resolved_names.all().iter().map(|(_, (fqn, _))| atom(fqn)).collect()
+    }
+
+    pub(super) fn get_alias(item: &UseItem) -> Atom {
+        atom(item.alias.as_ref().map_or_else(|| item.name.last_segment(), |alias| alias.identifier.value))
+    }
+
+    pub(super) fn calculate_delete_range_for_item(
+        parent_stmt: &Statement,
+        item_to_delete: &UseItem,
+    ) -> Option<Range<u32>> {
+        let Statement::Use(use_stmt) = parent_stmt else { return None };
+
+        let items = match &use_stmt.items {
+            UseItems::Sequence(s) => &s.items,
+            UseItems::TypedSequence(s) => &s.items,
+            UseItems::TypedList(l) => &l.items,
+            UseItems::MixedList(l) => return find_range_in_mixed_list(l, item_to_delete),
+        };
+
+        let Some(index) = items.nodes.iter().position(|i| std::ptr::eq(i, item_to_delete)) else {
+            return Some(item_to_delete.span().to_range());
+        };
+
+        if items.nodes.len() == 1 {
+            return Some(parent_stmt.span().to_range());
         }
+
+        let delete_span = if index > 0 {
+            let comma_span = items.tokens[index - 1].span;
+            comma_span.join(item_to_delete.span())
+        } else {
+            let comma_span = items.tokens[index].span;
+            item_to_delete.span().join(comma_span)
+        };
+
+        Some(delete_span.to_range())
     }
 
-    fn extract_simple_name(name: &str) -> &str {
-        name.rsplit('\\').next().unwrap_or(name)
-    }
+    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Option<Range<u32>> {
+        let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&i.item, item_to_delete)) else {
+            return Some(item_to_delete.span().to_range());
+        };
 
-    fn is_item_used(program: &Program, item: &UseItem, resolved_names: &HashSet<String>) -> bool {
-        let identifier =
-            if let Some(alias) = &item.alias { alias.identifier.value } else { extract_simple_name(item.name.value()) };
+        if list.items.nodes.len() == 1 {
+            return Some(list.span().to_range());
+        }
 
-        resolved_names.contains(identifier)
-            || resolved_names.contains(item.name.value())
-            || is_used_in_docblocks(program, identifier)
-            || is_used_in_docblocks(program, item.name.value())
-    }
+        let typed_item_span = list.items.nodes[index].span();
 
-    fn is_used_in_docblocks(program: &Program, identifier: &str) -> bool {
-        program.trivia.iter().filter(|trivia| trivia.kind.is_docblock()).any(|trivia| trivia.value.contains(identifier))
-    }
+        let delete_span = if index > 0 {
+            let comma_span = list.items.tokens[index - 1].span;
+            comma_span.join(typed_item_span)
+        } else {
+            let comma_span = list.items.tokens[index].span;
+            typed_item_span.join(comma_span)
+        };
 
-    fn get_resolved_names<'arena>(ctx: &LintContext<'_, 'arena>) -> HashSet<String> {
-        ctx.resolved_names
-            .all()
-            .iter()
-            .flat_map(|(_, (resolved_name, _))| {
-                let full_name = resolved_name.to_string();
-                let simple_name = extract_simple_name(&full_name).to_string();
-                [full_name, simple_name]
-            })
-            .filter(|name| !name.is_empty())
-            .collect()
+        Some(delete_span.to_range())
     }
 }

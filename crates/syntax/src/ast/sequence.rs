@@ -4,9 +4,9 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec;
 use bumpalo::collections::vec::IntoIter;
 use bumpalo::vec;
-use mago_database::file::FileId;
 use serde::Serialize;
 
+use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;

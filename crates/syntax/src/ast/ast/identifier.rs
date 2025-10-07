@@ -67,6 +67,16 @@ impl<'arena> Identifier<'arena> {
             Identifier::FullyQualified(fully_qualified_identifier) => fully_qualified_identifier.value,
         }
     }
+
+    #[inline]
+    pub fn last_segment(&self) -> &'arena str {
+        let value = self.value();
+
+        match value.rfind('\\') {
+            Some(pos) => &value[pos + 1..],
+            None => value,
+        }
+    }
 }
 
 impl HasSpan for Identifier<'_> {

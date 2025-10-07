@@ -13,6 +13,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+mago-atom = { workspace = true }
 mago-fixer = { workspace = true }
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }

@@ -1616,6 +1616,7 @@ dependencies = [
  "ahash",
  "bumpalo",
  "indoc",
+ "mago-atom",
  "mago-casing",
  "mago-collector",
  "mago-database",

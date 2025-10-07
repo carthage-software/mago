@@ -215,20 +215,19 @@ pub(crate) fn is_array_contained_by_array(
                         return false;
                     }
                 }
-            } else if !input_has_key {
-                if !input_value_type.is_never()
-                    && !union_comparator::is_contained_by(
-                        codebase,
-                        &input_value_type,
-                        container_item_value_type,
-                        false,
-                        false,
-                        inside_assertion,
-                        atomic_comparison_result,
-                    )
-                {
-                    return false;
-                }
+            } else if !input_has_key
+                && !input_value_type.is_never()
+                && !union_comparator::is_contained_by(
+                    codebase,
+                    &input_value_type,
+                    container_item_value_type,
+                    false,
+                    false,
+                    inside_assertion,
+                    atomic_comparison_result,
+                )
+            {
+                return false;
             }
         }
     }

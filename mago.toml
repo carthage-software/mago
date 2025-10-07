@@ -12,6 +12,8 @@ kan-defect = { threshold = 1.9 }
 halstead = { effort-threshold = 7000 }
 literal-named-argument = { enabled = false }
 too-many-enum-cases = { threshold = 30 }
+# Enable disabled-by-default rules
+no-redundant-use = { enabled = true }
 
 [analyzer]
 allow-possibly-undefined-array-keys = false
