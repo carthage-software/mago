@@ -96,6 +96,15 @@ namespace {
         ;
     }
 
+    /**
+     * @param array{required_field: string, ...} $value
+     * @return array{required_field: string, ...}
+     */
+    function i_take_flexible_array(array $value): array
+    {
+        return $value;
+    }
+
     $array_type = Psl\Type\shape([
         'name' => Psl\Type\string(),
         'age' => Psl\Type\int(),
@@ -116,20 +125,16 @@ namespace {
         ]),
     ]);
 
+    $enum_type = Psl\Type\instance_of(Example::class);
+
     $flexible_type = Psl\Type\shape([
         'required_field' => Psl\Type\string(),
     ], true);
 
-    $flexible = $flexible_type->assert(get_mixed());
-
-    /* @mago-expect analysis:type-confirmation */
-    Mago\confirm($flexible, 'array{required_field: string, ...}');
-
-    $enum_type = Psl\Type\instance_of(Example::class);
-
     $array = $array_type->assert(get_mixed());
     $list = $list_type->assert(get_mixed());
     $enum = $enum_type->assert(get_mixed());
+    $flexible = $flexible_type->assert(get_mixed());
 
     i_take_string($array['name']);
     i_take_int($array['age']);
@@ -154,4 +159,7 @@ namespace {
     }
 
     i_take_enum($enum);
+
+    i_take_flexible_array($flexible);
+    i_take_string($flexible['required_field']);
 }
