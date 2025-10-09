@@ -16,6 +16,8 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::best_practices::is_call_forwarding;
+use crate::rule::utils::misc::get_single_return_statement;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -90,19 +92,22 @@ impl LintRule for PreferArrowFunctionRule {
             return;
         };
 
-        let statements = closure.body.statements.as_slice();
-        if statements.len() != 1 {
-            return;
-        }
-
-        let Statement::Return(Return {
-            r#return: return_keyword,
-            value: Some(returned_value),
-            terminator: return_terminator,
-        }) = &statements[0]
-        else {
+        let Some(return_statement) = get_single_return_statement(&closure.body) else {
             return;
         };
+
+        let Return { r#return: keyword, value: Some(value), terminator } = return_statement else {
+            return;
+        };
+
+        if ctx.registry.is_rule_enabled("prefer-first-class-callable")
+            && let Expression::Call(call) = value
+            && is_call_forwarding(&closure.parameter_list, call)
+        {
+            // If the "prefer-first-class-callable" rule is enabled,
+            // we skip reporting this issue to avoid overlapping suggestions.
+            return;
+        }
 
         let issue =
             Issue::new(self.cfg.level(), "This closure can be simplified to a more concise arrow function.")
@@ -111,7 +116,7 @@ impl LintRule for PreferArrowFunctionRule {
                     Annotation::primary(closure.function.span).with_message("This traditional closure..."),
                 )
                 .with_annotation(
-                    Annotation::secondary(returned_value.span())
+                    Annotation::secondary(value.span())
                         .with_message("...can be converted to an arrow function that implicitly returns this expression."),
                 )
                 .with_note("Arrow functions provide a more concise syntax for simple closures that do nothing but return an expression.")
@@ -121,10 +126,10 @@ impl LintRule for PreferArrowFunctionRule {
         ctx.collector.propose(issue, |plan| {
             let to_replace_with_fn = closure.function.span.to_range();
             let to_replace_with_arrow = match &closure.use_clause {
-                Some(use_clause) => use_clause.span().join(return_keyword.span).to_range(),
-                None => closure.body.left_brace.join(return_keyword.span).to_range(),
+                Some(use_clause) => use_clause.span().join(keyword.span).to_range(),
+                None => closure.body.left_brace.join(keyword.span).to_range(),
             };
-            let to_remove = return_terminator.span().join(closure.body.right_brace).to_range();
+            let to_remove = terminator.span().join(closure.body.right_brace).to_range();
 
             plan.replace(to_replace_with_fn, "fn", SafetyClassification::PotentiallyUnsafe);
             plan.replace(to_replace_with_arrow, "=>", SafetyClassification::PotentiallyUnsafe);

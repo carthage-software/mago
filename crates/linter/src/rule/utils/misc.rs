@@ -1,5 +1,20 @@
 use mago_syntax::ast::*;
 
+#[inline]
+pub fn get_single_return_statement<'ast, 'arena>(block: &'ast Block<'arena>) -> Option<&'ast Return<'arena>> {
+    let statements = block.statements.as_slice();
+
+    if statements.len() != 1 {
+        return None;
+    }
+
+    let Statement::Return(return_stmt) = &statements[0] else {
+        return None;
+    };
+
+    Some(return_stmt)
+}
+
 pub fn is_method_setter_or_getter<'ast, 'arena>(method: &'ast Method<'arena>) -> bool {
     let MethodBody::Concrete(block) = &method.body else {
         return false;

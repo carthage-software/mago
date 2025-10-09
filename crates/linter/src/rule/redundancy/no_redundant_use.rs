@@ -103,7 +103,7 @@ impl LintRule for NoRedundantUseRule {
 
         // If `tempest` integration is enabled, and this file ends with `.view.php`,
         // check inline mentions as well.
-        if ctx.integration.contains(Integration::Tempest)
+        if ctx.registry.is_integration_enabled(Integration::Tempest)
             && ctx.source_file.path.as_ref().and_then(|p| p.to_str()).is_some_and(|s| s.ends_with(".view.php"))
         {
             check_inline_mentions = true;

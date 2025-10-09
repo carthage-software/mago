@@ -1,5 +1,6 @@
 use mago_syntax::ast::NodeKind;
 
+use crate::integration::Integration;
 use crate::integration::IntegrationSet;
 use crate::rule::AnyRule;
 use crate::settings::Settings;
@@ -33,6 +34,18 @@ impl RuleRegistry {
             temp.into_iter().map(|v| Box::<[usize]>::leak(v.into_boxed_slice()) as &'static [usize]).collect();
 
         Self { integrations, rules, by_kind }
+    }
+
+    /// Checks if a specific rule is enabled in the registry.
+    #[inline]
+    pub fn is_rule_enabled(&self, code: &str) -> bool {
+        self.rules.iter().any(|r| r.name() == code)
+    }
+
+    /// Checks if a specific integration is enabled in the registry.
+    #[inline]
+    pub fn is_integration_enabled(&self, name: Integration) -> bool {
+        self.integrations.contains(name)
     }
 
     #[inline]

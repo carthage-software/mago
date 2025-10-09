@@ -80,22 +80,16 @@ impl<'arena> Linter<'arena> {
         // Set legacy rule code mappings for compatibility with the old linter.
         collector.set_aliases(LEGACY_RULE_CODE_MAPPINGS);
 
-        let mut context = LintContext::new(
-            self.php_version,
-            self.arena,
-            self.registry.integrations(),
-            source_file,
-            resolved_names,
-            collector,
-        );
+        let mut context =
+            LintContext::new(self.php_version, self.arena, &self.registry, source_file, resolved_names, collector);
 
-        walk(Node::Program(program), &mut context, &self.registry);
+        walk(Node::Program(program), &mut context);
 
         context.collector.finish()
     }
 }
 
-fn walk<'ctx, 'ast, 'arena>(node: Node<'ast, 'arena>, ctx: &mut LintContext<'ctx, 'arena>, reg: &RuleRegistry) {
+fn walk<'ctx, 'ast, 'arena>(node: Node<'ast, 'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);
@@ -103,16 +97,16 @@ fn walk<'ctx, 'ast, 'arena>(node: Node<'ast, 'arena>, ctx: &mut LintContext<'ctx
         in_scope = true;
     }
 
-    let rules_to_run = reg.for_kind(node.kind());
+    let rules_to_run = ctx.registry.for_kind(node.kind());
 
     for &rule_index in rules_to_run {
-        let rule = reg.rule(rule_index);
+        let rule = ctx.registry.rule(rule_index);
 
         rule.check(ctx, node);
     }
 
     for child in node.children() {
-        walk(child, ctx, reg);
+        walk(child, ctx);
     }
 
     if in_scope {

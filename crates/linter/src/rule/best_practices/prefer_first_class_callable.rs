@@ -16,6 +16,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::get_single_return_statement;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -159,7 +160,7 @@ impl LintRule for PreferFirstClassCallableRule {
     }
 }
 
-fn is_call_forwarding<'ast, 'arena>(
+pub(super) fn is_call_forwarding<'ast, 'arena>(
     parameter_list: &'ast FunctionLikeParameterList<'arena>,
     call: &'ast Call<'arena>,
 ) -> bool {
@@ -190,19 +191,4 @@ fn is_call_forwarding<'ast, 'arena>(
     // Same number of parameters and arguments, and all arguments are direct references to the corresponding parameters
     // -> it's a call forwarding
     true
-}
-
-#[inline]
-fn get_single_return_statement<'ast, 'arena>(block: &'ast Block<'arena>) -> Option<&'ast Return<'arena>> {
-    let statements = block.statements.as_slice();
-
-    if statements.len() != 1 {
-        return None;
-    }
-
-    let Statement::Return(return_stmt) = &statements[0] else {
-        return None;
-    };
-
-    Some(return_stmt)
 }
