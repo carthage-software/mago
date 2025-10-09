@@ -106,6 +106,11 @@ macro_rules! define_rules {
             }
 
             #[inline]
+            pub fn code(&self) -> &'static str {
+                self.meta().code
+            }
+
+            #[inline]
             pub fn default_level(&self) -> Level {
                 match self {
                     $( AnyRule::$variant(_) => <$rule as LintRule>::Config::default().level(), )*

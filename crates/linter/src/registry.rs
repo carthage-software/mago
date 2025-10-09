@@ -39,7 +39,7 @@ impl RuleRegistry {
     /// Checks if a specific rule is enabled in the registry.
     #[inline]
     pub fn is_rule_enabled(&self, code: &str) -> bool {
-        self.rules.iter().any(|r| r.name() == code)
+        self.rules.iter().any(|r| r.code() == code)
     }
 
     /// Checks if a specific integration is enabled in the registry.
