@@ -98,7 +98,6 @@
 }
 
 #mago-logo {
-    position: static;
     animation: float 6s ease-in-out infinite;
     transition: transform 0.3s ease-out;
 }
