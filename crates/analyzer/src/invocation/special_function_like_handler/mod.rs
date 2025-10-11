@@ -5,6 +5,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::special_function_like_handler::core::closure::GetCurrentClosureMethodHandler;
+use crate::invocation::special_function_like_handler::flow_php::type_component::TypeComponentFunctionsHandler as FlowPhpTypeComponentFunctionsHandler;
 use crate::invocation::special_function_like_handler::psl::regex_component::RegexComponentFunctionsHandler;
 use crate::invocation::special_function_like_handler::psl::str_component::StrComponentFunctionsHandler;
 use crate::invocation::special_function_like_handler::psl::type_component::TypeComponentFunctionsHandler;
@@ -14,6 +15,7 @@ use crate::invocation::special_function_like_handler::standard::array::ArrayFunc
 use crate::invocation::special_function_like_handler::standard::string::StringFunctionsHandler;
 
 mod core;
+mod flow_php;
 mod psl;
 mod random;
 mod spl;
@@ -51,6 +53,8 @@ pub fn handle_special_functions<'ctx, 'ast, 'arena>(
         &StrComponentFunctionsHandler,
         &TypeComponentFunctionsHandler,
         &RegexComponentFunctionsHandler,
+        // Flow-PHP specific function handlers
+        &FlowPhpTypeComponentFunctionsHandler,
     ];
 
     let function_like_identifier = invocation.target.get_function_like_identifier()?;
