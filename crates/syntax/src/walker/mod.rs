@@ -717,8 +717,8 @@ generate_ast_walker! {
         }
 
         walker.walk_local_identifier(&property_hook.name, context);
-        if let Some(parameters) = &property_hook.parameters {
-            walker.walk_function_like_parameter_list(parameters, context);
+        if let Some(parameter_list) = &property_hook.parameter_list {
+            walker.walk_function_like_parameter_list(parameter_list, context);
         }
 
         walker.walk_property_hook_body(&property_hook.body, context);

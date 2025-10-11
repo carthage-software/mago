@@ -9,7 +9,6 @@ use crate::document::*;
 use crate::internal::FormatterState;
 use crate::internal::format::assignment::AssignmentLikeNode;
 use crate::internal::format::assignment::print_assignment;
-use crate::internal::format::block::block_is_empty;
 use crate::internal::format::block::print_block_of_nodes;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
@@ -34,6 +33,7 @@ pub mod call_node;
 pub mod class_like;
 pub mod control_structure;
 pub mod expression;
+pub mod function_like;
 pub mod member_access;
 pub mod misc;
 pub mod parameters;
@@ -885,108 +885,6 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for Method<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, Method, {
-            let mut attributes = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
-                attributes.push(attribute_list.format(f));
-                attributes.push(Document::Line(Line::hard()));
-            }
-
-            let leading_comments = f.print_leading_comments(self.modifiers.first_span().unwrap_or(self.function.span));
-            let mut signature = print_modifiers(f, &self.modifiers);
-            if !signature.is_empty() {
-                signature.push(Document::space());
-            }
-
-            signature.push(self.function.format(f));
-            signature.push(Document::space());
-            if self.ampersand.is_some() {
-                signature.push(Document::String("&"));
-            }
-
-            signature.push(self.name.format(f));
-            let has_parameters_or_inner_parameter_comments =
-                !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
-
-            signature.push(self.parameter_list.format(f));
-            if let Some(return_type) = &self.return_type_hint {
-                signature.push(return_type.format(f));
-            }
-
-            let signature_id = f.next_id();
-            let signature_document = Document::Group(Group::new(signature).with_id(signature_id));
-
-            Document::Group(Group::new(vec![
-                in f.arena;
-                Document::Group(Group::new(attributes)),
-                leading_comments.unwrap_or_else(Document::empty),
-                signature_document,
-                match &self.body {
-                    MethodBody::Abstract(_) => self.body.format(f),
-                    MethodBody::Concrete(block) => {
-                        let is_constructor = self.name.value.eq_ignore_ascii_case("__construct");
-
-                        let inlined_braces = if is_constructor {
-                            f.settings.inline_empty_constructor_braces
-                        } else {
-                            f.settings.inline_empty_method_braces
-                        } && block_is_empty(f, &block.left_brace, &block.right_brace);
-
-                        Document::Group(Group::new(vec![
-                            in f.arena;
-                            if inlined_braces {
-                                Document::space()
-                            } else {
-                                match f.settings.method_brace_style {
-                                    BraceStyle::SameLine => Document::space(),
-                                    BraceStyle::NextLine => {
-                                        if !has_parameters_or_inner_parameter_comments {
-                                            Document::Line(Line::hard())
-                                        } else {
-                                            Document::IfBreak(
-                                                IfBreak::new(
-                                                    f.arena,
-                                                    Document::space(),
-                                                    Document::Array(vec![
-                                                        in f.arena;
-                                                        Document::Line(Line::hard()),
-                                                        Document::BreakParent,
-                                                    ]),
-                                                )
-                                                .with_id(signature_id),
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                            self.body.format(f),
-                        ]))
-                    }
-                },
-            ]))
-        })
-    }
-}
-
-impl<'arena> Format<'arena> for MethodBody<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, MethodBody, {
-            match self {
-                MethodBody::Abstract(b) => b.format(f),
-                MethodBody::Concrete(b) => b.format(f),
-            }
-        })
-    }
-}
-
-impl<'arena> Format<'arena> for MethodAbstractBody {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, MethodAbstractBody, { Document::String(";") })
-    }
-}
-
 impl<'arena> Format<'arena> for Keyword<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Keyword, { Document::String(print_lowercase_keyword(f, self.value)) })
@@ -1565,7 +1463,7 @@ impl<'arena> Format<'arena> for PropertyHook<'arena> {
             }
 
             contents.push(self.name.format(f));
-            if let Some(parameters) = &self.parameters {
+            if let Some(parameters) = &self.parameter_list {
                 if f.settings.space_before_hook_parameter_list_parenthesis {
                     contents.push(Document::space());
                 }
@@ -1679,73 +1577,6 @@ impl<'arena> Format<'arena> for FunctionLikeReturnTypeHint<'arena> {
                 format_token(f, self.colon, ":"),
                 Document::space(),
                 self.hint.format(f),
-            ]))
-        })
-    }
-}
-
-impl<'arena> Format<'arena> for Function<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, Function, {
-            let mut attributes = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
-                attributes.push(attribute_list.format(f));
-                attributes.push(Document::Line(Line::hard()));
-            }
-
-            let leading_comments = f.print_leading_comments(self.function.span);
-            let mut signature = vec![in f.arena];
-            signature.push(self.function.format(f));
-            signature.push(Document::space());
-            if self.ampersand.is_some() {
-                signature.push(Document::String("&"));
-            }
-
-            signature.push(self.name.format(f));
-            let has_parameters_or_inner_parameter_comments =
-                !self.parameter_list.parameters.is_empty() || f.has_inner_comment(self.parameter_list.span());
-
-            signature.push(self.parameter_list.format(f));
-            if let Some(return_type) = &self.return_type_hint {
-                signature.push(return_type.format(f));
-            }
-
-            let signature_id = f.next_id();
-            let signature_document = Document::Group(Group::new(signature).with_id(signature_id));
-
-            let inlined_braces = f.settings.inline_empty_function_braces
-                && block_is_empty(f, &self.body.left_brace, &self.body.right_brace);
-
-            Document::Group(Group::new(vec![
-                in f.arena;
-                Document::Group(Group::new(attributes)),
-                leading_comments.unwrap_or_else(Document::empty),
-                signature_document,
-                Document::Group(Group::new(vec![
-                    in f.arena;
-                    if inlined_braces {
-                        Document::space()
-                    } else {
-                        match f.settings.function_brace_style {
-                            BraceStyle::SameLine => Document::space(),
-                            BraceStyle::NextLine => {
-                                if !has_parameters_or_inner_parameter_comments {
-                                    Document::Line(Line::hard())
-                                } else {
-                                    Document::IfBreak(
-                                        IfBreak::new(
-                                            f.arena,
-                                            Document::space(),
-                                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
-                                        )
-                                        .with_id(signature_id),
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    self.body.format(f),
-                ])),
             ]))
         })
     }

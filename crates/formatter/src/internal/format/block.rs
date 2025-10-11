@@ -96,13 +96,9 @@ pub(super) fn print_block<'arena>(
         // in some cases.
         match &parent {
             // functions, and methods
-            Node::MethodBody(_) => {
-                if let Some(Node::Method(method)) = f.grandparent_node() {
-                    if method.name.value.eq_ignore_ascii_case("__construct") {
-                        !f.settings.inline_empty_constructor_braces
-                    } else {
-                        !f.settings.inline_empty_method_braces
-                    }
+            Node::Method(method) => {
+                if method.name.value.eq_ignore_ascii_case("__construct") {
+                    !f.settings.inline_empty_constructor_braces
                 } else {
                     !f.settings.inline_empty_method_braces
                 }
@@ -163,7 +159,7 @@ pub(super) fn print_block_body<'arena>(
     if has_body { Some(Document::Array(statement::print_statement_sequence(f, stmts))) } else { None }
 }
 
-pub fn block_is_empty(f: &mut FormatterState<'_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
+pub fn block_is_empty(f: &FormatterState<'_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
     let content = &f.source_text[left_brace.end.offset as usize..right_brace.start.offset as usize];
 
     for c in content.chars() {

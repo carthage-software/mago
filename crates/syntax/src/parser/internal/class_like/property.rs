@@ -132,7 +132,7 @@ pub fn parse_property_hook<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Resu
         ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
         modifiers: parse_modifier_sequence(stream)?,
         name: identifier::parse_local_identifier(stream)?,
-        parameters: parameter::parse_optional_function_like_parameter_list(stream)?,
+        parameter_list: parameter::parse_optional_function_like_parameter_list(stream)?,
         body: parse_property_hook_body(stream)?,
     })
 }

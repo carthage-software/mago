@@ -24,25 +24,7 @@ pub(super) fn print_function_like_parameters<'arena>(
         return Document::Array(contents);
     }
 
-    let should_break = 'should_break: {
-        if f.settings.break_promoted_properties_list
-            && parameter_list.parameters.iter().any(|p| p.is_promoted_property())
-        {
-            break 'should_break true;
-        }
-
-        if f.settings.preserve_breaking_parameter_list
-            && misc::has_new_line_in_range(
-                f.source_text,
-                parameter_list.left_parenthesis.start.offset,
-                parameter_list.parameters.as_slice()[0].span().start.offset,
-            )
-        {
-            break 'should_break true;
-        }
-
-        false
-    };
+    let should_break = should_break_parameters(f, parameter_list);
 
     let previous_break = f.parameter_state.force_break;
     if should_break {
@@ -102,8 +84,29 @@ pub(super) fn print_function_like_parameters<'arena>(
     Document::Group(Group::new(parts).with_break(should_break))
 }
 
-fn should_hug_the_only_parameter<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn should_break_parameters<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    if f.settings.break_promoted_properties_list && parameter_list.parameters.iter().any(|p| p.is_promoted_property()) {
+        return true;
+    }
+
+    if f.settings.preserve_breaking_parameter_list
+        && misc::has_new_line_in_range(
+            f.source_text,
+            parameter_list.left_parenthesis.start.offset,
+            parameter_list.parameters.as_slice()[0].span().start.offset,
+        )
+    {
+        return true;
+    }
+
+    false
+}
+
+pub(super) fn should_hug_the_only_parameter<'arena>(
+    f: &FormatterState<'_, 'arena>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> bool {
     if parameter_list.parameters.len() != 1 {

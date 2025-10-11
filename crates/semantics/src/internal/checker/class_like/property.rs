@@ -534,7 +534,7 @@ pub fn check_property(
                     );
                 }
 
-                if let Some(parameter_list) = &hook.parameters {
+                if let Some(parameter_list) = &hook.parameter_list {
                     check_for_promoted_properties_outside_constructor(parameter_list, context);
 
                     match lowered_name.as_str() {

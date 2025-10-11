@@ -167,7 +167,7 @@ pub struct PropertyHook<'arena> {
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
     pub ampersand: Option<Span>,
     pub name: LocalIdentifier<'arena>,
-    pub parameters: Option<FunctionLikeParameterList<'arena>>,
+    pub parameter_list: Option<FunctionLikeParameterList<'arena>>,
     pub body: PropertyHookBody<'arena>,
 }
 

@@ -456,8 +456,9 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
             buffer.push_str(", ");
             buffer.push_str(&print_document_to_string(arena, flat_content));
             if !options.is_empty() {
-                buffer.push_str(", ");
+                buffer.push_str(", {");
                 buffer.push_str(&options.join(", "));
+                buffer.push('}');
             }
 
             buffer.push(')');

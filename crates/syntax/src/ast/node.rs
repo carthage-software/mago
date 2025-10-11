@@ -1007,7 +1007,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children.extend(node.attribute_lists.iter().map(Node::AttributeList));
                 children.extend(node.modifiers.iter().map(Node::Modifier));
                 children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.parameters.iter().map(Node::FunctionLikeParameterList));
+                children.extend(node.parameter_list.iter().map(Node::FunctionLikeParameterList));
                 children.push(Node::PropertyHookBody(&node.body));
 
                 children
