@@ -128,7 +128,7 @@ $hash = hash('sha256', $data);
 
 use FFI;
 
-$ffi = FFI::cdef(\"void* malloc(size_t size);\");
+$ffi = FFI::cdef("void* malloc(size_t size);");
 $ffi->malloc(1024); // Allocate memory but never free it
 ```
 

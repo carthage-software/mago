@@ -282,6 +282,8 @@ If a setting truly needs to vary between contexts, it should be handled at the i
 #### Correct code
 
 ```php
+<?php
+
 // In framework config files (e.g., wp-config.php), use constants.
 define( 'WP_DEBUG', true );
 
@@ -292,6 +294,8 @@ wp_raise_memory_limit( 'admin' );
 #### Incorrect code
 
 ```php
+<?php
+
 // This can override server settings in an unpredictable way.
 ini_set( 'display_errors', 1 );
 ini_set( 'memory_limit', '256M' );
@@ -366,31 +370,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('flights', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-                $table->string('airline');
-                $table->timestamps();
-        });
-    }
-
-    public function down(): void {
-        Schema::drop('flights');
-    }
-};
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
 class MyMigration extends Migration {
     public function up(): void {
         Schema::create('flights', function (Blueprint $table) {
@@ -407,6 +386,31 @@ class MyMigration extends Migration {
 }
 
 return new MyMigration();
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('flights', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+                $table->string('airline');
+                $table->timestamps();
+        });
+    }
+
+    public function down(): void {
+        Schema::drop('flights');
+    }
+};
 ```
 
 
@@ -1070,7 +1074,7 @@ which would cause a fatal error in a Yoda condition instead of a silent logical 
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
 
 ### Examples

@@ -89,11 +89,14 @@ to prevent catastrophic performance issues and data corruption.
 ```php
 <?php
 
-function my_plugin_activation_hook() {
+function my_plugin_activate() {
     global $wpdb;
+
+    // Running schema changes inside an activation hook is safe.
     $wpdb->query("ALTER TABLE {$wpdb->posts} ADD my_column VARCHAR(255)");
 }
-register_activation_hook(__FILE__, 'my_plugin_activation_hook');
+
+register_activation_hook(__FILE__, 'my_plugin_activate');
 ```
 
 #### Incorrect code

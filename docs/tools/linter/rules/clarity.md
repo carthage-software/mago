@@ -515,7 +515,10 @@ it can be noisy and may not be relevant to all codebases.
 <?php
 
 /**
+ * For more information, {@see https://example.com}.
+ *
  * @param int $a
+ *
  * @return int
  */
 function foo($a) {
@@ -529,8 +532,12 @@ function foo($a) {
 <?php
 
 /**
- @param int $a
-    */
+ * For more information, {@see https://example.com
+ *
+ * @param int $a
+ *
+ * @return int
+ */
 function foo($a) {
     return $a;
 }
