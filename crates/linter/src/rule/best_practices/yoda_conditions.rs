@@ -36,6 +36,10 @@ impl Default for YodaConditionsConfig {
 }
 
 impl Config for YodaConditionsConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
