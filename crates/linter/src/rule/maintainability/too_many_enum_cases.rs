@@ -55,6 +55,8 @@ impl LintRule for TooManyEnumCasesRule {
                 This rule checks the number of cases in enums. If the number of cases exceeds a configurable threshold, an issue is reported.
             "#},
             good_example: indoc::indoc! {r#"
+                <?php
+
                 enum SimpleEnum {
                     case A;
                     case B;
@@ -62,6 +64,8 @@ impl LintRule for TooManyEnumCasesRule {
                 }
             "#},
             bad_example: indoc::indoc! {r#"
+                <?php
+
                 enum LargeEnum {
                     case A;
                     case B;
@@ -87,7 +91,6 @@ impl LintRule for TooManyEnumCasesRule {
                 }
             "#},
             category: Category::Maintainability,
-
             requirements: RuleRequirements::None,
         };
 
@@ -132,12 +135,6 @@ impl LintRule for TooManyEnumCasesRule {
                         "Try splitting the enum into smaller logical groups or refactoring to reduce the total number of cases."
                     )
             );
-
-            // If this enum has too many cases, we don't need to check the nested enums.
-        } else if r#enum.members.contains_methods() {
-            // Continue checking nested enums, if any.
-        } else {
-            // If this enum has no methods, there can't be any nested enums.
         }
     }
 }

@@ -63,6 +63,8 @@ impl LintRule for NoIniSetRule {
                 If a setting truly needs to vary between contexts, it should be handled at the infrastructure or framework configuration level, never by calling ini_set within the application code.
             "#},
             good_example: indoc! {r#"
+                <?php
+
                 // In framework config files (e.g., wp-config.php), use constants.
                 define( 'WP_DEBUG', true );
 
@@ -70,6 +72,8 @@ impl LintRule for NoIniSetRule {
                 wp_raise_memory_limit( 'admin' );
             "#},
             bad_example: indoc! {r#"
+                <?php
+
                 // This can override server settings in an unpredictable way.
                 ini_set( 'display_errors', 1 );
                 ini_set( 'memory_limit', '256M' );

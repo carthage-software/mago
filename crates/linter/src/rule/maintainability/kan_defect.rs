@@ -59,10 +59,106 @@ impl LintRule for KanDefectRule {
                   - https://github.com/phpmetrics/PhpMetrics/blob/c43217cd7783bbd54d0b8c1dd43f697bc36ef79d/src/Hal/Metric/Class_/Complexity/KanDefectVisitor.php
                   - https://phpmetrics.org/
             "#},
-            good_example: "",
-            bad_example: "",
-            category: Category::Maintainability,
+            good_example: indoc::indoc! {r#"
+                <?php
 
+                function handleRequest($request) {
+                    $validated = validateRequest($request);
+                    $processed = processRequest($validated);
+                    return formatResponse($processed);
+                }
+
+                function validateRequest($request) {
+                    if (empty($request['type'])) {
+                        return null;
+                    }
+                    return $request;
+                }
+
+                function processRequest($request) {
+                    return match($request['type']) {
+                        'create' => createResource($request),
+                        'update' => updateResource($request),
+                        'delete' => deleteResource($request),
+                        default => null
+                    };
+                }
+
+                function formatResponse($data) {
+                    return ['status' => 'success', 'data' => $data];
+                }
+            "#},
+            bad_example: indoc::indoc! {r#"
+                <?php
+
+                function handleRequest($request) {
+                    if (empty($request)) {
+                        return null;
+                    }
+
+                    if (!isset($request['type'])) {
+                        return null;
+                    }
+
+                    switch ($request['type']) {
+                        case 'create':
+                            if (!isset($request['data'])) {
+                                return null;
+                            }
+                            break;
+                        case 'update':
+                            if (!isset($request['id'])) {
+                                return null;
+                            }
+                            break;
+                        case 'delete':
+                            if (!isset($request['id'])) {
+                                return null;
+                            }
+                            break;
+                    }
+
+                    if (isset($request['filters'])) {
+                        foreach ($request['filters'] as $key => $value) {
+                            switch ($key) {
+                                case 'status':
+                                    if ($value === 'active') {
+                                        // filter
+                                    }
+                                    break;
+                                case 'category':
+                                    if (!empty($value)) {
+                                        // filter
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+
+                    while (!empty($request['items'])) {
+                        $item = array_shift($request['items']);
+                        if ($item['valid']) {
+                            foreach ($item['tags'] as $tag) {
+                                if ($tag === 'important') {
+                                    // process
+                                }
+                            }
+                        }
+                    }
+
+                    foreach ($request['metadata'] as $meta) {
+                        switch ($meta['type']) {
+                            case 'timestamp':
+                                break;
+                            case 'user':
+                                break;
+                        }
+                    }
+
+                    return ['status' => 'success'];
+                }
+            "#},
+            category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
 

@@ -57,12 +57,16 @@ impl LintRule for TooManyPropertiesRule {
                 If the number of properties exceeds a configurable threshold, an issue is reported.
             "#},
             good_example: indoc::indoc! {r#"
+                <?php
+
                 class SimpleClass {
                     public $a;
                     public $b;
                 }
             "#},
             bad_example: indoc::indoc! {r#"
+                <?php
+
                 class ComplexClass {
                     public $a; public $b; public $c; public $d; public $e;
                     public $f; public $g; public $h; public $i; public $j; public $k;

@@ -31,3 +31,6 @@ indoc = { workspace = true }
 bumpalo = { workspace = true }
 
 [dev-dependencies]
+mago-syntax = { workspace = true }
+mago-names = { workspace = true }
+bumpalo = { workspace = true }

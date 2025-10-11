@@ -57,13 +57,16 @@ impl LintRule for TooManyMethodsRule {
                 If the number of methods exceeds a configurable threshold, an issue is reported.
             "#},
             good_example: indoc::indoc! {r#"
+                <?php
+
                 class SimpleClass {
                     public function a() {}
-
                     public function b() {}
                 }
             "#},
             bad_example: indoc::indoc! {r#"
+                <?php
+
                 class ComplexClass {
                     public function a() {}
                     public function b() {}
@@ -89,7 +92,6 @@ impl LintRule for TooManyMethodsRule {
                 }
             "#},
             category: Category::Maintainability,
-
             requirements: RuleRequirements::None,
         };
 

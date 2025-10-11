@@ -55,7 +55,10 @@ impl LintRule for ValidDocblockRule {
                 <?php
 
                 /**
+                 * For more information, {@see https://example.com}.
+                 *
                  * @param int $a
+                 *
                  * @return int
                  */
                 function foo($a) {
@@ -64,10 +67,14 @@ impl LintRule for ValidDocblockRule {
             "#},
             bad_example: indoc! {r#"
                 <?php
-
+                
                 /**
-                 @param int $a
-                    */
+                 * For more information, {@see https://example.com
+                 *
+                 * @param int $a
+                 *
+                 * @return int
+                 */
                 function foo($a) {
                     return $a;
                 }

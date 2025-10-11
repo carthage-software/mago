@@ -54,10 +54,108 @@ impl LintRule for CyclomaticComplexityRule {
 
                 Cyclomatic complexity is a measure of the number of linearly independent paths through a program's source code.
             "#},
-            good_example: "",
-            bad_example: "",
-            category: Category::Maintainability,
+            good_example: indoc! {r#"
+                <?php
 
+                function validateUser($user) {
+                    if (!isValidEmail($user['email'])) {
+                        return false;
+                    }
+
+                    if (!isValidAge($user['age'])) {
+                        return false;
+                    }
+
+                    if (!hasRequiredFields($user)) {
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                function isValidEmail($email) {
+                    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+                }
+
+                function isValidAge($age) {
+                    return $age >= 18 && $age <= 120;
+                }
+
+                function hasRequiredFields($user) {
+                    return isset($user['name']) && isset($user['email']);
+                }
+            "#},
+            bad_example: indoc! {r#"
+                <?php
+
+                function validateUser($user) {
+                    if (!isset($user['email'])) {
+                        return false;
+                    }
+
+                    if (!filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
+                        return false;
+                    }
+
+                    if (!isset($user['age'])) {
+                        return false;
+                    }
+
+                    if ($user['age'] < 18) {
+                        return false;
+                    }
+
+                    if ($user['age'] > 120) {
+                        return false;
+                    }
+
+                    if (!isset($user['name'])) {
+                        return false;
+                    }
+
+                    if (strlen($user['name']) < 2) {
+                        return false;
+                    }
+
+                    if (!isset($user['country'])) {
+                        return false;
+                    }
+
+                    if (!in_array($user['country'], ['US', 'UK', 'CA'])) {
+                        return false;
+                    }
+
+                    if (isset($user['phone'])) {
+                        if (!preg_match('/^\d{10}$/', $user['phone'])) {
+                            return false;
+                        }
+                    }
+
+                    if (isset($user['preferences'])) {
+                        if (is_array($user['preferences'])) {
+                            foreach ($user['preferences'] as $key => $value) {
+                                if ($key === 'newsletter') {
+                                    if ($value !== true && $value !== false) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (isset($user['address'])) {
+                        if (!isset($user['address']['street'])) {
+                            return false;
+                        }
+                        if (!isset($user['address']['city'])) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            "#},
+            category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
         &META

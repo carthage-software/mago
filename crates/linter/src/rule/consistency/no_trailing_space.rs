@@ -55,14 +55,13 @@ impl LintRule for NoTrailingSpaceRule {
                 <?php
 
                 // This is a good comment.
-                "#},
+            "#},
             bad_example: indoc! {r#"
                 <?php
 
-                // This is a comment with trailing whitespace.
+                // This is a comment with trailing whitespace.  
             "#},
             category: Category::Consistency,
-
             requirements: RuleRequirements::None,
         };
 

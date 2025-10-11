@@ -19,7 +19,7 @@ use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-static TAGGED_FIXME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"fixme\((#|@)?\\S+\)").unwrap());
+static TAGGED_FIXME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"fixme\((#|@)?\S+").unwrap());
 
 #[derive(Debug, Clone)]
 pub struct TaggedFixmeRule {

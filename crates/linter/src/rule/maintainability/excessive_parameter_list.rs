@@ -54,10 +54,21 @@ impl LintRule for ExcessiveParameterListRule {
 
                 If the number of parameters exceeds a configurable threshold, an issue is reported.
             "#},
-            good_example: "",
-            bad_example: "",
-            category: Category::Maintainability,
+            good_example: indoc! {r#"
+                <?php
 
+                function processOrder($orderId, $userId, $total, $status, $date) {
+                    return true;
+                }
+            "#},
+            bad_example: indoc! {r#"
+                <?php
+
+                function createUser($name, $email, $password, $age, $country, $city, $zipCode) {
+                    return true;
+                }
+            "#},
+            category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
 
