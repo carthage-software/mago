@@ -309,6 +309,7 @@ fn scrape_special_function_call_assertions(
                     false, false, true, true,
                 )))),
             )),
+            "count" => Some((0, Assertion::HasAtLeastCount(1))),
             _ => None,
         };
 

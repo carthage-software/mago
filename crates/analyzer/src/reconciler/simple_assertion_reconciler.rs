@@ -295,6 +295,9 @@ pub(crate) fn reconcile(
         Assertion::HasExactCount(count) => {
             Some(reconcile_exactly_countable(context, assertion, existing_var_type, key, negated, span, false, count))
         }
+        Assertion::HasAtLeastCount(count) => {
+            Some(reconcile_at_least_countable(context, assertion, existing_var_type, key, negated, span, false, count))
+        }
         Assertion::IsLessThan(less_than) => {
             Some(reconcile_less_than(context, assertion, existing_var_type, key, negated, span, less_than))
         }
@@ -1462,6 +1465,71 @@ fn reconcile_non_empty_countable(
 }
 
 fn reconcile_exactly_countable(
+    context: &mut Context<'_, '_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    negated: bool,
+    span: Option<&Span>,
+    recursive_check: bool,
+    count: &usize,
+) -> TUnion {
+    let old_var_type_atom = existing_var_type.get_id();
+
+    let mut did_remove_type = false;
+
+    let existing_var_types = existing_var_type.types.as_ref();
+    let mut existing_var_type = existing_var_type.clone();
+
+    for atomic in existing_var_types {
+        if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
+            let min_under_count = if let Some(known_count) = known_count { known_count < count } else { false };
+            if !non_empty || min_under_count {
+                existing_var_type.remove_type(atomic);
+                if !element_type.is_never() {
+                    existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
+                        element_type: element_type.clone(),
+                        known_elements: known_elements.clone(),
+                        known_count: Some(*count),
+                        non_empty: true,
+                    })));
+                }
+
+                did_remove_type = true;
+            }
+        } else if let TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items })) = atomic {
+            did_remove_type = true;
+
+            if !non_empty {
+                existing_var_type.remove_type(atomic);
+
+                existing_var_type.types.to_mut().push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: known_items.clone(),
+                    parameters: parameters.clone(),
+                    non_empty: true,
+                })));
+            }
+        }
+    }
+
+    if !did_remove_type || existing_var_type.types.is_empty() {
+        // every type was removed, this is an impossible assertion
+        if let Some(key) = key
+            && let Some(span) = span
+            && !recursive_check
+        {
+            trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, span);
+        }
+
+        if existing_var_type.types.is_empty() {
+            return get_never();
+        }
+    }
+
+    existing_var_type
+}
+
+fn reconcile_at_least_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
