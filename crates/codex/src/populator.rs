@@ -708,6 +708,9 @@ fn populate_metadata_from_trait(
     // Also inherit invalid dependencies from the trait
     metadata.invalid_dependencies.extend(trait_metadata.invalid_dependencies.iter().copied());
 
+    // Inherit nested trait usages from the trait
+    metadata.add_used_traits(trait_metadata.used_traits.iter().copied());
+
     // Extend template parameters based on the trait's templates
     extend_template_parameters(metadata, trait_metadata);
 
