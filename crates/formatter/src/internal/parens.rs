@@ -145,7 +145,11 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             return matches!(self.nth_parent_kind(3), Some(Node::Pipe(_)));
         }
 
-        self.is_unary_or_binary_or_ternary(parent_node) || matches!(parent_node, Node::VariadicArrayElement(_))
+        self.is_unary_or_binary_or_ternary(parent_node)
+            || matches!(
+                parent_node,
+                Node::Clone(_) | Node::ArrayAppend(_) | Node::VariadicArrayElement(_) | Node::UnaryPostfix(_)
+            )
     }
 
     fn assignment_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
