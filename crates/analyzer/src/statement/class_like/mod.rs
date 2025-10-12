@@ -222,7 +222,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
         return Ok(());
     }
 
-    let name = &class_like_metadata.name;
+    let name = &class_like_metadata.original_name;
 
     check_class_like_extends(context, class_like_metadata, extends_ast);
     check_class_like_implements(context, class_like_metadata, implements_ast);

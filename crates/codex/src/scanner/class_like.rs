@@ -18,6 +18,7 @@ use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::function_like::MethodMetadata;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
@@ -36,10 +37,15 @@ use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::builder;
+use crate::ttype::get_list;
 use crate::ttype::get_mixed;
+use crate::ttype::get_named_object;
+use crate::ttype::get_non_empty_list;
 use crate::ttype::get_string;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::variance::Variance;
@@ -300,42 +306,24 @@ fn scan_class_like<'ctx, 'arena>(
         SymbolKind::Enum => {
             class_like_metadata.flags |= MetadataFlags::FINAL;
 
-            if enum_type.is_some() {
-                let backed_enum_interface = atom("backedenum");
-                let from_method = atom("from");
-                let try_from_method = atom("tryfrom");
-
-                class_like_metadata.all_parent_interfaces.insert(backed_enum_interface);
-                class_like_metadata.direct_parent_interfaces.insert(backed_enum_interface);
-
-                class_like_metadata
-                    .appearing_method_ids
-                    .insert(from_method, MethodIdentifier::new(backed_enum_interface, from_method));
-                class_like_metadata
-                    .declaring_method_ids
-                    .insert(from_method, MethodIdentifier::new(backed_enum_interface, from_method));
-                class_like_metadata
-                    .appearing_method_ids
-                    .insert(try_from_method, MethodIdentifier::new(backed_enum_interface, try_from_method));
-                class_like_metadata
-                    .declaring_method_ids
-                    .insert(try_from_method, MethodIdentifier::new(backed_enum_interface, try_from_method));
+            match enum_type {
+                Some(backing_type) => {
+                    if backing_type.hint.is_string() {
+                        class_like_metadata.add_direct_parent_interface(atom("stringbackedenum"));
+                    } else if backing_type.hint.is_int() {
+                        class_like_metadata.add_direct_parent_interface(atom("intbackedenum"));
+                    } else {
+                        class_like_metadata.add_direct_parent_interface(atom("backedenum"));
+                    }
+                }
+                None => {
+                    class_like_metadata.add_direct_parent_interface(atom("unitenum"));
+                }
             }
 
-            let unit_enum_interface = atom("unitenum");
-            let cases_method = atom("cases");
-
-            class_like_metadata.all_parent_interfaces.insert(unit_enum_interface);
-            class_like_metadata.direct_parent_interfaces.insert(unit_enum_interface);
-
-            class_like_metadata
-                .appearing_method_ids
-                .insert(cases_method, MethodIdentifier::new(unit_enum_interface, cases_method));
-            class_like_metadata
-                .declaring_method_ids
-                .insert(cases_method, MethodIdentifier::new(unit_enum_interface, cases_method));
-
             codebase.symbols.add_enum_name(name);
+
+            create_enum_methods(codebase, &mut class_like_metadata, span);
         }
         SymbolKind::Trait => {
             if class_like_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
@@ -1277,4 +1265,186 @@ fn scan_class_like<'ctx, 'arena>(
     }
 
     Some(class_like_metadata)
+}
+
+fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLikeMetadata, span: Span) {
+    let mut add_method =
+        |name: &str, class_like_metadata: &mut ClassLikeMetadata, function_like_metadata: FunctionLikeMetadata| {
+            let name = ascii_lowercase_atom(name);
+            let method_id = (class_like_metadata.name, name);
+
+            let method_identifier = MethodIdentifier::new(class_like_metadata.name, name);
+
+            class_like_metadata.methods.insert(name);
+            class_like_metadata.add_declaring_method_id(name, method_identifier);
+            class_like_metadata.inheritable_method_ids.insert(name, method_identifier);
+            codebase.function_likes.insert(method_id, function_like_metadata);
+        };
+
+    let enum_name = class_like.name.as_str();
+    let backing_type = class_like.enum_type.as_ref().cloned();
+
+    if let Some(backing_type) = backing_type {
+        let from_method = create_enum_from_method(enum_name, span, backing_type.clone());
+        add_method("from", class_like, from_method);
+
+        let try_from_method = create_enum_try_from_method(enum_name, span, backing_type);
+        add_method("tryFrom", class_like, try_from_method);
+    }
+
+    let has_cases = !class_like.enum_cases.is_empty();
+    let cases_method = create_enum_cases_method(enum_name, span, has_cases);
+    add_method("cases", class_like, cases_method);
+}
+
+fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
+    FunctionLikeMetadata {
+        kind: FunctionLikeKind::Method,
+        span: enum_method_span,
+        name: Some(atom("from")),
+        original_name: Some(atom("from")),
+        name_span: Some(enum_method_span),
+        parameters: vec![FunctionLikeParameterMetadata {
+            attributes: vec![],
+            name: VariableIdentifier(atom("$value")),
+            type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
+            out_type: None,
+            default_type: None,
+            span: enum_method_span,
+            name_span: enum_method_span,
+            flags: MetadataFlags::empty(),
+        }],
+        return_type_declaration_metadata: Some(TypeMetadata::new(
+            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
+            enum_method_span,
+        )),
+        return_type_metadata: Some(TypeMetadata::new(
+            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
+            enum_method_span,
+        )),
+        template_types: vec![],
+        attributes: vec![],
+        method_metadata: Some(MethodMetadata {
+            is_final: true,
+            is_abstract: false,
+            is_static: true,
+            is_constructor: false,
+            visibility: Visibility::Public,
+            where_constraints: Default::default(),
+        }),
+        type_resolution_context: None,
+        thrown_types: vec![TypeMetadata::new(get_named_object(atom("ValueError"), None), enum_method_span)],
+        issues: Default::default(),
+        assertions: Default::default(),
+        if_true_assertions: Default::default(),
+        if_false_assertions: Default::default(),
+        flags: MetadataFlags::POPULATED,
+    }
+}
+
+fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
+    FunctionLikeMetadata {
+        kind: FunctionLikeKind::Method,
+        span: enum_method_span,
+        name: Some(atom("tryFrom")),
+        original_name: Some(atom("tryFrom")),
+        name_span: Some(enum_method_span),
+        parameters: vec![FunctionLikeParameterMetadata {
+            attributes: vec![],
+            name: VariableIdentifier(atom("$value")),
+            type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
+            out_type: None,
+            default_type: None,
+            span: enum_method_span,
+            name_span: enum_method_span,
+            flags: MetadataFlags::empty(),
+        }],
+        return_type_declaration_metadata: Some(TypeMetadata::new(
+            TUnion::from_vec(vec![
+                TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None })),
+                TAtomic::Null,
+            ]),
+            enum_method_span,
+        )),
+        return_type_metadata: Some(TypeMetadata::new(
+            TUnion::from_vec(vec![
+                TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None })),
+                TAtomic::Null,
+            ]),
+            enum_method_span,
+        )),
+        template_types: vec![],
+        attributes: vec![],
+        method_metadata: Some(MethodMetadata {
+            is_final: true,
+            is_abstract: false,
+            is_static: true,
+            is_constructor: false,
+            visibility: Visibility::Public,
+            where_constraints: Default::default(),
+        }),
+        type_resolution_context: None,
+        thrown_types: vec![],
+        issues: Default::default(),
+        assertions: Default::default(),
+        if_true_assertions: Default::default(),
+        if_false_assertions: Default::default(),
+        flags: MetadataFlags::POPULATED,
+    }
+}
+
+fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: bool) -> FunctionLikeMetadata {
+    FunctionLikeMetadata {
+        kind: FunctionLikeKind::Method,
+        span: enum_method_span,
+        name: Some(atom("cases")),
+        original_name: Some(atom("cases")),
+        name_span: Some(enum_method_span),
+        parameters: vec![],
+        return_type_declaration_metadata: Some(TypeMetadata::new(
+            if has_cases {
+                get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
+                    name: atom(enum_name),
+                    case: None,
+                }))]))
+            } else {
+                get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
+                    name: atom(enum_name),
+                    case: None,
+                }))]))
+            },
+            enum_method_span,
+        )),
+        return_type_metadata: Some(TypeMetadata::new(
+            if has_cases {
+                get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
+                    name: atom(enum_name),
+                    case: None,
+                }))]))
+            } else {
+                get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
+                    name: atom(enum_name),
+                    case: None,
+                }))]))
+            },
+            enum_method_span,
+        )),
+        template_types: vec![],
+        attributes: vec![],
+        method_metadata: Some(MethodMetadata {
+            is_final: true,
+            is_abstract: false,
+            is_static: true,
+            is_constructor: false,
+            visibility: Visibility::Public,
+            where_constraints: Default::default(),
+        }),
+        type_resolution_context: None,
+        thrown_types: vec![],
+        issues: Default::default(),
+        assertions: Default::default(),
+        if_true_assertions: Default::default(),
+        if_false_assertions: Default::default(),
+        flags: MetadataFlags::POPULATED,
+    }
 }

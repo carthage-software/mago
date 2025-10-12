@@ -646,6 +646,11 @@ pub fn get_list(element_type: TUnion) -> TUnion {
 }
 
 #[inline]
+pub fn get_non_empty_list(element_type: TUnion) -> TUnion {
+    wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type)))))
+}
+
+#[inline]
 pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
         Box::new(key_parameter),

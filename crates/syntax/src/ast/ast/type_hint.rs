@@ -185,6 +185,18 @@ impl Hint<'_> {
         matches!(self, Self::Bool(_) | Self::Float(_) | Self::Integer(_) | Self::String(_))
     }
 
+    /// Returns `true` if the type is a string type.
+    #[inline]
+    pub const fn is_string(&self) -> bool {
+        matches!(self, Self::String(_))
+    }
+
+    /// Returns `true` if the type is an integer type.
+    #[inline]
+    pub const fn is_int(&self) -> bool {
+        matches!(self, Self::Integer(_))
+    }
+
     /// Returns `true` if the type is a union type.
     ///
     /// A union type is a type that is a union of multiple type hints separated by a pipe (`|`) character.
