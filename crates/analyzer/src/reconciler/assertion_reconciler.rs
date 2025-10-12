@@ -598,7 +598,7 @@ fn intersect_contained_atomic_with_another(
     };
 
     let TAtomic::Object(TObject::Named(named_object)) = sub_atomic else {
-        return Some(super_atomic.clone());
+        return Some(sub_atomic.clone());
     };
 
     if let TAtomic::Object(TObject::Named(super_named_object)) = super_atomic

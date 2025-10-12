@@ -303,11 +303,12 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                 calling_instance_type,
             );
 
-            let final_parameter_type = if template_result.has_template_types() {
-                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
-            } else {
-                base_parameter_type
-            };
+            let final_parameter_type =
+                if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                } else {
+                    base_parameter_type
+                };
 
             verify_argument_type(
                 context,
@@ -428,8 +429,13 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     calling_instance_type,
                 );
 
-                let final_variadic_parameter_type =
-                    inferred_type_replacer::replace(&base_variadic_parameter_type, template_result, context.codebase);
+                let final_variadic_parameter_type = if template_result.has_template_types()
+                    || !template_result.lower_bounds.is_empty()
+                {
+                    inferred_type_replacer::replace(&base_variadic_parameter_type, template_result, context.codebase)
+                } else {
+                    base_variadic_parameter_type
+                };
 
                 for unpacked_argument in unpacked_arguments {
                     let argument_expression = unpacked_argument.value();
@@ -849,11 +855,12 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                 calling_instance_type,
             );
 
-            let final_parameter_type = if template_result.has_template_types() {
-                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
-            } else {
-                base_parameter_type
-            };
+            let final_parameter_type =
+                if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                } else {
+                    base_parameter_type
+                };
 
             let parameter_position = parameter_refs
                 .iter()
