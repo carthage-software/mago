@@ -15,6 +15,7 @@ use crate::commands::config::ConfigCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
+use crate::commands::list_files::ListFilesCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 use crate::error::Error;
 
@@ -26,6 +27,7 @@ pub mod config;
 pub mod format;
 pub mod init;
 pub mod lint;
+pub mod list_files;
 pub mod self_update;
 
 /// Styling for the Mago CLI.
@@ -47,6 +49,9 @@ pub enum MagoCommand {
     /// Display the final, merged configuration that Mago is using.
     #[command(name = "config")]
     Config(ConfigCommand),
+    /// Display all files that will be scanned by Mago.
+    #[command(name = "list-files")]
+    ListFiles(ListFilesCommand),
     /// Analyze the abstract syntax tree (AST) of PHP code.
     #[command(name = "ast")]
     Ast(AstCommand),
