@@ -1138,8 +1138,11 @@ fn reconcile_not_isset(
     key: Option<&String>,
     span: Option<&Span>,
 ) -> TUnion {
+    // When !isset is true, the value is definitely not set (either null or undefined)
+    // For array accesses, this means the key doesn't exist or the value is null
+    // In both cases, the resulting type should be null
     if possibly_undefined {
-        return get_never();
+        return get_null();
     }
 
     if !existing_var_type.is_nullable()
