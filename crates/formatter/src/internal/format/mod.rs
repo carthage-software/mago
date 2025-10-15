@@ -1605,20 +1605,28 @@ impl<'arena> Format<'arena> for Try<'arena> {
 impl<'arena> Format<'arena> for TryCatchClause<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, TryCatchClause, {
+            let hint_group_id = f.next_id();
+
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.catch.format(f),
                 Document::space(),
                 format_token(f, self.left_parenthesis, "("),
-                Document::Group(Group::new({
-                    let mut context = vec![in f.arena; self.hint.format(f)];
-                    if let Some(variable) = &self.variable {
-                        context.push(Document::space());
-                        context.push(variable.format(f));
-                    }
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    Document::IndentIfBreak(IndentIfBreak::new(hint_group_id, {
+                        let mut context = vec![in f.arena; Document::Line(Line::soft())];
 
-                    context
-                })),
+                        context.push(self.hint.format(f));
+                        if let Some(variable) = &self.variable {
+                            context.push(Document::space());
+                            context.push(variable.format(f));
+                        }
+
+                        context
+                    })),
+                    Document::Line(Line::soft()),
+                ]).with_id(hint_group_id)),
                 format_token(f, self.right_parenthesis, ")"),
                 Document::space(),
                 self.block.format(f),
