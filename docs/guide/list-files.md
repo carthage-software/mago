@@ -7,9 +7,7 @@ title: Listing files
 Sometimes it might be useful to get a list of all files that a given Mago
 command would scan given the current configuration. For example to use it to
 refine the current configuration, or to pass it to a different tool for some
-kind of processing For example to use it to refine the current configuration,
-or to pass it to a different tool for some kind of processing. This can be done
-using the list-files command.
+kind of processing. This can be done using the list-files command.
 
 ## Usage
 
@@ -49,6 +47,6 @@ Usage: mago list-files [OPTIONS]
 
 | Flag, Alias(es)           | Description                                                                                                    |
 | :------------------------ | :------------------------------------------------------------------------------------------------------------- |
-|       `--command`         | Select for which command the file list should be generated. <br/>**Values:** `linter`, `formatter`, `analyzer` |
+|       `--command`         | Select for which command the file list should be generated. <br/>**Values:** `linter`, `formatter`, `analyzer`, `guard` |
 | `-0`, `--zero-terminate`  | Use NUL bytes instead of newlines to terminate the filenames.                                                  |
 | `-h`, `--help`            | Print help information.                                                                                        |

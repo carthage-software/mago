@@ -75,6 +75,7 @@ export default defineConfig({
           },
           { text: "Initialization", link: "/guide/initialization" },
           { text: "Configuration", link: "/guide/configuration" },
+          { text: "List Files", link: "/guide/list-files" },
           {
             text: "Environment Variables",
             link: "/guide/environment-variables",

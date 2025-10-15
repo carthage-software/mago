@@ -14,6 +14,7 @@ enum Command {
     Linter,
     Formatter,
     Analyzer,
+    Guard,
 }
 
 /// Display all files that will be scanned given the current configuration
@@ -53,6 +54,7 @@ impl ListFilesCommand {
                 Command::Linter => &mut configuration.linter.excludes,
                 Command::Formatter => &mut configuration.formatter.excludes,
                 Command::Analyzer => &mut configuration.analyzer.excludes,
+                Command::Guard => &mut configuration.guard.excludes,
             }));
         }
 
