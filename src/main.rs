@@ -96,6 +96,7 @@ pub fn run() -> Result<ExitCode, Error> {
     match command {
         MagoCommand::Init(cmd) => cmd.execute(configuration, None),
         MagoCommand::Config(cmd) => cmd.execute(configuration),
+        MagoCommand::ListFiles(cmd) => cmd.execute(configuration),
         MagoCommand::Lint(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::Format(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::Ast(cmd) => cmd.execute(configuration, color_choice),
