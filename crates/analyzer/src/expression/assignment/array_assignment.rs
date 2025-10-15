@@ -205,8 +205,8 @@ fn update_atomic_given_key(
                 };
 
                 match array {
-                    TArray::List(list) => {
-                        if let ArrayKey::Integer(key_value) = array_key {
+                    TArray::List(list) => match array_key {
+                        ArrayKey::Integer(key_value) => {
                             *has_matching_item = true;
 
                             if let Some(known_elements) = list.known_elements.as_mut() {
@@ -223,7 +223,31 @@ fn update_atomic_given_key(
 
                             list.non_empty = true;
                         }
-                    }
+                        ArrayKey::String(ustr) => {
+                            *has_matching_item = true;
+
+                            let parameters = if list.element_type.is_never() {
+                                None
+                            } else {
+                                Some((Box::new(get_non_negative_int()), list.element_type.clone()))
+                            };
+
+                            let mut known_items = BTreeMap::new();
+                            if let Some(known_elements) = list.known_elements.as_ref() {
+                                for (k, v) in known_elements {
+                                    known_items.insert(ArrayKey::Integer(*k as i64), v.clone());
+                                }
+                            }
+
+                            known_items.insert(ustr.into(), (false, current_type.clone()));
+
+                            *array = TArray::Keyed(TKeyedArray {
+                                parameters,
+                                known_items: Some(known_items),
+                                non_empty: true,
+                            });
+                        }
+                    },
                     TArray::Keyed(keyed_array) => {
                         *has_matching_item = true;
 

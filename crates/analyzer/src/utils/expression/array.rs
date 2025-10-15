@@ -22,6 +22,7 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_empty_string;
+use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
@@ -380,7 +381,7 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
-    let expected_key_type = get_int();
+    let expected_key_type = if in_assignment { get_arraykey() } else { get_non_negative_int() };
 
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
