@@ -22,7 +22,7 @@ features:
     details: Mago is engineered from the ground up for maximum performance, leveraging Rust and a parallel pipeline to analyze and format code faster than any other tool.
   - icon: 🛠️
     title: All-in-one solution
-    details: Get a powerful static analyzer, a configurable linter with auto-fixing, and an opinionated code formatter in a single, cohesive binary.
+    details: Get a powerful static analyzer, a configurable linter, an architectural guard, and an opinionated code formatter in a single, cohesive binary.
   - icon: 🎨
     title: Smart & opinionated
     details: With a focus on correctness and modern PHP standards, Mago provides intelligent feedback and consistent formatting to eliminate style debates and prevent bugs.

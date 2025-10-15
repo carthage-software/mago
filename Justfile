@@ -71,6 +71,7 @@ publish:
     cargo publish -p mago-codex
     cargo publish -p mago-prelude
     cargo publish -p mago-algebra
+    cargo publish -p mago-guard
     cargo publish -p mago-analyzer
     cargo publish -p mago-linter
     cargo publish -p mago-wasm

@@ -100,6 +100,7 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::Format(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::Ast(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::Analyze(cmd) => cmd.execute(configuration, color_choice),
+        MagoCommand::Guard(cmd) => cmd.execute(configuration, color_choice),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

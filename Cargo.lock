@@ -1431,6 +1431,7 @@ dependencies = [
  "mago-database",
  "mago-fixer",
  "mago-formatter",
+ "mago-guard",
  "mago-linter",
  "mago-names",
  "mago-php-version",
@@ -1607,6 +1608,28 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "unicode-width 0.2.1",
+]
+
+[[package]]
+name = "mago-guard"
+version = "1.0.0-beta.28"
+dependencies = [
+ "ahash",
+ "bumpalo",
+ "indoc",
+ "mago-atom",
+ "mago-codex",
+ "mago-collector",
+ "mago-database",
+ "mago-names",
+ "mago-prelude",
+ "mago-reporting",
+ "mago-span",
+ "mago-syntax",
+ "mago-syntax-core",
+ "regex",
+ "serde",
+ "toml",
 ]
 
 [[package]]

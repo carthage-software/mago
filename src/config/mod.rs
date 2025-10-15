@@ -16,6 +16,7 @@ use mago_php_version::PHPVersion;
 
 use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::formatter::FormatterConfiguration;
+use crate::config::guard::GuardConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::source::SourceConfiguration;
 use crate::consts::*;
@@ -23,6 +24,7 @@ use crate::error::Error;
 
 pub mod analyzer;
 pub mod formatter;
+pub mod guard;
 pub mod linter;
 pub mod source;
 
@@ -64,6 +66,10 @@ pub struct Configuration {
     /// Configuration options for the analyzer.
     #[serde(default)]
     pub analyzer: AnalyzerConfiguration,
+
+    /// Configuration options for the guard.
+    #[serde(default)]
+    pub guard: GuardConfiguration,
 
     /// The log filter.
     ///
@@ -194,6 +200,7 @@ impl Configuration {
             linter: LinterConfiguration::default(),
             formatter: FormatterConfiguration::default(),
             analyzer: AnalyzerConfiguration::default(),
+            guard: GuardConfiguration::default(),
             log: Value::new(None, ValueKind::Nil),
         }
     }
