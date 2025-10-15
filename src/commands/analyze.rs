@@ -11,6 +11,7 @@ use mago_prelude::Prelude;
 use crate::commands::args::baseline::BaselineArgs;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
+use crate::consts::PRELUDE_BYTES;
 use crate::database;
 use crate::error::Error;
 use crate::pipeline::analysis::run_analysis_pipeline;
@@ -81,8 +82,6 @@ impl AnalyzeCommand {
         let (base_db, codebase_metadata, symbol_references) = if self.no_stubs {
             (Default::default(), Default::default(), Default::default())
         } else {
-            const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.bin"));
-
             let prelude = Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude");
 
             (prelude.database, prelude.metadata, prelude.symbol_references)

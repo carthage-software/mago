@@ -23,6 +23,7 @@ use crate::utils::progress::remove_progress_bar;
 
 pub mod analysis;
 pub mod format;
+pub mod guard;
 pub mod lint;
 
 use std::fmt::Debug;

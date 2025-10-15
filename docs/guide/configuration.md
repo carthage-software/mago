@@ -53,6 +53,7 @@ For details on configuring the linter, formatter, and analyzer, see their respec
 - [Linter Configuration](/tools/linter/configuration-reference.md)
 - [Formatter Configuration](/tools/formatter/configuration-reference.md)
 - [Analyzer Configuration](/tools/analyzer/configuration-reference.md)
+- [Guard Configuration](/tools/guard/configuration-reference.md)
 
 ## The `config` Command
 

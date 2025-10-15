@@ -45,6 +45,7 @@ Mago is organized into several tools and utility commands, each accessed via a s
 | [`mago analyze`](/tools/analyzer/command-reference.md) | Analyzes PHP code for type-safety and other issues.        |
 | [`mago ast`](/tools/lexer-parser/command-reference.md) | Inspects the Abstract Syntax Tree of a PHP file.           |
 | [`mago format`](/tools/formatter/command-reference.md) | Formats PHP code.                                          |
+| [`mago guard`](/tools/guard/command-reference.md)      | Enforces architectural rules and boundaries.               |
 | [`mago lint`](/tools/linter/command-reference.md)      | Lints PHP code for style, correctness, and best practices. |
 
 ### Utility Commands

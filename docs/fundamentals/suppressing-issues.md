@@ -6,10 +6,11 @@ Both pragmas require you to specify the exact issue you intend to suppress, usin
 
 ## Categories
 
-There are two issue categories available:
+There are three issue categories available:
 
-- `lint` ( alias: `linter` ): For issues reported by the linter.
-- `analysis` ( alias: `analyzer`, `analyser`): For issues reported by the static analyzer.
+- `lint` (alias: `linter`): For issues reported by the linter.
+- `analysis` (alias: `analyzer`, `analyser`): For issues reported by the static analyzer.
+- `guard`: For issues reported by the architectural guard.
 
 ## Asserting an Issue (`@mago-expect`)
 
@@ -87,7 +88,11 @@ function foo(): string {
 Here are some practical examples of using pragma suppressions:
 
 ```php
-// Suppress a single issue
+// Suppress a guard issue
+// @mago-expect guard:disallowed-use
+use App\Infrastructure\SomeForbiddenClass;
+
+// Suppress a single lint issue
 // @mago-expect lint:no-shorthand-ternary
 $result = $condition ?: 'default';
 

@@ -52,6 +52,7 @@ mago-semantics = { path = "crates/semantics", version = "1.0.0-beta.28" }
 mago-collector = { path = "crates/collector", version = "1.0.0-beta.28" }
 mago-database = { path = "crates/database", version = "1.0.0-beta.28" }
 mago-pager = { path = "crates/pager", version = "1.0.0-beta.28" }
+mago-guard = { path = "crates/guard", version = "1.0.0-beta.28" }
 tracing = { version = "0.1.40" }
 ahash = { version = "0.8", default-features = false, features = ["compile-time-rng", "std"] }
 serde_json = { version = "1.0.138" }
@@ -123,6 +124,7 @@ mago-semantics = { workspace = true }
 mago-prelude = { workspace = true }
 mago-codex = { workspace = true }
 mago-analyzer = { workspace = true }
+mago-guard = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 ahash = { workspace = true }

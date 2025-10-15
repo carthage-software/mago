@@ -13,6 +13,7 @@ use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::ast::AstCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::format::FormatCommand;
+use crate::commands::guard::GuardCommand;
 use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::self_update::SelfUpdateCommand;
@@ -24,6 +25,7 @@ pub mod analyze;
 pub mod ast;
 pub mod config;
 pub mod format;
+pub mod guard;
 pub mod init;
 pub mod lint;
 pub mod self_update;
@@ -56,6 +58,9 @@ pub enum MagoCommand {
     /// Analyze PHP code using Mago's analyzer.
     #[command(name = "analyze")]
     Analyze(AnalyzeCommand),
+    /// Check architectural boundaries using guard rules.
+    #[command(name = "guard")]
+    Guard(GuardCommand),
     /// Format PHP code using Mago's formatter.
     #[command(name = "format")]
     Format(FormatCommand),

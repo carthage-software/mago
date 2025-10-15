@@ -159,6 +159,22 @@ export default defineConfig({
             ],
           },
           {
+            text: "Architectural Guard",
+            collapsed: true,
+            items: [
+              { text: "Overview", link: "/tools/guard/overview" },
+              { text: "Usage", link: "/tools/guard/usage" },
+              {
+                text: "Configuration reference",
+                link: "/tools/guard/configuration-reference",
+              },
+              {
+                text: "Command reference",
+                link: "/tools/guard/command-reference",
+              },
+            ],
+          },
+          {
             text: "Lexer & parser",
             collapsed: true,
             items: [
