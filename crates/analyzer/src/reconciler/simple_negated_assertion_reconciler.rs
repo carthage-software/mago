@@ -59,6 +59,42 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
+            TAtomic::Object(TObject::Named(subtracting_named)) => {
+                // Only handle sealed classes here, let the complex reconciler handle normal classes
+                let subtracting_class_name = subtracting_named.get_name_ref();
+
+                let mut should_subtract_permitted_inheritor = false;
+                for atomic in existing_var_type.types.as_ref() {
+                    if let TAtomic::Object(TObject::Named(existing_named)) = atomic {
+                        let existing_class_name = existing_named.get_name_ref();
+                        if let Some(existing_metadata) = context.codebase.get_class_like(existing_class_name) {
+                            if let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors {
+                                if permitted_inheritors
+                                    .iter()
+                                    .any(|inheritor| inheritor.eq_ignore_ascii_case(subtracting_class_name))
+                                {
+                                    should_subtract_permitted_inheritor = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if should_subtract_permitted_inheritor {
+                    return Some(subtract_object(
+                        context,
+                        assertion,
+                        existing_var_type,
+                        key,
+                        negated,
+                        span,
+                        assertion.has_equality(),
+                    ));
+                }
+
+                // Let the complex reconciler handle this
+            }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
                 return Some(subtract_bool(
                     context,
@@ -261,6 +297,9 @@ fn subtract_object(
 
     let mut acceptable_types = vec![];
 
+    // Get the type being subtracted from the assertion
+    let type_to_subtract = assertion.get_type();
+
     for atomic in existing_var_types {
         if let TAtomic::GenericParameter(generic_parameter) = &atomic {
             if !is_equality && !generic_parameter.constraint.is_mixed() {
@@ -279,6 +318,35 @@ fn subtract_object(
 
             if is_equality {
                 acceptable_types.push(atomic);
+            } else {
+                if let TAtomic::Object(TObject::Named(existing_named)) = &atomic
+                    && let Some(TAtomic::Object(TObject::Named(subtracting_named))) = type_to_subtract
+                {
+                    let existing_class_name = existing_named.get_name_ref();
+                    let subtracting_class_name = subtracting_named.get_name_ref();
+
+                    if let Some(existing_metadata) = context.codebase.get_class_like(existing_class_name) {
+                        // Check if the existing type has permitted inheritors (sealed class/interface)
+                        if let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors {
+                            // If the type we're subtracting is one of the permitted inheritors
+                            // PHP class names are case-insensitive, so we need to compare case-insensitively
+                            let is_subtracting_permitted = permitted_inheritors
+                                .iter()
+                                .any(|inheritor| inheritor.eq_ignore_ascii_case(subtracting_class_name));
+
+                            if is_subtracting_permitted {
+                                // Add the remaining permitted inheritors as acceptable types
+                                for inheritor_name in permitted_inheritors.iter() {
+                                    // Skip the one we're subtracting (case-insensitive comparison)
+                                    if !inheritor_name.eq_ignore_ascii_case(subtracting_class_name) {
+                                        let remaining_object = TNamedObject::new(*inheritor_name);
+                                        acceptable_types.push(TAtomic::Object(TObject::Named(remaining_object)));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } else {
             acceptable_types.push(atomic);
