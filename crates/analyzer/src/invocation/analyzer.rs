@@ -6,7 +6,6 @@ use itertools::Itertools;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::concat_atom;
-
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::expander;
@@ -167,8 +166,20 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 
             if base_parameter_type.has_template_types() {
                 parameter_type_had_template_types = true;
+                let mut replaced_type =
+                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
+                if replaced_type.is_expandable() {
+                    expander::expand_union(
+                        context.codebase,
+                        &mut replaced_type,
+                        &TypeExpansionOptions {
+                            self_class: base_class_metadata.map(|meta| meta.name),
+                            ..Default::default()
+                        },
+                    );
+                }
 
-                Some(inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase))
+                Some(replaced_type)
             } else {
                 Some(base_parameter_type)
             }
@@ -305,7 +316,19 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 
             let final_parameter_type =
                 if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                    let mut final_parameter_type =
+                        inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
+
+                    expander::expand_union(
+                        context.codebase,
+                        &mut final_parameter_type,
+                        &TypeExpansionOptions {
+                            self_class: base_class_metadata.map(|meta| meta.name),
+                            ..Default::default()
+                        },
+                    );
+
+                    final_parameter_type
                 } else {
                     base_parameter_type
                 };
@@ -429,13 +452,29 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     calling_instance_type,
                 );
 
-                let final_variadic_parameter_type = if template_result.has_template_types()
-                    || !template_result.lower_bounds.is_empty()
-                {
-                    inferred_type_replacer::replace(&base_variadic_parameter_type, template_result, context.codebase)
-                } else {
-                    base_variadic_parameter_type
-                };
+                let final_variadic_parameter_type =
+                    if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                        let mut replaced_type = inferred_type_replacer::replace(
+                            &base_variadic_parameter_type,
+                            template_result,
+                            context.codebase,
+                        );
+
+                        if replaced_type.is_expandable() {
+                            expander::expand_union(
+                                context.codebase,
+                                &mut replaced_type,
+                                &TypeExpansionOptions {
+                                    self_class: base_class_metadata.map(|meta| meta.name),
+                                    ..Default::default()
+                                },
+                            );
+                        }
+
+                        replaced_type
+                    } else {
+                        base_variadic_parameter_type
+                    };
 
                 for unpacked_argument in unpacked_arguments {
                     let argument_expression = unpacked_argument.value();
@@ -738,7 +777,24 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
-                                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                                let mut replaced_type = inferred_type_replacer::replace(
+                                    &base_parameter_type,
+                                    template_result,
+                                    context.codebase,
+                                );
+
+                                if replaced_type.is_expandable() {
+                                    expander::expand_union(
+                                        context.codebase,
+                                        &mut replaced_type,
+                                        &TypeExpansionOptions {
+                                            self_class: base_class_metadata.map(|meta| meta.name),
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+
+                                replaced_type
                             } else {
                                 base_parameter_type
                             };
@@ -771,7 +827,24 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
-                                inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                                let mut replaced_type = inferred_type_replacer::replace(
+                                    &base_parameter_type,
+                                    template_result,
+                                    context.codebase,
+                                );
+
+                                if replaced_type.is_expandable() {
+                                    expander::expand_union(
+                                        context.codebase,
+                                        &mut replaced_type,
+                                        &TypeExpansionOptions {
+                                            self_class: base_class_metadata.map(|meta| meta.name),
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+
+                                replaced_type
                             } else {
                                 base_parameter_type
                             };
@@ -857,7 +930,21 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
 
             let final_parameter_type =
                 if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase)
+                    let mut replaced_type =
+                        inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
+
+                    if replaced_type.is_expandable() {
+                        expander::expand_union(
+                            context.codebase,
+                            &mut replaced_type,
+                            &TypeExpansionOptions {
+                                self_class: base_class_metadata.map(|meta| meta.name),
+                                ..Default::default()
+                            },
+                        );
+                    }
+
+                    replaced_type
                 } else {
                     base_parameter_type
                 };

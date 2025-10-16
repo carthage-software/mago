@@ -10,6 +10,8 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
@@ -853,15 +855,28 @@ fn check_template_parameters<'ctx, 'arena>(
             IndexMap::default();
 
         for (template_name, template_type_map) in &parent_metadata.template_types {
-            let Some(extended_type) = extended_parameters.get(template_name) else {
+            let Some(mut extended_type) = extended_parameters.get(template_name).cloned() else {
                 i += 1;
                 continue;
             };
 
-            let Some(template_type) = template_type_map.last().map(|(_, template_type)| template_type) else {
+            let Some(mut template_type) = template_type_map.last().map(|(_, template_type)| template_type).cloned()
+            else {
                 i += 1;
                 continue;
             };
+
+            expand_union(
+                context.codebase,
+                &mut extended_type,
+                &TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() },
+            );
+
+            expand_union(
+                context.codebase,
+                &mut template_type,
+                &TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() },
+            );
 
             let extended_type_str = extended_type.get_id();
 
@@ -931,8 +946,8 @@ fn check_template_parameters<'ctx, 'arena>(
 
             if !template_type.is_mixed() {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
-                let replaced_template_type = standin_type_replacer::replace(
-                    template_type,
+                let mut replaced_template_type = standin_type_replacer::replace(
+                    &template_type,
                     &mut template_result,
                     context.codebase,
                     &None,
@@ -941,9 +956,15 @@ fn check_template_parameters<'ctx, 'arena>(
                     StandinOptions::default(),
                 );
 
+                expand_union(
+                    context.codebase,
+                    &mut replaced_template_type,
+                    &TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() },
+                );
+
                 if !union_comparator::is_contained_by(
                     context.codebase,
-                    extended_type,
+                    &extended_type,
                     &replaced_template_type,
                     false,
                     false,
@@ -971,13 +992,13 @@ fn check_template_parameters<'ctx, 'arena>(
                     previous_extended_types
                         .entry(*template_name)
                         .or_default()
-                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type.clone()));
+                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
                 }
             } else {
                 previous_extended_types
                     .entry(*template_name)
                     .or_default()
-                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type.clone()));
+                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
             }
 
             i += 1;

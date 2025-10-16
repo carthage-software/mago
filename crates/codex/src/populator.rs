@@ -121,31 +121,39 @@ pub fn populate_codebase(
             }
         }
 
-        for map in metadata.template_extended_parameters.values_mut() {
-            for (_, v) in map {
-                if v.needs_population() || userland_force_repopulation {
-                    populate_union_type(
-                        v,
-                        &codebase.symbols,
-                        Some(&class_like_reference_source),
-                        symbol_references,
-                        userland_force_repopulation,
-                    );
-                }
+        for v in metadata.template_types.iter_mut().map(|m| m.1.iter_mut()).flatten().map(|template| &mut template.1) {
+            if v.needs_population() || userland_force_repopulation {
+                populate_union_type(
+                    v,
+                    &codebase.symbols,
+                    Some(&class_like_reference_source),
+                    symbol_references,
+                    userland_force_repopulation,
+                );
             }
         }
 
-        for (_, map) in &mut metadata.template_types {
-            for (_, v) in map {
-                if v.needs_population() || userland_force_repopulation {
-                    populate_union_type(
-                        v,
-                        &codebase.symbols,
-                        Some(&class_like_reference_source),
-                        symbol_references,
-                        userland_force_repopulation,
-                    );
-                }
+        for template in &mut metadata.template_extended_offsets.values_mut().flatten() {
+            if template.needs_population() || userland_force_repopulation {
+                populate_union_type(
+                    template,
+                    &codebase.symbols,
+                    Some(&class_like_reference_source),
+                    symbol_references,
+                    userland_force_repopulation,
+                );
+            }
+        }
+
+        for p in metadata.template_extended_parameters.values_mut().map(|m| m.values_mut()).flatten() {
+            if p.needs_population() || userland_force_repopulation {
+                populate_union_type(
+                    p,
+                    &codebase.symbols,
+                    Some(&class_like_reference_source),
+                    symbol_references,
+                    userland_force_repopulation,
+                );
             }
         }
 
@@ -498,19 +506,6 @@ fn populate_class_like_metadata(
         let method_id = MethodIdentifier::new(*classlike_name, *method_name);
         metadata.appearing_method_ids.insert(*method_name, method_id);
         metadata.declaring_method_ids.insert(*method_name, method_id);
-    }
-
-    let force_repopulation = !safe_symbols.contains(classlike_name);
-    for parameter_types in metadata.template_extended_offsets.values_mut() {
-        for parameter_type in parameter_types {
-            populate_union_type(
-                parameter_type,
-                &codebase.symbols,
-                Some(&ReferenceSource::Symbol(true, *classlike_name)),
-                symbol_references,
-                force_repopulation,
-            );
-        }
     }
 
     for trait_name in metadata.used_traits.iter().copied().collect::<Vec<_>>() {
