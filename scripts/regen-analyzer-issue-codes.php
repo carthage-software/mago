@@ -125,6 +125,7 @@ final class AnalyzerCodeModuleGenerator
         'paradoxical-condition',
         'possible-method-access-on-null',
         'possibly-invalid-argument',
+        'null-array-access',
         'possibly-null-array-access',
         'possibly-null-array-index',
         'possibly-undefined-array-index',

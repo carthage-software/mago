@@ -164,6 +164,7 @@ pub enum IssueCode {
     NonExistentProperty,
     NonIterableObjectIteration,
     NullArgument,
+    NullArrayAccess,
     NullArrayIndex,
     NullIterator,
     NullOperand,
@@ -419,6 +420,7 @@ impl IssueCode {
             Self::NonExistentProperty => "non-existent-property",
             Self::NonIterableObjectIteration => "non-iterable-object-iteration",
             Self::NullArgument => "null-argument",
+            Self::NullArrayAccess => "null-array-access",
             Self::NullArrayIndex => "null-array-index",
             Self::NullIterator => "null-iterator",
             Self::NullOperand => "null-operand",
@@ -537,11 +539,12 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_nullable_issue_codes() -> [Self; 16] {
+    pub const fn get_nullable_issue_codes() -> [Self; 17] {
         [
             Self::ImpossibleNullTypeComparison,
             Self::MethodAccessOnNull,
             Self::NullArgument,
+            Self::NullArrayAccess,
             Self::NullArrayIndex,
             Self::NullIterator,
             Self::NullOperand,
@@ -558,11 +561,12 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_nullable_issue_code_values() -> [&'static str; 16] {
+    pub const fn get_nullable_issue_code_values() -> [&'static str; 17] {
         [
             "impossible-null-type-comparison",
             "method-access-on-null",
             "null-argument",
+            "null-array-access",
             "null-array-index",
             "null-iterator",
             "null-operand",
@@ -947,7 +951,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_array_issue_codes() -> [Self; 21] {
+    pub const fn get_array_issue_codes() -> [Self; 22] {
         [
             Self::ArrayAppendInReadContext,
             Self::ArrayToStringConversion,
@@ -962,6 +966,7 @@ impl IssueCode {
             Self::MixedArrayAccess,
             Self::MixedArrayAssignment,
             Self::MixedArrayIndex,
+            Self::NullArrayAccess,
             Self::NullArrayIndex,
             Self::PossiblyNullArrayAccess,
             Self::PossiblyNullArrayIndex,
@@ -973,7 +978,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_array_issue_code_values() -> [&'static str; 21] {
+    pub const fn get_array_issue_code_values() -> [&'static str; 22] {
         [
             "array-append-in-read-context",
             "array-to-string-conversion",
@@ -988,6 +993,7 @@ impl IssueCode {
             "mixed-array-access",
             "mixed-array-assignment",
             "mixed-array-index",
+            "null-array-access",
             "null-array-index",
             "possibly-null-array-access",
             "possibly-null-array-index",
@@ -1266,6 +1272,7 @@ impl std::str::FromStr for IssueCode {
             "non-existent-property" => Ok(Self::NonExistentProperty),
             "non-iterable-object-iteration" => Ok(Self::NonIterableObjectIteration),
             "null-argument" => Ok(Self::NullArgument),
+            "null-array-access" => Ok(Self::NullArrayAccess),
             "null-array-index" => Ok(Self::NullArrayIndex),
             "null-iterator" => Ok(Self::NullIterator),
             "null-operand" => Ok(Self::NullOperand),
