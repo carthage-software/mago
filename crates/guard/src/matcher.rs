@@ -16,11 +16,13 @@ pub const SEPARATOR: char = '\\';
 ///   - `**`: Matches any number of segments (including zero).
 ///   - Segments can also contain `*` for partial matches (e.g., `*Repository`).
 /// * `is_constant`: If `true`, the last segment of the FQN is matched case-sensitively.
+/// * `treat_as_namespace`: If `true`, the pattern is treated as a namespace, meaning it matches
+///   any FQN that starts with the pattern.
 ///
 /// # Returns
 ///
 /// `true` if the `fqcn` matches the `pattern`, `false` otherwise.
-pub fn matches(fqcn: &str, pattern: &str, treat_as_namespace: bool, is_constant: bool) -> bool {
+pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace: bool) -> bool {
     if !pattern.contains('*') {
         let p = pattern.trim_matches(SEPARATOR);
         let f = fqcn.trim_matches(SEPARATOR);
