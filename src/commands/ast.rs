@@ -5,15 +5,16 @@ use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
-use mago_database::Database;
-use mago_reporting::IssueCollection;
 use serde_json::json;
 use termtree::Tree;
+use unicode_width::UnicodeWidthStr;
 
+use mago_database::Database;
 use mago_database::file::File;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
 use mago_syntax::ast::*;
 use mago_syntax::error::ParseError;
 use mago_syntax::lexer::Lexer;
@@ -23,6 +24,8 @@ use mago_syntax_core::input::Input;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::error::Error;
+
+const VALUE_COLUMN_WIDTH: usize = 50;
 
 /// A powerful tool for inspecting the lexical and syntactical structure of PHP code.
 ///
@@ -144,12 +147,18 @@ impl AstCommand {
             println!("  {: <25} {: <50} {}", "Kind".bold(), "Value".bold(), "Span".bold());
             println!("  {0:─<25} {0:─<50} {0:─<20}", "");
             for token in tokens {
-                let value_str = format!("{:?}", token.value).bright_black();
+                let end_byte_index = token.value.char_indices().nth(48).map_or(token.value.len(), |(i, _)| i);
+                let value_for_display = format!("{:?}", &token.value[..end_byte_index]);
+                let visual_width = UnicodeWidthStr::width(value_for_display.as_str());
+                let padding_needed = VALUE_COLUMN_WIDTH.saturating_sub(visual_width);
+
+                let value_str = format!("{}{}", value_for_display, " ".repeat(padding_needed)).bright_black();
                 let kind_str = format!("{:?}", token.kind).cyan();
+
                 println!(
-                    "  {: <25} {: <50} {}",
+                    "  {: <25} {} {}",
                     kind_str,
-                    &value_str[..value_str.len().min(48)],
+                    value_str,
                     format!("[{}..{}]", token.span.start, token.span.end).dimmed()
                 );
             }
