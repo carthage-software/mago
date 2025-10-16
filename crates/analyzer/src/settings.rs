@@ -96,6 +96,16 @@ pub struct Settings {
     /// Defaults to `true`.
     pub perform_heuristic_checks: bool,
 
+    /// Enforce strict checks when accessing list elements by index.
+    ///
+    /// When `true`, the analyzer requires that any integer used to access a `list`
+    /// element is provably non-negative (e.g., of type `int<0, max>`). This helps
+    /// prevent potential runtime errors from using a negative index.
+    ///
+    /// When `false` (the default), any `int` is permitted as an index, offering
+    /// more flexibility at the cost of type safety.
+    pub strict_list_index_checks: bool,
+
     /// Enable colored output in terminal environments that support it. Defaults to `true`.
     ///
     /// This setting is primarily used for enabling/disabling colored diffs in
@@ -148,6 +158,7 @@ impl Settings {
             // TODO(azjezz): enable heuristic checks in the future,
             // need optimizations first
             perform_heuristic_checks: false,
+            strict_list_index_checks: false,
             diff: false,
         }
     }

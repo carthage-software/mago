@@ -65,3 +65,4 @@ These flags control specific, powerful analysis capabilities.
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
 | `check-throws`                        | `true`  | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.              |
 | `perform-heuristic-checks`            | `true`  | Perform extra heuristic checks for potential issues that are not strict typing errors.               |
+| `strict-list-index-checks`            | `false` | When `true`, requires any integer used as a `list` index to be provably non-negative.                |

@@ -66,6 +66,7 @@ fn run_test_case_inner(config: TestCase) {
             find_unused_expressions: true,
             check_throws: true,
             allow_possibly_undefined_array_keys: false,
+            strict_list_index_checks: true,
             ..Default::default()
         },
     );

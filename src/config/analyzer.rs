@@ -96,6 +96,16 @@ pub struct AnalyzerConfiguration {
     /// Whether to check for thrown exceptions.
     pub check_throws: bool,
 
+    /// Enforce strict checks when accessing list elements by index.
+    ///
+    /// When `true`, the analyzer requires that any integer used to access a `list`
+    /// element is provably non-negative (e.g., of type `int<0, max>`). This helps
+    /// prevent potential runtime errors from using a negative index.
+    ///
+    /// When `false` (the default), any `int` is permitted as an index, offering
+    /// more flexibility at the cost of type safety.
+    pub strict_list_index_checks: bool,
+
     /// Whether to perform heuristic checks.
     pub perform_heuristic_checks: bool,
 }
@@ -130,6 +140,7 @@ impl AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             perform_heuristic_checks: self.perform_heuristic_checks,
+            strict_list_index_checks: self.strict_list_index_checks,
             use_colors: match color_choice {
                 ColorChoice::Always => true,
                 ColorChoice::Never => false,
@@ -174,6 +185,7 @@ impl Default for AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
             perform_heuristic_checks: defaults.perform_heuristic_checks,
+            strict_list_index_checks: defaults.strict_list_index_checks,
         }
     }
 }
