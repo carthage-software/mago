@@ -7,7 +7,6 @@ use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
-use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
@@ -25,8 +24,6 @@ use crate::ttype::comparator::object_comparator;
 use crate::ttype::comparator::resource_comparator;
 use crate::ttype::comparator::scalar_comparator;
 use crate::ttype::comparator::union_comparator;
-use crate::ttype::get_iterable_parameters;
-use crate::ttype::get_iterable_value_parameter;
 
 use super::iterable_comparator;
 
@@ -190,43 +187,6 @@ pub fn is_contained_by(
         }
 
         return false;
-    }
-
-    if let TAtomic::Object(TObject::Named(_)) = container_type_part {
-        match input_type_part {
-            TAtomic::Array(TArray::Keyed(_)) => {
-                if let Some(parameters) = get_iterable_parameters(container_type_part, codebase) {
-                    return self::is_contained_by(
-                        codebase,
-                        input_type_part,
-                        &TAtomic::Array(TArray::Keyed(TKeyedArray {
-                            parameters: Some((Box::new(parameters.0), Box::new(parameters.1))),
-                            known_items: None,
-                            non_empty: false,
-                        })),
-                        inside_assertion,
-                        atomic_comparison_result,
-                    );
-                }
-            }
-            TAtomic::Array(TArray::List(_)) => {
-                if let Some(value_parameter) = get_iterable_value_parameter(container_type_part, codebase) {
-                    return self::is_contained_by(
-                        codebase,
-                        input_type_part,
-                        &TAtomic::Array(TArray::List(TList {
-                            element_type: Box::new(value_parameter),
-                            known_elements: None,
-                            non_empty: false,
-                            known_count: None,
-                        })),
-                        inside_assertion,
-                        atomic_comparison_result,
-                    );
-                }
-            }
-            _ => (),
-        }
     }
 
     if let TAtomic::Resource(_) = container_type_part {
