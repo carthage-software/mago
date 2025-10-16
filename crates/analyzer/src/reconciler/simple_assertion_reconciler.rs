@@ -59,7 +59,6 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    possibly_undefined: bool,
     key: Option<&String>,
     span: Option<&Span>,
     negated: bool,
@@ -243,16 +242,9 @@ pub(crate) fn reconcile(
         Assertion::Truthy | Assertion::NonEmpty => {
             Some(reconcile_truthy_or_non_empty(context, assertion, existing_var_type, key, negated, span))
         }
-        Assertion::IsEqualIsset | Assertion::IsIsset => Some(reconcile_isset(
-            context,
-            assertion,
-            existing_var_type,
-            possibly_undefined,
-            key,
-            negated,
-            span,
-            inside_loop,
-        )),
+        Assertion::IsEqualIsset | Assertion::IsIsset => {
+            Some(reconcile_isset(context, assertion, existing_var_type, key, negated, span, inside_loop))
+        }
         Assertion::HasStringArrayAccess => {
             Some(reconcile_array_access(context, assertion, existing_var_type, key, negated, span, false))
         }
@@ -269,16 +261,9 @@ pub(crate) fn reconcile(
         Assertion::InArray(typed_value) => {
             Some(reconcile_in_array(context, assertion, existing_var_type, key, negated, span, typed_value))
         }
-        Assertion::HasArrayKey(key_name) => Some(reconcile_has_array_key(
-            context,
-            assertion,
-            existing_var_type,
-            key,
-            key_name,
-            negated,
-            possibly_undefined,
-            span,
-        )),
+        Assertion::HasArrayKey(key_name) => {
+            Some(reconcile_has_array_key(context, assertion, existing_var_type, key, key_name, negated, span))
+        }
         Assertion::HasNonnullEntryForKey(key_name) => Some(reconcile_has_nonnull_entry_for_key(
             context,
             assertion,
@@ -286,7 +271,6 @@ pub(crate) fn reconcile(
             key,
             key_name,
             negated,
-            possibly_undefined,
             span,
         )),
         Assertion::NonEmptyCountable(_) => {
@@ -1345,15 +1329,14 @@ fn reconcile_isset(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    possibly_undefined: bool,
     key: Option<&String>,
     negated: bool,
     span: Option<&Span>,
     inside_loop: bool,
 ) -> TUnion {
-    let mut did_remove_type = possibly_undefined || existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined || existing_var_type.possibly_undefined_from_try;
 
-    if possibly_undefined {
+    if existing_var_type.possibly_undefined {
         did_remove_type = true;
     }
 
@@ -1907,10 +1890,9 @@ fn reconcile_has_array_key(
     key: Option<&String>,
     key_name: &ArrayKey,
     negated: bool,
-    possibly_undefined: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = possibly_undefined;
+    let mut did_remove_type = existing_var_type.possibly_undefined;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
     let existing_var_types = new_var_type.types.to_mut().drain(..).collect::<Vec<_>>();
@@ -1984,14 +1966,7 @@ fn reconcile_has_array_key(
                 } else {
                     let acceptable_atomic = TAtomic::GenericParameter(TGenericParameter {
                         constraint: Box::new(reconcile_has_array_key(
-                            context,
-                            assertion,
-                            constraint,
-                            None,
-                            key_name,
-                            negated,
-                            possibly_undefined,
-                            None,
+                            context, assertion, constraint, None, key_name, negated, None,
                         )),
                         parameter_name: *parameter_name,
                         defining_entity: *defining_entity,
@@ -2045,10 +2020,9 @@ fn reconcile_has_nonnull_entry_for_key(
     key: Option<&String>,
     key_name: &ArrayKey,
     negated: bool,
-    possibly_undefined: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = possibly_undefined;
+    let mut did_remove_type = existing_var_type.possibly_undefined;
 
     let mut new_var_type = existing_var_type.clone();
 
@@ -2135,16 +2109,7 @@ fn reconcile_has_nonnull_entry_for_key(
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
                 if let Some(atomic) = map_concrete_generic_constraint(generic_parameter, |constraint| {
-                    reconcile_has_nonnull_entry_for_key(
-                        context,
-                        assertion,
-                        constraint,
-                        None,
-                        key_name,
-                        negated,
-                        possibly_undefined,
-                        None,
-                    )
+                    reconcile_has_nonnull_entry_for_key(context, assertion, constraint, None, key_name, negated, None)
                 }) {
                     acceptable_types.push(atomic);
                 }

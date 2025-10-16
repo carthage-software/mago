@@ -13,7 +13,6 @@ use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
-
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -140,7 +139,6 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
 
         let did_type_exist = block_context.locals.contains_key(key);
         let mut has_object_array_access = false;
-        let mut possibly_undefined = false;
 
         let mut result_type = block_context.locals.get(key).map(|t| t.as_ref().clone()).or_else(|| {
             get_value_for_key(
@@ -154,7 +152,6 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                 false,
                 inside_loop,
                 &mut has_object_array_access,
-                &mut possibly_undefined,
             )
         });
 
@@ -167,7 +164,6 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                     context,
                     assertion,
                     result_type.as_ref(),
-                    possibly_undefined,
                     Some(key),
                     inside_loop,
                     Some(span),
@@ -614,7 +610,6 @@ fn get_value_for_key<'ctx>(
     has_empty: bool,
     inside_loop: bool,
     has_object_array_access: &mut bool,
-    possibly_undefined: &mut bool,
 ) -> Option<TUnion> {
     let mut key_parts = break_up_path_into_parts(&key);
     if key_parts.is_empty() {
@@ -730,7 +725,7 @@ fn get_value_for_key<'ctx>(
                             new_base_type_candidate = known_item.1.clone();
 
                             if known_item.0 {
-                                *possibly_undefined = true;
+                                new_base_type_candidate.possibly_undefined = true;
                             }
                         } else {
                             if has_empty {
@@ -756,7 +751,7 @@ fn get_value_for_key<'ctx>(
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
-                                *possibly_undefined = true;
+                                new_base_type_candidate.possibly_undefined = true;
                             }
                         }
                     } else if let TAtomic::Array(TArray::List(TList { known_elements, .. })) = &existing_key_type_part {
@@ -776,7 +771,7 @@ fn get_value_for_key<'ctx>(
                             new_base_type_candidate = known_item.1.clone();
 
                             if known_item.0 {
-                                *possibly_undefined = true;
+                                new_base_type_candidate.possibly_undefined = true;
                             }
                         } else {
                             new_base_type_candidate =
@@ -790,7 +785,7 @@ fn get_value_for_key<'ctx>(
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
-                                *possibly_undefined = true;
+                                new_base_type_candidate.possibly_undefined = true;
                             }
                         }
                     } else if matches!(existing_key_type_part, TAtomic::Scalar(TScalar::String(_))) {

@@ -16,20 +16,27 @@ use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
+use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
+use crate::ttype::atomic::conditional::TConditional;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
+use crate::ttype::atomic::generic::TGenericParameter;
+use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::error::TypeError;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_bool;
@@ -68,14 +75,6 @@ use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
-
-use super::atomic::array::key::ArrayKey;
-use super::atomic::array::list::TList;
-use super::atomic::conditional::TConditional;
-use super::atomic::generic::TGenericParameter;
-use super::atomic::iterable::TIterable;
-use super::atomic::reference::TReference;
-use super::atomic::scalar::int::TInteger;
 
 /// Parses a type string (typically from a PHPDoc comment) and resolves it
 /// into a semantic `TUnion` type representation.
@@ -562,7 +561,10 @@ fn get_shape_from_ast(
                     }
                 };
 
-                let field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                if field_is_optional {
+                    field_value_type.possibly_undefined = true;
+                }
 
                 tree.insert(offset, (field_is_optional, field_value_type));
             }
@@ -626,7 +628,10 @@ fn get_shape_from_ast(
                     }
                 };
 
-                let field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                if field_is_optional {
+                    field_value_type.possibly_undefined = true;
+                }
 
                 tree.insert(array_key, (field_is_optional, field_value_type));
             }

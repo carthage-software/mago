@@ -438,6 +438,8 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
                                 )
                             ),
                         );
+
+                        resulting_type = resulting_type.as_nullable();
                     }
                 }
 
@@ -565,9 +567,10 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                 *has_valid_expected_index = true;
                 *has_matching_dict_key = true;
 
-                let expression_type = actual_value;
+                let mut expression_type = actual_value;
                 if actual_possibly_undefined {
                     *has_possibly_undefined = true;
+                    expression_type.set_possibly_undefined(true, None);
                     if !in_assignment && !block_context.inside_isset && !block_context.inside_unset {
                         context.collector.report_with_code(
                             match &array_key {
@@ -592,6 +595,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                                 )
                             ),
                         );
+
+                        expression_type = expression_type.as_nullable();
                     }
                 }
 

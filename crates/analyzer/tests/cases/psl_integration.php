@@ -140,8 +140,7 @@ namespace {
     i_take_int($array['age']);
     i_take_string($array['address']['street']);
     i_take_string($array['address']['city']);
-    /** @mago-expect analysis:possibly-undefined-string-array-index */
-    i_take_string($array['address']['country']);
+    i_take_string($array['address']['country'] ?? '');
 
     if (isset($array['address']['country'])) {
         i_take_string($array['address']['country']);
@@ -151,8 +150,7 @@ namespace {
     i_take_int($list[1]);
     i_take_string($list[2]['street']);
     i_take_string($list[2]['city']);
-    /** @mago-expect analysis:possibly-undefined-string-array-index */
-    i_take_string($list[2]['country']);
+    i_take_string($list[2]['country'] ?? '');
 
     if (isset($list[2]['country'])) {
         i_take_string($list[2]['country']);

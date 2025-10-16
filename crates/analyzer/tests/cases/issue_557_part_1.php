@@ -25,6 +25,10 @@ $x = [];
 // Test 1: Direct negated isset check
 // When !isset($x['foo']) is true, $x['foo'] should be null
 if (!isset($x['foo'])) {
+    /**
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-invalid-argument
+     */
     expectsNull($x['foo']);
 }
 
@@ -33,6 +37,10 @@ if (!isset($x['foo'])) {
 if (isset($x['foo'])) {
     expectsString($x['foo']);
 } else {
+    /**
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-invalid-argument
+     */
     expectsNull($x['foo']);
 }
 
@@ -41,6 +49,12 @@ if (isset($x['foo'])) {
 $y = [];
 
 if (!isset($y['foo']['bar'])) {
+    /**
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-null-array-access
+     * @mago-expect analysis:possibly-invalid-argument
+     */
     expectsNull($y['foo']['bar']);
 } else {
     expectsArray($y['foo']);
@@ -49,6 +63,12 @@ if (!isset($y['foo']['bar'])) {
 if (isset($y['foo']['bar'])) {
     expectsString($y['foo']['bar']);
 } else {
+    /**
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-undefined-string-array-index
+     * @mago-expect analysis:possibly-null-array-access
+     * @mago-expect analysis:possibly-invalid-argument
+     */
     expectsNull($y['foo']['bar']);
 }
 

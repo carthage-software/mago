@@ -18,6 +18,10 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::atomic::scalar::int::TInteger;
+use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::comparator::ComparisonResult;
+use crate::ttype::comparator::union_comparator;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::shared::*;
 use crate::ttype::template::TemplateResult;
@@ -733,27 +737,20 @@ pub fn add_union_type(
     codebase: &CodebaseMetadata,
     overwrite_empty_array: bool,
 ) -> TUnion {
-    if &base_type == other_type {
-        base_type.possibly_undefined |= other_type.possibly_undefined;
-        base_type.possibly_undefined_from_try |= other_type.possibly_undefined_from_try;
-        base_type.ignore_falsable_issues |= other_type.ignore_falsable_issues;
-        base_type.ignore_nullable_issues |= other_type.ignore_nullable_issues;
+    if &base_type != other_type {
+        base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
+            base_type.types
+        } else {
+            combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
+        };
 
-        return base_type;
-    }
+        if !other_type.had_template {
+            base_type.had_template = false;
+        }
 
-    base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
-        base_type.types
-    } else {
-        combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
-    };
-
-    if !other_type.had_template {
-        base_type.had_template = false;
-    }
-
-    if !other_type.reference_free {
-        base_type.reference_free = false;
+        if !other_type.reference_free {
+            base_type.reference_free = false;
+        }
     }
 
     base_type.possibly_undefined |= other_type.possibly_undefined;
@@ -764,7 +761,226 @@ pub fn add_union_type(
     base_type
 }
 
-pub fn intersect_union_types(_type_1: &TUnion, _type_2: &TUnion, _codebase: &CodebaseMetadata) -> Option<TUnion> {
+pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &CodebaseMetadata) -> Option<TUnion> {
+    if type_1 == type_2 {
+        return Some(type_1.clone());
+    }
+
+    if type_1.is_never() || type_2.is_never() {
+        return Some(get_never());
+    }
+
+    let mut intersection_performed = false;
+
+    if type_1.is_mixed() {
+        if type_2.is_mixed() {
+            return Some(get_mixed());
+        }
+
+        return Some(type_2.clone());
+    } else if type_2.is_mixed() {
+        return Some(type_1.clone());
+    }
+
+    let mut intersected_atomic_types = vec![];
+    for type_1_atomic in type_1.types.iter() {
+        for type_2_atomic in type_2.types.iter() {
+            if let Some(intersection_atomic) =
+                intersect_atomic_types(type_1_atomic, type_2_atomic, codebase, &mut intersection_performed)
+            {
+                intersected_atomic_types.push(intersection_atomic);
+            }
+        }
+    }
+
+    let mut combined_type: Option<TUnion> = None;
+    if !intersected_atomic_types.is_empty() {
+        let combined_vec = combiner::combine(intersected_atomic_types, codebase, false);
+        if !combined_vec.is_empty() {
+            combined_type = Some(TUnion::from_vec(combined_vec));
+        }
+    }
+
+    // If atomic-level intersection didn't yield a result, check for subtyping at the union level.
+    if !intersection_performed {
+        if union_comparator::is_contained_by(
+            codebase,
+            type_1,
+            type_2,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        ) {
+            intersection_performed = true;
+            combined_type = Some(type_1.clone());
+        } else if union_comparator::is_contained_by(
+            codebase,
+            type_2,
+            type_1,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        ) {
+            intersection_performed = true;
+            combined_type = Some(type_2.clone());
+        }
+    }
+
+    if let Some(mut final_type) = combined_type {
+        final_type.possibly_undefined = type_1.possibly_undefined && type_2.possibly_undefined;
+        final_type.possibly_undefined_from_try =
+            type_1.possibly_undefined_from_try && type_2.possibly_undefined_from_try;
+        final_type.ignore_falsable_issues = type_1.ignore_falsable_issues && type_2.ignore_falsable_issues;
+        final_type.ignore_nullable_issues = type_1.ignore_nullable_issues && type_2.ignore_nullable_issues;
+
+        return Some(final_type);
+    }
+
+    if !intersection_performed && type_1.get_id() != type_2.get_id() {
+        return None;
+    }
+
+    None
+}
+
+/// This is the core logic used by `intersect_union_types`.
+fn intersect_atomic_types(
+    type_1: &TAtomic,
+    type_2: &TAtomic,
+    codebase: &CodebaseMetadata,
+    intersection_performed: &mut bool,
+) -> Option<TAtomic> {
+    if let (TAtomic::Scalar(TScalar::Integer(t1_int)), TAtomic::Scalar(TScalar::Integer(t2_int))) = (type_1, type_2) {
+        let (min1, max1) = t1_int.get_bounds();
+        let (min2, max2) = t2_int.get_bounds();
+
+        let new_min = match (min1, min2) {
+            (Some(m1), Some(m2)) => Some(m1.max(m2)),
+            (Some(m), None) | (None, Some(m)) => Some(m),
+            (None, None) => None,
+        };
+
+        let new_max = match (max1, max2) {
+            (Some(m1), Some(m2)) => Some(m1.min(m2)),
+            (Some(m), None) | (None, Some(m)) => Some(m),
+            (None, None) => None,
+        };
+
+        let intersected_int = if let (Some(min), Some(max)) = (new_min, new_max) {
+            if min > max {
+                return None;
+            }
+
+            if min == max { TInteger::Literal(min) } else { TInteger::Range(min, max) }
+        } else if let Some(min) = new_min {
+            TInteger::From(min)
+        } else if let Some(max) = new_max {
+            TInteger::To(max)
+        } else {
+            TInteger::Unspecified
+        };
+
+        *intersection_performed = true;
+        return Some(TAtomic::Scalar(TScalar::Integer(intersected_int)));
+    }
+
+    let t1_union = TUnion::from_atomic(type_1.clone());
+    let t2_union = TUnion::from_atomic(type_2.clone());
+
+    let mut narrower_type = None;
+    let mut wider_type = None;
+
+    if union_comparator::is_contained_by(
+        codebase,
+        &t2_union,
+        &t1_union,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    ) {
+        narrower_type = Some(type_2);
+        wider_type = Some(type_1);
+    } else if union_comparator::is_contained_by(
+        codebase,
+        &t1_union,
+        &t2_union,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    ) {
+        narrower_type = Some(type_1);
+        wider_type = Some(type_2);
+    }
+
+    if let (Some(narrower), Some(wider)) = (narrower_type, wider_type) {
+        *intersection_performed = true;
+        let mut result = narrower.clone();
+
+        if narrower.can_be_intersected() && wider.can_be_intersected() {
+            let mut wider_clone = wider.clone();
+            if let Some(types) = wider_clone.get_intersection_types_mut() {
+                types.clear();
+            }
+            result.add_intersection_type(wider_clone);
+
+            if let Some(wider_intersections) = wider.get_intersection_types() {
+                for i_type in wider_intersections {
+                    result.add_intersection_type(i_type.clone());
+                }
+            }
+        }
+        return Some(result);
+    }
+
+    if let (TAtomic::Scalar(TScalar::String(s1)), TAtomic::Scalar(TScalar::String(s2))) = (type_1, type_2) {
+        if let (Some(v1), Some(v2)) = (&s1.get_known_literal_value(), &s2.get_known_literal_value())
+            && v1 != v2
+        {
+            return None;
+        }
+
+        let combined = TAtomic::Scalar(TScalar::String(TString {
+            is_numeric: s1.is_numeric || s2.is_numeric,
+            is_truthy: s1.is_truthy || s2.is_truthy,
+            is_non_empty: s1.is_non_empty || s2.is_non_empty,
+            is_lowercase: s1.is_lowercase || s2.is_lowercase,
+            literal: if s1.is_literal_origin() && s2.is_literal_origin() {
+                Some(TStringLiteral::Unspecified)
+            } else {
+                None
+            },
+        }));
+        *intersection_performed = true;
+        return Some(combined);
+    }
+
+    if type_1.can_be_intersected() && type_2.can_be_intersected() {
+        if let (TAtomic::Object(TObject::Named(n1)), TAtomic::Object(TObject::Named(n2))) = (type_1, type_2)
+            && let (Some(c1), Some(c2)) = (codebase.get_class_like(&n1.name), codebase.get_class_like(&n2.name))
+            && !c1.kind.is_interface()
+            && !c1.kind.is_trait()
+            && !c2.kind.is_interface()
+            && !c2.kind.is_trait()
+        {
+            return None;
+        }
+
+        let mut result = type_1.clone();
+        result.add_intersection_type(type_2.clone());
+        if let Some(intersections) = type_2.get_intersection_types() {
+            for i in intersections {
+                result.add_intersection_type(i.clone());
+            }
+        }
+
+        *intersection_performed = true;
+        return Some(result);
+    }
+
     None
 }
 

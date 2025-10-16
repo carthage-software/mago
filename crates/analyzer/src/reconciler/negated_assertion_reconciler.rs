@@ -30,7 +30,6 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    possibly_undefined: bool,
     key: Option<&String>,
     old_var_type_atom: Atom,
     span: Option<&Span>,
@@ -53,15 +52,8 @@ pub(crate) fn reconcile(
         );
     }
 
-    let simple_negated_type = simple_negated_assertion_reconciler::reconcile(
-        context,
-        assertion,
-        existing_var_type,
-        possibly_undefined,
-        key,
-        span,
-        negated,
-    );
+    let simple_negated_type =
+        simple_negated_assertion_reconciler::reconcile(context, assertion, existing_var_type, key, span, negated);
 
     if let Some(simple_negated_type) = simple_negated_type {
         return simple_negated_type;

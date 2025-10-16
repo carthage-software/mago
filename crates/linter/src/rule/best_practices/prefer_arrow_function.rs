@@ -92,11 +92,11 @@ impl LintRule for PreferArrowFunctionRule {
             return;
         };
 
-        if let Some(use_clause) = closure.use_clause.as_ref() {
-            if use_clause.variables.iter().any(|variable| variable.ampersand.is_some()) {
-                // If the closure captures any variables by reference, we skip it.
-                return;
-            }
+        if let Some(use_clause) = closure.use_clause.as_ref()
+            && use_clause.variables.iter().any(|variable| variable.ampersand.is_some())
+        {
+            // If the closure captures any variables by reference, we skip it.
+            return;
         }
 
         let Some(return_statement) = get_single_return_statement(&closure.body) else {

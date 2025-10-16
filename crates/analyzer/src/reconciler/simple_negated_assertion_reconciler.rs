@@ -34,7 +34,6 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    possibly_undefined: bool,
     key: Option<&String>,
     span: Option<&Span>,
     negated: bool,
@@ -187,7 +186,7 @@ pub(crate) fn reconcile(
         Assertion::Falsy | Assertion::Empty => {
             Some(reconcile_falsy_or_empty(context, assertion, existing_var_type, key, negated, span))
         }
-        Assertion::IsNotIsset => Some(reconcile_not_isset(context, existing_var_type, possibly_undefined, key, span)),
+        Assertion::IsNotIsset => Some(reconcile_not_isset(context, existing_var_type, key, span)),
         Assertion::ArrayKeyDoesNotExist => Some(get_never()),
         Assertion::DoesNotHaveArrayKey(key_name) => {
             Some(reconcile_no_array_key(context, assertion, existing_var_type, key, span, key_name, negated))
@@ -1134,15 +1133,14 @@ fn reconcile_falsy_or_empty(
 fn reconcile_not_isset(
     _context: &mut Context<'_, '_>,
     existing_var_type: &TUnion,
-    possibly_undefined: bool,
     key: Option<&String>,
     span: Option<&Span>,
 ) -> TUnion {
     // When !isset is true, the value is definitely not set (either null or undefined)
     // For array accesses, this means the key doesn't exist or the value is null
     // In both cases, the resulting type should be null
-    if possibly_undefined {
-        return get_null();
+    if existing_var_type.possibly_undefined {
+        return get_never();
     }
 
     if !existing_var_type.is_nullable()
@@ -1150,7 +1148,7 @@ fn reconcile_not_isset(
         && !key.contains('[')
         && (!existing_var_type.is_mixed() || existing_var_type.is_always_truthy())
     {
-        if let Some(_pos) = span {
+        if span.is_some() {
             // todo
         }
 

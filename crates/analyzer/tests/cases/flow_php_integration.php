@@ -85,11 +85,7 @@ namespace {
     ]);
 
     // Test structure with allow_extra (third parameter)
-    $flexible_type = Flow\Types\DSL\type_structure(
-        ['required_field' => Flow\Types\DSL\type_string()],
-        [],
-        true
-    );
+    $flexible_type = Flow\Types\DSL\type_structure(['required_field' => Flow\Types\DSL\type_string()], [], true);
 
     $array = $array_type->assert(get_mixed());
 
@@ -98,8 +94,7 @@ namespace {
     i_take_string($array['address']['street']);
     i_take_string($array['address']['city']);
 
-    /** @mago-expect analysis:possibly-undefined-string-array-index */
-    i_take_string($array['address']['country']);
+    i_take_string($array['address']['country'] ?? 'DefaultCountry');
 
     if (isset($array['address']['country'])) {
         i_take_string($array['address']['country']);

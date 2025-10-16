@@ -325,7 +325,6 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             context,
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
-            false,
             Some(&"".to_string()),
             block_context.inside_loop,
             Some(&condition.span()),

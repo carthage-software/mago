@@ -349,7 +349,6 @@ impl<'ctx> BlockContext<'ctx> {
                         context,
                         assertion,
                         Some(&new_type.clone()),
-                        false,
                         None,
                         false,
                         None,
@@ -656,7 +655,7 @@ pub fn subtract_union_types<'ctx, 'arena>(
         let assertion = Assertion::IsNotType(atomic);
         let key = result.get_id();
 
-        result = negated_assertion_reconciler::reconcile(context, &assertion, &result, false, None, key, None, true);
+        result = negated_assertion_reconciler::reconcile(context, &assertion, &result, None, key, None, true);
         if result.is_never() {
             break;
         }

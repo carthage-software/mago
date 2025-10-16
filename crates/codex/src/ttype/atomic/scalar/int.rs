@@ -224,6 +224,18 @@ impl TInteger {
         }
     }
 
+    /// Returns the bounds of the integer type as a tuple `(min, max)`, where each bound is optional.
+    #[inline]
+    pub const fn get_bounds(&self) -> (Option<i64>, Option<i64>) {
+        match *self {
+            TInteger::Literal(value) => (Some(value), Some(value)),
+            TInteger::From(value) => (Some(value), None),
+            TInteger::To(value) => (None, Some(value)),
+            TInteger::Range(from, to) => (Some(from), Some(to)),
+            TInteger::Unspecified => (None, None),
+        }
+    }
+
     /// Checks if the integer type represented by `input` is fully contained
     /// within the integer type represented by `self`.
     ///
