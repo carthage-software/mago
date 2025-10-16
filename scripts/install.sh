@@ -257,7 +257,7 @@ separator
 
 green "Installing binary to ${binary_dir}..."
 if mv "${destination}/${BIN_NAME}" "${binary_dir}/"; then
-  chmod +x "${binary_dir}/${BIN_NAME}" || bail "Failed to make the binary executable."
+  chmod +x "${binary_dir}/${BIN_NAME}" || fail "Failed to make the binary executable."
   green "Installation complete!"
 
   if ! echo "$PATH" | grep -qE "(^|:)$binary_dir($|:)"; then
