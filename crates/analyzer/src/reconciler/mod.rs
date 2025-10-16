@@ -462,7 +462,7 @@ fn add_nested_assertions<'ctx>(
                                 active_new_types.entry(base_key.clone()).or_default().insert(entry.len() - 1);
                             }
 
-                            break 'outer;
+                            continue 'outer;
                         }
                     } else {
                         entry.push(vec![if array_key.contains('\'') {

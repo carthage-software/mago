@@ -5,7 +5,6 @@ use mago_algebra::assertion_set::negate_assertion_set;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
-
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
@@ -126,9 +125,9 @@ pub fn scrape_assertions(
                             && !expression_type.possibly_undefined
                             && !expression_type.possibly_undefined_from_try
                         {
-                            if_types.insert(value_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
+                            if_types.entry(value_id).or_insert_with(|| vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
                         } else {
-                            if_types.insert(value_id, vec![vec![Assertion::IsIsset]]);
+                            if_types.entry(value_id).or_insert_with(|| vec![vec![Assertion::IsIsset]]);
                         }
                     } else {
                         let mut root_array_id = None;
@@ -146,7 +145,8 @@ pub fn scrape_assertions(
 
                         if let Some(root_array_id) = root_array_id {
                             if_types
-                                .insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
+                                .entry(root_array_id)
+                                .or_insert_with(|| vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
                         }
                     }
                 }

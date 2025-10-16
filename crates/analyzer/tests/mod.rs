@@ -242,6 +242,7 @@ test_case!(issue_557_part_1);
 test_case!(issue_557_part_2);
 test_case!(issue_559);
 test_case!(issue_563);
+test_case!(issue_564);
 test_case!(issue_567);
 
 #[test]
