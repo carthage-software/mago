@@ -130,6 +130,10 @@ impl PermittedDependencyKind {
 }
 
 impl StructuralSymbolKind {
+    pub const fn is_constant(&self) -> bool {
+        matches!(self, StructuralSymbolKind::Constant)
+    }
+
     /// Returns the string representation of the symbol kind.
     pub const fn as_str(&self) -> &'static str {
         match self {

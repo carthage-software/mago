@@ -24,7 +24,6 @@ mago-database = { workspace = true }
 mago-codex = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
-regex = { workspace = true }
 bumpalo = { workspace = true }
 
 [dev-dependencies]

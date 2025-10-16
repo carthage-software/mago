@@ -9,7 +9,7 @@ use std::sync::RwLock;
 static REGEX_CACHE: LazyLock<RwLock<HashMap<String, Regex>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Checks if a fully qualified name matches a given pattern.
-pub fn matches_pattern(fqn: &str, pattern: &str, is_namespace: bool) -> bool {
+pub fn matches_patterxn(fqn: &str, pattern: &str, is_namespace: bool) -> bool {
     if !pattern.contains('*') {
         if is_namespace {
             let ns_pattern = pattern.trim_end_matches('\\');

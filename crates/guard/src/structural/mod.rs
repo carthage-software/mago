@@ -2,12 +2,12 @@ use mago_syntax::ast::*;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;
+use crate::matcher;
 use crate::report::flaw::FlawKind;
 use crate::report::flaw::StructuralFlaw;
 use crate::settings::StructuralInheritanceConstraint;
 use crate::settings::StructuralRule;
 use crate::settings::StructuralSymbolKind;
-use crate::utils::matches_pattern;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StructuralGuardWalker;
@@ -28,12 +28,12 @@ impl StructuralGuardWalker {
             return false;
         }
 
-        if !matches_pattern(fqn, &rule.on, true) {
+        if !matcher::matches(fqn, &rule.on, kind.is_constant(), true) {
             return false;
         }
 
-        if let Some(not) = &rule.not_on
-            && matches_pattern(fqn, not, true)
+        if let Some(not_on) = &rule.not_on
+            && matcher::matches(fqn, not_on, kind.is_constant(), true)
         {
             return false;
         }
@@ -89,7 +89,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matches_pattern(class.name.value, must_be_named, false)
+                && !matcher::matches(class.name.value, must_be_named, false, false)
             {
                 structural_flaws.push(StructuralFlaw {
                     symbol_fqn: fqn.to_string(),
@@ -295,7 +295,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matches_pattern(interface.name.value, must_be_named, false)
+                && !matcher::matches(interface.name.value, must_be_named, false, false)
             {
                 structural_flaws.push(StructuralFlaw {
                     symbol_fqn: fqn.to_string(),
@@ -372,7 +372,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matches_pattern(r#enum.name.value, must_be_named, false)
+                && !matcher::matches(r#enum.name.value, must_be_named, false, false)
             {
                 structural_flaws.push(StructuralFlaw {
                     symbol_fqn: fqn.to_string(),
@@ -451,7 +451,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matches_pattern(r#trait.name.value, must_be_named, false)
+                && !matcher::matches(r#trait.name.value, must_be_named, false, false)
             {
                 structural_flaws.push(StructuralFlaw {
                     symbol_fqn: fqn.to_string(),
@@ -533,7 +533,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matches_pattern(function.name.value, must_be_named, false)
+                && !matcher::matches(function.name.value, must_be_named, false, false)
             {
                 structural_flaws.push(StructuralFlaw {
                     symbol_fqn: fqn.to_string(),
@@ -590,7 +590,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
             for structural_rule in structural_rules {
                 if let Some(must_be_named) = &structural_rule.must_be_named
-                    && !matches_pattern(constant_item.name.value, must_be_named, false)
+                    && !matcher::matches(constant_item.name.value, must_be_named, true, false)
                 {
                     structural_flaws.push(StructuralFlaw {
                         symbol_fqn: fqn.to_string(),

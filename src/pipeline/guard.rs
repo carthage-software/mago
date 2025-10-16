@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_codex::metadata::CodebaseMetadata;
 use mago_database::ReadDatabase;
 use mago_guard::ArchitecturalGuard;
@@ -57,7 +59,7 @@ pub fn run_guard_pipeline(
     let pipeline = StatelessParallelPipeline::new(
         GUARD_PROGRESS_PREFIX,
         database,
-        (codebase, guard_settings),
+        (Arc::new(codebase), guard_settings),
         Box::new(GuardResultReducer),
         true,
     );

@@ -14,9 +14,9 @@ pub mod report;
 pub mod settings;
 
 mod context;
+mod matcher;
 mod perimeter;
 mod structural;
-mod utils;
 
 #[derive(Debug)]
 pub struct ArchitecturalGuard {

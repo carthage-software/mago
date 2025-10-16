@@ -2,6 +2,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_span::Span;
 
 use crate::context::GuardContext;
+use crate::matcher;
 use crate::path::NamespacePath;
 use crate::path::Path;
 use crate::path::SymbolSelector;
@@ -11,7 +12,6 @@ use crate::report::breach::BreachVector;
 use crate::settings::PermittedDependency;
 use crate::settings::PermittedDependencyKind;
 use crate::settings::Settings;
-use crate::utils::matches_pattern;
 
 /// Checks a symbol usage and reports violations.
 ///
@@ -68,7 +68,7 @@ fn check_allowed(
         .filter(|rule| match &rule.namespace {
             NamespacePath::Global => ctx.get_current_namespace().is_empty(),
             NamespacePath::Specific(rule_namespace) => {
-                matches_pattern(ctx.get_current_namespace(), rule_namespace, true)
+                matcher::matches(ctx.get_current_namespace(), rule_namespace, false, true)
             }
         })
         .collect();
@@ -166,7 +166,7 @@ fn get_layer_index(namespace: &str, settings: &Settings) -> Option<usize> {
             NamespacePath::Global if namespace.is_empty() => {
                 return Some(i);
             }
-            NamespacePath::Specific(ns) if matches_pattern(namespace, ns, true) => {
+            NamespacePath::Specific(ns) if matcher::matches(namespace, ns, false, true) => {
                 return Some(i);
             }
             _ => {}
@@ -201,7 +201,7 @@ fn is_path_allowed(
         Path::All => true,
         Path::Native => is_native(codebase, target_fqn),
         Path::Self_ => {
-            matches_pattern(target_fqn, source_namespace, false)
+            matcher::matches(target_fqn, source_namespace, false, false)
                 || get_root_namespace(source_namespace).eq_ignore_ascii_case(get_root_namespace(target_fqn))
         }
         Path::Layer(layer_name) => settings.perimeter.layers.get(layer_name).is_some_and(|layer_patterns| {
@@ -212,10 +212,10 @@ fn is_path_allowed(
         Path::Selector(selector) => match selector {
             SymbolSelector::Namespace(ns) => match ns {
                 NamespacePath::Global => !target_fqn.contains('\\'),
-                NamespacePath::Specific(pattern) => matches_pattern(target_fqn, pattern, true),
+                NamespacePath::Specific(pattern) => matcher::matches(target_fqn, pattern, false, true),
             },
             SymbolSelector::Symbol(sn) => target_fqn.eq_ignore_ascii_case(sn),
-            SymbolSelector::Pattern(p) => matches_pattern(target_fqn, p, false),
+            SymbolSelector::Pattern(p) => matcher::matches(target_fqn, p, false, false),
         },
     }
 }
