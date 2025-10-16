@@ -121,7 +121,7 @@ pub fn populate_codebase(
             }
         }
 
-        for v in metadata.template_types.iter_mut().map(|m| m.1.iter_mut()).flatten().map(|template| &mut template.1) {
+        for v in metadata.template_types.iter_mut().flat_map(|m| m.1.iter_mut()).map(|template| &mut template.1) {
             if v.needs_population() || userland_force_repopulation {
                 populate_union_type(
                     v,
@@ -145,7 +145,7 @@ pub fn populate_codebase(
             }
         }
 
-        for p in metadata.template_extended_parameters.values_mut().map(|m| m.values_mut()).flatten() {
+        for p in metadata.template_extended_parameters.values_mut().flat_map(|m| m.values_mut()) {
             if p.needs_population() || userland_force_repopulation {
                 populate_union_type(
                     p,

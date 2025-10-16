@@ -383,8 +383,10 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
 ) -> TUnion {
     let expected_key_type = if in_assignment {
         get_arraykey()
+    } else if context.settings.strict_list_index_checks {
+        get_non_negative_int()
     } else {
-        if context.settings.strict_list_index_checks { get_non_negative_int() } else { get_int() }
+        get_int()
     };
 
     let mut union_comparison_result = ComparisonResult::new();
