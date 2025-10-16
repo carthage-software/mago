@@ -783,18 +783,43 @@ fn get_null_inequality_assertions(
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    if let Expression::Binary(binary) = unwrap_expression(base_conditional)
+        && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
+        && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
+    {
+        let coalesce_lhs = binary.lhs;
 
-    if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
+        if let Some(var_name) = get_expression_id(
+            coalesce_lhs,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        ) {
+            if_types.insert(var_name, vec![vec![Assertion::IsIsset]]);
+        } else if let Expression::ArrayAccess(array_access) = coalesce_lhs {
+            if let Some(root_array_id) = get_expression_id(
+                array_access.array,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            ) {
+                if_types.insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
+            }
+        }
+    } else {
+        let var_name = get_expression_id(
+            base_conditional,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        );
+
+        if let Some(var_name) = var_name {
+            if_types.insert(var_name, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
+        }
     }
 
-    vec![if_types]
+    if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
 fn get_false_inquality_assertions(
