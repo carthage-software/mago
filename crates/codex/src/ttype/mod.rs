@@ -514,6 +514,13 @@ pub fn get_null() -> TUnion {
 }
 
 #[inline]
+pub fn get_undefined_null() -> TUnion {
+    let mut null = TUnion::from_single(Cow::Borrowed(NULL_ATOMIC));
+    null.possibly_undefined = true;
+    null
+}
+
+#[inline]
 pub fn get_arraykey() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ARRAYKEY_ATOMIC))
 }

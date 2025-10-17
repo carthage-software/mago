@@ -19,7 +19,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
-use mago_codex::ttype::get_null;
+use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_span::Span;
@@ -1204,7 +1204,7 @@ fn reconcile_not_isset(
     // For array accesses, this means the key doesn't exist or the value is null
     // In both cases, the resulting type should be null
     if existing_var_type.possibly_undefined {
-        return get_never();
+        return get_undefined_null();
     }
 
     if !existing_var_type.is_nullable()
@@ -1219,7 +1219,7 @@ fn reconcile_not_isset(
         return get_never();
     }
 
-    get_null()
+    get_undefined_null()
 }
 
 fn reconcile_empty_countable(
