@@ -63,6 +63,7 @@ pub struct WasmAnalyzerSettings {
     pub check_throws: bool,
     pub perform_heuristic_checks: bool,
     pub strict_list_index_checks: bool,
+    pub no_boolean_literal_comparison: bool,
     pub use_colors: bool,
 }
 
@@ -108,6 +109,7 @@ impl WasmAnalyzerSettings {
             check_throws: self.check_throws,
             strict_list_index_checks: self.strict_list_index_checks,
             perform_heuristic_checks: self.perform_heuristic_checks,
+            no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             use_colors: self.use_colors,
             diff: false, // Not applicable in wasm context
         }

@@ -6,6 +6,7 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -53,6 +54,61 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 
     check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator)?;
     check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator)?;
+
+    if context.settings.no_boolean_literal_comparison
+        // Only consider equality/inequality operators.
+        && binary.operator.is_equality()
+        // Identify if one side is a boolean literal and the other side's type is `bool`.
+        && let Some((variable_expr, literal_expr, literal_value)) =
+            if let Some(literal_value) = get_boolean_literal(binary.rhs) {
+                if lhs_type.is_bool() { Some((binary.lhs, binary.rhs, literal_value)) } else { None }
+            } else if let Some(literal_value) = get_boolean_literal(binary.lhs) {
+                if rhs_type.is_bool() { Some((binary.rhs, binary.lhs, literal_value)) } else { None }
+            } else {
+                None
+            }
+    {
+        // Determine if the simplified expression should be negated.
+        let should_negate = if binary.operator.is_negated_equality() && literal_value {
+            // `!= true`, `!== true`, or `<> true` becomes `!`
+            true
+        } else if !binary.operator.is_negated_equality() && !literal_value {
+            // `== false` or `=== false` becomes `!`
+            true
+        } else {
+            // `== true`, `=== true`, `!= false`, `!== false`, `<> false` are non-negated
+            false
+        };
+
+        let issue = Issue::warning("Avoid direct comparison with boolean literals.")
+            .with_annotation(Annotation::primary(binary.span()).with_message(format!(
+                "This comparison with `{}` is redundant",
+                if literal_value { "true" } else { "false" }
+            )))
+            .with_note("Comparing a value directly to `true` or `false` is verbose and can be simplified.")
+            .with_help(if should_negate {
+                "This can be simplified to `!<expression>`."
+            } else {
+                "This can be simplified to just `<expression>`."
+            });
+
+        context.collector.propose_with_code(IssueCode::RedundantComparison, issue, |plan| {
+            // Determine which part of the expression to remove (the operator and the literal).
+            let redundant_range = if variable_expr.start_position() < literal_expr.start_position() {
+                // Case: `$variable op $literal`
+                binary.operator.span().join(literal_expr.span()).to_range()
+            } else {
+                // Case: `$literal op $variable`
+                literal_expr.span().join(binary.operator.span()).to_range()
+            };
+
+            plan.delete(redundant_range, SafetyClassification::Safe);
+
+            if should_negate {
+                plan.insert(variable_expr.start_position().offset, "!", SafetyClassification::Safe);
+            }
+        });
+    }
 
     let mut reported_general_invalid_operand = false;
 
@@ -267,6 +323,16 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
     Ok(())
+}
+
+/// Attempts to extract a boolean literal from an expression, looking through parentheses.
+fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<bool> {
+    match expr {
+        Expression::Literal(Literal::True(_)) => Some(true),
+        Expression::Literal(Literal::False(_)) => Some(false),
+        Expression::Parenthesized(Parenthesized { expression, .. }) => get_boolean_literal(expression),
+        _ => None,
+    }
 }
 
 /// Checks a single operand of a comparison operation for problematic types.

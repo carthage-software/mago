@@ -14,7 +14,11 @@ literal-named-argument = { enabled = false }
 too-many-enum-cases = { threshold = 30 }
 # Enable disabled-by-default rules
 no-redundant-use = { enabled = true }
+no-variable-variable = { enabled = true }
+no-redundant-readonly = { enabled = true }
+sensitive-parameter = { enabled = true }
 
 [analyzer]
 allow-possibly-undefined-array-keys = false
 find-unused-expressions = true
+no-boolean-literal-comparison = true

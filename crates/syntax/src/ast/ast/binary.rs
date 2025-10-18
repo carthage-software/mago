@@ -110,6 +110,10 @@ impl<'arena> BinaryOperator<'arena> {
         )
     }
 
+    pub const fn is_negated_equality(&self) -> bool {
+        matches!(self, Self::NotEqual(_) | Self::NotIdentical(_) | Self::AngledNotEqual(_))
+    }
+
     #[inline]
     pub const fn is_identity(&self) -> bool {
         matches!(self, Self::Identical(_) | Self::NotIdentical(_))

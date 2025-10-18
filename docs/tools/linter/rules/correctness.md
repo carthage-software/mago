@@ -246,7 +246,7 @@ For example, `if ($x === true)` is equivalent to the more concise `if ($x)`, and
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"note"` |
 
 ### Examples

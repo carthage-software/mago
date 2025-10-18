@@ -106,6 +106,13 @@ pub struct Settings {
     /// more flexibility at the cost of type safety.
     pub strict_list_index_checks: bool,
 
+    /// Disable comparisons to boolean literals (`true`/`false`).
+    ///
+    /// When enabled, comparisons to boolean literals will not be reported as issues.
+    ///
+    /// Defaults to `false`.
+    pub no_boolean_literal_comparison: bool,
+
     /// Enable colored output in terminal environments that support it. Defaults to `true`.
     ///
     /// This setting is primarily used for enabling/disabling colored diffs in
@@ -159,6 +166,7 @@ impl Settings {
             // need optimizations first
             perform_heuristic_checks: false,
             strict_list_index_checks: false,
+            no_boolean_literal_comparison: false,
             diff: false,
         }
     }

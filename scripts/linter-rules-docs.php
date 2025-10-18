@@ -81,8 +81,6 @@ try {
 
 /**
  * The main entry point for the script.
- *
- * @mago-expect lint:no-boolean-literal-comparison
  */
 function main(): void
 {
@@ -133,8 +131,6 @@ function main(): void
  *     'integrations': list<int>
  *   }
  * }>
- *
- * @mago-expect lint:no-boolean-literal-comparison
  */
 function fetch_rules_from_mago(string $mago_executable): array
 {
@@ -171,8 +167,6 @@ function fetch_rules_from_mago(string $mago_executable): array
  * Fetches the default linter configuration from the Mago CLI.
  *
  * @return array{rules: array<string, array{'enabled': bool, 'level': string, ...<string, scalar|array<scalar>>}>}
- *
- * @mago-expect lint:no-boolean-literal-comparison
  */
 function fetch_linter_config(string $mago_executable): array
 {
@@ -597,8 +591,6 @@ function to_kebab_case(string $str): string
 
 /**
  * Recursively deletes a directory and all its contents.
- *
- * @mago-expect lint:no-boolean-literal-comparison
  */
 function delete_directory(string $dir): void
 {

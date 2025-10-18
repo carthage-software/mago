@@ -50,6 +50,10 @@ pub trait LintRule {
 
     fn targets() -> &'static [NodeKind];
 
+    fn deprecated() -> bool {
+        false
+    }
+
     #[inline]
     fn is_enabled_for(php_version: PHPVersion, integrations: IntegrationSet) -> bool {
         Self::meta().requirements.are_met_by(php_version, integrations)

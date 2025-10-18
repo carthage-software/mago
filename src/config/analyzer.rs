@@ -106,6 +106,11 @@ pub struct AnalyzerConfiguration {
     /// more flexibility at the cost of type safety.
     pub strict_list_index_checks: bool,
 
+    /// Disallow comparisons where a boolean literal is used as an operand.
+    ///
+    /// Defaults to `false`.
+    pub no_boolean_literal_comparison: bool,
+
     /// Whether to perform heuristic checks.
     pub perform_heuristic_checks: bool,
 }
@@ -141,6 +146,7 @@ impl AnalyzerConfiguration {
             check_throws: self.check_throws,
             perform_heuristic_checks: self.perform_heuristic_checks,
             strict_list_index_checks: self.strict_list_index_checks,
+            no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             use_colors: match color_choice {
                 ColorChoice::Always => true,
                 ColorChoice::Never => false,
@@ -186,6 +192,7 @@ impl Default for AnalyzerConfiguration {
             check_throws: defaults.check_throws,
             perform_heuristic_checks: defaults.perform_heuristic_checks,
             strict_list_index_checks: defaults.strict_list_index_checks,
+            no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
         }
     }
 }

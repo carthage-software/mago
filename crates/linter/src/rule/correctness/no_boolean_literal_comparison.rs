@@ -35,6 +35,11 @@ impl Default for NoBooleanLiteralComparisonConfig {
 }
 
 impl Config for NoBooleanLiteralComparisonConfig {
+    fn default_enabled() -> bool {
+        // This rule is disabled by default due to its deprecation.
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -42,6 +47,13 @@ impl Config for NoBooleanLiteralComparisonConfig {
 
 impl LintRule for NoBooleanLiteralComparisonRule {
     type Config = NoBooleanLiteralComparisonConfig;
+
+    fn deprecated() -> bool {
+        // The functionality of this rule has been merged into the `analyzer`,
+        // preventing false-positives for things like `false === $foo` where `$foo` might be `false|string`
+        // for example, and a direct comparison is necessary.
+        true
+    }
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {

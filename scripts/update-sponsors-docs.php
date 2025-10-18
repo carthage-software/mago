@@ -48,7 +48,6 @@ final class Sponsor
 /**
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
- * @mago-expect lint:no-boolean-literal-comparison
  */
 final class SponsorsData
 {
@@ -308,7 +307,7 @@ function overwrite_sponsors_file(string $new_content): void
 function update_markdown_file(string $filePath, string $start_marker, string $end_marker, string $new_content): void
 {
     $file_content = file_get_contents($filePath);
-    if (false === $file_content) { // @mago-expect lint:no-boolean-literal-comparison
+    if (false === $file_content) {
         throw new RuntimeException('Failed to read {' . $filePath . '}');
     }
 
