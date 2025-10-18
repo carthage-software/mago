@@ -121,10 +121,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
     // Check class-like extends
     fn walk_in_extends(&mut self, extends: &'ast Extends<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        for extended_typ in extends.types.iter() {
-            let fqn = context.lookup_name(extended_typ);
+        for extended_type in extends.types.iter() {
+            let fqn = context.lookup_name(extended_type);
 
-            check_usage(context, fqn, PermittedDependencyKind::ClassLike, BreachVector::Extends, extended_typ.span());
+            check_usage(context, fqn, PermittedDependencyKind::ClassLike, BreachVector::Extends, extended_type.span());
         }
     }
 

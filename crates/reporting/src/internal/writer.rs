@@ -35,26 +35,26 @@ impl ReportWriter {
         Self { inner: Arc::new(Mutex::new(stream)) }
     }
 
-    /// Acquires a lock on the internal `StandardStream`, returning a `Gaurd` for performing write operations.
+    /// Acquires a lock on the internal `StandardStream`, returning a `Guard` for performing write operations.
     ///
     /// # Returns
     ///
-    /// A `Gaurd` object, which implements `Write` and `WriteColor` traits for text and styled output.
+    /// A `Guard` object, which implements `Write` and `WriteColor` traits for text and styled output.
     ///
     /// # Panics
     ///
     /// Panics if the internal `Mutex` is poisoned.
-    pub fn lock(&self) -> Gaurd<'_> {
-        Gaurd(self.inner.lock().expect("writer lock poisoned, this should never happen"))
+    pub fn lock(&self) -> Guard<'_> {
+        Guard(self.inner.lock().expect("writer lock poisoned, this should never happen"))
     }
 }
 
 /// A guard object for safely accessing and writing to the `StandardStream`.
 ///
 /// This struct is created by the `lock` method of `ReportWriter`.
-pub(crate) struct Gaurd<'a>(MutexGuard<'a, StandardStream>);
+pub(crate) struct Guard<'a>(MutexGuard<'a, StandardStream>);
 
-impl WriteColor for Gaurd<'_> {
+impl WriteColor for Guard<'_> {
     /// Sets the color for subsequent output written through this guard.
     ///
     /// # Parameters
@@ -86,7 +86,7 @@ impl WriteColor for Gaurd<'_> {
     }
 }
 
-impl std::io::Write for Gaurd<'_> {
+impl std::io::Write for Guard<'_> {
     /// Writes a buffer to the stream.
     ///
     /// # Parameters

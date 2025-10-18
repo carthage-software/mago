@@ -15,13 +15,11 @@ extend-ignore-re = [
     "<<<FOF",
     "FOF;",
     '"nd",',
+    'GTI'
 ]
 
 [default.extend-words]
 "trivias" = "trivias"
-
-[default.extend-identifiers]
-"Gaurd" = "Gaurd"
 
 [type.rust.extend-identifiers]
 "thr" = "thr"
