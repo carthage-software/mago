@@ -336,6 +336,11 @@ std::thread_local! {
     });
 }
 
+/// Return a read reference to the superglobals map.
+pub fn get_super_globals() -> impl Iterator<Item = (&'static str, Rc<TUnion>)> {
+    SUPERGLOBALS_MAP.with(|map| map.iter().map(|(k, v)| (*k, v.clone())).collect::<Vec<_>>().into_iter())
+}
+
 pub fn get_global_variable_type(variable_name: &str) -> Option<Rc<TUnion>> {
     SUPERGLOBALS_MAP.with(|map| map.get(variable_name).cloned())
 }

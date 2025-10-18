@@ -631,7 +631,12 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     return value_parameter.into_owned();
                 }
 
-                let result = if !block_context.inside_isset {
+                let result = if in_assignment && has_value_parameter && !value_parameter.is_mixed() {
+                    // Assignment to a new key on an array with explicit generic parameters - allow it without error
+                    // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
+                    // But NOT unsealed arrays with just `...` (which have mixed as value type)
+                    value_parameter.into_owned()
+                } else if !block_context.inside_isset {
                     context.collector.report_with_code(
                         IssueCode::UndefinedStringArrayIndex,
                         Issue::error(format!(
@@ -654,7 +659,14 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     );
 
                     if has_value_parameter { get_mixed() } else { get_null() }
+                } else if has_value_parameter && !value_parameter.is_mixed() {
+                    // Inside isset() check on array with generic parameters - the key might exist at runtime
+                    // Don't report impossible isset - just return the value type as possibly undefined
+                    *has_possibly_undefined = true;
+
+                    value_parameter.into_owned()
                 } else {
+                    // Inside isset() but array has NO generic parameters (or only mixed) - key definitely doesn't exist
                     context.collector.report_with_code(
                         IssueCode::ImpossibleNonnullEntryCheck,
                         Issue::warning(format!(

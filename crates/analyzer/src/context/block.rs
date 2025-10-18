@@ -20,6 +20,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_span::Span;
 
+use crate::common::global::get_super_globals;
 use crate::context::Context;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::finally_scope::FinallyScope;
@@ -139,8 +140,8 @@ impl ReferenceConstraint {
 }
 
 impl<'ctx> BlockContext<'ctx> {
-    pub fn new(scope: ScopeContext<'ctx>) -> Self {
-        Self {
+    pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
+        let mut block_context = Self {
             scope,
             locals: BTreeMap::new(),
             static_locals: HashSet::default(),
@@ -177,7 +178,15 @@ impl<'ctx> BlockContext<'ctx> {
             if_body_context: None,
             control_actions: HashSet::default(),
             possibly_thrown_exceptions: AtomMap::default(),
+        };
+
+        if register_super_globals {
+            for (var_name, var_type) in get_super_globals() {
+                block_context.locals.insert(var_name.to_owned(), var_type);
+            }
         }
+
+        block_context
     }
 
     pub fn is_global_scope(&self) -> bool {

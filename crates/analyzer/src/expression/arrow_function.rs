@@ -48,7 +48,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         scope.set_class_like(block_context.scope.get_class_like());
         scope.set_static(self.r#static.is_some());
 
-        let mut inner_block_context = BlockContext::new(scope);
+        let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
         let variables = get_variables_referenced_in_expression(self.expression, true);
         let params = self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();

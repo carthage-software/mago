@@ -54,7 +54,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         scope.set_function_like(Some(function_metadata));
         scope.set_static(self.r#static.is_some());
 
-        let mut inner_block_context = BlockContext::new(scope);
+        let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {

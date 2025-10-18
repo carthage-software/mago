@@ -69,7 +69,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         analyze_function_like(
             context,
             artifacts,
-            &mut BlockContext::new(scope),
+            &mut BlockContext::new(scope, context.settings.register_super_globals),
             method_metadata,
             &self.parameter_list,
             FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),

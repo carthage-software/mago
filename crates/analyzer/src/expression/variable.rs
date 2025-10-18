@@ -12,7 +12,6 @@ use mago_syntax::ast::*;
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
-use crate::common::global::get_global_variable_type;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -118,11 +117,7 @@ fn read_variable<'ctx, 'arena>(
     let variable_type = match block_context.locals.get(variable_name) {
         Some(variable_type) => variable_type.clone(),
         None => {
-            if let Some(global_variable_type) = get_global_variable_type(variable_name) {
-                block_context.locals.insert(variable_name.to_string(), global_variable_type.clone());
-
-                global_variable_type
-            } else if block_context.variables_possibly_in_scope.contains(variable_name) {
+            if block_context.variables_possibly_in_scope.contains(variable_name) {
                 context.collector.report_with_code(
                     IssueCode::PossiblyUndefinedVariable,
                     Issue::warning(format!(

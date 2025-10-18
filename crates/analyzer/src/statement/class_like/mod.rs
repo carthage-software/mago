@@ -326,13 +326,11 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
     check_class_like_properties(context, class_like_metadata);
 
-    let mut block_context = BlockContext::new({
-        let mut scope = ScopeContext::new();
+    let mut scope = ScopeContext::new();
+    scope.set_class_like(Some(class_like_metadata));
+    scope.set_static(true);
 
-        scope.set_class_like(Some(class_like_metadata));
-        scope.set_static(true);
-        scope
-    });
+    let mut block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
     for member in members {
         match member {

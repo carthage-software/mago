@@ -64,6 +64,7 @@ pub struct WasmAnalyzerSettings {
     pub perform_heuristic_checks: bool,
     pub strict_list_index_checks: bool,
     pub no_boolean_literal_comparison: bool,
+    pub register_super_globals: bool,
     pub use_colors: bool,
 }
 
@@ -110,6 +111,7 @@ impl WasmAnalyzerSettings {
             strict_list_index_checks: self.strict_list_index_checks,
             perform_heuristic_checks: self.perform_heuristic_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            register_super_globals: self.register_super_globals,
             use_colors: self.use_colors,
             diff: false, // Not applicable in wasm context
         }

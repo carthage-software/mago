@@ -113,6 +113,14 @@ pub struct Settings {
     /// Defaults to `false`.
     pub no_boolean_literal_comparison: bool,
 
+    /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
+    ///
+    /// If disabled, super globals won't be available unless explicitly imported using
+    /// the `global` keyword.
+    ///
+    /// Defaults to `true`.
+    pub register_super_globals: bool,
+
     /// Enable colored output in terminal environments that support it. Defaults to `true`.
     ///
     /// This setting is primarily used for enabling/disabling colored diffs in
@@ -167,6 +175,7 @@ impl Settings {
             perform_heuristic_checks: false,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
+            register_super_globals: true,
             diff: false,
         }
     }

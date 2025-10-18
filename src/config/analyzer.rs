@@ -111,6 +111,14 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub no_boolean_literal_comparison: bool,
 
+    /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
+    ///
+    /// If disabled, super globals won't be available unless explicitly imported using
+    /// the `global` keyword.
+    ///
+    /// Defaults to `true`.
+    pub register_super_globals: bool,
+
     /// Whether to perform heuristic checks.
     pub perform_heuristic_checks: bool,
 }
@@ -147,6 +155,7 @@ impl AnalyzerConfiguration {
             perform_heuristic_checks: self.perform_heuristic_checks,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            register_super_globals: self.register_super_globals,
             use_colors: match color_choice {
                 ColorChoice::Always => true,
                 ColorChoice::Never => false,
@@ -193,6 +202,7 @@ impl Default for AnalyzerConfiguration {
             perform_heuristic_checks: defaults.perform_heuristic_checks,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
+            register_super_globals: defaults.register_super_globals,
         }
     }
 }

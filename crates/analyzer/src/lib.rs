@@ -163,7 +163,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             collector,
         );
 
-        let mut block_context = BlockContext::new(ScopeContext::new());
+        let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
         let mut artifacts = AnalysisArtifacts::new();
 
         analyze_statements(statements, &mut context, &mut block_context, &mut artifacts)?;
