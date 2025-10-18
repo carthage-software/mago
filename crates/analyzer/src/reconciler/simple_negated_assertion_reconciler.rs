@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
@@ -59,39 +60,16 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Object(TObject::Named(subtracting_named)) => {
-                // Only handle sealed classes here, let the complex reconciler handle normal classes
-                let subtracting_class_name = subtracting_named.get_name_ref();
-
-                let mut should_subtract_permitted_inheritor = false;
-                for atomic in existing_var_type.types.as_ref() {
-                    if let TAtomic::Object(TObject::Named(existing_named)) = atomic {
-                        let existing_class_name = existing_named.get_name_ref();
-                        if let Some(existing_metadata) = context.codebase.get_class_like(existing_class_name)
-                            && let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors
-                            && permitted_inheritors
-                                .iter()
-                                .any(|inheritor| inheritor.eq_ignore_ascii_case(subtracting_class_name))
-                        {
-                            should_subtract_permitted_inheritor = true;
-                            break;
-                        }
-                    }
-                }
-
-                if should_subtract_permitted_inheritor {
-                    return Some(subtract_object(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
-
-                // Let the complex reconciler handle this
+            TAtomic::Object(TObject::Named(_subtracting_named)) => {
+                return Some(subtract_object(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
                 return Some(subtract_bool(
@@ -319,29 +297,34 @@ fn subtract_object(
             } else if let TAtomic::Object(TObject::Named(existing_named)) = &atomic
                 && let Some(TAtomic::Object(TObject::Named(subtracting_named))) = type_to_subtract
             {
-                let existing_class_name = existing_named.get_name_ref();
-                let subtracting_class_name = subtracting_named.get_name_ref();
+                let lowercase_subtracting_name = ascii_lowercase_atom(subtracting_named.get_name_ref());
 
-                if let Some(existing_metadata) = context.codebase.get_class_like(existing_class_name) {
-                    // Check if the existing type has permitted inheritors (sealed class/interface)
-                    if let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors {
-                        // If the type we're subtracting is one of the permitted inheritors
-                        // PHP class names are case-insensitive, so we need to compare case-insensitively
-                        let is_subtracting_permitted = permitted_inheritors
+                // If the class names match (case-insensitive), this type is being subtracted - don't add it
+                if existing_named.get_name_ref().eq_ignore_ascii_case(&lowercase_subtracting_name) {
+                    // Type is removed, don't add to acceptable_types
+                } else if let Some(existing_metadata) = context.codebase.get_class_like(existing_named.get_name_ref())
+                    // Check if the existing type has permitted inheritors
+                    && let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors
+                    // Check if the subtracting type is an inheritor of the existing type
+                    && context.codebase.is_instance_of(&lowercase_subtracting_name, existing_named.get_name_ref())
+                    // If the type we're subtracting is one of the permitted inheritors
+                    // PHP class names are case-insensitive, so we need to compare case-insensitively
+                    && permitted_inheritors.contains(&lowercase_subtracting_name)
+                {
+                    // This is a sealed BASE class/interface and we're subtracting one of its permitted inheritors
+                    // Expand to all OTHER permitted inheritors
+                    acceptable_types.extend(
+                        permitted_inheritors
                             .iter()
-                            .any(|inheritor| inheritor.eq_ignore_ascii_case(subtracting_class_name));
-
-                        if is_subtracting_permitted {
-                            // Add the remaining permitted inheritors as acceptable types
-                            for inheritor_name in permitted_inheritors.iter() {
-                                // Skip the one we're subtracting (case-insensitive comparison)
-                                if !inheritor_name.eq_ignore_ascii_case(subtracting_class_name) {
-                                    let remaining_object = TNamedObject::new(*inheritor_name);
-                                    acceptable_types.push(TAtomic::Object(TObject::Named(remaining_object)));
-                                }
-                            }
-                        }
-                    }
+                            .filter(|inheritor| !inheritor.eq_ignore_ascii_case(&lowercase_subtracting_name))
+                            .map(|inheritor| TNamedObject::new(*inheritor))
+                            .map(TObject::Named)
+                            .map(TAtomic::Object),
+                    );
+                } else {
+                    // Either not a sealed class, or we're subtracting something that's not in the permitted list,
+                    // or this is a concrete class (not abstract/interface) - just keep it
+                    acceptable_types.push(atomic);
                 }
             }
         } else {
@@ -744,10 +727,9 @@ fn subtract_arraykey(
         return existing_var_type.clone();
     }
 
-    let old_var_type_atom = existing_var_type.get_id();
     let mut did_remove_type = false;
     let existing_var_types = existing_var_type.types.as_ref();
-    let mut existing_var_type = existing_var_type.clone();
+    let mut new_existing_var_type = existing_var_type.clone();
 
     for atomic in existing_var_types {
         if let TAtomic::GenericParameter(generic_parameter) = atomic {
@@ -759,14 +741,14 @@ fn subtract_arraykey(
                     subtract_arraykey(context, assertion, constraint, None, false, None, is_equality)
                 })
             {
-                existing_var_type.remove_type(&atomic);
-                existing_var_type.types.to_mut().push(atomic);
+                new_existing_var_type.remove_type(&atomic);
+                new_existing_var_type.types.to_mut().push(atomic);
             }
         } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
             if !is_equality {
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::bool()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::bool()));
             }
 
             did_remove_type = true;
@@ -774,23 +756,24 @@ fn subtract_arraykey(
             did_remove_type = true;
 
             if !is_equality {
-                existing_var_type.remove_type(atomic);
+                new_existing_var_type.remove_type(atomic);
             }
         }
     }
 
-    if (existing_var_type.types.is_empty() || !did_remove_type)
+    if (new_existing_var_type.types.is_empty() || !did_remove_type)
         && let Some(key) = key
         && let Some(pos) = span
     {
+        let old_var_type_atom = existing_var_type.get_id();
         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
-    if existing_var_type.types.is_empty() {
+    if new_existing_var_type.types.is_empty() {
         return get_never();
     }
 
-    existing_var_type
+    new_existing_var_type
 }
 
 fn subtract_bool(
@@ -806,10 +789,9 @@ fn subtract_bool(
         return existing_var_type.clone();
     }
 
-    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
-    let mut existing_var_type = existing_var_type.clone();
+    let mut new_existing_var_type = existing_var_type.clone();
 
     for atomic in existing_var_types {
         if let TAtomic::GenericParameter(generic_parameter) = atomic {
@@ -817,18 +799,18 @@ fn subtract_bool(
                 if let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
                     subtract_bool(context, assertion, constraint, None, false, None, is_equality)
                 }) {
-                    existing_var_type.remove_type(&atomic);
-                    existing_var_type.types.to_mut().push(atomic);
+                    new_existing_var_type.remove_type(&atomic);
+                    new_existing_var_type.types.to_mut().push(atomic);
                 }
             } else {
                 did_remove_type = true;
             }
         } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
             if !is_equality {
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
             }
 
             did_remove_type = true;
@@ -836,23 +818,24 @@ fn subtract_bool(
             did_remove_type = true;
 
             if !is_equality {
-                existing_var_type.remove_type(atomic);
+                new_existing_var_type.remove_type(atomic);
             }
         }
     }
 
-    if (existing_var_type.types.is_empty() || !did_remove_type)
+    if (new_existing_var_type.types.is_empty() || !did_remove_type)
         && let Some(key) = key
         && let Some(pos) = span
     {
+        let old_var_type_atom = existing_var_type.get_id();
         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
-    if existing_var_type.types.is_empty() {
+    if new_existing_var_type.types.is_empty() {
         return get_never();
     }
 
-    existing_var_type
+    new_existing_var_type
 }
 
 pub(crate) fn subtract_null(
@@ -986,10 +969,9 @@ fn subtract_false(
         return existing_var_type.clone();
     }
 
-    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
-    let mut existing_var_type = existing_var_type.clone();
+    let mut new_existing_var_type = existing_var_type.clone();
 
     for atomic in existing_var_types {
         match atomic {
@@ -999,45 +981,46 @@ fn subtract_false(
                         subtract_false(context, assertion, constraint, None, false, None, is_equality)
                     })
                 {
-                    existing_var_type.remove_type(&atomic);
-                    existing_var_type.types.to_mut().push(atomic);
+                    new_existing_var_type.remove_type(&atomic);
+                    new_existing_var_type.types.to_mut().push(atomic);
                 } else {
                     did_remove_type = true;
                 }
             }
             TAtomic::Scalar(TScalar::Generic) => {
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#true()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#true()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
                 did_remove_type = true;
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#true()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#true()));
                 did_remove_type = true;
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => {
                 did_remove_type = true;
-                existing_var_type.remove_type(atomic);
+                new_existing_var_type.remove_type(atomic);
             }
             _ => {}
         }
     }
 
-    if (existing_var_type.types.is_empty() || !did_remove_type)
+    if (new_existing_var_type.types.is_empty() || !did_remove_type)
         && let Some(key) = key
         && let Some(pos) = span
     {
+        let old_var_type_atom = existing_var_type.get_id();
         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
-    if existing_var_type.types.is_empty() {
+    if new_existing_var_type.types.is_empty() {
         return get_never();
     }
 
-    existing_var_type
+    new_existing_var_type
 }
 
 fn subtract_true(
@@ -1053,10 +1036,9 @@ fn subtract_true(
         return existing_var_type.clone();
     }
 
-    let old_var_type_atom = existing_var_type.get_id();
     let existing_var_types = existing_var_type.types.as_ref();
     let mut did_remove_type = false;
-    let mut existing_var_type = existing_var_type.clone();
+    let mut new_existing_var_type = existing_var_type.clone();
 
     for atomic in existing_var_types {
         match atomic {
@@ -1066,46 +1048,47 @@ fn subtract_true(
                         subtract_true(context, assertion, constraint, None, false, None, is_equality)
                     })
                 {
-                    existing_var_type.remove_type(&atomic);
-                    existing_var_type.types.to_mut().push(atomic);
+                    new_existing_var_type.remove_type(&atomic);
+                    new_existing_var_type.types.to_mut().push(atomic);
                 } else {
                     did_remove_type = true;
                 }
             }
             TAtomic::Scalar(TScalar::Generic) => {
                 did_remove_type = true;
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#false()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#false()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general() => {
-                existing_var_type.remove_type(atomic);
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#false()));
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::r#false()));
                 did_remove_type = true;
             }
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => {
                 did_remove_type = true;
 
-                existing_var_type.remove_type(atomic);
+                new_existing_var_type.remove_type(atomic);
             }
             _ => (),
         }
     }
 
-    if (existing_var_type.types.is_empty() || !did_remove_type)
+    if (new_existing_var_type.types.is_empty() || !did_remove_type)
         && let Some(key) = key
         && let Some(pos) = span
     {
+        let old_var_type_atom = existing_var_type.get_id();
         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, pos);
     }
 
-    if existing_var_type.types.is_empty() {
+    if new_existing_var_type.types.is_empty() {
         return get_never();
     }
 
-    existing_var_type
+    new_existing_var_type
 }
 
 fn reconcile_falsy_or_empty(

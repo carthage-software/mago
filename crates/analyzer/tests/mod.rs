@@ -250,6 +250,12 @@ test_case!(issue_567);
 test_case!(issue_568);
 test_case!(issue_570);
 test_case!(issue_573);
+test_case!(sealed_class_2_inheritors);
+test_case!(sealed_class_5_inheritors);
+test_case!(sealed_class_7_inheritors);
+test_case!(sealed_class_10_inheritors);
+test_case!(sealed_class_15_inheritors);
+test_case!(sealed_class_performance);
 
 #[test]
 fn test_all_test_cases_are_ran() {
