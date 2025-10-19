@@ -194,6 +194,7 @@ test_case!(chunk_with_keys);
 test_case!(trait_alias_vis_self);
 test_case!(true_ident);
 test_case!(eliminate_true_and_false_from_scalar);
+test_case!(subtract_objects);
 
 // Github Issues
 test_case!(issue_275);

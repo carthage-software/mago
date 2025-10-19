@@ -60,7 +60,27 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Object(TObject::Named(_subtracting_named)) => {
+            TAtomic::Object(TObject::Named(subtracting_named))
+                if existing_var_type
+                    .types
+                    .iter()
+                    .filter_map(|existing_atomic| match existing_atomic {
+                        TAtomic::Object(TObject::Named(existing_named)) => Some(&existing_named.name),
+                        _ => None,
+                    })
+                    .filter_map(|existing_class| {
+                        if context.codebase.is_instance_of(&subtracting_named.name, existing_class) {
+                            context.codebase.get_class_like(existing_class)
+                        } else {
+                            None
+                        }
+                    })
+                    .any(|parent_class| {
+                        parent_class.permitted_inheritors.as_ref().is_some_and(|permitted_inheritors| {
+                            permitted_inheritors.contains(&ascii_lowercase_atom(&subtracting_named.name))
+                        })
+                    }) =>
+            {
                 return Some(subtract_object(
                     context,
                     assertion,
