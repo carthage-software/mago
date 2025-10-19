@@ -305,6 +305,9 @@ final class AnalyzerCodeModuleGenerator
         'non-documented-method',
         'non-documented-property',
         'non-documented-constant',
+        'missing-parameter-type',
+        'missing-property-type',
+        'missing-return-type',
     ];
 
     /**

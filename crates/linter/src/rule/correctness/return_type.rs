@@ -39,6 +39,12 @@ impl Default for ReturnTypeConfig {
 }
 
 impl Config for ReturnTypeConfig {
+    fn default_enabled() -> bool {
+        // This rule is disabled by default due to its deprecation.
+        // Use the analyzer's `check-missing-type-hints` setting instead.
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -46,6 +52,10 @@ impl Config for ReturnTypeConfig {
 
 impl LintRule for ReturnTypeRule {
     type Config = ReturnTypeConfig;
+
+    fn deprecated() -> bool {
+        true
+    }
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {

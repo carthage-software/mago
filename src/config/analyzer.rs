@@ -111,6 +111,32 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub no_boolean_literal_comparison: bool,
 
+    /// Check for missing type hints on parameters, properties, and return types.
+    ///
+    /// When enabled, the analyzer will report warnings for function parameters, class properties,
+    /// and function return types that lack explicit type declarations.
+    ///
+    /// Defaults to `false`.
+    pub check_missing_type_hints: bool,
+
+    /// Check for missing type hints (both parameters and return types) in closures when `check_missing_type_hints` is enabled.
+    ///
+    /// When `true`, closures (anonymous functions declared with `function() {}`) will be
+    /// checked for missing type hints. When `false`, closures are ignored, which is useful
+    /// because closures often rely on type inference.
+    ///
+    /// Defaults to `false`.
+    pub check_closure_missing_type_hints: bool,
+
+    /// Check for missing type hints (both parameters and return types) in arrow functions when `check_missing_type_hints` is enabled.
+    ///
+    /// When `true`, arrow functions (declared with `fn() => ...`) will be checked for missing
+    /// type hints. When `false`, arrow functions are ignored, which is useful because arrow
+    /// functions often rely on type inference and are typically short, making types obvious.
+    ///
+    /// Defaults to `false`.
+    pub check_arrow_function_missing_type_hints: bool,
+
     /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
     ///
     /// If disabled, super globals won't be available unless explicitly imported using
@@ -155,6 +181,9 @@ impl AnalyzerConfiguration {
             perform_heuristic_checks: self.perform_heuristic_checks,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            check_missing_type_hints: self.check_missing_type_hints,
+            check_closure_missing_type_hints: self.check_closure_missing_type_hints,
+            check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
             register_super_globals: self.register_super_globals,
             use_colors: match color_choice {
                 ColorChoice::Always => true,
@@ -202,6 +231,9 @@ impl Default for AnalyzerConfiguration {
             perform_heuristic_checks: defaults.perform_heuristic_checks,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
+            check_missing_type_hints: defaults.check_missing_type_hints,
+            check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
+            check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,
             register_super_globals: defaults.register_super_globals,
         }
     }

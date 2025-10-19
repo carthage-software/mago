@@ -113,6 +113,34 @@ pub struct Settings {
     /// Defaults to `false`.
     pub no_boolean_literal_comparison: bool,
 
+    /// Check for missing type hints on parameters, properties, and return types.
+    ///
+    /// When enabled, the analyzer will report warnings for function parameters, class properties,
+    /// and function return types that lack explicit type declarations. The analyzer uses its
+    /// type system knowledge to avoid false positives - for instance, it won't require a type hint
+    /// on a property if adding one would conflict with a parent class or trait that has no type hint.
+    ///
+    /// Defaults to `false`.
+    pub check_missing_type_hints: bool,
+
+    /// Check for missing type hints (both parameters and return types) in closures when `check_missing_type_hints` is enabled.
+    ///
+    /// When `true`, closures (anonymous functions declared with `function() {}`) will be
+    /// checked for missing type hints. When `false`, closures are ignored, which is useful
+    /// because closures often rely on type inference.
+    ///
+    /// Defaults to `false`.
+    pub check_closure_missing_type_hints: bool,
+
+    /// Check for missing type hints (both parameters and return types) in arrow functions when `check_missing_type_hints` is enabled.
+    ///
+    /// When `true`, arrow functions (declared with `fn() => ...`) will be checked for missing
+    /// type hints. When `false`, arrow functions are ignored, which is useful because arrow
+    /// functions often rely on type inference and are typically short, making types obvious.
+    ///
+    /// Defaults to `false`.
+    pub check_arrow_function_missing_type_hints: bool,
+
     /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
     ///
     /// If disabled, super globals won't be available unless explicitly imported using
@@ -175,6 +203,9 @@ impl Settings {
             perform_heuristic_checks: false,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            check_closure_missing_type_hints: false,
+            check_arrow_function_missing_type_hints: false,
             register_super_globals: true,
             diff: false,
         }

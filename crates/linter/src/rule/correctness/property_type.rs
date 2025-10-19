@@ -35,6 +35,12 @@ impl Default for PropertyTypeConfig {
 }
 
 impl Config for PropertyTypeConfig {
+    fn default_enabled() -> bool {
+        // This rule is disabled by default due to its deprecation.
+        // Use the analyzer's `check-missing-type-hints` setting instead.
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -42,6 +48,10 @@ impl Config for PropertyTypeConfig {
 
 impl LintRule for PropertyTypeRule {
     type Config = PropertyTypeConfig;
+
+    fn deprecated() -> bool {
+        true
+    }
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {

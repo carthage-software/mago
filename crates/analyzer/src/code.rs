@@ -125,9 +125,12 @@ pub enum IssueCode {
     MismatchedArrayIndex,
     MissingMagicMethod,
     MissingOverrideAttribute,
+    MissingParameterType,
+    MissingPropertyType,
     MissingRequiredInterface,
     MissingRequiredParent,
     MissingReturnStatement,
+    MissingReturnType,
     MissingTemplateParameter,
     MixedArgument,
     MixedArrayAccess,
@@ -381,9 +384,12 @@ impl IssueCode {
             Self::MismatchedArrayIndex => "mismatched-array-index",
             Self::MissingMagicMethod => "missing-magic-method",
             Self::MissingOverrideAttribute => "missing-override-attribute",
+            Self::MissingParameterType => "missing-parameter-type",
+            Self::MissingPropertyType => "missing-property-type",
             Self::MissingRequiredInterface => "missing-required-interface",
             Self::MissingRequiredParent => "missing-required-parent",
             Self::MissingReturnStatement => "missing-return-statement",
+            Self::MissingReturnType => "missing-return-type",
             Self::MissingTemplateParameter => "missing-template-parameter",
             Self::MixedArgument => "mixed-argument",
             Self::MixedArrayAccess => "mixed-array-access",
@@ -879,7 +885,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_property_issue_codes() -> [Self; 16] {
+    pub const fn get_property_issue_codes() -> [Self; 17] {
         [
             Self::AmbiguousObjectPropertyAccess,
             Self::IncompatiblePropertyType,
@@ -888,6 +894,7 @@ impl IssueCode {
             Self::InvalidPropertyRead,
             Self::InvalidPropertyWrite,
             Self::InvalidStaticPropertyAccess,
+            Self::MissingPropertyType,
             Self::MixedPropertyAccess,
             Self::MixedPropertyTypeCoercion,
             Self::NonDocumentedProperty,
@@ -900,7 +907,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_property_issue_code_values() -> [&'static str; 16] {
+    pub const fn get_property_issue_code_values() -> [&'static str; 17] {
         [
             "ambiguous-object-property-access",
             "incompatible-property-type",
@@ -909,6 +916,7 @@ impl IssueCode {
             "invalid-property-read",
             "invalid-property-write",
             "invalid-static-property-access",
+            "missing-property-type",
             "mixed-property-access",
             "mixed-property-type-coercion",
             "non-documented-property",
@@ -1005,7 +1013,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_return_issue_codes() -> [Self; 10] {
+    pub const fn get_return_issue_codes() -> [Self; 11] {
         [
             Self::FalsableReturnStatement,
             Self::HiddenGeneratorReturn,
@@ -1014,13 +1022,14 @@ impl IssueCode {
             Self::LessSpecificNestedReturnStatement,
             Self::LessSpecificReturnStatement,
             Self::MissingReturnStatement,
+            Self::MissingReturnType,
             Self::MixedReturnStatement,
             Self::NeverReturn,
             Self::NullableReturnStatement,
         ]
     }
 
-    pub const fn get_return_issue_code_values() -> [&'static str; 10] {
+    pub const fn get_return_issue_code_values() -> [&'static str; 11] {
         [
             "falsable-return-statement",
             "hidden-generator-return",
@@ -1029,6 +1038,7 @@ impl IssueCode {
             "less-specific-nested-return-statement",
             "less-specific-return-statement",
             "missing-return-statement",
+            "missing-return-type",
             "mixed-return-statement",
             "never-return",
             "nullable-return-statement",
@@ -1233,9 +1243,12 @@ impl std::str::FromStr for IssueCode {
             "mismatched-array-index" => Ok(Self::MismatchedArrayIndex),
             "missing-magic-method" => Ok(Self::MissingMagicMethod),
             "missing-override-attribute" => Ok(Self::MissingOverrideAttribute),
+            "missing-parameter-type" => Ok(Self::MissingParameterType),
+            "missing-property-type" => Ok(Self::MissingPropertyType),
             "missing-required-interface" => Ok(Self::MissingRequiredInterface),
             "missing-required-parent" => Ok(Self::MissingRequiredParent),
             "missing-return-statement" => Ok(Self::MissingReturnStatement),
+            "missing-return-type" => Ok(Self::MissingReturnType),
             "missing-template-parameter" => Ok(Self::MissingTemplateParameter),
             "mixed-argument" => Ok(Self::MixedArgument),
             "mixed-array-access" => Ok(Self::MixedArrayAccess),

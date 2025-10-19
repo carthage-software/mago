@@ -339,6 +339,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
             ClassLikeMember::Property(property) => {
                 property.analyze(context, &mut block_context, artifacts)?;
+                crate::utils::missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
             }
             ClassLikeMember::EnumCase(enum_case) => {
                 enum_case.analyze(context, &mut block_context, artifacts)?;

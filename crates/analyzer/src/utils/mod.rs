@@ -9,6 +9,7 @@ pub mod conditional;
 pub mod docblock;
 pub mod expression;
 pub mod misc;
+pub mod missing_type_hints;
 pub mod php_emulation;
 pub mod template;
 

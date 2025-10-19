@@ -85,6 +85,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             );
         }
 
+        // Check for missing type hints
+        for parameter in self.parameter_list.parameters.iter() {
+            crate::utils::missing_type_hints::check_parameter_type_hint(
+                context,
+                Some(class_like_metadata),
+                method_metadata,
+                parameter,
+            );
+        }
+
+        crate::utils::missing_type_hints::check_return_type_hint(
+            context,
+            Some(class_like_metadata),
+            method_metadata,
+            self.name.value,
+            self.return_type_hint.as_ref(),
+            self.span(),
+        );
+
         Ok(())
     }
 }

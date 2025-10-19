@@ -64,6 +64,9 @@ pub struct WasmAnalyzerSettings {
     pub perform_heuristic_checks: bool,
     pub strict_list_index_checks: bool,
     pub no_boolean_literal_comparison: bool,
+    pub check_missing_type_hints: bool,
+    pub check_closure_missing_type_hints: bool,
+    pub check_arrow_function_missing_type_hints: bool,
     pub register_super_globals: bool,
     pub use_colors: bool,
 }
@@ -111,6 +114,9 @@ impl WasmAnalyzerSettings {
             strict_list_index_checks: self.strict_list_index_checks,
             perform_heuristic_checks: self.perform_heuristic_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            check_missing_type_hints: self.check_missing_type_hints,
+            check_closure_missing_type_hints: self.check_closure_missing_type_hints,
+            check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
             register_super_globals: self.register_super_globals,
             use_colors: self.use_colors,
             diff: false, // Not applicable in wasm context
