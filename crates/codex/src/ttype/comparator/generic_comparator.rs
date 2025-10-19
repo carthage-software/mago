@@ -34,7 +34,7 @@ pub(crate) fn is_contained_by(
     }
 
     let container_type_parameters = container_object.get_type_parameters().unwrap_or_default();
-    let input_type_parameters = input_object.get_type_parameters().unwrap_or_default();
+    let input_type_parameters = input_object.get_type_parameters();
 
     let mut all_parameters_match = true;
     for (parameter_offset, container_type_parameter) in container_type_parameters.iter().enumerate() {
@@ -47,7 +47,7 @@ pub(crate) fn is_contained_by(
             template_name,
             &container_metadata.name,
             input_metadata,
-            Some(input_type_parameters),
+            input_type_parameters,
         ) else {
             return false;
         };
