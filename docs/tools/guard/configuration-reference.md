@@ -171,8 +171,8 @@ must-implement = ["App\\InterfaceA", "App\\InterfaceB"]
 
 # Must extend (AbstractA AND AbstractB) OR (AbstractC)
 must-extend = [
-    ["App\AbstractA", "App\\AbstractB"],
-    ["App\AbstractC"],
+    ["App\\AbstractA", "App\\AbstractB"],
+    ["App\\AbstractC"],
 ]
 
 # Must not implement any interface
