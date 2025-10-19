@@ -1,5 +1,8 @@
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::function_like::FunctionLikeKind;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_php_version::PHPVersion;
+use mago_php_version::feature::Feature;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -7,18 +10,54 @@ use mago_syntax::ast::*;
 use crate::code::IssueCode;
 use crate::context::Context;
 
+/// Check if a constant is missing a type hint and whether it's safe to add one.
+///
+/// A constant should only be reported as missing a type hint if:
+/// 1. It has no type hint
+/// 2. Typed class constants are supported in the target PHP version
+pub fn check_constant_type_hint<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_constant: &ClassLikeConstant<'arena>,
+) {
+    if !context.settings.check_missing_type_hints
+        || !context.settings.version.is_supported(Feature::TypedClassLikeConstants)
+    {
+        return;
+    }
+
+    if class_like_constant.hint.is_some() {
+        return;
+    }
+
+    let item = class_like_constant.first_item();
+
+    let constant_name = item.name.value;
+
+    context.collector.report_with_code(
+        IssueCode::MissingConstantType,
+        Issue::warning(format!("Class constant `{constant_name}` is missing a type hint."))
+            .with_annotation(
+                Annotation::primary(class_like_constant.span())
+                    .with_message(format!("Class constant `{constant_name}` is defined here")),
+            )
+            .with_note("Adding a type hint to constants improves code readability and helps prevent type errors.")
+            .with_help(format!("Consider specifying a type hint for `{constant_name}`.")),
+    );
+}
+
 /// Check if a property is missing a type hint and whether it's safe to add one.
 ///
 /// A property should only be reported as missing a type hint if:
 /// 1. It has no type hint
 /// 2. It is not prefixed with `$_` (ignored by convention)
 /// 3. It would be safe to add a type hint (i.e., no parent class/trait has the same property without a type hint)
+/// 4. Typed properties are supported in the target PHP version
 pub fn check_property_type_hint<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &ClassLikeMetadata,
     property: &Property<'arena>,
 ) {
-    if !context.settings.check_missing_type_hints {
+    if !context.settings.check_missing_type_hints || !context.settings.version.is_supported(Feature::TypedProperties) {
         return;
     }
 
@@ -80,13 +119,14 @@ pub fn check_property_type_hint<'ctx, 'arena>(
 /// 2. It is not prefixed with `$_` (ignored by convention)
 /// 3. The method is not overriding a parent method (where adding a type hint might cause issues)
 /// 4. If it's a closure/arrow function parameter, the corresponding ignore setting is not enabled
+/// 5. Typed parameters are supported in the target PHP version
 pub fn check_parameter_type_hint<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
     parameter: &FunctionLikeParameter<'arena>,
 ) {
-    if !context.settings.check_missing_type_hints {
+    if !context.settings.check_missing_type_hints || context.settings.version < PHPVersion::PHP70 {
         return;
     }
 
@@ -96,7 +136,6 @@ pub fn check_parameter_type_hint<'ctx, 'arena>(
     }
 
     // Check if we should skip based on function kind
-    use mago_codex::metadata::function_like::FunctionLikeKind;
     if matches!(function_like_metadata.kind, FunctionLikeKind::Closure)
         && !context.settings.check_closure_missing_type_hints
     {
@@ -134,6 +173,7 @@ pub fn check_parameter_type_hint<'ctx, 'arena>(
 /// 2. It's not a constructor or destructor
 /// 3. If it's a method, it's not overriding a parent method
 /// 4. If it's a closure/arrow function, the corresponding ignore setting is not enabled
+/// 5. Return type hints are supported in the target PHP version
 pub fn check_return_type_hint<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: Option<&ClassLikeMetadata>,
@@ -142,7 +182,7 @@ pub fn check_return_type_hint<'ctx, 'arena>(
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
     span: mago_span::Span,
 ) {
-    if !context.settings.check_missing_type_hints {
+    if !context.settings.check_missing_type_hints || context.settings.version < PHPVersion::PHP70 {
         return;
     }
 
@@ -152,7 +192,6 @@ pub fn check_return_type_hint<'ctx, 'arena>(
     }
 
     // Check if we should skip based on function kind
-    use mago_codex::metadata::function_like::FunctionLikeKind;
     if matches!(function_like_metadata.kind, FunctionLikeKind::Closure)
         && !context.settings.check_closure_missing_type_hints
     {
@@ -236,8 +275,6 @@ fn is_safe_to_add_parameter_type_hint(
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
 ) -> bool {
-    use mago_codex::metadata::function_like::FunctionLikeKind;
-
     // If it's not a method, it's always safe
     if !matches!(function_like_metadata.kind, FunctionLikeKind::Method) {
         return true;
@@ -267,8 +304,6 @@ fn is_safe_to_add_return_type_hint(
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
 ) -> bool {
-    use mago_codex::metadata::function_like::FunctionLikeKind;
-
     // If it's not a method, it's always safe
     if !matches!(function_like_metadata.kind, FunctionLikeKind::Method) {
         return true;

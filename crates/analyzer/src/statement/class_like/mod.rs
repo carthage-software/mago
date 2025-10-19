@@ -32,6 +32,7 @@ use crate::error::AnalysisError;
 use crate::heuristic;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
+use crate::utils::missing_type_hints;
 
 pub mod constant;
 pub mod enum_case;
@@ -335,11 +336,14 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     for member in members {
         match member {
             ClassLikeMember::Constant(class_like_constant) => {
+                missing_type_hints::check_constant_type_hint(context, class_like_constant);
+
                 class_like_constant.analyze(context, &mut block_context, artifacts)?;
             }
             ClassLikeMember::Property(property) => {
+                missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
+
                 property.analyze(context, &mut block_context, artifacts)?;
-                crate::utils::missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
             }
             ClassLikeMember::EnumCase(enum_case) => {
                 enum_case.analyze(context, &mut block_context, artifacts)?;
