@@ -326,8 +326,13 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         StaticClassType::Name(*fq_class_id)
     };
 
+    // Get the class it was called on - need original name for callable creation
+    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id)?;
+
     Some(ResolvedMethod {
-        classname: defining_class_metadata.name,
+        // Use the original name of the class it was called on
+        // This is important for first-class callables with static return types
+        classname: called_on_class_metadata.original_name,
         method_identifier: declaring_method_id,
         static_class_type,
         is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),

@@ -27,7 +27,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodClosureCreation<'are
         let mut callables = vec![];
         for resolved_method in method_resolution.resolved_methods {
             callables.push(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
+                resolved_method.classname,
                 *resolved_method.method_identifier.get_method_name(),
             ))));
         }

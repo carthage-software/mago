@@ -41,6 +41,14 @@ pub fn cast_atomic_to_callable<'a>(
     }
 
     if let Some(literal_string) = atomic.get_literal_string_value() {
+        // Check if this is a static method callable in the format "ClassName::methodName"
+        if let Some((class_part, method_part)) = literal_string.split_once("::") {
+            return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(
+                atom(class_part),
+                atom(method_part),
+            ))));
+        }
+
         return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(atom(literal_string)))));
     }
 
@@ -84,8 +92,14 @@ fn handle_array_callable(
     let class_or_object = class_or_object.get_single();
     let method_name = atom(method.get_single_literal_string_value()?);
 
+    // Check if the first element is a literal string (e.g., 'ClassName')
     if let Some(class_name) = class_or_object.get_literal_string_value() {
         return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(atom(class_name), method_name))));
+    }
+
+    // Check if the first element is a class-string literal (e.g., ClassName::class)
+    if let Some(class_name) = class_or_object.get_class_string_value() {
+        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(class_name, method_name))));
     }
 
     // Collect all atomics to check - handle intersections and generic parameters

@@ -1,8 +1,10 @@
 use mago_atom::AtomMap;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_void;
@@ -24,6 +26,7 @@ use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
@@ -184,16 +187,48 @@ fn get_function_like_target<'ctx, 'arena>(
     inferred_return_type: Option<Box<TUnion>>,
 ) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
     let mut identifier = function_like;
+    let original_class_for_method_context =
+        if let FunctionLikeIdentifier::Method(class_name, _) = function_like { Some(class_name) } else { None };
 
-    let metadata = context.codebase.get_function_like(&identifier).or_else(|| {
-        if let Some(alternative) = alternative {
-            context.codebase.get_function_like(&alternative).inspect(|_| {
-                identifier = alternative;
-            })
-        } else {
-            None
-        }
-    });
+    let metadata = context
+        .codebase
+        .get_function_like(&identifier)
+        .or_else(|| {
+            // If this is a method and we can't find it, try looking up the inheritance chain
+            if let FunctionLikeIdentifier::Method(class_name, method_name) = identifier {
+                if let Some(class_metadata) = context.codebase.get_class_like(&class_name) {
+                    // Try to find the method in parent classes
+                    if let Some(declaring_method_id) = class_metadata.declaring_method_ids.get(&method_name) {
+                        let declaring_class_id = declaring_method_id.get_class_name();
+                        context
+                            .codebase
+                            .get_function_like(&FunctionLikeIdentifier::Method(*declaring_class_id, method_name))
+                            .inspect(|_| {
+                                identifier = FunctionLikeIdentifier::Method(*declaring_class_id, method_name);
+                            })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else if let Some(alternative) = alternative {
+                context.codebase.get_function_like(&alternative).inspect(|_| {
+                    identifier = alternative;
+                })
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            if let Some(alternative) = alternative {
+                context.codebase.get_function_like(&alternative).inspect(|_| {
+                    identifier = alternative;
+                })
+            } else {
+                None
+            }
+        });
 
     let Some(metadata) = metadata else {
         let title_str = function_like.title_kind_str();
@@ -225,7 +260,30 @@ fn get_function_like_target<'ctx, 'arena>(
         return Ok(None);
     };
 
-    Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context: None, span }))
+    // If this is a method, we need to create a method context so that static types can be resolved properly
+    let method_context = if let Some(original_class_name) = original_class_for_method_context {
+        // Look up the class metadata for the class this method is being called on (not where it's declared)
+        if let Some(class_like_metadata) = context.codebase.get_class_like(&original_class_name) {
+            // Create the method identifier using the looked up identifier (which points to where the method is declared)
+            let declaring_method_id = if let FunctionLikeIdentifier::Method(class_name, method_name) = identifier {
+                Some(MethodIdentifier::new(class_name, method_name))
+            } else {
+                None
+            };
+
+            Some(MethodTargetContext {
+                declaring_method_id,
+                class_like_metadata,
+                class_type: StaticClassType::Name(original_class_name),
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span }))
 }
 
 fn inspect_arguments<'ctx, 'ast, 'arena>(

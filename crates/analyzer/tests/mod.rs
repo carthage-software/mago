@@ -195,6 +195,12 @@ test_case!(trait_alias_vis_self);
 test_case!(true_ident);
 test_case!(eliminate_true_and_false_from_scalar);
 test_case!(subtract_objects);
+test_case!(sealed_class_2_inheritors);
+test_case!(sealed_class_5_inheritors);
+test_case!(sealed_class_7_inheritors);
+test_case!(sealed_class_10_inheritors);
+test_case!(sealed_class_15_inheritors);
+test_case!(sealed_class_performance);
 
 // Github Issues
 test_case!(issue_275);
@@ -230,6 +236,7 @@ test_case!(issue_493);
 test_case!(issue_504);
 test_case!(issue_508);
 test_case!(issue_510);
+test_case!(issue_511);
 test_case!(issue_520);
 test_case!(issue_521);
 test_case!(issue_523);
@@ -251,12 +258,8 @@ test_case!(issue_567);
 test_case!(issue_568);
 test_case!(issue_570);
 test_case!(issue_573);
-test_case!(sealed_class_2_inheritors);
-test_case!(sealed_class_5_inheritors);
-test_case!(sealed_class_7_inheritors);
-test_case!(sealed_class_10_inheritors);
-test_case!(sealed_class_15_inheritors);
-test_case!(sealed_class_performance);
+test_case!(issue_549);
+test_case!(issue_577);
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -102,13 +102,17 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     if !left_assertions.is_empty() {
         right_block_context = block_context.clone();
 
+        // Don't report issues when applying LHS assertions to prepare RHS context
+        // Issues will be reported when actually analyzing the RHS expression
+        let empty_referenced_vars = HashSet::default();
+
         reconciler::reconcile_keyed_types(
             context,
             &left_assertions,
             active_left_assertions,
             &mut right_block_context,
             &mut changed_var_ids,
-            &left_referenced_var_ids,
+            &empty_referenced_vars,
             &binary.rhs.span(),
             !binary.operator.span().is_zero(),
             !block_context.inside_negation,
