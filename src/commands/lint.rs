@@ -14,8 +14,7 @@ use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings;
 use mago_reporting::Level;
 
-use crate::commands::args::baseline::BaselineArgs;
-use crate::commands::args::reporting::ReportingArgs;
+use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::database;
 use crate::error::Error;
@@ -109,10 +108,7 @@ pub struct LintCommand {
     pub only: Vec<String>,
 
     #[clap(flatten)]
-    pub reporting: ReportingArgs,
-
-    #[clap(flatten)]
-    pub baseline: BaselineArgs,
+    pub baseline_reporting: BaselineReportingArgs,
 }
 
 impl LintCommand {
@@ -168,27 +164,10 @@ impl LintCommand {
         };
 
         let issues = run_lint_pipeline(database.read_only(), shared_context)?;
+        let baseline = configuration.linter.baseline.clone();
 
-        let config_baseline = configuration.linter.baseline.clone();
-        let read_database = database.read_only();
-
-        // Process baseline first
-        let (filtered_issues, should_fail_from_baseline, early_exit) =
-            self.baseline.process_baseline(issues, config_baseline.as_deref(), &read_database)?;
-
-        // Handle early exits (baseline generation/verification)
-        if let Some(exit_code) = early_exit {
-            return Ok(exit_code);
-        }
-
-        // Process issues with reporting
-        self.reporting.process_issues_with_baseline_result(
-            filtered_issues,
-            configuration,
-            color_choice,
-            database,
-            should_fail_from_baseline,
-        )
+        // Process issues
+        self.baseline_reporting.process_issues_with_baseline(issues, configuration, color_choice, database, baseline)
     }
 }
 

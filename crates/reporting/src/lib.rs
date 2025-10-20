@@ -1,3 +1,15 @@
+//! Issue reporting and formatting for Mago.
+//!
+//! This crate provides functionality for reporting code issues identified by the linter and analyzer.
+//! It includes support for multiple output formats, baseline filtering, and rich terminal output.
+//!
+//! # Core Types
+//!
+//! - [`Issue`]: Represents a single code issue with severity level, annotations, and optional fixes
+//! - [`IssueCollection`]: A collection of issues with filtering and sorting capabilities
+//! - [`reporter::Reporter`]: Handles formatting and outputting issues in various formats
+//! - [`baseline::Baseline`]: Manages baseline files to filter out known issues
+
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::iter::Once;
@@ -17,6 +29,7 @@ pub use termcolor::ColorChoice;
 
 mod internal;
 
+pub mod baseline;
 pub mod error;
 pub mod reporter;
 
@@ -487,6 +500,11 @@ impl IssueCollection {
         self.issues.iter().map(|issue| issue.level).max()
     }
 
+    /// Returns the lowest severity level of the issues in the collection.
+    pub fn get_lowest_level(&self) -> Option<Level> {
+        self.issues.iter().map(|issue| issue.level).min()
+    }
+
     pub fn filter_out_ignored(&mut self, ignore: &[String]) {
         self.issues.retain(|issue| if let Some(code) = &issue.code { !ignore.contains(code) } else { true });
     }
@@ -495,8 +513,8 @@ impl IssueCollection {
         self.issues.iter_mut().flat_map(|issue| issue.take_suggestions())
     }
 
-    pub fn only_fixable(self) -> impl Iterator<Item = Issue> {
-        self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty())
+    pub fn filter_fixable(self) -> Self {
+        Self { issues: self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()).collect() }
     }
 
     /// Sorts the issues in the collection.

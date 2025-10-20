@@ -1,16 +1,29 @@
+//! Error types for the reporting crate.
+//!
+//! This module defines the error types that can occur during issue reporting,
+//! including database errors, JSON serialization errors, file I/O errors,
+//! and invalid configuration errors.
+
 use codespan_reporting::files::Error as FilesError;
 use serde_json::Error as JsonError;
 use std::io::Error as IoError;
 
 use mago_database::error::DatabaseError;
 
+/// Errors that can occur during issue reporting.
 #[derive(Debug)]
 pub enum ReportingError {
+    /// An error occurred while accessing the database.
     DatabaseError(DatabaseError),
+    /// An error occurred while serializing or deserializing JSON.
     JsonError(JsonError),
+    /// An error occurred while accessing source files.
     FilesError(FilesError),
+    /// An I/O error occurred.
     IoError(IoError),
+    /// An invalid reporting target was specified.
     InvalidTarget(String),
+    /// An invalid reporting format was specified.
     InvalidFormat(String),
 }
 

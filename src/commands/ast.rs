@@ -102,7 +102,7 @@ impl AstCommand {
             let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
             let database = Database::single(file);
 
-            return self.reporting.process_issues(issues, configuration, color_choice, database);
+            return self.reporting.process_issues(issues, configuration, color_choice, database, None, false);
         }
 
         Ok(ExitCode::SUCCESS)
@@ -130,6 +130,8 @@ impl AstCommand {
                         configuration,
                         color_choice,
                         database,
+                        None,
+                        false,
                     )?;
 
                     return Ok(ExitCode::FAILURE);

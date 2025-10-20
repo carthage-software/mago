@@ -8,8 +8,7 @@ use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_prelude::Prelude;
 
-use crate::commands::args::baseline::BaselineArgs;
-use crate::commands::args::reporting::ReportingArgs;
+use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::database;
@@ -56,13 +55,9 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
-    /// Arguments related to reporting and fixing issues.
+    /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
-    pub reporting: ReportingArgs,
-
-    /// Arguments related to baseline functionality.
-    #[clap(flatten)]
-    pub baseline: BaselineArgs,
+    pub baseline_reporting: BaselineReportingArgs,
 }
 
 impl AnalyzeCommand {
@@ -117,25 +112,15 @@ impl AnalyzeCommand {
         let mut issues = analysis_results.issues;
         issues.filter_out_ignored(&configuration.analyzer.ignore);
 
-        let config_baseline = configuration.analyzer.baseline.clone();
-        let read_database = final_database.read_only();
+        let baseline = configuration.analyzer.baseline.clone();
 
-        // Process baseline first
-        let (filtered_issues, should_fail_from_baseline, early_exit) =
-            self.baseline.process_baseline(issues, config_baseline.as_deref(), &read_database)?;
-
-        // Handle early exits (baseline generation/verification)
-        if let Some(exit_code) = early_exit {
-            return Ok(exit_code);
-        }
-
-        // Process issues with reporting
-        self.reporting.process_issues_with_baseline_result(
-            filtered_issues,
+        // 5. Process issues with baseline reporting if configured.
+        self.baseline_reporting.process_issues_with_baseline(
+            issues,
             configuration,
             color_choice,
             final_database,
-            should_fail_from_baseline,
+            baseline,
         )
     }
 }

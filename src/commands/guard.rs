@@ -8,8 +8,7 @@ use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_prelude::Prelude;
 
-use crate::commands::args::baseline::BaselineArgs;
-use crate::commands::args::reporting::ReportingArgs;
+use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::database;
@@ -52,13 +51,9 @@ pub struct GuardCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
-    /// Arguments related to reporting issues.
+    /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
-    pub reporting: ReportingArgs,
-
-    /// Arguments related to baseline functionality.
-    #[clap(flatten)]
-    pub baseline: BaselineArgs,
+    pub baseline_reporting: BaselineReportingArgs,
 }
 
 impl GuardCommand {
@@ -71,10 +66,6 @@ impl GuardCommand {
     /// 3. Checking architectural boundaries against guard rules (with progress).
     /// 4. Reporting any found violations.
     pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        if self.reporting.fix {
-            tracing::warn!("Fix mode is not yet implemented for guard. Running in check-only mode.");
-        }
-
         configuration.source.excludes.extend(std::mem::take(&mut configuration.guard.excludes));
 
         let (base_db, codebase_metadata, _) = {
@@ -97,23 +88,14 @@ impl GuardCommand {
 
         let guard_settings = configuration.guard.settings.clone();
         let issues = run_guard_pipeline(final_database.read_only(), codebase_metadata, guard_settings)?;
+        let baseline = configuration.guard.baseline.clone();
 
-        let config_baseline = configuration.guard.baseline.clone();
-        let read_database = final_database.read_only();
-
-        let (filtered_issues, should_fail_from_baseline, early_exit) =
-            self.baseline.process_baseline(issues, config_baseline.as_deref(), &read_database)?;
-
-        if let Some(exit_code) = early_exit {
-            return Ok(exit_code);
-        }
-
-        self.reporting.process_issues_with_baseline_result(
-            filtered_issues,
+        self.baseline_reporting.process_issues_with_baseline(
+            issues,
             configuration,
             color_choice,
             final_database,
-            should_fail_from_baseline,
+            baseline,
         )
     }
 }

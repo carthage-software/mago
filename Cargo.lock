@@ -1707,6 +1707,7 @@ dependencies = [
  "serde_json",
  "strum",
  "termcolor",
+ "tracing",
 ]
 
 [[package]]

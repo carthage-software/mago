@@ -1,3 +1,14 @@
+//! Command-line arguments for issue reporting and fixing.
+//!
+//! This module defines the command-line interface for controlling how issues are
+//! reported and optionally fixed. It provides options for filtering, sorting, and
+//! formatting issue output, as well as applying automatic fixes to code.
+//!
+//! The reporting functionality supports multiple output formats (rich terminal output,
+//! JSON, checkstyle, etc.), different output targets (stdout/stderr), and various
+//! filtering options. The fixing functionality can apply safe, potentially unsafe,
+//! or unsafe fixes based on user preferences.
+
 use std::borrow::Cow;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -5,6 +16,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
+use mago_reporting::baseline::Baseline;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
@@ -20,6 +32,7 @@ use mago_reporting::ColorChoice as ReportingColorChoice;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_reporting::reporter::Reporter;
+use mago_reporting::reporter::ReporterConfig;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 
@@ -32,7 +45,7 @@ use crate::utils::progress::ProgressBarTheme;
 use crate::utils::progress::create_progress_bar;
 use crate::utils::progress::remove_progress_bar;
 
-/// Defines command-line options for issue reporting and fixing.
+/// Command-line arguments for issue reporting and fixing.
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
@@ -149,46 +162,48 @@ pub struct ReportingArgs {
 }
 
 impl ReportingArgs {
-    /// Orchestrates the entire issue processing pipeline.
+    /// Processes issues by either reporting them or applying fixes.
     ///
-    /// # Arguments
+    /// This is the main entry point for issue processing. Depending on whether the `--fix`
+    /// flag is enabled, it either applies automatic fixes to the code or reports the issues
+    /// using the configured format and output settings.
     ///
-    /// * `self`: The configured reporting arguments from the command line.
-    /// * `issues`: The collection of issues detected by the preceding command.
-    /// * `configuration`: The application's global configuration.
-    /// * `color_choice`: Output color choice.
-    /// * `database`: The mutable database containing all source files.
+    /// When applying fixes, only safe fixes are applied by default unless `--unsafe` or
+    /// `--potentially-unsafe` flags are provided. When reporting, issues can be filtered,
+    /// sorted, and formatted according to the configured options.
     ///
-    /// # Returns
-    ///
-    /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
-    /// or an `Error` if an unrecoverable problem occurs.
+    /// Returns an exit code indicating success or failure based on whether issues were
+    /// found and whether they meet the configured failure threshold.
     pub fn process_issues(
         self,
-        mut issues: IssueCollection,
+        issues: IssueCollection,
         configuration: Configuration,
         color_choice: ColorChoice,
         database: Database,
+        baseline: Option<Baseline>,
+        fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
-        if let Some(min_level) = self.minimum_report_level {
-            let unfiltered_count = issues.len();
-            issues = issues.with_minimum_level(min_level);
-
-            tracing::debug!(
-                "Filtered out {} issues below the minimum report level of `{}`.",
-                unfiltered_count - issues.len(),
-                min_level.to_string(),
-            );
-        }
-
         if self.fix {
             self.handle_fix_mode(issues, configuration, color_choice, database)
         } else {
-            self.handle_report_mode(issues, &configuration, color_choice, database, false)
+            self.handle_report_mode(
+                issues,
+                configuration,
+                color_choice,
+                database,
+                baseline,
+                fail_on_out_of_sync_baseline,
+            )
         }
     }
 
-    /// Handles the logic for when the `--fix` flag is enabled.
+    /// Applies automatic fixes to code when the `--fix` flag is enabled.
+    ///
+    /// This method filters fixes based on safety classification and applies them
+    /// in parallel. It respects the `--unsafe` and `--potentially-unsafe` flags
+    /// to determine which fixes are safe to apply. When `--format-after-fix` is
+    /// enabled, modified files are automatically formatted. When `--dry-run` is
+    /// enabled, changes are previewed but not written to disk.
     fn handle_fix_mode(
         self,
         issues: IssueCollection,
@@ -197,11 +212,12 @@ impl ReportingArgs {
         mut database: Database,
     ) -> Result<ExitCode, Error> {
         let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
-            self.apply_fixes(issues, &configuration, color_choice, &mut database)?;
+            self.apply_fixes(issues, configuration, color_choice, &mut database)?;
 
         if skipped_unsafe > 0 {
             tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
         }
+
         if skipped_potentially_unsafe > 0 {
             tracing::warn!(
                 "Skipped {} potentially unsafe fixes. Use `--potentially-unsafe` or `--unsafe` to apply them.",
@@ -226,61 +242,91 @@ impl ReportingArgs {
         }
     }
 
-    /// Handles the logic for reporting issues (when `--fix` is not enabled).
+    /// Reports issues to the configured output target when `--fix` is not enabled.
+    ///
+    /// This method creates a reporter with the configured settings and outputs
+    /// issues according to the specified format. It applies baseline filtering
+    /// if a baseline is provided, filters by severity level if configured, and
+    /// can optionally filter to show only fixable issues or sort issues for
+    /// better readability.
+    ///
+    /// The exit code is determined by the highest severity level of reported
+    /// issues compared to the `--minimum-fail-level` threshold.
     fn handle_report_mode(
         self,
-        mut issues: IssueCollection,
-        configuration: &Configuration,
+        issues: IssueCollection,
+        configuration: Configuration,
         color_choice: ColorChoice,
         database: Database,
-        should_fail_from_baseline: bool,
+        baseline: Option<Baseline>,
+        fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
 
-        if self.sort {
-            issues = issues.sorted();
+        let issues_to_report = issues;
+
+        let reporter_configuration = ReporterConfig {
+            target: self.reporting_target,
+            format: self.reporting_format,
+            color_choice: match color_choice {
+                ColorChoice::Auto => ReportingColorChoice::Auto,
+                ColorChoice::Always => ReportingColorChoice::Always,
+                ColorChoice::Never => ReportingColorChoice::Never,
+            },
+            filter_fixable: self.fixable_only,
+            sort: self.sort,
+            minimum_report_level: self.minimum_report_level,
+            use_pager: self.pager_args.should_use_pager(&configuration),
+            pager_command: configuration.pager.clone(),
+        };
+
+        let reporter = Reporter::new(read_database, reporter_configuration);
+        let status = reporter.report(issues_to_report, baseline)?;
+
+        if status.baseline_dead_issues {
+            tracing::warn!(
+                "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
+            );
+
+            if fail_on_out_of_sync_baseline {
+                return Ok(ExitCode::FAILURE);
+            }
         }
 
-        let should_fail = should_fail_from_baseline || issues.has_minimum_level(self.minimum_fail_level);
-        let issues_to_report = if self.fixable_only { issues.only_fixable().collect() } else { issues };
+        if status.baseline_filtered_issues > 0 {
+            tracing::info!("Filtered out {} issues based on the baseline file.", status.baseline_filtered_issues);
+        }
 
-        if issues_to_report.is_empty() {
+        if let Some(highest_reported_level) = status.highest_reported_level
+            && self.minimum_fail_level <= highest_reported_level
+        {
+            return Ok(ExitCode::FAILURE);
+        }
+
+        if status.total_reported_issues == 0 {
             if self.fixable_only {
                 tracing::info!("No fixable issues found.");
             } else {
                 tracing::info!("No issues found.");
             }
-        } else {
-            let reporter = Reporter::new(
-                read_database,
-                self.reporting_target,
-                match color_choice {
-                    ColorChoice::Auto => ReportingColorChoice::Auto,
-                    ColorChoice::Always => ReportingColorChoice::Always,
-                    ColorChoice::Never => ReportingColorChoice::Never,
-                },
-                self.pager_args.should_use_pager(configuration),
-                configuration.pager.clone(),
-            );
-
-            reporter.report(issues_to_report, self.reporting_format)?;
         }
 
-        Ok(if should_fail { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+        Ok(ExitCode::SUCCESS)
     }
 
-    /// Applies fixes to the issues provided using a parallel pipeline.
+    /// Applies code fixes in parallel according to safety settings.
     ///
-    /// This function filters fix plans based on safety settings, then applies the
-    /// fixes concurrently using a rayon thread pool.
+    /// This method extracts fix plans from issues, filters them based on the
+    /// configured safety level (safe, potentially unsafe, or unsafe), and applies
+    /// them concurrently using a parallel thread pool. Each fix can optionally be
+    /// followed by code formatting if `--format-after-fix` is enabled.
     ///
-    /// # Returns
-    ///
-    /// A tuple: `(applied_fix_count, skipped_unsafe_count, skipped_potentially_unsafe_count)`.
+    /// Returns the count of applied fixes and the counts of skipped fixes by
+    /// safety classification.
     fn apply_fixes(
         &self,
         issues: IssueCollection,
-        configuration: &Configuration,
+        configuration: Configuration,
         color_choice: ColorChoice,
         database: &mut Database,
     ) -> Result<(usize, usize, usize), Error> {
@@ -332,14 +378,14 @@ impl ReportingArgs {
         Ok((applied_fix_count, skipped_unsafe, skipped_potentially_unsafe))
     }
 
-    /// Filters fix operations from issues based on safety settings.
+    /// Filters fix plans based on configured safety thresholds.
     ///
-    /// # Returns
+    /// This method examines each fix operation's safety classification and
+    /// includes or skips it based on the `--unsafe` and `--potentially-unsafe`
+    /// flags. Safe fixes are always included.
     ///
-    /// A tuple containing:
-    /// * A vector of `(FileId, FixPlan)` for applicable fixes.
-    /// * The count of fixes skipped due to being `Unsafe`.
-    /// * The count of fixes skipped due to being `PotentiallyUnsafe`.
+    /// Returns a tuple containing the list of applicable fix plans and the
+    /// counts of skipped fixes by safety classification.
     #[inline]
     fn filter_fix_plans(
         &self,
@@ -393,49 +439,5 @@ impl ReportingArgs {
         }
 
         (applicable_plans, skipped_unsafe_count, skipped_potentially_unsafe_count)
-    }
-
-    /// Extended version of process_issues that works with baseline functionality.
-    ///
-    /// This method accepts pre-processed issues (already filtered through baseline)
-    /// and an indicator if the baseline processing determined the command should fail.
-    ///
-    /// # Arguments
-    ///
-    /// * `self`: The configured reporting arguments from the command line.
-    /// * `issues`: The collection of issues (potentially already filtered by baseline).
-    /// * `configuration`: The application's global configuration.
-    /// * `color_choice`: Output color choice.
-    /// * `database`: The mutable database containing all source files.
-    /// * `should_fail_from_baseline`: Whether the baseline processing indicated failure.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing an `ExitCode` to indicate success or failure to the shell,
-    /// or an `Error` if an unrecoverable problem occurs.
-    pub fn process_issues_with_baseline_result(
-        self,
-        mut issues: IssueCollection,
-        configuration: Configuration,
-        color_choice: ColorChoice,
-        database: Database,
-        should_fail_from_baseline: bool,
-    ) -> Result<ExitCode, Error> {
-        if let Some(min_level) = self.minimum_report_level {
-            let unfiltered_count = issues.len();
-            issues = issues.with_minimum_level(min_level);
-
-            tracing::debug!(
-                "Filtered out {} issues below the minimum report level of {:?}.",
-                unfiltered_count - issues.len(),
-                min_level
-            );
-        }
-
-        if self.fix {
-            self.handle_fix_mode(issues, configuration, color_choice, database)
-        } else {
-            self.handle_report_mode(issues, &configuration, color_choice, database, should_fail_from_baseline)
-        }
     }
 }
