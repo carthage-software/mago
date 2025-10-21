@@ -238,11 +238,12 @@ mod tests {
     use mago_span::Position;
     use mago_span::Span;
 
-    fn create_test_database() -> Database {
-        Database::single(File::ephemeral(
-            Cow::Borrowed("test.php"),
-            Cow::Borrowed("<?php\n// Line 1\n// Line 2\n// Line 3\n"),
-        ))
+    fn create_test_database() -> (Database, FileId) {
+        let file =
+            File::ephemeral(Cow::Borrowed("test.php"), Cow::Borrowed("<?php\n// Line 1\n// Line 2\n// Line 3\n"));
+        let file_id = file.id;
+        let db = Database::single(file);
+        (db, file_id)
     }
 
     fn create_test_issue(file_id: FileId, code: &str, start_offset: u32, end_offset: u32) -> Issue {
@@ -262,9 +263,8 @@ mod tests {
 
     #[test]
     fn test_generate_baseline_from_issues() {
-        let db = create_test_database();
+        let (db, file_id) = create_test_database();
         let read_db = db.read_only();
-        let file_id = FileId::zero();
 
         let mut issues = IssueCollection::new();
         issues.push(create_test_issue(file_id, "E001", 0, 5));
@@ -279,9 +279,8 @@ mod tests {
 
     #[test]
     fn test_filter_issues() {
-        let db = create_test_database();
+        let (db, file_id) = create_test_database();
         let read_db = db.read_only();
-        let file_id = FileId::zero();
 
         let mut baseline = Baseline::new();
         let mut entry = BaselineEntry::default();
@@ -300,9 +299,8 @@ mod tests {
 
     #[test]
     fn test_compare_baseline_with_issues() {
-        let db = create_test_database();
+        let (db, file_id) = create_test_database();
         let read_db = db.read_only();
-        let file_id = FileId::zero();
 
         let mut baseline = Baseline::new();
         let mut entry = BaselineEntry::default();
