@@ -19,7 +19,7 @@ pub struct GuardService {
     /// The read-only database containing source files to guard.
     database: ReadDatabase,
 
-    /// A codebase metadat of builtin symbols.
+    /// A codebase metadata of builtin symbols.
     codebase: CodebaseMetadata,
 
     /// The guard settings to configure the linting process.
@@ -35,7 +35,7 @@ impl GuardService {
     /// # Arguments
     ///
     /// * `database` - The read-only database containing source files to guard.
-    /// * `codebase` - A codebase metadat of builtin symbols.
+    /// * `codebase` - A codebase metadata of builtin symbols.
     /// * `settings` - The guard settings to configure the guarding process.
     /// * `use_progress_bars` - Whether to display progress bars during guarding.
     ///
