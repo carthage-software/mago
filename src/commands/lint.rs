@@ -1,27 +1,76 @@
+//! Linting command implementation.
+//!
+//! This module implements the `mago lint` command, which checks PHP code against a
+//! configurable set of linting rules to identify style violations, code smells, and
+//! potential quality issues.
+//!
+//! # Features
+//!
+//! The linter provides several modes of operation:
+//!
+//! - **Full Linting** (default): Run all enabled rules against the codebase
+//! - **Semantics Only** (`--semantics`): Only validate syntax and basic semantic structure
+//! - **Pedantic Mode** (`--pedantic`): Enable all available rules for maximum thoroughness
+//! - **Targeted Linting** (`--only`): Run only specific rules by code
+//!
+//! # Rule Discovery
+//!
+//! The command supports introspection of available rules:
+//!
+//! - **List Rules** (`--list-rules`): Display all currently enabled rules
+//! - **Explain Rule** (`--explain <CODE>`): Show detailed documentation for a specific rule
+//!
+//! # Baseline Support
+//!
+//! The linter integrates with baseline functionality to enable incremental adoption
+//! by ignoring pre-existing issues while catching new ones. See [`BaselineReportingArgs`]
+//! for baseline options.
+
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
 
 use mago_database::DatabaseReader;
-use mago_linter::integration::IntegrationSet;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
-use mago_linter::settings::RulesSettings;
-use mago_linter::settings::Settings;
+use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
-use crate::database;
 use crate::error::Error;
-use crate::pipeline::lint::LintContext;
-use crate::pipeline::lint::LintMode;
-use crate::pipeline::lint::run_lint_pipeline;
+use crate::utils::create_orchestrator;
 
+/// Command for linting PHP source code.
+///
+/// This command runs configurable linting rules to check code style, consistency,
+/// and quality. It supports multiple modes including semantic-only validation,
+/// pedantic checking, and targeted rule execution.
+///
+/// # Examples
+///
+/// Lint all configured source paths:
+/// ```text
+/// mago lint
+/// ```
+///
+/// Lint specific files or directories:
+/// ```text
+/// mago lint src/ tests/
+/// ```
+///
+/// Run only specific rules:
+/// ```text
+/// mago lint --only no-empty,constant-condition
+/// ```
+///
+/// Show documentation for a rule:
+/// ```text
+/// mago lint --explain no-empty
+/// ```
 #[derive(Parser, Debug)]
 #[command(
     name = "lint",
@@ -112,42 +161,59 @@ pub struct LintCommand {
 }
 
 impl LintCommand {
-    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        configuration.source.excludes.extend(std::mem::take(&mut configuration.linter.excludes));
+    /// Executes the lint command.
+    ///
+    /// This method orchestrates the linting process based on the command's configuration:
+    ///
+    /// 1. Creates an orchestrator with the configured settings
+    /// 2. Applies path overrides if `path` was provided
+    /// 3. Loads the database by scanning the file system
+    /// 4. Creates the linting service with the database
+    /// 5. Handles special modes (`--explain`, `--list-rules`)
+    /// 6. Runs linting in the appropriate mode (full or semantics-only)
+    /// 7. Processes and reports issues through the baseline processor
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The loaded configuration containing linter settings
+    /// * `color_choice` - Whether to use colored output
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(ExitCode::SUCCESS)` if linting completed successfully (even with issues found)
+    /// - `Ok(ExitCode::FAILURE)` if a rule explanation was requested but the rule wasn't found
+    /// - `Err(Error)` if database loading, linting, or reporting failed
+    ///
+    /// # Special Modes
+    ///
+    /// - **Explain Mode** (`--explain`): Displays detailed rule documentation and exits
+    /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
+    /// - **Empty Database**: Logs a message and exits successfully if no files found
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic);
+        orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
+        if !self.path.is_empty() {
+            orchestrator.set_source_paths(self.path.iter());
+        }
 
-        let database = if !self.path.is_empty() {
-            database::load_from_paths(&mut configuration.source, self.path, None)?
-        } else {
-            database::load_from_configuration(&mut configuration.source, false, None)?
-        };
-
-        let registry = if self.pedantic {
-            RuleRegistry::build(
-                Settings {
-                    php_version: configuration.php_version,
-                    integrations: IntegrationSet::all(),
-                    rules: RulesSettings::default(),
-                },
-                None,
-                true, // Include disabled rules.
-            )
-        } else {
-            RuleRegistry::build(
-                Settings {
-                    php_version: configuration.php_version,
-                    integrations: IntegrationSet::from_slice(&configuration.linter.integrations),
-                    rules: configuration.linter.rules.clone(),
-                },
-                if self.only.is_empty() { None } else { Some(&self.only) },
-                false,
-            )
-        };
+        let database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let service = orchestrator.get_lint_service(database.read_only());
 
         if let Some(explain_code) = self.explain {
+            let registry = service.create_registry(
+                if self.only.is_empty() { None } else { Some(&self.only) },
+                self.pedantic, // Enable all rules if pedantic is set
+            );
+
             return explain_rule(&registry, &explain_code);
         }
 
         if self.list_rules {
+            let registry = service.create_registry(
+                if self.only.is_empty() { None } else { Some(&self.only) },
+                self.pedantic, // Enable all rules if pedantic is set
+            );
+
             return list_rules(registry.rules(), self.json);
         }
 
@@ -157,20 +223,39 @@ impl LintCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let shared_context = LintContext {
-            registry: Arc::new(registry),
-            php_version: configuration.php_version,
-            mode: if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
-        };
+        let issues = service.lint(if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full })?;
 
-        let issues = run_lint_pipeline(database.read_only(), shared_context)?;
-        let baseline = configuration.linter.baseline.clone();
+        let baseline = configuration.linter.baseline.as_deref();
+        let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
 
-        // Process issues
-        self.baseline_reporting.process_issues_with_baseline(issues, configuration, color_choice, database, baseline)
+        processor.process_issues(issues)
     }
 }
 
+/// Displays detailed documentation for a specific linting rule.
+///
+/// This function shows comprehensive information about a rule including its
+/// description, code, category, and good/bad examples. The output is formatted
+/// for terminal display with colors and proper wrapping.
+///
+/// # Arguments
+///
+/// * `registry` - The rule registry containing all available rules
+/// * `code` - The rule code to explain (e.g., "no-empty", "prefer-while-loop")
+///
+/// # Returns
+///
+/// - `Ok(ExitCode::SUCCESS)` if the rule was found and explained
+/// - `Ok(ExitCode::FAILURE)` if the rule code doesn't exist in the registry
+///
+/// # Output Format
+///
+/// The explanation includes:
+/// - Rule name and description (wrapped to 80 characters)
+/// - Rule code and category
+/// - Good example (if available)
+/// - Bad example (if available)
+/// - Suggested command to try the rule
 pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Error> {
     let Some(rule) = registry.rules().iter().find(|r| r.meta().code == code) else {
         println!();
@@ -217,6 +302,32 @@ pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Err
     Ok(ExitCode::SUCCESS)
 }
 
+/// Lists all enabled linting rules.
+///
+/// This function displays all currently active rules in either human-readable
+/// table format or JSON format. The table is formatted with proper column
+/// alignment showing rule name, code, severity level, and category.
+///
+/// # Arguments
+///
+/// * `rules` - The list of enabled rules to display
+/// * `json` - Whether to output in JSON format instead of a table
+///
+/// # Returns
+///
+/// Always returns `Ok(ExitCode::SUCCESS)` since listing rules cannot fail.
+///
+/// # Output Formats
+///
+/// **Table Format** (default):
+/// - Aligned columns for Name, Code, Level, and Category
+/// - Color-coded severity levels (Error=red, Warning=yellow, etc.)
+/// - Helpful footer with `--explain` command suggestion
+///
+/// **JSON Format** (`--json`):
+/// - Array of rule metadata objects
+/// - Pretty-printed for readability
+/// - Machine-parseable for tooling integration
 pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
     if rules.is_empty() && !json {
         println!("{}", "No rules are currently enabled.".yellow());

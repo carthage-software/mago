@@ -81,7 +81,7 @@ impl LintRule for ExcessiveParameterListRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<ExcessiveParameterListConfig>) -> Self {
+    fn build(settings: &RuleSettings<ExcessiveParameterListConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

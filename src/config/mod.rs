@@ -1,3 +1,49 @@
+//! Configuration management for Mago CLI.
+//!
+//! This module provides a comprehensive configuration system that supports multiple
+//! sources and precedence levels. Configuration can be loaded from TOML files,
+//! environment variables, and command-line arguments, with each source overriding
+//! the previous one.
+//!
+//! # Configuration Sources
+//!
+//! Configuration is loaded and merged from the following sources, in order of precedence
+//! (highest to lowest):
+//!
+//! 1. **Environment Variables**: Prefixed with `MAGO_` (e.g., `MAGO_THREADS=4`)
+//! 2. **Workspace Config**: `mago.toml` in the workspace directory
+//! 3. **Global Config**: `mago.toml` in `$XDG_CONFIG_HOME` or `$HOME`
+//! 4. **Explicit File**: Specified via `--config` flag (bypasses workspace/global)
+//! 5. **Defaults**: Built-in defaults for all settings
+//!
+//! # Configuration Structure
+//!
+//! The configuration is organized into several sub-configurations:
+//!
+//! - **Source**: Defines workspace paths and file discovery patterns
+//! - **Linter**: Controls linting behavior and rule sets
+//! - **Formatter**: Defines code formatting style preferences
+//! - **Analyzer**: Controls static type analysis settings
+//! - **Guard**: Configures the guard service for continuous monitoring
+//!
+//! # Normalization and Validation
+//!
+//! After loading, configurations are normalized to ensure valid values:
+//!
+//! - Thread count defaults to logical CPU count if zero
+//! - Stack size is clamped between minimum and maximum bounds
+//! - PHP version compatibility is validated
+//! - Source paths are resolved and validated
+//!
+//! # Environment Variables
+//!
+//! All configuration options can be set via environment variables using the
+//! `MAGO_` prefix and kebab-case conversion. For nested options, use underscores:
+//!
+//! - `MAGO_THREADS` → `threads`
+//! - `MAGO_PHP_VERSION` → `php_version`
+//! - `MAGO_SOURCE_WORKSPACE` → `source.workspace`
+
 use std::env::home_dir;
 use std::path::Path;
 use std::path::PathBuf;
@@ -28,87 +74,163 @@ pub mod guard;
 pub mod linter;
 pub mod source;
 
-/// Configuration options for mago.
+/// The main configuration structure for Mago CLI.
+///
+/// This struct aggregates all configuration settings for Mago, including global options
+/// like threading and PHP version, as well as specialized configurations for each service
+/// (linter, analyzer, formatter, guard).
+///
+/// Configuration values are loaded from multiple sources with the following precedence
+/// (from highest to lowest):
+///
+/// 1. Environment variables (`MAGO_*`)
+/// 2. Workspace `mago.toml` file
+/// 3. Global `mago.toml` file (`$XDG_CONFIG_HOME` or `$HOME`)
+/// 4. Built-in defaults
+///
+/// The struct uses serde for deserialization from TOML files and environment variables,
+/// with strict validation via `deny_unknown_fields` to catch configuration errors early.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Configuration {
-    /// The number of threads to use.
+    /// Number of worker threads for parallel processing.
+    ///
+    /// Controls the thread pool size used by Rayon for parallel operations.
+    /// If set to 0, defaults to the number of logical CPUs available.
+    /// Can be overridden via `MAGO_THREADS` environment variable or `--threads` CLI flag.
     pub threads: usize,
 
-    /// The size of the stack for each thread.
+    /// Stack size for each worker thread in bytes.
+    ///
+    /// Determines the maximum stack size allocated for each thread in the thread pool.
+    /// Must be between `MINIMUM_STACK_SIZE` and `MAXIMUM_STACK_SIZE`.
+    /// If set to 0, uses `MAXIMUM_STACK_SIZE`. Values outside the valid range are
+    /// automatically clamped during normalization.
     pub stack_size: usize,
 
-    /// The version of PHP to use.
+    /// Target PHP version for parsing and analysis.
+    ///
+    /// Specifies which PHP version to assume when parsing code and performing analysis.
+    /// This affects syntax parsing rules, available built-in functions, and type checking.
+    /// Can be overridden via `MAGO_PHP_VERSION` environment variable or `--php-version` CLI flag.
     pub php_version: PHPVersion,
 
-    /// Whether to allow unsupported PHP versions.
+    /// Whether to allow PHP versions not officially supported by Mago.
+    ///
+    /// When enabled, Mago will not fail if the specified PHP version is outside the
+    /// officially supported range. Use with caution as behavior may be unpredictable.
+    /// Can be enabled via `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION` environment variable
+    /// or `--allow-unsupported-php-version` CLI flag.
     pub allow_unsupported_php_version: bool,
 
-    /// Whether to use the pager when printing output.
-    #[serde(default)]
-    pub use_pager: bool,
-
-    /// The pager to use when printing output.
-    #[serde(default)]
-    pub pager: Option<String>,
-
-    /// Configuration options for source discovery.
+    /// Source discovery and workspace configuration.
+    ///
+    /// Defines the workspace root, source paths to scan, and exclusion patterns.
+    /// This configuration determines which PHP files are loaded into the database
+    /// for analysis, linting, or formatting.
     pub source: SourceConfiguration,
 
-    /// Configuration options for the linter.
+    /// Linter service configuration.
+    ///
+    /// Controls linting behavior, including enabled/disabled rules, rule-specific
+    /// settings, and reporting preferences. Defaults to an empty configuration
+    /// if not specified in the config file.
     #[serde(default)]
     pub linter: LinterConfiguration,
 
-    /// Configuration options for the formatter.
+    /// Formatter service configuration.
+    ///
+    /// Defines code formatting style preferences such as indentation, line width,
+    /// brace placement, and spacing rules. Defaults to standard formatting settings
+    /// if not specified in the config file.
     #[serde(default)]
     pub formatter: FormatterConfiguration,
 
-    /// Configuration options for the analyzer.
+    /// Type analyzer service configuration.
+    ///
+    /// Controls static type analysis behavior, including strictness levels,
+    /// inference settings, and type-related rules. Defaults to an empty configuration
+    /// if not specified in the config file.
     #[serde(default)]
     pub analyzer: AnalyzerConfiguration,
 
-    /// Configuration options for the guard.
+    /// Guard service configuration for continuous monitoring.
+    ///
+    /// Defines settings for the guard/watch mode, including file watching behavior,
+    /// debouncing, and incremental analysis. Defaults to an empty configuration
+    /// if not specified in the config file.
     #[serde(default)]
     pub guard: GuardConfiguration,
 
-    /// The log filter.
+    /// Log filter for tracing output.
     ///
-    /// This is not a configuration option, but it is included here to allow specifying the log filter
-    /// in the environment using `MAGO_LOG`.
+    /// This field exists solely to prevent errors when `MAGO_LOG` environment
+    /// variable is set. Due to `deny_unknown_fields`, without this field serde
+    /// would reject the configuration when `MAGO_LOG` is present in the environment.
     ///
-    /// If this field is to be removed, serde will complain about an unknown field in the configuration
-    /// when `MAGO_LOG` is set due to the `deny_unknown_fields` attribute and the use of `Environment` source.
+    /// This is not a user-facing configuration option and is never serialized.
     #[serde(default, skip_serializing)]
     #[allow(dead_code)]
     log: Value,
 }
 
 impl Configuration {
-    /// Loads the configuration from a file or environment variables.
+    /// Loads and merges configuration from multiple sources.
     ///
-    /// This function attempts to load the configuration from the following sources, in order of precedence:
+    /// This method orchestrates the complete configuration loading process, combining
+    /// settings from files, environment variables, and CLI arguments with proper
+    /// precedence handling. The configuration is then normalized and validated.
     ///
-    /// 1. Environment variables with the prefix `MAGO_`.
-    /// 2. A TOML file specified by the `file` argument.
-    /// 3. A TOML file named `mago.toml` in the current directory.
-    /// 4. A TOML file named `mago.toml` in the `$XDG_CONFIG_HOME` directory.
-    /// 5. A TOML file named `mago.toml` in the `$HOME` directory.
+    /// # Loading Process
     ///
-    /// When the `file` argument is set, 3 and 4 are not used at all.
+    /// The method follows this workflow:
     ///
-    /// The loaded configuration is then normalized and validated.
+    /// 1. **Create Base Configuration**: Initialize with workspace-specific defaults
+    /// 2. **Load Global Configs**: Merge `$XDG_CONFIG_HOME/mago.toml` and `$HOME/mago.toml`
+    ///    (skipped if explicit config file is provided)
+    /// 3. **Load Workspace Config**: Merge `<workspace>/mago.toml`
+    ///    (skipped if explicit config file is provided)
+    /// 4. **Load Explicit Config**: If `file` is provided, load it as the sole config file
+    /// 5. **Apply Environment Variables**: Override with `MAGO_*` environment variables
+    /// 6. **Apply CLI Overrides**: Apply specific CLI argument overrides
+    /// 7. **Normalize and Validate**: Ensure all values are within valid ranges
+    ///
+    /// # Precedence Order
+    ///
+    /// Settings are merged with the following precedence (highest to lowest):
+    ///
+    /// 1. CLI arguments (`php_version`, `threads`, `allow_unsupported_php_version`)
+    /// 2. Environment variables (`MAGO_*`)
+    /// 3. Workspace config file (`<workspace>/mago.toml`)
+    /// 4. Global config files (`$XDG_CONFIG_HOME/mago.toml`, `$HOME/mago.toml`)
+    /// 5. Explicit config file (if provided via `file` parameter, bypasses 3 and 4)
+    /// 6. Default values
     ///
     /// # Arguments
     ///
-    /// * `workspace` - An optional path to the workspace directory.
-    /// * `file` - An optional path to a TOML configuration file.
-    /// * `php_version` - An optional PHP version to use for the configuration.
-    /// * `threads` - An optional number of threads to use for linting and formatting.
-    /// * `allow_unsupported_php_version` - Whether to allow unsupported PHP versions.
+    /// * `workspace` - Optional workspace directory path. If not provided, uses current directory.
+    ///   This directory is scanned for source files and may contain a `mago.toml` file.
+    /// * `file` - Optional explicit path to a configuration file. When provided, global and
+    ///   workspace config files are not loaded. The specified file must exist.
+    /// * `php_version` - Optional PHP version override. Takes precedence over all config sources.
+    /// * `threads` - Optional thread count override. Takes precedence over all config sources.
+    /// * `allow_unsupported_php_version` - If `true`, enables support for PHP versions outside
+    ///   the officially supported range. Only overrides the config if `true`.
     ///
     /// # Returns
     ///
-    /// A `Result` containing the loaded `Configuration`, or an `Error` if the configuration could not be loaded or validated.
+    /// - `Ok(Configuration)` - Successfully loaded and validated configuration
+    /// - `Err(Error::Configuration)` - Failed to parse TOML or deserialize configuration
+    /// - `Err(Error::IOError)` - Failed to read configuration file (when `file` is provided)
+    ///
+    /// # Errors
+    ///
+    /// This method may fail if:
+    /// - The specified config file does not exist or cannot be read (when `file` is provided)
+    /// - Configuration files contain invalid TOML syntax
+    /// - Configuration values fail validation (e.g., unknown field names due to `deny_unknown_fields`)
+    /// - Required configuration fields are missing
+    /// - Normalization fails (e.g., invalid source paths)
     pub fn load(
         workspace: Option<PathBuf>,
         file: Option<&Path>,
@@ -179,23 +301,42 @@ impl Configuration {
         Ok(configuration)
     }
 
-    /// Creates a new `Configuration` with the given workspace directory.
+    /// Creates a default configuration anchored to a specific workspace directory.
+    ///
+    /// This constructor initializes a configuration with sensible defaults suitable
+    /// for immediate use. All service-specific configurations (linter, formatter,
+    /// analyzer, guard) use their default settings.
+    ///
+    /// # Default Values
+    ///
+    /// - **threads**: Number of logical CPUs available on the system
+    /// - **stack_size**: `DEFAULT_STACK_SIZE` (typically 8MB)
+    /// - **php_version**: `DEFAULT_PHP_VERSION` (latest stable PHP version)
+    /// - **allow_unsupported_php_version**: `false`
+    /// - **source**: Workspace-specific source configuration
+    /// - **linter**: Default linter configuration
+    /// - **formatter**: Default formatter configuration
+    /// - **analyzer**: Default analyzer configuration
+    /// - **guard**: Default guard configuration
+    ///
+    /// This method is primarily used as the starting point for configuration loading,
+    /// with values subsequently overridden by config files and environment variables.
     ///
     /// # Arguments
     ///
-    /// * `workspace` - The workspace directory from which to start scanning.
+    /// * `workspace` - The root directory of the workspace to analyze. This directory
+    ///   serves as the base path for relative source paths and is where the database
+    ///   will look for PHP files.
     ///
     /// # Returns
     ///
-    /// A new `Configuration` with the given workspace directory.
+    /// A new `Configuration` instance with default values and the specified workspace.
     pub fn from_workspace(workspace: PathBuf) -> Self {
         Self {
             threads: *LOGICAL_CPUS,
             stack_size: DEFAULT_STACK_SIZE,
             php_version: DEFAULT_PHP_VERSION,
             allow_unsupported_php_version: false,
-            use_pager: false,
-            pager: None,
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
             formatter: FormatterConfiguration::default(),
@@ -207,6 +348,40 @@ impl Configuration {
 }
 
 impl Configuration {
+    /// Normalizes and validates configuration values.
+    ///
+    /// This method ensures that all configuration values are within acceptable ranges
+    /// and makes sensible adjustments where needed. It is called automatically by
+    /// [`load`](Self::load) after merging all configuration sources.
+    ///
+    /// # Normalization Rules
+    ///
+    /// ## Thread Count
+    ///
+    /// - If set to `0`: Defaults to the number of logical CPUs
+    /// - Otherwise: Uses the configured value as-is
+    ///
+    /// ## Stack Size
+    ///
+    /// - If set to `0`: Uses `MAXIMUM_STACK_SIZE`
+    /// - If greater than `MAXIMUM_STACK_SIZE`: Clamped to `MAXIMUM_STACK_SIZE`
+    /// - If less than `MINIMUM_STACK_SIZE`: Clamped to `MINIMUM_STACK_SIZE`
+    /// - Otherwise: Uses the configured value as-is
+    ///
+    /// ## Source Configuration
+    ///
+    /// Delegates to [`SourceConfiguration::normalize`] to validate workspace paths
+    /// and resolve relative paths.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if normalization succeeded
+    /// - `Err(Error)` if source normalization failed (e.g., invalid workspace path)
+    ///
+    /// # Side Effects
+    ///
+    /// This method logs warnings and informational messages when values are adjusted,
+    /// helping users understand how their configuration was interpreted.
     fn normalize(&mut self) -> Result<(), Error> {
         match self.threads {
             0 => {

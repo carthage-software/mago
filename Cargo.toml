@@ -51,8 +51,8 @@ mago-prelude = { path = "crates/prelude", version = "1.0.0-beta.34" }
 mago-semantics = { path = "crates/semantics", version = "1.0.0-beta.34" }
 mago-collector = { path = "crates/collector", version = "1.0.0-beta.34" }
 mago-database = { path = "crates/database", version = "1.0.0-beta.34" }
-mago-pager = { path = "crates/pager", version = "1.0.0-beta.34" }
 mago-guard = { path = "crates/guard", version = "1.0.0-beta.34" }
+mago-orchestrator = { path = "crates/orchestrator", version = "1.0.0-beta.34" }
 tracing = { version = "0.1.40" }
 ahash = { version = "0.8", default-features = false, features = ["compile-time-rng", "std"] }
 serde_json = { version = "1.0.138" }
@@ -112,7 +112,6 @@ itoa = "1.0"
 mago-syntax = { workspace = true }
 mago-syntax-core = { workspace = true }
 mago-reporting = { workspace = true }
-mago-atom = { workspace = true }
 mago-database = { workspace = true }
 mago-linter = { workspace = true }
 mago-names = { workspace = true }
@@ -120,14 +119,12 @@ mago-formatter = { workspace = true }
 mago-fixer = { workspace = true }
 mago-php-version = { workspace = true }
 mago-composer = { workspace = true }
-mago-semantics = { workspace = true }
 mago-prelude = { workspace = true }
-mago-codex = { workspace = true }
 mago-analyzer = { workspace = true }
 mago-guard = { workspace = true }
+mago-orchestrator = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
-ahash = { workspace = true }
 termtree = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }

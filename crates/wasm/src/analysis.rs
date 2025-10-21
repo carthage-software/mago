@@ -1,27 +1,25 @@
 //! # Analysis Core
 //!
 //! This module contains the primary logic for running Mago's analysis pipeline
-//! in a WASM context. It defines the structure for the analysis results and
-//! orchestrates the execution of the parser, semantic checker, analyzer, linter,
-//! and formatter.
+//! in a WASM context using the Orchestrator services.
 
 use std::borrow::Cow;
 use std::sync::LazyLock;
 
-use bumpalo::Bump;
-use mago_prelude::Prelude;
+use mago_analyzer::analysis_result::AnalysisResult;
+use mago_orchestrator::service::analysis::AnalysisService;
+use mago_orchestrator::service::format::FileFormatStatus;
+use mago_orchestrator::service::format::FormatService;
 use serde::Serialize;
 
-use mago_analyzer::Analyzer;
 use mago_codex::reference::SymbolReferences;
+use mago_database::DatabaseReader;
+use mago_database::ReadDatabase;
 use mago_database::file::File;
-use mago_formatter::Formatter;
-use mago_linter::Linter;
-use mago_names::resolver::NameResolver;
+use mago_orchestrator::service::lint::LintMode;
+use mago_prelude::Prelude;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
-use mago_semantics::SemanticsChecker;
-use mago_syntax::parser::parse_file;
 
 use crate::settings::WasmSettings;
 
@@ -41,49 +39,67 @@ pub struct WasmAnalysisResults {
     pub formatted_code: Option<String>,
 }
 
-/// Runs the complete analysis pipeline on a string of PHP code.
+/// Runs the complete analysis pipeline on a string of PHP code using the Orchestrator.
 pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults {
-    let Prelude { database: _, mut metadata, mut symbol_references } = LazyLock::force(&STATIC_PRELUDE).clone();
+    let Prelude { database: _, metadata, symbol_references } = LazyLock::force(&STATIC_PRELUDE).clone();
 
-    let arena = Bump::new();
-    let source_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
+    // Create orchestrator configuration from WASM settings
+    let config = settings.to_orchestrator_config();
 
-    let (program, parse_error) = parse_file(&arena, &source_file);
-    let resolved_names = NameResolver::new(&arena).resolve(program);
-
-    let semantic_issues = SemanticsChecker::new(settings.php_version).check(&source_file, program, &resolved_names);
-
-    metadata.extend(mago_codex::scanner::scan_program(&arena, &source_file, program, &resolved_names));
-
-    mago_codex::populator::populate_codebase(
-        &mut metadata,
-        &mut symbol_references,
-        Default::default(),
-        Default::default(),
+    // Run linting (includes parsing and semantics)
+    let lint_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
+    let lint_database = ReadDatabase::single(lint_file);
+    let lint_service = mago_orchestrator::service::lint::LintService::new(
+        lint_database,
+        config.linter_settings.clone(),
+        false, // no progress bars in WASM
     );
 
-    let analyzer_settings = settings.analyzer.to_analyzer_settings(settings.php_version);
-    let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &metadata, analyzer_settings);
-    let mut analyzer_analysis_result = mago_analyzer::analysis_result::AnalysisResult::new(Default::default());
-    analyzer.analyze(program, &mut analyzer_analysis_result).unwrap();
-    let analyzer_issues = analyzer_analysis_result.issues;
+    let lint_issues = lint_service.lint(LintMode::Full).unwrap_or_else(|_| IssueCollection::new());
 
-    symbol_references.extend(analyzer_analysis_result.symbol_references);
+    // For WASM, we'll put all lint issues together
+    let parse_error = None;
+    let semantic_issues = IssueCollection::new();
+    let linter_issues = lint_issues;
 
-    let linter_settings = settings.linter.to_linter_settings(settings.php_version);
-    let linter = Linter::new(&arena, linter_settings, None, false);
-    let linter_issues = linter.lint(&source_file, program, &resolved_names);
+    // Run analysis
+    let analysis_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
+    let analysis_database = ReadDatabase::single(analysis_file);
+    let analysis_service = AnalysisService::new(
+        analysis_database,
+        metadata,
+        symbol_references,
+        config.analyzer_settings,
+        false, // no progress bars in WASM
+    );
 
-    let formatted_code = if parse_error.is_none() {
-        let formatter = Formatter::new(&arena, settings.php_version, settings.formatter);
+    let analysis_result = analysis_service.run().unwrap_or_else(|_| AnalysisResult::new(SymbolReferences::new()));
 
-        Some(formatter.format(&source_file, program).to_string())
-    } else {
-        None
-    };
+    let analyzer_issues = analysis_result.issues;
+    let symbol_references = analysis_result.symbol_references;
+
+    // Run formatting
+    let format_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
+    let format_file_id = format_file.id;
+    let format_database = ReadDatabase::single(format_file);
+
+    // Get the file from the database for formatting
+    let file = format_database.get(&format_file_id).expect("File should exist in database");
+    let format_service = FormatService::new(
+        format_database,
+        config.php_version,
+        config.formatter_settings,
+        false, // no progress bars in WASM
+    );
+
+    let formatted_code = format_service.format_file(&file).ok().and_then(|status| match status {
+        FileFormatStatus::Changed(content) => Some(content),
+        FileFormatStatus::Unchanged => Some(code),
+        FileFormatStatus::FailedToParse(_) => None,
+    });
 
     WasmAnalysisResults {
-        parse_error: parse_error.as_ref().map(|e| e.into()),
+        parse_error,
         semantic_issues,
         linter_issues,
         analyzer_issues,

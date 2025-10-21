@@ -38,7 +38,7 @@ pub enum AssertionStyle {
     This,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AssertionStyleConfig {
     pub level: Level,
@@ -108,7 +108,7 @@ impl LintRule for AssertionStyleRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

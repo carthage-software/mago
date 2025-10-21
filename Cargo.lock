@@ -1409,7 +1409,6 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 name = "mago"
 version = "1.0.0-beta.34"
 dependencies = [
- "ahash",
  "bumpalo",
  "clap",
  "colored",
@@ -1420,8 +1419,6 @@ dependencies = [
  "indicatif 0.18.0",
  "indoc",
  "mago-analyzer",
- "mago-atom",
- "mago-codex",
  "mago-composer",
  "mago-database",
  "mago-fixer",
@@ -1429,10 +1426,10 @@ dependencies = [
  "mago-guard",
  "mago-linter",
  "mago-names",
+ "mago-orchestrator",
  "mago-php-version",
  "mago-prelude",
  "mago-reporting",
- "mago-semantics",
  "mago-syntax",
  "mago-syntax-core",
  "mimalloc",
@@ -1559,6 +1556,7 @@ dependencies = [
 name = "mago-database"
 version = "1.0.0-beta.34"
 dependencies = [
+ "ahash",
  "glob",
  "globset",
  "memchr",
@@ -1662,11 +1660,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-pager"
+name = "mago-orchestrator"
 version = "1.0.0-beta.34"
 dependencies = [
- "libc",
- "shell-words",
+ "ahash",
+ "bumpalo",
+ "config",
+ "indicatif 0.18.0",
+ "mago-analyzer",
+ "mago-atom",
+ "mago-codex",
+ "mago-database",
+ "mago-formatter",
+ "mago-guard",
+ "mago-linter",
+ "mago-names",
+ "mago-php-version",
+ "mago-reporting",
+ "mago-semantics",
+ "mago-syntax",
+ "rayon",
+ "tracing",
 ]
 
 [[package]]
@@ -1701,13 +1715,11 @@ dependencies = [
  "codespan-reporting",
  "mago-database",
  "mago-fixer",
- "mago-pager",
  "mago-span",
  "serde",
  "serde_json",
  "strum",
  "termcolor",
- "tracing",
 ]
 
 [[package]]
@@ -1774,18 +1786,16 @@ dependencies = [
 name = "mago-wasm"
 version = "1.0.0-beta.34"
 dependencies = [
- "bumpalo",
  "mago-analyzer",
  "mago-codex",
  "mago-database",
  "mago-formatter",
+ "mago-guard",
  "mago-linter",
- "mago-names",
+ "mago-orchestrator",
  "mago-php-version",
  "mago-prelude",
  "mago-reporting",
- "mago-semantics",
- "mago-syntax",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

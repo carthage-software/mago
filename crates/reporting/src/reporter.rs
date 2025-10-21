@@ -16,7 +16,6 @@ use strum::Display;
 use strum::VariantNames;
 
 use mago_database::ReadDatabase;
-use mago_pager::Pager;
 use termcolor::ColorChoice;
 
 use crate::IssueCollection;
@@ -57,24 +56,10 @@ pub enum ReportingFormat {
     Emacs,
 }
 
-impl ReportingFormat {
-    /// Returns `true` if the reporting format supports being displayed in a pager.
-    pub fn supports_paging(&self) -> bool {
-        match self {
-            // These formats are meant for human consumption in a terminal.
-            Self::Rich | Self::Medium | Self::Short | Self::Ariadne | Self::Emacs => true,
-
-            // These formats are for CI/CD, machine-readable, or produce short summaries.
-            Self::Github | Self::Gitlab | Self::Json | Self::Count | Self::CodeCount | Self::Checkstyle => false,
-        }
-    }
-}
-
 /// Configuration options for the reporter.
 ///
 /// This struct controls how issues are formatted and displayed, including
-/// the output target, format style, color usage, filtering options, and
-/// pagination settings.
+/// the output target, format style, color usage, and filtering options.
 #[derive(Debug)]
 pub struct ReporterConfig {
     /// The target where the report will be sent.
@@ -102,12 +87,6 @@ pub struct ReporterConfig {
     ///
     /// Issues below this level will be completely ignored and not displayed.
     pub minimum_report_level: Option<Level>,
-
-    /// Whether to use a pager for the report output.
-    pub use_pager: bool,
-
-    /// Optional custom pager command to use when paging is enabled.
-    pub pager_command: Option<String>,
 }
 
 /// Status information returned after reporting issues.
@@ -190,19 +169,7 @@ impl Reporter {
         }
 
         let writer = ReportWriter::new(self.config.target, self.config.color_choice);
-        if self.config.use_pager
-            && self.config.target == ReportingTarget::Stdout
-            && self.config.format.supports_paging()
-        {
-            let mut pager = Pager::default();
-            if let Some(pager_command) = &self.config.pager_command {
-                pager = pager.command(pager_command);
-            }
-
-            pager.page(|_| self.config.format.emit(&mut writer.lock(), &self.database, issues))??;
-        } else {
-            self.config.format.emit(&mut writer.lock(), &self.database, issues)?;
-        }
+        self.config.format.emit(&mut writer.lock(), &self.database, issues)?;
 
         Ok(ReportStatus {
             baseline_dead_issues: baseline_has_dead_issues,

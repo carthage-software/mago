@@ -84,7 +84,7 @@ impl LintRule for FunctionNameRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

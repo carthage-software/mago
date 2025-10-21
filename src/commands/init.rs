@@ -1,3 +1,34 @@
+//! Interactive configuration initialization command.
+//!
+//! This module implements the `mago init` command, which provides an interactive guided setup
+//! for creating a new `mago.toml` configuration file. The initialization process walks users
+//! through configuring all aspects of Mago including source paths, linter rules, formatter
+//! settings, and analyzer options.
+//!
+//! # Setup Process
+//!
+//! The initialization is divided into five steps:
+//!
+//! 1. **Project Setup**: Configure PHP version, source paths, includes, and excludes
+//! 2. **Linter Configuration**: Select framework integrations and rules
+//! 3. **Formatter Configuration**: Set code style preferences
+//! 4. **Analyzer Configuration**: Enable analysis features and categories
+//! 5. **Review & Confirm**: Preview and write the configuration file
+//!
+//! # Auto-Detection
+//!
+//! The command intelligently detects project settings from `composer.json` when available:
+//!
+//! - **PHP Version**: Extracted from the `require.php` constraint
+//! - **Source Paths**: Derived from PSR-4 autoload configuration
+//! - **Framework Integrations**: Detected from required packages (Laravel, Symfony, etc.)
+//!
+//! # Configuration Template
+//!
+//! The generated configuration file is based on a TOML template with placeholder values
+//! that are replaced based on user selections. The template includes sensible defaults
+//! and common customizations for PSR-12 compliance.
+
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -24,6 +55,17 @@ use crate::consts::DEFAULT_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::version::extract_minimum_php_version;
 
+/// TOML template for the generated `mago.toml` configuration file.
+///
+/// This template uses placeholder markers (e.g., `{php_version}`, `{paths}`) that are
+/// replaced with user-selected values during the initialization process. The template
+/// provides a well-structured configuration with all major sections:
+///
+/// - PHP version targeting
+/// - Source path configuration
+/// - Formatter style settings (PSR-12 compatible by default)
+/// - Linter rules and integrations
+/// - Analyzer features and options
 const CONFIGURATION_TEMPLATE: &str = r#"# Welcome to Mago!
 # For full documentation, see https://mago.carthage.software/tools/overview
 php-version = "{php_version}"
@@ -50,6 +92,26 @@ halstead = { effort-threshold = 7000 }
 {analyzer_settings}
 "#;
 
+/// Command for initializing a new Mago configuration file.
+///
+/// This command provides an interactive guided setup process for creating a `mago.toml`
+/// configuration file. It walks users through five steps to configure all aspects of Mago,
+/// with intelligent auto-detection from `composer.json` when available.
+///
+/// # Behavior
+///
+/// - If `mago.toml` exists, offers to back it up before proceeding
+/// - Attempts to auto-detect settings from `composer.json` if present
+/// - Provides interactive prompts for all configuration options
+/// - Generates a complete, ready-to-use `mago.toml` file
+///
+/// # User Experience
+///
+/// The command uses a colorful,  well-formatted terminal interface with:
+/// - Step-by-step progress indicators
+/// - Helpful descriptions for each option
+/// - Sensible defaults for all settings
+/// - Preview of the final configuration before writing
 #[derive(Parser, Debug)]
 #[command(
     name = "init",
@@ -59,6 +121,36 @@ halstead = { effort-threshold = 7000 }
 pub struct InitCommand;
 
 impl InitCommand {
+    /// Executes the interactive initialization process.
+    ///
+    /// This method orchestrates the complete initialization workflow:
+    ///
+    /// 1. Displays a welcome banner
+    /// 2. Checks for existing configuration and offers backup if needed
+    /// 3. Guides the user through five setup steps:
+    ///    - Project settings (paths, PHP version)
+    ///    - Linter configuration (integrations, rules)
+    ///    - Formatter settings (style preferences)
+    ///    - Analyzer configuration (features, issue categories)
+    ///    - Review and confirmation
+    /// 4. Writes the final configuration to `mago.toml`
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The base configuration (used for workspace path)
+    /// * `configuration_file` - Optional path override for the config file location
+    ///
+    /// # Returns
+    ///
+    /// Always returns `Ok(ExitCode::SUCCESS)` since initialization can be cancelled
+    /// at any point without being considered a failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Reading `composer.json` fails when user opts to use it
+    /// - Writing the configuration file fails due to permissions or I/O errors
+    /// - Terminal interaction fails (non-interactive environment)
     pub fn execute(self, configuration: Configuration, configuration_file: Option<PathBuf>) -> Result<ExitCode, Error> {
         let theme = ColorfulTheme {
             prompt_prefix: style("".to_string()),
@@ -128,23 +220,45 @@ impl InitCommand {
     }
 }
 
+/// Project configuration settings collected during initialization.
+///
+/// This struct holds the basic project setup gathered from either auto-detection
+/// (via `composer.json`) or user prompts, including the target PHP version and
+/// file path configurations.
 #[derive(Debug)]
 struct InitializationProjectSettings {
+    /// Target PHP version (e.g., "8.2", "8.3")
     php_version: String,
+    /// Source code paths to analyze (e.g., ["src", "tests"])
     paths: Vec<String>,
+    /// Dependency paths for context (e.g., ["vendor"])
     includes: Vec<String>,
+    /// Paths to exclude from all processing (e.g., ["build", "dist"])
     excludes: Vec<String>,
 }
 
+/// Analyzer configuration settings collected during initialization.
+///
+/// This struct holds all analyzer-specific settings gathered from user prompts,
+/// including feature toggles and issue category selections. These settings
+/// determine the depth and scope of static analysis.
 #[derive(Debug)]
 struct InitializationAnalyzerSettings {
+    /// Issue codes to ignore globally
     ignore: Vec<String>,
+    /// Issue categories to disable (e.g., "nullable", "mixed")
     disabled_categories: Vec<String>,
+    /// Whether to find unused definitions (classes, functions, methods)
     find_unused_definitions: bool,
+    /// Whether to find unused expressions (statements with no effect)
     find_unused_expressions: bool,
+    /// Whether to analyze code paths that appear unreachable
     analyze_dead_code: bool,
+    /// Whether to check for unhandled thrown exceptions
     check_throws: bool,
+    /// Whether to allow access to potentially undefined array keys
     allow_possibly_undefined_array_keys: bool,
+    /// Whether to enable heuristic-based code quality checks
     perform_heuristic_checks: bool,
 }
 

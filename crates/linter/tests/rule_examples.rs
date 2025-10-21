@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
 use bumpalo::Bump;
+use mago_atom::AtomSet;
+use mago_atom::atom;
 use mago_database::file::File;
 use mago_linter::Linter;
 use mago_linter::integration::IntegrationSet;
@@ -15,7 +17,7 @@ use mago_syntax::parser::parse_file;
 #[test]
 fn test_all_rule_examples() {
     let settings = Settings::default();
-    let registry = RuleRegistry::build(settings, None, true);
+    let registry = RuleRegistry::build(&settings, None, true);
     let rules = registry.rules();
 
     let mut failures = Vec::new();
@@ -59,7 +61,10 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
         integrations: IntegrationSet::all(),
         rules: RulesSettings {
             disallowed_functions: RuleSettings {
-                config: DisallowedFunctionsConfig { extensions: vec!["curl".to_string()], ..Default::default() },
+                config: DisallowedFunctionsConfig {
+                    extensions: AtomSet::from_iter([atom("curl")]),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..RulesSettings::default()
@@ -68,7 +73,7 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
     };
 
     let php_version = settings.php_version;
-    let registry = RuleRegistry::build(settings, Some(&[rule_code.to_string()]), true);
+    let registry = RuleRegistry::build(&settings, Some(&[rule_code.to_string()]), true);
     if registry.rules().is_empty() {
         return Err(format!("No rules found for code '{}'", rule_code));
     }

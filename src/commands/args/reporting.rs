@@ -1,51 +1,50 @@
 //! Command-line arguments for issue reporting and fixing.
 //!
-//! This module defines the command-line interface for controlling how issues are
-//! reported and optionally fixed. It provides options for filtering, sorting, and
-//! formatting issue output, as well as applying automatic fixes to code.
+//! This module defines [`ReportingArgs`], a reusable set of command-line arguments
+//! for controlling how issues are reported and optionally fixed. These arguments
+//! can be flattened into any command that needs to report analysis results.
 //!
-//! The reporting functionality supports multiple output formats (rich terminal output,
-//! JSON, checkstyle, etc.), different output targets (stdout/stderr), and various
-//! filtering options. The fixing functionality can apply safe, potentially unsafe,
-//! or unsafe fixes based on user preferences.
+//! # Features
+//!
+//! The reporting arguments control several aspects:
+//!
+//! - **Output Formatting**: Choose from rich, medium, short, JSON, and other formats
+//! - **Output Targeting**: Send output to stdout or stderr
+//! - **Issue Filtering**: Filter by fixability, severity level
+//! - **Issue Sorting**: Sort issues for better organization
+//! - **Automatic Fixing**: Apply fixes with various safety levels
+//! - **Fix Previewing**: Dry-run mode to preview fixes without applying them
+//!
+//! # Fix Safety Levels
+//!
+//! Fixes are categorized by safety:
+//!
+//! - **Safe**: Applied by default with `--fix`
+//! - **Potentially Unsafe**: Requires `--potentially-unsafe` flag
+//! - **Unsafe**: Requires `--unsafe` flag
+//!
+//! # Exit Codes
+//!
+//! The `minimum_fail_level` determines when the command exits with failure.
+//! This enables CI integration where certain issue severities should fail builds.
 
-use std::borrow::Cow;
-use std::process::ExitCode;
-use std::sync::Arc;
-
-use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
-use mago_reporting::baseline::Baseline;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
+use mago_orchestrator::Orchestrator;
 
 use mago_database::Database;
-use mago_database::DatabaseReader;
-use mago_database::ReadDatabase;
-use mago_database::change::ChangeLog;
-use mago_database::file::FileId;
-use mago_fixer::FixPlan;
-use mago_fixer::SafetyClassification;
-use mago_formatter::Formatter;
-use mago_reporting::ColorChoice as ReportingColorChoice;
-use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_reporting::reporter::Reporter;
-use mago_reporting::reporter::ReporterConfig;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
 
-use crate::commands::args::pager::PagerArgs;
-use crate::config::Configuration;
 use crate::enum_variants;
-use crate::error::Error;
-use crate::utils;
-use crate::utils::progress::ProgressBarTheme;
-use crate::utils::progress::create_progress_bar;
-use crate::utils::progress::remove_progress_bar;
+use crate::service::IssueProcessor;
 
 /// Command-line arguments for issue reporting and fixing.
+///
+/// This struct defines all options for controlling issue output and automatic
+/// fix application. It's designed to be flattened into command structs using
+/// `#[clap(flatten)]`.
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
@@ -156,288 +155,46 @@ pub struct ReportingArgs {
         value_parser = enum_variants!(Level)
     )]
     pub minimum_report_level: Option<Level>,
-
-    #[clap(flatten)]
-    pub pager_args: PagerArgs,
 }
 
 impl ReportingArgs {
-    /// Processes issues by either reporting them or applying fixes.
+    /// Creates an issue processor from these reporting arguments.
     ///
-    /// This is the main entry point for issue processing. Depending on whether the `--fix`
-    /// flag is enabled, it either applies automatic fixes to the code or reports the issues
-    /// using the configured format and output settings.
+    /// This method converts the command-line arguments into an [`IssueProcessor`]
+    /// that will handle issue reporting and optionally apply fixes according to
+    /// the configured options.
     ///
-    /// When applying fixes, only safe fixes are applied by default unless `--unsafe` or
-    /// `--potentially-unsafe` flags are provided. When reporting, issues can be filtered,
-    /// sorted, and formatted according to the configured options.
+    /// # Arguments
     ///
-    /// Returns an exit code indicating success or failure based on whether issues were
-    /// found and whether they meet the configured failure threshold.
-    pub fn process_issues(
+    /// * `orchestrator` - The orchestrator for formatting fixed files
+    /// * `database` - The database containing source files
+    /// * `color_choice` - Whether to use colored output
+    ///
+    /// # Returns
+    ///
+    /// An [`IssueProcessor`] configured with all the reporting and fixing options
+    /// from this argument set.
+    pub fn get_processor<'a>(
         self,
-        issues: IssueCollection,
-        configuration: Configuration,
-        color_choice: ColorChoice,
+        orchestrator: Orchestrator<'a>,
         database: Database,
-        baseline: Option<Baseline>,
-        fail_on_out_of_sync_baseline: bool,
-    ) -> Result<ExitCode, Error> {
-        if self.fix {
-            self.handle_fix_mode(issues, configuration, color_choice, database)
-        } else {
-            self.handle_report_mode(
-                issues,
-                configuration,
-                color_choice,
-                database,
-                baseline,
-                fail_on_out_of_sync_baseline,
-            )
-        }
-    }
-
-    /// Applies automatic fixes to code when the `--fix` flag is enabled.
-    ///
-    /// This method filters fixes based on safety classification and applies them
-    /// in parallel. It respects the `--unsafe` and `--potentially-unsafe` flags
-    /// to determine which fixes are safe to apply. When `--format-after-fix` is
-    /// enabled, modified files are automatically formatted. When `--dry-run` is
-    /// enabled, changes are previewed but not written to disk.
-    fn handle_fix_mode(
-        self,
-        issues: IssueCollection,
-        configuration: Configuration,
         color_choice: ColorChoice,
-        mut database: Database,
-    ) -> Result<ExitCode, Error> {
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
-            self.apply_fixes(issues, configuration, color_choice, &mut database)?;
-
-        if skipped_unsafe > 0 {
-            tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
-        }
-
-        if skipped_potentially_unsafe > 0 {
-            tracing::warn!(
-                "Skipped {} potentially unsafe fixes. Use `--potentially-unsafe` or `--unsafe` to apply them.",
-                skipped_potentially_unsafe
-            );
-        }
-
-        if applied_fixes == 0 {
-            tracing::info!("No fixes were applied.");
-
-            return Ok(ExitCode::SUCCESS);
-        }
-
-        if self.dry_run {
-            tracing::info!("Found {} fixes that can be applied (dry-run).", applied_fixes);
-
-            Ok(ExitCode::FAILURE)
-        } else {
-            tracing::info!("Successfully applied {} fixes.", applied_fixes);
-
-            Ok(ExitCode::SUCCESS)
-        }
-    }
-
-    /// Reports issues to the configured output target when `--fix` is not enabled.
-    ///
-    /// This method creates a reporter with the configured settings and outputs
-    /// issues according to the specified format. It applies baseline filtering
-    /// if a baseline is provided, filters by severity level if configured, and
-    /// can optionally filter to show only fixable issues or sort issues for
-    /// better readability.
-    ///
-    /// The exit code is determined by the highest severity level of reported
-    /// issues compared to the `--minimum-fail-level` threshold.
-    fn handle_report_mode(
-        self,
-        issues: IssueCollection,
-        configuration: Configuration,
-        color_choice: ColorChoice,
-        database: Database,
-        baseline: Option<Baseline>,
-        fail_on_out_of_sync_baseline: bool,
-    ) -> Result<ExitCode, Error> {
-        let read_database = database.read_only();
-
-        let issues_to_report = issues;
-
-        let reporter_configuration = ReporterConfig {
-            target: self.reporting_target,
-            format: self.reporting_format,
-            color_choice: match color_choice {
-                ColorChoice::Auto => ReportingColorChoice::Auto,
-                ColorChoice::Always => ReportingColorChoice::Always,
-                ColorChoice::Never => ReportingColorChoice::Never,
-            },
-            filter_fixable: self.fixable_only,
+    ) -> IssueProcessor<'a> {
+        IssueProcessor {
+            orchestrator,
+            database,
+            fixable_only: self.fixable_only,
             sort: self.sort,
+            fix: self.fix,
+            r#unsafe: self.r#unsafe,
+            potentially_unsafe: self.potentially_unsafe,
+            format_after_fix: self.format_after_fix,
+            dry_run: self.dry_run,
+            reporting_target: self.reporting_target,
+            reporting_format: self.reporting_format,
+            minimum_fail_level: self.minimum_fail_level,
             minimum_report_level: self.minimum_report_level,
-            use_pager: self.pager_args.should_use_pager(&configuration),
-            pager_command: configuration.pager.clone(),
-        };
-
-        let reporter = Reporter::new(read_database, reporter_configuration);
-        let status = reporter.report(issues_to_report, baseline)?;
-
-        if status.baseline_dead_issues {
-            tracing::warn!(
-                "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
-            );
-
-            if fail_on_out_of_sync_baseline {
-                return Ok(ExitCode::FAILURE);
-            }
+            color_choice,
         }
-
-        if status.baseline_filtered_issues > 0 {
-            tracing::info!("Filtered out {} issues based on the baseline file.", status.baseline_filtered_issues);
-        }
-
-        if let Some(highest_reported_level) = status.highest_reported_level
-            && self.minimum_fail_level <= highest_reported_level
-        {
-            return Ok(ExitCode::FAILURE);
-        }
-
-        if status.total_reported_issues == 0 {
-            if self.fixable_only {
-                tracing::info!("No fixable issues found.");
-            } else {
-                tracing::info!("No issues found.");
-            }
-        }
-
-        Ok(ExitCode::SUCCESS)
-    }
-
-    /// Applies code fixes in parallel according to safety settings.
-    ///
-    /// This method extracts fix plans from issues, filters them based on the
-    /// configured safety level (safe, potentially unsafe, or unsafe), and applies
-    /// them concurrently using a parallel thread pool. Each fix can optionally be
-    /// followed by code formatting if `--format-after-fix` is enabled.
-    ///
-    /// Returns the count of applied fixes and the counts of skipped fixes by
-    /// safety classification.
-    fn apply_fixes(
-        &self,
-        issues: IssueCollection,
-        configuration: Configuration,
-        color_choice: ColorChoice,
-        database: &mut Database,
-    ) -> Result<(usize, usize, usize), Error> {
-        let read_database = Arc::new(database.read_only());
-        let change_log = ChangeLog::new();
-
-        let (fix_plans, skipped_unsafe, skipped_potentially_unsafe) = self.filter_fix_plans(&read_database, issues);
-
-        if fix_plans.is_empty() {
-            return Ok((0, skipped_unsafe, skipped_potentially_unsafe));
-        }
-
-        let progress_bar = create_progress_bar(fix_plans.len(), "✨ Fixing", ProgressBarTheme::Cyan);
-
-        let changed_results: Vec<bool> = fix_plans
-            .into_par_iter()
-            .map_init(Bump::new, |arena, (file_id, plan)| {
-                arena.reset();
-
-                let file = read_database.get_ref(&file_id)?;
-                let fixed_content = plan.execute(&file.contents).get_fixed();
-                let final_content = if self.format_after_fix {
-                    let formatter = Formatter::new(arena, configuration.php_version, configuration.formatter.settings);
-
-                    if let Ok(content) = formatter.format_code(file.name.clone(), Cow::Owned(fixed_content.clone())) {
-                        Cow::Borrowed(content)
-                    } else {
-                        Cow::Owned(fixed_content)
-                    }
-                } else {
-                    Cow::Owned(fixed_content)
-                };
-
-                let changed =
-                    utils::apply_update(&change_log, file, final_content.as_ref(), self.dry_run, false, color_choice)?;
-                progress_bar.inc(1);
-                Ok(changed)
-            })
-            .collect::<Result<Vec<bool>, Error>>()?;
-
-        remove_progress_bar(progress_bar);
-
-        if !self.dry_run {
-            database.commit(change_log, true)?;
-        }
-
-        let applied_fix_count = changed_results.into_iter().filter(|&c| c).count();
-
-        Ok((applied_fix_count, skipped_unsafe, skipped_potentially_unsafe))
-    }
-
-    /// Filters fix plans based on configured safety thresholds.
-    ///
-    /// This method examines each fix operation's safety classification and
-    /// includes or skips it based on the `--unsafe` and `--potentially-unsafe`
-    /// flags. Safe fixes are always included.
-    ///
-    /// Returns a tuple containing the list of applicable fix plans and the
-    /// counts of skipped fixes by safety classification.
-    #[inline]
-    fn filter_fix_plans(
-        &self,
-        database: &ReadDatabase,
-        issues: IssueCollection,
-    ) -> (Vec<(FileId, FixPlan)>, usize, usize) {
-        let mut skipped_unsafe_count = 0;
-        let mut skipped_potentially_unsafe_count = 0;
-        let mut applicable_plans = Vec::new();
-
-        for (file_id, plan) in issues.to_fix_plans() {
-            if plan.is_empty() {
-                continue;
-            }
-
-            let mut filtered_operations = Vec::new();
-            for operation in plan.take_operations() {
-                // Consumes operations from the plan
-                match operation.get_safety_classification() {
-                    SafetyClassification::Unsafe => {
-                        if self.r#unsafe {
-                            filtered_operations.push(operation);
-                        } else {
-                            skipped_unsafe_count += 1;
-                            tracing::debug!(
-                                "Skipping unsafe fix for `{}`. Use --unsafe to apply.",
-                                database.get_ref(&file_id).map(|f| f.name.as_ref()).unwrap_or("<unknown>"),
-                            );
-                        }
-                    }
-                    SafetyClassification::PotentiallyUnsafe => {
-                        if self.r#unsafe || self.potentially_unsafe {
-                            filtered_operations.push(operation);
-                        } else {
-                            skipped_potentially_unsafe_count += 1;
-                            tracing::debug!(
-                                "Skipping potentially unsafe fix for `{}`. Use --potentially-unsafe or --unsafe to apply.",
-                                database.get_ref(&file_id).map(|f| f.name.as_ref()).unwrap_or("<unknown>"),
-                            );
-                        }
-                    }
-                    SafetyClassification::Safe => {
-                        filtered_operations.push(operation);
-                    }
-                }
-            }
-
-            if !filtered_operations.is_empty() {
-                applicable_plans.push((file_id, FixPlan::from_operations(filtered_operations)));
-            }
-        }
-
-        (applicable_plans, skipped_unsafe_count, skipped_potentially_unsafe_count)
     }
 }

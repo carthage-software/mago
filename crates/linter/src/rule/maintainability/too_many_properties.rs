@@ -86,7 +86,7 @@ impl LintRule for TooManyPropertiesRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<TooManyPropertiesConfig>) -> Self {
+    fn build(settings: &RuleSettings<TooManyPropertiesConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

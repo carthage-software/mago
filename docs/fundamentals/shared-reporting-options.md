@@ -38,8 +38,6 @@ You can choose from several reporting formats with the `--reporting-format` flag
 - **CI/CD & Machine-Readable:** `github`, `gitlab`, `json`, `checkstyle`
 - **Summaries:** `count`, `code-count`
 
-For more details on which formats support terminal paging, see the [Pager Support](/fundamentals/pager-support.md) documentation.
-
 ## Baseline
 
 These flags are used to manage baseline files for ignoring pre-existing issues. This feature is available for `mago lint` and `mago analyze`.

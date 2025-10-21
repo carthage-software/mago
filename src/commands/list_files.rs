@@ -1,13 +1,46 @@
+//! File listing command implementation.
+//!
+//! This module implements the `mago list-files` command, which displays all PHP files
+//! that would be processed by Mago based on the current configuration. This is a
+//! diagnostic tool useful for verifying path configurations and exclusion patterns.
+//!
+//! # Purpose
+//!
+//! The command helps users:
+//!
+//! - **Verify Configuration**: Ensure the correct files are being included/excluded
+//! - **Debug Path Issues**: Identify why certain files aren't being processed
+//! - **Preview Scope**: See what will be analyzed before running expensive commands
+//! - **Integration**: Generate file lists for external tools (with `--zero-terminate`)
+//!
+//! # Command-Specific Excludes
+//!
+//! When `--command` is specified, the file list applies that command's specific
+//! exclusion patterns in addition to the global source configuration. This shows
+//! exactly which files that specific command would process.
+//!
+//! # Output Formats
+//!
+//! - **Default**: One file path per line (newline-terminated)
+//! - **NUL-terminated** (`-0`): NUL byte separator for safe processing of filenames
+//!   with newlines or special characters
+
 use std::process::ExitCode;
 
+use clap::ColorChoice;
 use clap::Parser;
 use clap::ValueEnum;
 use mago_database::DatabaseReader;
 
 use crate::config::Configuration;
-use crate::database;
 use crate::error::Error;
+use crate::utils::create_orchestrator;
 
+/// Commands that have specific exclusion patterns.
+///
+/// Each Mago command can have its own set of files to exclude beyond the global
+/// source configuration. This enum represents the commands that support
+/// command-specific excludes.
 #[derive(ValueEnum, Debug, Clone, Copy)]
 #[value(rename_all = "kebab-case")]
 enum Command {
@@ -48,17 +81,47 @@ pub struct ListFilesCommand {
 }
 
 impl ListFilesCommand {
-    pub fn execute(self, mut configuration: Configuration) -> Result<ExitCode, Error> {
+    /// Executes the file listing command.
+    ///
+    /// This method scans the workspace according to the configuration and prints
+    /// all discovered PHP files to stdout. The output format depends on the
+    /// `--zero-terminate` flag.
+    ///
+    /// # Process
+    ///
+    /// 1. Creates an orchestrator with the configuration
+    /// 2. Applies command-specific excludes if `--command` was provided
+    /// 3. Loads the database by scanning the file system
+    /// 4. Prints each file path with the appropriate terminator
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The configuration specifying paths and excludes
+    /// * `color_choice` - Color settings (not used by this command)
+    ///
+    /// # Returns
+    ///
+    /// Always returns `Ok(ExitCode::SUCCESS)` since listing files cannot fail
+    /// once the database is loaded successfully.
+    ///
+    /// # Output Format
+    ///
+    /// Each file path is printed in the order discovered by the database loader.
+    /// Paths are absolute and canonicalized. The terminator character is either
+    /// newline (default) or NUL byte (`-0`).
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
         if let Some(command) = self.command {
-            configuration.source.excludes.extend(std::mem::take(match command {
-                Command::Linter => &mut configuration.linter.excludes,
-                Command::Formatter => &mut configuration.formatter.excludes,
-                Command::Analyzer => &mut configuration.analyzer.excludes,
-                Command::Guard => &mut configuration.guard.excludes,
-            }));
+            match command {
+                Command::Linter => orchestrator.add_exclude_patterns(configuration.linter.excludes.iter()),
+                Command::Formatter => orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter()),
+                Command::Analyzer => orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter()),
+                Command::Guard => orchestrator.add_exclude_patterns(configuration.guard.excludes.iter()),
+            }
         }
 
-        let database = database::load_from_configuration(&mut configuration.source, false, None)?;
+        let database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+
         for file in database.files() {
             print!("{}{}", file.name, if self.zero_terminate { '\0' } else { '\n' });
         }

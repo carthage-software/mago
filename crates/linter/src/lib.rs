@@ -50,7 +50,7 @@ impl<'arena> Linter<'arena> {
         Self {
             arena,
             php_version: settings.php_version,
-            registry: Arc::new(RuleRegistry::build(settings, only, include_disabled)),
+            registry: Arc::new(RuleRegistry::build(&settings, only, include_disabled)),
         }
     }
 

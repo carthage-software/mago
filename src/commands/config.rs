@@ -1,3 +1,31 @@
+//! Configuration display command implementation.
+//!
+//! This module implements the `mago config` command, which displays the effective
+//! configuration after merging all sources (files, environment variables, defaults).
+//! This is a diagnostic tool essential for debugging configuration issues.
+//!
+//! # Configuration Merging
+//!
+//! Mago loads configuration from multiple sources in this precedence order:
+//!
+//! 1. **Command-line arguments** (highest precedence)
+//! 2. **Environment variables** (prefixed with `MAGO_`)
+//! 3. **Project config** (`./mago.toml`)
+//! 4. **Global config** (`~/.config/mago/config.toml`)
+//! 5. **Built-in defaults** (lowest precedence)
+//!
+//! # Output Format
+//!
+//! The command outputs configuration as JSON for easy parsing and readability.
+//! Users can focus on specific sections or view defaults without any config files.
+//!
+//! # Use Cases
+//!
+//! - **Debugging**: Verify which settings are actually being used
+//! - **Documentation**: See all available configuration options
+//! - **CI Integration**: Extract configuration programmatically
+//! - **Validation**: Confirm environment variables are being read correctly
+
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -11,6 +39,10 @@ use crate::config::source::SourceConfiguration;
 use crate::consts::CURRENT_DIR;
 use crate::error::Error;
 
+/// Configuration sections that can be displayed individually.
+///
+/// This enum represents the major configuration sections in Mago's configuration
+/// file. Each section configures a different aspect of Mago's behavior.
 #[derive(ValueEnum, Debug, Clone, Copy)]
 #[value(rename_all = "kebab-case")]
 enum ConfigSection {
@@ -59,6 +91,31 @@ pub struct ConfigCommand {
 }
 
 impl ConfigCommand {
+    /// Executes the config display command.
+    ///
+    /// This method outputs the effective configuration as JSON, either for the
+    /// entire configuration or a specific section. The output includes all merged
+    /// settings from all sources unless `--default` is specified.
+    ///
+    /// # Behavior
+    ///
+    /// - If `--default` is set, shows built-in defaults only
+    /// - If `--show <section>` is set, displays only that section
+    /// - Otherwise, displays the complete merged configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The fully merged configuration to display
+    ///
+    /// # Returns
+    ///
+    /// Always returns `Ok(ExitCode::SUCCESS)` since displaying configuration
+    /// cannot fail (serialization to JSON is infallible for these types).
+    ///
+    /// # Output
+    ///
+    /// The configuration is serialized to pretty-printed JSON and written to stdout.
+    /// This format is both human-readable and machine-parseable.
     pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
         let json = if let Some(section) = self.show {
             match section {

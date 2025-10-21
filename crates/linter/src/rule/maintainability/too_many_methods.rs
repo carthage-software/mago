@@ -105,7 +105,7 @@ impl LintRule for TooManyMethodsRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<TooManyMethodsConfig>) -> Self {
+    fn build(settings: &RuleSettings<TooManyMethodsConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

@@ -18,7 +18,7 @@ impl RuleRegistry {
     /// # Arguments
     ///
     /// * `only` - If `Some`, only builds rules whose codes are in this list.
-    pub fn build(settings: Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
+    pub fn build(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         let integrations = settings.integrations;
         let rules: Vec<AnyRule> = AnyRule::get_all_for(settings, only, include_disabled || only.is_some());
 

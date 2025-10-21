@@ -8,7 +8,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::fmt;
 
-use crate::utils::progress::GLOBAL_PROGRESS_MANAGER;
+use mago_orchestrator::progress::GLOBAL_PROGRESS_MANAGER;
 
 /// Initializes the logger with the specified directive and environment variable.
 ///

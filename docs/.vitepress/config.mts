@@ -99,7 +99,6 @@ export default defineConfig({
             link: "/fundamentals/suppressing-issues",
           },
           { text: "Baseline", link: "/fundamentals/baseline" },
-          { text: "Pager Support", link: "/fundamentals/pager-support" },
         ],
       },
       {

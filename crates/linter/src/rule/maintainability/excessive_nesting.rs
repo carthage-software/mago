@@ -28,7 +28,7 @@ pub struct ExcessiveNestingRule {
     cfg: ExcessiveNestingConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ExcessiveNestingConfig {
     pub level: Level,
@@ -104,7 +104,7 @@ impl LintRule for ExcessiveNestingRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
@@ -113,8 +113,7 @@ impl LintRule for ExcessiveNestingRule {
             return;
         };
 
-        let mut walker =
-            NestingWalker { threshold: self.cfg.threshold, level: 0, meta: self.meta, cfg: self.cfg.clone() };
+        let mut walker = NestingWalker { threshold: self.cfg.threshold, level: 0, meta: self.meta, cfg: self.cfg };
 
         walker.walk_program(program, ctx);
     }

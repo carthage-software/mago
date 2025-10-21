@@ -1,0 +1,33 @@
+[package]
+name = "mago-orchestrator"
+description = "..."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-syntax = { workspace = true }
+mago-reporting = { workspace = true }
+mago-atom = { workspace = true }
+mago-database = { workspace = true }
+mago-linter = { workspace = true }
+mago-names = { workspace = true }
+mago-formatter = { workspace = true }
+mago-php-version = { workspace = true }
+mago-semantics = { workspace = true }
+mago-codex = { workspace = true }
+mago-analyzer = { workspace = true }
+mago-guard = { workspace = true }
+ahash = { workspace = true }
+tracing = { workspace = true }
+config = { workspace = true }
+indicatif = { workspace = true }
+rayon = { workspace = true }
+bumpalo = { workspace = true }

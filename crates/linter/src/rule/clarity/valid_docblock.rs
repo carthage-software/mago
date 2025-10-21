@@ -67,7 +67,7 @@ impl LintRule for ValidDocblockRule {
             "#},
             bad_example: indoc! {r#"
                 <?php
-                
+
                 /**
                  * For more information, {@see https://example.com
                  *
@@ -93,7 +93,7 @@ impl LintRule for ValidDocblockRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

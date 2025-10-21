@@ -103,7 +103,7 @@ impl LintRule for TooManyEnumCasesRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<TooManyEnumCasesConfig>) -> Self {
+    fn build(settings: &RuleSettings<TooManyEnumCasesConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

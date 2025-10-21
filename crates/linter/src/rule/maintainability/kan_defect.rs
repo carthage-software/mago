@@ -178,7 +178,7 @@ impl LintRule for KanDefectRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<KanDefectConfig>) -> Self {
+    fn build(settings: &RuleSettings<KanDefectConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

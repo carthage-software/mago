@@ -9,7 +9,7 @@ use mago_linter::rule_meta::RuleMeta;
 use mago_linter::settings::Settings;
 
 /// Retrieves metadata for all available linter rules based on the provided settings.
-pub fn get_available_rules(settings: Settings) -> Vec<&'static RuleMeta> {
+pub fn get_available_rules(settings: &Settings) -> Vec<&'static RuleMeta> {
     let registry = RuleRegistry::build(settings, None, true);
 
     registry.rules().iter().map(AnyRule::meta).collect()

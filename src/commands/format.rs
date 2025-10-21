@@ -1,26 +1,65 @@
+//! Code formatting command implementation.
+//!
+//! This module implements the `mago format` (aliased as `mago fmt`) command, which
+//! automatically formats PHP code according to configured style rules. The formatter
+//! ensures consistent code style across the entire codebase.
+//!
+//! # Formatting Modes
+//!
+//! The formatter supports three distinct modes:
+//!
+//! - **In-place Formatting** (default): Modifies files directly on disk
+//! - **Check Mode** (`--check`): Validates formatting without making changes (CI-friendly)
+//! - **Dry Run** (`--dry-run`): Shows what would change via diff without modifying files
+//! - **STDIN Mode** (`--stdin-input`): Reads from stdin, writes formatted code to stdout
+//!
+//! # Configuration
+//!
+//! Formatting style is configured in `mago.toml` under the `[formatter]` section:
+//!
+//! - **print-width**: Maximum line length
+//! - **tab-width**: Number of spaces per indentation level
+//! - **use-tabs**: Whether to use tabs instead of spaces
+//! - Additional style preferences for braces, spacing, etc.
+//!
+//! # Output and Reporting
+//!
+//! - **In-place**: Prints summary of formatted files
+//! - **Check**: Exits with failure code if files need formatting
+//! - **Dry run**: Displays colorized diffs of proposed changes
+//! - **STDIN**: Outputs formatted code directly
+//!
+//! # Use Cases
+//!
+//! - Pre-commit hooks to ensure consistent formatting
+//! - CI checks to validate code style compliance
+//! - Editor integration for format-on-save
+//! - Bulk formatting after style guide changes
+
 use std::borrow::Cow;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
 
+use mago_database::DatabaseReader;
 use mago_database::change::ChangeLog;
 use mago_database::error::DatabaseError;
 use mago_database::file::File;
-use mago_formatter::Formatter;
+use mago_orchestrator::service::format::FileFormatStatus;
 
 use crate::config::Configuration;
-use crate::database;
 use crate::error::Error;
-use crate::pipeline::format::FormatContext;
-use crate::pipeline::format::FormatMode;
-use crate::pipeline::format::run_format_pipeline;
+use crate::utils;
+use crate::utils::create_orchestrator;
 
-/// Represents the `format` command, which is responsible for formatting source files
-/// according to specified rules in the configuration file.
+/// Command for formatting PHP source files according to style rules.
+///
+/// This command applies consistent formatting to PHP code based on the configured
+/// style preferences. It supports multiple modes including in-place formatting,
+/// check mode for CI, and dry-run mode for previewing changes.
 #[derive(Parser, Debug)]
 #[command(
     name = "format",
@@ -65,74 +104,113 @@ pub struct FormatCommand {
 }
 
 impl FormatCommand {
-    /// Executes the format command with the provided configuration and options.
+    /// Executes the formatting command.
+    ///
+    /// This method handles all formatting modes (in-place, check, dry-run, stdin)
+    /// and orchestrates the complete formatting workflow:
+    ///
+    /// 1. **Mode Selection**: Determines which mode to use based on flags
+    /// 2. **STDIN Handling**: If `--stdin-input`, reads from stdin and formats immediately
+    /// 3. **Database Loading**: Scans workspace for PHP files (unless stdin mode)
+    /// 4. **Service Creation**: Creates formatting service with configuration
+    /// 5. **Formatting**: Processes each file according to the selected mode
+    /// 6. **Reporting**: Outputs results (summary, diffs, or exit code)
     ///
     /// # Arguments
     ///
-    /// * `configuration` - The application configuration loaded from file or defaults.
-    /// * `use_colors` - Whether to use colored output for diffs in dry-run mode.
+    /// * `configuration` - The configuration containing formatter settings
+    /// * `color_choice` - Whether to use colored output for diffs
     ///
     /// # Returns
     ///
-    /// Exit code: `0` if successful or no changes were needed, `1` if issues were found during the check.
-    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        configuration.source.excludes.extend(std::mem::take(&mut configuration.formatter.excludes));
+    /// - `Ok(ExitCode::SUCCESS)` if formatting succeeded or no changes needed
+    /// - `Ok(ExitCode::FAILURE)` in check mode if files need formatting
+    /// - `Err(Error)` if database loading or formatting failed
+    ///
+    /// # Modes
+    ///
+    /// - **In-place** (default): Writes formatted code back to files
+    /// - **Check** (`--check`): Returns failure if any file needs formatting
+    /// - **Dry run** (`--dry-run`): Prints diffs without modifying files
+    /// - **STDIN** (`--stdin-input`): Formats input from stdin to stdout
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
+        if !self.path.is_empty() {
+            orchestrator.set_source_paths(self.path.iter());
+        }
+
+        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let service = orchestrator.get_format_service(database.read_only());
 
         if self.stdin_input {
-            let arena = Bump::new();
             let file = Self::create_file_from_stdin()?;
-            let formatter = Formatter::new(&arena, configuration.php_version, configuration.formatter.settings);
-            return Ok(match formatter.format_file(&file) {
-                Ok(formatted) => {
-                    print!("{formatted}");
+            let status = service.format_file(&file)?;
+
+            let exit_code = match status {
+                FileFormatStatus::Unchanged => {
+                    print!("{}", file.contents);
+
                     ExitCode::SUCCESS
                 }
-                Err(error) => {
-                    tracing::error!("Failed to format input: {}", error);
+                FileFormatStatus::Changed(new_content) => {
+                    print!("{new_content}");
+
+                    ExitCode::SUCCESS
+                }
+                FileFormatStatus::FailedToParse(parse_error) => {
+                    tracing::error!("Failed to parse input: {}", parse_error);
                     ExitCode::FAILURE
                 }
-            });
+            };
+
+            return Ok(exit_code);
         }
 
-        let mut database = if !self.path.is_empty() {
-            database::load_from_paths(&mut configuration.source, self.path, None)?
-        } else {
-            database::load_from_configuration(&mut configuration.source, false, None)?
-        };
+        let result = service.run()?;
 
-        // 1. Create the shared ChangeLog and context for the pipeline.
-        let change_log = ChangeLog::new();
-        let shared_context = FormatContext {
-            php_version: configuration.php_version,
-            settings: configuration.formatter.settings,
-            mode: if self.dry_run {
-                FormatMode::DryRun
-            } else if self.check {
-                FormatMode::Check
-            } else {
-                FormatMode::Format
-            },
-            change_log: change_log.clone(),
-        };
+        for (file_id, parse_error) in result.parse_errors() {
+            let file = database.get_ref(file_id)?;
 
-        let changed_count = run_format_pipeline(database.read_only(), shared_context, color_choice)?;
-
-        if !self.dry_run {
-            database.commit(change_log, true)?;
+            tracing::error!("Failed to parse file '{}': {parse_error}", file.name);
         }
 
-        if changed_count == 0 {
+        let changed_files_count = result.changed_files_count();
+
+        if changed_files_count == 0 {
             tracing::info!("All files are already formatted.");
+
             return Ok(ExitCode::SUCCESS);
         }
 
-        Ok(if self.dry_run || self.check {
-            tracing::info!("Found {} file(s) that need formatting.", changed_count);
+        if self.check {
+            tracing::info!(
+                "Found {changed_files_count} file(s) need formatting. Run the command without '--check' to format them.",
+            );
+
+            return Ok(ExitCode::FAILURE);
+        }
+
+        let change_log = ChangeLog::new();
+        for (file_id, new_content) in result.changed_files() {
+            let file = database.get_ref(file_id)?;
+
+            utils::apply_update(&change_log, file, new_content, self.dry_run, color_choice)?;
+        }
+
+        database.commit(change_log, true)?;
+
+        let exit_code = if self.dry_run {
+            tracing::info!("Found {changed_files_count} file(s) that need formatting.");
+
             ExitCode::FAILURE
         } else {
-            tracing::info!("Formatted {} file(s) successfully.", changed_count);
+            tracing::info!("Formatted {changed_files_count} file(s) successfully.");
+
             ExitCode::SUCCESS
-        })
+        };
+
+        Ok(exit_code)
     }
 
     /// Creates an ephemeral file from standard input.

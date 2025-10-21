@@ -8,10 +8,12 @@ use serde::Deserialize;
 
 use mago_analyzer::settings::Settings as AnalyzerSettings;
 use mago_formatter::settings::FormatSettings;
+use mago_guard::settings::Settings as GuardSettings;
 use mago_linter::integration::Integration;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings as LinterSettings;
+use mago_orchestrator::OrchestratorConfiguration;
 use mago_php_version::PHPVersion;
 
 /// The root settings object for the Mago WASM API.
@@ -120,6 +122,26 @@ impl WasmAnalyzerSettings {
             register_super_globals: self.register_super_globals,
             use_colors: self.use_colors,
             diff: false, // Not applicable in wasm context
+        }
+    }
+}
+
+impl WasmSettings {
+    /// Converts WASM settings into an `OrchestratorConfiguration`.
+    pub fn to_orchestrator_config(&self) -> OrchestratorConfiguration<'_> {
+        OrchestratorConfiguration {
+            php_version: self.php_version,
+            analyzer_settings: self.analyzer.to_analyzer_settings(self.php_version),
+            linter_settings: self.linter.to_linter_settings(self.php_version),
+            guard_settings: GuardSettings::default(),
+            formatter_settings: self.formatter,
+            // WASM context does not support progress bars or path configurations
+            paths: vec![],
+            includes: vec![],
+            excludes: vec![],
+            extensions: vec![],
+            use_progress_bars: false,
+            use_colors: false,
         }
     }
 }

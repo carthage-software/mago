@@ -172,7 +172,7 @@ impl LintRule for HalsteadRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<HalsteadConfig>) -> Self {
+    fn build(settings: &RuleSettings<HalsteadConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

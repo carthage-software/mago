@@ -27,26 +27,6 @@ Mago follows the XDG Base Directory Specification. You can use this environment 
 
 - **Example**: `XDG_CONFIG_HOME=/path/to/config mago lint`
 
-## Pager
-
-### `MAGO_PAGER`
-
-Specifies the pager command to use for displaying output that exceeds the screen size. This takes precedence over the `PAGER` environment variable.
-
-- **Example**: `MAGO_PAGER='less -R' mago config`
-
-### `PAGER`
-
-A standard environment variable used to specify the pager command. Mago uses this as a fallback if `MAGO_PAGER` is not set.
-
-- **Example**: `PAGER=delta mago config`
-
-### `NOPAGER`
-
-If this variable is set to any value (e.g., `1`, `true`), it disables the pager, and all output will be printed directly to standard output.
-
-- **Example**: `NOPAGER=1 mago config`
-
 ## Overriding Configuration
 
 The following environment variables can be used to override settings from the `mago.toml` file.

@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use ahash::HashSet;
 use bumpalo::Bump;
-use mago_atom::AtomSet;
 use rayon::prelude::*;
 
+use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
@@ -16,15 +16,10 @@ use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file;
 
-use crate::error::Error;
-use crate::utils::progress::ProgressBarTheme;
-use crate::utils::progress::create_progress_bar;
-use crate::utils::progress::remove_progress_bar;
-
-pub mod analysis;
-pub mod format;
-pub mod guard;
-pub mod lint;
+use crate::error::OrchestratorError;
+use crate::progress::ProgressBarTheme;
+use crate::progress::create_progress_bar;
+use crate::progress::remove_progress_bar;
 
 use std::fmt::Debug;
 
@@ -46,13 +41,13 @@ pub trait Reducer<T, R>: Debug {
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         results: Vec<T>,
-    ) -> Result<R, Error>;
+    ) -> Result<R, OrchestratorError>;
 }
 
 /// A trait that defines the final "reduce" step for a stateless parallel computation.
 pub trait StatelessReducer<I, R>: Debug {
     /// Aggregates intermediate results from the parallel "map" phase into a final result.
-    fn reduce(&self, results: Vec<I>) -> Result<R, Error>;
+    fn reduce(&self, results: Vec<I>) -> Result<R, OrchestratorError>;
 }
 
 /// An orchestrator for a multi-phase, data-parallel computation pipeline.
@@ -72,6 +67,7 @@ pub struct ParallelPipeline<T, I, R> {
     symbol_references: SymbolReferences,
     shared_context: T,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
+    should_use_progress_bar: bool,
 }
 
 /// An orchestrator for a simple, single-phase data-parallel computation.
@@ -101,8 +97,17 @@ where
         symbol_references: SymbolReferences,
         shared_context: T,
         reducer: Box<dyn Reducer<I, R> + Send + Sync>,
+        should_use_progress_bar: bool,
     ) -> Self {
-        Self { task_name, database: Arc::new(database), codebase, symbol_references, shared_context, reducer }
+        Self {
+            task_name,
+            database: Arc::new(database),
+            codebase,
+            symbol_references,
+            shared_context,
+            reducer,
+            should_use_progress_bar,
+        }
     }
 
     /// Executes the full pipeline with a given map function.
@@ -112,9 +117,9 @@ where
     /// * `map_function`: The core logic to be applied in parallel to each `Host` file
     ///   during the analysis phase. It receives the shared context, file data, and the
     ///   fully populated codebase, and returns an intermediate result.
-    pub fn run<F>(self, map_function: F) -> Result<R, Error>
+    pub fn run<F>(self, map_function: F) -> Result<R, OrchestratorError>
     where
-        F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, Error> + Send + Sync,
+        F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
         let source_files = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect::<Vec<_>>();
         if source_files.is_empty() {
@@ -123,15 +128,29 @@ where
             return self.reducer.reduce(self.codebase, self.symbol_references, Vec::new());
         }
 
-        let compiling_bar = create_progress_bar(source_files.len(), "Compiling", ProgressBarTheme::Magenta);
+        let compiling_bar = if self.should_use_progress_bar {
+            Some(create_progress_bar(source_files.len(), "📚 Compiling", ProgressBarTheme::Blue))
+        } else {
+            None
+        };
 
         let partial_codebases: Vec<CodebaseMetadata> = source_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
-                let metadata = scan_file_for_metadata(&file, arena);
+                let (program, parse_issues) = parse_file(arena, &file);
+                if parse_issues.is_some() {
+                    tracing::warn!("Parsing issues in '{}'. Codebase analysis may be incomplete.", file.name);
+                }
+
+                let resolver = NameResolver::new(arena);
+                let resolved_names = resolver.resolve(program);
+
+                let metadata = scan_program(arena, &file, program, &resolved_names);
 
                 arena.reset();
-                compiling_bar.inc(1);
+                if let Some(compiling_bar) = &compiling_bar {
+                    compiling_bar.inc(1);
+                }
 
                 metadata
             })
@@ -144,7 +163,9 @@ where
 
         let mut symbol_references = self.symbol_references;
         populate_codebase(&mut merged_codex, &mut symbol_references, AtomSet::default(), HashSet::default());
-        remove_progress_bar(compiling_bar);
+        if let Some(compiling_bar) = compiling_bar {
+            remove_progress_bar(compiling_bar);
+        }
 
         let host_files = self
             .database
@@ -161,41 +182,36 @@ where
 
         let final_codebase = Arc::new(merged_codex);
 
-        let main_task_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Blue);
+        let main_task_bar = if self.should_use_progress_bar {
+            Some(create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Green))
+        } else {
+            None
+        };
 
         let results: Vec<I> = host_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
                 let context = self.shared_context.clone();
                 let codebase = Arc::clone(&final_codebase);
-                let result = map_function(context, arena, file, codebase)?;
+                let result = map_function(context, arena, file, codebase);
 
                 arena.reset();
-                main_task_bar.inc(1);
+                if let Some(main_task_bar) = &main_task_bar {
+                    main_task_bar.inc(1);
+                }
 
-                Ok(result)
+                result
             })
-            .collect::<Result<Vec<I>, Error>>()?;
+            .collect::<Result<Vec<I>, OrchestratorError>>()?;
 
-        remove_progress_bar(main_task_bar);
+        if let Some(main_task_bar) = main_task_bar {
+            remove_progress_bar(main_task_bar);
+        }
 
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
 
         self.reducer.reduce(final_codebase, symbol_references, results)
     }
-}
-
-/// The "map" function for the compilation phase: extracts `CodebaseMetadata` from a single file.
-fn scan_file_for_metadata(source_file: &File, arena: &Bump) -> CodebaseMetadata {
-    let (program, parse_issues) = parse_file(arena, source_file);
-    if parse_issues.is_some() {
-        tracing::warn!("Parsing issues in '{}'. Codebase analysis may be incomplete.", source_file.name);
-    }
-
-    let resolver = NameResolver::new(arena);
-    let resolved_names = resolver.resolve(program);
-
-    scan_program(arena, source_file, program, &resolved_names)
 }
 
 impl<T, I, R> StatelessParallelPipeline<T, I, R>
@@ -215,9 +231,9 @@ where
     }
 
     /// Executes the pipeline with a given map function on all `Host` files.
-    pub fn run<F>(&self, map_function: F) -> Result<R, Error>
+    pub fn run<F>(&self, map_function: F) -> Result<R, OrchestratorError>
     where
-        F: Fn(T, &Bump, Arc<File>) -> Result<I, Error> + Send + Sync,
+        F: Fn(T, &Bump, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
     {
         let host_files = self
             .database
@@ -238,12 +254,11 @@ where
                     let result = map_function(context, arena, file)?;
 
                     arena.reset();
-
                     Ok(result)
                 })
-                .collect::<Result<Vec<I>, Error>>()?
+                .collect::<Result<Vec<I>, OrchestratorError>>()?
         } else {
-            let progress_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Yellow);
+            let progress_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Magenta);
 
             let results: Vec<I> = host_files
                 .into_par_iter()
@@ -256,7 +271,7 @@ where
 
                     Ok(result)
                 })
-                .collect::<Result<Vec<I>, Error>>()?;
+                .collect::<Result<Vec<I>, OrchestratorError>>()?;
 
             remove_progress_bar(progress_bar);
 

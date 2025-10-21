@@ -22,18 +22,16 @@ wasm-opt = false
 wasm-opt = false
 
 [dependencies]
-mago-syntax = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-php-version = { workspace = true }
 mago-linter = { workspace = true }
-mago-names = { workspace = true }
 mago-codex = { workspace = true }
 mago-formatter = { workspace = true }
-mago-semantics = { workspace = true }
 mago-analyzer = { workspace = true }
+mago-guard = { workspace = true }
+mago-orchestrator = { workspace = true }
 mago-prelude = { workspace = true, features = ["build"] }
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 serde = { workspace = true }
-bumpalo = { workspace = true }

@@ -1,16 +1,21 @@
 //! # Mago WASM Bindings
 //!
-//! This crate provides [wasm-bindgen] exports that wrap Mago’s internal
-//! functionality (formatter, parser, linter, etc.) so they can be called
-//! from JavaScript in a WebAssembly environment.
+//! This crate provides [wasm-bindgen] exports that wrap Mago's internal
+//! functionality (formatter, parser, linter, analyzer, etc.) using the
+//! Orchestrator service architecture so they can be called from JavaScript
+//! in a WebAssembly environment.
 
 use std::borrow::Cow;
 
-use bumpalo::Bump;
+use mago_orchestrator::service::format::FileFormatStatus;
+use mago_orchestrator::service::format::FormatService;
 use wasm_bindgen::prelude::*;
 
-use mago_formatter::Formatter;
+use mago_database::DatabaseReader;
+use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_formatter::settings::FormatSettings;
+use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersion;
 
 mod analysis;
@@ -19,8 +24,8 @@ mod settings;
 
 /// Runs the full analysis pipeline (parse, semantics, lint, analyze, format).
 ///
-/// Takes a string of PHP code and a settings object, returning a comprehensive
-/// analysis result.
+/// Takes a string of PHP code and an optional settings object, returning a
+/// comprehensive analysis result.
 #[wasm_bindgen(js_name = run)]
 pub fn run(code: String, settings: JsValue) -> Result<JsValue, JsValue> {
     let settings: settings::WasmSettings = if !settings.is_undefined() && !settings.is_null() {
@@ -42,10 +47,10 @@ pub fn get_rules(linter_settings: JsValue) -> Result<JsValue, JsValue> {
     let settings = if !linter_settings.is_undefined() && !linter_settings.is_null() {
         serde_wasm_bindgen::from_value(linter_settings)?
     } else {
-        mago_linter::settings::Settings::default()
+        LinterSettings::default()
     };
 
-    let rules = rules::get_available_rules(settings);
+    let rules = rules::get_available_rules(&settings);
     Ok(serde_wasm_bindgen::to_value(&rules)?)
 }
 
@@ -61,17 +66,32 @@ pub fn format_code(code: String, php_version: JsValue, settings: JsValue) -> Res
         PHPVersion::default()
     };
 
-    let settings: FormatSettings = if !settings.is_undefined() && !settings.is_null() {
+    let format_settings: FormatSettings = if !settings.is_undefined() && !settings.is_null() {
         serde_wasm_bindgen::from_value(settings)?
     } else {
         FormatSettings::default()
     };
 
-    let arena = Bump::new();
-    let formatter = Formatter::new(&arena, php_version, settings);
+    // Create a single-file database
+    let source_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
+    let file_id = source_file.id;
+    let read_database = ReadDatabase::single(source_file);
 
-    formatter
-        .format_code(Cow::Borrowed("code.php"), Cow::Owned(code))
-        .map(|s| s.to_string())
-        .map_err(|err| JsValue::from_str(&err.to_string()))
+    // Get the file from the database
+    let file = read_database.get(&file_id).expect("File should exist in database");
+
+    // Use the orchestrator's format service
+    let format_service = FormatService::new(
+        read_database,
+        php_version,
+        format_settings,
+        false, // no progress bars in WASM
+    );
+
+    format_service.format_file(&file).map_err(|err| JsValue::from_str(&err.to_string())).and_then(|status| match status
+    {
+        FileFormatStatus::Changed(content) => Ok(content),
+        FileFormatStatus::Unchanged => Ok(code),
+        FileFormatStatus::FailedToParse(error) => Err(JsValue::from_str(&error.to_string())),
+    })
 }

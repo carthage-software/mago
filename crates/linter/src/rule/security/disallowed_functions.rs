@@ -2,6 +2,7 @@ use indoc::indoc;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::AtomSet;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -25,17 +26,17 @@ pub struct DisallowedFunctionsRule {
     cfg: DisallowedFunctionsConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct DisallowedFunctionsConfig {
     pub level: Level,
-    pub functions: Vec<String>,
-    pub extensions: Vec<String>,
+    pub functions: AtomSet,
+    pub extensions: AtomSet,
 }
 
 impl Default for DisallowedFunctionsConfig {
     fn default() -> Self {
-        Self { level: Level::Warning, functions: Vec::new(), extensions: Vec::new() }
+        Self { level: Level::Warning, functions: AtomSet::default(), extensions: AtomSet::default() }
     }
 }
 
@@ -85,8 +86,8 @@ impl LintRule for DisallowedFunctionsRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config }
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
+        Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {

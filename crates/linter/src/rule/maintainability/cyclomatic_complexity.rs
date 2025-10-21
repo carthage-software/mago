@@ -174,7 +174,7 @@ impl LintRule for CyclomaticComplexityRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<CyclomaticComplexityConfig>) -> Self {
+    fn build(settings: &RuleSettings<CyclomaticComplexityConfig>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

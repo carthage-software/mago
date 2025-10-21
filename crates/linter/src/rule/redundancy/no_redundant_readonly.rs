@@ -88,7 +88,7 @@ impl LintRule for NoRedundantReadonlyRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 

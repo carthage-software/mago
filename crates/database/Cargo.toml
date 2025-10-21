@@ -17,6 +17,7 @@ memchr = { workspace = true }
 glob = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }
+ahash  = { workspace = true }
 globset = { workspace = true }
 serde = { workspace = true, features = ["rc"] }
 rayon = { workspace = true }

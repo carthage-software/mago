@@ -24,8 +24,6 @@ stack-size = 8388608 # 8 MB
 | `allow-unsupported-php-version` | `boolean` | `false`        | Allow Mago to run on unsupported PHP versions. Not recommended.                                       |
 | `threads`                       | `integer` | (logical CPUs) | The number of threads to use for parallel tasks.                                                      |
 | `stack-size`                    | `integer` | (see below)    | The stack size in bytes for each thread. Defaults to 2MB, with a minimum of 2MB and a maximum of 8MB. |
-| `use-pager`                     | `boolean` | `false`        | Use a pager for long output. See [Pager Support](/fundamentals/pager-support).                        |
-| `pager`                         | `string`  | `null`         | The pager command to use (e.g., `"less -R"`).                                                         |
 
 ## `[source]` Section
 

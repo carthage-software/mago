@@ -1,12 +1,14 @@
 use indoc::indoc;
-use mago_span::Span;
+use mago_atom::atom;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::AtomSet;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::*;
 
 use crate::category::Category;
@@ -27,16 +29,16 @@ pub struct TaintedDataToSinkRule {
     cfg: TaintedDataToSinkConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaintedDataToSinkConfig {
     pub level: Level,
-    pub known_sink_functions: Vec<String>,
+    pub known_sink_functions: AtomSet,
 }
 
 impl Default for TaintedDataToSinkConfig {
     fn default() -> Self {
-        Self { level: Level::Error, known_sink_functions: vec![PRINTF_FUNCTION.to_string()] }
+        Self { level: Level::Error, known_sink_functions: AtomSet::from_iter([atom(PRINTF_FUNCTION)]) }
     }
 }
 
@@ -85,8 +87,8 @@ impl LintRule for TaintedDataToSinkRule {
         TARGETS
     }
 
-    fn build(settings: RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config }
+    fn build(settings: &RuleSettings<Self::Config>) -> Self {
+        Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {

@@ -1,3 +1,47 @@
+//! AST inspection command implementation.
+//!
+//! This module implements the `mago ast` command, which provides detailed inspection
+//! of how Mago parses PHP code. This is a diagnostic and educational tool that reveals
+//! the internal structure of PHP code at various levels.
+//!
+//! # Inspection Modes
+//!
+//! The command supports three different inspection modes:
+//!
+//! - **AST Mode** (default): Displays the complete Abstract Syntax Tree
+//! - **Token Mode** (`--tokens`): Shows the lexer's token stream
+//! - **Names Mode** (`--names`): Displays resolved symbol names
+//!
+//! # Output Formats
+//!
+//! Each mode supports multiple output formats:
+//!
+//! - **Tree Format** (default): Human-readable tree structure with colors
+//! - **JSON Format** (`--json`): Machine-parseable structured output
+//! - **Debug Format** (`--debug`): Rust debug representation
+//!
+//! # Use Cases
+//!
+//! - **Parser Debugging**: Verify how code is being parsed
+//! - **Learning**: Understand PHP's syntactic structure
+//! - **Tool Development**: Build tools that work with Mago's AST
+//! - **Issue Reporting**: Provide detailed context for parser bugs
+//!
+//! # AST Structure
+//!
+//! The AST (Abstract Syntax Tree) represents the hierarchical structure of PHP code
+//! after parsing. It includes:
+//!
+//! - Program structure (namespaces, classes, functions)
+//! - Statements (if, while, foreach, etc.)
+//! - Expressions (calls, operations, literals)
+//! - Type hints and declarations
+//!
+//! # Name Resolution
+//!
+//! The `--names` mode shows how identifiers are resolved to fully-qualified names,
+//! taking into account use statements and namespace context.
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -24,10 +68,16 @@ use mago_syntax_core::input::Input;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::config::Configuration;
 use crate::error::Error;
+use crate::utils::create_orchestrator;
 
+/// Maximum width for value columns in tree output.
 const VALUE_COLUMN_WIDTH: usize = 50;
 
-/// A powerful tool for inspecting the lexical and syntactical structure of PHP code.
+/// Command for inspecting the structure of PHP code.
+///
+/// This command provides multiple views into how Mago parses and processes PHP code,
+/// from the token level up to the complete Abstract Syntax Tree. It's essential for
+/// debugging parser issues and understanding code structure.
 ///
 /// This command can tokenize a file, parse it into an Abstract Syntax Tree (AST),
 /// and display the results in various formats. It's an essential utility for
@@ -102,7 +152,10 @@ impl AstCommand {
             let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
             let database = Database::single(file);
 
-            return self.reporting.process_issues(issues, configuration, color_choice, database, None, false);
+            return self
+                .reporting
+                .get_processor(create_orchestrator(&configuration, color_choice, false), database, color_choice)
+                .process_issues(issues, None, false);
         }
 
         Ok(ExitCode::SUCCESS)
@@ -125,16 +178,10 @@ impl AstCommand {
                     let issue = Into::<Issue>::into(&err);
                     let database = Database::single(file);
 
-                    self.reporting.process_issues(
-                        IssueCollection::from([issue]),
-                        configuration,
-                        color_choice,
-                        database,
-                        None,
-                        false,
-                    )?;
-
-                    return Ok(ExitCode::FAILURE);
+                    return self
+                        .reporting
+                        .get_processor(create_orchestrator(&configuration, color_choice, false), database, color_choice)
+                        .process_issues(IssueCollection::from([issue]), None, false);
                 }
                 None => break,
             }

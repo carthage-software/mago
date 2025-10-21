@@ -1,3 +1,43 @@
+//! Architectural guard command implementation.
+//!
+//! This module implements the `mago guard` command, which enforces architectural
+//! rules and layer dependencies in PHP codebases. The guard helps maintain clean
+//! architecture by ensuring code follows defined structural constraints.
+//!
+//! # Purpose
+//!
+//! The guard command validates that:
+//!
+//! - **Layer Boundaries**: Different architectural layers respect dependency rules
+//! - **Dependency Direction**: Dependencies flow in the correct direction
+//! - **Symbol Access**: Only allowed symbol types are accessed across boundaries
+//! - **Namespace Isolation**: Namespaces remain properly isolated
+//!
+//! # Guard Rules
+//!
+//! Rules are defined in `mago.toml` under the `[guard]` section and specify:
+//!
+//! - Which namespaces/layers exist
+//! - What dependencies are allowed between them
+//! - Which symbol types (classes, functions, etc.) are permitted
+//! - Exceptions for specific cases
+//!
+//! # Analysis Process
+//!
+//! The guard analyzes symbol dependencies by:
+//!
+//! 1. Building a complete codebase model with all symbols
+//! 2. Tracking all symbol references and dependencies
+//! 3. Validating each dependency against the defined rules
+//! 4. Reporting violations as issues
+//!
+//! # Common Use Cases
+//!
+//! - Enforcing hexagonal/onion architecture
+//! - Preventing domain layer from depending on infrastructure
+//! - Ensuring presentation layer doesn't access data layer directly
+//! - Maintaining module boundaries in modular monoliths
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -11,11 +51,10 @@ use mago_prelude::Prelude;
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
-use crate::database;
 use crate::error::Error;
-use crate::pipeline::guard::run_guard_pipeline;
+use crate::utils::create_orchestrator;
 
-/// Check architectural boundaries using guard rules.
+/// Command for enforcing architectural rules and layer dependencies.
 ///
 /// The `guard` command performs architectural boundary checking on your PHP codebase.
 /// It analyzes symbol dependencies and ensures they comply with the architectural rules
@@ -41,7 +80,7 @@ pub struct GuardCommand {
     /// This is useful for targeted checking, testing changes, or integrating
     /// with development workflows and CI systems.
     #[arg()]
-    pub paths: Vec<PathBuf>,
+    pub path: Vec<PathBuf>,
 
     /// Disable built-in PHP and library stubs for checking.
     ///
@@ -57,45 +96,61 @@ pub struct GuardCommand {
 }
 
 impl GuardCommand {
-    /// Executes the guard command.
+    /// Executes the architectural guard checking process.
     ///
-    /// This function orchestrates the process of:
+    /// This method orchestrates the complete guard validation workflow:
     ///
-    /// 1. Loading source files.
-    /// 2. Compiling a codebase model from these files (with progress).
-    /// 3. Checking architectural boundaries against guard rules (with progress).
-    /// 4. Reporting any found violations.
-    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        configuration.source.excludes.extend(std::mem::take(&mut configuration.guard.excludes));
-
-        let (base_db, codebase_metadata, _) = {
-            let prelude = Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude");
-
-            (prelude.database, prelude.metadata, prelude.symbol_references)
-        };
-
-        let final_database = if !self.paths.is_empty() {
-            database::load_from_paths(&mut configuration.source, self.paths, Some(base_db))?
+    /// 1. **Load Prelude**: Decode embedded stubs for PHP built-ins (unless `--no-stubs`)
+    /// 2. **Create Orchestrator**: Initialize with configuration and color settings
+    /// 3. **Apply Overrides**: Use `path` argument if provided to override config paths
+    /// 4. **Load Database**: Scan workspace and include external files for context
+    /// 5. **Validate Files**: Ensure at least one host file exists to check
+    /// 6. **Create Service**: Initialize guard service with database and codebase metadata
+    /// 7. **Run Checks**: Validate dependencies against architectural rules
+    /// 8. **Process Results**: Report violations through baseline processor
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The loaded configuration containing guard rules
+    /// * `color_choice` - Whether to use colored output
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(ExitCode::SUCCESS)` if checking completed successfully
+    /// - `Err(Error)` if database loading, checking, or reporting failed
+    ///
+    /// # Guard Rules
+    ///
+    /// Rules are read from `configuration.guard.rules` and define which dependencies
+    /// are allowed between different namespaces or layers. Violations are reported
+    /// as issues with details about the forbidden dependency.
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let Prelude { database, metadata, .. } = if self.no_stubs {
+            Prelude::default()
         } else {
-            database::load_from_configuration(&mut configuration.source, false, Some(base_db))?
+            Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
 
-        if !final_database.files().any(|f| f.file_type == FileType::Host) {
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
+        if !self.path.is_empty() {
+            orchestrator.set_source_paths(self.path.iter());
+        }
+
+        let database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+
+        if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to check with guard.");
 
             return Ok(ExitCode::SUCCESS);
         }
 
-        let guard_settings = configuration.guard.settings.clone();
-        let issues = run_guard_pipeline(final_database.read_only(), codebase_metadata, guard_settings)?;
-        let baseline = configuration.guard.baseline.clone();
+        let service = orchestrator.get_guard_service(database.read_only(), metadata);
+        let issues = service.run()?;
 
-        self.baseline_reporting.process_issues_with_baseline(
-            issues,
-            configuration,
-            color_choice,
-            final_database,
-            baseline,
-        )
+        let baseline = configuration.guard.baseline.as_deref();
+        let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
+
+        processor.process_issues(issues)
     }
 }

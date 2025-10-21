@@ -1,9 +1,72 @@
+//! High-performance file database for PHP projects.
+//!
+//! This crate provides an efficient in-memory database for managing collections of PHP source files.
+//! It offers two complementary database types optimized for different access patterns:
+//!
+//! - [`Database`]: Mutable builder optimized for modifications (add, update, delete)
+//! - [`ReadDatabase`]: Immutable snapshot optimized for high-performance reads
+//!
+//! # Architecture
+//!
+//! The database uses a two-phase approach:
+//!
+//! 1. **Build Phase**: Use [`Database`] to load files, make modifications, and track changes
+//! 2. **Query Phase**: Convert to [`ReadDatabase`] via [`Database::read_only`] for fast lookups
+//!
+//! # Key Features
+//!
+//! - **Fast Lookups**: O(1) average-time access by ID, name, or filesystem path
+//! - **Change Tracking**: Record and batch apply file modifications via [`ChangeLog`]
+//! - **Deterministic Iteration**: [`ReadDatabase`] guarantees consistent iteration order
+//! - **Parallel Operations**: Concurrent file I/O and processing support
+//! - **Type Safety**: Strong typing with stable [`FileId`] handles
+//!
+//! # Common Workflow
+//!
+//! ## Loading Files
+//!
+//! Use [`loader::DatabaseLoader`] to scan a project directory:
+//!
+//! The loader handles file discovery, exclusion patterns, and parallel loading.
+//!
+//! ## Querying Files
+//!
+//! Both database types implement [`DatabaseReader`] for uniform access:
+//!
+//! ## Modifying Files
+//!
+//! Use [`ChangeLog`] to batch modifications:
+//!
+//! Changes can be applied to the database and optionally written to disk in parallel.
+//!
+//! # Performance Characteristics
+//!
+//! ## Database (Mutable)
+//!
+//! - Add/Update/Delete: O(1) average
+//! - Lookup by ID/name: O(1) average
+//! - Iteration: Unordered
+//! - Memory: ~2x file count (maps for bidirectional lookup)
+//!
+//! ## ReadDatabase (Immutable)
+//!
+//! - Creation: O(n log n) for sorting
+//! - Lookup by ID/name/path: O(1) average
+//! - Iteration: Deterministic, sorted by FileId
+//! - Memory: ~3x file count (vector + 3 index maps)
+//!
+//! # Thread Safety
+//!
+//! [`Database`] is not thread-safe and should be used from a single thread during construction.
+//! [`ReadDatabase`] can be freely shared across threads for concurrent read access.
+
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use ahash::HashMap;
+use ahash::HashMapExt;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use serde::Deserialize;
@@ -206,6 +269,15 @@ impl Database {
 }
 
 impl ReadDatabase {
+    pub fn empty() -> Self {
+        Self {
+            files: Vec::with_capacity(0),
+            id_to_index: HashMap::with_capacity(0),
+            name_to_index: HashMap::with_capacity(0),
+            path_to_index: HashMap::with_capacity(0),
+        }
+    }
+
     /// Creates a new `ReadDatabase` containing only a single file.
     ///
     /// This is a convenience constructor for situations, such as testing or
