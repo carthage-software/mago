@@ -42,7 +42,7 @@ jobs:
           echo "::group::Cloning and setting up carthage-software/cel-php"
           git clone --branch main --depth 1 https://github.com/carthage-software/cel-php.git cel-project
           cd cel-project
-          composer install --no-interaction --prefer-dist --optimize-autoloader
+          composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
           echo "::endgroup::"
 
           echo "::group::Running Mago analyze on carthage-software/cel-php"
@@ -56,7 +56,7 @@ jobs:
           echo "::group::Cloning and setting up azjezz/psl"
           git clone --branch next --depth 1 https://github.com/azjezz/psl.git psl-project
           cd psl-project
-          composer install --no-interaction --prefer-dist --optimize-autoloader
+          composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
           echo "::endgroup::"
 
           echo "::group::Running Mago analyze on azjezz/psl"
