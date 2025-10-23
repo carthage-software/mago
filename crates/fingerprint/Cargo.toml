@@ -1,0 +1,26 @@
+[package]
+name = "mago-fingerprint"
+description = "Position-insensitive AST fingerprinting for incremental analysis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+mago-syntax = { workspace = true }
+mago-names = { workspace = true }
+mago-atom = { workspace = true }
+ahash = { workspace = true }
+
+[dev-dependencies]
+mago-span = { workspace = true }
+mago-database = { workspace = true }
+bumpalo = { workspace = true }
+pretty_assertions = { workspace = true }
+indoc = { workspace = true }
+
+[lints]
+workspace = true

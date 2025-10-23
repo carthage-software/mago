@@ -49,6 +49,14 @@ impl<'arena> ResolvedNames<'arena> {
         self.names.get(&position.offset()).map(|(name, _)| name).expect("resolved name not found at position")
     }
 
+    /// Attempts to resolve the name at the given source position.
+    ///
+    /// Returns `Some(&str)` if a resolved name exists at the position,
+    /// or `None` if no name is found.
+    pub fn resolve<T: HasPosition>(&self, position: &T) -> Option<&'arena str> {
+        self.names.get(&position.offset()).map(|(name, _)| *name)
+    }
+
     /// Checks if the name resolved at the given position originated from an explicit `use` alias or construct.
     ///
     /// Returns `false` if the name was resolved relative to the namespace, is a definition,

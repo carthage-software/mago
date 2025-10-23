@@ -1578,6 +1578,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-fingerprint"
+version = "1.0.0-beta.34"
+dependencies = [
+ "ahash",
+ "bumpalo",
+ "indoc",
+ "mago-atom",
+ "mago-database",
+ "mago-names",
+ "mago-span",
+ "mago-syntax",
+ "pretty_assertions",
+]
+
+[[package]]
 name = "mago-fixer"
 version = "1.0.0-beta.34"
 dependencies = [

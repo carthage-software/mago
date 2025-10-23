@@ -67,6 +67,7 @@ publish:
     cargo publish -p mago-formatter
     cargo publish -p mago-names
     cargo publish -p mago-semantics
+    cargo publish -p mago-fingerprint
     cargo publish -p mago-codex
     cargo publish -p mago-prelude
     cargo publish -p mago-algebra

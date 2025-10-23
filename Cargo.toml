@@ -35,6 +35,7 @@ mago-composer = { path = "crates/composer", version = "1.0.0-beta.34" }
 mago-docblock = { path = "crates/docblock", version = "1.0.0-beta.34" }
 mago-fixer = { path = "crates/fixer", version = "1.0.0-beta.34" }
 mago-formatter = { path = "crates/formatter", version = "1.0.0-beta.34" }
+mago-fingerprint = { path = "crates/fingerprint", version = "1.0.0-beta.34" }
 mago-atom = { path = "crates/atom", version = "1.0.0-beta.34" }
 mago-linter = { path = "crates/linter", version = "1.0.0-beta.34" }
 mago-names = { path = "crates/names", version = "1.0.0-beta.34" }

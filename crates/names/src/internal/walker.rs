@@ -17,6 +17,12 @@ pub struct NameWalker<'arena> {
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for NameWalker<'arena> {
     fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut NameResolutionContext<'arena>) {
+        context.exit_namespace();
+
+        if let Some(ns) = namespace.name.as_ref() {
+            self.resolved_names.insert_at(ns, ns.value(), false);
+        }
+
         context.enter_namespace(namespace.name.as_ref().map(|n| n.value()));
     }
 
