@@ -33,6 +33,7 @@
 //! - **`guard`** ([`GuardCommand`]): Enforce architectural rules
 //! - **`ast`** ([`AstCommand`]): Display the abstract syntax tree
 //! - **`self-update`** ([`SelfUpdateCommand`]): Update Mago to the latest version
+//! - **`generate-completions`** ([`GenerateCompletionsCommand`]): Generate shell completions
 //!
 //! # Configuration Hierarchy
 //!
@@ -59,6 +60,7 @@ use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::ast::AstCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::format::FormatCommand;
+use crate::commands::generate_completions::GenerateCompletionsCommand;
 use crate::commands::guard::GuardCommand;
 use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
@@ -72,6 +74,7 @@ pub mod analyze;
 pub mod ast;
 pub mod config;
 pub mod format;
+pub mod generate_completions;
 pub mod guard;
 pub mod init;
 pub mod lint;
@@ -215,6 +218,12 @@ pub enum MagoCommand {
     /// **Usage**: `mago self-update`
     #[command(name = "self-update")]
     SelfUpdate(SelfUpdateCommand),
+
+    /// Generate shell completions for the given shell
+    ///
+    /// **Usage**: `mago generate-completions`
+    #[command(name = "generate-completions")]
+    GenerateCompletions(GenerateCompletionsCommand),
 }
 
 /// Top-level CLI arguments parsed by [`clap`].
