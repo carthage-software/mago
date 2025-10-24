@@ -40,6 +40,12 @@ The most common way to install Mago on macOS and Linux is by using our shell scr
 curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
 ```
 
+To install a specific version:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.0.0-beta.34
+```
+
 For all other installation methods, including Homebrew, Composer, and Cargo, please refer to our official **[Installation Guide](https://mago.carthage.software/guide/installation)**.
 
 ## Getting Started

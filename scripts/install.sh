@@ -7,6 +7,7 @@ BIN_NAME="mago"
 TMP_DIR=$(mktemp -d)
 NEW_ISSUE="https://github.com/carthage-software/mago/issues/new"
 INSTALL_DIR=""
+VERSION=""
 
 function separator() {
     echo
@@ -30,7 +31,7 @@ function fail() {
 }
 
 blue "Welcome to the Mago Installer!"
-blue "This script will download and install the latest version of Mago for your system."
+blue "This script will download and install Mago for your system."
 echo
 yellow "If you encounter any issues, please open a GitHub issue at ${NEW_ISSUE}."
 
@@ -38,6 +39,9 @@ for arg in "$@"; do
   case $arg in
     --install-dir=*)
       INSTALL_DIR="${arg#*=}"
+      ;;
+    --version=*)
+      VERSION="${arg#*=}"
       ;;
     *)
       fail "Unknown argument: $arg"
@@ -192,28 +196,35 @@ green "Binary will be installed to: $binary_dir"
 
 separator
 
-# Fetch the latest release tag
-green "Fetching the latest release of Mago..."
-if command -v curl > /dev/null; then
-  response=$(curl -s -f "https://api.github.com/repos/${REPO}/releases/latest") || {
-    red "Failed to fetch the latest release. Please check your internet connection or try again later."
-    fail "Open an issue on GitHub at ${NEW_ISSUE} if the issue persists."
-  }
-elif command -v wget > /dev/null; then
-  response=$(wget -q -O - "https://api.github.com/repos/${REPO}/releases/latest") || {
-    red "Failed to fetch the latest release. Please check your internet connection or try again later."
-    fail "Open an issue on GitHub at ${NEW_ISSUE} if the issue persists."
-  }
+# Determine which version to install
+if [ -n "$VERSION" ]; then
+  # Use the specified version
+  latest_tag="$VERSION"
+  green "Installing specified version: ${latest_tag}"
 else
-  fail "Neither 'curl' nor 'wget' are installed. Please install one of these tools to proceed."
-fi
+  # Fetch the latest release tag
+  green "Fetching the latest release of Mago..."
+  if command -v curl > /dev/null; then
+    response=$(curl -s -f "https://api.github.com/repos/${REPO}/releases/latest") || {
+      red "Failed to fetch the latest release. Please check your internet connection or try again later."
+      fail "Open an issue on GitHub at ${NEW_ISSUE} if the issue persists."
+    }
+  elif command -v wget > /dev/null; then
+    response=$(wget -q -O - "https://api.github.com/repos/${REPO}/releases/latest") || {
+      red "Failed to fetch the latest release. Please check your internet connection or try again later."
+      fail "Open an issue on GitHub at ${NEW_ISSUE} if the issue persists."
+    }
+  else
+    fail "Neither 'curl' nor 'wget' are installed. Please install one of these tools to proceed."
+  fi
 
-latest_tag=$(echo "$response" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
-if [ -z "$latest_tag" ]; then
-  red "Failed to extract the latest release tag from the GitHub API response."
-  fail "Please open an issue on GitHub at ${NEW_ISSUE}."
+  latest_tag=$(echo "$response" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+  if [ -z "$latest_tag" ]; then
+    red "Failed to extract the latest release tag from the GitHub API response."
+    fail "Please open an issue on GitHub at ${NEW_ISSUE}."
+  fi
+  green "Latest release: ${latest_tag}"
 fi
-green "Latest release: ${latest_tag}"
 
 separator
 
