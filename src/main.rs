@@ -181,5 +181,6 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }
+        MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
     }
 }

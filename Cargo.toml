@@ -73,6 +73,7 @@ indicatif = { version = "0.18.0" }
 paste = "1.0.15"
 criterion = "0.7.0"
 clap = { version = "4.5.20", features = ["cargo", "derive", "unicode", "wrap_help"] }
+clap_complete = "4.5.59"
 async-walkdir = "2.0.0"
 termtree = "0.5.1"
 wasm-bindgen = "0.2.97"
@@ -126,6 +127,7 @@ mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
+clap_complete = { workspace = true }
 termtree = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
