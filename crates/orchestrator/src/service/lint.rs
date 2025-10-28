@@ -76,12 +76,12 @@ impl LintService {
     /// # Returns
     ///
     /// A `Result` containing the final `IssueCollection` or an `OrchestratorError`.
-    pub fn lint(self, mode: LintMode) -> Result<IssueCollection, OrchestratorError> {
+    pub fn lint(self, mode: LintMode, only: Option<&[String]>) -> Result<IssueCollection, OrchestratorError> {
         const PROGRESS_BAR_THEME: &str = "🧹 Linting";
 
         let context = LintContext {
             php_version: self.settings.php_version,
-            registry: Arc::new(self.create_registry(None, false)),
+            registry: Arc::new(self.create_registry(only, false)),
             mode,
         };
 

@@ -55,7 +55,7 @@ pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults
         false, // no progress bars in WASM
     );
 
-    let lint_issues = lint_service.lint(LintMode::Full).unwrap_or_else(|_| IssueCollection::new());
+    let lint_issues = lint_service.lint(LintMode::Full, None).unwrap_or_else(|_| IssueCollection::new());
 
     // For WASM, we'll put all lint issues together
     let parse_error = None;
