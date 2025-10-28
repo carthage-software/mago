@@ -223,7 +223,10 @@ impl LintCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let issues = service.lint(if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full })?;
+        let issues = service.lint(
+            if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
+            if self.only.is_empty() { None } else { Some(self.only.as_slice()) },
+        )?;
 
         let baseline = configuration.linter.baseline.as_deref();
         let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
