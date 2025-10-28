@@ -1,6 +1,6 @@
 [package]
 name = "mago-orchestrator"
-description = "..."
+description = "An orchestrator crate for Mago, coordinating various components to provide a unified PHP tooling experience."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -27,7 +27,7 @@ mago-analyzer = { workspace = true }
 mago-guard = { workspace = true }
 ahash = { workspace = true }
 tracing = { workspace = true }
-config = { workspace = true }
 indicatif = { workspace = true }
 rayon = { workspace = true }
 bumpalo = { workspace = true }
+xxhash-rust = { workspace = true }

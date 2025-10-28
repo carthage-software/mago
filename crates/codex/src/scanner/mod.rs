@@ -55,6 +55,7 @@ pub fn scan_program<'arena, 'ctx>(
     let mut scanner = Scanner::new();
 
     scanner.walk_program(program, &mut context);
+
     scanner.codebase
 }
 
@@ -240,7 +241,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         let constants = scan_constant(constant, context, self.get_current_type_resolution_context(), &self.scope);
 
         for constant_metadata in constants {
-            self.codebase.constants.insert(constant_metadata.name, constant_metadata);
+            let constant_name = constant_metadata.name;
+            self.codebase.constants.insert(constant_name, constant_metadata);
         }
     }
 

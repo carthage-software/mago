@@ -150,7 +150,7 @@ pub struct AnalyzerConfiguration {
 }
 
 impl AnalyzerConfiguration {
-    pub fn to_settings(&self, php_version: PHPVersion, color_choice: ColorChoice) -> Settings {
+    pub fn to_settings(&self, php_version: PHPVersion, color_choice: ColorChoice, enable_diff: bool) -> Settings {
         Settings {
             version: php_version,
             mixed_issues: self.mixed_issues,
@@ -190,7 +190,7 @@ impl AnalyzerConfiguration {
                 ColorChoice::Never => false,
                 ColorChoice::Auto => std::io::stdout().is_terminal(),
             },
-            diff: false,
+            diff: enable_diff,
         }
     }
 }

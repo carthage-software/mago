@@ -10,6 +10,8 @@ pub enum OrchestratorError {
     Database(DatabaseError),
     /// An error occurred during analysis.
     Analysis(AnalysisError),
+    /// An error occurred while accessing the cache (lock poisoning).
+    CacheLockPoisoned,
     /// A general error with a message.
     General(String),
 }
@@ -19,6 +21,7 @@ impl std::fmt::Display for OrchestratorError {
         match self {
             Self::Database(error) => write!(f, "Database error: {}", error),
             Self::Analysis(error) => write!(f, "Analysis error: {}", error),
+            Self::CacheLockPoisoned => write!(f, "Cache lock poisoned"),
             Self::General(message) => write!(f, "{}", message),
         }
     }
@@ -29,6 +32,7 @@ impl std::error::Error for OrchestratorError {
         match self {
             Self::Database(error) => Some(error),
             Self::Analysis(error) => Some(error),
+            Self::CacheLockPoisoned => None,
             Self::General(_) => None,
         }
     }

@@ -238,11 +238,14 @@ mod tests {
     use mago_span::Position;
     use mago_span::Span;
 
-    fn create_test_database() -> (Database, FileId) {
+    fn create_test_database() -> (Database<'static>, FileId) {
         let file =
             File::ephemeral(Cow::Borrowed("test.php"), Cow::Borrowed("<?php\n// Line 1\n// Line 2\n// Line 3\n"));
         let file_id = file.id;
-        let db = Database::single(file);
+        let config =
+            mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
+                .into_static();
+        let db = Database::single(file, config);
         (db, file_id)
     }
 

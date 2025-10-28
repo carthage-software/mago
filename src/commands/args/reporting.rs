@@ -30,9 +30,7 @@
 
 use clap::ColorChoice;
 use clap::Parser;
-use mago_orchestrator::Orchestrator;
 
-use mago_database::Database;
 use mago_reporting::Level;
 use mago_reporting::reporter::ReportingFormat;
 use mago_reporting::reporter::ReportingTarget;
@@ -48,7 +46,7 @@ use crate::service::IssueProcessor;
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Copy)]
 pub struct ReportingArgs {
     /// Filter the output to only show issues that can be automatically fixed.
     ///
@@ -166,23 +164,14 @@ impl ReportingArgs {
     ///
     /// # Arguments
     ///
-    /// * `orchestrator` - The orchestrator for formatting fixed files
-    /// * `database` - The database containing source files
     /// * `color_choice` - Whether to use colored output
     ///
     /// # Returns
     ///
     /// An [`IssueProcessor`] configured with all the reporting and fixing options
     /// from this argument set.
-    pub fn get_processor<'a>(
-        self,
-        orchestrator: Orchestrator<'a>,
-        database: Database,
-        color_choice: ColorChoice,
-    ) -> IssueProcessor<'a> {
+    pub fn get_processor(self, color_choice: ColorChoice) -> IssueProcessor {
         IssueProcessor {
-            orchestrator,
-            database,
             fixable_only: self.fixable_only,
             sort: self.sort,
             fix: self.fix,

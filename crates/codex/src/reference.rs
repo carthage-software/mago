@@ -67,6 +67,15 @@ pub struct SymbolReferences {
     /// Maps a referencing function/method (`FunctionLikeIdentifier`) to a set of functions/methods (`FunctionLikeIdentifier`)
     /// whose return values it references/uses. Used for dead code analysis on return values.
     functionlike_references_to_functionlike_returns: HashMap<FunctionLikeIdentifier, HashSet<FunctionLikeIdentifier>>,
+
+    /// Maps a file (represented by its hash as an Atom) to a set of referenced symbols/members `(Symbol, Member)`
+    /// found within the file's global scope (outside any symbol). This tracks references from top-level code.
+    /// Used for incremental analysis to determine which files need re-analysis when a symbol changes.
+    file_references_to_symbols: HashMap<Atom, HashSet<SymbolIdentifier>>,
+
+    /// Maps a file (represented by its hash as an Atom) to a set of referenced symbols/members `(Symbol, Member)`
+    /// found within the file's global scope signatures (e.g., top-level type declarations).
+    file_references_to_symbols_in_signature: HashMap<Atom, HashSet<SymbolIdentifier>>,
 }
 
 impl SymbolReferences {
@@ -78,7 +87,40 @@ impl SymbolReferences {
             symbol_references_to_symbols_in_signature: HashMap::default(),
             symbol_references_to_overridden_members: HashMap::default(),
             functionlike_references_to_functionlike_returns: HashMap::default(),
+            file_references_to_symbols: HashMap::default(),
+            file_references_to_symbols_in_signature: HashMap::default(),
         }
+    }
+
+    /// Counts the total number of symbol-to-symbol body references.
+    #[inline]
+    pub fn count_body_references(&self) -> usize {
+        self.symbol_references_to_symbols.values().map(|v| v.len()).sum()
+    }
+
+    /// Counts the total number of symbol-to-symbol signature references.
+    #[inline]
+    pub fn count_signature_references(&self) -> usize {
+        self.symbol_references_to_symbols_in_signature.values().map(|v| v.len()).sum()
+    }
+
+    /// Counts how many symbols reference the given symbol.
+    ///
+    /// # Arguments
+    /// * `symbol` - The symbol to check references to
+    /// * `in_signature` - If true, count signature references; if false, count body references
+    ///
+    /// # Returns
+    /// The number of symbols that reference the given symbol
+    #[inline]
+    pub fn count_referencing_symbols(&self, symbol: &SymbolIdentifier, in_signature: bool) -> usize {
+        let map = if in_signature {
+            &self.symbol_references_to_symbols_in_signature
+        } else {
+            &self.symbol_references_to_symbols
+        };
+
+        map.values().filter(|referenced_set| referenced_set.contains(symbol)).count()
     }
 
     /// Records that a top-level symbol (e.g., a function) references a class member.
@@ -218,6 +260,28 @@ impl SymbolReferences {
         }
     }
 
+    /// Adds a file-level reference to a class member.
+    /// This is used for references from global/top-level scope that aren't within any symbol.
+    #[inline]
+    pub fn add_file_reference_to_class_member(
+        &mut self,
+        file_hash: Atom,
+        class_member: SymbolIdentifier,
+        in_signature: bool,
+    ) {
+        if in_signature {
+            self.file_references_to_symbols_in_signature.entry(file_hash).or_default().insert(class_member);
+        } else {
+            // Check if already in signature to avoid duplicate tracking
+            if let Some(sig_refs) = self.file_references_to_symbols_in_signature.get(&file_hash)
+                && sig_refs.contains(&class_member)
+            {
+                return;
+            }
+            self.file_references_to_symbols.entry(file_hash).or_default().insert(class_member);
+        }
+    }
+
     /// Convenience method to add a reference *from* the current function context *to* a class member.
     /// Delegates to appropriate `add_*` methods based on the function context.
     #[inline]
@@ -226,6 +290,26 @@ impl SymbolReferences {
         scope: &ScopeContext<'_>,
         class_member: SymbolIdentifier,
         in_signature: bool,
+    ) {
+        self.add_reference_to_class_member_with_file(scope, class_member, in_signature, None)
+    }
+
+    /// Convenience method to add a reference *from* the current function context *to* a class member.
+    /// Delegates to appropriate `add_*` methods based on the function context.
+    /// If file_hash is provided and the reference is from global scope, uses file-level tracking.
+    ///
+    /// # Note on Normalization
+    ///
+    /// This method assumes that symbol names (class_member, function_name, class_name) are already
+    /// normalized to lowercase, as they come from the codebase which stores all symbols in lowercase form.
+    /// No additional normalization is performed to avoid redundant overhead.
+    #[inline]
+    pub fn add_reference_to_class_member_with_file(
+        &mut self,
+        scope: &ScopeContext<'_>,
+        class_member: SymbolIdentifier,
+        in_signature: bool,
+        file_hash: Option<Atom>,
     ) {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
@@ -239,14 +323,27 @@ impl SymbolReferences {
                         in_signature,
                     ),
                 _ => {
-                    // A reference from a closure can be ignored for now.
+                    // A reference from a closure or arrow function
+                    // If we have a file hash, track it at file level; otherwise use empty_atom()
+                    if let Some(hash) = file_hash {
+                        self.add_file_reference_to_class_member(hash, class_member, in_signature)
+                    } else {
+                        self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature)
+                    }
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
             // Reference from the class scope itself (e.g., property default)
-            self.add_symbol_reference_to_class_member(ascii_lowercase_atom(&calling_class), class_member, in_signature)
+            self.add_symbol_reference_to_class_member(calling_class, class_member, in_signature)
+        } else {
+            // No function or class scope - this is a top-level/global reference
+            // Track it at file level if we have a file hash
+            if let Some(hash) = file_hash {
+                self.add_file_reference_to_class_member(hash, class_member, in_signature)
+            } else {
+                self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature)
+            }
         }
-        // If no context, the reference source is unknown/untracked in this map
     }
 
     #[inline]
@@ -339,6 +436,14 @@ impl SymbolReferences {
         }
         for (k, v) in other.functionlike_references_to_functionlike_returns {
             self.functionlike_references_to_functionlike_returns.entry(k).or_default().extend(v);
+        }
+
+        for (k, v) in other.file_references_to_symbols {
+            self.file_references_to_symbols.entry(k).or_default().extend(v);
+        }
+
+        for (k, v) in other.file_references_to_symbols_in_signature {
+            self.file_references_to_symbols_in_signature.entry(k).or_default().extend(v);
         }
     }
 
@@ -473,14 +578,14 @@ impl SymbolReferences {
             // Represent the containing symbol (ignore member part for diff check)
             let containing_symbol = (sig_ref_key.0, empty_atom());
 
-            if codebase_diff.contains_add_or_delete_entry(&containing_symbol) {
+            if codebase_diff.contains_changed_entry(&containing_symbol) {
                 invalid_signatures.insert(*sig_ref_key);
                 partially_invalid_symbols.insert(sig_ref_key.0);
             }
         }
 
         // Start with symbols directly added/deleted in the diff.
-        let mut symbols_to_process = codebase_diff.get_add_or_delete().iter().copied().collect::<Vec<_>>();
+        let mut symbols_to_process = codebase_diff.get_changed().iter().copied().collect::<Vec<_>>();
         let mut processed_symbols = HashSet::default();
         let mut expense_counter = 0;
 
@@ -554,17 +659,15 @@ impl SymbolReferences {
             }
         }
 
-        // Add items whose signatures were kept, but bodies might have changed
-        for keep_sig_item in codebase_diff.get_keep_signature() {
-            invalid_bodies.insert(*keep_sig_item);
-            if !keep_sig_item.1.is_empty() {
-                partially_invalid_symbols.insert(keep_sig_item.0);
-            }
-        }
+        // Note: With single-hash fingerprinting, we don't distinguish between signature and body changes.
+        // Any change to a symbol (signature or body) marks it as 'changed' in the diff.
 
-        // Combine results: invalid_signatures includes items whose definition changed or depend on changed signatures.
+        // Combine results: invalid_symbols includes items whose definition changed or depend on changed signatures,
+        // PLUS items whose bodies reference invalid signatures.
         // partially_invalid_symbols includes symbols containing members from either invalid_signatures or invalid_bodies.
-        Some((invalid_signatures, partially_invalid_symbols))
+        let mut all_invalid_symbols = invalid_signatures;
+        all_invalid_symbols.extend(invalid_bodies);
+        Some((all_invalid_symbols, partially_invalid_symbols))
     }
 
     /// Removes all references *originating from* symbols/members that are marked as invalid.
@@ -609,5 +712,17 @@ impl SymbolReferences {
         &self,
     ) -> &HashMap<FunctionLikeIdentifier, HashSet<FunctionLikeIdentifier>> {
         &self.functionlike_references_to_functionlike_returns
+    }
+
+    /// Returns a reference to the map tracking file-level references to symbols (body).
+    #[inline]
+    pub fn get_file_references_to_symbols(&self) -> &HashMap<Atom, HashSet<SymbolIdentifier>> {
+        &self.file_references_to_symbols
+    }
+
+    /// Returns a reference to the map tracking file-level references to symbols (signature).
+    #[inline]
+    pub fn get_file_references_to_symbols_in_signature(&self) -> &HashMap<Atom, HashSet<SymbolIdentifier>> {
+        &self.file_references_to_symbols_in_signature
     }
 }

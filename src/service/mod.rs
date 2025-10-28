@@ -67,6 +67,7 @@ use mago_fixer::FixPlan;
 use mago_fixer::SafetyClassification;
 use mago_orchestrator::Orchestrator;
 use mago_orchestrator::service::format::FileFormatStatus;
+
 use mago_reporting::ColorChoice as ReportingColorChoice;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
@@ -107,19 +108,7 @@ use crate::utils;
 /// - Fix options control safety levels, formatting, and dry-run mode
 /// - Exit code behavior is determined by severity thresholds
 #[derive(Debug)]
-pub struct IssueProcessor<'a> {
-    /// Orchestrator for formatting files after fixes are applied.
-    ///
-    /// Contains the formatter configuration and lifetime-managed resources
-    /// needed for code formatting operations.
-    pub orchestrator: Orchestrator<'a>,
-
-    /// Database containing all source files being processed.
-    ///
-    /// In fix mode, this database is modified to apply changes. In report mode,
-    /// it provides read-only access to file contents for reporting.
-    pub database: Database,
-
+pub struct IssueProcessor {
     /// Filter to show only issues that have automatic fixes available.
     ///
     /// When `true`, issues without fixes are excluded from the report.
@@ -225,14 +214,7 @@ pub struct IssueProcessor<'a> {
 /// The processor is typically created from `BaselineReportingArgs` via the `get_processor`
 /// method and consumed by calling [`process_issues`](Self::process_issues).
 #[derive(Debug)]
-pub struct BaselineIssueProcessor<'a> {
-    /// Read-only database access for baseline operations.
-    ///
-    /// Baseline generation and verification require read access to file metadata
-    /// but don't modify the database. The wrapped `issue_processor` has its own
-    /// database instance for potential modifications.
-    pub read_database: ReadDatabase,
-
+pub struct BaselineIssueProcessor {
     /// Optional path to the baseline file.
     ///
     /// Can be specified via CLI argument (`--baseline`) or configuration file.
@@ -241,7 +223,7 @@ pub struct BaselineIssueProcessor<'a> {
     ///
     /// When `None`, baseline operations are disabled and issues are processed
     /// without filtering.
-    pub baseline_path: Option<Cow<'a, Path>>,
+    pub baseline_path: Option<Cow<'static, Path>>,
 
     /// Generate a new baseline file from current issues.
     ///
@@ -275,10 +257,10 @@ pub struct BaselineIssueProcessor<'a> {
     ///
     /// After baseline operations (loading, generation, or verification), this
     /// processor handles the actual reporting or fixing of issues.
-    pub issue_processor: IssueProcessor<'a>,
+    pub issue_processor: IssueProcessor,
 }
 
-impl<'a> IssueProcessor<'a> {
+impl IssueProcessor {
     /// Processes issues by either reporting them or applying fixes.
     ///
     /// This is the main entry point for issue processing. Depending on whether the `--fix`
@@ -292,15 +274,17 @@ impl<'a> IssueProcessor<'a> {
     /// Returns an exit code indicating success or failure based on whether issues were
     /// found and whether they meet the configured failure threshold.
     pub fn process_issues(
-        self,
+        &self,
+        orchestrator: &Orchestrator<'_>,
+        database: &mut Database<'_>,
         issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
         if self.fix {
-            self.handle_fix_mode(issues)
+            self.handle_fix_mode(orchestrator, database, issues)
         } else {
-            self.handle_report_mode(issues, baseline, fail_on_out_of_sync_baseline)
+            self.handle_report_mode(database, issues, baseline, fail_on_out_of_sync_baseline)
         }
     }
 
@@ -311,9 +295,15 @@ impl<'a> IssueProcessor<'a> {
     /// to determine which fixes are safe to apply. When `--format-after-fix` is
     /// enabled, modified files are automatically formatted. When `--dry-run` is
     /// enabled, changes are previewed but not written to disk.
-    fn handle_fix_mode(self, issues: IssueCollection) -> Result<ExitCode, Error> {
+    fn handle_fix_mode(
+        &self,
+        orchestrator: &Orchestrator<'_>,
+        database: &mut Database<'_>,
+        issues: IssueCollection,
+    ) -> Result<ExitCode, Error> {
         let dry_run = self.dry_run;
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) = self.apply_fixes(issues)?;
+        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
+            self.apply_fixes(orchestrator, database, issues)?;
 
         if skipped_unsafe > 0 {
             tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
@@ -353,13 +343,14 @@ impl<'a> IssueProcessor<'a> {
     ///
     /// The exit code is determined by the highest severity level of reported
     /// issues compared to the `--minimum-fail-level` threshold.
-    fn handle_report_mode(
-        self,
+    fn handle_report_mode<'d>(
+        &self,
+        database: &'d Database<'d>,
         issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
-        let read_database = self.database.read_only();
+        let read_database = database.read_only();
 
         let issues_to_report = issues;
 
@@ -419,8 +410,13 @@ impl<'a> IssueProcessor<'a> {
     ///
     /// Returns the count of applied fixes and the counts of skipped fixes by
     /// safety classification.
-    fn apply_fixes(mut self, issues: IssueCollection) -> Result<(usize, usize, usize), Error> {
-        let read_database = Arc::new(self.database.read_only());
+    fn apply_fixes(
+        &self,
+        orchestrator: &Orchestrator<'_>,
+        database: &mut Database<'_>,
+        issues: IssueCollection,
+    ) -> Result<(usize, usize, usize), Error> {
+        let read_database = Arc::new(database.read_only());
         let change_log = ChangeLog::new();
 
         let (fix_plans, skipped_unsafe, skipped_potentially_unsafe) = self.filter_fix_plans(&read_database, issues);
@@ -436,7 +432,7 @@ impl<'a> IssueProcessor<'a> {
                 let fixed_content = plan.execute(&file.contents).get_fixed();
                 let final_content = if self.format_after_fix {
                     let file = File::ephemeral(file.name.clone(), Cow::Owned(fixed_content));
-                    let format_status = self.orchestrator.format_file_in(&file, arena)?;
+                    let format_status = orchestrator.format_file_in(&file, arena)?;
 
                     match format_status {
                         FileFormatStatus::Unchanged => file.contents.into_owned(),
@@ -462,7 +458,7 @@ impl<'a> IssueProcessor<'a> {
             .collect::<Result<Vec<bool>, Error>>()?;
 
         if !self.dry_run {
-            self.database.commit(change_log, true)?;
+            database.commit(change_log, true)?;
         }
 
         let applied_fix_count = changed_results.into_iter().filter(|&c| c).count();
@@ -534,7 +530,7 @@ impl<'a> IssueProcessor<'a> {
     }
 }
 
-impl<'a> BaselineIssueProcessor<'a> {
+impl BaselineIssueProcessor {
     /// Processes issues with baseline awareness.
     ///
     /// This method orchestrates the complete baseline-aware issue processing workflow.
@@ -555,6 +551,8 @@ impl<'a> BaselineIssueProcessor<'a> {
     ///
     /// # Arguments
     ///
+    /// * `orchestrator` - The orchestrator for formatting fixed files
+    /// * `database` - The database containing source files
     /// * `issues` - The collection of issues to process
     ///
     /// # Returns
@@ -563,33 +561,39 @@ impl<'a> BaselineIssueProcessor<'a> {
     /// - `Ok(ExitCode::FAILURE)` - Issues found above fail threshold, baseline out of sync,
     ///   or validation failed
     /// - `Err(Error)` - Baseline I/O error or issue processing error
-    pub fn process_issues(self, issues: IssueCollection) -> Result<ExitCode, Error> {
-        let baseline = match self.baseline_path.as_deref() {
-            Some(baseline_path) => {
-                if self.generate_baseline {
-                    self.generate_baseline(baseline_path, issues)?;
+    pub fn process_issues(
+        &self,
+        orchestrator: &Orchestrator<'_>,
+        database: &mut Database<'_>,
+        issues: IssueCollection,
+    ) -> Result<ExitCode, Error> {
+        // Extract baseline_path before consuming self
+        let baseline = if let Some(baseline_path_cow) = self.baseline_path.as_ref() {
+            let baseline_path = baseline_path_cow.as_ref();
+            if self.generate_baseline {
+                let read_database = database.read_only();
+                self.generate_baseline(baseline_path, &read_database, issues)?;
 
-                    return Ok(ExitCode::SUCCESS);
-                }
-
-                if self.verify_baseline {
-                    let success = self.verify_baseline(baseline_path, issues)?;
-
-                    return Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE });
-                }
-
-                self.get_baseline(Some(baseline_path))
+                return Ok(ExitCode::SUCCESS);
             }
-            None => {
-                if !self.validate_baseline_parameters() {
-                    return Ok(ExitCode::FAILURE);
-                }
 
-                None
+            if self.verify_baseline {
+                let read_database = database.read_only();
+                let success = self.verify_baseline(baseline_path, &read_database, issues)?;
+
+                return Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE });
             }
+
+            self.get_baseline(Some(baseline_path))
+        } else {
+            if !self.validate_baseline_parameters() {
+                return Ok(ExitCode::FAILURE);
+            }
+
+            None
         };
 
-        self.issue_processor.process_issues(issues, baseline, self.fail_on_out_of_sync_baseline)
+        self.issue_processor.process_issues(orchestrator, database, issues, baseline, self.fail_on_out_of_sync_baseline)
     }
 
     /// Loads an existing baseline file from disk.
@@ -606,7 +610,7 @@ impl<'a> BaselineIssueProcessor<'a> {
     ///
     /// - `Some(Baseline)` if the file exists and was successfully deserialized
     /// - `None` if no path was provided, the file doesn't exist, or deserialization failed
-    fn get_baseline(&self, baseline_path: Option<&'a Path>) -> Option<Baseline> {
+    fn get_baseline(&self, baseline_path: Option<&Path>) -> Option<Baseline> {
         let path = baseline_path?;
         if !path.exists() {
             tracing::warn!("Baseline file `{}` does not exist.", path.display());
@@ -633,6 +637,7 @@ impl<'a> BaselineIssueProcessor<'a> {
     /// # Arguments
     ///
     /// * `baseline_path` - Path where the baseline file should be written
+    /// * `read_database` - Read-only database access for file metadata
     /// * `issues` - Collection of issues to include in the baseline
     ///
     /// # Returns
@@ -646,9 +651,14 @@ impl<'a> BaselineIssueProcessor<'a> {
     /// - If `backup_baseline` is `true` and a baseline already exists, creates a backup
     ///   with a `.bkp` extension
     /// - Logs informational messages about the generation process
-    fn generate_baseline(&self, baseline_path: &'a Path, issues: IssueCollection) -> Result<(), Error> {
+    fn generate_baseline(
+        &self,
+        baseline_path: &Path,
+        read_database: &ReadDatabase,
+        issues: IssueCollection,
+    ) -> Result<(), Error> {
         tracing::info!("Generating baseline file...");
-        let baseline = Baseline::generate_from_issues(&issues, &self.read_database);
+        let baseline = Baseline::generate_from_issues(&issues, read_database);
         baseline::serialize_baseline(baseline_path, &baseline, self.backup_baseline)?;
         tracing::info!("Baseline file successfully generated at `{}`.", baseline_path.display());
 
@@ -664,6 +674,7 @@ impl<'a> BaselineIssueProcessor<'a> {
     /// # Arguments
     ///
     /// * `baseline_path` - Path to the baseline file to verify
+    /// * `read_database` - Read-only database access for file metadata
     /// * `issues` - Current collection of issues to compare against the baseline
     ///
     /// # Returns
@@ -678,7 +689,12 @@ impl<'a> BaselineIssueProcessor<'a> {
     /// - Info: Whether verification is starting or if baseline is up-to-date
     /// - Warning: Counts of new issues and removed issues
     /// - Error: Overall summary of files with changes and suggestion to regenerate
-    fn verify_baseline(&self, baseline_path: &'a Path, issues: IssueCollection) -> Result<bool, Error> {
+    fn verify_baseline(
+        &self,
+        baseline_path: &Path,
+        read_database: &ReadDatabase,
+        issues: IssueCollection,
+    ) -> Result<bool, Error> {
         if !baseline_path.exists() {
             tracing::info!("Baseline file `{}` does not exist.", baseline_path.display());
             return Ok(false);
@@ -687,7 +703,7 @@ impl<'a> BaselineIssueProcessor<'a> {
         tracing::info!("Verifying baseline file at `{}`...", baseline_path.display());
 
         let baseline = unserialize_baseline(baseline_path)?;
-        let comparison = baseline.compare_with_issues(&issues, &self.read_database);
+        let comparison = baseline.compare_with_issues(&issues, read_database);
 
         if comparison.is_up_to_date {
             tracing::info!("Baseline is up to date.");

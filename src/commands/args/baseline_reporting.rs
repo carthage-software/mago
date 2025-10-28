@@ -17,9 +17,6 @@ use std::path::PathBuf;
 use clap::ColorChoice;
 use clap::Parser;
 
-use mago_database::Database;
-use mago_orchestrator::Orchestrator;
-
 use crate::commands::args::reporting::ReportingArgs;
 use crate::service::BaselineIssueProcessor;
 
@@ -84,8 +81,6 @@ impl BaselineReportingArgs {
     ///
     /// # Arguments
     ///
-    /// * `orchestrator` - The orchestrator for formatting fixed files
-    /// * `database` - The database containing source files
     /// * `color_choice` - Whether to use colored output
     /// * `baseline` - Optional baseline path from configuration (overridden by CLI arg)
     ///
@@ -93,24 +88,17 @@ impl BaselineReportingArgs {
     ///
     /// A [`BaselineIssueProcessor`] configured with all the baseline and reporting
     /// options from this argument set.
-    pub fn get_processor<'a>(
-        self,
-        orchestrator: Orchestrator<'a>,
-        database: Database,
-        color_choice: ColorChoice,
-        baseline: Option<&'a Path>,
-    ) -> BaselineIssueProcessor<'a> {
+    pub fn get_processor(&self, color_choice: ColorChoice, baseline: Option<&Path>) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
-            read_database: database.read_only(),
-            baseline_path: match self.baseline {
-                Some(path) => Some(Cow::Owned(path)),
-                None => baseline.map(Cow::Borrowed),
+            baseline_path: match &self.baseline {
+                Some(path) => Some(Cow::Owned(path.to_path_buf())),
+                None => baseline.map(|p| Cow::Owned(p.to_path_buf())),
             },
             generate_baseline: self.generate_baseline,
             backup_baseline: self.backup_baseline,
             verify_baseline: self.verify_baseline,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
-            issue_processor: self.reporting.get_processor(orchestrator, database, color_choice),
+            issue_processor: self.reporting.get_processor(color_choice),
         }
     }
 }

@@ -21,6 +21,7 @@ mago-syntax = { workspace = true }
 mago-type-syntax = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }
+mago-fingerprint = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

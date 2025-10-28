@@ -35,12 +35,20 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Duration;
 
 use clap::ColorChoice;
 use clap::Parser;
 
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
+use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::file::FileType;
+use mago_database::watcher::DatabaseWatcher;
+use mago_database::watcher::WatchOptions;
+use mago_orchestrator::Orchestrator;
+use mago_orchestrator::incremental::IncrementalAnalysis;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
@@ -96,6 +104,16 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
+    /// Enable watch mode for continuous analysis.
+    ///
+    /// When enabled, the analyzer watches the workspace for file changes and
+    /// automatically re-runs analysis whenever PHP files are modified,
+    /// created, or deleted. This provides instant feedback during development.
+    ///
+    /// Press Ctrl+C to stop watching.
+    #[arg(long, default_value_t = false)]
+    pub watch: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -142,14 +160,26 @@ impl AnalyzeCommand {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
 
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, !self.watch, self.watch);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter());
         }
 
-        let database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+        // Check if watch mode is enabled early, since it needs ownership of configuration
+        if self.watch {
+            return self.run_watch_mode(
+                orchestrator,
+                &configuration,
+                color_choice,
+                database,
+                metadata,
+                symbol_references,
+            );
+        }
+
+        let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
@@ -157,14 +187,109 @@ impl AnalyzeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let service = orchestrator.get_analysis_service(database.read_only(), metadata, symbol_references);
-        let mut issues = service.run()?.issues;
+        let mut service = orchestrator.get_analysis_service(
+            database.read_only(),
+            metadata,
+            symbol_references,
+            self.create_incremental_analysis(),
+        );
 
+        let analysis_result = service.run()?;
+
+        let mut issues = analysis_result.issues;
         issues.filter_out_ignored(&configuration.analyzer.ignore);
 
         let baseline = configuration.analyzer.baseline.as_deref();
-        let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
 
-        processor.process_issues(issues)
+        processor.process_issues(&orchestrator, &mut database, issues)
+    }
+
+    /// Creates incremental analysis manager based on flags.
+    ///
+    /// Returns `Some(IncrementalAnalysis)` if incremental analysis should be used,
+    /// `None` otherwise.
+    fn create_incremental_analysis(&self) -> Option<IncrementalAnalysis> {
+        if !self.watch {
+            return None;
+        }
+
+        Some(IncrementalAnalysis::new())
+    }
+
+    /// Runs in watch mode, continuously monitoring for file changes and re-analyzing.
+    ///
+    /// This method sets up a file watcher on the workspace directory and runs
+    /// full analysis whenever PHP files are modified, created, or deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The loaded configuration
+    /// * `color_choice` - Whether to use colored output
+    /// * `prelude_database` - The prelude database with builtin symbols
+    /// * `metadata` - The codebase metadata (from prelude)
+    /// * `symbol_references` - Symbol references (from prelude)
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(ExitCode::SUCCESS)` when user interrupts with Ctrl+C
+    /// - `Err(e)` if watcher setup or analysis fails
+    fn run_watch_mode(
+        &self,
+        orchestrator: Orchestrator<'_>,
+        configuration: &Configuration,
+        color_choice: ColorChoice,
+        prelude_database: Database<'static>,
+        metadata: CodebaseMetadata,
+        symbol_references: SymbolReferences,
+    ) -> Result<ExitCode, Error> {
+        tracing::info!("Starting watch mode. Press Ctrl+C to stop.");
+
+        let database = orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database))?;
+
+        let mut watcher = DatabaseWatcher::new(database);
+
+        watcher.watch(WatchOptions { poll_interval: Some(Duration::from_millis(500)), ..Default::default() })?;
+
+        tracing::info!("Watching {} for changes...", configuration.source.workspace.display());
+        tracing::info!("Running initial analysis...");
+        let mut service = orchestrator.get_analysis_service(
+            watcher.read_only_database(),
+            metadata,
+            symbol_references,
+            self.create_incremental_analysis(),
+        );
+
+        let analysis_result = service.run()?;
+
+        let mut issues = analysis_result.issues;
+        issues.filter_out_ignored(&configuration.analyzer.ignore);
+        let baseline = configuration.analyzer.baseline.as_deref();
+
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
+
+        watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues))?;
+
+        tracing::info!("Initial analysis complete. Watching for changes...");
+
+        loop {
+            let changed_file_ids = watcher.wait()?;
+            if changed_file_ids.is_empty() {
+                continue;
+            }
+
+            tracing::info!("Detected {} file change(s), re-analyzing...", changed_file_ids.len());
+
+            service.update_database(watcher.database().read_only());
+
+            let analysis_result = service.run_incremental()?;
+
+            let mut issues = analysis_result.issues;
+            issues.filter_out_ignored(&configuration.analyzer.ignore);
+
+            watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues))?;
+
+            tracing::info!("Analysis complete. Watching for changes...");
+        }
     }
 }

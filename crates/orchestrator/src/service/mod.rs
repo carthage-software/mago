@@ -25,6 +25,7 @@
 //! Services are typically created via the [`Orchestrator`](crate::Orchestrator) factory
 //! methods rather than being instantiated directly.
 
+mod incremental_pipeline;
 mod pipeline;
 
 pub mod analysis;

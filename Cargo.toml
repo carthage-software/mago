@@ -109,6 +109,8 @@ libc = "0.2.175"
 shell-words = "1.1.0"
 ryu = "1.0"
 itoa = "1.0"
+notify = "7.0"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dependencies]
 mago-syntax = { workspace = true }
@@ -123,6 +125,7 @@ mago-php-version = { workspace = true }
 mago-composer = { workspace = true }
 mago-prelude = { workspace = true }
 mago-analyzer = { workspace = true }
+mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
 serde = { workspace = true }

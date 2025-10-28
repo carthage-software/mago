@@ -150,12 +150,19 @@ impl AstCommand {
 
         if let Some(error) = error {
             let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
-            let database = Database::single(file);
+            let config =
+                mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
+                    .into_static();
+            let mut database = Database::single(file, config);
+            let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            return self
-                .reporting
-                .get_processor(create_orchestrator(&configuration, color_choice, false), database, color_choice)
-                .process_issues(issues, None, false);
+            return self.reporting.get_processor(color_choice).process_issues(
+                &orchestrator,
+                &mut database,
+                issues,
+                None,
+                false,
+            );
         }
 
         Ok(ExitCode::SUCCESS)
@@ -176,12 +183,24 @@ impl AstCommand {
                 Some(Ok(token)) => tokens.push(token),
                 Some(Err(err)) => {
                     let issue = Into::<Issue>::into(&err);
-                    let database = Database::single(file);
+                    let config = mago_database::DatabaseConfiguration::new(
+                        std::path::Path::new("/"),
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                    )
+                    .into_static();
+                    let mut database = Database::single(file, config);
+                    let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-                    return self
-                        .reporting
-                        .get_processor(create_orchestrator(&configuration, color_choice, false), database, color_choice)
-                        .process_issues(IssueCollection::from([issue]), None, false);
+                    return self.reporting.get_processor(color_choice).process_issues(
+                        &orchestrator,
+                        &mut database,
+                        IssueCollection::from([issue]),
+                        None,
+                        false,
+                    );
                 }
                 None => break,
             }

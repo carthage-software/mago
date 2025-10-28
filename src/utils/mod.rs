@@ -23,6 +23,8 @@ pub(crate) fn create_orchestrator<'a>(
     configuration: &'a Configuration,
     color_choice: ColorChoice,
     pedantic_linter: bool,
+    use_progress_bars: bool,
+    enable_diff: bool,
 ) -> Orchestrator<'a> {
     let linter_settings = if pedantic_linter {
         Settings {
@@ -40,11 +42,11 @@ pub(crate) fn create_orchestrator<'a>(
 
     let orchestrator_config = OrchestratorConfiguration {
         php_version: configuration.php_version,
-        analyzer_settings: configuration.analyzer.to_settings(configuration.php_version, color_choice),
+        analyzer_settings: configuration.analyzer.to_settings(configuration.php_version, color_choice, enable_diff),
         linter_settings,
         guard_settings: configuration.guard.settings.clone(),
         formatter_settings: configuration.formatter.settings,
-        use_progress_bars: true,
+        use_progress_bars,
         use_colors: color_choice != ColorChoice::Never,
         paths: configuration.source.paths.iter().map(|p| p.as_ref()).collect(),
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),

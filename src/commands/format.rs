@@ -134,7 +134,7 @@ impl FormatCommand {
     /// - **Dry run** (`--dry-run`): Prints diffs without modifying files
     /// - **STDIN** (`--stdin-input`): Formats input from stdin to stdout
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter());

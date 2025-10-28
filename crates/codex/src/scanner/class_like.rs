@@ -230,6 +230,8 @@ pub fn register_enum<'ctx, 'arena>(
 
     codebase.class_likes.insert(name, class_like_metadata);
 
+    // Fingerprinting is now handled by signature_builder for the entire file
+
     Some((name, template_resolution_context))
 }
 

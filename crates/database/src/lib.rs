@@ -75,6 +75,7 @@ use serde::Serialize;
 use crate::change::Change;
 use crate::change::ChangeLog;
 use crate::error::DatabaseError;
+use crate::exclusion::Exclusion;
 use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
@@ -88,66 +89,112 @@ pub mod error;
 pub mod exclusion;
 pub mod file;
 pub mod loader;
+pub mod watcher;
 
 mod operation;
 
-/// A mutable database for managing a collection of project files.
-///
-/// This struct acts as the primary "builder" for your file set. It is optimized
-/// for efficient additions, updates, and deletions. Once you have loaded all
-/// files and performed any initial modifications, you can create a high-performance,
-/// immutable snapshot for fast querying by calling [`read_only`](Self::read_only).
-///
-/// While this structure implements [`Clone`](std::clone::Clone), it is not intended
-/// for frequent cloning. Instead, it is designed to be used as a single mutable
-/// instance that you modify in place. Cloning is provided for scenarios where
-/// you need to create a backup or checkpoint of the current state before making
-/// further changes.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Database {
-    /// Maps a file's logical name to its `File` object for fast name-based access.
-    files: HashMap<Cow<'static, str>, Arc<File>>,
-    /// Maps a file's stable ID back to its logical name for fast ID-based mutations.
-    id_to_name: HashMap<FileId, Cow<'static, str>>,
+/// Configuration for database loading and watching.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseConfiguration<'a> {
+    pub workspace: Cow<'a, Path>,
+    pub paths: Vec<Cow<'a, Path>>,
+    pub includes: Vec<Cow<'a, Path>>,
+    pub excludes: Vec<Exclusion<'a>>,
+    pub extensions: Vec<Cow<'a, str>>,
 }
 
-/// An immutable, read-optimized snapshot of a file database.
-///
-/// This structure is designed for high-performance lookups and iteration. It stores
-/// all files in a contiguous, sorted vector and uses multiple `HashMap` indices
-/// to provide $O(1)$ average-time access to files by their ID, name, or path.
-///
-/// A `ReadDatabase` is created via [`Database::read_only`].
+impl<'a> DatabaseConfiguration<'a> {
+    pub fn new(
+        workspace: &'a Path,
+        paths: Vec<&'a Path>,
+        includes: Vec<&'a Path>,
+        excludes: Vec<Exclusion<'a>>,
+        extensions: Vec<&'a str>,
+    ) -> Self {
+        let paths = canonicalize_paths(workspace, paths);
+        let includes = canonicalize_paths(workspace, includes);
+
+        let excludes = excludes
+            .into_iter()
+            .filter_map(|exclusion| match exclusion {
+                Exclusion::Path(p) => Some(if p.is_absolute() {
+                    Exclusion::Path(p)
+                } else {
+                    workspace.join(p).canonicalize().ok().map(Cow::Owned).map(Exclusion::Path)?
+                }),
+                Exclusion::Pattern(pat) => Some(Exclusion::Pattern(pat)),
+            })
+            .collect();
+
+        let extensions = extensions.into_iter().map(Cow::Borrowed).collect();
+
+        Self { workspace: Cow::Borrowed(workspace), paths, includes, excludes, extensions }
+    }
+
+    pub fn into_static(self) -> DatabaseConfiguration<'static> {
+        DatabaseConfiguration {
+            workspace: Cow::Owned(self.workspace.into_owned()),
+            paths: self.paths.into_iter().map(|p| Cow::Owned(p.into_owned())).collect(),
+            includes: self.includes.into_iter().map(|p| Cow::Owned(p.into_owned())).collect(),
+            excludes: self
+                .excludes
+                .into_iter()
+                .map(|e| match e {
+                    Exclusion::Path(p) => Exclusion::Path(Cow::Owned(p.into_owned())),
+                    Exclusion::Pattern(pat) => Exclusion::Pattern(Cow::Owned(pat.into_owned())),
+                })
+                .collect(),
+            extensions: self.extensions.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
+        }
+    }
+}
+
+fn canonicalize_paths<'a>(workspace: &'a Path, paths: Vec<&'a Path>) -> Vec<Cow<'a, Path>> {
+    paths
+        .into_iter()
+        .filter_map(|p| {
+            Some(if p.is_absolute() {
+                Cow::Borrowed(p)
+            } else {
+                workspace
+                    .join(p)
+                    .canonicalize()
+                    .inspect_err(|_| tracing::warn!("Ignoring invalid or non-existent path `{}`", p.display()))
+                    .ok()
+                    .map(Cow::Owned)?
+            })
+        })
+        .collect()
+}
+
+/// Mutable database for managing project files with add/update/delete operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Database<'a> {
+    files: HashMap<Cow<'static, str>, Arc<File>>,
+    id_to_name: HashMap<FileId, Cow<'static, str>>,
+    pub(crate) configuration: DatabaseConfiguration<'a>,
+}
+
+/// Immutable, read-optimized snapshot of the database.
 #[derive(Debug)]
 pub struct ReadDatabase {
-    /// A contiguous list of all files, sorted by `FileId` for deterministic iteration.
     files: Vec<Arc<File>>,
-    /// Maps a file's stable ID to its index in the `files` vector.
     id_to_index: HashMap<FileId, usize>,
-    /// Maps a file's logical name to its index in the `files` vector.
     name_to_index: HashMap<Cow<'static, str>, usize>,
-    /// Maps a file's absolute path to its index in the `files` vector.
     path_to_index: HashMap<PathBuf, usize>,
 }
 
-impl Database {
-    /// Creates a new, empty `Database`.
-    pub fn new() -> Self {
-        Self::default()
+impl<'a> Database<'a> {
+    pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
+        Self { files: HashMap::default(), id_to_name: HashMap::default(), configuration }
     }
 
-    /// Creates a new `Database` containing only a single file.
-    ///
-    /// This is a convenience constructor for situations, such as testing or
-    /// single-file tools, where an operation requires a [`Database`]
-    /// implementation but only needs to be aware of one file.
-    pub fn single(file: File) -> Self {
-        let mut db = Self::new();
+    pub fn single(file: File, configuration: DatabaseConfiguration<'a>) -> Self {
+        let mut db = Self::new(configuration);
         db.add(file);
         db
     }
 
-    /// Adds a file to the database, overwriting any existing file with the same name.
     pub fn add(&mut self, file: File) -> FileId {
         let name = file.name.clone();
         let id = file.id;
@@ -234,7 +281,6 @@ impl Database {
             }
         }
 
-        // If requested, perform all collected filesystem operations in parallel.
         if write_to_disk {
             fs_operations.into_par_iter().try_for_each(|op| -> Result<(), DatabaseError> { op.execute() })?;
         }
@@ -292,7 +338,6 @@ impl ReadDatabase {
         let mut name_to_index = HashMap::with_capacity(1);
         let mut path_to_index = HashMap::with_capacity(1);
 
-        // The index for the single file will always be 0.
         id_to_index.insert(file.id, 0);
         name_to_index.insert(file.name.clone(), 0);
         if let Some(path) = &file.path {
@@ -380,7 +425,7 @@ pub trait DatabaseReader {
     }
 }
 
-impl DatabaseReader for Database {
+impl<'a> DatabaseReader for Database<'a> {
     fn get_id(&self, name: &str) -> Option<FileId> {
         self.files.get(name).map(|f| f.id)
     }

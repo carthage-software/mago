@@ -65,7 +65,7 @@ pub fn analyze_code(code: String, settings: WasmSettings) -> WasmAnalysisResults
     // Run analysis
     let analysis_file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
     let analysis_database = ReadDatabase::single(analysis_file);
-    let analysis_service = AnalysisService::new(
+    let mut analysis_service = AnalysisService::new(
         analysis_database,
         metadata,
         symbol_references,

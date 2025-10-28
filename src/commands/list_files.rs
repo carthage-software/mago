@@ -110,7 +110,7 @@ impl ListFilesCommand {
     /// Paths are absolute and canonicalized. The terminator character is either
     /// newline (default) or NUL byte (`-0`).
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         if let Some(command) = self.command {
             match command {
                 Command::Linter => orchestrator.add_exclude_patterns(configuration.linter.excludes.iter()),

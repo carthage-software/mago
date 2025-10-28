@@ -190,13 +190,13 @@ impl LintCommand {
     /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
     /// - **Empty Database**: Logs a message and exits successfully if no files found
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter());
         }
 
-        let database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
         let service = orchestrator.get_lint_service(database.read_only());
 
         if let Some(explain_code) = self.explain {
@@ -229,9 +229,9 @@ impl LintCommand {
         )?;
 
         let baseline = configuration.linter.baseline.as_deref();
-        let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
 
-        processor.process_issues(issues)
+        processor.process_issues(&orchestrator, &mut database, issues)
     }
 }
 

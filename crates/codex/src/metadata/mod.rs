@@ -27,6 +27,7 @@ use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::signature::FileSignature;
 use crate::symbol::SymbolKind;
 use crate::symbol::Symbols;
 use crate::ttype::atomic::TAtomic;
@@ -73,6 +74,11 @@ pub struct CodebaseMetadata {
     pub safe_symbols: AtomSet,
     /// Set of specific members `(SymbolFQCN, MemberName)` that are considered safe/validated.
     pub safe_symbol_members: HashSet<(Atom, Atom)>,
+    /// Map from FileId to its signature for incremental analysis.
+    ///
+    /// Each FileSignature contains a hierarchical tree of DefSignatureNode representing
+    /// top-level symbols (classes, functions, constants) and their nested members (methods, properties).
+    pub file_signatures: HashMap<FileId, FileSignature>,
 }
 
 impl CodebaseMetadata {
@@ -750,6 +756,52 @@ impl CodebaseMetadata {
         let name = Self::get_anonymous_class_name(span);
         if self.class_exists(&name) { self.class_likes.get(&name) } else { None }
     }
+
+    // Fingerprint Methods
+
+    /// Gets the file signature for a given file ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_id` - The file identifier
+    ///
+    /// # Returns
+    ///
+    /// A reference to the FileSignature if it exists, or `None` if the file has no signature.
+    #[inline]
+    pub fn get_file_signature(&self, file_id: &FileId) -> Option<&FileSignature> {
+        self.file_signatures.get(file_id)
+    }
+
+    /// Adds or updates a file signature for a given file ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_id` - The file identifier
+    /// * `signature` - The file signature
+    ///
+    /// # Returns
+    ///
+    /// The previous FileSignature if it existed.
+    #[inline]
+    pub fn set_file_signature(&mut self, file_id: FileId, signature: FileSignature) -> Option<FileSignature> {
+        self.file_signatures.insert(file_id, signature)
+    }
+
+    /// Removes the file signature for a given file ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_id` - The file identifier
+    ///
+    /// # Returns
+    ///
+    /// The removed FileSignature if it existed.
+    #[inline]
+    pub fn remove_file_signature(&mut self, file_id: &FileId) -> Option<FileSignature> {
+        self.file_signatures.remove(file_id)
+    }
+
     // Utility Methods
 
     /// Merges information from another `CodebaseMetadata` into this one.
@@ -834,6 +886,7 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.file_signatures.extend(other.file_signatures);
     }
 
     /// Takes all issues from the codebase metadata.
@@ -863,6 +916,13 @@ impl CodebaseMetadata {
 
         issues
     }
+
+    /// Gets all file IDs that have signatures in this metadata.
+    ///
+    /// This is a helper method for incremental analysis to iterate over all files.
+    pub fn get_all_file_ids(&self) -> Vec<FileId> {
+        self.file_signatures.keys().copied().collect()
+    }
 }
 
 impl Default for CodebaseMetadata {
@@ -879,6 +939,7 @@ impl Default for CodebaseMetadata {
             direct_classlike_descendants: AtomMap::default(),
             safe_symbols: AtomSet::default(),
             safe_symbol_members: HashSet::default(),
+            file_signatures: HashMap::default(),
         }
     }
 }

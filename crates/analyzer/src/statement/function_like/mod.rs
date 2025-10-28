@@ -182,6 +182,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
+    parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
 
     Ok(artifacts)
 }

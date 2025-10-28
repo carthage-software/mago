@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use crate::error::DatabaseError;
 
-// A simple enum to represent the filesystem operations to be performed.
 #[derive(Debug)]
 pub(crate) enum FilesystemOperation {
     Write(PathBuf, Cow<'static, str>),

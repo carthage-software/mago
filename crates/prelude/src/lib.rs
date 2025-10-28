@@ -38,10 +38,10 @@ pub mod build;
 ///
 /// This struct holds all the necessary, fully-analyzed data for PHP's core library,
 /// allowing for instant startup without needing to parse and analyze stubs at runtime.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Prelude {
     /// The database of all built-in PHP files.
-    pub database: Database,
+    pub database: Database<'static>,
     /// The fully populated and analyzed metadata for all symbols in the database.
     pub metadata: CodebaseMetadata,
     /// The collected symbol references from the analysis.
@@ -76,5 +76,19 @@ impl Prelude {
     #[cfg(feature = "build")]
     pub fn encode(&self) -> Result<Vec<u8>, PreludeError> {
         Ok(bincode::serde::encode_to_vec(self, standard())?)
+    }
+}
+
+impl Default for Prelude {
+    fn default() -> Self {
+        let configuration =
+            mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
+                .into_static();
+
+        Self {
+            database: mago_database::Database::new(configuration),
+            metadata: CodebaseMetadata::default(),
+            symbol_references: SymbolReferences::default(),
+        }
     }
 }

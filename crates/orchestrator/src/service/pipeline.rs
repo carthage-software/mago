@@ -9,6 +9,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
+use mago_codex::signature_builder;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -36,12 +37,17 @@ pub trait Reducer<T, R>: Debug {
     /// * `codebase`: The fully compiled and populated `CodebaseMetadata`.
     /// * `symbol_references`: The final set of `SymbolReferences`.
     /// * `results`: A vector containing the intermediate results from each parallel task.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of `(result, codebase, symbol_references)` where the codebase
+    /// and symbol_references are returned after being used by the reducer.
     fn reduce(
         &self,
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         results: Vec<T>,
-    ) -> Result<R, OrchestratorError>;
+    ) -> Result<(R, CodebaseMetadata, SymbolReferences), OrchestratorError>;
 }
 
 /// A trait that defines the final "reduce" step for a stateless parallel computation.
@@ -49,6 +55,9 @@ pub trait StatelessReducer<I, R>: Debug {
     /// Aggregates intermediate results from the parallel "map" phase into a final result.
     fn reduce(&self, results: Vec<I>) -> Result<R, OrchestratorError>;
 }
+
+/// A callback type invoked after the scanning phase completes.
+pub type PostScanCallback = Box<dyn FnOnce(&mut CodebaseMetadata, &SymbolReferences) + Send>;
 
 /// An orchestrator for a multi-phase, data-parallel computation pipeline.
 ///
@@ -59,7 +68,6 @@ pub trait StatelessReducer<I, R>: Debug {
 ///     on each host file, using the final codebase from Phase 1 as input.
 /// 3.  **Phase 3 (Finalize):** The user-provided [`Reducer`] aggregates the results
 ///     from the analysis phase into a final output.
-#[derive(Debug)]
 pub struct ParallelPipeline<T, I, R> {
     task_name: &'static str,
     database: Arc<ReadDatabase>,
@@ -68,6 +76,25 @@ pub struct ParallelPipeline<T, I, R> {
     shared_context: T,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
+    after_scanning: Option<PostScanCallback>,
+}
+
+impl<T, I, R> std::fmt::Debug for ParallelPipeline<T, I, R>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ParallelPipeline")
+            .field("task_name", &self.task_name)
+            .field("database", &self.database)
+            .field("codebase", &self.codebase)
+            .field("symbol_references", &self.symbol_references)
+            .field("shared_context", &self.shared_context)
+            .field("reducer", &"<reducer>")
+            .field("should_use_progress_bar", &self.should_use_progress_bar)
+            .field("after_scanning", &self.after_scanning.is_some())
+            .finish()
+    }
 }
 
 /// An orchestrator for a simple, single-phase data-parallel computation.
@@ -107,7 +134,21 @@ where
             shared_context,
             reducer,
             should_use_progress_bar,
+            after_scanning: None,
         }
+    }
+
+    /// Sets a callback to be invoked after the scanning phase completes.
+    ///
+    /// This callback receives mutable access to the codebase metadata and immutable
+    /// access to symbol references. It's useful for operations like incremental analysis
+    /// that need to mark safe symbols before the analysis phase begins.
+    pub fn with_after_scanning(
+        mut self,
+        callback: impl FnOnce(&mut CodebaseMetadata, &SymbolReferences) + Send + 'static,
+    ) -> Self {
+        self.after_scanning = Some(Box::new(callback));
+        self
     }
 
     /// Executes the full pipeline with a given map function.
@@ -117,7 +158,14 @@ where
     /// * `map_function`: The core logic to be applied in parallel to each `Host` file
     ///   during the analysis phase. It receives the shared context, file data, and the
     ///   fully populated codebase, and returns an intermediate result.
-    pub fn run<F>(self, map_function: F) -> Result<R, OrchestratorError>
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of `(result, codebase, symbol_references)` where:
+    /// - `result`: The aggregated result from the reducer
+    /// - `codebase`: The final codebase metadata after all processing
+    /// - `symbol_references`: The final symbol references
+    pub fn run<F>(self, map_function: F) -> Result<(R, CodebaseMetadata, SymbolReferences), OrchestratorError>
     where
         F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
@@ -125,7 +173,9 @@ where
         if source_files.is_empty() {
             tracing::info!("No source files found for analysis.");
 
-            return self.reducer.reduce(self.codebase, self.symbol_references, Vec::new());
+            let (result, codebase, symbol_references) =
+                self.reducer.reduce(self.codebase, self.symbol_references, Vec::new())?;
+            return Ok((result, codebase, symbol_references));
         }
 
         let compiling_bar = if self.should_use_progress_bar {
@@ -134,9 +184,9 @@ where
             None
         };
 
-        let partial_codebases: Vec<CodebaseMetadata> = source_files
+        let partial_codebases: Result<Vec<CodebaseMetadata>, OrchestratorError> = source_files
             .into_par_iter()
-            .map_init(Bump::new, |arena, file| {
+            .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
                 let (program, parse_issues) = parse_file(arena, &file);
                 if parse_issues.is_some() {
                     tracing::warn!("Parsing issues in '{}'. Codebase analysis may be incomplete.", file.name);
@@ -145,24 +195,33 @@ where
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
 
-                let metadata = scan_program(arena, &file, program, &resolved_names);
+                let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
+
+                let mut metadata = scan_program(arena, &file, program, &resolved_names);
+                metadata.set_file_signature(file.id, file_signature);
 
                 arena.reset();
                 if let Some(compiling_bar) = &compiling_bar {
                     compiling_bar.inc(1);
                 }
 
-                metadata
+                Ok(metadata)
             })
             .collect();
 
         let mut merged_codex = self.codebase;
-        for partial in partial_codebases {
+        for partial in partial_codebases? {
             merged_codex.extend(partial);
         }
 
         let mut symbol_references = self.symbol_references;
         populate_codebase(&mut merged_codex, &mut symbol_references, AtomSet::default(), HashSet::default());
+
+        // Invoke after_scanning callback if provided (for incremental analysis)
+        if let Some(callback) = self.after_scanning {
+            callback(&mut merged_codex, &symbol_references);
+        }
+
         if let Some(compiling_bar) = compiling_bar {
             remove_progress_bar(compiling_bar);
         }
@@ -177,7 +236,9 @@ where
         if host_files.is_empty() {
             tracing::warn!("No host files found for analysis after compilation.");
 
-            return self.reducer.reduce(merged_codex, symbol_references, Vec::new());
+            let (result, codebase, symbol_references) =
+                self.reducer.reduce(merged_codex, symbol_references, Vec::new())?;
+            return Ok((result, codebase, symbol_references));
         }
 
         let final_codebase = Arc::new(merged_codex);
@@ -210,7 +271,8 @@ where
 
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
 
-        self.reducer.reduce(final_codebase, symbol_references, results)
+        let (result, codebase, symbol_references) = self.reducer.reduce(final_codebase, symbol_references, results)?;
+        Ok((result, codebase, symbol_references))
     }
 }
 

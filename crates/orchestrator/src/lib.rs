@@ -40,6 +40,7 @@ use bumpalo::Bump;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
+use mago_database::DatabaseConfiguration;
 use mago_database::ReadDatabase;
 use mago_database::exclusion::Exclusion;
 use mago_database::file::File;
@@ -56,6 +57,7 @@ pub use error::OrchestratorError;
 
 pub mod config;
 pub mod error;
+pub mod incremental;
 pub mod progress;
 pub mod service;
 
@@ -146,8 +148,8 @@ impl<'a> Orchestrator<'a> {
         &self,
         workspace: &'a Path,
         include_externals: bool,
-        prelude_database: Option<Database>,
-    ) -> Result<Database, OrchestratorError> {
+        prelude_database: Option<Database<'static>>,
+    ) -> Result<Database<'static>, OrchestratorError> {
         /// Converts string patterns from the configuration into `Exclusion` types.
         fn create_excludes_from_patterns<'a>(patterns: &[&'a str], root: &Path) -> Vec<Exclusion<'a>> {
             patterns
@@ -172,15 +174,26 @@ impl<'a> Orchestrator<'a> {
         }
 
         let excludes = create_excludes_from_patterns(&self.config.excludes, workspace);
+        let excludes_static: Vec<Exclusion<'static>> = excludes
+            .into_iter()
+            .map(|e| match e {
+                Exclusion::Path(p) => Exclusion::Path(Cow::Owned(p.into_owned())),
+                Exclusion::Pattern(pat) => Exclusion::Pattern(Cow::Owned(pat.into_owned())),
+            })
+            .collect();
+
         let includes = if include_externals { self.config.includes.clone() } else { vec![] };
 
-        let mut loader = DatabaseLoader::new(
-            workspace,
-            self.config.paths.clone(),
-            includes,
-            excludes,
-            self.config.extensions.clone(),
-        );
+        let configuration = Box::new(DatabaseConfiguration {
+            workspace: Cow::Owned(workspace.to_path_buf()),
+            paths: self.config.paths.iter().map(|p| Cow::Owned(p.to_path_buf())).collect(),
+            includes: includes.iter().map(|p| Cow::Owned(p.to_path_buf())).collect(),
+            excludes: excludes_static,
+            extensions: self.config.extensions.iter().map(|s| Cow::Owned(s.to_string())).collect(),
+        });
+
+        let configuration_ref: &'static _ = Box::leak(configuration);
+        let mut loader = DatabaseLoader::new(configuration_ref);
 
         if let Some(prelude_db) = prelude_database {
             loader = loader.with_database(prelude_db);
@@ -232,6 +245,7 @@ impl<'a> Orchestrator<'a> {
     /// * `database` - A read-only database handle containing the PHP files to analyze
     /// * `codebase` - Metadata about the codebase structure and symbols
     /// * `symbol_references` - Information about symbol usage and references across the codebase
+    /// * `incremental` - Optional incremental analysis manager for marking safe symbols
     ///
     /// # Returns
     ///
@@ -241,14 +255,21 @@ impl<'a> Orchestrator<'a> {
         database: ReadDatabase,
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
+        incremental: Option<incremental::IncrementalAnalysis>,
     ) -> AnalysisService {
-        AnalysisService::new(
+        let mut service = AnalysisService::new(
             database,
             codebase,
             symbol_references,
             self.config.analyzer_settings,
             self.config.use_progress_bars,
-        )
+        );
+
+        if let Some(incremental) = incremental {
+            service = service.with_incremental(incremental);
+        }
+
+        service
     }
 
     /// Creates a code formatting service with the current configuration.

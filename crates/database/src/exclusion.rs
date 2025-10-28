@@ -57,7 +57,7 @@ use std::path::Path;
 ///
 /// Exclusions are ordered first by variant (Path before Pattern), then by the
 /// value within the variant. This enables efficient deduplication and set operations.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum Exclusion<'a> {
     /// Exclude a specific file or directory by its exact path.
     ///

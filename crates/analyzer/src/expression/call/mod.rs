@@ -1,4 +1,5 @@
 use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -88,6 +89,24 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
                     continue;
                 }
                 _ => {}
+            }
+        }
+
+        if let Some(identifier) = target.get_function_like_identifier() {
+            match identifier {
+                FunctionLikeIdentifier::Function(function_name) => {
+                    let normalized_name = ascii_lowercase_atom(function_name.as_ref());
+                    artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, normalized_name, false);
+                }
+                FunctionLikeIdentifier::Method(class_name, method_name) => {
+                    artifacts.symbol_references.add_reference_for_method_call(
+                        &block_context.scope,
+                        &MethodIdentifier::new(*class_name, *method_name),
+                    );
+                }
+                _ => {
+                    // Closures don't need reference tracking for invalidation
+                }
             }
         }
 

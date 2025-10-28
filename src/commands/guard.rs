@@ -131,13 +131,13 @@ impl GuardCommand {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
 
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, false);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter());
         }
 
-        let database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+        let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to check with guard.");
@@ -149,8 +149,8 @@ impl GuardCommand {
         let issues = service.run()?;
 
         let baseline = configuration.guard.baseline.as_deref();
-        let processor = self.baseline_reporting.get_processor(orchestrator, database, color_choice, baseline);
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
 
-        processor.process_issues(issues)
+        processor.process_issues(&orchestrator, &mut database, issues)
     }
 }

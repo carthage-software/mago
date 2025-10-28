@@ -7,33 +7,47 @@ use mago_database::file::FileId;
 
 use crate::symbol::SymbolIdentifier;
 
+/// Represents a text diff hunk with position and offset information.
+///
+/// Format: `(old_start, old_length, line_offset, column_offset)`
+/// - `old_start`: Starting byte offset in the old version
+/// - `old_length`: Length of the changed region in bytes
+/// - `line_offset`: Line number change (new_line - old_line)
+/// - `column_offset`: Column number change (new_column - old_column)
+pub type DiffHunk = (usize, usize, isize, isize);
+
+/// Represents a range of deleted code.
+///
+/// Format: `(start_offset, end_offset)`
+/// - `start_offset`: Starting byte offset of deletion
+/// - `end_offset`: Ending byte offset of deletion
+pub type DeletionRange = (usize, usize);
+
 /// Represents the differences between two states of a codebase, typically used for incremental analysis.
 ///
-/// It tracks symbols/members to keep, those whose signatures changed but bodies might be reusable,
-/// added/deleted symbols/members, and detailed text diff/deletion ranges per file.
+/// This structure uses a single fingerprint hash per symbol to determine changes. Any change to a symbol
+/// (signature, body, modifiers, attributes) produces a different hash, triggering re-analysis.
+///
 /// Provides a comprehensive API for modification and querying following established conventions.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodebaseDiff {
-    /// Set of `(Symbol, Member)` pairs whose definition and signature are unchanged and can be kept as is.
+    /// Set of `(Symbol, Member)` pairs whose fingerprint hash is UNCHANGED.
+    /// These symbols can be safely skipped during re-analysis.
     /// Member is empty for top-level symbols.
     keep: HashSet<SymbolIdentifier>,
 
-    /// Set of `(Symbol, Member)` pairs whose signature (e.g., parameter types, return type)
-    /// is unchanged, allowing potential reuse of inferred body information, even if the body itself changed.
+    /// Set of `(Symbol, Member)` pairs that are new, deleted, or have a different fingerprint hash.
+    /// These symbols MUST be re-analyzed.
     /// Member is empty for top-level symbols.
-    keep_signature: HashSet<SymbolIdentifier>,
-
-    /// Set of `(Symbol, Member)` pairs that were either added or deleted entirely between states.
-    /// Member is empty for top-level symbols.
-    add_or_delete: HashSet<SymbolIdentifier>,
+    changed: HashSet<SymbolIdentifier>,
 
     /// Map from source file identifier to a vector of text diff hunks.
-    /// Each tuple typically represents `(old_start, old_len, new_start, new_len)` line info for a change.
-    /// (Exact tuple meaning depends on the diffing library used).
-    diff_map: HashMap<FileId, Vec<(usize, usize, isize, isize)>>,
+    /// Used for mapping issue positions between old and new code.
+    diff_map: HashMap<FileId, Vec<DiffHunk>>,
 
-    /// Map from source file identifier to a vector of deleted line ranges `(start_line, end_line)`.
-    deletion_ranges_map: HashMap<FileId, Vec<(usize, usize)>>,
+    /// Map from source file identifier to a vector of deleted code ranges.
+    /// Used for filtering out issues in deleted code regions.
+    deletion_ranges_map: HashMap<FileId, Vec<DeletionRange>>,
 }
 
 impl CodebaseDiff {
@@ -46,8 +60,7 @@ impl CodebaseDiff {
     #[inline]
     pub fn extend(&mut self, other: Self) {
         self.keep.extend(other.keep);
-        self.keep_signature.extend(other.keep_signature);
-        self.add_or_delete.extend(other.add_or_delete);
+        self.changed.extend(other.changed);
         for (source, diffs) in other.diff_map {
             self.diff_map.entry(source).or_default().extend(diffs);
         }
@@ -62,27 +75,21 @@ impl CodebaseDiff {
         &self.keep
     }
 
-    /// Returns a reference to the set of symbols/members whose signatures can be kept.
+    /// Returns a reference to the set of changed symbols/members.
     #[inline]
-    pub fn get_keep_signature(&self) -> &HashSet<SymbolIdentifier> {
-        &self.keep_signature
-    }
-
-    /// Returns a reference to the set of added or deleted symbols/members.
-    #[inline]
-    pub fn get_add_or_delete(&self) -> &HashSet<SymbolIdentifier> {
-        &self.add_or_delete
+    pub fn get_changed(&self) -> &HashSet<SymbolIdentifier> {
+        &self.changed
     }
 
     /// Returns a reference to the map of source files to text diff hunks.
     #[inline]
-    pub fn get_diff_map(&self) -> &HashMap<FileId, Vec<(usize, usize, isize, isize)>> {
+    pub fn get_diff_map(&self) -> &HashMap<FileId, Vec<DiffHunk>> {
         &self.diff_map
     }
 
     /// Returns a reference to the map of source files to deletion ranges.
     #[inline]
-    pub fn get_deletion_ranges_map(&self) -> &HashMap<FileId, Vec<(usize, usize)>> {
+    pub fn get_deletion_ranges_map(&self) -> &HashMap<FileId, Vec<DeletionRange>> {
         &self.deletion_ranges_map
     }
 
@@ -138,163 +145,99 @@ impl CodebaseDiff {
         self
     }
 
-    /// Sets the 'keep_signature' set, replacing the existing one.
+    /// Sets the 'changed' set, replacing the existing one.
     #[inline]
-    pub fn set_keep_signature(&mut self, keep_set: impl IntoIterator<Item = SymbolIdentifier>) {
-        self.keep_signature = keep_set.into_iter().collect();
+    pub fn set_changed(&mut self, change_set: impl IntoIterator<Item = SymbolIdentifier>) {
+        self.changed = change_set.into_iter().collect();
     }
 
-    /// Returns a new instance with the 'keep_signature' set replaced.
+    /// Returns a new instance with the 'changed' set replaced.
     #[inline]
-    pub fn with_keep_signature(mut self, keep_set: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
-        self.set_keep_signature(keep_set);
+    pub fn with_changed(mut self, change_set: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
+        self.set_changed(change_set);
         self
     }
 
-    /// Adds a single entry to the 'keep_signature' set. Returns `true` if the entry was not already present.
+    /// Adds a single entry to the 'changed' set. Returns `true` if the entry was not already present.
     #[inline]
-    pub fn add_keep_signature_entry(&mut self, entry: SymbolIdentifier) -> bool {
-        self.keep_signature.insert(entry)
+    pub fn add_changed_entry(&mut self, entry: SymbolIdentifier) -> bool {
+        self.changed.insert(entry)
     }
 
-    /// Returns a new instance with the entry added to the 'keep_signature' set.
+    /// Checks if the 'changed' set contains a specific entry.
     #[inline]
-    pub fn with_added_keep_signature_entry(mut self, entry: SymbolIdentifier) -> Self {
-        self.add_keep_signature_entry(entry);
+    pub fn contains_changed_entry(&self, entry: &SymbolIdentifier) -> bool {
+        self.changed.contains(entry)
+    }
+
+    /// Returns a new instance with the entry added to the 'changed' set.
+    #[inline]
+    pub fn with_added_changed_entry(mut self, entry: SymbolIdentifier) -> Self {
+        self.add_changed_entry(entry);
         self
     }
 
-    /// Adds multiple entries to the 'keep_signature' set.
+    /// Adds multiple entries to the 'changed' set.
     #[inline]
-    pub fn add_keep_signature_entries(&mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) {
-        self.keep_signature.extend(entries);
+    pub fn add_changed_entries(&mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) {
+        self.changed.extend(entries);
     }
 
-    /// Returns a new instance with multiple entries added to the 'keep_signature' set.
+    /// Returns a new instance with multiple entries added to the 'changed' set.
     #[inline]
-    pub fn with_added_keep_signature_entries(mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
-        self.add_keep_signature_entries(entries);
+    pub fn with_added_changed_entries(mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
+        self.add_changed_entries(entries);
         self
     }
 
-    /// Clears the 'keep_signature' set.
+    /// Clears the 'changed' set.
     #[inline]
-    pub fn unset_keep_signature(&mut self) {
-        self.keep_signature.clear();
+    pub fn unset_changed(&mut self) {
+        self.changed.clear();
     }
 
-    /// Returns a new instance with an empty 'keep_signature' set.
+    /// Returns a new instance with an empty 'changed' set.
     #[inline]
-    pub fn without_keep_signature(mut self) -> Self {
-        self.unset_keep_signature();
-        self
-    }
-
-    /// Sets the 'add_or_delete' set, replacing the existing one.
-    #[inline]
-    pub fn set_add_or_delete(&mut self, change_set: impl IntoIterator<Item = SymbolIdentifier>) {
-        self.add_or_delete = change_set.into_iter().collect();
-    }
-
-    /// Returns a new instance with the 'add_or_delete' set replaced.
-    #[inline]
-    pub fn with_add_or_delete(mut self, change_set: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
-        self.set_add_or_delete(change_set);
-        self
-    }
-
-    /// Adds a single entry to the 'add_or_delete' set. Returns `true` if the entry was not already present.
-    #[inline]
-    pub fn add_add_or_delete_entry(&mut self, entry: SymbolIdentifier) -> bool {
-        self.add_or_delete.insert(entry)
-    }
-
-    /// Checks if the 'add_or_delete' set contains a specific entry.
-    #[inline]
-    pub fn contains_add_or_delete_entry(&self, entry: &SymbolIdentifier) -> bool {
-        self.add_or_delete.contains(entry)
-    }
-
-    /// Returns a new instance with the entry added to the 'add_or_delete' set.
-    #[inline]
-    pub fn with_added_add_or_delete_entry(mut self, entry: SymbolIdentifier) -> Self {
-        self.add_add_or_delete_entry(entry);
-        self
-    }
-
-    /// Adds multiple entries to the 'add_or_delete' set.
-    #[inline]
-    pub fn add_add_or_delete_entries(&mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) {
-        self.add_or_delete.extend(entries);
-    }
-
-    /// Returns a new instance with multiple entries added to the 'add_or_delete' set.
-    #[inline]
-    pub fn with_added_add_or_delete_entries(mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
-        self.add_add_or_delete_entries(entries);
-        self
-    }
-
-    /// Clears the 'add_or_delete' set.
-    #[inline]
-    pub fn unset_add_or_delete(&mut self) {
-        self.add_or_delete.clear();
-    }
-
-    /// Returns a new instance with an empty 'add_or_delete' set.
-    #[inline]
-    pub fn without_add_or_delete(mut self) -> Self {
-        self.unset_add_or_delete();
+    pub fn without_changed(mut self) -> Self {
+        self.unset_changed();
         self
     }
 
     /// Sets the diff map, replacing the existing one.
     #[inline]
-    pub fn set_diff_map(&mut self, map: HashMap<FileId, Vec<(usize, usize, isize, isize)>>) {
+    pub fn set_diff_map(&mut self, map: HashMap<FileId, Vec<DiffHunk>>) {
         self.diff_map = map;
     }
 
     /// Returns a new instance with the diff map replaced.
     #[inline]
-    pub fn with_diff_map(mut self, map: HashMap<FileId, Vec<(usize, usize, isize, isize)>>) -> Self {
+    pub fn with_diff_map(mut self, map: HashMap<FileId, Vec<DiffHunk>>) -> Self {
         self.set_diff_map(map);
         self
     }
 
     /// Adds or replaces the diff hunks for a specific source file. Returns previous hunks if any.
     #[inline]
-    pub fn add_diff_map_entry(
-        &mut self,
-        source: FileId,
-        diffs: Vec<(usize, usize, isize, isize)>,
-    ) -> Option<Vec<(usize, usize, isize, isize)>> {
+    pub fn add_diff_map_entry(&mut self, source: FileId, diffs: Vec<DiffHunk>) -> Option<Vec<DiffHunk>> {
         self.diff_map.insert(source, diffs)
     }
 
     /// Returns a new instance with the diff hunks for the source file added or updated.
     #[inline]
-    pub fn with_added_diff_map_entry(mut self, source: FileId, diffs: Vec<(usize, usize, isize, isize)>) -> Self {
+    pub fn with_added_diff_map_entry(mut self, source: FileId, diffs: Vec<DiffHunk>) -> Self {
         self.add_diff_map_entry(source, diffs);
         self
     }
 
     /// Extends the diff hunks for a specific source file.
     #[inline]
-    pub fn add_diffs_for_source(
-        &mut self,
-        source: FileId,
-        diffs: impl IntoIterator<Item = (usize, usize, isize, isize)>,
-    ) {
+    pub fn add_diffs_for_source(&mut self, source: FileId, diffs: impl IntoIterator<Item = DiffHunk>) {
         self.diff_map.entry(source).or_default().extend(diffs);
     }
 
     /// Returns a new instance with the diff hunks for the source file extended.
     #[inline]
-    pub fn with_added_diffs_for_source(
-        mut self,
-        source: FileId,
-        diffs: impl IntoIterator<Item = (usize, usize, isize, isize)>,
-    ) -> Self {
+    pub fn with_added_diffs_for_source(mut self, source: FileId, diffs: impl IntoIterator<Item = DiffHunk>) -> Self {
         self.add_diffs_for_source(source, diffs);
         self
     }
@@ -314,13 +257,13 @@ impl CodebaseDiff {
 
     /// Sets the deletion ranges map, replacing the existing one.
     #[inline]
-    pub fn set_deletion_ranges_map(&mut self, map: HashMap<FileId, Vec<(usize, usize)>>) {
+    pub fn set_deletion_ranges_map(&mut self, map: HashMap<FileId, Vec<DeletionRange>>) {
         self.deletion_ranges_map = map;
     }
 
     /// Returns a new instance with the deletion ranges map replaced.
     #[inline]
-    pub fn with_deletion_ranges_map(mut self, map: HashMap<FileId, Vec<(usize, usize)>>) -> Self {
+    pub fn with_deletion_ranges_map(mut self, map: HashMap<FileId, Vec<DeletionRange>>) -> Self {
         self.set_deletion_ranges_map(map);
         self
     }
@@ -330,14 +273,14 @@ impl CodebaseDiff {
     pub fn add_deletion_ranges_entry(
         &mut self,
         source: FileId,
-        ranges: Vec<(usize, usize)>,
-    ) -> Option<Vec<(usize, usize)>> {
+        ranges: Vec<DeletionRange>,
+    ) -> Option<Vec<DeletionRange>> {
         self.deletion_ranges_map.insert(source, ranges)
     }
 
     /// Returns a new instance with the deletion ranges for the source file added or updated.
     #[inline]
-    pub fn with_added_deletion_ranges_entry(mut self, file: FileId, ranges: Vec<(usize, usize)>) -> Self {
+    pub fn with_added_deletion_ranges_entry(mut self, file: FileId, ranges: Vec<DeletionRange>) -> Self {
         self.add_deletion_ranges_entry(file, ranges);
         self
     }

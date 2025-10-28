@@ -34,8 +34,11 @@ pub(crate) fn build_prelude_internal() -> Prelude {
     Prelude { database, metadata, symbol_references }
 }
 
-fn get_prelude_database() -> mago_database::Database {
-    let mut db = mago_database::Database::new();
+fn get_prelude_database() -> mago_database::Database<'static> {
+    let configuration =
+        mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
+            .into_static();
+    let mut db = mago_database::Database::new(configuration);
     for filename in PHPAssets::iter() {
         let Some(embedded) = PHPAssets::get(&filename) else { continue };
 

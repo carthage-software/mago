@@ -1,6 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use bumpalo::Bump;
+
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_collector::Collector;

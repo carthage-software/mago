@@ -76,7 +76,10 @@ mod tests {
 
     pub(crate) fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
         let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
-        let database = Database::single(file);
+        let config =
+            mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
+                .into_static();
+        let database = Database::single(file, config);
 
         let mut codebase = CodebaseMetadata::new();
         let arena = Bump::new();
