@@ -44,7 +44,8 @@ features:
 <div class="sponsors-list"><div class="sponsors-list-large"><div class="sponsor-item-large"><a href="https://www.jetbrains.com/" title="JetBrains" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/60931315?u=f9b545e50cace9e9028f77eaf1e83104d18d4d48&v=4&s=256" alt="JetBrains"></a><div class="sponsor-name"><a href="https://www.jetbrains.com/" target="_blank" rel="noopener">JetBrains</a></div></div>
 </div><hr><div class="sponsors-list-medium"><div class="sponsor-item-medium"><a href="https://github.com/jasonrm" title="Jason R. McNeil" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=96" alt="Jason R. McNeil"></a></div>
 <div class="sponsor-item-medium"><a href="https://ofcompute.rs/" title="Vincent Berset" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=96" alt="Vincent Berset"></a></div>
-</div><hr><div class="sponsors-list-small"><a class="sponsor-item-small" href="https://www.ticketswap.com" title="TicketSwap" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=48" alt="TicketSwap"></a>
+</div><hr><div class="sponsors-list-small"><a class="sponsor-item-small" href="https://github.com/kambo-1st" title="Bohuslav Šimek" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=48" alt="Bohuslav Šimek"></a>
+<a class="sponsor-item-small" href="https://www.ticketswap.com" title="TicketSwap" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=48" alt="TicketSwap"></a>
 </div></div><hr /><p style="text-align: center;">Your logo here? <a href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Become a sponsor!</a></p>
 <!-- SPONSORS_END -->
 </div>
