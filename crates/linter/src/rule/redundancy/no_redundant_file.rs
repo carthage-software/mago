@@ -145,7 +145,7 @@ fn is_statement_useful<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool
         | Statement::Break(_)
         | Statement::Switch(_)
         | Statement::If(_) => true,
-        Statement::Echo(_) | Statement::HaltCompiler(_) | Statement::Unset(_) => true,
+        Statement::Echo(_) | Statement::EchoTag(_) | Statement::HaltCompiler(_) | Statement::Unset(_) => true,
         Statement::Class(_) | Statement::Interface(_) | Statement::Trait(_) | Statement::Enum(_) => true,
         Statement::Constant(_) | Statement::Function(_) => true,
         Statement::Return(_) => true,
