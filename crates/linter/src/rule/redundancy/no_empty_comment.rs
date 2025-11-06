@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_span::HasSpan;
+use mago_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -58,6 +60,8 @@ impl LintRule for NoEmptyCommentRule {
                 <?php
 
                 // This is a useful comment.
+                //
+                // And so is this whole single line comment block, including the enclosed empty line.
                 # This is also a useful comment.
                 /**
                  * This is a docblock.
@@ -93,7 +97,37 @@ impl LintRule for NoEmptyCommentRule {
             return;
         };
 
+        // Keep track of ongoing blocks of single line comments and only complain about empty
+        // single line comments if they are at the start or end of such a block
+        let mut current_block = None;
+        let mut pending = Vec::new();
+        let mut submit = |pending: &mut Vec<Span>| {
+            for span in pending.drain(..) {
+                let issue = Issue::new(self.cfg.level(), "Empty comments are not allowed.")
+                    .with_code(self.meta.code)
+                    .with_annotation(Annotation::primary(span).with_message("This is an empty comment"))
+                    .with_help("Consider removing this comment.");
+
+                ctx.collector.propose(issue, |plan| {
+                    plan.delete(span.to_range(), SafetyClassification::Safe);
+                });
+            }
+        };
+
         for trivia in program.trivia.iter() {
+            // Check if we're still in the same block of single line comments
+            if let Some((kind, end)) = &mut current_block {
+                if (trivia.kind == *kind || trivia.kind == TriviaKind::WhiteSpace) && trivia.start_position() == *end {
+                    *end = trivia.end_position();
+                } else {
+                    current_block = None;
+                }
+            }
+
+            if current_block.is_none() {
+                submit(&mut pending);
+            }
+
             if !trivia.kind.is_comment() {
                 continue;
             }
@@ -104,23 +138,16 @@ impl LintRule for NoEmptyCommentRule {
 
             let is_empty = comment_lines(trivia).iter().all(|(_, line)| line.trim().is_empty());
             if !is_empty {
+                if trivia.kind.is_single_line_comment() {
+                    current_block = Some((trivia.kind, trivia.end_position()));
+                    pending.clear();
+                }
                 continue;
             }
 
-            let issue = Issue::new(self.cfg.level(), "Empty comments are not allowed.")
-                .with_code(self.meta.code)
-                .with_annotation(Annotation::primary(trivia.span).with_message("This is an empty comment"))
-                .with_help("Consider removing this comment.");
-
-            if trivia.kind.is_single_line_comment() {
-                ctx.collector.report(issue);
-
-                continue;
-            }
-
-            ctx.collector.propose(issue, |plan| {
-                plan.delete(trivia.span.to_range(), SafetyClassification::Safe);
-            });
+            pending.push(trivia.span);
         }
+
+        submit(&mut pending);
     }
 }
