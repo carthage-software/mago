@@ -15,7 +15,8 @@ extend-ignore-re = [
     "<<<FOF",
     "FOF;",
     '"nd",',
-    'GTI'
+    'GTI',
+    'ND'
 ]
 
 [default.extend-words]
