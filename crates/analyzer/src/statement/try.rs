@@ -209,6 +209,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     true,
                 );
             }
+            
+            all_catches_leave = catch_actions.iter().all(|actions| !actions.contains(&ControlAction::None));
 
             let new_catch_assigned_variables_ids = catch_block_context.assigned_variable_ids.clone();
             catch_block_context.assigned_variable_ids.extend(old_catch_assigned_variable_ids);
