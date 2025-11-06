@@ -21,6 +21,11 @@ impl RuleRegistry {
     pub fn build(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         let integrations = settings.integrations;
         let rules: Vec<AnyRule> = AnyRule::get_all_for(settings, only, include_disabled || only.is_some());
+        if let Some(only) = only
+            && rules.is_empty()
+        {
+            tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
+        }
 
         let max_kind = u8::MAX as usize + 1;
         let mut temp: Vec<Vec<usize>> = vec![Vec::new(); max_kind];
