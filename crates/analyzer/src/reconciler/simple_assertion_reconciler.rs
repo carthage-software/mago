@@ -2022,8 +2022,6 @@ fn reconcile_has_nonnull_entry_for_key(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined;
-
     let mut new_var_type = existing_var_type.clone();
 
     let existing_var_types = new_var_type.types.to_mut().drain(..).collect::<Vec<_>>();
@@ -2039,22 +2037,16 @@ fn reconcile_has_nonnull_entry_for_key(
 
                         if known_item.0 {
                             *known_item = (false, nonnull);
-                            did_remove_type = true;
                         } else if known_item.1 != nonnull {
                             known_item.1 = nonnull;
-                            did_remove_type = true;
                         }
                     } else if let Some((_, value_param)) = parameters {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
                         known_items.insert(*key_name, (false, nonnull));
-                        did_remove_type = true;
                     } else {
-                        did_remove_type = true;
                         continue;
                     }
                 } else if let Some((key_param, value_param)) = parameters {
-                    did_remove_type = true;
-
                     if union_comparator::can_expression_types_be_identical(
                         context.codebase,
                         &key_name.to_general_union(),
@@ -2068,46 +2060,39 @@ fn reconcile_has_nonnull_entry_for_key(
                         continue;
                     }
                 } else {
-                    did_remove_type = true;
                     continue;
                 }
 
                 acceptable_types.push(atomic);
             }
             TAtomic::Array(TArray::List(TList { known_elements, element_type, .. })) => {
-                if let ArrayKey::Integer(i) = key_name {
-                    if let Some(known_elements) = known_elements {
-                        if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
-                            let nonnull = subtract_null(context, assertion, &known_element.1, None, negated, None);
+                let ArrayKey::Integer(i) = key_name else {
+                    continue;
+                };
 
-                            if known_element.0 {
-                                *known_element = (false, nonnull);
-                                did_remove_type = true;
-                            } else if known_element.1 != nonnull {
-                                known_element.1 = nonnull;
-                                did_remove_type = true;
-                            }
-                        } else if !element_type.is_never() {
-                            let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
-                            known_elements.insert(*i as usize, (false, nonnull));
-                            did_remove_type = true;
-                        } else {
-                            did_remove_type = true;
-                            continue;
+                if let Some(known_elements) = known_elements {
+                    if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
+                        let nonnull = subtract_null(context, assertion, &known_element.1, None, negated, None);
+
+                        if known_element.0 {
+                            *known_element = (false, nonnull);
+                        } else if known_element.1 != nonnull {
+                            known_element.1 = nonnull;
                         }
                     } else if !element_type.is_never() {
                         let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
-                        *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]));
-                        did_remove_type = true;
+                        known_elements.insert(*i as usize, (false, nonnull));
+                    } else {
+                        continue;
                     }
-
-                    acceptable_types.push(atomic);
-                } else {
-                    did_remove_type = true;
+                } else if !element_type.is_never() {
+                    let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
+                    *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]));
                 }
+
+                acceptable_types.push(atomic);
             }
             TAtomic::GenericParameter(generic_parameter) => {
-                did_remove_type = true;
                 if let Some(atomic) = map_concrete_generic_constraint(generic_parameter, |constraint| {
                     reconcile_has_nonnull_entry_for_key(context, assertion, constraint, None, key_name, negated, None)
                 }) {
@@ -2115,38 +2100,33 @@ fn reconcile_has_nonnull_entry_for_key(
                 }
             }
             TAtomic::Variable { .. } => {
-                did_remove_type = true;
                 acceptable_types.push(atomic);
             }
             TAtomic::Mixed(_) => {
-                did_remove_type = true;
                 acceptable_types.push(atomic);
             }
             TAtomic::Object(TObject::Named(_)) => {
-                did_remove_type = true;
                 acceptable_types.push(atomic);
             }
             TAtomic::Scalar(TScalar::String(s)) if !s.is_known_literal() => {
                 if let ArrayKey::Integer(_) = key_name {
                     acceptable_types.push(atomic);
                 }
-
-                did_remove_type = true;
             }
-            _ => {
-                did_remove_type = true;
-            }
+            _ => {}
         }
     }
 
-    // every type was removed, this is an impossible assertion
+    // Only report issues if all types became incompatible (truly impossible)
+    // Don't report redundancy just because the type already satisfied the assertion,
+    // as the check might be part of a more specific condition (e.g., is_string after isset)
     if let Some(key) = key
         && let Some(span) = span
-        && (!did_remove_type || acceptable_types.is_empty())
+        && acceptable_types.is_empty()
     {
         let old_var_type_atom = existing_var_type.get_id();
 
-        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, span);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
     }
 
     if acceptable_types.is_empty() {

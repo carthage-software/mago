@@ -456,13 +456,23 @@ fn add_nested_assertions<'ctx>(
                         entry.push(vec![Assertion::HasNonnullEntryForKey(new_key)]);
 
                         if key_parts.is_empty() {
-                            keys_to_remove.push(nk.clone());
+                            // Only remove the nested key if it contains ONLY isset-related assertions
+                            // If it has other assertions (e.g., IsType from is_string()), keep them
+                            let only_isset_assertions = new_type.iter().all(|clause| {
+                                clause
+                                    .iter()
+                                    .all(|assertion| matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset))
+                            });
 
-                            if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
-                                active_new_types.entry(base_key.clone()).or_default().insert(entry.len() - 1);
+                            if only_isset_assertions {
+                                keys_to_remove.push(nk.clone());
+
+                                if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
+                                    active_new_types.entry(base_key.clone()).or_default().insert(entry.len() - 1);
+                                }
+
+                                continue 'outer;
                             }
-
-                            continue 'outer;
                         }
                     } else {
                         entry.push(vec![if array_key.contains('\'') {
