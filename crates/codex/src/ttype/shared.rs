@@ -39,6 +39,8 @@ pub const NON_POSITIVE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(
 pub const NEGATIVE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::negative()));
 /// A static `TAtomic` representing a non-negative integer (`non-negative-int` or `int<0, max>`).
 pub const NON_NEGATIVE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::non_negative()));
+/// A static `TAtomic` representing a `literal-int` where the value is unknown.
+pub const UNSPECIFIED_LITERAL_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::UnspecifiedLiteral));
 /// A static `TAtomic` for the general `string` type.
 pub const STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, false)));
 /// A static `TAtomic` for a `lowercase-string`.

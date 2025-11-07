@@ -36,6 +36,9 @@ pub enum TInteger {
     Range(i64, i64),
     /// The most general integer type, representing any possible integer value.
     Unspecified,
+    /// Literal integer with unspecified value (literal-int).
+    /// This type accepts only literal integers (known values) but not general int.
+    UnspecifiedLiteral,
 }
 
 impl TInteger {
@@ -105,10 +108,22 @@ impl TInteger {
         Self::To(0)
     }
 
+    /// Creates an instance representing a `literal-int` (any literal integer).
+    #[inline]
+    pub const fn unspecified_literal() -> Self {
+        Self::UnspecifiedLiteral
+    }
+
     /// Returns `true` if the type is `Unspecified`.
     #[inline]
     pub const fn is_unspecified(&self) -> bool {
         matches!(self, TInteger::Unspecified)
+    }
+
+    /// Returns `true` if the type is `UnspecifiedLiteral`.
+    #[inline]
+    pub const fn is_unspecified_literal(&self) -> bool {
+        matches!(self, TInteger::UnspecifiedLiteral)
     }
 
     /// Returns `true` if the type is a `Literal`.
@@ -232,7 +247,7 @@ impl TInteger {
             TInteger::From(value) => (Some(value), None),
             TInteger::To(value) => (None, Some(value)),
             TInteger::Range(from, to) => (Some(from), Some(to)),
-            TInteger::Unspecified => (None, None),
+            TInteger::Unspecified | TInteger::UnspecifiedLiteral => (None, None),
         }
     }
 
@@ -255,8 +270,18 @@ impl TInteger {
             return true;
         }
 
+        // Rule: UnspecifiedLiteral contains any Literal value
+        if self.is_unspecified_literal() {
+            return input.is_literal();
+        }
+
         // Rule: A specific container cannot hold the general `Unspecified` type.
         if input.is_unspecified() {
+            return false;
+        }
+
+        // Rule: A specific container cannot hold UnspecifiedLiteral
+        if input.is_unspecified_literal() {
             return false;
         }
 
@@ -290,10 +315,18 @@ impl TInteger {
             return int_containers.iter().any(|c| c.contains(*self));
         }
 
+        // An unspecified literal can only be contained by unspecified or another unspecified literal
+        if self.is_unspecified_literal() {
+            return int_containers.iter().any(|c| c.is_unspecified_literal() || c.is_unspecified());
+        }
+
         // An unspecified input can only be contained by an unspecified container (already checked).
         if self.is_unspecified() {
             return false;
         }
+
+        // Filter out UnspecifiedLiteral from containers before range reduction
+        int_containers.retain(|c| !c.is_unspecified_literal());
 
         // 3. Set up the range reduction algorithm.
         // Represent the input range with optional bounds, where None means infinity.
@@ -364,8 +397,10 @@ impl TInteger {
                             keep_container = false;
                         }
                     }
-                    TInteger::Unspecified => {
-                        unreachable!("Unspecified integers should have been filtered out before this point");
+                    TInteger::Unspecified | TInteger::UnspecifiedLiteral => {
+                        unreachable!(
+                            "Unspecified/UnspecifiedLiteral integers should have been filtered out before this point"
+                        );
                     }
                 }
 
@@ -407,8 +442,20 @@ impl TInteger {
             TInteger::Unspecified if !conservative_subtraction => {
                 // Subtracting the entire set leaves nothing.
             }
+            TInteger::UnspecifiedLiteral if !conservative_subtraction => {
+                // Subtracting all literals from UnspecifiedLiteral leaves nothing
+                if self.is_unspecified_literal() {
+                    // Nothing remains
+                } else if self.is_unspecified() {
+                    // Can't easily represent "all non-literals", return self
+                    res.push(*self);
+                } else if !self.is_literal() {
+                    // Range types remain unchanged when subtracting literals
+                    res.push(*self);
+                }
+            }
             TInteger::Literal(b) => match *self {
-                TInteger::Unspecified => {
+                TInteger::Unspecified | TInteger::UnspecifiedLiteral => {
                     if b > i64::MIN {
                         res.push(TInteger::To(b - 1));
                     }
@@ -471,6 +518,10 @@ impl TInteger {
                         res.push(TInteger::From(b2 + 1));
                     }
                 }
+                TInteger::UnspecifiedLiteral => {
+                    // Can't easily represent "all literals except those in range"
+                    res.push(TInteger::UnspecifiedLiteral);
+                }
                 TInteger::Literal(a) => {
                     if a >= b1 && a <= b2 {
                         // Fully contained.
@@ -524,6 +575,10 @@ impl TInteger {
                         res.push(TInteger::To(b - 1));
                     }
                 }
+                TInteger::UnspecifiedLiteral => {
+                    // Can't easily represent "all literals less than b"
+                    res.push(TInteger::UnspecifiedLiteral);
+                }
                 TInteger::Literal(a) => {
                     if a < b {
                         res.push(TInteger::Literal(a));
@@ -555,6 +610,10 @@ impl TInteger {
                     if b < i64::MAX {
                         res.push(TInteger::From(b + 1));
                     }
+                }
+                TInteger::UnspecifiedLiteral => {
+                    // Can't easily represent "all literals greater than b"
+                    res.push(TInteger::UnspecifiedLiteral);
                 }
                 TInteger::Literal(a) => {
                     if a > b {
@@ -599,6 +658,7 @@ impl TInteger {
             TInteger::To(t) => TInteger::From(-t),
             TInteger::Range(f, t) => TInteger::Range(-t, -f),
             TInteger::Unspecified => TInteger::Unspecified,
+            TInteger::UnspecifiedLiteral => TInteger::UnspecifiedLiteral,
         }
     }
 
@@ -700,6 +760,18 @@ impl TInteger {
             return vec![TInteger::Unspecified];
         }
 
+        // If there's an UnspecifiedLiteral, it absorbs all Literal values
+        if types.iter().any(TInteger::is_unspecified_literal) {
+            let mut result = vec![TInteger::UnspecifiedLiteral];
+            // Keep non-literal types
+            for t in types {
+                if !t.is_literal() && !t.is_unspecified_literal() {
+                    result.push(*t);
+                }
+            }
+            return result;
+        }
+
         if types.iter().all(TInteger::is_literal) {
             return types.to_vec();
         }
@@ -712,6 +784,7 @@ impl TInteger {
                 TInteger::To(t) => (i64::MIN, t),
                 TInteger::Range(f, t) => (f, t),
                 TInteger::Unspecified => (i64::MIN, i64::MAX),
+                TInteger::UnspecifiedLiteral => (i64::MIN, i64::MAX), // Should not reach here, but handle it
             })
             .collect();
 
@@ -788,6 +861,7 @@ impl TType for TInteger {
             }
             TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), ", ", i64_atom(*to), ">"),
             TInteger::Unspecified => atom("int"),
+            TInteger::UnspecifiedLiteral => atom("literal-int"),
         }
     }
 
@@ -804,6 +878,10 @@ impl Add for TInteger {
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_add(l2)),
             (Literal(l), From(f)) | (From(f), Literal(l)) => From(l.saturating_add(f)),
             (Literal(l), To(t)) | (To(t), Literal(l)) => To(l.saturating_add(t)),
@@ -826,6 +904,10 @@ impl Sub for TInteger {
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_sub(l2)),
             (From(f), Literal(l)) => From(f.saturating_sub(l)),
             (Literal(l), From(f)) => To(l.saturating_sub(f)),
@@ -850,6 +932,10 @@ impl Mul for TInteger {
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_mul(l2)),
             (Literal(0), _) | (_, Literal(0)) => Literal(0),
             (Literal(l), From(f)) | (From(f), Literal(l)) => {
@@ -910,6 +996,16 @@ impl Div for TInteger {
 
         match (self, rhs) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => {
+                if rhs.can_be_zero() {
+                    Unspecified
+                } else {
+                    UnspecifiedLiteral
+                }
+            }
+            (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (_, rhs) if rhs.can_be_zero() => Unspecified,
             (Literal(l1), Literal(l2)) => {
                 if l1 == 0 {
@@ -1009,8 +1105,19 @@ impl Rem for TInteger {
         use TInteger::*;
 
         match (self, rhs) {
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => {
+                if rhs.can_be_zero() {
+                    Unspecified
+                } else {
+                    UnspecifiedLiteral
+                }
+            }
+            (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Unspecified, other) => match other {
                 Unspecified => Unspecified,
+                UnspecifiedLiteral => Unspecified,
                 Literal(n) => {
                     if n == 0 {
                         // Division by zero is a potential error.
@@ -1127,6 +1234,7 @@ impl Neg for TInteger {
             TInteger::To(a) => TInteger::From(-a),
             TInteger::Range(min, max) => TInteger::Range(-max, -min),
             TInteger::Unspecified => TInteger::Unspecified,
+            TInteger::UnspecifiedLiteral => TInteger::UnspecifiedLiteral,
         }
     }
 }
@@ -1143,6 +1251,9 @@ impl BitAnd for TInteger {
         use TInteger::*;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 & l2),
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
             _ => Unspecified,
         }
     }
@@ -1159,6 +1270,9 @@ impl BitOr for TInteger {
         use TInteger::*;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 | l2),
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
             _ => Unspecified,
         }
     }
@@ -1175,6 +1289,9 @@ impl BitXor for TInteger {
         use TInteger::*;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 ^ l2),
+            (UnspecifiedLiteral, UnspecifiedLiteral)
+            | (UnspecifiedLiteral, Literal(_))
+            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
             _ => Unspecified,
         }
     }
@@ -1209,7 +1326,13 @@ impl Shl<TInteger> for TInteger {
                     Range(r1, r2)
                 }
                 Unspecified => Unspecified,
+                UnspecifiedLiteral => UnspecifiedLiteral,
             };
+        }
+
+        // Special case: UnspecifiedLiteral shifted by UnspecifiedLiteral
+        if self.is_unspecified_literal() && rhs.is_unspecified_literal() {
+            return UnspecifiedLiteral;
         }
 
         // If the shift amount is a range, the result is not a continuous interval.
@@ -1245,7 +1368,13 @@ impl Shr for TInteger {
                     Range(min(r1, r2), max(r1, r2))
                 }
                 Unspecified => Unspecified,
+                UnspecifiedLiteral => UnspecifiedLiteral,
             };
+        }
+
+        // Special case: UnspecifiedLiteral shifted by UnspecifiedLiteral
+        if self.is_unspecified_literal() && rhs.is_unspecified_literal() {
+            return UnspecifiedLiteral;
         }
 
         Unspecified
@@ -1283,6 +1412,7 @@ impl std::fmt::Display for TInteger {
             }
             TInteger::Range(from, to) => write!(f, "int<{from}, {to}>"),
             TInteger::Unspecified => write!(f, "int"),
+            TInteger::UnspecifiedLiteral => write!(f, "literal-int"),
         }
     }
 }

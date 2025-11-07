@@ -141,6 +141,12 @@ impl TScalar {
         TScalar::String(TString::unspecified_literal(non_empty))
     }
 
+    /// Creates a literal `int` type with an unspecified value (literal-int)
+    #[inline]
+    pub const fn unspecified_literal_int() -> Self {
+        TScalar::Integer(TInteger::unspecified_literal())
+    }
+
     /// Creates the general `class-string` type (no constraint `<T>`).
     #[inline]
     pub const fn class_string() -> Self {

@@ -70,6 +70,7 @@ use crate::ttype::get_scalar;
 use crate::ttype::get_string;
 use crate::ttype::get_true;
 use crate::ttype::get_truthy_string;
+use crate::ttype::get_unspecified_literal_int;
 use crate::ttype::get_unspecified_literal_string;
 use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -355,6 +356,7 @@ pub fn get_union_from_type_ast<'i>(
         Type::NonEmptyUnspecifiedLiteralString(_) => get_non_empty_unspecified_literal_string(),
         Type::NonEmptyLowercaseString(_) => get_non_empty_lowercase_string(),
         Type::LowercaseString(_) => get_lowercase_string(),
+        Type::UnspecifiedLiteralInt(_) => get_unspecified_literal_int(),
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
         Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
         Type::LiteralString(lit) => get_literal_string(atom(lit.value)),
