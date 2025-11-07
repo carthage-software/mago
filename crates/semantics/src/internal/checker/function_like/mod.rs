@@ -11,6 +11,172 @@ pub use parameter::*;
 
 use super::returns_generator;
 
+/// Helper function to check if an expression contains $this
+fn contains_this_in_expression<'arena>(expression: &Expression<'arena>) -> Option<Span> {
+    // Check if this expression is $this
+    if let Expression::Variable(Variable::Direct(var)) = expression
+        && var.name == "$this"
+    {
+        return Some(var.span());
+    }
+
+    // Don't recurse into nested closures/arrow functions/anonymous classes
+    // as they have their own $this binding
+    match expression {
+        Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::AnonymousClass(_) => {
+            return None;
+        }
+        _ => {}
+    }
+
+    // For now, we'll use a simple approach that just checks common cases
+    // A more complete implementation would traverse all expression types
+    match expression {
+        Expression::Binary(binary) => {
+            if let Some(span) = contains_this_in_expression(binary.lhs) {
+                return Some(span);
+            }
+            contains_this_in_expression(binary.rhs)
+        }
+        Expression::Parenthesized(paren) => contains_this_in_expression(paren.expression),
+        Expression::Access(access) => match access {
+            Access::Property(prop) => contains_this_in_expression(prop.object),
+            Access::NullSafeProperty(prop) => contains_this_in_expression(prop.object),
+            _ => None,
+        },
+        Expression::Call(call) => match call {
+            Call::Method(method_call) => contains_this_in_expression(method_call.object),
+            Call::NullSafeMethod(method_call) => contains_this_in_expression(method_call.object),
+            _ => None,
+        },
+        Expression::Conditional(conditional) => {
+            if let Some(span) = contains_this_in_expression(conditional.condition) {
+                return Some(span);
+            }
+            if let Some(then) = &conditional.then
+                && let Some(span) = contains_this_in_expression(then)
+            {
+                return Some(span);
+            }
+            contains_this_in_expression(conditional.r#else)
+        }
+        Expression::ArrayAccess(array_access) => contains_this_in_expression(array_access.array),
+        _ => None,
+    }
+}
+
+/// Helper function to check if a block contains $this
+fn contains_this_in_block<'arena>(block: &Block<'arena>) -> Option<Span> {
+    for statement in block.statements.iter() {
+        if let Some(span) = contains_this_in_statement(statement) {
+            return Some(span);
+        }
+    }
+    None
+}
+
+/// Helper function to check if a statement contains $this
+fn contains_this_in_statement<'arena>(statement: &Statement<'arena>) -> Option<Span> {
+    match statement {
+        Statement::Block(block) => contains_this_in_block(block),
+        Statement::Expression(expression) => contains_this_in_expression(expression.expression),
+        Statement::Return(r#return) => {
+            if let Some(value) = &r#return.value {
+                contains_this_in_expression(value)
+            } else {
+                None
+            }
+        }
+        Statement::Echo(echo) => {
+            for expr in echo.values.iter() {
+                if let Some(span) = contains_this_in_expression(expr) {
+                    return Some(span);
+                }
+            }
+            None
+        }
+        // For other statement types, we'll need to check their bodies
+        Statement::If(r#if) => {
+            if let Some(span) = contains_this_in_expression(r#if.condition) {
+                return Some(span);
+            }
+            match &r#if.body {
+                IfBody::Statement(stmt_body) => contains_this_in_statement(stmt_body.statement),
+                IfBody::ColonDelimited(colon_body) => {
+                    for stmt in colon_body.statements.iter() {
+                        if let Some(span) = contains_this_in_statement(stmt) {
+                            return Some(span);
+                        }
+                    }
+                    None
+                }
+            }
+        }
+        Statement::While(r#while) => {
+            if let Some(span) = contains_this_in_expression(r#while.condition) {
+                return Some(span);
+            }
+            match &r#while.body {
+                WhileBody::Statement(stmt) => contains_this_in_statement(stmt),
+                WhileBody::ColonDelimited(colon_body) => {
+                    for stmt in colon_body.statements.iter() {
+                        if let Some(span) = contains_this_in_statement(stmt) {
+                            return Some(span);
+                        }
+                    }
+                    None
+                }
+            }
+        }
+        Statement::For(r#for) => {
+            for init in r#for.initializations.iter() {
+                if let Some(span) = contains_this_in_expression(init) {
+                    return Some(span);
+                }
+            }
+            for condition in r#for.conditions.iter() {
+                if let Some(span) = contains_this_in_expression(condition) {
+                    return Some(span);
+                }
+            }
+            for increment in r#for.increments.iter() {
+                if let Some(span) = contains_this_in_expression(increment) {
+                    return Some(span);
+                }
+            }
+            match &r#for.body {
+                ForBody::Statement(stmt) => contains_this_in_statement(stmt),
+                ForBody::ColonDelimited(colon_body) => {
+                    for stmt in colon_body.statements.iter() {
+                        if let Some(span) = contains_this_in_statement(stmt) {
+                            return Some(span);
+                        }
+                    }
+                    None
+                }
+            }
+        }
+        Statement::Foreach(foreach) => {
+            if let Some(span) = contains_this_in_expression(foreach.expression) {
+                return Some(span);
+            }
+            match &foreach.body {
+                ForeachBody::Statement(stmt) => contains_this_in_statement(stmt),
+                ForeachBody::ColonDelimited(colon_body) => {
+                    for stmt in colon_body.statements.iter() {
+                        if let Some(span) = contains_this_in_statement(stmt) {
+                            return Some(span);
+                        }
+                    }
+                    None
+                }
+            }
+        }
+        Statement::Try(r#try) => contains_this_in_block(&r#try.block),
+        _ => None,
+    }
+}
+
 #[inline]
 pub fn check_function<'arena>(function: &Function<'arena>, context: &mut Context<'_, '_, 'arena>) {
     check_for_promoted_properties_outside_constructor(&function.parameter_list, context);
@@ -87,6 +253,23 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 
     check_for_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
 
+    // Check for $this usage in static arrow functions
+    if arrow_function.r#static.is_some()
+        && let Some(this_span) = contains_this_in_expression(arrow_function.expression)
+    {
+        context.report(
+            Issue::error("Cannot use `$this` in a static arrow function.")
+                .with_annotation(
+                    Annotation::primary(this_span).with_message("`$this` is not available in static context."),
+                )
+                .with_annotation(
+                    Annotation::secondary(arrow_function.r#static.unwrap().span)
+                        .with_message("Arrow function is declared as static here."),
+                )
+                .with_help("Remove the `static` keyword or avoid using `$this` in the arrow function body."),
+        );
+    }
+
     if let Some(return_hint) = &arrow_function.return_type_hint {
         // while technically valid, it is not possible to return `void` from an arrow function
         // because the return value is always inferred from the body, even if the body does
@@ -129,6 +312,23 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 #[inline]
 pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_, '_, 'arena>) {
     check_for_promoted_properties_outside_constructor(&closure.parameter_list, context);
+
+    // Check for $this usage in static closures
+    if closure.r#static.is_some()
+        && let Some(this_span) = contains_this_in_block(&closure.body)
+    {
+        context.report(
+            Issue::error("Cannot use `$this` in a static closure.")
+                .with_annotation(
+                    Annotation::primary(this_span).with_message("`$this` is not available in static context."),
+                )
+                .with_annotation(
+                    Annotation::secondary(closure.r#static.unwrap().span)
+                        .with_message("Closure is declared as static here."),
+                )
+                .with_help("Remove the `static` keyword or avoid using `$this` in the closure body."),
+        );
+    }
 
     if !context.version.is_supported(Feature::TrailingCommaInClosureUseList)
         && let Some(trailing_comma) = &closure.use_clause.as_ref().and_then(|u| u.variables.get_trailing_token())
