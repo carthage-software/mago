@@ -105,6 +105,7 @@ pub struct RulesSettings {
     pub explicit_octal: RuleSettings<ExplicitOctalConfig>,
     pub prefer_arrow_function: RuleSettings<PreferArrowFunctionConfig>,
     pub prefer_interface: RuleSettings<PreferInterfaceConfig>,
+    pub prefer_static_closure: RuleSettings<PreferStaticClosureConfig>,
     pub prefer_view_array: RuleSettings<PreferViewArrayConfig>,
     pub prefer_while_loop: RuleSettings<PreferWhileLoopConfig>,
     pub psl_array_functions: RuleSettings<PslArrayFunctionsConfig>,

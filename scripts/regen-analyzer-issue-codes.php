@@ -428,12 +428,12 @@ final class AnalyzerCodeModuleGenerator
         $count = count($codes);
         $method = "    pub const fn get_{$name}_issue_codes() -> [Self; {$count}] {\n";
         $method .= "        [\n            ";
-        $method .= implode(', ', array_map(fn(string $c): string => "Self::{$c}", array_keys($codes)));
+        $method .= implode(', ', array_map(static fn(string $c): string => "Self::{$c}", array_keys($codes)));
         $method .= "\n        ]\n    }\n\n";
 
         $method .= "    pub const fn get_{$name}_issue_code_values() -> [&'static str; {$count}] {\n";
         $method .= "        [\n            ";
-        $method .= implode(', ', array_map(fn(string $c): string => "\"{$c}\"", array_values($codes)));
+        $method .= implode(', ', array_map(static fn(string $c): string => "\"{$c}\"", array_values($codes)));
         $method .= "\n        ]\n    }\n\n";
 
         return $method;
