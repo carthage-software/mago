@@ -113,8 +113,9 @@ fn parse_lhs_expression<'arena>(
         return parse_ambiguous_clone_expression(stream);
     }
 
-    if matches!((token.kind, next), (T!["function" | "fn"], _))
-        || matches!((token.kind, next), (T!["static"], Some(T!["function" | "fn"])))
+    if !stream.state.within_string_interpolation
+        && (matches!((token.kind, next), (T!["function" | "fn"], _))
+            || matches!((token.kind, next), (T!["static"], Some(T!["function" | "fn"]))))
     {
         return parse_arrow_function_or_closure(stream).map(|e| match e {
             Either::Left(arrow_function) => Expression::ArrowFunction(arrow_function),
@@ -151,7 +152,8 @@ fn parse_lhs_expression<'arena>(
         (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(parse_magic_constant(stream)?),
         (kind, ..)
             if matches!(kind, T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "clone"])
-                || kind.is_soft_reserved_identifier() =>
+                || kind.is_soft_reserved_identifier()
+                || (stream.state.within_string_interpolation && kind.is_reserved_identifier()) =>
         {
             Expression::Identifier(identifier::parse_identifier(stream)?)
         }

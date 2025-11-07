@@ -152,7 +152,12 @@ pub fn parse_braced_expression_string_part<'arena>(
 fn parse_string_part_expression<'arena>(
     stream: &mut TokenStream<'_, 'arena>,
 ) -> Result<Expression<'arena>, ParseError> {
-    let expression = parse_expression(stream)?;
+    let previous_state = stream.state.within_string_interpolation;
+    stream.state.within_string_interpolation = true;
+    let expression = parse_expression(stream);
+    stream.state.within_string_interpolation = previous_state;
+
+    let expression = expression?;
 
     let Expression::ArrayAccess(ArrayAccess { array, left_bracket, index, right_bracket }) = expression else {
         return Ok(expression);

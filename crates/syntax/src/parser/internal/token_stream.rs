@@ -20,6 +20,7 @@ use crate::token::TokenKind;
 #[derive(Debug, Default)]
 pub struct State {
     pub within_indirect_variable: bool,
+    pub within_string_interpolation: bool,
 }
 
 #[derive(Debug)]

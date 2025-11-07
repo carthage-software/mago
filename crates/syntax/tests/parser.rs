@@ -1174,4 +1174,18 @@ mod parser {
     test_expression!(rand_199, "$a or $b || $c ** $d >= $e", "($a or ($b || (($c ** $d) >= $e)))");
 
     smoke_test!(closing_tag_echo_tag, "<?= $a ?> <?= $b;");
+
+    // Keywords in array access within string interpolation should be treated as identifiers
+    smoke_test!(keyword_class_in_string_array_access, "<?php echo \"$arr[class]\";");
+    smoke_test!(keyword_interface_in_string_array_access, "<?php echo \"$arr[interface]\";");
+    smoke_test!(keyword_function_in_string_array_access, "<?php echo \"$arr[function]\";");
+    smoke_test!(keyword_namespace_in_string_array_access, "<?php echo \"$arr[namespace]\";");
+    smoke_test!(keyword_if_in_string_array_access, "<?php echo \"$arr[if]\";");
+    smoke_test!(keyword_return_in_string_array_access, "<?php echo \"$arr[return]\";");
+    smoke_test!(keyword_trait_in_string_array_access, "<?php echo \"$arr[trait]\";");
+    smoke_test!(keyword_abstract_in_string_array_access, "<?php echo \"$arr[abstract]\";");
+    smoke_test!(keyword_final_in_string_array_access, "<?php echo \"$arr[final]\";");
+    smoke_test!(keyword_public_in_string_array_access, "<?php echo \"$arr[public]\";");
+    smoke_test!(keyword_private_in_string_array_access, "<?php echo \"$arr[private]\";");
+    smoke_test!(keyword_protected_in_string_array_access, "<?php echo \"$arr[protected]\";");
 }
