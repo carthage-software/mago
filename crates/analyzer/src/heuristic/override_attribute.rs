@@ -98,15 +98,18 @@ pub fn check_override_attribute<'ctx, 'arena>(
 
         let parent_classname = parents_metadata.original_name;
 
-        let issue =
-            Issue::error(format!("Missing `#[Override]` attribute on overriding method `{class_name}::{name}`."))
-                .with_code(IssueCode::MissingOverrideAttribute)
-                .with_annotation(
-                    Annotation::primary(method.name.span)
-                        .with_message(format!("This method overrides `{parent_classname}::{name}`.")),
-                )
-                .with_note("The `#[Override]` attribute clarifies intent and prevents accidental signature mismatches.")
-                .with_help("Add `#[Override]` attribute to method declaration.");
+        let original_method_name = method.name.value;
+
+        let issue = Issue::error(format!(
+            "Missing `#[Override]` attribute on overriding method `{class_name}::{original_method_name}`."
+        ))
+        .with_code(IssueCode::MissingOverrideAttribute)
+        .with_annotation(
+            Annotation::primary(method.name.span)
+                .with_message(format!("This method overrides `{parent_classname}::{original_method_name}`.")),
+        )
+        .with_note("The `#[Override]` attribute clarifies intent and prevents accidental signature mismatches.")
+        .with_help("Add `#[Override]` attribute to method declaration.");
 
         context.collector.propose(issue, |plan| {
             let offset = method.span().start.offset;
