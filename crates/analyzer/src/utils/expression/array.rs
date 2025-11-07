@@ -203,6 +203,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     &mut possibly_undefined,
                     &mut false,
                     &mut expected_index_types,
+                    array_like_type,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
@@ -545,6 +546,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     has_possibly_undefined: &mut bool,
     has_matching_dict_key: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
+    array_like_type: &TUnion,
 ) -> TUnion {
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
@@ -667,26 +669,49 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     value_parameter.into_owned()
                 } else {
                     // Inside isset() but array has NO generic parameters (or only mixed) - key definitely doesn't exist
-                    context.collector.report_with_code(
-                        IssueCode::ImpossibleNonnullEntryCheck,
-                        Issue::warning(format!(
-                            "Impossible `isset` check on key `{}` accessed on `{}`.",
-                            array_key,
-                            keyed_array.get_id()
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("`isset` on key `{array_key}` will always be false here."))
-                        )
-                        .with_note(
-                            format!(
-                                "The analysis determined that the key `{array_key}` definitely does not exist in this array, so checking `isset` is unnecessary."
+                    // However, if we're processing a union type, check if ANY other member has this key
+                    // Only report error if NONE of the union members have the key (type narrowing is valid otherwise)
+                    let should_report_error = if array_like_type.types.len() > 1 {
+                        // This is a union type - check if any other atomic type has this key
+                        !array_like_type.types.iter().any(|atomic_type| {
+                            if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
+                                if let Some(other_known_items) = other_keyed.get_known_items() {
+                                    other_known_items.contains_key(&array_key)
+                                } else {
+                                    // Array with generic parameters might have any key
+                                    other_keyed.get_generic_parameters().is_some()
+                                }
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        // Not a union, always report if key doesn't exist
+                        true
+                    };
+
+                    if should_report_error {
+                        context.collector.report_with_code(
+                            IssueCode::ImpossibleNonnullEntryCheck,
+                            Issue::warning(format!(
+                                "Impossible `isset` check on key `{}` accessed on `{}`.",
+                                array_key,
+                                keyed_array.get_id()
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("`isset` on key `{array_key}` will always be false here."))
                             )
-                        )
-                        .with_help(
-                            "Remove the redundant `isset` check."
-                        ),
-                    );
+                            .with_note(
+                                format!(
+                                    "The analysis determined that the key `{array_key}` definitely does not exist in this array, so checking `isset` is unnecessary."
+                                )
+                            )
+                            .with_help(
+                                "Remove the redundant `isset` check."
+                            ),
+                        );
+                    }
 
                     get_mixed()
                 };
