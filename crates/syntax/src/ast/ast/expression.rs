@@ -113,7 +113,7 @@ impl<'arena> Expression<'arena> {
             Self::ConstantAccess(_) => true,
             Self::Self_(_) => true,
             Self::Parent(_) => true,
-            Self::Static(_) => true,
+            Self::Static(_) => false,
             Self::Parenthesized(expression) => expression.expression.is_constant(version, initialization),
             Self::Access(access) => match access {
                 Access::ClassConstant(ClassConstantAccess { class, constant, .. }) => {
