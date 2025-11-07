@@ -74,8 +74,6 @@ pub struct CodebaseMetadata {
     pub safe_symbols: AtomSet,
     /// Set of specific members `(SymbolFQCN, MemberName)` that are considered safe/validated.
     pub safe_symbol_members: HashSet<(Atom, Atom)>,
-    /// Map from FileId to its signature for incremental analysis.
-    ///
     /// Each FileSignature contains a hierarchical tree of DefSignatureNode representing
     /// top-level symbols (classes, functions, constants) and their nested members (methods, properties).
     pub file_signatures: HashMap<FileId, FileSignature>,
@@ -757,8 +755,6 @@ impl CodebaseMetadata {
         if self.class_exists(&name) { self.class_likes.get(&name) } else { None }
     }
 
-    // Fingerprint Methods
-
     /// Gets the file signature for a given file ID.
     ///
     /// # Arguments
@@ -886,7 +882,6 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
-        self.file_signatures.extend(other.file_signatures);
     }
 
     /// Takes all issues from the codebase metadata.
