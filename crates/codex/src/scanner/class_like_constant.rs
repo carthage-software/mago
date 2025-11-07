@@ -16,6 +16,7 @@ use crate::scanner::docblock::ConstantDocblockComment;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -85,6 +86,9 @@ pub fn scan_class_like_constants<'ctx, 'arena>(
                 if let Some(type_string) = &docblock.type_string {
                     match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
                         Ok(type_metadata) => {
+                            let real_type = meta.type_declaration.as_ref();
+                            let type_metadata = merge_type_preserving_nullability(type_metadata, real_type);
+
                             meta.type_metadata = Some(type_metadata);
                         }
                         Err(typing_error) => class_like_metadata.issues.push(

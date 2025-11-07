@@ -24,6 +24,7 @@ use crate::scanner::docblock::FunctionLikeDocblockComment;
 use crate::scanner::parameter::scan_function_like_parameter;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::builder;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -416,6 +417,9 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                     provided_type
                 };
 
+                let real_type = parameter_metadata.type_metadata.as_ref();
+                let resulting_type = merge_type_preserving_nullability(resulting_type, real_type);
+
                 parameter_metadata.set_type_signature(Some(resulting_type));
             }
             Err(typing_error) => {
@@ -489,7 +493,12 @@ fn scan_function_like_docblock<'ctx, 'arena>(
 
     if let Some(return_type) = docblock.return_type.as_ref() {
         match get_type_metadata_from_type_string(&return_type.type_string, classname, &type_context, scope) {
-            Ok(return_type_signature) => metadata.set_return_type_metadata(Some(return_type_signature)),
+            Ok(return_type_signature) => {
+                let real_return_type = metadata.return_type_declaration_metadata.as_ref();
+                let return_type_signature = merge_type_preserving_nullability(return_type_signature, real_return_type);
+
+                metadata.set_return_type_metadata(Some(return_type_signature));
+            }
             Err(typing_error) => {
                 metadata.issues.push(
                     Issue::error("Failed to resolve `@return` type string.")

@@ -19,6 +19,7 @@ use crate::scanner::docblock::PropertyDocblockComment;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -197,6 +198,10 @@ pub fn scan_properties<'arena>(
                     if let Some(type_string) = &docblock.type_string {
                         match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
                             Ok(property_type_metadata) => {
+                                let real_type = metadata.type_declaration_metadata.as_ref();
+                                let property_type_metadata =
+                                    merge_type_preserving_nullability(property_type_metadata, real_type);
+
                                 metadata.set_type_metadata(Some(property_type_metadata));
                             }
                             Err(typing_error) => class_like_metadata.issues.push(
@@ -252,6 +257,9 @@ pub fn scan_properties<'arena>(
             {
                 match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
                     Ok(property_type) => {
+                        let real_type = metadata.type_declaration_metadata.as_ref();
+                        let property_type = merge_type_preserving_nullability(property_type, real_type);
+
                         metadata.set_type_metadata(Some(property_type));
                     }
                     Err(typing_error) => {

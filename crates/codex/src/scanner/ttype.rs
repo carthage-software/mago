@@ -171,3 +171,35 @@ fn get_union_from_identifier_hint<'arena>(
 
     wrap_atomic(TAtomic::Reference(TReference::Symbol { name: atom(name), parameters: None, intersection_types: None }))
 }
+
+/// Merges a docblock type with a real type, preserving nullability from the real type.
+///
+/// If the real type is nullable but the docblock type is not, this function makes
+/// the docblock type nullable. This ensures that the actual signature's nullability
+/// is respected even when a more specific type is provided in the docblock.
+///
+/// # Examples
+///
+/// - Real: `?string`, Docblock: `non-empty-string` → Result: `?non-empty-string`
+/// - Real: `null|int`, Docblock: `int` → Result: `null|int`
+/// - Real: `string`, Docblock: `non-empty-string` → Result: `non-empty-string`
+///
+/// # Arguments
+///
+/// * `docblock_type` - The type from the @param, @var, or @return annotation
+/// * `real_type` - The actual type from the code signature (if any)
+///
+/// # Returns
+///
+/// The docblock type, potentially modified to be nullable if the real type was nullable
+#[inline]
+pub fn merge_type_preserving_nullability(
+    docblock_type: TypeMetadata,
+    real_type: Option<&TypeMetadata>,
+) -> TypeMetadata {
+    if real_type.map(|tm| tm.type_union.is_nullable()).unwrap_or(false) && !docblock_type.type_union.accepts_null() {
+        docblock_type.map_type_union(|u| u.as_nullable())
+    } else {
+        docblock_type
+    }
+}
