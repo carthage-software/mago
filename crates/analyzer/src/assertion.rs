@@ -113,25 +113,6 @@ pub fn scrape_assertions(
             }
             Construct::Isset(isset_construct) => {
                 for value in isset_construct.values.iter() {
-                    // First, handle assertions for nullable array indices
-                    // For isset($arr[$key]) where $key is nullable, assert that $key is non-null
-                    let mut current_expr = value;
-                    while let Expression::ArrayAccess(array_access) = current_expr {
-                        if let Some(index_id) = get_expression_id(
-                            array_access.index,
-                            assertion_context.this_class_name,
-                            assertion_context.resolved_names,
-                            Some(assertion_context.codebase),
-                        ) && let Some(index_type) = artifacts.get_expression_type(array_access.index)
-                            && index_type.is_nullable()
-                        {
-                            if_types.entry(index_id).or_insert_with(|| vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
-                        }
-
-                        current_expr = array_access.array;
-                    }
-
-                    // Then handle the value itself
                     if let Some(value_id) = get_expression_id(
                         value,
                         assertion_context.this_class_name,
