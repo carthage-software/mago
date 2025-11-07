@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::rc::Rc;
 
+use ahash::HashSet;
+use mago_algebra::find_satisfying_assignments;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
@@ -16,7 +18,11 @@ use crate::artifacts::get_expression_range;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
+use crate::formula::get_formula;
+use crate::reconciler::reconcile_keyed_types;
+use crate::utils::conditional;
 
 /// Analyzes the null coalescing operator (`??`).
 ///
@@ -50,6 +56,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     };
 
     let result_type: TUnion;
+    let mut rhs_is_never = false;
 
     if lhs_type.is_null() {
         context.collector.report_with_code(
@@ -97,10 +104,46 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         let rhs_type =
             artifacts.get_expression_type(&binary.rhs).map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
 
+        rhs_is_never = rhs_type.is_never();
+
         result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, false);
     }
 
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
+
+    if rhs_is_never {
+        let assertion_context = context.get_assertion_context_from_block(block_context);
+        let if_clauses =
+            get_formula(binary.lhs.span(), binary.lhs.span(), binary.lhs, assertion_context, artifacts).unwrap();
+
+        let conditional_context_clauses = if_clauses.clone().into_iter().map(Rc::new).collect::<Vec<_>>();
+
+        let mut if_scope = IfScope::new();
+        let (if_conditional_scope, _) =
+            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
+
+        let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
+
+        let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
+            conditional_context_clauses.into_iter().map(|rc| (*rc).clone()).collect::<Vec<_>>().as_slice(),
+            Some(binary.lhs.span()),
+            &mut conditionally_referenced_variable_ids,
+        );
+
+        let mut changed_variable_ids = HashSet::default();
+
+        reconcile_keyed_types(
+            context,
+            &reconcilable_if_types,
+            active_if_types,
+            block_context,
+            &mut changed_variable_ids,
+            &conditionally_referenced_variable_ids,
+            &binary.lhs.span(),
+            false,
+            false,
+        );
+    }
 
     Ok(())
 }
