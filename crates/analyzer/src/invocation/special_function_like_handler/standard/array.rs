@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 use mago_atom::Atom;
 use mago_atom::concat_atom;
 
+use mago_codex::assertion::Assertion;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -12,10 +14,12 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
+use mago_syntax::ast::ast::Expression;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
@@ -23,6 +27,7 @@ use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::special_function_like_handler::SpecialFunctionLikeHandlerTrait;
 use crate::invocation::special_function_like_handler::utils::get_argument;
+use crate::reconciler::assertion_reconciler;
 use crate::visibility::check_property_read_visibility;
 
 #[derive(Debug)]
@@ -165,7 +170,83 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
 
                 Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed_array))))
             }
+            "array_filter" => {
+                let array_argument = get_argument(invocation.arguments_source, 0, vec!["array"])?;
+                let array_type = artifacts.get_expression_type(array_argument)?;
+
+                let callback_argument = get_argument(invocation.arguments_source, 1, vec!["callback"]);
+
+                let array = array_type.get_single_array()?;
+                let (key_type, mut value_type) = get_array_parameters(array, context.codebase);
+
+                if let Some(callback_arg) = callback_argument {
+                    let callback_type = artifacts.get_expression_type(callback_arg)?;
+
+                    if !callback_type.is_null() {
+                        if let Some(callback_metadata) = get_callback_metadata(context, callback_arg)
+                            && !callback_metadata.if_true_assertions.is_empty()
+                            && let Some(first_param) = callback_metadata.parameters.first()
+                        {
+                            let param_name = &first_param.get_name().0;
+
+                            if let Some(assertions) = callback_metadata.if_true_assertions.get(param_name) {
+                                for assertion in assertions {
+                                    value_type = apply_assertion_to_narrow_type(value_type, assertion, context);
+                                }
+
+                                if value_type.types.is_empty() {
+                                    return None;
+                                }
+
+                                return Some(get_keyed_array(key_type, value_type));
+                            }
+                        }
+
+                        return None;
+                    }
+                }
+
+                value_type.types.to_mut().retain(|atomic| !atomic.is_falsy());
+
+                if value_type.types.is_empty() {
+                    return None;
+                }
+
+                Some(get_keyed_array(key_type, value_type))
+            }
             _ => None,
         }
+    }
+}
+
+fn get_callback_metadata<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    callback_expr: &Expression<'arena>,
+) -> Option<&'ctx FunctionLikeMetadata> {
+    match callback_expr {
+        Expression::ArrowFunction(arrow_fn) => {
+            let span = arrow_fn.span();
+            context.codebase.get_closure(&span.file_id, &span.start)
+        }
+        Expression::Closure(closure) => {
+            let span = closure.span();
+            context.codebase.get_closure(&span.file_id, &span.start)
+        }
+        _ => None,
+    }
+}
+
+fn apply_assertion_to_narrow_type(
+    original_type: TUnion,
+    assertion: &Assertion,
+    context: &mut Context<'_, '_>,
+) -> TUnion {
+    match assertion {
+        Assertion::IsType(atomic) => {
+            let asserted_type = TUnion::from_atomic((*atomic).clone());
+            assertion_reconciler::intersect_union_with_union(context, &original_type, &asserted_type)
+                .unwrap_or(original_type)
+        }
+        _ => original_type,
     }
 }
