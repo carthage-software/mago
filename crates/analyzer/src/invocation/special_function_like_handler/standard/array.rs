@@ -1,14 +1,19 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
+use mago_atom::Atom;
 use mago_atom::concat_atom;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 
@@ -111,6 +116,54 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                 let list = TList::new(Box::new(column_type));
 
                 Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::List(list)))))
+            }
+            "compact" => {
+                let arguments = invocation.arguments_source.get_arguments();
+                let mut known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
+
+                let mut has_unknown = false;
+                for invocation_argument in arguments {
+                    // Skip unpacked arguments
+                    if invocation_argument.is_unpacked() {
+                        has_unknown = true;
+                        continue;
+                    }
+
+                    let argument_expr = invocation_argument.value();
+                    let argument_type = artifacts.get_expression_type(argument_expr)?;
+
+                    // Get the literal string value (variable name)
+                    let variable_name = match argument_type.get_single_literal_string_value() {
+                        Some(name) => name,
+                        None => continue, // Skip non-literal arguments
+                    };
+
+                    // Look up the variable in block context
+                    // Create variable ID by prepending "$" to the variable name
+                    let variable_id = format!("${}", variable_name);
+                    if let Some(variable_type) = block_context.locals.get(&variable_id) {
+                        // Add to known_items with the variable name as key (convert to Atom)
+                        let key = ArrayKey::String(Atom::from(variable_name));
+                        known_items.insert(key, (false, (**variable_type).clone()));
+                    } else {
+                        has_unknown = true;
+                    }
+                }
+
+                // If we didn't find any items, return None to fall back to default handling
+                if known_items.is_empty() {
+                    return None;
+                }
+
+                // Build the keyed array
+                let mut keyed_array = TKeyedArray::new();
+                keyed_array.known_items = Some(known_items);
+                keyed_array.non_empty = true;
+                if has_unknown {
+                    keyed_array.parameters = Some((Box::new(get_string()), Box::new(get_mixed())));
+                }
+
+                Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed_array))))
             }
             _ => None,
         }
