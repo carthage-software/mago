@@ -202,6 +202,7 @@ test_case!(sealed_class_10_inheritors);
 test_case!(sealed_class_15_inheritors);
 test_case!(sealed_class_performance);
 test_case!(class_instance);
+test_case!(conditional_return);
 
 // Github Issues
 test_case!(issue_275);

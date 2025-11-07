@@ -9,6 +9,7 @@ use mago_syntax::ast::UnionHint;
 
 use crate::metadata::ttype::TypeMetadata;
 use crate::scanner::Context;
+use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
@@ -197,6 +198,11 @@ pub fn merge_type_preserving_nullability(
     docblock_type: TypeMetadata,
     real_type: Option<&TypeMetadata>,
 ) -> TypeMetadata {
+    // Don't merge nullability if docblock has expandable types
+    if docblock_type.type_union.is_expandable() {
+        return docblock_type;
+    }
+
     if real_type.map(|tm| tm.type_union.is_nullable()).unwrap_or(false) && !docblock_type.type_union.accepts_null() {
         docblock_type.map_type_union(|u| u.as_nullable())
     } else {
