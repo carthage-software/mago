@@ -105,7 +105,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
         return get_never();
     }
 
-    if index_type.is_null() {
+    if index_type.is_null() && !index_type.is_keyed_array() {
         context.collector.report_with_code(
             IssueCode::NullArrayIndex,
             Issue::error(format!(
@@ -124,7 +124,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     }
 
     if !block_context.inside_isset {
-        if index_type.is_nullable() && !index_type.ignore_nullable_issues {
+        if index_type.is_nullable() && !index_type.ignore_nullable_issues && !array_like_type.is_keyed_array() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
                 Issue::warning(format!(
