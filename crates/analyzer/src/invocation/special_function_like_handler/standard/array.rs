@@ -13,7 +13,9 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
@@ -213,6 +215,79 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                 }
 
                 Some(get_keyed_array(key_type, value_type))
+            }
+            "array_merge" | "psl\\dict\\merge" => {
+                let arguments = invocation.arguments_source.get_arguments();
+                if arguments.is_empty() {
+                    return None;
+                }
+
+                let mut merged_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
+                let mut has_parameters = false;
+                let mut merged_key_type: Option<TUnion> = None;
+                let mut merged_value_type: Option<TUnion> = None;
+
+                for invocation_argument in arguments {
+                    if invocation_argument.is_unpacked() {
+                        return None;
+                    }
+
+                    let argument_expr = invocation_argument.value();
+                    let argument_type = artifacts.get_expression_type(argument_expr)?;
+                    if !argument_type.is_single() {
+                        return None;
+                    }
+
+                    let iterable = argument_type.get_single();
+
+                    if let TAtomic::Array(TArray::Keyed(keyed)) = iterable {
+                        if let Some(ref items) = keyed.known_items {
+                            for (key, value) in items.iter() {
+                                merged_items.insert(*key, value.clone());
+                            }
+                        }
+
+                        if let Some((key_type, value_type)) = &keyed.parameters {
+                            has_parameters = true;
+                            merged_key_type = Some(match merged_key_type {
+                                Some(existing) => combine_union_types(&existing, key_type, context.codebase, false),
+                                None => (**key_type).clone(),
+                            });
+                            merged_value_type = Some(match merged_value_type {
+                                Some(existing) => combine_union_types(&existing, value_type, context.codebase, false),
+                                None => (**value_type).clone(),
+                            });
+                        }
+                    } else if let Some((iterable_key, iterable_value)) =
+                        get_iterable_parameters(iterable, context.codebase)
+                    {
+                        has_parameters = true;
+                        merged_key_type = Some(match merged_key_type {
+                            Some(existing) => combine_union_types(&existing, &iterable_key, context.codebase, false),
+                            None => iterable_key,
+                        });
+                        merged_value_type = Some(match merged_value_type {
+                            Some(existing) => combine_union_types(&existing, &iterable_value, context.codebase, false),
+                            None => iterable_value,
+                        });
+                    } else {
+                        return None;
+                    }
+                }
+
+                let mut result_array = TKeyedArray::new();
+
+                if !merged_items.is_empty() {
+                    result_array.known_items = Some(merged_items);
+                    result_array.non_empty = true;
+                }
+
+                if has_parameters {
+                    result_array.parameters =
+                        Some((Box::new(merged_key_type.unwrap()), Box::new(merged_value_type.unwrap())));
+                }
+
+                Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(result_array))))
             }
             _ => None,
         }
