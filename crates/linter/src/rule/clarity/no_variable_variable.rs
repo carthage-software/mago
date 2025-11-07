@@ -35,11 +35,6 @@ impl Default for NoVariableVariableConfig {
 }
 
 impl Config for NoVariableVariableConfig {
-    fn default_enabled() -> bool {
-        // TODO(azjezz): enable by default in the next major release
-        false
-    }
-
     fn level(&self) -> Level {
         self.level
     }

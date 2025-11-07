@@ -36,11 +36,6 @@ impl Default for NoProtectedInFinalConfig {
 }
 
 impl Config for NoProtectedInFinalConfig {
-    fn default_enabled() -> bool {
-        // TODO(azjezz): enable in the next major release
-        false
-    }
-
     fn level(&self) -> Level {
         self.level
     }
@@ -83,7 +78,6 @@ impl LintRule for NoProtectedInFinalRule {
                 }
             "#},
             category: Category::Redundancy,
-
             requirements: RuleRequirements::None,
         };
 
@@ -103,6 +97,12 @@ impl LintRule for NoProtectedInFinalRule {
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         let (members, message) = match node {
             Node::Class(class) if class.modifiers.contains_final() => {
+                if class.extends.is_some() || class.implements.is_some() {
+                    // Although the class is final, it extends or implements something,
+                    // so we cannot be sure that protected members are not needed.
+                    return;
+                }
+
                 (&class.members, "The `protected` visibility can be made `private` as the class is final.")
             }
             Node::Enum(r#enum) => {

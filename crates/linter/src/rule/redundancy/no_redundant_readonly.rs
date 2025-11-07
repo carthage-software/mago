@@ -38,11 +38,6 @@ impl Default for NoRedundantReadonlyConfig {
 }
 
 impl Config for NoRedundantReadonlyConfig {
-    fn default_enabled() -> bool {
-        // TODO(azjezz): enable in the next major release
-        false
-    }
-
     fn level(&self) -> Level {
         self.level
     }

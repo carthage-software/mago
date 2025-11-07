@@ -37,11 +37,6 @@ impl Default for SensitiveParameterConfig {
 }
 
 impl Config for SensitiveParameterConfig {
-    fn default_enabled() -> bool {
-        // TODO(azjezz): enable in the next major release
-        false
-    }
-
     fn level(&self) -> Level {
         self.level
     }
