@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 
 use bumpalo::collections::Vec;
@@ -7,6 +8,7 @@ use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
 
+use crate::document::Align;
 use crate::document::Document;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -992,13 +994,20 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
             };
 
             contents.push(Document::Line(Line::hard()));
+
+            // Track the indentation from the last line of the previous literal part
+            let mut last_part_indentation = Cow::Borrowed("");
+
             for part in self.parts.iter() {
                 let formatted = match part {
                     StringPart::Literal(l) => {
                         let content = l.value;
                         let mut part_contents = vec![in f.arena;];
                         let own_line = f.has_newline(l.span.start.offset, true);
-                        for mut line in f.split_lines(content) {
+                        let lines = f.split_lines(content);
+
+                        for line in lines.iter() {
+                            let mut line = *line;
                             if own_line {
                                 line = FormatterState::skip_leading_whitespace_up_to(line, indent);
                             }
@@ -1018,9 +1027,60 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                             part_contents.push(Document::Line(Line::hard()));
                         }
 
+                        // Calculate indentation from the last line of this literal part
+                        // We need to use the stripped line (after removing heredoc indent)
+                        if let Some(last_line) = lines.last() {
+                            let stripped_line = if own_line {
+                                FormatterState::skip_leading_whitespace_up_to(last_line, indent)
+                            } else {
+                                *last_line
+                            };
+
+                            let mut tabs = 0;
+                            let mut spaces = 0;
+                            for ch in stripped_line.chars() {
+                                match ch {
+                                    '\t' => tabs += 1,
+                                    ' ' => spaces += 1,
+                                    _ => break,
+                                }
+                            }
+
+                            if tabs > 0 || spaces > 0 {
+                                last_part_indentation = if tabs > 0 {
+                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                } else {
+                                    Cow::Owned(" ".repeat(spaces))
+                                };
+                            } else {
+                                last_part_indentation = Cow::Borrowed("");
+                            }
+                        }
+
                         Document::Array(part_contents)
                     }
-                    _ => part.format(f),
+                    _ => {
+                        let base_alignment = match self.indentation {
+                            DocumentIndentation::None => Cow::Borrowed(""),
+                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
+                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
+                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                        };
+
+                        let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
+                            Cow::Owned(format!("{}{}", base_alignment, last_part_indentation))
+                        } else {
+                            Cow::Borrowed("")
+                        };
+
+                        Document::Align(Align {
+                            alignment: f.as_str(&combined_alignment),
+                            contents: vec![
+                                in f.arena;
+                                part.format(f)
+                            ],
+                        })
+                    }
                 };
 
                 contents.push(formatted);
@@ -1037,9 +1097,46 @@ impl<'arena> Format<'arena> for InterpolatedString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, InterpolatedString, {
             let mut parts = vec![in f.arena; Document::String("\"")];
+            let mut last_part_indentation = Cow::Borrowed("");
 
             for part in self.parts.iter() {
-                parts.push(part.format(f));
+                let formatted = match part {
+                    StringPart::Literal(l) => {
+                        let lines = f.split_lines(l.value);
+                        if let Some(last_line) = lines.last() {
+                            let mut tabs = 0;
+                            let mut spaces = 0;
+                            for ch in last_line.chars() {
+                                match ch {
+                                    '\t' => tabs += 1,
+                                    ' ' => spaces += 1,
+                                    _ => break,
+                                }
+                            }
+                            if tabs > 0 || spaces > 0 {
+                                last_part_indentation = if tabs > 0 {
+                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                } else {
+                                    Cow::Owned(" ".repeat(spaces))
+                                };
+                            } else {
+                                last_part_indentation = Cow::Borrowed("");
+                            }
+                        }
+                        part.format(f)
+                    }
+                    _ => {
+                        if !last_part_indentation.is_empty() {
+                            Document::Align(Align {
+                                alignment: f.as_str(&last_part_indentation),
+                                contents: vec![in f.arena; part.format(f)],
+                            })
+                        } else {
+                            part.format(f)
+                        }
+                    }
+                };
+                parts.push(formatted);
             }
 
             parts.push(Document::String("\""));
@@ -1053,9 +1150,47 @@ impl<'arena> Format<'arena> for ShellExecuteString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ShellExecuteString, {
             let mut parts = vec![in f.arena; Document::String("`")];
+            let mut last_part_indentation = Cow::Borrowed("");
 
             for part in self.parts.iter() {
-                parts.push(part.format(f));
+                let formatted = match part {
+                    StringPart::Literal(l) => {
+                        let lines = f.split_lines(l.value);
+                        if let Some(last_line) = lines.last() {
+                            let mut tabs = 0;
+                            let mut spaces = 0;
+                            for ch in last_line.chars() {
+                                match ch {
+                                    '\t' => tabs += 1,
+                                    ' ' => spaces += 1,
+                                    _ => break,
+                                }
+                            }
+                            if tabs > 0 || spaces > 0 {
+                                last_part_indentation = if tabs > 0 {
+                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                } else {
+                                    Cow::Owned(" ".repeat(spaces))
+                                };
+                            } else {
+                                last_part_indentation = Cow::Borrowed("");
+                            }
+                        }
+                        part.format(f)
+                    }
+                    StringPart::BracedExpression(_) => {
+                        if !last_part_indentation.is_empty() {
+                            Document::Align(Align {
+                                alignment: f.as_str(&last_part_indentation),
+                                contents: vec![in f.arena; part.format(f)],
+                            })
+                        } else {
+                            part.format(f)
+                        }
+                    }
+                    _ => part.format(f),
+                };
+                parts.push(formatted);
             }
 
             parts.push(Document::String("`"));
