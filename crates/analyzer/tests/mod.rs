@@ -192,6 +192,7 @@ test_case!(real_pseudo_method);
 test_case!(chunk);
 test_case!(chunk_with_keys);
 test_case!(trait_alias_vis_self);
+test_case!(trait_constant_override);
 test_case!(true_ident);
 test_case!(eliminate_true_and_false_from_scalar);
 test_case!(subtract_objects);
@@ -203,6 +204,7 @@ test_case!(sealed_class_15_inheritors);
 test_case!(sealed_class_performance);
 test_case!(class_instance);
 test_case!(conditional_return);
+test_case!(literal_int);
 
 // Github Issues
 test_case!(issue_275);

@@ -2,6 +2,7 @@ use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -356,6 +357,10 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
         }
     }
+
+    // Check trait constant overrides AFTER constants have been analyzed
+    // so we can compare their inferred values
+    check_class_like_constants(context, class_like_metadata, members);
 
     Ok(())
 }
@@ -1239,6 +1244,64 @@ fn check_class_like_properties<'ctx, 'arena>(
                     );
                 }
             }
+        }
+    }
+}
+
+fn check_class_like_constants<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &[ClassLikeMember<'arena>],
+) {
+    // Check if any constant declared directly in this class overrides a trait constant
+    for member in members {
+        let ClassLikeMember::Constant(constant) = member else {
+            continue;
+        };
+
+        for item in constant.items.iter() {
+            let constant_name = atom(item.name.value);
+
+            // Check if this constant came from a trait
+            let Some(trait_fqcn) = class_like_metadata.trait_constant_ids.get(&constant_name) else {
+                continue;
+            };
+
+            // Get the trait metadata
+            let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn) else {
+                continue;
+            };
+
+            // Compare values
+            let trait_constant_matches = if let Some(trait_constant) = trait_metadata.constants.get(&constant_name)
+                && let Some(class_constant) = class_like_metadata.constants.get(&constant_name)
+            {
+                trait_constant.inferred_type == class_constant.inferred_type
+            } else {
+                false
+            };
+
+            // Only report error if the values differ
+            if trait_constant_matches {
+                continue;
+            }
+
+            let class_name = class_like_metadata.original_name;
+            let trait_name = trait_metadata.original_name;
+
+            context.collector.report_with_code(
+                IssueCode::TraitConstantOverride,
+                Issue::error(format!(
+                    "Class `{class_name}` cannot override constant `{constant_name}` from trait `{trait_name}` with a different value."
+                ))
+                .with_annotation(
+                    Annotation::primary(item.name.span())
+                        .with_message(format!("This constant has a different value than in trait `{trait_name}`")),
+                )
+                .with_note("PHP does not allow a class to override constants from traits it directly uses with a different value.")
+                .with_note(format!("Trait `{trait_name}` declares constant `{constant_name}`, which is inherited by `{class_name}`."))
+                .with_help(format!("Either use the same value as in the trait, remove the constant declaration from `{class_name}`, or remove the `use {trait_name}` statement.")),
+            );
         }
     }
 }

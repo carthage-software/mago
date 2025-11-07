@@ -692,6 +692,9 @@ fn populate_metadata_from_trait(
 
     // Inherit constants (if not already defined)
     for (trait_constant_name, trait_constant_metadata) in &trait_metadata.constants {
+        // Always track that this constant came from this trait (used for override validation)
+        metadata.trait_constant_ids.insert(*trait_constant_name, trait_name);
+
         if !metadata.constants.contains_key(trait_constant_name) {
             metadata.constants.insert(*trait_constant_name, trait_constant_metadata.clone());
         }

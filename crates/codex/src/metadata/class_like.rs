@@ -71,6 +71,7 @@ pub struct ClassLikeMetadata {
     pub overridden_property_ids: AtomMap<AtomSet>,
     pub initialized_properties: AtomSet,
     pub constants: IndexMap<Atom, ClassLikeConstantMetadata, RandomState>,
+    pub trait_constant_ids: AtomMap<Atom>,
     pub enum_cases: IndexMap<Atom, EnumCaseMetadata, RandomState>,
     pub invalid_dependencies: AtomSet,
     pub attributes: Vec<AttributeMetadata>,
@@ -93,6 +94,7 @@ impl ClassLikeMetadata {
     ) -> ClassLikeMetadata {
         ClassLikeMetadata {
             constants: IndexMap::with_hasher(RandomState::new()),
+            trait_constant_ids: AtomMap::default(),
             enum_cases: IndexMap::with_hasher(RandomState::new()),
             flags,
             kind: SymbolKind::Class,

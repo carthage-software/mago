@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
+#[repr(u16)]
 pub enum IssueCode {
     AbstractClassUsedAsAttribute,
     AbstractInstantiation,
@@ -224,6 +224,7 @@ pub enum IssueCode {
     TemplateConstraintViolation,
     TooFewArguments,
     TooManyArguments,
+    TraitConstantOverride,
     TraitInstantiation,
     TypeConfirmation,
     TypeInspection,
@@ -484,6 +485,7 @@ impl IssueCode {
             Self::TemplateConstraintViolation => "template-constraint-violation",
             Self::TooFewArguments => "too-few-arguments",
             Self::TooManyArguments => "too-many-arguments",
+            Self::TraitConstantOverride => "trait-constant-override",
             Self::TraitInstantiation => "trait-instantiation",
             Self::TypeConfirmation => "type-confirmation",
             Self::TypeInspection => "type-inspection",
@@ -519,8 +521,8 @@ impl IssueCode {
         }
     }
 
-    pub fn as_u8(&self) -> u8 {
-        *self as u8
+    pub fn as_u16(&self) -> u16 {
+        *self as u16
     }
 
     pub const fn get_falsable_issue_codes() -> [Self; 7] {
@@ -1344,6 +1346,7 @@ impl std::str::FromStr for IssueCode {
             "template-constraint-violation" => Ok(Self::TemplateConstraintViolation),
             "too-few-arguments" => Ok(Self::TooFewArguments),
             "too-many-arguments" => Ok(Self::TooManyArguments),
+            "trait-constant-override" => Ok(Self::TraitConstantOverride),
             "trait-instantiation" => Ok(Self::TraitInstantiation),
             "type-confirmation" => Ok(Self::TypeConfirmation),
             "type-inspection" => Ok(Self::TypeInspection),

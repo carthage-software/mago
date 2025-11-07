@@ -292,6 +292,7 @@ final class AnalyzerCodeModuleGenerator
         'unreachable-switch-default',
         'invalid-isset-expression',
         'invalid-trait-use',
+        'trait-constant-override',
         'psalm-trace',
         'reference-constraint-violation',
         'invalid-pass-by-reference',
@@ -382,12 +383,12 @@ final class AnalyzerCodeModuleGenerator
 
     private function generateEnum(): string
     {
-        if (count($this->allCodes) > 255) {
-            throw new \RuntimeException('Too many issue codes; cannot be represented by a u8.');
+        if (count($this->allCodes) > 65535) {
+            throw new \RuntimeException('Too many issue codes; cannot be represented by a u16.');
         }
 
         $enum = "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n";
-        $enum .= "#[repr(u8)]\n";
+        $enum .= "#[repr(u16)]\n";
         $enum .= "pub enum IssueCode {\n";
         foreach ($this->allCodes as $code => $_) {
             $enum .= "    {$code},\n";
@@ -408,9 +409,9 @@ final class AnalyzerCodeModuleGenerator
         }
         $impl .= "        }\n    }\n\n";
 
-        // as_u8() method
-        $impl .= "    pub fn as_u8(&self) -> u8 {\n";
-        $impl .= "        *self as u8\n";
+        // as_u16() method
+        $impl .= "    pub fn as_u16(&self) -> u16 {\n";
+        $impl .= "        *self as u16\n";
         $impl .= "    }\n\n";
 
         foreach ($this->categories as $name => $codes) {
