@@ -355,6 +355,7 @@ namespace {
 
         /**
          * @readonly
+         * @var DOMNamedNodeMap<DOMAttr>
          */
         public null|DOMNamedNodeMap $attributes;
 
@@ -1177,7 +1178,8 @@ namespace {
     }
 
     /**
-     * @implements IteratorAggregate<string, DOMNode>
+     * @template-covariant TNode of DOMNode
+     * @implements IteratorAggregate<string, TNode>
      */
     class DOMNamedNodeMap implements IteratorAggregate, Countable
     {
@@ -1186,10 +1188,12 @@ namespace {
          */
         public int $length;
 
+        /** @return null|TNode */
         public function getNamedItem(string $qualifiedName): null|DOMNode
         {
         }
 
+        /** @return null|TNode */
         public function getNamedItemNS(null|string $namespace, string $localName): null|DOMNode
         {
         }
