@@ -233,8 +233,13 @@ test_case!(interface_constant_validation);
 test_case!(trait_constant_conflicts);
 test_case!(trait_constant_direct_access);
 test_case!(trait_override_final_methods);
+test_case!(inheritdoc_basic_parent_class);
+test_case!(inheritdoc_multiple_interfaces);
+test_case!(inheritdoc_nested_generics);
+test_case!(inheritdoc_priority);
 
 // Github Issues
+test_case!(issue_265);
 test_case!(issue_275);
 test_case!(issue_306);
 test_case!(issue_355);

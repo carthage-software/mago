@@ -134,6 +134,10 @@ pub struct FunctionLikeMetadata {
     /// function/method returns `false`. From `@psalm-assert-if-false`, etc.
     pub if_false_assertions: BTreeMap<Atom, Vec<Assertion>>,
 
+    /// Tracks whether this function/method has a docblock comment.
+    /// Used to determine if docblock inheritance should occur implicitly.
+    pub has_docblock: bool,
+
     pub flags: MetadataFlags,
 }
 
@@ -187,6 +191,7 @@ impl FunctionLikeMetadata {
             assertions: BTreeMap::new(),
             if_true_assertions: BTreeMap::new(),
             if_false_assertions: BTreeMap::new(),
+            has_docblock: false,
             issues: vec![],
         }
     }
@@ -270,5 +275,16 @@ impl FunctionLikeMetadata {
     #[inline]
     pub fn add_template_type(&mut self, template: TemplateTuple) {
         self.template_types.push(template);
+    }
+
+    /// Determines if this function/method needs docblock inheritance.
+    ///
+    /// Returns `true` if:
+    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (INHERITS_DOCS flag set)
+    ///
+    /// Returns `false` otherwise.
+    #[inline]
+    pub fn needs_docblock_inheritance(&self) -> bool {
+        self.flags.contains(MetadataFlags::INHERITS_DOCS)
     }
 }

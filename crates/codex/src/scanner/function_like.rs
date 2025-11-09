@@ -283,7 +283,11 @@ fn scan_function_like_docblock<'ctx, 'arena>(
 ) {
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
         Ok(Some(docblock)) => docblock,
-        Ok(None) => return,
+        Ok(None) => {
+            metadata.has_docblock = false;
+
+            return;
+        }
         Err(parse_error) => {
             metadata.issues.push(
                 Issue::error("Failed to parse function-like docblock comment.")
@@ -296,6 +300,8 @@ fn scan_function_like_docblock<'ctx, 'arena>(
             return;
         }
     };
+
+    metadata.has_docblock = true;
 
     if docblock.is_deprecated {
         metadata.flags |= MetadataFlags::DEPRECATED;
