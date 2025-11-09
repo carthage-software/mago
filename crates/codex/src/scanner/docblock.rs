@@ -304,8 +304,18 @@ impl FunctionLikeDocblockComment {
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
         for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
+            let tag = match element {
+                Element::Tag(tag) => tag,
+                Element::Text(text) => {
+                    inherits_docs = inherits_docs
+                        || text
+                            .segments
+                            .iter()
+                            .any(|s| matches!(s, TextSegment::InlineTag(Tag { kind: TagKind::InheritDoc, .. })));
+
+                    continue;
+                }
+                _ => continue,
             };
 
             match tag.kind {
