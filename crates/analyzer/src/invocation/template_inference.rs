@@ -573,7 +573,10 @@ fn infer_templates_from_input_and_container_types(
                                 _ => None,
                             });
 
+                        let mut has_direct_generic = false;
                         for generic_parameter in generic_parameters {
+                            has_direct_generic = true;
+
                             let Some((template_name, _)) = container_meta.template_types.get(index) else {
                                 continue;
                             };
@@ -612,6 +615,28 @@ fn infer_templates_from_input_and_container_types(
                                 );
                             }
                         }
+
+                        if has_direct_generic {
+                            continue;
+                        }
+
+                        if !parameter_template_union.has_template_types() {
+                            continue;
+                        }
+
+                        let input_params = input_obj.get_type_parameters();
+                        let Some(input_param_at_index) = input_params.and_then(|params| params.get(index)) else {
+                            continue;
+                        };
+
+                        infer_templates_from_input_and_container_types(
+                            context,
+                            parameter_template_union,
+                            input_param_at_index,
+                            template_result,
+                            options,
+                            violations,
+                        );
                     }
                 }
             }
