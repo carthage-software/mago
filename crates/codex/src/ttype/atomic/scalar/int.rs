@@ -653,10 +653,10 @@ impl TInteger {
     /// Returns a new `TInteger` that represents the negation of the current type.
     pub fn negated(&self) -> Self {
         match *self {
-            TInteger::Literal(v) => TInteger::Literal(-v),
-            TInteger::From(f) => TInteger::To(-f),
-            TInteger::To(t) => TInteger::From(-t),
-            TInteger::Range(f, t) => TInteger::Range(-t, -f),
+            TInteger::Literal(v) => TInteger::Literal(v.saturating_neg()),
+            TInteger::From(f) => TInteger::To(f.saturating_neg()),
+            TInteger::To(t) => TInteger::From(t.saturating_neg()),
+            TInteger::Range(f, t) => TInteger::Range(t.saturating_neg(), f.saturating_neg()),
             TInteger::Unspecified => TInteger::Unspecified,
             TInteger::UnspecifiedLiteral => TInteger::UnspecifiedLiteral,
         }
@@ -1149,7 +1149,7 @@ impl Rem for TInteger {
                     } else {
                         // n2 < 0
                         // Divisor is negative, result range is bounded by n1.
-                        Range(n1 + 1, -n1 - 1)
+                        Range(n1.saturating_add(1), n1.saturating_neg().saturating_sub(1))
                     }
                 }
             },
@@ -1165,7 +1165,11 @@ impl Rem for TInteger {
             (_, Literal(1)) | (_, Literal(-1)) => Literal(0),
             (Literal(l), From(f)) => {
                 if f > 0 {
-                    if l >= 0 { Range(0, (f - 1).min(l)) } else { Range(-(f - 1).min(-l), 0) }
+                    if l >= 0 {
+                        Range(0, (f - 1).min(l))
+                    } else {
+                        Range((f - 1).min(l.saturating_neg()).saturating_neg(), 0)
+                    }
                 } else {
                     Unspecified
                 }
@@ -1174,7 +1178,7 @@ impl Rem for TInteger {
                 if l > 0 {
                     if f >= 0 { Range(0, l - 1) } else { Range(-(l - 1), l - 1) }
                 } else if l < 0 {
-                    if f >= 0 { Range(0, -l - 1) } else { Range(l + 1, 0) }
+                    if f >= 0 { Range(0, l.saturating_neg().saturating_sub(1)) } else { Range(l.saturating_add(1), 0) }
                 } else {
                     Unspecified
                 }
@@ -1223,16 +1227,10 @@ impl Neg for TInteger {
 
     fn neg(self) -> Self::Output {
         match self {
-            TInteger::Literal(a) => {
-                if a == i64::MIN {
-                    TInteger::Literal(i64::MAX)
-                } else {
-                    TInteger::Literal(-a)
-                }
-            }
-            TInteger::From(a) => TInteger::To(-a),
-            TInteger::To(a) => TInteger::From(-a),
-            TInteger::Range(min, max) => TInteger::Range(-max, -min),
+            TInteger::Literal(a) => TInteger::Literal(a.saturating_neg()),
+            TInteger::From(a) => TInteger::To(a.saturating_neg()),
+            TInteger::To(a) => TInteger::From(a.saturating_neg()),
+            TInteger::Range(min, max) => TInteger::Range(max.saturating_neg(), min.saturating_neg()),
             TInteger::Unspecified => TInteger::Unspecified,
             TInteger::UnspecifiedLiteral => TInteger::UnspecifiedLiteral,
         }
@@ -1671,5 +1669,62 @@ mod tests {
         assert_eq!(TInteger::Range(5, 10).to_string(), "int<5, 10>");
 
         assert_eq!(TInteger::Unspecified.to_string(), "int");
+    }
+
+    #[test]
+    fn test_negation_overflow_protection() {
+        // Test negation of i64::MIN doesn't panic
+        assert_eq!(TInteger::Literal(i64::MIN).negated(), TInteger::Literal(i64::MAX));
+        assert_eq!(-TInteger::Literal(i64::MIN), TInteger::Literal(i64::MAX));
+
+        // Test From/To variants with i64::MIN
+        assert_eq!(TInteger::From(i64::MIN).negated(), TInteger::To(i64::MAX));
+        assert_eq!(-TInteger::From(i64::MIN), TInteger::To(i64::MAX));
+        assert_eq!(TInteger::To(i64::MIN).negated(), TInteger::From(i64::MAX));
+        assert_eq!(-TInteger::To(i64::MIN), TInteger::From(i64::MAX));
+
+        // Test Range with i64::MIN
+        assert_eq!(TInteger::Range(i64::MIN, -100).negated(), TInteger::Range(100, i64::MAX));
+        assert_eq!(-TInteger::Range(i64::MIN, -100), TInteger::Range(100, i64::MAX));
+        assert_eq!(TInteger::Range(-100, i64::MIN).negated(), TInteger::Range(i64::MAX, 100));
+
+        // Test normal negation still works
+        assert_eq!(TInteger::Literal(42).negated(), TInteger::Literal(-42));
+        assert_eq!(-TInteger::Literal(-42), TInteger::Literal(42));
+    }
+
+    #[test]
+    fn test_modulo_overflow_protection() {
+        let min = TInteger::Literal(i64::MIN);
+
+        assert_eq!(min % TInteger::Literal(-1), TInteger::Unspecified);
+
+        let _ = min % TInteger::Literal(2);
+        let result = TInteger::Literal(i64::MIN) % TInteger::From(-10);
+        assert!(matches!(result, TInteger::Range(_, _) | TInteger::Unspecified));
+    }
+
+    #[test]
+    fn test_arithmetic_with_extreme_values() {
+        let a = TInteger::Range(i64::MIN, i64::MIN + 10);
+        let b = TInteger::Range(i64::MIN, i64::MIN + 5);
+        let result = a - b;
+
+        assert!(matches!(result, TInteger::Range(_, _) | TInteger::Unspecified));
+
+        let range_with_min = TInteger::Range(i64::MIN, 0);
+        let negated = range_with_min.negated();
+        assert_eq!(negated, TInteger::Range(0, i64::MAX));
+
+        let min_lit = TInteger::Literal(i64::MIN);
+        let max_lit = TInteger::Literal(i64::MAX);
+        let _ = min_lit + max_lit;
+        let _ = min_lit - max_lit;
+        let _ = min_lit * TInteger::Literal(2);
+        let _ = -min_lit;
+
+        let from_min = TInteger::From(i64::MIN);
+        let _ = -from_min;
+        let _ = from_min.negated();
     }
 }
