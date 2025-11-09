@@ -2,10 +2,13 @@ use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -14,9 +17,11 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::visibility::Visibility;
 use mago_names::kind::NameKind;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -33,12 +38,77 @@ use crate::error::AnalysisError;
 use crate::heuristic;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
+use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
 use crate::utils::missing_type_hints;
 
 pub mod constant;
 pub mod enum_case;
 pub mod method;
+pub mod method_signature;
 pub mod property;
+
+/// Helper function to check if a child type is compatible with (contained by) a parent type.
+///
+/// This is a convenience wrapper around `union_comparator::is_contained_by` with standard
+/// settings for inheritance checks (no null/false ignoring, not inside assertion).
+#[inline]
+fn is_type_compatible(codebase: &mago_codex::metadata::CodebaseMetadata, child: &TUnion, parent: &TUnion) -> bool {
+    union_comparator::is_contained_by(codebase, child, parent, false, false, false, &mut ComparisonResult::default())
+}
+
+/// Represents different types of property conflicts between traits
+#[derive(Debug)]
+enum PropertyConflict {
+    Visibility(Visibility, Visibility, Visibility, Visibility),
+    Static(bool, bool),
+    Readonly(bool, bool),
+    Type(Option<String>, Option<String>),
+    Default(Option<String>, Option<String>),
+}
+
+impl PropertyConflict {
+    fn describe(&self) -> String {
+        match self {
+            PropertyConflict::Visibility(r1, w1, r2, w2) => {
+                let p1_vis = if r1 == w1 { format!("{}", r1) } else { format!("{} {}(set)", r1, w1) };
+                let p2_vis = if r2 == w2 { format!("{}", r2) } else { format!("{} {}(set)", r2, w2) };
+                format!("visibility differs ({} vs {})", p1_vis, p2_vis)
+            }
+            PropertyConflict::Static(s1, s2) => {
+                let p1_mod = if *s1 { "static" } else { "instance" };
+                let p2_mod = if *s2 { "static" } else { "instance" };
+                format!("static modifier differs ({} vs {})", p1_mod, p2_mod)
+            }
+            PropertyConflict::Readonly(r1, r2) => {
+                let p1_mod = if *r1 { "readonly" } else { "not readonly" };
+                let p2_mod = if *r2 { "readonly" } else { "not readonly" };
+                format!("readonly modifier differs ({} vs {})", p1_mod, p2_mod)
+            }
+            PropertyConflict::Type(t1, t2) => match (t1, t2) {
+                (Some(type1), Some(type2)) => format!("type declaration differs ({} vs {})", type1, type2),
+                (Some(type1), None) => format!("type declaration differs ({} vs untyped)", type1),
+                (None, Some(type2)) => format!("type declaration differs (untyped vs {})", type2),
+                (None, None) => unreachable!(),
+            },
+            PropertyConflict::Default(d1, d2) => match (d1, d2) {
+                (Some(def1), Some(def2)) => format!("default value differs ({} vs {})", def1, def2),
+                (Some(def1), None) => format!("default value differs ({} vs no default)", def1),
+                (None, Some(def2)) => format!("default value differs (no default vs {})", def2),
+                (None, None) => unreachable!(),
+            },
+        }
+    }
+
+    fn get_issue_code(&self) -> IssueCode {
+        match self {
+            PropertyConflict::Visibility(_, _, _, _) => IssueCode::IncompatiblePropertyVisibility,
+            PropertyConflict::Static(_, _) => IssueCode::IncompatiblePropertyStatic,
+            PropertyConflict::Readonly(_, _) => IssueCode::IncompatiblePropertyReadonly,
+            PropertyConflict::Type(_, _) => IssueCode::IncompatiblePropertyType,
+            PropertyConflict::Default(_, _) => IssueCode::IncompatiblePropertyDefault,
+        }
+    }
+}
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
     fn analyze<'ctx>(
@@ -296,6 +366,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
         }
     }
+
+    if !class_like_metadata.kind.is_trait() {
+        check_abstract_method_signatures(context, class_like_metadata, declaration_span);
+        check_trait_method_conflicts(context, class_like_metadata, members);
+    }
+
+    check_trait_property_conflicts(context, class_like_metadata, members);
 
     if !class_like_metadata.template_types.is_empty() {
         for (template_name, _) in &class_like_metadata.template_types {
@@ -619,6 +696,8 @@ fn check_class_like_implements<'ctx, 'arena>(
                     actual_parameters_count,
                     InheritanceKind::Implements(implemented_type.span()),
                 );
+
+                check_interface_method_signatures(context, class_like_metadata, implemented_metadata);
             }
             None => {
                 let implemented_name = implemented_type.value();
@@ -970,15 +1049,7 @@ fn check_template_parameters<'ctx, 'arena>(
                     &TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() },
                 );
 
-                if !union_comparator::is_contained_by(
-                    context.codebase,
-                    &extended_type,
-                    &replaced_template_type,
-                    false,
-                    false,
-                    false,
-                    &mut ComparisonResult::default(),
-                ) {
+                if !is_type_compatible(context.codebase, &extended_type, &replaced_template_type) {
                     let replaced_type_str = replaced_template_type.get_id();
 
                     context.collector.report_with_code(
@@ -1014,6 +1085,900 @@ fn check_template_parameters<'ctx, 'arena>(
     }
 }
 
+/// Checks if this is the same method that was inherited (not overridden).
+/// Example: StringBox extends Box and inherits Box::setValue without overriding it.
+#[inline]
+fn should_skip_same_method(appearing_fqcn: &str, overridden_fqcn: &str) -> bool {
+    ascii_lowercase_atom(appearing_fqcn) == ascii_lowercase_atom(overridden_fqcn)
+}
+
+/// Checks if this is a trait-to-trait abstract method conflict that should be handled
+/// by `check_trait_method_conflicts` instead of here.
+///
+/// We skip when BOTH methods are:
+/// - From different traits
+/// - Both are abstract
+/// - Both traits are used by the current class
+#[inline]
+fn should_skip_trait_to_trait_conflict(
+    appearing_class: &ClassLikeMetadata,
+    appearing_method: &FunctionLikeMetadata,
+    overridden_class: &ClassLikeMetadata,
+    overridden_method: &FunctionLikeMetadata,
+    class_like_metadata: &ClassLikeMetadata,
+) -> bool {
+    if !appearing_class.kind.is_trait() || !overridden_class.kind.is_trait() {
+        return false;
+    }
+
+    let appearing_is_abstract = appearing_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+    let overridden_is_abstract = overridden_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+
+    if !appearing_is_abstract || !overridden_is_abstract {
+        return false;
+    }
+
+    let appearing_lowercase = ascii_lowercase_atom(&appearing_class.name);
+    let overridden_lowercase = ascii_lowercase_atom(&overridden_class.name);
+
+    if !class_like_metadata.used_traits.contains(&appearing_lowercase)
+        || !class_like_metadata.used_traits.contains(&overridden_lowercase)
+    {
+        return false;
+    }
+
+    appearing_lowercase != overridden_lowercase
+}
+
+/// Checks if this is an enum implementing BackedEnum/UnitEnum, which is allowed
+/// to narrow the method signatures (e.g., `from(string)` instead of `from(int|string)`).
+#[inline]
+fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, interface_fqcn: &str) -> bool {
+    class_like_metadata.kind.is_enum() && (interface_fqcn == "backedenum" || interface_fqcn == "unitenum")
+}
+
+fn check_abstract_method_signatures<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    _class_span: Span,
+) {
+    for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
+        let method_name_str = method_name_atom.as_ref();
+
+        let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+            continue;
+        };
+
+        let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
+        let appearing_method_opt = context.codebase.get_method(appearing_fqcn_str, method_name_str);
+
+        let (method_fqcn_str, appearing_method) = if let Some(method) = appearing_method_opt {
+            (appearing_fqcn_str, method)
+        } else if let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) {
+            let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
+            let Some(method) = context.codebase.get_method(declaring_fqcn_str, method_name_str) else {
+                continue;
+            };
+            (declaring_fqcn_str, method)
+        } else {
+            continue;
+        };
+
+        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids.iter() {
+            let parent_fqcn_str = parent_fqcn.as_ref();
+
+            let declaring_class_name = parent_declaring_method_id.get_class_name();
+            let declaring_class_name_str = declaring_class_name.as_ref();
+
+            if should_skip_same_method(method_fqcn_str, parent_fqcn_str) {
+                continue;
+            }
+
+            let Some(overridden_method) =
+                context.codebase.get_declaring_method(declaring_class_name_str, method_name_str)
+            else {
+                continue;
+            };
+
+            let Some(overridden_meta) = overridden_method.method_metadata.as_ref() else {
+                continue;
+            };
+
+            if !overridden_meta.is_abstract && !overridden_meta.is_final {
+                continue;
+            }
+
+            let Some(overridden_class) = context.codebase.get_class_like(declaring_class_name_str) else {
+                continue;
+            };
+
+            let Some(appearing_class) = context.codebase.get_class_like(method_fqcn_str) else {
+                continue;
+            };
+
+            if should_skip_trait_to_trait_conflict(
+                appearing_class,
+                appearing_method,
+                overridden_class,
+                overridden_method,
+                class_like_metadata,
+            ) {
+                continue;
+            }
+
+            if should_skip_enum_builtin_interface(class_like_metadata, declaring_class_name_str) {
+                continue;
+            }
+
+            let substituted_overridden_method =
+                get_substituted_method(overridden_method, class_like_metadata, declaring_class_name, context.codebase);
+
+            let issues = method_signature::validate_method_signature_compatibility(
+                context.codebase,
+                class_like_metadata.name,
+                appearing_method,
+                &substituted_overridden_method,
+            );
+
+            if issues.is_empty() {
+                continue;
+            }
+
+            let error_span = if appearing_class.kind.is_trait() {
+                class_like_metadata.name_span.unwrap_or(class_like_metadata.span)
+            } else {
+                appearing_method.name_span.unwrap_or(appearing_method.span)
+            };
+
+            for incompatibility in issues {
+                report_signature_compatibility_issue(
+                    context,
+                    class_like_metadata,
+                    overridden_class,
+                    method_name_atom,
+                    appearing_method,
+                    incompatibility,
+                    error_span,
+                );
+            }
+        }
+    }
+}
+
+fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &'ast [ClassLikeMember<'arena>],
+) {
+    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
+
+    for member in members.iter() {
+        if let ClassLikeMember::TraitUse(trait_use) = member {
+            let mut trait_names = Vec::new();
+            for trait_name_id in trait_use.trait_names.iter() {
+                let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
+                trait_names.push(Atom::from(trait_fqcn.as_str()));
+            }
+            trait_uses.push((trait_use, trait_names));
+        }
+    }
+
+    for i in 0..trait_uses.len() {
+        let (first_trait_use, first_traits) = &trait_uses[i];
+
+        for k in 0..first_traits.len() {
+            for l in (k + 1)..first_traits.len() {
+                let first_trait_fqcn = &first_traits[k];
+                let second_trait_fqcn = &first_traits[l];
+
+                let Some(first_trait_metadata) = context.codebase.get_class_like(first_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+                let Some(second_trait_metadata) = context.codebase.get_class_like(second_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for (method_name, first_method_id) in &first_trait_metadata.declaring_method_ids {
+                    if let Some(second_method_id) = second_trait_metadata.declaring_method_ids.get(method_name) {
+                        let first_method_str = method_name.as_ref();
+                        let Some(first_method) = context
+                            .codebase
+                            .get_declaring_method(first_method_id.get_class_name().as_ref(), first_method_str)
+                        else {
+                            continue;
+                        };
+                        let Some(second_method) = context
+                            .codebase
+                            .get_declaring_method(second_method_id.get_class_name().as_ref(), first_method_str)
+                        else {
+                            continue;
+                        };
+
+                        let first_is_abstract = first_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+                        let second_is_abstract = second_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+
+                        if first_is_abstract || second_is_abstract {
+                            let issues = method_signature::validate_method_signature_compatibility(
+                                context.codebase,
+                                class_like_metadata.name,
+                                second_method,
+                                first_method,
+                            );
+
+                            for incompatibility in issues {
+                                let trait_use_span = first_trait_use.span();
+
+                                report_signature_compatibility_issue(
+                                    context,
+                                    class_like_metadata,
+                                    first_trait_metadata,
+                                    method_name,
+                                    second_method,
+                                    incompatibility,
+                                    trait_use_span,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (second_trait_use, second_traits) in trait_uses.iter().skip(i + 1) {
+            for first_trait_fqcn in first_traits {
+                let Some(first_trait_metadata) = context.codebase.get_class_like(first_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for second_trait_fqcn in second_traits {
+                    let Some(second_trait_metadata) = context.codebase.get_class_like(second_trait_fqcn.as_ref())
+                    else {
+                        continue;
+                    };
+
+                    for (method_name, first_method_id) in &first_trait_metadata.declaring_method_ids {
+                        if let Some(second_method_id) = second_trait_metadata.declaring_method_ids.get(method_name) {
+                            let first_method_str = method_name.as_ref();
+                            let Some(first_method) = context
+                                .codebase
+                                .get_declaring_method(first_method_id.get_class_name().as_ref(), first_method_str)
+                            else {
+                                continue;
+                            };
+                            let Some(second_method) = context
+                                .codebase
+                                .get_declaring_method(second_method_id.get_class_name().as_ref(), first_method_str)
+                            else {
+                                continue;
+                            };
+
+                            let first_is_abstract =
+                                first_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+                            let second_is_abstract =
+                                second_method.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+
+                            if first_is_abstract || second_is_abstract {
+                                let issues = method_signature::validate_method_signature_compatibility(
+                                    context.codebase,
+                                    class_like_metadata.name,
+                                    second_method,
+                                    first_method,
+                                );
+
+                                for incompatibility in issues {
+                                    let second_trait_use_span = second_trait_use.span();
+
+                                    report_signature_compatibility_issue(
+                                        context,
+                                        class_like_metadata,
+                                        first_trait_metadata,
+                                        method_name,
+                                        second_method,
+                                        incompatibility,
+                                        second_trait_use_span,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &'ast [ClassLikeMember<'arena>],
+) {
+    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
+
+    for member in members.iter() {
+        if let ClassLikeMember::TraitUse(trait_use) = member {
+            let mut trait_names = Vec::new();
+            for trait_name_id in trait_use.trait_names.iter() {
+                let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
+                trait_names.push(Atom::from(trait_fqcn.as_str()));
+            }
+            trait_uses.push((trait_use, trait_names));
+        }
+    }
+
+    let mut class_properties: IndexMap<Atom, &PropertyMetadata> = IndexMap::new();
+    for (property_name, property_metadata) in &class_like_metadata.properties {
+        if let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(property_name)
+            && declaring_class == &class_like_metadata.name
+        {
+            class_properties.insert(*property_name, property_metadata);
+        }
+    }
+
+    for i in 0..trait_uses.len() {
+        let (first_trait_use, first_traits) = &trait_uses[i];
+
+        for k in 0..first_traits.len() {
+            for l in (k + 1)..first_traits.len() {
+                let first_trait_fqcn = &first_traits[k];
+                let second_trait_fqcn = &first_traits[l];
+
+                let Some(first_trait_metadata) = context.codebase.get_class_like(first_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+                let Some(second_trait_metadata) = context.codebase.get_class_like(second_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for (property_name, first_property) in &first_trait_metadata.properties {
+                    let Some(second_property) = second_trait_metadata.properties.get(property_name) else {
+                        continue;
+                    };
+
+                    if properties_are_compatible(first_property, second_property) {
+                        continue;
+                    }
+
+                    report_trait_property_conflict(
+                        context,
+                        &class_like_metadata.name,
+                        property_name,
+                        first_trait_fqcn,
+                        second_trait_fqcn,
+                        first_trait_use.span(),
+                        first_property,
+                        second_property,
+                    );
+                }
+            }
+        }
+
+        for (second_trait_use, second_traits) in trait_uses.iter().skip(i + 1) {
+            for first_trait_fqcn in first_traits {
+                let Some(first_trait_metadata) = context.codebase.get_class_like(first_trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for second_trait_fqcn in second_traits {
+                    let Some(second_trait_metadata) = context.codebase.get_class_like(second_trait_fqcn.as_ref())
+                    else {
+                        continue;
+                    };
+
+                    for (property_name, first_property) in &first_trait_metadata.properties {
+                        let Some(second_property) = second_trait_metadata.properties.get(property_name) else {
+                            continue;
+                        };
+
+                        if properties_are_compatible(first_property, second_property) {
+                            continue;
+                        }
+
+                        report_trait_property_conflict(
+                            context,
+                            &class_like_metadata.name,
+                            property_name,
+                            first_trait_fqcn,
+                            second_trait_fqcn,
+                            second_trait_use.span(),
+                            first_property,
+                            second_property,
+                        );
+                    }
+                }
+            }
+        }
+
+        for first_trait_fqcn in first_traits {
+            let Some(first_trait_metadata) = context.codebase.get_class_like(first_trait_fqcn.as_ref()) else {
+                continue;
+            };
+
+            for (property_name, trait_property) in &first_trait_metadata.properties {
+                let Some(class_property) = class_properties.get(property_name) else {
+                    continue;
+                };
+
+                if properties_are_compatible(trait_property, class_property) {
+                    continue;
+                }
+
+                let conflict_span = members
+                    .iter()
+                    .find_map(|member| {
+                        if let ClassLikeMember::Property(prop) = member {
+                            match prop {
+                                Property::Plain(plain_prop) => {
+                                    for item in plain_prop.items.iter() {
+                                        let var_name = Atom::from(item.variable().name);
+                                        if var_name == *property_name {
+                                            return Some(prop.span());
+                                        }
+                                    }
+                                }
+                                Property::Hooked(hooked_prop) => {
+                                    let var_name = Atom::from(hooked_prop.item.variable().name);
+                                    if var_name == *property_name {
+                                        return Some(prop.span());
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .unwrap_or_else(|| first_trait_use.span());
+
+                report_trait_property_conflict(
+                    context,
+                    &class_like_metadata.name,
+                    property_name,
+                    first_trait_fqcn,
+                    &class_like_metadata.name,
+                    conflict_span,
+                    trait_property,
+                    class_property,
+                );
+            }
+        }
+    }
+}
+
+fn properties_are_compatible(prop1: &PropertyMetadata, prop2: &PropertyMetadata) -> bool {
+    if prop1.read_visibility != prop2.read_visibility {
+        return false;
+    }
+    if prop1.write_visibility != prop2.write_visibility {
+        return false;
+    }
+
+    if prop1.flags.is_static() != prop2.flags.is_static() {
+        return false;
+    }
+
+    if prop1.flags.is_readonly() != prop2.flags.is_readonly() {
+        return false;
+    }
+
+    match (&prop1.type_declaration_metadata, &prop2.type_declaration_metadata) {
+        (Some(t1), Some(t2)) => {
+            if t1.type_union.get_id() != t2.type_union.get_id() {
+                return false;
+            }
+        }
+        (None, None) => {}
+        _ => return false,
+    }
+
+    match (&prop1.default_type_metadata, &prop2.default_type_metadata) {
+        (Some(d1), Some(d2)) => {
+            if d1.type_union.get_id() != d2.type_union.get_id() {
+                return false;
+            }
+        }
+        (None, None) => {}
+        _ => return false,
+    }
+
+    true
+}
+
+/// Check if two properties are compatible, returns Err with specific conflict type if not
+fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetadata) -> Result<(), PropertyConflict> {
+    if prop1.read_visibility != prop2.read_visibility || prop1.write_visibility != prop2.write_visibility {
+        return Err(PropertyConflict::Visibility(
+            prop1.read_visibility,
+            prop1.write_visibility,
+            prop2.read_visibility,
+            prop2.write_visibility,
+        ));
+    }
+
+    if prop1.flags.is_static() != prop2.flags.is_static() {
+        return Err(PropertyConflict::Static(prop1.flags.is_static(), prop2.flags.is_static()));
+    }
+
+    if prop1.flags.is_readonly() != prop2.flags.is_readonly() {
+        return Err(PropertyConflict::Readonly(prop1.flags.is_readonly(), prop2.flags.is_readonly()));
+    }
+
+    match (&prop1.type_declaration_metadata, &prop2.type_declaration_metadata) {
+        (Some(t1), Some(t2)) => {
+            if t1.type_union.get_id() != t2.type_union.get_id() {
+                return Err(PropertyConflict::Type(
+                    Some(format!("{:?}", t1.type_union)),
+                    Some(format!("{:?}", t2.type_union)),
+                ));
+            }
+        }
+        (Some(t1), None) => {
+            return Err(PropertyConflict::Type(Some(format!("{:?}", t1.type_union)), None));
+        }
+        (None, Some(t2)) => {
+            return Err(PropertyConflict::Type(None, Some(format!("{:?}", t2.type_union))));
+        }
+        (None, None) => {}
+    }
+
+    match (&prop1.default_type_metadata, &prop2.default_type_metadata) {
+        (Some(d1), Some(d2)) => {
+            if d1.type_union.get_id() != d2.type_union.get_id() {
+                return Err(PropertyConflict::Default(
+                    Some(format!("{:?}", d1.type_union)),
+                    Some(format!("{:?}", d2.type_union)),
+                ));
+            }
+        }
+        (Some(d1), None) => {
+            return Err(PropertyConflict::Default(Some(format!("{:?}", d1.type_union)), None));
+        }
+        (None, Some(d2)) => {
+            return Err(PropertyConflict::Default(None, Some(format!("{:?}", d2.type_union))));
+        }
+        (None, None) => {}
+    }
+
+    Ok(())
+}
+
+fn report_trait_property_conflict(
+    context: &mut Context,
+    class_name: &Atom,
+    property_name: &Atom,
+    trait1_name: &Atom,
+    trait2_name: &Atom,
+    conflict_span: Span,
+    prop1: &PropertyMetadata,
+    prop2: &PropertyMetadata,
+) {
+    let conflict = match check_property_compatibility(prop1, prop2) {
+        Ok(()) => {
+            PropertyConflict::Type(None, None) // Dummy value
+        }
+        Err(conflict) => conflict,
+    };
+
+    let conflict_description = conflict.describe();
+    let issue_code = conflict.get_issue_code();
+
+    context.collector.report_with_code(
+        issue_code,
+        Issue::error(format!(
+            "Property `{}` is defined differently in `{}` and `{}` used by `{}`: {}",
+            property_name, trait1_name, trait2_name, class_name, conflict_description
+        ))
+        .with_annotation(Annotation::primary(conflict_span).with_message("Conflicting property definitions"))
+        .with_note(format!("In PHP, this will cause a fatal error: '{} and {} define the same property ({}) in the composition of {}. However, the definition differs and is considered incompatible.'", trait1_name, trait2_name, property_name, class_name))
+        .with_help("Ensure both sources define the property identically (same visibility, type, default value, and modifiers), or use only one source."),
+    );
+}
+
+/// Apply template parameter substitution to a method's parameter and return types
+///
+/// For example, if interface has `K` and `V` template parameters, and the implementation
+/// maps them to `TKey` and `TValue`, this function replaces all occurrences of `K` with `TKey`
+/// and `V` with `TValue` in the method signature.
+///
+/// Gets the substituted method by applying template parameter mapping from the class.
+/// Returns the original method if no template substitution is needed.
+#[inline]
+fn get_substituted_method(
+    method: &FunctionLikeMetadata,
+    class_like_metadata: &ClassLikeMetadata,
+    parent_class_name: &Atom,
+    codebase: &mago_codex::metadata::CodebaseMetadata,
+) -> FunctionLikeMetadata {
+    let template_mapping =
+        class_like_metadata.template_extended_parameters.get(parent_class_name).cloned().unwrap_or_default();
+
+    if template_mapping.is_empty() {
+        method.clone()
+    } else {
+        let mut template_result = TemplateResult::default();
+        for (template_name, concrete_type) in template_mapping {
+            template_result.add_lower_bound(template_name, GenericParent::ClassLike(*parent_class_name), concrete_type);
+        }
+
+        apply_template_substitution_to_method(method, &template_result, codebase)
+    }
+}
+
+fn apply_template_substitution_to_method(
+    method: &FunctionLikeMetadata,
+    template_result: &TemplateResult,
+    codebase: &mago_codex::metadata::CodebaseMetadata,
+) -> FunctionLikeMetadata {
+    let mut substituted_method = method.clone();
+
+    for param in &mut substituted_method.parameters {
+        if let Some(type_metadata) = &mut param.type_metadata {
+            type_metadata.type_union =
+                inferred_type_replacer::replace(&type_metadata.type_union, template_result, codebase);
+        }
+    }
+
+    if let Some(return_type) = &mut substituted_method.return_type_declaration_metadata {
+        return_type.type_union = inferred_type_replacer::replace(&return_type.type_union, template_result, codebase);
+    }
+
+    substituted_method
+}
+
+fn check_interface_method_signatures<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    interface_metadata: &'ctx ClassLikeMetadata,
+) {
+    let interface_fqcn_str: &str = interface_metadata.name.as_ref();
+    if should_skip_enum_builtin_interface(class_like_metadata, interface_fqcn_str) {
+        return;
+    }
+
+    for (method_name_atom, interface_method_id) in &interface_metadata.declaring_method_ids {
+        let method_name_str = method_name_atom.as_ref();
+        let interface_fqcn_str = interface_method_id.get_class_name().as_ref();
+
+        let Some(interface_method) = context.codebase.get_declaring_method(interface_fqcn_str, method_name_str) else {
+            continue;
+        };
+
+        let Some(class_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+            continue;
+        };
+
+        let class_fqcn_str = class_method_id.get_class_name().as_ref();
+        let Some(class_method) = context.codebase.get_declaring_method(class_fqcn_str, method_name_str) else {
+            continue;
+        };
+
+        if should_skip_same_method(class_fqcn_str, interface_fqcn_str) {
+            continue;
+        }
+
+        let substituted_interface_method = get_substituted_method(
+            interface_method,
+            class_like_metadata,
+            interface_method_id.get_class_name(),
+            context.codebase,
+        );
+
+        let issues = method_signature::validate_method_signature_compatibility(
+            context.codebase,
+            class_like_metadata.name,
+            class_method,
+            &substituted_interface_method,
+        );
+
+        for incompatibility in issues {
+            // Use the method span as primary location (where the issue actually is)
+            let method_span = class_method.name_span.unwrap_or(class_method.span);
+
+            // Get the actual declaring class for error reporting
+            let declaring_class = context.codebase.get_class_like(interface_fqcn_str).unwrap_or(interface_metadata);
+
+            report_signature_compatibility_issue(
+                context,
+                class_like_metadata,
+                declaring_class,
+                method_name_atom,
+                class_method,
+                incompatibility,
+                method_span,
+            );
+        }
+    }
+}
+
+fn report_signature_compatibility_issue<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    child_class: &'ctx ClassLikeMetadata,
+    parent_class: &'ctx ClassLikeMetadata,
+    method_name: &Atom,
+    parent_method: &FunctionLikeMetadata,
+    incompatibility: SignatureCompatibilityIssue,
+    primary_span: Span,
+) {
+    let child_name = child_class.original_name;
+    let parent_name = parent_class.original_name;
+    let child_class_span = child_class.name_span.unwrap_or(child_class.span);
+    let parent_class_span = parent_class.name_span.unwrap_or(parent_class.span);
+
+    use method_signature::SignatureCompatibilityIssue;
+
+    match incompatibility {
+        SignatureCompatibilityIssue::FinalMethodOverride => {
+            context.collector.report_with_code(
+                IssueCode::OverrideFinalMethod,
+                Issue::error(format!("Cannot override final method `{}::{}()`", parent_name, method_name))
+                    .with_annotation(
+                        Annotation::primary(primary_span).with_message("Attempting to override final method here"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parent_class_span)
+                            .with_message(format!("Method `{}::{}()` is declared as final", parent_name, method_name)),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    )
+                    .with_note("Final methods cannot be overridden in child classes or traits.")
+                    .with_help(format!(
+                        "Remove the method `{}()` from `{}`, or remove the final modifier from the parent method.",
+                        method_name, child_name
+                    )),
+            );
+        }
+        SignatureCompatibilityIssue::StaticModifierMismatch { child_is_static, parent_is_static: _ } => {
+            let (child_modifier, parent_modifier) =
+                if child_is_static { ("static", "non-static") } else { ("non-static", "static") };
+
+            context.collector.report_with_code(
+                IssueCode::IncompatibleStaticModifier,
+                Issue::error(format!(
+                    "Cannot make {} method `{}::{}()` {} in class `{}`",
+                    parent_modifier, parent_name, method_name, child_modifier, child_name
+                ))
+                .with_annotation(
+                    Annotation::primary(primary_span)
+                        .with_message(format!("This method is {} but should be {}", child_modifier, parent_modifier)),
+                )
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "`{}::{}()` is defined as {} here",
+                    parent_name, method_name, parent_modifier
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("The static modifier must match exactly between parent and child methods.")
+                .with_help(format!("Change the method in `{}` to be {} like the parent.", child_name, parent_modifier)),
+            );
+        }
+        SignatureCompatibilityIssue::VisibilityNarrowed { child_visibility, parent_visibility } => {
+            context.collector.report_with_code(
+                IssueCode::IncompatibleVisibility,
+                Issue::error(format!(
+                    "Visibility of `{}::{}()` must not be narrowed from {} to {}",
+                    child_name, method_name, parent_visibility, child_visibility
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "Method declared as {} but should be {} or wider",
+                    child_visibility, parent_visibility
+                )))
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent method `{}::{}()` is declared as {} here",
+                    parent_name, method_name, parent_visibility
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("Visibility can only be widened (e.g., protected → public) not narrowed.")
+                .with_help(format!("Change the visibility to {} or wider.", parent_visibility)),
+            );
+        }
+        SignatureCompatibilityIssue::ParameterCountMismatch { child_required_count, parent_required_count } => {
+            context.collector.report_with_code(
+                IssueCode::IncompatibleParameterCount,
+                Issue::error(format!(
+                    "`{}::{}()` must accept at least {} required parameters like `{}::{}()`",
+                    child_name, method_name, parent_required_count, parent_name, method_name
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "Method requires {} parameters but parent requires {}",
+                    child_required_count, parent_required_count
+                )))
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent method `{}::{}()` requires {} parameters",
+                    parent_name, method_name, parent_required_count
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("Child methods must accept at least as many required parameters as the parent.")
+                .with_help("Add optional parameters or reduce the number of required parameters in the child method."),
+            );
+        }
+        SignatureCompatibilityIssue::IncompatibleParameterType { parameter_index, child_type, parent_type } => {
+            let param_name =
+                parent_method.parameters.get(parameter_index).map(|p| p.name.0.as_ref()).unwrap_or("unknown");
+
+            context.collector.report_with_code(
+                IssueCode::IncompatibleParameterType,
+                Issue::error(format!(
+                    "Parameter `{}` of `{}::{}()` expects type `{}` but parent `{}::{}()` expects type `{}`",
+                    param_name, child_name, method_name, child_type, parent_name, method_name, parent_type
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "Parameter `{}` expects type `{}` but parent expects `{}`",
+                    param_name, child_type, parent_type
+                )))
+                .with_annotation(
+                    Annotation::secondary(parent_class_span).with_message(format!(
+                        "Parent method `{}::{}()` parameter defined here",
+                        parent_name, method_name
+                    )),
+                )
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("Parameter types must be contravariant: child must accept equal or wider types than parent.")
+                .with_help("Change the parameter type to be compatible with the parent method."),
+            );
+        }
+        SignatureCompatibilityIssue::IncompatibleReturnType { child_type, parent_type } => {
+            context.collector.report_with_code(
+                IssueCode::IncompatibleReturnType,
+                Issue::error(format!(
+                    "Return type `{}` of `{}::{}()` is incompatible with parent return type `{}` of `{}::{}()`",
+                    child_type, child_name, method_name, parent_type, parent_name, method_name
+                ))
+                .with_annotation(
+                    Annotation::primary(primary_span)
+                        .with_message(format!("Returns type `{}` but parent expects `{}`", child_type, parent_type)),
+                )
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent method `{}::{}()` return type defined here",
+                    parent_name, method_name
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("Return types must be covariant: child must return equal or narrower types than parent.")
+                .with_help("Change the return type to be compatible with the parent method."),
+            );
+        }
+        SignatureCompatibilityIssue::ParameterNameMismatch {
+            parameter_index,
+            child_name: child_param_name,
+            parent_name: parent_param_name,
+        } => {
+            context.collector.report_with_code(
+                IssueCode::IncompatibleParameterName,
+                Issue::warning(format!(
+                    "Parameter #{} of `{}::{}()` is named `{}` but parent `{}::{}()` names it `{}`",
+                    parameter_index + 1,
+                    child_name,
+                    method_name,
+                    child_param_name,
+                    parent_name,
+                    method_name,
+                    parent_param_name
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "Parameter named `{child_param_name}` but parent uses `{parent_param_name}`",
+                )))
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent method `{parent_name}::{method_name}()` parameter `{parent_param_name}` defined here",
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                )
+                .with_note("Parameter name changes can break code using named arguments.")
+                .with_help(format!(
+                    "Consider renaming the parameter to `{}` to match the parent method.",
+                    parent_param_name
+                )),
+            );
+        }
+    }
+}
+
 fn check_class_like_properties<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
@@ -1022,36 +1987,44 @@ fn check_class_like_properties<'ctx, 'arena>(
         return;
     }
 
-    for (property, fqcn) in &class_like_metadata.appearing_property_ids {
-        let Some(declaring_property) = context.codebase.get_declaring_property(fqcn, property) else {
+    // Check properties declared directly in this class against parent classes
+    for (property_name, property_metadata) in &class_like_metadata.properties {
+        // Only check properties declared in this class, not inherited ones
+        let Some(declaring_fqcn) = class_like_metadata.declaring_property_ids.get(property_name) else {
             continue;
         };
 
-        if let Some(parents_fqcn) = class_like_metadata.overridden_property_ids.get(property) {
-            for parent_fqcn in parents_fqcn {
-                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn) else {
-                    continue;
-                };
+        if declaring_fqcn != &class_like_metadata.name {
+            // Property is inherited, not declared in this class
+            continue;
+        }
 
-                let Some(parent_property) = parent_metadata.properties.get(property) else {
-                    continue;
-                };
+        // Check each parent class for this property
+        for parent_fqcn in &class_like_metadata.all_parent_classes {
+            let parent_fqcn_str = parent_fqcn.as_ref();
+            let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn_str) else {
+                continue;
+            };
 
-                if declaring_property.read_visibility > parent_property.read_visibility
-                    && let Some(property_span) = declaring_property.span
-                    && let Some(parent_property_span) = parent_property.span
-                {
-                    let declaring_class_name = class_like_metadata.original_name;
-                    let parent_class_name = parent_metadata.original_name;
+            let Some(parent_property) = parent_metadata.properties.get(property_name) else {
+                continue;
+            };
 
-                    context.collector.report_with_code(
-                        IssueCode::OverriddenPropertyAccess,
+            if property_metadata.read_visibility > parent_property.read_visibility {
+                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
+                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
+
+                let declaring_class_name = class_like_metadata.original_name;
+                let parent_class_name = parent_metadata.original_name;
+
+                context.collector.report_with_code(
+                        IssueCode::IncompatiblePropertyAccess,
                         Issue::error(format!(
-                            "Property `{declaring_class_name}::{property}` has a different read access level than `{parent_class_name}::{property}`."
+                            "Property `{declaring_class_name}::{property_name}` has a different read access level than `{parent_class_name}::{property_name}`."
                         ))
                         .with_annotation(
                             Annotation::primary(property_span)
-                                .with_message(format!("This property is declared as `{}`", declaring_property.read_visibility.as_str())),
+                                .with_message(format!("This property is declared as `{}`", property_metadata.read_visibility.as_str())),
                         )
                         .with_annotation(
                             Annotation::secondary(parent_property_span)
@@ -1060,25 +2033,26 @@ fn check_class_like_properties<'ctx, 'arena>(
                         .with_note("The access level of an overridden property must not be more restrictive than the parent property.")
                         .with_help("Adjust the access level of the property in the child class to match or be less restrictive than the parent class."),
                     );
-                }
+            }
 
-                if (declaring_property.write_visibility != declaring_property.read_visibility
-                    || parent_property.write_visibility != parent_property.read_visibility)
-                    && declaring_property.write_visibility > parent_property.write_visibility
-                    && let Some(property_span) = declaring_property.span
-                    && let Some(parent_property_span) = parent_property.span
-                {
-                    let declaring_class_name = class_like_metadata.original_name;
-                    let parent_class_name = parent_metadata.original_name;
+            if (property_metadata.write_visibility != property_metadata.read_visibility
+                || parent_property.write_visibility != parent_property.read_visibility)
+                && property_metadata.write_visibility > parent_property.write_visibility
+            {
+                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
+                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
 
-                    context.collector.report_with_code(
-                        IssueCode::OverriddenPropertyAccess,
+                let declaring_class_name = class_like_metadata.original_name;
+                let parent_class_name = parent_metadata.original_name;
+
+                context.collector.report_with_code(
+                        IssueCode::IncompatiblePropertyAccess,
                         Issue::error(format!(
-                            "Property `{declaring_class_name}::{property}` has a different write access level than `{parent_class_name}::{property}`."
+                            "Property `{declaring_class_name}::{property_name}` has a different write access level than `{parent_class_name}::{property_name}`."
                         ))
                         .with_annotation(
                             Annotation::primary(property_span)
-                                .with_message(format!("This property is declared as `{}(set)`", declaring_property.write_visibility.as_str())),
+                                .with_message(format!("This property is declared as `{}(set)`", property_metadata.write_visibility.as_str())),
                         )
                         .with_annotation(
                             Annotation::secondary(parent_property_span)
@@ -1087,45 +2061,93 @@ fn check_class_like_properties<'ctx, 'arena>(
                         .with_note("The access level of an overridden property must not be more restrictive than the parent property.")
                         .with_help("Adjust the access level of the property in the child class to match or be less restrictive than the parent class."),
                     );
-                }
+            }
 
-                let mut has_type_incompatibility = false;
-                match (
-                    declaring_property.type_declaration_metadata.as_ref(),
-                    parent_property.type_declaration_metadata.as_ref(),
-                ) {
-                    (Some(declaring_type), Some(parent_type)) => {
-                        let contains_parent = union_comparator::is_contained_by(
-                            context.codebase,
-                            &declaring_type.type_union,
-                            &parent_type.type_union,
-                            false,
-                            false,
-                            false,
-                            &mut ComparisonResult::default(),
-                        );
+            // Check static modifier consistency
+            if property_metadata.flags.is_static() != parent_property.flags.is_static() {
+                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
+                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
 
-                        let contains_declaring = union_comparator::is_contained_by(
-                            context.codebase,
-                            &parent_type.type_union,
-                            &declaring_type.type_union,
-                            false,
-                            false,
-                            false,
-                            &mut ComparisonResult::default(),
-                        );
+                let declaring_class_name = class_like_metadata.original_name;
+                let parent_class_name = parent_metadata.original_name;
+                let (child_modifier, parent_modifier) = if property_metadata.flags.is_static() {
+                    ("static", "non-static")
+                } else {
+                    ("non-static", "static")
+                };
 
-                        let is_wider = contains_parent && !contains_declaring;
-                        let is_narrower = contains_declaring && !contains_parent;
-                        if is_wider || is_narrower {
-                            has_type_incompatibility = true;
+                context.collector.report_with_code(
+                        IssueCode::IncompatibleStaticModifier,
+                        Issue::error(format!(
+                            "Cannot redeclare {parent_modifier} property `{parent_class_name}::{property_name}` as {child_modifier} `{declaring_class_name}::{property_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(property_span)
+                                .with_message(format!("This property is declared as `{child_modifier}`")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(parent_property_span)
+                                .with_message(format!("Parent property is declared as `{parent_modifier}`")),
+                        )
+                        .with_note("Properties must maintain the same static modifier when overriding parent properties.")
+                        .with_help(format!("Change this property to be `{parent_modifier}` to match the parent class.")),
+                    );
+            }
 
-                            let declaring_type_id = declaring_type.type_union.get_id();
-                            let parent_type_id = parent_type.type_union.get_id();
-                            let property_name = declaring_property.name.0;
-                            let class_name = class_like_metadata.original_name;
+            // Check readonly modifier consistency
+            if property_metadata.flags.is_readonly() != parent_property.flags.is_readonly() {
+                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
+                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
 
-                            context.collector.report_with_code(
+                let declaring_class_name = class_like_metadata.original_name;
+                let parent_class_name = parent_metadata.original_name;
+                let (child_modifier, parent_modifier) = if property_metadata.flags.is_readonly() {
+                    ("readonly", "non-readonly")
+                } else {
+                    ("non-readonly", "readonly")
+                };
+
+                context.collector.report_with_code(
+                        IssueCode::IncompatibleReadonlyModifier,
+                        Issue::error(format!(
+                            "Cannot redeclare {parent_modifier} property `{parent_class_name}::{property_name}` as {child_modifier} `{declaring_class_name}::{property_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(property_span)
+                                .with_message(format!("This property is declared as `{child_modifier}`")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(parent_property_span)
+                                .with_message(format!("Parent property is declared as `{parent_modifier}`")),
+                        )
+                        .with_note("Properties must maintain the same readonly modifier when overriding parent properties.")
+                        .with_help(format!("Change this property to be `{parent_modifier}` to match the parent class.")),
+                    );
+            }
+
+            let mut has_type_incompatibility = false;
+            match (
+                property_metadata.type_declaration_metadata.as_ref(),
+                parent_property.type_declaration_metadata.as_ref(),
+            ) {
+                (Some(declaring_type), Some(parent_type)) => {
+                    let contains_parent =
+                        is_type_compatible(context.codebase, &declaring_type.type_union, &parent_type.type_union);
+
+                    let contains_declaring =
+                        is_type_compatible(context.codebase, &parent_type.type_union, &declaring_type.type_union);
+
+                    let is_wider = contains_parent && !contains_declaring;
+                    let is_narrower = contains_declaring && !contains_parent;
+                    if is_wider || is_narrower {
+                        has_type_incompatibility = true;
+
+                        let declaring_type_id = declaring_type.type_union.get_id();
+                        let parent_type_id = parent_type.type_union.get_id();
+                        let property_name = property_metadata.name.0;
+                        let class_name = class_like_metadata.original_name;
+
+                        context.collector.report_with_code(
                                 IssueCode::IncompatiblePropertyType,
                                 Issue::error(format!(
                                     "Property `{class_name}::{property_name}` has an incompatible type declaration."
@@ -1141,42 +2163,42 @@ fn check_class_like_properties<'ctx, 'arena>(
                                 .with_note("PHP requires property types to be invariant, meaning the type declaration in a child class must be exactly the same as in the parent class.")
                                 .with_help(format!("Change the type of `{property_name}` to `{parent_type_id}` to match the parent property."))
                             );
-                        }
                     }
-                    (Some(declaring_type), None) => {
-                        has_type_incompatibility = true;
+                }
+                (Some(declaring_type), None) => {
+                    has_type_incompatibility = true;
 
-                        let property_name = declaring_property.name.0;
-                        let class_name = class_like_metadata.original_name;
+                    let property_name = property_metadata.name.0;
+                    let class_name = class_like_metadata.original_name;
 
-                        let mut issue = Issue::error(format!(
-                            "Property `{class_name}::{property_name}` adds a type that is missing on the parent property."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(declaring_type.span)
-                                .with_message("This type declaration is not present on the parent property"),
+                    let mut issue = Issue::error(format!(
+                        "Property `{class_name}::{property_name}` adds a type that is missing on the parent property."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(declaring_type.span)
+                            .with_message("This type declaration is not present on the parent property"),
+                    );
+
+                    if let Some(parent_property_span) = parent_property.name_span {
+                        issue = issue.with_annotation(
+                            Annotation::secondary(parent_property_span)
+                                .with_message("The parent property is defined here without a type"),
                         );
+                    };
 
-                        if let Some(parent_property_span) = parent_property.name_span {
-                            issue = issue.with_annotation(
-                                Annotation::secondary(parent_property_span)
-                                    .with_message("The parent property is defined here without a type"),
-                            );
-                        };
-
-                        context.collector.report_with_code(IssueCode::IncompatiblePropertyType, issue
+                    context.collector.report_with_code(IssueCode::IncompatiblePropertyType, issue
                             .with_note("Adding a type to a property that was untyped in a parent class is an incompatible change.")
                                    .with_help("You can either remove the type from this property or add an identical type to the property in the parent class."));
-                    }
-                    (None, Some(parent_type)) => {
-                        has_type_incompatibility = true;
+                }
+                (None, Some(parent_type)) => {
+                    has_type_incompatibility = true;
 
-                        if let Some(property_span) = declaring_property.name_span {
-                            let property_name = declaring_property.name.0;
-                            let class_name = class_like_metadata.original_name;
-                            let parent_type_id = parent_type.type_union.get_id();
+                    if let Some(property_span) = property_metadata.name_span {
+                        let property_name = property_metadata.name.0;
+                        let class_name = class_like_metadata.original_name;
+                        let parent_type_id = parent_type.type_union.get_id();
 
-                            context.collector.report_with_code(
+                        context.collector.report_with_code(
                                 IssueCode::IncompatiblePropertyType,
                                 Issue::error(format!(
                                     "Property `{class_name}::{property_name}` is missing the type declaration from its parent."
@@ -1192,41 +2214,26 @@ fn check_class_like_properties<'ctx, 'arena>(
                                 .with_note("Removing a type from a property that was typed in a parent class is an incompatible change.")
                                 .with_help(format!("Add the type declaration `{parent_type_id}` to this property to match the parent definition."))
                             );
-                        }
-                    }
-                    (None, None) => {
-                        // no type declaration, nothing to check
                     }
                 }
+                (None, None) => {
+                    // no type declaration, nothing to check
+                }
+            }
 
-                if !has_type_incompatibility
-                    && let Some(declaring_type) = &declaring_property.type_metadata
-                    && declaring_type.from_docblock
-                    && let Some(parent_type) = &parent_property.type_metadata
-                    && (!union_comparator::is_contained_by(
-                        context.codebase,
-                        &declaring_type.type_union,
-                        &parent_type.type_union,
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::default(),
-                    ) || !union_comparator::is_contained_by(
-                        context.codebase,
-                        &parent_type.type_union,
-                        &declaring_type.type_union,
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::default(),
-                    ))
-                {
-                    let declaring_type_id = declaring_type.type_union.get_id();
-                    let parent_type_id = parent_type.type_union.get_id();
-                    let property_name = declaring_property.name.0;
-                    let class_name = class_like_metadata.original_name;
+            if !has_type_incompatibility
+                && let Some(declaring_type) = &property_metadata.type_metadata
+                && declaring_type.from_docblock
+                && let Some(parent_type) = &parent_property.type_metadata
+                && (!is_type_compatible(context.codebase, &declaring_type.type_union, &parent_type.type_union)
+                    || !is_type_compatible(context.codebase, &parent_type.type_union, &declaring_type.type_union))
+            {
+                let declaring_type_id = declaring_type.type_union.get_id();
+                let parent_type_id = parent_type.type_union.get_id();
+                let property_name = property_metadata.name.0;
+                let class_name = class_like_metadata.original_name;
 
-                    context.collector.report_with_code(
+                context.collector.report_with_code(
                         IssueCode::IncompatiblePropertyType,
                         Issue::error(format!(
                             "Property `{class_name}::{property_name}` has an incompatible type declaration from docblock."
@@ -1242,7 +2249,6 @@ fn check_class_like_properties<'ctx, 'arena>(
                         .with_note("PHP requires property types to be invariant, meaning the type declaration in a child class must be exactly the same as in the parent class.")
                         .with_help(format!("Change the type of `{property_name}` to `{parent_type_id}` to match the parent property.")),
                     );
-                }
             }
         }
     }
@@ -1253,7 +2259,6 @@ fn check_class_like_constants<'ctx, 'arena>(
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &[ClassLikeMember<'arena>],
 ) {
-    // Check if any constant declared directly in this class overrides a trait constant
     for member in members {
         let ClassLikeMember::Constant(constant) = member else {
             continue;
@@ -1262,46 +2267,257 @@ fn check_class_like_constants<'ctx, 'arena>(
         for item in constant.items.iter() {
             let constant_name = atom(item.name.value);
 
-            // Check if this constant came from a trait
             let Some(trait_fqcn) = class_like_metadata.trait_constant_ids.get(&constant_name) else {
                 continue;
             };
 
-            // Get the trait metadata
             let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn) else {
                 continue;
             };
 
-            // Compare values
-            let trait_constant_matches = if let Some(trait_constant) = trait_metadata.constants.get(&constant_name)
-                && let Some(class_constant) = class_like_metadata.constants.get(&constant_name)
-            {
-                trait_constant.inferred_type == class_constant.inferred_type
-            } else {
-                false
+            let Some(trait_constant) = trait_metadata.constants.get(&constant_name) else {
+                continue;
+            };
+            let Some(class_constant) = class_like_metadata.constants.get(&constant_name) else {
+                continue;
             };
 
-            // Only report error if the values differ
-            if trait_constant_matches {
+            let value_matches = trait_constant.inferred_type == class_constant.inferred_type;
+            let visibility_matches = trait_constant.visibility == class_constant.visibility;
+            let finality_matches = trait_constant.flags.is_final() == class_constant.flags.is_final();
+
+            if value_matches && visibility_matches && finality_matches {
                 continue;
             }
 
             let class_name = class_like_metadata.original_name;
             let trait_name = trait_metadata.original_name;
 
-            context.collector.report_with_code(
-                IssueCode::TraitConstantOverride,
-                Issue::error(format!(
-                    "Class `{class_name}` cannot override constant `{constant_name}` from trait `{trait_name}` with a different value."
-                ))
-                .with_annotation(
-                    Annotation::primary(item.name.span())
-                        .with_message(format!("This constant has a different value than in trait `{trait_name}`")),
-                )
-                .with_note("PHP does not allow a class to override constants from traits it directly uses with a different value.")
-                .with_note(format!("Trait `{trait_name}` declares constant `{constant_name}`, which is inherited by `{class_name}`."))
-                .with_help(format!("Either use the same value as in the trait, remove the constant declaration from `{class_name}`, or remove the `use {trait_name}` statement.")),
-            );
+            if !value_matches && visibility_matches && finality_matches {
+                context.collector.report_with_code(
+                    IssueCode::TraitConstantOverride,
+                    Issue::error(format!(
+                        "Class `{class_name}` cannot override constant `{constant_name}` from trait `{trait_name}` with a different value."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(item.name.span())
+                            .with_message(format!("This constant has a different value than in trait `{trait_name}`")),
+                    )
+                    .with_note("PHP does not allow a class to override constants from traits it directly uses with a different value.")
+                    .with_note(format!("Trait `{trait_name}` declares constant `{constant_name}`, which is inherited by `{class_name}`."))
+                    .with_help(format!("Either use the same value as in the trait, remove the constant declaration from `{class_name}`, or remove the `use {trait_name}` statement.")),
+                );
+            } else {
+                let mut conflicts = Vec::new();
+                if !value_matches {
+                    conflicts.push("value");
+                }
+                if !visibility_matches {
+                    conflicts.push("visibility");
+                }
+                if !finality_matches {
+                    conflicts.push("finality");
+                }
+                let conflicts_str = conflicts.join(", ");
+
+                context.collector.report_with_code(
+                    IssueCode::IncompatibleConstantOverride,
+                    Issue::error(format!(
+                        "{} and {} define the same constant ({}) in the composition of {}. However, the definition differs and is considered incompatible.",
+                        class_name, trait_name, constant_name, class_name
+                    ))
+                    .with_annotation(
+                        Annotation::primary(item.name.span())
+                            .with_message(format!("This constant differs from trait definition ({} differ)", conflicts_str)),
+                    )
+                    .with_note(format!("Trait `{trait_name}` declares constant `{constant_name}`, which is inherited by `{class_name}`."))
+                    .with_note("PHP requires that constants from traits match exactly in value, visibility, and finality when redeclared.")
+                    .with_help(format!("Either match the trait's definition exactly, remove the constant declaration from `{class_name}`, or remove the `use {trait_name}` statement.")),
+                );
+            }
+        }
+    }
+
+    for member in members {
+        let ClassLikeMember::Constant(constant) = member else {
+            continue;
+        };
+
+        for item in constant.items.iter() {
+            let constant_name = atom(item.name.value);
+
+            let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {
+                continue;
+            };
+
+            for parent_fqcn in &class_like_metadata.all_parent_classes {
+                let parent_fqcn_str = parent_fqcn.as_ref();
+                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn_str) else {
+                    continue;
+                };
+
+                let Some(parent_constant) = parent_metadata.constants.get(&constant_name) else {
+                    continue;
+                };
+
+                if parent_constant.flags.is_final() {
+                    let child_span = item.name.span();
+                    let parent_span = parent_constant.span;
+                    let class_name = class_like_metadata.original_name;
+                    let parent_class_name = parent_metadata.original_name;
+
+                    context.collector.report_with_code(
+                        IssueCode::OverrideFinalConstant,
+                        Issue::error(format!(
+                            "Class `{class_name}` cannot override final constant `{constant_name}` from parent class `{parent_class_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(child_span)
+                                .with_message("This constant attempts to override a final constant"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(parent_span)
+                                .with_message(format!("The constant is declared as final in parent class `{parent_class_name}` here")),
+                        )
+                        .with_note("PHP 8.1+ allows constants to be marked as final to prevent overriding in child classes.")
+                        .with_help(format!("Remove this constant declaration from `{class_name}` or remove the final modifier from the parent constant.")),
+                    );
+                }
+
+                if child_constant.visibility > parent_constant.visibility {
+                    let child_span = item.name.span();
+                    let parent_span = parent_constant.span;
+                    let class_name = class_like_metadata.original_name;
+                    let parent_class_name = parent_metadata.original_name;
+                    let child_visibility = child_constant.visibility;
+                    let parent_visibility = parent_constant.visibility;
+
+                    context.collector.report_with_code(
+                        IssueCode::IncompatibleConstantAccess,
+                        Issue::error(format!(
+                            "Constant `{class_name}::{constant_name}` has narrower visibility than parent constant."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(child_span)
+                                .with_message(format!("This constant is declared as `{child_visibility}`, which is narrower than the parent's `{parent_visibility}`")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(parent_span)
+                                .with_message(format!("Parent constant is declared as `{parent_visibility}` in `{parent_class_name}` here")),
+                        )
+                        .with_note("PHP requires that overriding constants maintain or widen visibility (public → protected → private).")
+                        .with_help(format!("Change the visibility of `{constant_name}` to at least `{parent_visibility}` to match the parent constant.")),
+                    );
+                }
+
+                let (Some(child_type), Some(parent_type)) =
+                    (&child_constant.type_declaration, &parent_constant.type_declaration)
+                else {
+                    continue;
+                };
+
+                if is_type_compatible(context.codebase, &child_type.type_union, &parent_type.type_union) {
+                    continue;
+                }
+                let child_type_id = child_type.type_union.get_id();
+                let parent_type_id = parent_type.type_union.get_id();
+                let class_name = class_like_metadata.original_name;
+                let parent_class_name = parent_metadata.original_name;
+
+                context.collector.report_with_code(
+                    IssueCode::IncompatibleConstantType,
+                    Issue::error(format!(
+                        "Constant `{class_name}::{constant_name}` has an incompatible type declaration."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(child_type.span)
+                            .with_message(format!("This type `{child_type_id}` is not compatible with the parent's type")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parent_type.span)
+                            .with_message(format!("The parent constant is defined with type `{parent_type_id}` in `{parent_class_name}` here")),
+                    )
+                    .with_note("PHP 8.3+ allows typed constants with covariance, meaning the child type must be a subtype of the parent type.")
+                    .with_help(format!("Change the type of `{constant_name}` to be compatible with `{parent_type_id}`.")),
+                );
+            }
+        }
+    }
+
+    for member in members {
+        let ClassLikeMember::Constant(constant) = member else {
+            continue;
+        };
+
+        for item in constant.items.iter() {
+            let constant_name = atom(item.name.value);
+
+            let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {
+                continue;
+            };
+
+            for interface_fqcn in &class_like_metadata.all_parent_interfaces {
+                let interface_fqcn_str = interface_fqcn.as_ref();
+                let Some(interface_metadata) = context.codebase.get_class_like(interface_fqcn_str) else {
+                    continue;
+                };
+
+                let Some(interface_constant) = interface_metadata.constants.get(&constant_name) else {
+                    continue;
+                };
+
+                if child_constant.visibility != Visibility::Public {
+                    let child_span = item.name.span();
+                    let interface_span = interface_constant.span;
+                    let class_name = class_like_metadata.original_name;
+                    let interface_name = interface_metadata.original_name;
+                    let child_visibility = child_constant.visibility;
+
+                    context.collector.report_with_code(
+                        IssueCode::IncompatibleConstantVisibility,
+                        Issue::error(format!(
+                            "Constant `{class_name}::{constant_name}` must be public to implement interface `{interface_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(child_span)
+                                .with_message(format!("This constant is declared as `{child_visibility}`, but must be `public`")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(interface_span)
+                                .with_message(format!("Interface constant is declared in `{interface_name}` here")),
+                        )
+                        .with_note("All interface constants are implicitly public and implementing classes must maintain public visibility.")
+                        .with_help(format!("Change the visibility of `{constant_name}` to `public`.")),
+                    );
+                }
+
+                if let (Some(child_type), Some(interface_type)) =
+                    (&child_constant.type_declaration, &interface_constant.type_declaration)
+                    && !is_type_compatible(context.codebase, &child_type.type_union, &interface_type.type_union)
+                {
+                    let child_type_id = child_type.type_union.get_id();
+                    let interface_type_id = interface_type.type_union.get_id();
+                    let class_name = class_like_metadata.original_name;
+                    let interface_name = interface_metadata.original_name;
+
+                    context.collector.report_with_code(
+                            IssueCode::IncompatibleConstantType,
+                            Issue::error(format!(
+                                "Constant `{class_name}::{constant_name}` has an incompatible type declaration."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(child_type.span)
+                                    .with_message(format!("This type `{child_type_id}` is not compatible with the interface's type")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(interface_type.span)
+                                    .with_message(format!("The interface constant is defined with type `{interface_type_id}` in `{interface_name}` here")),
+                            )
+                            .with_note("Constants implementing interface constants must have compatible types (covariance allowed).")
+                            .with_help(format!("Change the type of `{constant_name}` to be compatible with `{interface_type_id}`.")),
+                        );
+                }
+            }
         }
     }
 }

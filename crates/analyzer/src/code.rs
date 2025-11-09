@@ -27,6 +27,7 @@ pub enum IssueCode {
     DeprecatedFunction,
     DeprecatedMethod,
     DeprecatedTrait,
+    DirectTraitConstantAccess,
     DocblockTypeMismatch,
     DuplicateArrayKey,
     DuplicateCaughtType,
@@ -57,8 +58,25 @@ pub enum IssueCode {
     ImpossibleTypeComparison,
     ImpureConstruct,
     ImpureStaticVariable,
+    IncompatibleConstantAccess,
+    IncompatibleConstantOverride,
+    IncompatibleConstantType,
+    IncompatibleConstantVisibility,
+    IncompatibleParameterCount,
+    IncompatibleParameterName,
+    IncompatibleParameterType,
+    IncompatiblePropertyAccess,
+    IncompatiblePropertyDefault,
+    IncompatiblePropertyOverride,
+    IncompatiblePropertyReadonly,
+    IncompatiblePropertyStatic,
     IncompatiblePropertyType,
+    IncompatiblePropertyVisibility,
+    IncompatibleReadonlyModifier,
+    IncompatibleReturnType,
+    IncompatibleStaticModifier,
     IncompatibleTemplateLowerBound,
+    IncompatibleVisibility,
     InconsistentTemplate,
     InterfaceInstantiation,
     InvalidArgument,
@@ -106,6 +124,7 @@ pub enum IssueCode {
     InvalidStaticPropertyAccess,
     InvalidTemplateParameter,
     InvalidThrow,
+    InvalidTraitAliasModifier,
     InvalidTraitUse,
     InvalidTypeCast,
     InvalidUnset,
@@ -167,6 +186,7 @@ pub enum IssueCode {
     NonExistentMethod,
     NonExistentProperty,
     NonIterableObjectIteration,
+    NonStaticAbstractImplementation,
     NullArgument,
     NullArrayAccess,
     NullArrayIndex,
@@ -174,7 +194,8 @@ pub enum IssueCode {
     NullOperand,
     NullPropertyAccess,
     NullableReturnStatement,
-    OverriddenPropertyAccess,
+    OverrideFinalConstant,
+    OverrideFinalMethod,
     ParadoxicalCondition,
     ParentOutsideClassScope,
     PossibleMethodAccessOnNull,
@@ -288,6 +309,7 @@ impl IssueCode {
             Self::DeprecatedFunction => "deprecated-function",
             Self::DeprecatedMethod => "deprecated-method",
             Self::DeprecatedTrait => "deprecated-trait",
+            Self::DirectTraitConstantAccess => "direct-trait-constant-access",
             Self::DocblockTypeMismatch => "docblock-type-mismatch",
             Self::DuplicateArrayKey => "duplicate-array-key",
             Self::DuplicateCaughtType => "duplicate-caught-type",
@@ -318,8 +340,25 @@ impl IssueCode {
             Self::ImpossibleTypeComparison => "impossible-type-comparison",
             Self::ImpureConstruct => "impure-construct",
             Self::ImpureStaticVariable => "impure-static-variable",
+            Self::IncompatibleConstantAccess => "incompatible-constant-access",
+            Self::IncompatibleConstantOverride => "incompatible-constant-override",
+            Self::IncompatibleConstantType => "incompatible-constant-type",
+            Self::IncompatibleConstantVisibility => "incompatible-constant-visibility",
+            Self::IncompatibleParameterCount => "incompatible-parameter-count",
+            Self::IncompatibleParameterName => "incompatible-parameter-name",
+            Self::IncompatibleParameterType => "incompatible-parameter-type",
+            Self::IncompatiblePropertyAccess => "incompatible-property-access",
+            Self::IncompatiblePropertyDefault => "incompatible-property-default",
+            Self::IncompatiblePropertyOverride => "incompatible-property-override",
+            Self::IncompatiblePropertyReadonly => "incompatible-property-readonly",
+            Self::IncompatiblePropertyStatic => "incompatible-property-static",
             Self::IncompatiblePropertyType => "incompatible-property-type",
+            Self::IncompatiblePropertyVisibility => "incompatible-property-visibility",
+            Self::IncompatibleReadonlyModifier => "incompatible-readonly-modifier",
+            Self::IncompatibleReturnType => "incompatible-return-type",
+            Self::IncompatibleStaticModifier => "incompatible-static-modifier",
             Self::IncompatibleTemplateLowerBound => "incompatible-template-lower-bound",
+            Self::IncompatibleVisibility => "incompatible-visibility",
             Self::InconsistentTemplate => "inconsistent-template",
             Self::InterfaceInstantiation => "interface-instantiation",
             Self::InvalidArgument => "invalid-argument",
@@ -367,6 +406,7 @@ impl IssueCode {
             Self::InvalidStaticPropertyAccess => "invalid-static-property-access",
             Self::InvalidTemplateParameter => "invalid-template-parameter",
             Self::InvalidThrow => "invalid-throw",
+            Self::InvalidTraitAliasModifier => "invalid-trait-alias-modifier",
             Self::InvalidTraitUse => "invalid-trait-use",
             Self::InvalidTypeCast => "invalid-type-cast",
             Self::InvalidUnset => "invalid-unset",
@@ -428,6 +468,7 @@ impl IssueCode {
             Self::NonExistentMethod => "non-existent-method",
             Self::NonExistentProperty => "non-existent-property",
             Self::NonIterableObjectIteration => "non-iterable-object-iteration",
+            Self::NonStaticAbstractImplementation => "non-static-abstract-implementation",
             Self::NullArgument => "null-argument",
             Self::NullArrayAccess => "null-array-access",
             Self::NullArrayIndex => "null-array-index",
@@ -435,7 +476,8 @@ impl IssueCode {
             Self::NullOperand => "null-operand",
             Self::NullPropertyAccess => "null-property-access",
             Self::NullableReturnStatement => "nullable-return-statement",
-            Self::OverriddenPropertyAccess => "overridden-property-access",
+            Self::OverrideFinalConstant => "override-final-constant",
+            Self::OverrideFinalMethod => "override-final-method",
             Self::ParadoxicalCondition => "paradoxical-condition",
             Self::ParentOutsideClassScope => "parent-outside-class-scope",
             Self::PossibleMethodAccessOnNull => "possible-method-access-on-null",
@@ -889,10 +931,16 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_property_issue_codes() -> [Self; 17] {
+    pub const fn get_property_issue_codes() -> [Self; 22] {
         [
             Self::AmbiguousObjectPropertyAccess,
+            Self::IncompatiblePropertyAccess,
+            Self::IncompatiblePropertyDefault,
+            Self::IncompatiblePropertyOverride,
+            Self::IncompatiblePropertyReadonly,
+            Self::IncompatiblePropertyStatic,
             Self::IncompatiblePropertyType,
+            Self::IncompatiblePropertyVisibility,
             Self::InvalidPropertyAccess,
             Self::InvalidPropertyAssignmentValue,
             Self::InvalidPropertyRead,
@@ -904,17 +952,22 @@ impl IssueCode {
             Self::NonDocumentedProperty,
             Self::NonExistentProperty,
             Self::NullPropertyAccess,
-            Self::OverriddenPropertyAccess,
             Self::PossiblyNonExistentProperty,
             Self::PossiblyNullPropertyAccess,
             Self::PropertyTypeCoercion,
         ]
     }
 
-    pub const fn get_property_issue_code_values() -> [&'static str; 17] {
+    pub const fn get_property_issue_code_values() -> [&'static str; 22] {
         [
             "ambiguous-object-property-access",
+            "incompatible-property-access",
+            "incompatible-property-default",
+            "incompatible-property-override",
+            "incompatible-property-readonly",
+            "incompatible-property-static",
             "incompatible-property-type",
+            "incompatible-property-visibility",
             "invalid-property-access",
             "invalid-property-assignment-value",
             "invalid-property-read",
@@ -926,7 +979,6 @@ impl IssueCode {
             "non-documented-property",
             "non-existent-property",
             "null-property-access",
-            "overridden-property-access",
             "possibly-non-existent-property",
             "possibly-null-property-access",
             "property-type-coercion",
@@ -1017,10 +1069,11 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_return_issue_codes() -> [Self; 11] {
+    pub const fn get_return_issue_codes() -> [Self; 12] {
         [
             Self::FalsableReturnStatement,
             Self::HiddenGeneratorReturn,
+            Self::IncompatibleReturnType,
             Self::InvalidGeneratorReturnType,
             Self::InvalidReturnStatement,
             Self::LessSpecificNestedReturnStatement,
@@ -1033,10 +1086,11 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_return_issue_code_values() -> [&'static str; 11] {
+    pub const fn get_return_issue_code_values() -> [&'static str; 12] {
         [
             "falsable-return-statement",
             "hidden-generator-return",
+            "incompatible-return-type",
             "invalid-generator-return-type",
             "invalid-return-statement",
             "less-specific-nested-return-statement",
@@ -1049,7 +1103,7 @@ impl IssueCode {
         ]
     }
 
-    pub const fn get_method_issue_codes() -> [Self; 14] {
+    pub const fn get_method_issue_codes() -> [Self; 15] {
         [
             Self::AmbiguousObjectMethodAccess,
             Self::DeprecatedMethod,
@@ -1062,13 +1116,14 @@ impl IssueCode {
             Self::MixedMethodAccess,
             Self::NonDocumentedMethod,
             Self::NonExistentMethod,
+            Self::OverrideFinalMethod,
             Self::PossibleMethodAccessOnNull,
             Self::UnimplementedAbstractMethod,
             Self::UnusedMethodCall,
         ]
     }
 
-    pub const fn get_method_issue_code_values() -> [&'static str; 14] {
+    pub const fn get_method_issue_code_values() -> [&'static str; 15] {
         [
             "ambiguous-object-method-access",
             "deprecated-method",
@@ -1081,6 +1136,7 @@ impl IssueCode {
             "mixed-method-access",
             "non-documented-method",
             "non-existent-method",
+            "override-final-method",
             "possible-method-access-on-null",
             "unimplemented-abstract-method",
             "unused-method-call",
@@ -1149,6 +1205,7 @@ impl std::str::FromStr for IssueCode {
             "deprecated-function" => Ok(Self::DeprecatedFunction),
             "deprecated-method" => Ok(Self::DeprecatedMethod),
             "deprecated-trait" => Ok(Self::DeprecatedTrait),
+            "direct-trait-constant-access" => Ok(Self::DirectTraitConstantAccess),
             "docblock-type-mismatch" => Ok(Self::DocblockTypeMismatch),
             "duplicate-array-key" => Ok(Self::DuplicateArrayKey),
             "duplicate-caught-type" => Ok(Self::DuplicateCaughtType),
@@ -1179,8 +1236,25 @@ impl std::str::FromStr for IssueCode {
             "impossible-type-comparison" => Ok(Self::ImpossibleTypeComparison),
             "impure-construct" => Ok(Self::ImpureConstruct),
             "impure-static-variable" => Ok(Self::ImpureStaticVariable),
+            "incompatible-constant-access" => Ok(Self::IncompatibleConstantAccess),
+            "incompatible-constant-override" => Ok(Self::IncompatibleConstantOverride),
+            "incompatible-constant-type" => Ok(Self::IncompatibleConstantType),
+            "incompatible-constant-visibility" => Ok(Self::IncompatibleConstantVisibility),
+            "incompatible-parameter-count" => Ok(Self::IncompatibleParameterCount),
+            "incompatible-parameter-name" => Ok(Self::IncompatibleParameterName),
+            "incompatible-parameter-type" => Ok(Self::IncompatibleParameterType),
+            "incompatible-property-access" => Ok(Self::IncompatiblePropertyAccess),
+            "incompatible-property-default" => Ok(Self::IncompatiblePropertyDefault),
+            "incompatible-property-override" => Ok(Self::IncompatiblePropertyOverride),
+            "incompatible-property-readonly" => Ok(Self::IncompatiblePropertyReadonly),
+            "incompatible-property-static" => Ok(Self::IncompatiblePropertyStatic),
             "incompatible-property-type" => Ok(Self::IncompatiblePropertyType),
+            "incompatible-property-visibility" => Ok(Self::IncompatiblePropertyVisibility),
+            "incompatible-readonly-modifier" => Ok(Self::IncompatibleReadonlyModifier),
+            "incompatible-return-type" => Ok(Self::IncompatibleReturnType),
+            "incompatible-static-modifier" => Ok(Self::IncompatibleStaticModifier),
             "incompatible-template-lower-bound" => Ok(Self::IncompatibleTemplateLowerBound),
+            "incompatible-visibility" => Ok(Self::IncompatibleVisibility),
             "inconsistent-template" => Ok(Self::InconsistentTemplate),
             "interface-instantiation" => Ok(Self::InterfaceInstantiation),
             "invalid-argument" => Ok(Self::InvalidArgument),
@@ -1228,6 +1302,7 @@ impl std::str::FromStr for IssueCode {
             "invalid-static-property-access" => Ok(Self::InvalidStaticPropertyAccess),
             "invalid-template-parameter" => Ok(Self::InvalidTemplateParameter),
             "invalid-throw" => Ok(Self::InvalidThrow),
+            "invalid-trait-alias-modifier" => Ok(Self::InvalidTraitAliasModifier),
             "invalid-trait-use" => Ok(Self::InvalidTraitUse),
             "invalid-type-cast" => Ok(Self::InvalidTypeCast),
             "invalid-unset" => Ok(Self::InvalidUnset),
@@ -1289,6 +1364,7 @@ impl std::str::FromStr for IssueCode {
             "non-existent-method" => Ok(Self::NonExistentMethod),
             "non-existent-property" => Ok(Self::NonExistentProperty),
             "non-iterable-object-iteration" => Ok(Self::NonIterableObjectIteration),
+            "non-static-abstract-implementation" => Ok(Self::NonStaticAbstractImplementation),
             "null-argument" => Ok(Self::NullArgument),
             "null-array-access" => Ok(Self::NullArrayAccess),
             "null-array-index" => Ok(Self::NullArrayIndex),
@@ -1296,7 +1372,8 @@ impl std::str::FromStr for IssueCode {
             "null-operand" => Ok(Self::NullOperand),
             "null-property-access" => Ok(Self::NullPropertyAccess),
             "nullable-return-statement" => Ok(Self::NullableReturnStatement),
-            "overridden-property-access" => Ok(Self::OverriddenPropertyAccess),
+            "override-final-constant" => Ok(Self::OverrideFinalConstant),
+            "override-final-method" => Ok(Self::OverrideFinalMethod),
             "paradoxical-condition" => Ok(Self::ParadoxicalCondition),
             "parent-outside-class-scope" => Ok(Self::ParentOutsideClassScope),
             "possible-method-access-on-null" => Ok(Self::PossibleMethodAccessOnNull),

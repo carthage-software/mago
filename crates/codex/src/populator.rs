@@ -854,6 +854,10 @@ fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_metad
         metadata
             .appearing_property_ids
             .insert(*property_name, if is_trait { classlike_name } else { *appearing_classlike });
+
+        if parent_is_trait && let Some(parent_property) = parent_metadata.properties.get(property_name) {
+            metadata.properties.entry(*property_name).or_insert_with(|| parent_property.clone());
+        }
     }
 
     for (property_name, declaring_classlike) in &parent_metadata.declaring_property_ids {

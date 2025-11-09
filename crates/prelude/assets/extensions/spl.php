@@ -507,7 +507,7 @@ class ParentIterator extends RecursiveFilterIterator implements RecursiveIterato
  */
 interface SeekableIterator extends Iterator
 {
-    public function seek(int $position): void;
+    public function seek(int $offset): void;
 }
 
 /**
@@ -1343,11 +1343,11 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     }
 
     /**
-     * @param int $position
+     * @param int $offset
      *
      * @return void
      */
-    public function seek($position)
+    public function seek($offset)
     {
     }
 }
@@ -1623,9 +1623,9 @@ class DirectoryIterator extends SplFileInfo implements SeekableIterator
     }
 
     /**
-     * @param int $position
+     * @param int $offset
      */
-    public function seek($position)
+    public function seek($offset)
     {
     }
 

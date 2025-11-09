@@ -195,6 +195,22 @@ fn find_constant_in_class<'ctx>(
     class_span: Span,
     const_span: Span,
 ) -> Option<ResolvedConstant> {
+    if metadata.kind.is_trait() {
+        context.collector.report_with_code(
+            IssueCode::DirectTraitConstantAccess,
+            Issue::error(format!(
+                "Cannot access trait constant `{}::{}` directly.",
+                metadata.original_name, const_name
+            ))
+            .with_annotation(
+                Annotation::primary(class_span).with_message(format!("`{}` is a trait", metadata.original_name)),
+            )
+            .with_annotation(Annotation::secondary(const_span).with_message("Constant accessed here"))
+            .with_note("Trait constants can only be accessed through classes that use the trait.")
+            .with_help(format!("Access this constant through a class that uses `{}` instead.", metadata.original_name)),
+        );
+    }
+
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
         let mut const_type = constant_metadata

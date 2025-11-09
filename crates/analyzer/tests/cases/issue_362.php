@@ -35,13 +35,13 @@ class ArrayCollection implements ArrayAccess, Countable, IteratorAggregate
     }
 
     /** @param TKey $offset */
-    public function offsetExists($offset): bool
+    public function offsetExists(mixed $offset): bool
     {
         return isset($this->elements[$offset]);
     }
 
     /** @param TKey $offset */
-    public function offsetGet($offset): mixed
+    public function offsetGet(mixed $offset): mixed
     {
         return $this->elements[$offset] ?? null;
     }
@@ -52,13 +52,13 @@ class ArrayCollection implements ArrayAccess, Countable, IteratorAggregate
      *
      * @mago-expect analysis:invalid-property-assignment-value
      */
-    public function offsetSet($offset, $value): void
+    public function offsetSet(mixed $offset, mixed $value): void
     {
         $this->elements[$offset] = $value;
     }
 
     /** @param TKey $offset */
-    public function offsetUnset($offset): void
+    public function offsetUnset(mixed $offset): void
     {
         unset($this->elements[$offset]);
     }
