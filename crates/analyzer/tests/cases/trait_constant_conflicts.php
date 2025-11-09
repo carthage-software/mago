@@ -1,103 +1,131 @@
 <?php
 
 // Test 1: Visibility conflict (public trait -> private class)
-trait PublicConstantTrait {
+trait PublicConstantTrait
+{
     public const VALUE = 1;
 }
 
-class PrivateConstantClass {
+class PrivateConstantClass
+{
     use PublicConstantTrait;
+
     // @mago-expect analysis:incompatible-constant-override
     private const VALUE = 1;
 }
 
 // Test 2: Visibility conflict (protected trait -> private class)
-trait ProtectedConstantTrait {
+trait ProtectedConstantTrait
+{
     protected const CODE = 42;
 }
 
-class PrivateCodeClass {
+class PrivateCodeClass
+{
     use ProtectedConstantTrait;
+
     // @mago-expect analysis:incompatible-constant-override
     private const CODE = 42;
 }
 
 // Test 3: Finality conflict (non-final trait -> final class)
-trait RegularTrait {
+trait RegularTrait
+{
     public const STATUS = 'active';
 }
 
-class FinalConstantClass {
+class FinalConstantClass
+{
     use RegularTrait;
+
     // @mago-expect analysis:incompatible-constant-override
-    public final const STATUS = 'active';
+    final public const STATUS = 'active';
 }
 
 // Test 4: Nested trait conflict (trait using trait)
-trait BaseTrait {
+trait BaseTrait
+{
     public const ID = 100;
 }
 
-trait NestedTrait {
+trait NestedTrait
+{
     use BaseTrait;
+
     // @mago-expect analysis:incompatible-constant-override
     private const ID = 100;
 }
 
 // Test 5: Multiple conflicts (visibility AND finality)
-trait PublicFinalTrait {
-    public final const NAME = 'test';
+trait PublicFinalTrait
+{
+    final public const NAME = 'test';
 }
 
-class PrivateNonFinalClass {
+class PrivateNonFinalClass
+{
     use PublicFinalTrait;
+
     // @mago-expect analysis:incompatible-constant-override
     private const NAME = 'test';
 }
 
 // Test 6: Value conflict (uses trait-constant-override for value-only changes)
-trait ValueTrait {
+trait ValueTrait
+{
     public const NUMBER = 10;
 }
 
-class DifferentValueClass {
+class DifferentValueClass
+{
     use ValueTrait;
-    // @mago-expect analysis:constant-override
+
+    // @mago-expect analysis:trait-constant-override
     public const NUMBER = 20;
 }
 
 // Test 7: Valid - exact match
-trait ValidTrait {
+trait ValidTrait
+{
     public const VALID = true;
 }
 
-class ValidClass {
+class ValidClass
+{
     use ValidTrait;
-    public const VALID = true;  // No error - exact match
+
+    public const VALID = true; // No error - exact match
 }
 
 // Test 8: Even widening visibility is NOT allowed for trait constants
-trait ProtectedWidenTrait {
+trait ProtectedWidenTrait
+{
     protected const WIDEN = 'yes';
 }
 
-class PublicWidenClass {
+class PublicWidenClass
+{
     use ProtectedWidenTrait;
+
     // @mago-expect analysis:incompatible-constant-override
-    public const WIDEN = 'yes';  // ERROR - even widening is not allowed
+    public const WIDEN = 'yes'; // ERROR - even widening is not allowed
 }
 
 //Test 9: Nested trait with multiple levels
-trait GrandBaseTrait {
+trait GrandBaseTrait
+{
     public const LEVEL = 1;
 }
 
-trait ParentTrait {
+trait ParentTrait
+{
     use GrandBaseTrait;
 }
 
-trait ChildTrait {
+trait ChildTrait
+{
     use ParentTrait;
+
     // @mago-expect analysis:incompatible-constant-override
     private const LEVEL = 1;
 }
