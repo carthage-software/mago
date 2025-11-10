@@ -23,9 +23,9 @@ use crate::reference::SymbolReferences;
 use crate::symbol::SymbolIdentifier;
 use crate::symbol::Symbols;
 use crate::ttype::TType;
+use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
-use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::reference::TReference;
@@ -524,10 +524,10 @@ fn check_union_for_circular_refs(
     visiting: &mut AtomSet,
     path: &mut Vec<String>,
 ) -> Option<Vec<String>> {
-    for atomic in type_union.types.as_ref() {
-        match atomic {
-            // Direct symbol reference - check if it's a type alias
-            TAtomic::Reference(TReference::Symbol { name, .. }) => {
+    let nodes = type_union.get_all_child_nodes();
+    for node in nodes {
+        match node {
+            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => {
                 if let Some(referenced_type) = all_aliases.get(name)
                     && let Some(cycle) =
                         detect_circular_type_reference(*name, referenced_type, all_aliases, visiting, path)
@@ -535,31 +535,12 @@ fn check_union_for_circular_refs(
                     return Some(cycle);
                 }
             }
-            TAtomic::Array(TArray::Keyed(keyed)) => {
-                if let Some(known_items) = &keyed.known_items {
-                    for (_optional, value_union) in known_items.values() {
-                        if let Some(cycle) = check_union_for_circular_refs(value_union, all_aliases, visiting, path) {
-                            return Some(cycle);
-                        }
-                    }
-                }
-                if let Some((key_type, value_type)) = &keyed.parameters {
-                    if let Some(cycle) = check_union_for_circular_refs(key_type, all_aliases, visiting, path) {
-                        return Some(cycle);
-                    }
-                    if let Some(cycle) = check_union_for_circular_refs(value_type, all_aliases, visiting, path) {
-                        return Some(cycle);
-                    }
-                }
+            _ => {
+                // Other types are not relevant for circular reference detection
             }
-            TAtomic::Array(TArray::List(list)) => {
-                if let Some(cycle) = check_union_for_circular_refs(&list.element_type, all_aliases, visiting, path) {
-                    return Some(cycle);
-                }
-            }
-            _ => {}
         }
     }
+
     None
 }
 
