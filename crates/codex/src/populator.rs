@@ -167,6 +167,16 @@ pub fn populate_codebase(
             }
         }
 
+        for type_alias in metadata.type_aliases.values_mut() {
+            populate_union_type(
+                &mut type_alias.type_union,
+                &codebase.symbols,
+                Some(&class_like_reference_source),
+                symbol_references,
+                userland_force_repopulation,
+            );
+        }
+
         for (constant_name, constant) in &mut metadata.constants {
             let constant_reference_source = ReferenceSource::ClassLikeMember(true, *name, *constant_name);
 
