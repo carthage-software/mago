@@ -47,6 +47,11 @@ pub fn validate_method_signature_compatibility(
     child_method: &FunctionLikeMetadata,
     parent_method: &FunctionLikeMetadata,
 ) -> Vec<SignatureCompatibilityIssue> {
+    if !child_method.flags.is_user_defined() {
+        // The child method is not user-defined; skip validation.
+        return Vec::new();
+    }
+
     let mut issues = Vec::new();
 
     let Some(child_method_meta) = child_method.method_metadata.as_ref() else {
