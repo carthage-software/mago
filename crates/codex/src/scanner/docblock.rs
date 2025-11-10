@@ -248,15 +248,11 @@ impl ClassLikeDocblockComment {
                 TagKind::Type | TagKind::PsalmType | TagKind::PhpstanType => {
                     if let Some(type_tag) = parse_type_tag(tag.description, tag.description_span) {
                         type_aliases.push(type_tag);
-                    } else {
-                        panic!("Failed to parse type tag");
                     }
                 }
                 TagKind::ImportType | TagKind::PsalmImportType | TagKind::PhpstanImportType => {
                     if let Some(import_type_tag) = parse_import_type_tag(tag.description, tag.description_span) {
                         imported_type_aliases.push(import_type_tag);
-                    } else {
-                        panic!("Failed to parse import type tag");
                     }
                 }
                 _ => {
