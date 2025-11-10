@@ -351,6 +351,43 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
                 }
             }
         }
+        TypeTokenKind::Exclamation => {
+            let exclamation = stream.consume()?.span;
+            let next = stream.peek()?;
+
+            // Parse the class identifier (can be fully qualified, qualified, or local)
+            let class = match next.kind {
+                TypeTokenKind::Identifier
+                | TypeTokenKind::QualifiedIdentifier
+                | TypeTokenKind::FullyQualifiedIdentifier => Identifier::from(stream.consume()?),
+                _ => {
+                    return Err(ParseError::UnexpectedToken(
+                        vec![
+                            TypeTokenKind::Identifier,
+                            TypeTokenKind::QualifiedIdentifier,
+                            TypeTokenKind::FullyQualifiedIdentifier,
+                        ],
+                        next.kind,
+                        next.span,
+                    ));
+                }
+            };
+
+            // Parse `::`
+            let double_colon = stream.eat(TypeTokenKind::ColonColon)?.span;
+
+            // Parse the alias name (can be identifier or keyword without `-`)
+            let next = stream.peek()?;
+            let alias = if next.kind.is_keyword() && !next.value.contains('-') {
+                AliasName::Keyword(Keyword::from(stream.consume()?))
+            } else if next.kind == TypeTokenKind::Identifier {
+                AliasName::Identifier(Identifier::from(stream.consume()?))
+            } else {
+                return Err(ParseError::UnexpectedToken(vec![TypeTokenKind::Identifier], next.kind, next.span));
+            };
+
+            Type::AliasReference(AliasReferenceType { exclamation, class, double_colon, alias })
+        }
         TypeTokenKind::Whitespace | TypeTokenKind::SingleLineComment => {
             unreachable!("trivia tokens are skipped by the stream.")
         }

@@ -637,16 +637,34 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
 ///
 /// `Some(TypeTag)` if parsing is successful, `None` otherwise.
 pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
-    let equals_index = content.find('=')?;
+    let leading_ws = (content.len() - content.trim_start().len()) as u32;
+    let content = content.trim_start();
+    // Support both formats: "@type Name Type" and "@type Name = Type"
+    let (name, type_part, type_offset) = if let Some(equals_index) = content.find('=') {
+        // Format: @type Name = Type
+        let (name, rest) = content.split_at(equals_index);
+        let name = name.trim();
 
-    let (name, rest) = content.split_at(equals_index);
-    let name = name.trim();
+        if !is_valid_identifier_start(name, false) || rest.is_empty() {
+            return None;
+        }
 
-    if !is_valid_identifier_start(name, false) || rest.is_empty() {
-        return None;
-    }
+        // Pass rest (with leading space after '=') to split_tag_content to handle trimming
+        (name, &rest[1..], leading_ws + (equals_index + 1) as u32)
+    } else {
+        // Format: @type Name Type
+        let (name, rest) = content.split_once(char::is_whitespace)?;
+        let name = name.trim();
 
-    let (type_string, _) = split_tag_content(&rest[1..], span.subspan(equals_index as u32, 0))?;
+        if !is_valid_identifier_start(name, false) {
+            return None;
+        }
+
+        // Pass rest to split_tag_content to handle trimming
+        (name, rest, leading_ws + (name.len() + 1) as u32)
+    };
+
+    let (type_string, _) = split_tag_content(type_part, span.subspan(type_offset, 0))?;
 
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
@@ -669,7 +687,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
 ///
 /// `Some(ImportTypeTag)` if parsing is successful, `None` otherwise.
 pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag> {
-    let (name, rest) = content.split_once(" ")?;
+    let (name, rest) = content.trim_start().split_once(" ")?;
     let name = name.trim();
     let rest = rest.trim();
 
@@ -682,18 +700,23 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag>
         return None;
     }
 
-    let (imported_from, rest) = rest.split_once(" ")?;
+    let (imported_from, rest) = if let Some((imp_from, rest)) = rest.split_once(" ") {
+        (imp_from.trim(), rest.trim())
+    } else {
+        (rest.trim(), "")
+    };
+
     if !is_valid_identifier_start(imported_from, true) {
         return None;
     }
 
-    let rest = rest.trim();
     let mut alias = None;
-    if !rest.is_empty() {
-        let (r#as, rest) = rest.split_once(" ")?;
-        if r#as.eq_ignore_ascii_case("as") && !rest.is_empty() {
-            alias = Some(rest.split_whitespace().next()?.trim().to_owned());
-        }
+
+    if let Some((r#as, rest)) = rest.split_once(" ")
+        && r#as.trim().eq_ignore_ascii_case("as")
+        && !rest.is_empty()
+    {
+        alias = Some(rest.split_whitespace().next()?.trim().to_owned());
     }
 
     Some(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
@@ -1364,8 +1387,8 @@ mod tests {
         let result = parse_type_tag(content, span).unwrap();
         assert_eq!(result.name, "MyType");
         assert_eq!(result.type_string.value, "string");
-        assert_eq!(result.type_string.span.start.offset, 8);
-        assert_eq!(result.type_string.span.end.offset, 8 + "string".len() as u32);
+        assert_eq!(result.type_string.span.start.offset, 9);
+        assert_eq!(result.type_string.span.end.offset, 9 + "string".len() as u32);
         assert_eq!(result.span, span);
     }
 

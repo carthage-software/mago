@@ -280,6 +280,7 @@ impl<'input> TypeLexer<'input> {
             [b':', ..] => (TypeTokenKind::Colon, 1),
             [b'=', ..] => (TypeTokenKind::Equals, 1),
             [b'?', ..] => (TypeTokenKind::Question, 1),
+            [b'!', ..] => (TypeTokenKind::Exclamation, 1),
             [b'&', ..] => (TypeTokenKind::Ampersand, 1),
             [b'|', ..] => (TypeTokenKind::Pipe, 1),
             [b'>', ..] => (TypeTokenKind::GreaterThan, 1),

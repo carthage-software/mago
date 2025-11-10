@@ -12,6 +12,7 @@ use crate::symbol::SymbolKind;
 use crate::symbol::Symbols;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
+use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::callable::TCallable;
@@ -36,6 +37,7 @@ use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 use crate::ttype::union::populate_union_type;
 
+pub mod alias;
 pub mod array;
 pub mod callable;
 pub mod conditional;
@@ -62,6 +64,7 @@ pub enum TAtomic {
     Variable(Atom),
     Conditional(TConditional),
     Derived(TDerived),
+    Alias(TAlias),
     Never,
     Null,
     Void,
@@ -768,6 +771,7 @@ impl TType for TAtomic {
             TAtomic::Reference(ttype) => ttype.get_child_nodes(),
             TAtomic::Resource(ttype) => ttype.get_child_nodes(),
             TAtomic::Scalar(ttype) => ttype.get_child_nodes(),
+            TAtomic::Alias(ttype) => ttype.get_child_nodes(),
             _ => vec![],
         }
     }
@@ -785,6 +789,7 @@ impl TType for TAtomic {
             TAtomic::Resource(ttype) => ttype.can_be_intersected(),
             TAtomic::Conditional(ttype) => ttype.can_be_intersected(),
             TAtomic::Derived(ttype) => ttype.can_be_intersected(),
+            TAtomic::Alias(ttype) => ttype.can_be_intersected(),
             _ => false,
         }
     }
@@ -802,6 +807,7 @@ impl TType for TAtomic {
             TAtomic::Resource(ttype) => ttype.get_intersection_types(),
             TAtomic::Conditional(ttype) => ttype.get_intersection_types(),
             TAtomic::Derived(ttype) => ttype.get_intersection_types(),
+            TAtomic::Alias(ttype) => ttype.get_intersection_types(),
             _ => None,
         }
     }
@@ -819,6 +825,7 @@ impl TType for TAtomic {
             TAtomic::Resource(ttype) => ttype.get_intersection_types_mut(),
             TAtomic::Conditional(ttype) => ttype.get_intersection_types_mut(),
             TAtomic::Derived(ttype) => ttype.get_intersection_types_mut(),
+            TAtomic::Alias(ttype) => ttype.get_intersection_types_mut(),
             _ => None,
         }
     }
@@ -836,6 +843,7 @@ impl TType for TAtomic {
             TAtomic::Resource(ttype) => ttype.has_intersection_types(),
             TAtomic::Conditional(ttype) => ttype.has_intersection_types(),
             TAtomic::Derived(ttype) => ttype.has_intersection_types(),
+            TAtomic::Alias(ttype) => ttype.has_intersection_types(),
             _ => false,
         }
     }
@@ -853,6 +861,7 @@ impl TType for TAtomic {
             TAtomic::Resource(ttype) => ttype.add_intersection_type(intersection_type),
             TAtomic::Conditional(ttype) => ttype.add_intersection_type(intersection_type),
             TAtomic::Derived(ttype) => ttype.add_intersection_type(intersection_type),
+            TAtomic::Alias(ttype) => ttype.add_intersection_type(intersection_type),
             _ => false,
         }
     }
@@ -878,6 +887,7 @@ impl TType for TAtomic {
             TAtomic::Scalar(ttype) => ttype.needs_population(),
             TAtomic::Mixed(ttype) => ttype.needs_population(),
             TAtomic::Resource(ttype) => ttype.needs_population(),
+            TAtomic::Alias(ttype) => ttype.needs_population(),
             _ => false,
         }
     }
@@ -903,6 +913,7 @@ impl TType for TAtomic {
             TAtomic::Scalar(ttype) => ttype.is_expandable(),
             TAtomic::Mixed(ttype) => ttype.is_expandable(),
             TAtomic::Resource(ttype) => ttype.is_expandable(),
+            TAtomic::Alias(ttype) => ttype.is_expandable(),
             _ => false,
         }
     }
@@ -928,6 +939,7 @@ impl TType for TAtomic {
             TAtomic::Scalar(ttype) => ttype.is_complex(),
             TAtomic::Mixed(ttype) => ttype.is_complex(),
             TAtomic::Resource(ttype) => ttype.is_complex(),
+            TAtomic::Alias(ttype) => ttype.is_complex(),
             _ => false,
         }
     }
@@ -944,6 +956,7 @@ impl TType for TAtomic {
             TAtomic::Iterable(iterable) => iterable.get_id(),
             TAtomic::GenericParameter(parameter) => parameter.get_id(),
             TAtomic::Conditional(conditional) => conditional.get_id(),
+            TAtomic::Alias(alias) => alias.get_id(),
             TAtomic::Derived(derived) => derived.get_id(),
             TAtomic::Variable(name) => *name,
             TAtomic::Never => atom("never"),
@@ -965,6 +978,7 @@ impl TType for TAtomic {
             TAtomic::Iterable(iterable) => iterable.get_pretty_id_with_indent(indent),
             TAtomic::GenericParameter(parameter) => parameter.get_pretty_id_with_indent(indent),
             TAtomic::Conditional(conditional) => conditional.get_pretty_id_with_indent(indent),
+            TAtomic::Alias(alias) => alias.get_pretty_id_with_indent(indent),
             TAtomic::Derived(derived) => derived.get_pretty_id_with_indent(indent),
             TAtomic::Variable(name) => *name,
             TAtomic::Never => atom("never"),

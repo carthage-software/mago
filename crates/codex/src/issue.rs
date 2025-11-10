@@ -16,12 +16,14 @@ pub(crate) enum ScanningIssueKind {
     InvalidAssertionTag,
     InvalidVarTag,
     InvalidTemplateTag,
+    InvalidTypeTag,
     InvalidUseTag,
     InvalidExtendsTag,
     InvalidImplementsTag,
     InvalidRequireExtendsTag,
     InvalidRequireImplementsTag,
     InvalidInheritorsTag,
+    CircularTypeImport,
 }
 
 impl From<ScanningIssueKind> for String {

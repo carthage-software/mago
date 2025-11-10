@@ -31,6 +31,8 @@ pub struct ClassLikeDocblockComment {
     pub unchecked: bool,
     pub methods: Vec<MethodTag>,
     pub properties: Vec<PropertyTag>,
+    pub type_aliases: Vec<TypeTag>,
+    pub imported_type_aliases: Vec<ImportTypeTag>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -108,6 +110,8 @@ impl ClassLikeDocblockComment {
         let mut unchecked = false;
         let mut methods = Vec::new();
         let mut properties = Vec::new();
+        let mut type_aliases = Vec::new();
+        let mut imported_type_aliases = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -241,6 +245,20 @@ impl ClassLikeDocblockComment {
                         properties.push(property_tag);
                     }
                 }
+                TagKind::Type | TagKind::PsalmType | TagKind::PhpstanType => {
+                    if let Some(type_tag) = parse_type_tag(tag.description, tag.description_span) {
+                        type_aliases.push(type_tag);
+                    } else {
+                        panic!("Failed to parse type tag");
+                    }
+                }
+                TagKind::ImportType | TagKind::PsalmImportType | TagKind::PhpstanImportType => {
+                    if let Some(import_type_tag) = parse_import_type_tag(tag.description, tag.description_span) {
+                        imported_type_aliases.push(import_type_tag);
+                    } else {
+                        panic!("Failed to parse import type tag");
+                    }
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -266,6 +284,8 @@ impl ClassLikeDocblockComment {
             unchecked,
             methods,
             properties,
+            type_aliases,
+            imported_type_aliases,
         }))
     }
 }

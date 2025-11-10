@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_atom::i64_atom;
 use mago_names::kind::NameKind;
@@ -15,6 +16,7 @@ use mago_type_syntax::ast::*;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
@@ -321,18 +323,60 @@ pub fn get_union_from_type_ast<'i>(
 
             wrap_atomic(TAtomic::Reference(TReference::Member { class_like_name, member_selector }))
         }
+        Type::AliasReference(alias_reference) => {
+            let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case("self")
+                || alias_reference.class.value.eq_ignore_ascii_case("static")
+                || alias_reference.class.value.eq("this")
+                || alias_reference.class.value.eq("$this")
+            {
+                let Some(classname) = classname else {
+                    return Err(TypeError::InvalidType(
+                        ttype.to_string(),
+                        "Cannot resolve `self` type reference outside of a class context".to_string(),
+                        alias_reference.span(),
+                    ));
+                };
+
+                classname
+            } else {
+                let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
+
+                ascii_lowercase_atom(&class_like_name)
+            };
+
+            let alias_name = match alias_reference.alias {
+                AliasName::Identifier(identifier) => atom(identifier.value),
+                AliasName::Keyword(keyword) => atom(keyword.value),
+            };
+
+            wrap_atomic(TAtomic::Alias(TAlias::new(class_like_name, alias_name)))
+        }
         Type::Object(object_type) => wrap_atomic(get_object_from_ast(object_type, scope, type_context, classname)?),
         Type::Shape(shape_type) => wrap_atomic(get_shape_from_ast(shape_type, scope, type_context, classname)?),
         Type::Callable(callable_type) => {
             wrap_atomic(get_callable_from_ast(callable_type, scope, type_context, classname)?)
         }
-        Type::Reference(reference_type) => wrap_atomic(get_reference_from_ast(
-            &reference_type.identifier,
-            reference_type.parameters.as_ref(),
-            scope,
-            type_context,
-            classname,
-        )?),
+        Type::Reference(reference_type) => {
+            let reference_name_atom = atom(reference_type.identifier.value);
+
+            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(&reference_name_atom) {
+                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
+            }
+
+            if type_context.has_type_alias(&reference_name_atom)
+                && let Some(class_name) = classname
+            {
+                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
+            }
+
+            wrap_atomic(get_reference_from_ast(
+                &reference_type.identifier,
+                reference_type.parameters.as_ref(),
+                scope,
+                type_context,
+                classname,
+            )?)
+        }
         Type::Mixed(_) => get_mixed(),
         Type::Null(_) => get_null(),
         Type::Void(_) => get_void(),

@@ -17,6 +17,7 @@ use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property::PropertyMetadata;
+use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
 use crate::symbol::SymbolKind;
 use crate::ttype::atomic::TAtomic;
@@ -82,6 +83,9 @@ pub struct ClassLikeMetadata {
     pub issues: Vec<Issue>,
     pub attribute_flags: Option<AttributeFlags>,
     pub flags: MetadataFlags,
+    pub type_aliases: AtomMap<TypeMetadata>,
+    /// Imported type aliases in the form of (from_fqcn, type_name, span)
+    pub imported_type_aliases: AtomMap<(Atom, Atom, Span)>,
 }
 
 impl ClassLikeMetadata {
@@ -143,6 +147,8 @@ impl ClassLikeMetadata {
             permitted_inheritors: None,
             issues: vec![],
             attribute_flags: None,
+            type_aliases: AtomMap::default(),
+            imported_type_aliases: AtomMap::default(),
         }
     }
 
@@ -470,5 +476,6 @@ impl ClassLikeMetadata {
         self.attributes.shrink_to_fit();
         self.constants.shrink_to_fit();
         self.enum_cases.shrink_to_fit();
+        self.type_aliases.shrink_to_fit();
     }
 }

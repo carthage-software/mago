@@ -3,6 +3,7 @@ use serde::Serialize;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+pub use crate::ast::alias_reference::*;
 pub use crate::ast::array::*;
 pub use crate::ast::callable::*;
 pub use crate::ast::class_like_string::*;
@@ -25,6 +26,7 @@ pub use crate::ast::unary::*;
 pub use crate::ast::value_of::*;
 pub use crate::ast::variable::*;
 
+pub mod alias_reference;
 pub mod array;
 pub mod callable;
 pub mod class_like_string;
@@ -101,6 +103,7 @@ pub enum Type<'input> {
     LiteralInt(LiteralIntType<'input>),
     LiteralString(LiteralStringType<'input>),
     MemberReference(MemberReferenceType<'input>),
+    AliasReference(AliasReferenceType<'input>),
     Shape(ShapeType<'input>),
     Callable(CallableType<'input>),
     Variable(VariableType<'input>),
@@ -168,6 +171,7 @@ impl HasSpan for Type<'_> {
             Type::LiteralInt(ty) => ty.span(),
             Type::LiteralString(ty) => ty.span(),
             Type::MemberReference(ty) => ty.span(),
+            Type::AliasReference(ty) => ty.span(),
             Type::Shape(ty) => ty.span(),
             Type::Callable(ty) => ty.span(),
             Type::Conditional(ty) => ty.span(),
@@ -237,6 +241,7 @@ impl std::fmt::Display for Type<'_> {
             Type::LiteralInt(ty) => write!(f, "{ty}"),
             Type::LiteralString(ty) => write!(f, "{ty}"),
             Type::MemberReference(ty) => write!(f, "{ty}"),
+            Type::AliasReference(ty) => write!(f, "{ty}"),
             Type::Shape(ty) => write!(f, "{ty}"),
             Type::Callable(ty) => write!(f, "{ty}"),
             Type::Conditional(ty) => write!(f, "{ty}"),

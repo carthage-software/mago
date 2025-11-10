@@ -1,6 +1,8 @@
 use bumpalo::Bump;
 
 use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_atom::empty_atom;
@@ -92,6 +94,8 @@ struct Scanner {
     template_constraints: Vec<TemplateConstraintList>,
     scope: NamespaceScope,
     has_constructor: bool,
+    file_type_aliases: AtomSet,
+    file_imported_aliases: AtomMap<(Atom, Atom)>,
 }
 
 impl Scanner {
@@ -101,6 +105,13 @@ impl Scanner {
 
     fn get_current_type_resolution_context(&self) -> TypeResolutionContext {
         let mut context = TypeResolutionContext::new();
+        context = context.with_type_aliases(self.file_type_aliases.clone());
+
+        // Add imported aliases
+        for (local_name, (source_class, original_name)) in &self.file_imported_aliases {
+            context = context.with_imported_type_alias(*local_name, *source_class, *original_name);
+        }
+
         for template_constraint_list in self.template_constraints.iter().rev() {
             for (name, constraints) in template_constraint_list {
                 if !context.has_template_definition(name) {
@@ -267,9 +278,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         anonymous_class: &'arena AnonymousClass<'arena>,
         context: &mut Context<'ctx, 'arena>,
     ) {
-        if let Some((id, template_definition)) =
+        if let Some((id, template_definition, type_aliases, imported_aliases)) =
             register_anonymous_class(&mut self.codebase, anonymous_class, context, &mut self.scope)
         {
+            self.file_type_aliases.extend(type_aliases);
+            self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
             self.template_constraints.push(template_definition);
 
@@ -281,7 +294,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_class(&mut self, class: &'arena Class<'arena>, context: &mut Context<'ctx, 'arena>) {
-        if let Some((id, templates)) = register_class(&mut self.codebase, class, context, &mut self.scope) {
+        if let Some((id, templates, type_aliases, imported_aliases)) =
+            register_class(&mut self.codebase, class, context, &mut self.scope)
+        {
+            self.file_type_aliases.extend(type_aliases);
+            self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
             self.template_constraints.push(templates);
 
@@ -293,7 +310,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_trait(&mut self, r#trait: &'arena Trait<'arena>, context: &mut Context<'ctx, 'arena>) {
-        if let Some((id, templates)) = register_trait(&mut self.codebase, r#trait, context, &mut self.scope) {
+        if let Some((id, templates, type_aliases, imported_aliases)) =
+            register_trait(&mut self.codebase, r#trait, context, &mut self.scope)
+        {
+            self.file_type_aliases.extend(type_aliases);
+            self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
             self.template_constraints.push(templates);
 
@@ -305,7 +326,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_enum(&mut self, r#enum: &'arena Enum<'arena>, context: &mut Context<'ctx, 'arena>) {
-        if let Some((id, templates)) = register_enum(&mut self.codebase, r#enum, context, &mut self.scope) {
+        if let Some((id, templates, type_aliases, imported_aliases)) =
+            register_enum(&mut self.codebase, r#enum, context, &mut self.scope)
+        {
+            self.file_type_aliases.extend(type_aliases);
+            self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
             self.template_constraints.push(templates);
 
@@ -317,7 +342,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_interface(&mut self, interface: &'arena Interface<'arena>, context: &mut Context<'ctx, 'arena>) {
-        if let Some((id, templates)) = register_interface(&mut self.codebase, interface, context, &mut self.scope) {
+        if let Some((id, templates, type_aliases, imported_aliases)) =
+            register_interface(&mut self.codebase, interface, context, &mut self.scope)
+        {
+            self.file_type_aliases.extend(type_aliases);
+            self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
             self.template_constraints.push(templates);
 

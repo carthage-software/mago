@@ -55,8 +55,6 @@ pub mod ttype;
 pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,
-    /// Map from type alias name (`Atom`) to its metadata (`TypeMetadata`).
-    pub aliases: AtomMap<TypeMetadata>,
     /// Map from class-like FQCN (`Atom`) to its detailed metadata (`ClassLikeMetadata`).
     pub class_likes: AtomMap<ClassLikeMetadata>,
     /// Map from a function/method identifier tuple `(scope_id, function_id)` to its metadata (`FunctionLikeMetadata`).
@@ -802,10 +800,6 @@ impl CodebaseMetadata {
 
     /// Merges information from another `CodebaseMetadata` into this one.
     pub fn extend(&mut self, other: CodebaseMetadata) {
-        for (k, v) in other.aliases {
-            self.aliases.entry(k).or_insert(v);
-        }
-
         for (k, v) in other.class_likes {
             let metadata_to_keep = match self.class_likes.entry(k) {
                 Entry::Occupied(entry) => {
@@ -925,7 +919,6 @@ impl Default for CodebaseMetadata {
     fn default() -> Self {
         Self {
             class_likes: AtomMap::default(),
-            aliases: AtomMap::default(),
             function_likes: HashMap::default(),
             symbols: Symbols::new(),
             infer_types_from_usage: false,

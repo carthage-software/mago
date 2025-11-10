@@ -8,6 +8,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
@@ -357,6 +358,10 @@ pub(crate) fn expand_atomic(
             new_return_type_parts.extend(then.types.into_owned());
             new_return_type_parts.extend(otherwise.types.into_owned());
         }
+        TAtomic::Alias(alias) => {
+            *skip_key = true;
+            new_return_type_parts.extend(expand_alias(alias, codebase, options));
+        }
         TAtomic::Derived(derived) => match derived {
             TDerived::KeyOf(key_of) => {
                 *skip_key = true;
@@ -585,4 +590,14 @@ fn expand_value_of(
     };
 
     new_return_types.types.into_owned()
+}
+
+fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> Vec<TAtomic> {
+    let Some(mut expanded_union) = alias.resolve(codebase).cloned() else {
+        return vec![TAtomic::Alias(alias.clone())];
+    };
+
+    expand_union(codebase, &mut expanded_union, options);
+
+    expanded_union.types.into_owned()
 }

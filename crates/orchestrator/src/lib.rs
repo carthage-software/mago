@@ -186,8 +186,16 @@ impl<'a> Orchestrator<'a> {
 
         let configuration = Box::new(DatabaseConfiguration {
             workspace: Cow::Owned(workspace.to_path_buf()),
-            paths: self.config.paths.iter().map(|p| Cow::Owned(p.to_path_buf())).collect(),
-            includes: includes.iter().map(|p| Cow::Owned(p.to_path_buf())).collect(),
+            paths: self
+                .config
+                .paths
+                .iter()
+                .map(|p| if p.is_absolute() { Cow::Owned(p.to_path_buf()) } else { Cow::Owned(workspace.join(p)) })
+                .collect(),
+            includes: includes
+                .iter()
+                .map(|p| if p.is_absolute() { Cow::Owned(p.to_path_buf()) } else { Cow::Owned(workspace.join(p)) })
+                .collect(),
             excludes: excludes_static,
             extensions: self.config.extensions.iter().map(|s| Cow::Owned(s.to_string())).collect(),
         });

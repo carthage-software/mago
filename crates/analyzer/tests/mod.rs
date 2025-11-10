@@ -237,6 +237,12 @@ test_case!(inheritdoc_basic_parent_class);
 test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
 test_case!(inheritdoc_priority);
+test_case!(type_alias_basic);
+test_case!(type_alias_import);
+test_case!(type_alias_import_rename);
+test_case!(type_alias_complex_types);
+test_case!(type_alias_phpstan);
+test_case!(type_alias_syntax);
 
 // Github Issues
 test_case!(issue_265);

@@ -1,7 +1,8 @@
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use serde::Deserialize;
 use serde::Serialize;
-
-use mago_atom::Atom;
 
 use crate::misc::GenericParent;
 use crate::ttype::union::TUnion;
@@ -11,7 +12,7 @@ use crate::ttype::union::TUnion;
 /// This context typically includes the definitions of template parameters available in the current scope
 /// (e.g., from class or function `@template` tags) and any concrete types that these templates
 /// have been resolved to (e.g., when a generic class is instantiated or a generic method is called).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
     template_definitions: Vec<(Atom, Vec<(GenericParent, TUnion)>)>,
@@ -19,6 +20,13 @@ pub struct TypeResolutionContext {
     /// Concrete types that template parameters (often from an outer scope) resolve to
     /// within this specific context.
     resolved_template_types: Vec<(Atom, TUnion)>,
+
+    /// Type aliases defined in the current class scope (from @type tags).
+    type_aliases: AtomSet,
+
+    /// Imported type aliases (from @import-type tags).
+    /// Maps local alias name to (source class FQCN, original type name).
+    imported_type_aliases: AtomMap<(Atom, Atom)>,
 }
 
 /// Provides a default, empty type resolution context.
@@ -31,13 +39,21 @@ impl Default for TypeResolutionContext {
 impl TypeResolutionContext {
     /// Creates a new, empty `TypeResolutionContext` with no defined or resolved template types.
     pub fn new() -> Self {
-        Self { template_definitions: vec![], resolved_template_types: vec![] }
+        Self {
+            template_definitions: vec![],
+            resolved_template_types: vec![],
+            type_aliases: AtomSet::default(),
+            imported_type_aliases: AtomMap::default(),
+        }
     }
 
     /// Checks if this context is empty, meaning it has no template definitions or resolved types.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.template_definitions.is_empty() && self.resolved_template_types.is_empty()
+        self.template_definitions.is_empty()
+            && self.resolved_template_types.is_empty()
+            && self.type_aliases.is_empty()
+            && self.imported_type_aliases.is_empty()
     }
 
     /// Adds a template type definition (e.g., from an `@template T of Constraint` tag).
@@ -111,6 +127,69 @@ impl TypeResolutionContext {
     /// `true` if the template parameter is defined, `false` otherwise.
     pub fn has_template_definition(&self, name: &str) -> bool {
         self.template_definitions.iter().any(|(n, _)| n == name)
+    }
+
+    /// Adds type aliases from a class to this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `aliases`: A set of type alias names.
+    pub fn with_type_aliases(mut self, aliases: AtomSet) -> Self {
+        self.type_aliases = aliases;
+        self
+    }
+
+    /// Adds a single type alias to this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: The name of the type alias to add.
+    pub fn with_type_alias(mut self, name: Atom) -> Self {
+        self.type_aliases.insert(name);
+        self
+    }
+
+    /// Checks if a specific type alias is defined in this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: The name of the type alias to check.
+    pub fn has_type_alias(&self, name: &Atom) -> bool {
+        self.type_aliases.contains(name)
+    }
+
+    /// Adds an imported type alias to this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `local_name`: The local name of the imported alias (possibly renamed with "as").
+    /// * `source_class`: The FQCN of the class where the type alias is defined.
+    /// * `original_name`: The original name of the type alias in the source class.
+    pub fn with_imported_type_alias(mut self, local_name: Atom, source_class: Atom, original_name: Atom) -> Self {
+        self.imported_type_aliases.insert(local_name, (source_class, original_name));
+        self
+    }
+
+    /// Looks up an imported type alias in this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: The local name of the imported alias to look up.
+    ///
+    /// # Returns
+    ///
+    /// `Some` containing a reference to (source_class, original_name) if found, `None` otherwise.
+    pub fn get_imported_type_alias(&self, name: &Atom) -> Option<&(Atom, Atom)> {
+        self.imported_type_aliases.get(name)
+    }
+
+    /// Checks if a specific imported type alias is defined in this context.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: The local name of the imported alias to check.
+    pub fn has_imported_type_alias(&self, name: &Atom) -> bool {
+        self.imported_type_aliases.contains_key(name)
     }
 
     /// Looks up the concrete type that a specific template parameter resolves to in this context.

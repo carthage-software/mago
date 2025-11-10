@@ -79,6 +79,7 @@ pub enum TypeTokenKind {
     Pipe,
     Ampersand,
     Question,
+    Exclamation,
     Comma,
     Colon,
     ColonColon,

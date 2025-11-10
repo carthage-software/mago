@@ -1,7 +1,10 @@
 use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_docblock::tag::Visibility as DocblockVisibility;
+use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -52,13 +55,17 @@ use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
+/// Return type for class-like registration functions.
+/// Returns the name, template constraints, local type aliases, and imported type aliases.
+type ClassLikeRegistration = Option<(Atom, TemplateConstraintList, AtomSet, AtomMap<(Atom, Atom)>)>;
+
 #[inline]
 pub fn register_anonymous_class<'ctx, 'arena>(
     codebase: &mut CodebaseMetadata,
     class: &'arena AnonymousClass<'arena>,
     context: &mut Context<'ctx, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(Atom, TemplateConstraintList)> {
+) -> ClassLikeRegistration {
     let span = class.span();
     let name = get_anonymous_class_name(span);
 
@@ -84,9 +91,16 @@ pub fn register_anonymous_class<'ctx, 'arena>(
         .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
+    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let imported_aliases = class_like_metadata
+        .imported_type_aliases
+        .iter()
+        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
+        .collect::<AtomMap<(Atom, Atom)>>();
+
     codebase.class_likes.insert(name, class_like_metadata);
 
-    Some((name, template_resolution_context))
+    Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
 
 #[inline]
@@ -95,7 +109,7 @@ pub fn register_class<'ctx, 'arena>(
     class: &'arena Class<'arena>,
     context: &mut Context<'ctx, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(Atom, TemplateConstraintList)> {
+) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
         atom(context.resolved_names.get(&class.name)),
@@ -119,10 +133,16 @@ pub fn register_class<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
+    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let imported_aliases = class_like_metadata
+        .imported_type_aliases
+        .iter()
+        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
+        .collect::<AtomMap<(Atom, Atom)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
-    Some((name, template_resolution_context))
+    Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
 
 #[inline]
@@ -131,7 +151,7 @@ pub fn register_interface<'ctx, 'arena>(
     interface: &'arena Interface<'arena>,
     context: &mut Context<'ctx, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(Atom, TemplateConstraintList)> {
+) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
         atom(context.resolved_names.get(&interface.name)),
@@ -155,10 +175,16 @@ pub fn register_interface<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
+    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let imported_aliases = class_like_metadata
+        .imported_type_aliases
+        .iter()
+        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
+        .collect::<AtomMap<(Atom, Atom)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
-    Some((name, template_resolution_context))
+    Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
 
 #[inline]
@@ -167,7 +193,7 @@ pub fn register_trait<'ctx, 'arena>(
     r#trait: &'arena Trait<'arena>,
     context: &mut Context<'ctx, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(Atom, TemplateConstraintList)> {
+) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
         atom(context.resolved_names.get(&r#trait.name)),
@@ -191,10 +217,16 @@ pub fn register_trait<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
+    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let imported_aliases = class_like_metadata
+        .imported_type_aliases
+        .iter()
+        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
+        .collect::<AtomMap<(Atom, Atom)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
-    Some((name, template_resolution_context))
+    Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
 
 #[inline]
@@ -203,7 +235,7 @@ pub fn register_enum<'ctx, 'arena>(
     r#enum: &'arena Enum<'arena>,
     context: &mut Context<'ctx, 'arena>,
     scope: &mut NamespaceScope,
-) -> Option<(Atom, TemplateConstraintList)> {
+) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
         atom(context.resolved_names.get(&r#enum.name)),
@@ -227,12 +259,16 @@ pub fn register_enum<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
+    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let imported_aliases = class_like_metadata
+        .imported_type_aliases
+        .iter()
+        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
+        .collect::<AtomMap<(Atom, Atom)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
-    // Fingerprinting is now handled by signature_builder for the entire file
-
-    Some((name, template_resolution_context))
+    Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
 
 #[inline]
@@ -936,6 +972,40 @@ fn scan_class_like<'ctx, 'arena>(
             new_property.flags.set(MetadataFlags::MAGIC_PROPERTY, true);
 
             class_like_metadata.add_property_metadata(new_property);
+        }
+
+        // Process imported type aliases FIRST so they're available when building type alias definitions
+        for imported_type_alias in docblock.imported_type_aliases {
+            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let name = atom(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_deref().map(atom).unwrap_or(name);
+
+            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, name, imported_type_alias.span));
+            // Add to type context so imported aliases are available when building type alias definitions
+            type_context = type_context.with_imported_type_alias(alias, fqcn, name);
+        }
+
+        // Now build type alias definitions (can reference imported aliases)
+        for type_alias in &docblock.type_aliases {
+            let alias_name = atom(&type_alias.name);
+            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
+                Ok(type_metadata) => {
+                    type_context = type_context.with_type_alias(alias_name);
+
+                    class_like_metadata.type_aliases.insert(alias_name, type_metadata);
+                }
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@type` tag.")
+                            .with_code(ScanningIssueKind::InvalidTypeTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+                }
+            }
         }
     }
 

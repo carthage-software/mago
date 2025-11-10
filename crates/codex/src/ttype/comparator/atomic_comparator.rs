@@ -38,6 +38,37 @@ pub fn is_contained_by(
         return true;
     }
 
+    // Handle TAtomic::Alias - expand both input and container
+    if let TAtomic::Alias(alias) = container_type_part {
+        let Some(container_union) = alias.resolve(codebase) else {
+            return false;
+        };
+
+        for container_atomic in container_union.types.iter() {
+            if is_contained_by(codebase, input_type_part, container_atomic, inside_assertion, atomic_comparison_result)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if let TAtomic::Alias(alias) = input_type_part {
+        let Some(input_union) = alias.resolve(codebase) else {
+            return false;
+        };
+
+        for input_atomic in input_union.types.iter() {
+            if !is_contained_by(codebase, input_atomic, container_type_part, inside_assertion, atomic_comparison_result)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     // `T <= A & B`
     if let Some(container_intersection_types) = container_type_part.get_intersection_types()
         && !container_intersection_types.is_empty()
