@@ -243,6 +243,7 @@ test_case!(type_alias_import_rename);
 test_case!(type_alias_complex_types);
 test_case!(type_alias_phpstan);
 test_case!(type_alias_syntax);
+test_case!(change_private_parent_prop);
 
 // Github Issues
 test_case!(issue_265);

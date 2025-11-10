@@ -2010,6 +2010,11 @@ fn check_class_like_properties<'ctx, 'arena>(
                 continue;
             };
 
+            if parent_property.read_visibility.is_private() && parent_property.write_visibility.is_private() {
+                // Parent property is private, so not visible to child class - skip checks
+                continue;
+            }
+
             if property_metadata.read_visibility > parent_property.read_visibility {
                 let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
                 let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
