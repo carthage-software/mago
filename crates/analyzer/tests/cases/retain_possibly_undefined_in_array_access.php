@@ -16,7 +16,7 @@ class test
     }
 }
 
-/** @param 0|1|2 */
+/** @param 0|1|2 $y */
 function x(int $y): void
 {
     echo $y;

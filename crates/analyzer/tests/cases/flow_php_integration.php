@@ -9,7 +9,7 @@ namespace Flow\Types {
         /**
          * @param mixed $value
          *
-         * @assert assert T $value
+         * @assert T $value
          * @return T
          */
         public function assert($value): mixed;

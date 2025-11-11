@@ -3,7 +3,7 @@
 /**
  * @template T
  *
- * @param array<int, T>
+ * @param array<int, T> $arr
  *
  * @return null|list<T>
  */
