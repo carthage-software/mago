@@ -102,7 +102,7 @@ impl Formatter for AriadneFormatter {
                 .with_config(config)
                 .finish()
                 .write_for_stdout(ariadne_sources(relevant_sources), &mut buffer)
-                .map_err(|e| std::io::Error::other(e))?;
+                .map_err(std::io::Error::other)?;
             writer.write_all(&buffer)?;
         }
 

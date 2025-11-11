@@ -112,6 +112,7 @@ itoa = "1.0"
 notify = "8.2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 atty = "0.2"
+serde-sarif = "0.8"
 
 [dependencies]
 mago-syntax = { workspace = true }

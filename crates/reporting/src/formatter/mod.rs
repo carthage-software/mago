@@ -17,6 +17,7 @@ pub mod gitlab;
 pub mod json;
 pub mod medium;
 pub mod rich;
+pub mod sarif;
 pub mod short;
 pub mod utils;
 
@@ -83,6 +84,8 @@ pub enum ReportingFormat {
     Checkstyle,
     /// Emacs compilation mode format.
     Emacs,
+    /// SARIF format (Static Analysis Results Interchange Format).
+    Sarif,
 }
 
 /// Dispatch to the appropriate formatter based on the format type.
@@ -107,5 +110,6 @@ pub(crate) fn dispatch_format(
         ReportingFormat::Emacs => emacs::EmacsFormatter.format(writer, issues, database, config),
         ReportingFormat::Count => count::CountFormatter.format(writer, issues, database, config),
         ReportingFormat::CodeCount => code_count::CodeCountFormatter.format(writer, issues, database, config),
+        ReportingFormat::Sarif => sarif::SarifFormatter.format(writer, issues, database, config),
     }
 }

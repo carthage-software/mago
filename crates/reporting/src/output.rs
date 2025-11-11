@@ -10,10 +10,10 @@ use std::sync::Mutex;
 pub enum ReportingTarget {
     /// Write to standard output.
     #[strum(serialize = "stdout", serialize = "out")]
+    #[default]
     Stdout,
     /// Write to standard error.
     #[strum(serialize = "stderr", serialize = "err")]
-    #[default]
     Stderr,
     /// Write to a custom writer.
     #[strum(disabled)]
