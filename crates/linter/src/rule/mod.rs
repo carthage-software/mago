@@ -224,6 +224,7 @@ define_rules! {
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
     ExplicitNullableParam(explicit_nullable_param @ ExplicitNullableParamRule),
     PreferArrowFunction(prefer_arrow_function @ PreferArrowFunctionRule),
+    PreferEarlyContinue(prefer_early_continue @ PreferEarlyContinueRule),
     PreferStaticClosure(prefer_static_closure @ PreferStaticClosureRule),
     PreferViewArray(prefer_view_array @ PreferViewArrayRule),
     PreferWhileLoop(prefer_while_loop @ PreferWhileLoopRule),

@@ -141,9 +141,11 @@ final class InstallMagoBinaryCommand extends BaseCommand
         $json = $response->decodeJson();
 
         foreach ($json as $release) {
-            if ($release['tag_name'] === $version) {
-                return (string) $release['id'];
+            if ($release['tag_name'] !== $version) {
+                continue;
             }
+
+            return (string) $release['id'];
         }
 
         return 'latest';

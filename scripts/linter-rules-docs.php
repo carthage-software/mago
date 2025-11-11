@@ -285,12 +285,16 @@ function group_rules(array $rules): array
 
         if ([] !== $rule['requirements']['integrations']) {
             foreach ($rule['requirements']['integrations'] as $integration_set) {
-                if ($integration_set > 0) {
-                    foreach (Integration::cases() as $case) {
-                        if (($integration_set >> $case->value) & 1) {
-                            $rules_by_integration[$case->name][$rule['code']] = $rule;
-                        }
+                if ($integration_set <= 0) {
+                    continue;
+                }
+
+                foreach (Integration::cases() as $case) {
+                    if (!(($integration_set >> $case->value) & 1)) {
+                        continue;
                     }
+
+                    $rules_by_integration[$case->name][$rule['code']] = $rule;
                 }
             }
         }
@@ -501,9 +505,11 @@ function generate_rule_docs_section(array $rule, array $config): string
         $integrations_in_set = [];
         if ($set_mask > 0) {
             foreach (Integration::cases() as $case) {
-                if (($set_mask >> $case->value) & 1) {
-                    $integrations_in_set[] = '`' . $case->name . '`';
+                if (!(($set_mask >> $case->value) & 1)) {
+                    continue;
                 }
+
+                $integrations_in_set[] = '`' . $case->name . '`';
             }
         }
 
