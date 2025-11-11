@@ -639,29 +639,34 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
 pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
     let leading_ws = (content.len() - content.trim_start().len()) as u32;
     let content = content.trim_start();
-    // Support both formats: "@type Name Type" and "@type Name = Type"
-    let (name, type_part, type_offset) = if let Some(equals_index) = content.find('=') {
+    let (potential_name, _) = content.split_once(char::is_whitespace)?;
+
+    let name_len = potential_name.len();
+    let after_name = &content[name_len..];
+    let trimmed_after_name = after_name.trim_start();
+
+    let (name, type_part, type_offset) = if let Some(after_equals) = trimmed_after_name.strip_prefix('=') {
         // Format: @type Name = Type
-        let (name, rest) = content.split_at(equals_index);
-        let name = name.trim();
-
-        if !is_valid_identifier_start(name, false) || rest.is_empty() {
-            return None;
-        }
-
-        // Pass rest (with leading space after '=') to split_tag_content to handle trimming
-        (name, &rest[1..], leading_ws + (equals_index + 1) as u32)
-    } else {
-        // Format: @type Name Type
-        let (name, rest) = content.split_once(char::is_whitespace)?;
-        let name = name.trim();
+        let name = potential_name.trim();
 
         if !is_valid_identifier_start(name, false) {
             return None;
         }
 
-        // Pass rest to split_tag_content to handle trimming
-        (name, rest, leading_ws + (name.len() + 1) as u32)
+        let type_start_offset = name_len + (after_name.len() - trimmed_after_name.len()) + 1;
+
+        (name, after_equals, leading_ws + type_start_offset as u32)
+    } else {
+        let name = potential_name.trim();
+
+        if !is_valid_identifier_start(name, false) {
+            return None;
+        }
+
+        let rest = after_name.trim_start();
+        let type_start_offset = name_len + (after_name.len() - rest.len());
+
+        (name, rest, leading_ws + type_start_offset as u32)
     };
 
     let (type_string, _) = split_tag_content(type_part, span.subspan(type_offset, 0))?;
