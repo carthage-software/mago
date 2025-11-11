@@ -92,7 +92,7 @@ pub(crate) fn reconcile(
                 false,
             )
         {
-            trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, pos);
+            trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, pos);
         }
     }
 

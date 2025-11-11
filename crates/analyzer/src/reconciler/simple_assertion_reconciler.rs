@@ -1027,6 +1027,10 @@ fn intersect_bool(
     is_equality: bool,
     boolean: &TBool,
 ) -> TUnion {
+    // Treat specific boolean values (true/false literals) as equality checks
+    // even if the assertion is IsType rather than IsIdentical
+    let is_equality = is_equality || !boolean.is_general();
+
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
