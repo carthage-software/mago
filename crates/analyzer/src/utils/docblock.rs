@@ -145,7 +145,7 @@ pub fn get_docblock_variables<'ctx, 'arena>(
 
             let tag_content = tag.description;
 
-            let var_tag = parse_var_tag(tag_content, tag.description_span)?;
+            let var_tag = parse_var_tag(tag_content, tag.description_span).ok()?;
             let variable_name = var_tag.variable.map(|v| v.to_string());
             let type_string = var_tag.type_string;
 

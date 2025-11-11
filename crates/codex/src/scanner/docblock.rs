@@ -168,11 +168,9 @@ impl ClassLikeDocblockComment {
                     let description_str = tag.description;
                     let description_span = tag.description_span;
 
-                    if let Some(template) = parse_template_tag(description_str, description_span, false, false) {
-                        scope.add(NameKind::Default, &template.name, None as Option<&str>);
-
-                        templates.push(template);
-                    }
+                    let template = parse_template_tag(description_str, description_span, false, false)?;
+                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    templates.push(template);
                 }
                 TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant
@@ -180,21 +178,19 @@ impl ClassLikeDocblockComment {
                     let description_str = tag.description;
                     let description_span = tag.description_span;
 
-                    if let Some(template) = parse_template_tag(description_str, description_span, false, true) {
-                        scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    let template = parse_template_tag(description_str, description_span, false, true)?;
+                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
 
-                        templates.push(template);
-                    }
+                    templates.push(template);
                 }
                 TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant | TagKind::TemplateCovariant => {
                     let description_str = tag.description;
                     let description_span = tag.description_span;
 
-                    if let Some(template) = parse_template_tag(description_str, description_span, true, false) {
-                        scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    let template = parse_template_tag(description_str, description_span, true, false)?;
+                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
 
-                        templates.push(template);
-                    }
+                    templates.push(template);
                 }
                 TagKind::TemplateExtends | TagKind::Extends => {
                     let description_str = tag.description;
@@ -226,34 +222,28 @@ impl ClassLikeDocblockComment {
                         .push(TypeString { value: tag.description.to_string(), span: tag.description_span });
                 }
                 TagKind::Method | TagKind::PsalmMethod => {
-                    if let Some(method) = parse_method_tag(tag.description, tag.description_span) {
-                        methods.push(method);
-                    }
+                    let method = parse_method_tag(tag.description, tag.description_span)?;
+                    methods.push(method);
                 }
                 TagKind::Property | TagKind::PsalmProperty => {
-                    if let Some(property_tag) = parse_property_tag(tag.description, tag.description_span, true, true) {
-                        properties.push(property_tag);
-                    }
+                    let property_tag = parse_property_tag(tag.description, tag.description_span, true, true)?;
+                    properties.push(property_tag);
                 }
                 TagKind::PropertyRead | TagKind::PsalmPropertyRead => {
-                    if let Some(property_tag) = parse_property_tag(tag.description, tag.description_span, true, false) {
-                        properties.push(property_tag);
-                    }
+                    let property_tag = parse_property_tag(tag.description, tag.description_span, true, false)?;
+                    properties.push(property_tag);
                 }
                 TagKind::PropertyWrite | TagKind::PsalmPropertyWrite => {
-                    if let Some(property_tag) = parse_property_tag(tag.description, tag.description_span, false, true) {
-                        properties.push(property_tag);
-                    }
+                    let property_tag = parse_property_tag(tag.description, tag.description_span, false, true)?;
+                    properties.push(property_tag);
                 }
                 TagKind::Type | TagKind::PsalmType | TagKind::PhpstanType => {
-                    if let Some(type_tag) = parse_type_tag(tag.description, tag.description_span) {
-                        type_aliases.push(type_tag);
-                    }
+                    let type_tag = parse_type_tag(tag.description, tag.description_span)?;
+                    type_aliases.push(type_tag);
                 }
                 TagKind::ImportType | TagKind::PsalmImportType | TagKind::PhpstanImportType => {
-                    if let Some(import_type_tag) = parse_import_type_tag(tag.description, tag.description_span) {
-                        imported_type_aliases.push(import_type_tag);
-                    }
+                    let import_type_tag = parse_import_type_tag(tag.description, tag.description_span)?;
+                    imported_type_aliases.push(import_type_tag);
                 }
                 _ => {
                     // Ignore other tags
@@ -348,9 +338,8 @@ impl FunctionLikeDocblockComment {
                     is_internal = true;
                 }
                 TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
-                    if let Some(param) = parse_param_tag(tag.description, tag.description_span) {
-                        parameters.push(param);
-                    }
+                    let param = parse_param_tag(tag.description, tag.description_span)?;
+                    parameters.push(param);
                 }
                 TagKind::NoNamedArguments => {
                     no_named_arguments = true;
@@ -361,47 +350,40 @@ impl FunctionLikeDocblockComment {
                 | TagKind::TemplateInvariant
                 | TagKind::PhpstanTemplateInvariant
                 | TagKind::PsalmTemplateInvariant => {
-                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, false, false) {
-                        scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    let t = parse_template_tag(tag.description, tag.description_span, false, false)?;
+                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
-                        templates.push(t);
-                    }
+                    templates.push(t);
                 }
                 TagKind::TemplateCovariant | TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant => {
-                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, true, false) {
-                        scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    let t = parse_template_tag(tag.description, tag.description_span, true, false)?;
+                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
-                        templates.push(t);
-                    }
+                    templates.push(t);
                 }
                 TagKind::TemplateContravariant
                 | TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant => {
-                    if let Some(t) = parse_template_tag(tag.description, tag.description_span, false, true) {
-                        scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    let t = parse_template_tag(tag.description, tag.description_span, false, true)?;
+                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
 
-                        templates.push(t);
-                    }
+                    templates.push(t);
                 }
                 TagKind::Return => {
-                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
-                        generic_return_type = Some(return_tag);
-                    }
+                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
+                    generic_return_type = Some(return_tag);
                 }
                 TagKind::PhpstanReturn => {
-                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
-                        phpstan_return_type = Some(return_tag);
-                    }
+                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
+                    phpstan_return_type = Some(return_tag);
                 }
                 TagKind::PsalmReturn => {
-                    if let Some(return_tag) = parse_return_tag(tag.description, tag.description_span) {
-                        psalm_return_type = Some(return_tag);
-                    }
+                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
+                    psalm_return_type = Some(return_tag);
                 }
                 TagKind::Throws => {
-                    if let Some(throws_tag) = parse_throws_tag(tag.description, tag.description_span) {
-                        throws.push(throws_tag);
-                    }
+                    let throws_tag = parse_throws_tag(tag.description, tag.description_span)?;
+                    throws.push(throws_tag);
                 }
                 TagKind::NotDeprecated => {
                     is_deprecated = false;
@@ -413,29 +395,24 @@ impl FunctionLikeDocblockComment {
                     is_pure = true;
                 }
                 TagKind::PsalmParamOut | TagKind::ParamOut => {
-                    if let Some(param_out) = parse_param_out_tag(tag.description, tag.description_span) {
-                        parameters_out.push(param_out);
-                    }
+                    let param_out = parse_param_out_tag(tag.description, tag.description_span)?;
+                    parameters_out.push(param_out);
                 }
                 TagKind::Assert | TagKind::PsalmAssert | TagKind::PhpstanAssert => {
-                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
-                        assertions.push(assertion);
-                    }
+                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
+                    assertions.push(assertion);
                 }
                 TagKind::AssertIfTrue | TagKind::PsalmAssertIfTrue | TagKind::PhpstanAssertIfTrue => {
-                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
-                        if_true_assertions.push(assertion);
-                    }
+                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
+                    if_true_assertions.push(assertion);
                 }
                 TagKind::AssertIfFalse | TagKind::PsalmAssertIfFalse | TagKind::PhpstanAssertIfFalse => {
-                    if let Some(assertion) = parse_assertion_tag(tag.description, tag.description_span) {
-                        if_false_assertions.push(assertion);
-                    }
+                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
+                    if_false_assertions.push(assertion);
                 }
                 TagKind::Where => {
-                    if let Some(where_tag) = parse_where_tag(tag.description, tag.description_span) {
-                        where_constraints.push(where_tag);
-                    }
+                    let where_tag = parse_where_tag(tag.description, tag.description_span)?;
+                    where_constraints.push(where_tag);
                 }
                 TagKind::IgnoreNullableReturn | TagKind::PsalmIgnoreNullableReturn => {
                     ignore_nullable_return = true;

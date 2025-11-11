@@ -374,6 +374,10 @@ fn scan_function_like_docblock<'ctx, 'arena>(
         let param_type_string = &parameter_tag.type_string;
         let is_variadic = parameter_tag.variable.is_variadic;
 
+        let Some(param_type_string) = param_type_string else {
+            continue;
+        };
+
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
             metadata.issues.push(
                 Issue::error("The @param tag references an unknown parameter.")

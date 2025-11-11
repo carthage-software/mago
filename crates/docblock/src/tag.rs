@@ -1,3 +1,4 @@
+use crate::error::ParseError;
 use mago_span::Span;
 use serde::Deserialize;
 use serde::Serialize;
@@ -93,7 +94,7 @@ pub struct ImportTypeTag {
 pub struct ParameterTag {
     pub span: Span,
     pub variable: Variable,
-    pub type_string: TypeString,
+    pub type_string: Option<TypeString>,
     pub description: String,
 }
 
@@ -340,18 +341,20 @@ pub fn parse_template_tag(
     span: Span,
     mut covariant: bool,
     mut contravariant: bool,
-) -> Option<TemplateTag> {
+) -> Result<TemplateTag, ParseError> {
     // Find start offset of trimmed content relative to original `content`
     let trim_start_offset_rel = content.find(|c: char| !c.is_whitespace()).unwrap_or(0);
     let trimmed_content = content.trim();
 
     if trimmed_content.is_empty() {
-        return None;
+        return Err(ParseError::InvalidTemplateTag(span, "Expected template parameter name".to_string()));
     }
 
     let mut parts = trimmed_content.split_whitespace();
 
-    let mut name_part = parts.next()?;
+    let mut name_part = parts
+        .next()
+        .ok_or_else(|| ParseError::InvalidTemplateTag(span, "Expected template parameter name".to_string()))?;
     if name_part.starts_with('+') && !contravariant && !covariant {
         covariant = true;
         name_part = &name_part[1..];
@@ -402,7 +405,7 @@ pub fn parse_template_tag(
         }
     }
 
-    Some(TemplateTag { span, name, modifier, type_string: type_string_opt, covariant, contravariant })
+    Ok(TemplateTag { span, name, modifier, type_string: type_string_opt, covariant, contravariant })
 }
 
 /// Parses the content string of a `@where` tag.
@@ -415,12 +418,14 @@ pub fn parse_template_tag(
 /// # Returns
 ///
 /// `Some(WhereTag)` if parsing is successful, `None` otherwise.
-pub fn parse_where_tag(content: &str, span: Span) -> Option<WhereTag> {
-    let name_end_pos = content.find(char::is_whitespace)?;
+pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError> {
+    let name_end_pos = content.find(char::is_whitespace).ok_or_else(|| {
+        ParseError::InvalidWhereTag(span, "Expected template parameter name and constraint".to_string())
+    })?;
     let (name_part, mut rest) = content.split_at(name_end_pos);
 
     if !is_valid_identifier_start(name_part, false) {
-        return None;
+        return Err(ParseError::InvalidWhereTag(span, format!("Invalid template parameter name: '{}'", name_part)));
     }
 
     rest = rest.trim_start();
@@ -431,16 +436,20 @@ pub fn parse_where_tag(content: &str, span: Span) -> Option<WhereTag> {
         rest = &rest[1..];
         WhereModifier::Colon
     } else {
-        return None;
+        return Err(ParseError::InvalidWhereTag(
+            span,
+            "Expected 'is' or ':' after template parameter name".to_string(),
+        ));
     };
 
     let consumed_len = content.len() - rest.len();
     let type_part_start_pos = span.start.forward(consumed_len as u32);
     let type_part_span = Span::new(span.file_id, type_part_start_pos, span.end);
 
-    let (type_string, _rest) = split_tag_content(rest, type_part_span)?;
+    let (type_string, _rest) = split_tag_content(rest, type_part_span)
+        .ok_or_else(|| ParseError::InvalidWhereTag(span, "Failed to parse type constraint".to_string()))?;
 
-    Some(WhereTag { span, name: name_part.to_owned(), modifier, type_string })
+    Ok(WhereTag { span, name: name_part.to_owned(), modifier, type_string })
 }
 
 /// Parses the content string of a `@param` tag.
@@ -452,31 +461,54 @@ pub fn parse_where_tag(content: &str, span: Span) -> Option<WhereTag> {
 ///
 /// # Returns
 ///
-/// `Some(ParamTag)` if parsing is successful, `None` otherwise.
-pub fn parse_param_tag(content: &str, span: Span) -> Option<ParameterTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<ParameterTag, ParseError>` with the parsed parameter tag or an error.
+pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseError> {
+    let trimmed = content.trim_start();
 
-    // Type must exist and be valid
+    // Check if content starts with a variable (no type specified)
+    if trimmed.starts_with('$') {
+        // No type specified, just parse variable and description
+        let mut parts = trimmed.split_whitespace();
+        let raw_name =
+            parts.next().ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
+
+        let variable = parse_var_ident(raw_name, false)
+            .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
+
+        let desc_start = trimmed.find(&variable.name).map_or(0, |i| i + variable.name.len());
+        let description = trimmed[desc_start..].trim().to_owned();
+
+        return Ok(ParameterTag { span, variable, type_string: None, description });
+    }
+
+    // Type is specified, parse it
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidParameterTag(span, "Failed to parse parameter type".to_string()))?;
+
+    // Type must be valid (not empty, not starting with { or $)
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidParameterTag(span, format!("Invalid parameter type: '{}'", type_string.value)));
     }
 
     if rest_slice.is_empty() {
         // Variable name is mandatory
-        return None;
+        return Err(ParseError::InvalidParameterTag(span, "Missing parameter name".to_string()));
     }
 
     let mut rest_parts = rest_slice.split_whitespace();
-    let raw_name = rest_parts.next()?;
-    let variable = parse_var_ident(raw_name, false)?;
+    let raw_name = rest_parts
+        .next()
+        .ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
+    let variable = parse_var_ident(raw_name, false)
+        .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
 
     let desc_start = rest_slice.find(&variable.name).map_or(0, |i| i + variable.name.len());
     let description = rest_slice[desc_start..].trim_start().to_owned();
 
-    Some(ParameterTag { span, variable, type_string, description })
+    Ok(ParameterTag { span, variable, type_string: Some(type_string), description })
 }
 
 /// Parses the content string of a `@param-out` tag.
@@ -488,26 +520,34 @@ pub fn parse_param_tag(content: &str, span: Span) -> Option<ParameterTag> {
 ///
 /// # Returns
 ///
-/// `Some(ParamOutTag)` if parsing is successful, `None` otherwise.
-pub fn parse_param_out_tag(content: &str, span: Span) -> Option<ParameterOutTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<ParameterOutTag, ParseError>` with the parsed parameter-out tag or an error.
+pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag, ParseError> {
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Failed to parse parameter type".to_string()))?;
 
     // Type must exist and be valid
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidParameterOutTag(
+            span,
+            format!("Invalid parameter type: '{}'", type_string.value),
+        ));
     }
 
     if rest_slice.is_empty() {
-        return None;
+        return Err(ParseError::InvalidParameterOutTag(span, "Missing parameter name".to_string()));
     }
 
-    let raw_name = rest_slice.split_whitespace().next()?;
-    let variable = parse_var_ident(raw_name, false)?;
+    let raw_name = rest_slice
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Expected parameter name".to_string()))?;
+    let variable = parse_var_ident(raw_name, false)
+        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
 
-    Some(ParameterOutTag { span, variable, type_string })
+    Ok(ParameterOutTag { span, variable, type_string })
 }
 
 /// Parses the content string of a `@return` tag.
@@ -519,18 +559,19 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Option<ParameterOutTag>
 ///
 /// # Returns
 ///
-/// `Some(ReturnTypeTag)` if parsing is successful, `None` otherwise.
-pub fn parse_return_tag(content: &str, span: Span) -> Option<ReturnTypeTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<ReturnTypeTag, ParseError>` with the parsed return tag or an error.
+pub fn parse_return_tag(content: &str, span: Span) -> Result<ReturnTypeTag, ParseError> {
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidReturnTag(span, "Failed to parse return type".to_string()))?;
 
     // Type cannot start with '{'
     if type_string.value.starts_with('{') {
-        return None;
+        return Err(ParseError::InvalidReturnTag(span, format!("Invalid return type: '{}'", type_string.value)));
     }
 
     let description = rest_slice.to_owned();
 
-    Some(ReturnTypeTag { span, type_string, description })
+    Ok(ReturnTypeTag { span, type_string, description })
 }
 
 /// Parses the content string of a `@throws` tag.
@@ -542,23 +583,24 @@ pub fn parse_return_tag(content: &str, span: Span) -> Option<ReturnTypeTag> {
 ///
 /// # Returns
 ///
-/// `Some(ThrowsTag)` if parsing is successful, `None` otherwise.
-pub fn parse_throws_tag(content: &str, span: Span) -> Option<ThrowsTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<ThrowsTag, ParseError>` with the parsed throws tag or an error.
+pub fn parse_throws_tag(content: &str, span: Span) -> Result<ThrowsTag, ParseError> {
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidThrowsTag(span, "Failed to parse exception type".to_string()))?;
 
     // Type cannot start with '{'
     if type_string.value.starts_with('{') {
-        return None;
+        return Err(ParseError::InvalidThrowsTag(span, format!("Invalid exception type: '{}'", type_string.value)));
     }
 
     // Type cannot start with '$' unless it is "$this"
     if type_string.value.starts_with('$') && type_string.value != "$this" {
-        return None;
+        return Err(ParseError::InvalidThrowsTag(span, format!("Invalid exception type: '{}'", type_string.value)));
     }
 
     let description = rest_slice.to_owned();
 
-    Some(ThrowsTag { span, type_string, description })
+    Ok(ThrowsTag { span, type_string, description })
 }
 
 /// Parses the content string of an `@assert`, `@assert-if-true`, or `@assert-if-false` tag.
@@ -570,29 +612,32 @@ pub fn parse_throws_tag(content: &str, span: Span) -> Option<ThrowsTag> {
 ///
 /// # Returns
 ///
-/// `Some(AssertionTag)` if parsing is successful, `None` otherwise.
-pub fn parse_assertion_tag(content: &str, span: Span) -> Option<AssertionTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<AssertionTag, ParseError>` with the parsed assertion tag or an error.
+pub fn parse_assertion_tag(content: &str, span: Span) -> Result<AssertionTag, ParseError> {
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidAssertionTag(span, "Failed to parse assertion type".to_string()))?;
 
     // Type must exist and be valid
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidAssertionTag(span, format!("Invalid assertion type: '{}'", type_string.value)));
     }
 
     if rest_slice.is_empty() {
         // Variable name is mandatory
-        return None;
+        return Err(ParseError::InvalidAssertionTag(span, "Missing variable name".to_string()));
     }
 
     let mut rest_parts = rest_slice.split_whitespace();
 
-    let raw_name = rest_parts.next()?;
-    let variable = parse_var_ident(raw_name, true)?;
+    let raw_name =
+        rest_parts.next().ok_or_else(|| ParseError::InvalidAssertionTag(span, "Expected variable name".to_string()))?;
+    let variable = parse_var_ident(raw_name, true)
+        .ok_or_else(|| ParseError::InvalidAssertionTag(span, format!("Invalid variable name: '{}'", raw_name)))?;
 
-    Some(AssertionTag { span, variable, type_string })
+    Ok(AssertionTag { span, variable, type_string })
 }
 
 /// Parses the content string of a `@var` tag.
@@ -604,26 +649,30 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Option<AssertionTag> {
 ///
 /// # Returns
 ///
-/// `Some(VarTag)` if parsing is successful, `None` otherwise.
-pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
-    let (type_string, rest_slice) = split_tag_content(content, span)?;
+/// `Result<VarTag, ParseError>` with the parsed var tag or an error.
+pub fn parse_var_tag(content: &str, span: Span) -> Result<VarTag, ParseError> {
+    let (type_string, rest_slice) = split_tag_content(content, span)
+        .ok_or_else(|| ParseError::InvalidVarTag(span, "Failed to parse variable type".to_string()))?;
 
     // Type must exist and be valid
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidVarTag(span, format!("Invalid variable type: '{}'", type_string.value)));
     }
 
     let variable = if rest_slice.is_empty() {
         None
     } else {
-        let var_part = rest_slice.split_whitespace().next()?;
+        let var_part = rest_slice
+            .split_whitespace()
+            .next()
+            .ok_or_else(|| ParseError::InvalidVarTag(span, "Expected variable name".to_string()))?;
         parse_var_ident(var_part, true)
     };
 
-    Some(VarTag { span, type_string, variable })
+    Ok(VarTag { span, type_string, variable })
 }
 
 /// Parses the content string of a `@type` tag.
@@ -636,10 +685,18 @@ pub fn parse_var_tag(content: &str, span: Span) -> Option<VarTag> {
 /// # Returns
 ///
 /// `Some(TypeTag)` if parsing is successful, `None` otherwise.
-pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
+pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> {
     let leading_ws = (content.len() - content.trim_start().len()) as u32;
     let content = content.trim_start();
-    let (potential_name, _) = content.split_once(char::is_whitespace)?;
+
+    if content.is_empty() {
+        return Err(ParseError::InvalidTypeTag(span, "Type alias declaration is empty".to_string()));
+    }
+
+    let (potential_name, _) = content.split_once(char::is_whitespace).ok_or_else(|| {
+        let trimmed = content.trim();
+        ParseError::InvalidTypeTag(span, format!("Type alias name '{}' must be followed by a type definition", trimmed))
+    })?;
 
     let name_len = potential_name.len();
     let after_name = &content[name_len..];
@@ -650,7 +707,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
         let name = potential_name.trim();
 
         if !is_valid_identifier_start(name, false) {
-            return None;
+            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{}'", name)));
         }
 
         let type_start_offset = name_len + (after_name.len() - trimmed_after_name.len()) + 1;
@@ -660,7 +717,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
         let name = potential_name.trim();
 
         if !is_valid_identifier_start(name, false) {
-            return None;
+            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{}'", name)));
         }
 
         let rest = after_name.trim_start();
@@ -669,16 +726,17 @@ pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
         (name, rest, leading_ws + type_start_offset as u32)
     };
 
-    let (type_string, _) = split_tag_content(type_part, span.subspan(type_offset, 0))?;
+    let (type_string, _) = split_tag_content(type_part, span.subspan(type_offset, 0))
+        .ok_or_else(|| ParseError::InvalidTypeTag(span, "Failed to parse type definition".to_string()))?;
 
     if type_string.value.is_empty()
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidTypeTag(span, format!("Invalid type definition: '{}'", type_string.value)));
     }
 
-    Some(TypeTag { span, name: name.to_owned(), type_string })
+    Ok(TypeTag { span, name: name.to_owned(), type_string })
 }
 
 /// Parses the content string of an `@import-type` tag.
@@ -690,19 +748,32 @@ pub fn parse_type_tag(content: &str, span: Span) -> Option<TypeTag> {
 ///
 /// # Returns
 ///
-/// `Some(ImportTypeTag)` if parsing is successful, `None` otherwise.
-pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag> {
-    let (name, rest) = content.trim_start().split_once(" ")?;
+/// `Result<ImportTypeTag, ParseError>` with the parsed import type tag or an error.
+pub fn parse_import_type_tag(content: &str, span: Span) -> Result<ImportTypeTag, ParseError> {
+    let (name, rest) = content.trim_start().split_once(" ").ok_or_else(|| {
+        ParseError::InvalidImportTypeTag(span, "Expected type alias name and 'from' clause".to_string())
+    })?;
     let name = name.trim();
     let rest = rest.trim();
 
-    if !is_valid_identifier_start(name, false) || rest.is_empty() {
-        return None;
+    if !is_valid_identifier_start(name, false) {
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid type alias name: '{}'", name)));
     }
 
-    let (from, rest) = rest.split_once(" ")?;
-    if !from.eq_ignore_ascii_case("from") || rest.is_empty() {
-        return None;
+    if rest.is_empty() {
+        return Err(ParseError::InvalidImportTypeTag(span, "Missing 'from' clause".to_string()));
+    }
+
+    let (from, rest) = rest.split_once(" ").ok_or_else(|| {
+        ParseError::InvalidImportTypeTag(span, "Expected 'from' keyword followed by class name".to_string())
+    })?;
+
+    if !from.eq_ignore_ascii_case("from") {
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Expected 'from' keyword, found '{}'", from)));
+    }
+
+    if rest.is_empty() {
+        return Err(ParseError::InvalidImportTypeTag(span, "Missing class name after 'from'".to_string()));
     }
 
     let (imported_from, rest) = if let Some((imp_from, rest)) = rest.split_once(" ") {
@@ -712,7 +783,7 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag>
     };
 
     if !is_valid_identifier_start(imported_from, true) {
-        return None;
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid class name: '{}'", imported_from)));
     }
 
     let mut alias = None;
@@ -721,42 +792,60 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Option<ImportTypeTag>
         && r#as.trim().eq_ignore_ascii_case("as")
         && !rest.is_empty()
     {
-        alias = Some(rest.split_whitespace().next()?.trim().to_owned());
+        let alias_name = rest
+            .split_whitespace()
+            .next()
+            .ok_or_else(|| ParseError::InvalidImportTypeTag(span, "Expected alias name after 'as'".to_string()))?
+            .trim()
+            .to_owned();
+        alias = Some(alias_name);
     }
 
-    Some(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
+    Ok(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
 }
 
-pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bool) -> Option<PropertyTag> {
+pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bool) -> Result<PropertyTag, ParseError> {
     // If we are at `$` and not `$this`, then no type is present:
     let (type_string, variable) = if content.trim_start().starts_with('$') && !content.trim_start().starts_with("$this")
     {
-        let var_part = content.split_whitespace().next()?;
-        let variable = parse_var_ident(var_part, false)?;
+        let var_part = content
+            .split_whitespace()
+            .next()
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
+        let variable = parse_var_ident(var_part, false)
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{}'", var_part)))?;
 
         (None, variable)
     } else {
-        let (type_string, rest_slice) = split_tag_content(content, span)?;
+        let (type_string, rest_slice) = split_tag_content(content, span)
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Failed to parse type definition".to_string()))?;
 
         // Type must exist and be valid
         if type_string.value.is_empty()
             || type_string.value.starts_with('{')
             || (type_string.value.starts_with('$') && type_string.value != "$this")
         {
-            return None;
+            return Err(ParseError::InvalidPropertyTag(
+                span,
+                format!("Invalid type definition: '{}'", type_string.value),
+            ));
         }
 
         if rest_slice.is_empty() {
-            return None;
+            return Err(ParseError::InvalidPropertyTag(span, "Missing variable name after type".to_string()));
         }
 
-        let var_part = rest_slice.split_whitespace().next()?;
-        let variable = parse_var_ident(var_part, false)?;
+        let var_part = rest_slice
+            .split_whitespace()
+            .next()
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
+        let variable = parse_var_ident(var_part, false)
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{}'", var_part)))?;
 
         (Some(type_string), variable)
     };
 
-    Some(PropertyTag { span, type_string, variable, is_read, is_write })
+    Ok(PropertyTag { span, type_string, variable, is_read, is_write })
 }
 
 /// Splits tag content into the type string part and the rest, respecting brackets/quotes.
@@ -897,7 +986,7 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
 /// # Returns
 ///
 /// `Some(MethodTag)` if parsing is successful, `None` otherwise.
-pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
+pub fn parse_method_tag(mut content: &str, span: Span) -> Result<MethodTag, ParseError> {
     let mut is_static = false;
     let mut visibility = None;
 
@@ -906,7 +995,7 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
     loop {
         if let Some((new_content, char_count)) = try_consume(content, "static ") {
             if is_static {
-                return None;
+                return Err(ParseError::InvalidMethodTag(span, "Duplicate 'static' modifier".to_string()));
             }
 
             is_static = true;
@@ -914,7 +1003,7 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
             content = new_content;
         } else if let Some((new_content, char_count)) = try_consume(content, "public ") {
             if visibility.is_some() {
-                return None;
+                return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
 
             visibility = Some(Visibility::Public);
@@ -922,7 +1011,7 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
             content = new_content;
         } else if let Some((new_content, char_count)) = try_consume(content, "protected ") {
             if visibility.is_some() {
-                return None;
+                return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
 
             visibility = Some(Visibility::Protected);
@@ -930,7 +1019,7 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
             content = new_content;
         } else if let Some((new_content, char_count)) = try_consume(content, "private ") {
             if visibility.is_some() {
-                return None;
+                return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
 
             visibility = Some(Visibility::Private);
@@ -943,7 +1032,8 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
 
     let rest_span = span.subspan(acc_len as u32, span.length());
 
-    let (type_string, _) = split_tag_content(content, rest_span)?;
+    let (type_string, _) = split_tag_content(content, rest_span)
+        .ok_or_else(|| ParseError::InvalidMethodTag(span, "Failed to parse return type".to_string()))?;
 
     let (rest_slice, whitespace_count) = consume_whitespace(&content[type_string.span.length() as usize..]);
     let rest_slice_span = rest_span.subspan(type_string.span.length() + whitespace_count as u32, rest_span.length());
@@ -953,12 +1043,12 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
         || type_string.value.starts_with('{')
         || (type_string.value.starts_with('$') && type_string.value != "$this")
     {
-        return None;
+        return Err(ParseError::InvalidMethodTag(span, format!("Invalid return type: '{}'", type_string.value)));
     }
 
     if rest_slice.is_empty() {
         // Method definition is mandatory
-        return None;
+        return Err(ParseError::InvalidMethodTag(span, "Missing method signature".to_string()));
     }
 
     let mut chars = rest_slice.char_indices().peekable();
@@ -972,12 +1062,14 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
         }
     }
 
-    let name_end = name_end?;
+    let name_end = name_end.ok_or_else(|| {
+        ParseError::InvalidMethodTag(span, "Missing opening parenthesis '(' for method arguments".to_string())
+    })?;
 
     let name = rest_slice[..name_end].trim();
 
     if name.is_empty() {
-        return None;
+        return Err(ParseError::InvalidMethodTag(span, "Missing method name".to_string()));
     }
 
     let mut depth = 1;
@@ -997,7 +1089,9 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
         }
     }
 
-    let args_end = args_end?;
+    let args_end = args_end.ok_or_else(|| {
+        ParseError::InvalidMethodTag(span, "Missing closing parenthesis ')' for method arguments".to_string())
+    })?;
     let (args_str, whitespace_count) = consume_whitespace(&rest_slice[name_end + 1..args_end]);
     let args_span = rest_slice_span.subspan((whitespace_count + name_end) as u32 + 1, args_end as u32);
 
@@ -1012,7 +1106,7 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Option<MethodTag> {
         is_static,
     };
 
-    Some(MethodTag { span, type_string, method, description: description.into() })
+    Ok(MethodTag { span, type_string, method, description: description.into() })
 }
 
 fn consume_whitespace(input: &str) -> (&str, usize) {
@@ -1293,9 +1387,9 @@ mod tests {
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
 
-        assert_eq!(result.type_string.value, "string|int"); // Check owned string value
-        assert_eq!(result.type_string.span.start.offset, offset + 1); // Span of type part
-        assert_eq!(result.type_string.span.end.offset, offset + 1 + "string|int".len() as u32);
+        assert_eq!(result.type_string.as_ref().unwrap().value, "string|int"); // Check owned string value
+        assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1); // Span of type part
+        assert_eq!(result.type_string.as_ref().unwrap().span.end.offset, offset + 1 + "string|int".len() as u32);
         assert_eq!(result.variable.name, "$myVar");
         assert_eq!(result.description, "Description here");
         assert_eq!(result.span, span); // Check overall span
@@ -1307,9 +1401,12 @@ mod tests {
         let content = " array<int, string> $param ";
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "array<int, string>"); // Check owned string
-        assert_eq!(result.type_string.span.start.offset, offset + 1);
-        assert_eq!(result.type_string.span.end.offset, offset + 1 + "array<int, string>".len() as u32);
+        assert_eq!(result.type_string.as_ref().unwrap().value, "array<int, string>"); // Check owned string
+        assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1);
+        assert_eq!(
+            result.type_string.as_ref().unwrap().span.end.offset,
+            offset + 1 + "array<int, string>".len() as u32
+        );
         assert_eq!(result.variable.name, "$param");
         assert_eq!(result.description, "");
     }
@@ -1320,9 +1417,12 @@ mod tests {
         let content = " (string // comment \n | int) $var desc";
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "(string // comment \n | int)");
-        assert_eq!(result.type_string.span.start.offset, offset + 1);
-        assert_eq!(result.type_string.span.end.offset, offset + 1 + "(string // comment \n | int)".len() as u32);
+        assert_eq!(result.type_string.as_ref().unwrap().value, "(string // comment \n | int)");
+        assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1);
+        assert_eq!(
+            result.type_string.as_ref().unwrap().span.end.offset,
+            offset + 1 + "(string // comment \n | int)".len() as u32
+        );
         assert_eq!(result.variable.name, "$var");
         assert_eq!(result.description, "desc");
     }
@@ -1331,7 +1431,10 @@ mod tests {
     fn test_param_no_type() {
         let content = " $param Description here ";
         let span = test_span(content, 0);
-        assert!(parse_param_tag(content, span).is_none()); // No type before var
+        let result = parse_param_tag(content, span).unwrap();
+        assert!(result.type_string.is_none()); // No type specified
+        assert_eq!(result.variable.name, "$param");
+        assert_eq!(result.description, "Description here");
     }
 
     #[test]
@@ -1375,14 +1478,14 @@ mod tests {
     fn test_param_out_no_type() {
         let content = " $myVar ";
         let span = test_span(content, 0);
-        assert!(parse_param_out_tag(content, span).is_none());
+        assert!(parse_param_out_tag(content, span).is_err());
     }
 
     #[test]
     fn test_param_out_no_var() {
         let content = " string ";
         let span = test_span(content, 0);
-        assert!(parse_param_out_tag(content, span).is_none());
+        assert!(parse_param_out_tag(content, span).is_err());
     }
 
     #[test]

@@ -16,6 +16,18 @@ pub enum ParseError {
     MalformedCodeBlock(Span),
     InvalidComment(Span),
     ExpectedLine(Span),
+    InvalidTypeTag(Span, String),
+    InvalidImportTypeTag(Span, String),
+    InvalidTemplateTag(Span, String),
+    InvalidParameterTag(Span, String),
+    InvalidReturnTag(Span, String),
+    InvalidPropertyTag(Span, String),
+    InvalidMethodTag(Span, String),
+    InvalidThrowsTag(Span, String),
+    InvalidAssertionTag(Span, String),
+    InvalidVarTag(Span, String),
+    InvalidWhereTag(Span, String),
+    InvalidParameterOutTag(Span, String),
 }
 
 impl HasSpan for ParseError {
@@ -30,7 +42,19 @@ impl HasSpan for ParseError {
             | ParseError::UnclosedAnnotationArguments(span)
             | ParseError::MalformedCodeBlock(span)
             | ParseError::InvalidComment(span)
-            | ParseError::ExpectedLine(span) => *span,
+            | ParseError::ExpectedLine(span)
+            | ParseError::InvalidTypeTag(span, _)
+            | ParseError::InvalidImportTypeTag(span, _)
+            | ParseError::InvalidTemplateTag(span, _)
+            | ParseError::InvalidParameterTag(span, _)
+            | ParseError::InvalidReturnTag(span, _)
+            | ParseError::InvalidPropertyTag(span, _)
+            | ParseError::InvalidMethodTag(span, _)
+            | ParseError::InvalidThrowsTag(span, _)
+            | ParseError::InvalidAssertionTag(span, _)
+            | ParseError::InvalidVarTag(span, _)
+            | ParseError::InvalidWhereTag(span, _)
+            | ParseError::InvalidParameterOutTag(span, _) => *span,
         }
     }
 }
@@ -51,6 +75,18 @@ impl std::fmt::Display for ParseError {
             ParseError::UnclosedAnnotationArguments(_) => write!(f, "Unclosed annotation arguments"),
             ParseError::MalformedCodeBlock(_) => write!(f, "Malformed code block"),
             ParseError::ExpectedLine(_) => write!(f, "Unexpected end of docblock"),
+            ParseError::InvalidTypeTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidImportTypeTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidTemplateTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidParameterTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidReturnTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidPropertyTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidMethodTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidThrowsTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidAssertionTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidVarTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidWhereTag(_, msg) => write!(f, "{}", msg),
+            ParseError::InvalidParameterOutTag(_, msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -85,6 +121,24 @@ impl ParseError {
             ParseError::ExpectedLine(_) => {
                 "A tag or description was expected here, but the docblock ended prematurely.".to_string()
             }
+            ParseError::InvalidTypeTag(_, _) => "Type alias must have name followed by type definition".to_string(),
+            ParseError::InvalidImportTypeTag(_, _) => {
+                "Import must have type name, `from` keyword, and class name".to_string()
+            }
+            ParseError::InvalidTemplateTag(_, _) => "Template must have parameter name".to_string(),
+            ParseError::InvalidParameterTag(_, _) => "Parameter must have type followed by variable name".to_string(),
+            ParseError::InvalidReturnTag(_, _) => "Return must have valid type".to_string(),
+            ParseError::InvalidPropertyTag(_, _) => "Property must have type and/or variable name".to_string(),
+            ParseError::InvalidMethodTag(_, _) => "Method must have return type, name, and parameter list".to_string(),
+            ParseError::InvalidThrowsTag(_, _) => "Throws must have exception type".to_string(),
+            ParseError::InvalidAssertionTag(_, _) => "Assertion must have type followed by variable name".to_string(),
+            ParseError::InvalidVarTag(_, _) => "Variable must have type".to_string(),
+            ParseError::InvalidWhereTag(_, _) => {
+                "Template constraint must have parameter name, `is` or `:`, and type".to_string()
+            }
+            ParseError::InvalidParameterOutTag(_, _) => {
+                "Output parameter must have type followed by variable name".to_string()
+            }
         }
     }
 
@@ -103,6 +157,32 @@ impl ParseError {
             }
             ParseError::UnclosedAnnotationArguments(_) => {
                 "Add a closing `)` to complete the annotation's argument list.".to_string()
+            }
+            ParseError::InvalidTypeTag(_, _) => {
+                "Add type definition after alias name (can span multiple lines)".to_string()
+            }
+            ParseError::InvalidImportTypeTag(_, _) => {
+                "Ensure type name is followed by `from` and a valid class name".to_string()
+            }
+            ParseError::InvalidTemplateTag(_, _) => "Provide a valid template parameter name".to_string(),
+            ParseError::InvalidParameterTag(_, _) => {
+                "Ensure type is followed by a valid parameter name (e.g., `$param`)".to_string()
+            }
+            ParseError::InvalidReturnTag(_, _) => "Provide a valid return type".to_string(),
+            ParseError::InvalidPropertyTag(_, _) => {
+                "Ensure property has valid type and/or variable name (e.g., `$prop`)".to_string()
+            }
+            ParseError::InvalidMethodTag(_, _) => "Provide return type, method name, and parameter list".to_string(),
+            ParseError::InvalidThrowsTag(_, _) => "Provide a valid exception class name".to_string(),
+            ParseError::InvalidAssertionTag(_, _) => {
+                "Ensure type is followed by a valid variable name (e.g., `$var`)".to_string()
+            }
+            ParseError::InvalidVarTag(_, _) => "Provide a valid type for the variable".to_string(),
+            ParseError::InvalidWhereTag(_, _) => {
+                "Ensure template name is followed by `is` or `:` and a type".to_string()
+            }
+            ParseError::InvalidParameterOutTag(_, _) => {
+                "Ensure type is followed by a valid parameter name (e.g., `$param`)".to_string()
             }
             _ => "Review the docblock syntax to ensure it is correctly formatted.".to_string(),
         }
