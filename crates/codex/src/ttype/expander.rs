@@ -582,19 +582,19 @@ fn expand_value_of(
 }
 
 fn expand_index_access(
-    return_type_index_acess: &TIndexAccess,
+    return_type_index_access: &TIndexAccess,
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) -> Vec<TAtomic> {
-    let mut target_type = return_type_index_acess.get_target_type().clone();
+    let mut target_type = return_type_index_access.get_target_type().clone();
     expand_union(codebase, &mut target_type, options);
 
-    let mut index_type = return_type_index_acess.get_index_type().clone();
+    let mut index_type = return_type_index_access.get_index_type().clone();
     expand_union(codebase, &mut index_type, options);
 
     let Some(new_return_types) = TIndexAccess::get_indexed_access_result(&target_type.types, &index_type.types, false)
     else {
-        return vec![TAtomic::Derived(TDerived::IndexAccess(return_type_index_acess.clone()))];
+        return vec![TAtomic::Derived(TDerived::IndexAccess(return_type_index_access.clone()))];
     };
 
     new_return_types.types.into_owned()
