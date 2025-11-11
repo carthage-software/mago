@@ -12,7 +12,6 @@ use mago_syntax::ast::Program;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;
-use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -76,82 +75,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         let statements = program.statements.as_slice();
 
-        let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
-        if !self.settings.mixed_issues {
-            collector.add_disabled_codes(IssueCode::get_mixed_issue_code_values());
-        }
-
-        if !self.settings.falsable_issues {
-            collector.add_disabled_codes(IssueCode::get_falsable_issue_code_values());
-        }
-
-        if !self.settings.nullable_issues {
-            collector.add_disabled_codes(IssueCode::get_nullable_issue_code_values());
-        }
-
-        if !self.settings.redundancy_issues {
-            collector.add_disabled_codes(IssueCode::get_redundancy_issue_code_values());
-        }
-
-        if !self.settings.reference_issues {
-            collector.add_disabled_codes(IssueCode::get_reference_issue_code_values());
-        }
-
-        if !self.settings.unreachable_issues {
-            collector.add_disabled_codes(IssueCode::get_unreachable_issue_code_values());
-        }
-
-        if !self.settings.deprecation_issues {
-            collector.add_disabled_codes(IssueCode::get_deprecation_issue_code_values());
-        }
-
-        if !self.settings.impossibility_issues {
-            collector.add_disabled_codes(IssueCode::get_impossibility_issue_code_values());
-        }
-
-        if !self.settings.ambiguity_issues {
-            collector.add_disabled_codes(IssueCode::get_ambiguity_issue_code_values());
-        }
-
-        if !self.settings.existence_issues {
-            collector.add_disabled_codes(IssueCode::get_existence_issue_code_values());
-        }
-
-        if !self.settings.template_issues {
-            collector.add_disabled_codes(IssueCode::get_template_issue_code_values());
-        }
-
-        if !self.settings.argument_issues {
-            collector.add_disabled_codes(IssueCode::get_argument_issue_code_values());
-        }
-
-        if !self.settings.operand_issues {
-            collector.add_disabled_codes(IssueCode::get_operand_issue_code_values());
-        }
-
-        if !self.settings.property_issues {
-            collector.add_disabled_codes(IssueCode::get_property_issue_code_values());
-        }
-
-        if !self.settings.generator_issues {
-            collector.add_disabled_codes(IssueCode::get_generator_issue_code_values());
-        }
-
-        if !self.settings.array_issues {
-            collector.add_disabled_codes(IssueCode::get_array_issue_code_values());
-        }
-
-        if !self.settings.return_issues {
-            collector.add_disabled_codes(IssueCode::get_return_issue_code_values());
-        }
-
-        if !self.settings.method_issues {
-            collector.add_disabled_codes(IssueCode::get_method_issue_code_values());
-        }
-
-        if !self.settings.iterator_issues {
-            collector.add_disabled_codes(IssueCode::get_iterator_issue_code_values());
-        }
+        let collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
 
         let mut context = Context::new(
             self.arena,

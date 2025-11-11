@@ -26,32 +26,6 @@ baseline = "analyzer-baseline.toml"
 | `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally.         |
 | `baseline` | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 
-## Issue categories
-
-You can enable or disable entire categories of issues. All categories are enabled by default.
-
-| Option                 | Default | Description                                                   |
-| :--------------------- | :------ | :------------------------------------------------------------ |
-| `mixed-issues`         | `true`  | Report all issues related to the use of `mixed` types.        |
-| `falsable-issues`      | `true`  | Report all issues related to possibly `false` values.         |
-| `nullable-issues`      | `true`  | Report all issues related to possibly `null` values.          |
-| `redundancy-issues`    | `true`  | Report all issues related to redundant code.                  |
-| `reference-issues`     | `true`  | Report all issues related to by-reference variables.          |
-| `unreachable-issues`   | `true`  | Report all issues related to unreachable code.                |
-| `deprecation-issues`   | `true`  | Report all issues related to using deprecated code.           |
-| `impossibility-issues` | `true`  | Report all issues related to logically impossible conditions. |
-| `ambiguity-issues`     | `true`  | Report all issues related to ambiguous code constructs.       |
-| `existence-issues`     | `true`  | Report all issues related to the existence of symbols.        |
-| `template-issues`      | `true`  | Report all issues related to generic template types.          |
-| `argument-issues`      | `true`  | Report all issues related to function arguments.              |
-| `operand-issues`       | `true`  | Report all issues related to expression operands.             |
-| `property-issues`      | `true`  | Report all issues related to class properties.                |
-| `generator-issues`     | `true`  | Report all issues related to generators.                      |
-| `array-issues`         | `true`  | Report all issues related to array operations.                |
-| `return-issues`        | `true`  | Report issues related to function and method return types.    |
-| `method-issues`        | `true`  | Report issues related to methods and their usage.             |
-| `iterator-issues`      | `true`  | Report issues related to iterators and their usage.           |
-
 ## Feature flags
 
 These flags control specific, powerful analysis capabilities.

@@ -8,51 +8,22 @@ declare(strict_types=1);
  */
 namespace Mago\Scripts;
 
-use function array_keys;
-use function array_map;
-use function array_values;
 use function count;
-use function implode;
 use function ksort;
-use function str_contains;
-use function str_ends_with;
 use function str_replace;
-use function str_starts_with;
 use function ucwords;
 
 /**
  * Generates the Rust source code for the `IssueCode` enum and its implementations.
  *
- * This utility class is used internally to keep the list of issue codes and their
- * categories in sync without manual editing of Rust files.
+ * This utility class is used internally to keep the list of issue codes
+ * in sync without manual editing of Rust files.
  *
  * @mago-expect lint:kan-defect
  * @mago-expect lint:cyclomatic-complexity
  */
 final class AnalyzerCodeModuleGenerator
 {
-    private const CATEGORIES = [
-        'falsable' => ['false', 'falsable'],
-        'nullable' => ['null', 'nullable'],
-        'mixed' => ['mixed'],
-        'redundancy' => ['redundant', 'redundancy'],
-        'reference' => ['reference'],
-        'unreachable' => ['unreachable'],
-        'deprecation' => ['deprecated'],
-        'impossibility' => ['impossible', 'impossibility'],
-        'ambiguity' => ['ambiguous'],
-        'existence' => ['non-existent'],
-        'template' => ['template', 'type-parameter', 'where-constraint'],
-        'argument' => ['argument', 'arguments'],
-        'operand' => ['operand'],
-        'property' => ['property', 'properties'],
-        'generator' => ['generator', 'yield', 'yield-from'],
-        'array' => ['array'],
-        'return' => ['return', 'returns'],
-        'method' => ['method', 'methods'],
-        'iterator' => ['iterator', 'iterable'],
-    ];
-
     private const CODE_VALUES = [
         'invalid-assignment',
         'assignment-to-this',
@@ -335,11 +306,9 @@ final class AnalyzerCodeModuleGenerator
 
     /**
      * @param array<string, string> $allCodes
-     * @param array<string, array<string, string>> $categories
      */
     private function __construct(
         private readonly array $allCodes,
-        private readonly array $categories,
     ) {}
 
     public static function generate(): string
@@ -355,51 +324,14 @@ final class AnalyzerCodeModuleGenerator
 
     private static function fromRawData(): self
     {
-        $categories = [];
-        foreach (self::CATEGORIES as $name => $_) {
-            $categories[$name] = [];
-        }
-
         $allCodes = [];
         foreach (self::CODE_VALUES as $value) {
             $pascalCase = str_replace('-', '', ucwords($value, '-'));
             $allCodes[$pascalCase] = $value;
-
-            foreach (self::CATEGORIES as $categoryName => $filters) {
-                if (self::matchesFilter($value, $filters)) {
-                    $categories[$categoryName][$pascalCase] = $value;
-                }
-            }
         }
 
         ksort($allCodes);
-        foreach ($categories as &$codes) {
-            ksort($codes);
-        }
-
-        return new self($allCodes, $categories);
-    }
-
-    /**
-     * Checks if the given code matches any of the provided filters.
-     *
-     * A match occurs if the code starts with, ends with, or contains
-     * the filter surrounded by hyphens.
-     *
-     * @param list<string> $filters
-     */
-    private static function matchesFilter(string $code, array $filters): bool
-    {
-        foreach ($filters as $filter) {
-            if (
-                str_starts_with($code, $filter . '-')
-                || str_ends_with($code, '-' . $filter)
-                || str_contains($code, '-' . $filter . '-')
-            ) {
-                return true;
-            }
-        }
-        return false;
+        return new self($allCodes);
     }
 
     private function generateEnum(): string
@@ -435,30 +367,7 @@ final class AnalyzerCodeModuleGenerator
         $impl .= "        *self as u16\n";
         $impl .= "    }\n\n";
 
-        foreach ($this->categories as $name => $codes) {
-            $impl .= $this->generateCategoryMethod($name, $codes);
-        }
-
         return $impl . "}\n\n";
-    }
-
-    /**
-     * @param array<string, string> $codes
-     */
-    private function generateCategoryMethod(string $name, array $codes): string
-    {
-        $count = count($codes);
-        $method = "    pub const fn get_{$name}_issue_codes() -> [Self; {$count}] {\n";
-        $method .= "        [\n            ";
-        $method .= implode(', ', array_map(static fn(string $c): string => "Self::{$c}", array_keys($codes)));
-        $method .= "\n        ]\n    }\n\n";
-
-        $method .= "    pub const fn get_{$name}_issue_code_values() -> [&'static str; {$count}] {\n";
-        $method .= "        [\n            ";
-        $method .= implode(', ', array_map(static fn(string $c): string => "\"{$c}\"", array_values($codes)));
-        $method .= "\n        ]\n    }\n\n";
-
-        return $method;
     }
 
     private function generateTraits(): string
