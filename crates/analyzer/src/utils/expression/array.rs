@@ -164,6 +164,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
 
     let mut value_type = None;
     let mut expected_index_types = vec![];
+    let mut has_union_key_mismatch = false; // Track if we're in a union where key exists in some but not all variants
     while let Some(atomic_var_type) = array_atomic_types.pop() {
         if let TAtomic::GenericParameter(parameter) = atomic_var_type {
             array_atomic_types.extend(parameter.constraint.types.as_ref());
@@ -192,6 +193,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             }
             TAtomic::Array(TArray::Keyed(_)) => {
                 let mut possibly_undefined = false;
+                let mut has_key_in_other_variant = false;
                 let mut new_type = handle_array_access_on_keyed_array(
                     context,
                     block_context,
@@ -204,9 +206,14 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     &mut false,
                     &mut expected_index_types,
                     array_like_type,
+                    &mut has_key_in_other_variant,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
+
+                if has_key_in_other_variant {
+                    has_union_key_mismatch = true;
+                }
 
                 if let Some(existing_type) = value_type {
                     value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
@@ -376,6 +383,52 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             value_type.ignore_falsable_issues |= array_like_type.ignore_falsable_issues;
             value_type.ignore_falsable_issues |= array_like_type.ignore_falsable_issues;
 
+            // Report warning for possibly undefined array keys when accessing union types
+            // Only report if we detected that some variants have the key while others don't
+            if has_union_key_mismatch && !block_context.inside_isset && !in_assignment {
+                // Determine if this is likely a string or integer key based on the index type
+                let is_likely_string_key =
+                    index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_))));
+
+                if is_likely_string_key {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyUndefinedStringArrayIndex,
+                        Issue::warning(format!(
+                            "Possibly undefined array key accessed on `{}`.",
+                            array_like_type.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(access_index_span)
+                                .with_message("Key might not exist.")
+                        )
+                        .with_note(
+                            "The key exists in some but not all variants of the union type."
+                        )
+                        .with_help(
+                            "Ensure the key exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                        ),
+                    );
+                } else {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyUndefinedIntArrayIndex,
+                        Issue::warning(format!(
+                            "Possibly undefined array index accessed on `{}`.",
+                            array_like_type.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(access_index_span)
+                                .with_message("Index might not exist.")
+                        )
+                        .with_note(
+                            "The index exists in some but not all variants of the union type."
+                        )
+                        .with_help(
+                            "Ensure the index exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing indices."
+                        ),
+                    );
+                }
+            }
+
             value_type
         }
         None => get_mixed(),
@@ -544,9 +597,10 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     in_assignment: bool,
     has_valid_expected_index: &mut bool,
     has_possibly_undefined: &mut bool,
-    has_matching_dict_key: &mut bool,
+    has_matching_array_key: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
     array_like_type: &TUnion,
+    key_in_other_variant: &mut bool, // NEW: Track if key exists in other union variants but not this one
 ) -> TUnion {
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
@@ -583,7 +637,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
         if let Some(array_key) = index_type.get_single_array_key() {
             if let Some((actual_possibly_undefined, actual_value)) = known_items.get(&array_key).cloned() {
                 *has_valid_expected_index = true;
-                *has_matching_dict_key = true;
+                *has_matching_array_key = true;
 
                 let mut expression_type = actual_value;
                 if actual_possibly_undefined {
@@ -639,26 +693,52 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     // But NOT unsealed arrays with just `...` (which have mixed as value type)
                     value_parameter.into_owned()
                 } else if !block_context.inside_isset {
-                    context.collector.report_with_code(
-                        IssueCode::UndefinedStringArrayIndex,
-                        Issue::error(format!(
-                            "Undefined array key {} accessed on `{}`.",
-                            array_key,
-                            keyed_array.get_id()
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("Key {array_key} does not exist."))
-                        )
-                        .with_note(
-                            "Attempting to access a non-existent string key will raise a warning/notice at runtime."
-                        )
-                        .with_help(
-                            format!(
-                                "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                    // Check if we're in a union type and if ANY other member has this key
+                    let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
+                        array_like_type.types.iter().any(|atomic_type| {
+                            if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
+                                if let Some(other_known_items) = other_keyed.get_known_items() {
+                                    other_known_items.contains_key(&array_key)
+                                } else {
+                                    // Array with generic parameters might have any key
+                                    other_keyed.get_generic_parameters().is_some()
+                                }
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    };
+
+                    if !key_exists_in_other_variant {
+                        // Key doesn't exist in any variant - report error
+                        context.collector.report_with_code(
+                            IssueCode::UndefinedStringArrayIndex,
+                            Issue::error(format!(
+                                "Undefined array key {} accessed on `{}`.",
+                                array_key,
+                                keyed_array.get_id()
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("Key {array_key} does not exist."))
                             )
-                        ),
-                    );
+                            .with_note(
+                                "Attempting to access a non-existent string key will raise a warning/notice at runtime."
+                            )
+                            .with_help(
+                                format!(
+                                    "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                                )
+                            ),
+                        );
+                    } else {
+                        // Key exists in some but not all variants - mark as possibly undefined
+                        // Don't report warning here - it will be reported at the union level to avoid duplicates
+                        *has_possibly_undefined = true;
+                        *key_in_other_variant = true;
+                    }
 
                     if has_value_parameter { get_mixed() } else { get_null() }
                 } else if has_value_parameter && !value_parameter.is_mixed() {
