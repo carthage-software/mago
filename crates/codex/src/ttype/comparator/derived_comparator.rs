@@ -1,10 +1,12 @@
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::derived::TDerived;
+use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
+use crate::ttype::comparator::union_comparator;
 
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
@@ -19,27 +21,71 @@ pub fn is_contained_by(
         };
 
         return match (derived_container, derived_input) {
-            (TDerived::KeyOf(key_of_container), TDerived::KeyOf(key_of_input)) => atomic_comparator::is_contained_by(
+            (TDerived::KeyOf(key_of_container), TDerived::KeyOf(key_of_input)) => union_comparator::is_contained_by(
                 codebase,
                 key_of_input.get_target_type(),
                 key_of_container.get_target_type(),
+                false,
+                false,
                 inside_assertion,
                 atomic_comparison_result,
             ),
             (TDerived::ValueOf(value_of_container), TDerived::ValueOf(value_of_input)) => {
-                atomic_comparator::is_contained_by(
+                union_comparator::is_contained_by(
                     codebase,
                     value_of_input.get_target_type(),
                     value_of_container.get_target_type(),
+                    false,
+                    false,
                     inside_assertion,
                     atomic_comparison_result,
                 )
             }
+            (TDerived::IndexAccess(index_access_container), TDerived::IndexAccess(index_access_input)) => {
+                let container_indexed = TIndexAccess::get_indexed_access_result(
+                    &index_access_container.get_target_type().types,
+                    &index_access_container.get_index_type().types,
+                    false,
+                );
+
+                let input_indexed = TIndexAccess::get_indexed_access_result(
+                    &index_access_input.get_target_type().types,
+                    &index_access_input.get_index_type().types,
+                    false,
+                );
+
+                match (container_indexed, input_indexed) {
+                    (Some(container_union), Some(input_union)) => {
+                        for input_atomic in input_union.types.iter() {
+                            let mut found = false;
+                            for container_atomic in container_union.types.iter() {
+                                if atomic_comparator::is_contained_by(
+                                    codebase,
+                                    input_atomic,
+                                    container_atomic,
+                                    inside_assertion,
+                                    atomic_comparison_result,
+                                ) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
+                                return false;
+                            }
+                        }
+                        true
+                    }
+                    _ => false,
+                }
+            }
             (TDerived::PropertiesOf(properties_of_container), TDerived::PropertiesOf(properties_of_input)) => {
-                atomic_comparator::is_contained_by(
+                union_comparator::is_contained_by(
                     codebase,
                     properties_of_input.get_target_type(),
                     properties_of_container.get_target_type(),
+                    false,
+                    false,
                     inside_assertion,
                     atomic_comparison_result,
                 )
@@ -53,12 +99,15 @@ pub fn is_contained_by(
     };
 
     let input_union = match derived_input {
-        TDerived::KeyOf(key_of_input) => {
-            TKeyOf::get_key_of_targets(std::slice::from_ref(key_of_input.get_target_type()), codebase, false)
+        TDerived::KeyOf(key_of) => TKeyOf::get_key_of_targets(&key_of.get_target_type().types, codebase, false),
+        TDerived::ValueOf(value_of) => {
+            TValueOf::get_value_of_targets(&value_of.get_target_type().types, codebase, false)
         }
-        TDerived::ValueOf(tvalue_of) => {
-            TValueOf::get_value_of_targets(std::slice::from_ref(tvalue_of.get_target_type()), codebase, false)
-        }
+        TDerived::IndexAccess(index_access) => TIndexAccess::get_indexed_access_result(
+            &index_access.get_target_type().types,
+            &index_access.get_index_type().types,
+            false,
+        ),
         TDerived::PropertiesOf(_) => {
             return false;
         }

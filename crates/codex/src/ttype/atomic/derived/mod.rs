@@ -4,11 +4,13 @@ use serde::Serialize;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
-use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
+use crate::ttype::union::TUnion;
 
+pub mod index_access;
 pub mod key_of;
 pub mod properties_of;
 pub mod value_of;
@@ -20,6 +22,7 @@ pub mod value_of;
 /// - `key-of<T>`: Extracts the keys of an array-like type
 /// - `value-of<T>`: Extracts the values of an array-like or enum type
 /// - `properties-of<T>`: Extracts object properties, optionally filtered by visibility
+/// - `T[K]`: Indexed access type that resolves to the type at index K of type T
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub enum TDerived {
     /// Represents `key-of<T>` utility type
@@ -28,26 +31,30 @@ pub enum TDerived {
     ValueOf(TValueOf),
     /// Represents `properties-of<T>` utility type (including visibility-filtered variants)
     PropertiesOf(TPropertiesOf),
+    /// Represents `T[K]` indexed access type
+    IndexAccess(TIndexAccess),
 }
 
 impl TDerived {
     /// Returns the target type that this derived type operates on
     #[inline]
-    pub const fn get_target_type(&self) -> &TAtomic {
+    pub const fn get_target_type(&self) -> &TUnion {
         match self {
             TDerived::KeyOf(key_of) => key_of.get_target_type(),
             TDerived::ValueOf(value_of) => value_of.get_target_type(),
             TDerived::PropertiesOf(properties_of) => properties_of.get_target_type(),
+            TDerived::IndexAccess(index_access) => index_access.get_target_type(),
         }
     }
 
     /// Returns a mutable reference to the target type that this derived type operates on
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TAtomic {
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
         match self {
             TDerived::KeyOf(key_of) => key_of.get_target_type_mut(),
             TDerived::ValueOf(value_of) => value_of.get_target_type_mut(),
             TDerived::PropertiesOf(properties_of) => properties_of.get_target_type_mut(),
+            TDerived::IndexAccess(index_access) => index_access.get_target_type_mut(),
         }
     }
 }
@@ -58,6 +65,7 @@ impl TType for TDerived {
             TDerived::KeyOf(ttype) => ttype.get_child_nodes(),
             TDerived::ValueOf(ttype) => ttype.get_child_nodes(),
             TDerived::PropertiesOf(ttype) => ttype.get_child_nodes(),
+            TDerived::IndexAccess(ttype) => ttype.get_child_nodes(),
         }
     }
 
@@ -66,6 +74,7 @@ impl TType for TDerived {
             TDerived::KeyOf(ttype) => ttype.needs_population(),
             TDerived::ValueOf(ttype) => ttype.needs_population(),
             TDerived::PropertiesOf(ttype) => ttype.needs_population(),
+            TDerived::IndexAccess(ttype) => ttype.needs_population(),
         }
     }
 
@@ -74,6 +83,7 @@ impl TType for TDerived {
             TDerived::KeyOf(ttype) => ttype.is_expandable(),
             TDerived::ValueOf(ttype) => ttype.is_expandable(),
             TDerived::PropertiesOf(ttype) => ttype.is_expandable(),
+            TDerived::IndexAccess(ttype) => ttype.is_expandable(),
         }
     }
 
@@ -86,6 +96,7 @@ impl TType for TDerived {
             TDerived::KeyOf(key_of) => key_of.get_id(),
             TDerived::ValueOf(value_of) => value_of.get_id(),
             TDerived::PropertiesOf(properties_of) => properties_of.get_id(),
+            TDerived::IndexAccess(index_access) => index_access.get_id(),
         }
     }
 

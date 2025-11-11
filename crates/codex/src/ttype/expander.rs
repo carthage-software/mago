@@ -14,6 +14,7 @@ use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::atomic::derived::TDerived;
+use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
@@ -371,6 +372,10 @@ pub(crate) fn expand_atomic(
                 *skip_key = true;
                 new_return_type_parts.extend(expand_value_of(value_of, codebase, options));
             }
+            TDerived::IndexAccess(index_access) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_index_access(index_access, codebase, options));
+            }
             TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
         },
         _ => {}
@@ -551,18 +556,10 @@ fn expand_key_of(
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) -> Vec<TAtomic> {
-    let mut type_atomics = vec![];
-
     let mut target_type = return_type_key_of.get_target_type().clone();
-    let mut new_atomics = vec![];
-    let mut remove_target_atomic = false;
-    expand_atomic(&mut target_type, codebase, options, &mut remove_target_atomic, &mut new_atomics);
-    type_atomics.extend(new_atomics);
-    if !remove_target_atomic {
-        type_atomics.push(target_type);
-    }
+    expand_union(codebase, &mut target_type, options);
 
-    let Some(new_return_types) = TKeyOf::get_key_of_targets(&type_atomics, codebase, false) else {
+    let Some(new_return_types) = TKeyOf::get_key_of_targets(&target_type.types, codebase, false) else {
         return vec![TAtomic::Derived(TDerived::KeyOf(return_type_key_of.clone()))];
     };
 
@@ -574,19 +571,30 @@ fn expand_value_of(
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) -> Vec<TAtomic> {
-    let mut type_atomics = vec![];
-
     let mut target_type = return_type_value_of.get_target_type().clone();
-    let mut new_atomics = vec![];
-    let mut remove_target_atomic = false;
-    expand_atomic(&mut target_type, codebase, options, &mut remove_target_atomic, &mut new_atomics);
-    type_atomics.extend(new_atomics);
-    if !remove_target_atomic {
-        type_atomics.push(target_type);
-    }
+    expand_union(codebase, &mut target_type, options);
 
-    let Some(new_return_types) = TValueOf::get_value_of_targets(&type_atomics, codebase, false) else {
+    let Some(new_return_types) = TValueOf::get_value_of_targets(&target_type.types, codebase, false) else {
         return vec![TAtomic::Derived(TDerived::ValueOf(return_type_value_of.clone()))];
+    };
+
+    new_return_types.types.into_owned()
+}
+
+fn expand_index_access(
+    return_type_index_acess: &TIndexAccess,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Vec<TAtomic> {
+    let mut target_type = return_type_index_acess.get_target_type().clone();
+    expand_union(codebase, &mut target_type, options);
+
+    let mut index_type = return_type_index_acess.get_index_type().clone();
+    expand_union(codebase, &mut index_type, options);
+
+    let Some(new_return_types) = TIndexAccess::get_indexed_access_result(&target_type.types, &index_type.types, false)
+    else {
+        return vec![TAtomic::Derived(TDerived::IndexAccess(return_type_index_acess.clone()))];
     };
 
     new_return_types.types.into_owned()

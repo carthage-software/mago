@@ -11,6 +11,7 @@ use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::scalar::TScalar;
@@ -282,6 +283,30 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
                 *return_type = replace(return_type, template_result, codebase);
             }
         }
+        TAtomic::Derived(derived) => match derived {
+            TDerived::KeyOf(key_of) => {
+                let replaced_target_type = replace(key_of.get_target_type(), template_result, codebase);
+
+                *key_of.get_target_type_mut() = replaced_target_type;
+            }
+            TDerived::ValueOf(value_of) => {
+                let replaced_target_type = replace(value_of.get_target_type(), template_result, codebase);
+
+                *value_of.get_target_type_mut() = replaced_target_type;
+            }
+            TDerived::PropertiesOf(properties_of) => {
+                let replaced_target_type = replace(properties_of.get_target_type(), template_result, codebase);
+
+                *properties_of.get_target_type_mut() = replaced_target_type;
+            }
+            TDerived::IndexAccess(index_access) => {
+                let replaced_target_type = replace(index_access.get_target_type(), template_result, codebase);
+                *index_access.get_target_type_mut() = replaced_target_type;
+
+                let replaced_index_type = replace(index_access.get_index_type(), template_result, codebase);
+                *index_access.get_index_type_mut() = replaced_index_type;
+            }
+        },
         _ => (),
     }
 

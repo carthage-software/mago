@@ -5,33 +5,33 @@ use serde::Serialize;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
-use crate::ttype::atomic::TAtomic;
+use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TPropertiesOf {
     pub visibility: Option<Visibility>,
-    pub target_type: Box<TAtomic>,
+    pub target_type: Box<TUnion>,
 }
 
 impl TPropertiesOf {
     #[inline]
-    pub const fn new(target_type: Box<TAtomic>) -> Self {
+    pub const fn new(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: None, target_type }
     }
 
     #[inline]
-    pub const fn public(target_type: Box<TAtomic>) -> Self {
+    pub const fn public(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Public), target_type }
     }
 
     #[inline]
-    pub const fn protected(target_type: Box<TAtomic>) -> Self {
+    pub const fn protected(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Protected), target_type }
     }
 
     #[inline]
-    pub const fn private(target_type: Box<TAtomic>) -> Self {
+    pub const fn private(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Private), target_type }
     }
 
@@ -41,19 +41,19 @@ impl TPropertiesOf {
     }
 
     #[inline]
-    pub const fn get_target_type(&self) -> &TAtomic {
+    pub const fn get_target_type(&self) -> &TUnion {
         &self.target_type
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TAtomic {
+    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
         &mut self.target_type
     }
 }
 
 impl TType for TPropertiesOf {
     fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
-        vec![TypeRef::Atomic(&self.target_type)]
+        vec![TypeRef::Union(&self.target_type)]
     }
 
     fn needs_population(&self) -> bool {

@@ -1248,13 +1248,23 @@ pub fn populate_atomic_type(
             );
         }
         TAtomic::Derived(derived) => {
-            populate_atomic_type(
+            populate_union_type(
                 derived.get_target_type_mut(),
                 codebase_symbols,
                 reference_source,
                 symbol_references,
                 force,
             );
+
+            if let TDerived::IndexAccess(index_access) = derived {
+                populate_union_type(
+                    index_access.get_index_type_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+            }
         }
         _ => {}
     }

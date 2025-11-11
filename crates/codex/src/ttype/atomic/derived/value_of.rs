@@ -15,20 +15,20 @@ use crate::ttype::get_array_parameters;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct TValueOf(Box<TAtomic>);
+pub struct TValueOf(Box<TUnion>);
 
 impl TValueOf {
-    pub fn new(object: Box<TAtomic>) -> Self {
+    pub fn new(object: Box<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
-    pub const fn get_target_type(&self) -> &TAtomic {
+    pub const fn get_target_type(&self) -> &TUnion {
         &self.0
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TAtomic {
+    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
         &mut self.0
     }
 
@@ -127,7 +127,7 @@ impl TValueOf {
 
 impl TType for TValueOf {
     fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
-        vec![TypeRef::Atomic(&self.0)]
+        vec![TypeRef::Union(&self.0)]
     }
 
     fn needs_population(&self) -> bool {

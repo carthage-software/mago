@@ -26,6 +26,7 @@ use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::atomic::conditional::TConditional;
 use crate::ttype::atomic::derived::TDerived;
+use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
@@ -470,41 +471,45 @@ pub fn get_union_from_type_ast<'i>(
             conditional.is_negated(),
         )))),
         Type::Variable(variable_type) => TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value)))),
-        Type::KeyOf(key_of_type) => {
-            let target = get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?;
-
-            let mut atomics = vec![];
-            for target_type in target.types.into_owned() {
-                atomics.push(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(target_type)))));
-            }
-
-            TUnion::from_vec(atomics)
-        }
-        Type::ValueOf(value_of_type) => {
-            let target = get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?;
-
-            let mut atomics = vec![];
-            for target_type in target.types.into_owned() {
-                atomics.push(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(Box::new(target_type)))));
-            }
-
-            TUnion::from_vec(atomics)
-        }
+        Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(
+            get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
+        ))))),
+        Type::ValueOf(value_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(
+            Box::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
+        )))),
         Type::PropertiesOf(properties_of_type) => {
-            let target =
-                get_union_from_type_ast(&properties_of_type.parameter.entry.inner, scope, type_context, classname)?;
-
-            let mut atomics = vec![];
-            for target_type in target.types.into_owned() {
-                atomics.push(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
-                    PropertiesOfFilter::All => TPropertiesOf::new(Box::new(target_type)),
-                    PropertiesOfFilter::Public => TPropertiesOf::public(Box::new(target_type)),
-                    PropertiesOfFilter::Protected => TPropertiesOf::protected(Box::new(target_type)),
-                    PropertiesOfFilter::Private => TPropertiesOf::private(Box::new(target_type)),
-                })));
-            }
-
-            TUnion::from_vec(atomics)
+            TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
+                PropertiesOfFilter::All => TPropertiesOf::new(Box::new(get_union_from_type_ast(
+                    &properties_of_type.parameter.entry.inner,
+                    scope,
+                    type_context,
+                    classname,
+                )?)),
+                PropertiesOfFilter::Public => TPropertiesOf::public(Box::new(get_union_from_type_ast(
+                    &properties_of_type.parameter.entry.inner,
+                    scope,
+                    type_context,
+                    classname,
+                )?)),
+                PropertiesOfFilter::Protected => TPropertiesOf::protected(Box::new(get_union_from_type_ast(
+                    &properties_of_type.parameter.entry.inner,
+                    scope,
+                    type_context,
+                    classname,
+                )?)),
+                PropertiesOfFilter::Private => TPropertiesOf::private(Box::new(get_union_from_type_ast(
+                    &properties_of_type.parameter.entry.inner,
+                    scope,
+                    type_context,
+                    classname,
+                )?)),
+            })))
+        }
+        Type::IndexAccess(index_access_type) => {
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IndexAccess(TIndexAccess::new(
+                get_union_from_type_ast(&index_access_type.target, scope, type_context, classname)?,
+                get_union_from_type_ast(&index_access_type.index, scope, type_context, classname)?,
+            ))))
         }
         _ => {
             return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span()));
