@@ -21,7 +21,9 @@ This breaks down to two syllables:
 
 ### Will Mago implement an LSP?
 
-Yes. A Language Server Protocol (LSP) implementation is in progress. It is planned for the `1.0.0-rc.1` release and will be stabilized for the official `1.0.0` version.
+Yes. A Language Server Protocol (LSP) implementation is planned for the `2.0.0` release. While originally scheduled for `1.0.0`, we decided to delay it to ensure we deliver a feature-complete, high-quality LSP rather than a minimal implementation.
+
+For a detailed explanation of this decision, see our blog post: [Why Mago 1.0.0 Won't Ship With an LSP](https://carthage.software/en/blog/article/Why-Mago-1-0-0-Won-t-Ship-With-an-LSP)
 
 ### Will Mago offer editor extensions (VS Code, etc.)?
 
