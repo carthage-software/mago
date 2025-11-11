@@ -18,9 +18,6 @@ use crate::Issue;
 use crate::IssueCollection;
 use crate::Level;
 
-pub mod emitter;
-pub mod writer;
-
 /// Expanded representation of a file id.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ExpandedFileId {

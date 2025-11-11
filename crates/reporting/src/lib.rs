@@ -25,13 +25,18 @@ use mago_database::file::FileId;
 use mago_fixer::FixPlan;
 use mago_span::Span;
 
-pub use termcolor::ColorChoice;
-
+mod formatter;
 mod internal;
 
 pub mod baseline;
+pub mod color;
 pub mod error;
+pub mod output;
 pub mod reporter;
+
+pub use color::ColorChoice;
+pub use formatter::ReportingFormat;
+pub use output::ReportingTarget;
 
 /// Represents the kind of annotation associated with an issue.
 #[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize)]

@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::io::Write;
 use std::ops::Range;
 
 use codespan_reporting::diagnostic::Diagnostic;
@@ -11,7 +12,7 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::DisplayStyle;
 use mago_database::file::FileId;
-use termcolor::WriteColor;
+use termcolor::Buffer;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
@@ -22,52 +23,46 @@ use crate::Issue;
 use crate::IssueCollection;
 use crate::Level;
 use crate::error::ReportingError;
+use crate::formatter::Formatter;
+use crate::formatter::FormatterConfig;
 
-pub fn rich_format(
-    writer: &mut dyn WriteColor,
-    database: &ReadDatabase,
-    issues: IssueCollection,
-) -> Result<(), ReportingError> {
-    codespan_format_with_config(
-        writer,
-        database,
-        issues,
-        Config { display_style: DisplayStyle::Rich, ..Default::default() },
-    )
+/// Formatter that outputs issues in rich diagnostic format with full context.
+pub(crate) struct RichFormatter;
+
+impl Formatter for RichFormatter {
+    fn format(
+        &self,
+        writer: &mut dyn Write,
+        issues: &IssueCollection,
+        database: &ReadDatabase,
+        config: &FormatterConfig,
+    ) -> Result<(), ReportingError> {
+        codespan_format_with_config(
+            writer,
+            issues,
+            database,
+            config,
+            Config { display_style: DisplayStyle::Rich, ..Default::default() },
+        )
+    }
 }
 
-pub fn medium_format(
-    writer: &mut dyn WriteColor,
+pub(super) fn codespan_format_with_config(
+    writer: &mut dyn Write,
+    issues: &IssueCollection,
     database: &ReadDatabase,
-    issues: IssueCollection,
+    config: &FormatterConfig,
+    codespan_config: Config,
 ) -> Result<(), ReportingError> {
-    codespan_format_with_config(
-        writer,
-        database,
-        issues,
-        Config { display_style: DisplayStyle::Medium, ..Default::default() },
-    )
-}
+    // Apply filters
+    let issues = apply_filters(issues, config);
 
-pub fn short_format(
-    writer: &mut dyn WriteColor,
-    database: &ReadDatabase,
-    issues: IssueCollection,
-) -> Result<(), ReportingError> {
-    codespan_format_with_config(
-        writer,
-        database,
-        issues,
-        Config { display_style: DisplayStyle::Short, ..Default::default() },
-    )
-}
+    // Determine if we should use colors
+    let use_colors = config.color_choice.should_use_colors(atty::is(atty::Stream::Stdout));
 
-fn codespan_format_with_config(
-    writer: &mut dyn WriteColor,
-    database: &ReadDatabase,
-    issues: IssueCollection,
-    config: Config,
-) -> Result<(), ReportingError> {
+    // Create a buffer for codespan (it requires WriteColor)
+    let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };
+
     let files = DatabaseFiles(database);
 
     let highest_level = issues.get_highest_level();
@@ -99,7 +94,7 @@ fn codespan_format_with_config(
 
         let diagnostic: Diagnostic<FileId> = issue.into();
 
-        term::emit(writer, &config, &files, &diagnostic)?;
+        term::emit_to_write_style(&mut buffer, &codespan_config, &files, &diagnostic)?;
     }
 
     if let Some(highest_level) = highest_level {
@@ -131,10 +126,31 @@ fn codespan_format_with_config(
             diagnostic = diagnostic.with_notes(vec![format!("{} issues contain auto-fix suggestions", suggestions)]);
         }
 
-        term::emit(writer, &config, &files, &diagnostic)?;
+        term::emit_to_write_style(&mut buffer, &codespan_config, &files, &diagnostic)?;
     }
 
+    // Write buffer to writer
+    writer.write_all(buffer.as_slice())?;
+
     Ok(())
+}
+
+fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
+    let mut filtered = issues.clone();
+
+    if let Some(min_level) = config.minimum_level {
+        filtered = filtered.with_minimum_level(min_level);
+    }
+
+    if config.filter_fixable {
+        filtered = filtered.filter_fixable();
+    }
+
+    if config.sort {
+        filtered = filtered.sorted();
+    }
+
+    filtered
 }
 
 struct DatabaseFiles<'a>(&'a ReadDatabase);

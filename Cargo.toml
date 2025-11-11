@@ -62,7 +62,7 @@ strum = { version = "0.27", features = ["derive"] }
 ordered-float = { version = "5.0", default-features = false, features = ["serde"] }
 pretty_assertions = { version = "1.4.1" }
 either = { version = "1.13.0" }
-codespan-reporting = { version = "0.12.0", features = ["serde", "serialization"] }
+codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 config = { version = "0.15.4", features = ["toml"] }
 toml = "0.9.2"
@@ -95,7 +95,7 @@ indexmap = { version = "2.8.0", features = ["serde"] }
 rand = "0.9.0"
 bitflags = { version = "2.9.1", features = ["serde"] }
 strsim = "0.11.1"
-ariadne = "0.5.1"
+ariadne = "0.6.0"
 glob = "0.3.2"
 walkdir = "2"
 globset = "0.4"
@@ -109,8 +109,9 @@ libc = "0.2.175"
 shell-words = "1.1.0"
 ryu = "1.0"
 itoa = "1.0"
-notify = "7.0"
+notify = "8.2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+atty = "0.2"
 
 [dependencies]
 mago-syntax = { workspace = true }

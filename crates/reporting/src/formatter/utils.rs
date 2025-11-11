@@ -1,5 +1,6 @@
 use crate::Issue;
 
+/// XML-encode a string by escaping special characters.
 pub fn xml_encode(input: impl AsRef<str>) -> String {
     let input = input.as_ref();
     // the result will never be smaller than the input,
@@ -28,6 +29,7 @@ pub fn xml_encode(input: impl AsRef<str>) -> String {
     result
 }
 
+/// Build a long message from an issue including notes, help, and links.
 pub fn long_message(issue: &Issue) -> String {
     let mut message = issue.message.clone();
     if !issue.notes.is_empty() {
@@ -45,7 +47,7 @@ pub fn long_message(issue: &Issue) -> String {
     }
 
     if let Some(link) = issue.link.as_ref() {
-        message.push_str("\n\nAMore information: ");
+        message.push_str("\n\nMore information: ");
         message.push_str(link.as_str());
     }
 

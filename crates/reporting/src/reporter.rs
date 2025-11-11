@@ -8,53 +8,19 @@
 //! The reporter can filter issues based on baseline files and severity levels,
 //! and can sort issues for better readability.
 
-use std::str::FromStr;
-
-use serde::Deserialize;
-use serde::Serialize;
-use strum::Display;
-use strum::VariantNames;
+use std::io::Write;
 
 use mago_database::ReadDatabase;
-use termcolor::ColorChoice;
 
 use crate::IssueCollection;
 use crate::Level;
 use crate::baseline::Baseline;
+use crate::color::ColorChoice;
 use crate::error::ReportingError;
-use crate::internal::emitter::Emitter;
-use crate::internal::writer::ReportWriter;
-
-/// Defines the output target for the reporter.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, VariantNames)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum ReportingTarget {
-    /// Direct output to standard output (stdout).
-    #[default]
-    Stdout,
-    /// Direct output to standard error (stderr).
-    Stderr,
-}
-
-/// The format to use when writing the report.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, VariantNames)]
-#[serde(rename_all = "kebab-case")]
-#[strum(serialize_all = "kebab-case")]
-pub enum ReportingFormat {
-    #[default]
-    Rich,
-    Medium,
-    Short,
-    Ariadne,
-    Github,
-    Gitlab,
-    Json,
-    Count,
-    CodeCount,
-    Checkstyle,
-    Emacs,
-}
+use crate::formatter::FormatterConfig;
+use crate::formatter::ReportingFormat;
+use crate::formatter::dispatch_format;
+use crate::output::ReportingTarget;
 
 /// Configuration options for the reporter.
 ///
@@ -123,13 +89,21 @@ pub struct Reporter {
 }
 
 impl Reporter {
+    /// Create a new reporter with the given database and configuration.
     pub fn new(database: ReadDatabase, config: ReporterConfig) -> Self {
         Self { database, config }
     }
 
+    /// Report issues to the configured target.
+    ///
+    /// This method applies baseline filtering, severity filtering, and sorting
+    /// based on the reporter configuration, then formats and outputs the issues.
     pub fn report(&self, issues: IssueCollection, baseline: Option<Baseline>) -> Result<ReportStatus, ReportingError> {
+        let mut writer = self.config.target.resolve();
+
         let mut issues = issues;
 
+        // Apply baseline filtering
         let mut baseline_has_dead_issues = false;
         let mut baseline_filtered_issues = 0;
         if let Some(baseline) = baseline {
@@ -142,22 +116,12 @@ impl Reporter {
             issues = filtered_issues;
         }
 
-        if let Some(min_level) = self.config.minimum_report_level {
-            issues = issues.with_minimum_level(min_level);
-        }
-
-        if self.config.filter_fixable {
-            issues = issues.filter_fixable();
-        }
-
-        if self.config.sort {
-            issues = issues.sorted();
-        }
-
+        // Track reported issue stats before formatting
         let total_reported_issues = issues.len();
         let highest_reported_level = issues.get_highest_level();
         let lowest_reported_level = issues.get_lowest_level();
 
+        // Early return if no issues to report
         if total_reported_issues == 0 {
             return Ok(ReportStatus {
                 baseline_dead_issues: baseline_has_dead_issues,
@@ -168,8 +132,16 @@ impl Reporter {
             });
         }
 
-        let writer = ReportWriter::new(self.config.target, self.config.color_choice);
-        self.config.format.emit(&mut writer.lock(), &self.database, issues)?;
+        // Build formatter config
+        let formatter_config = FormatterConfig {
+            color_choice: self.config.color_choice,
+            sort: self.config.sort,
+            minimum_level: self.config.minimum_report_level,
+            filter_fixable: self.config.filter_fixable,
+        };
+
+        // Dispatch to the appropriate formatter
+        dispatch_format(self.config.format, &mut *writer, &issues, &self.database, &formatter_config)?;
 
         Ok(ReportStatus {
             baseline_dead_issues: baseline_has_dead_issues,
@@ -179,37 +151,79 @@ impl Reporter {
             total_reported_issues,
         })
     }
-}
 
-impl FromStr for ReportingTarget {
-    type Err = ReportingError;
+    /// Report issues to a custom writer.
+    ///
+    /// This method allows writing to any `Write` implementation, making it useful
+    /// for testing, capturing output to strings, writing to files, or streaming
+    /// over network sockets.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Write to a buffer for testing
+    /// let mut buffer = Vec::new();
+    /// reporter.report_to(issues, None, &mut buffer)?;
+    /// let output = String::from_utf8(buffer)?;
+    ///
+    /// // Write to a file
+    /// let mut file = File::create("report.txt")?;
+    /// reporter.report_to(issues, None, &mut file)?;
+    /// ```
+    pub fn report_to<W: Write>(
+        &self,
+        issues: IssueCollection,
+        baseline: Option<Baseline>,
+        writer: &mut W,
+    ) -> Result<ReportStatus, ReportingError> {
+        let mut issues = issues;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "stdout" | "out" => Ok(Self::Stdout),
-            "stderr" | "err" => Ok(Self::Stderr),
-            _ => Err(ReportingError::InvalidTarget(s.to_string())),
+        // Apply baseline filtering
+        let mut baseline_has_dead_issues = false;
+        let mut baseline_filtered_issues = 0;
+        if let Some(baseline) = baseline {
+            let original_count = issues.len();
+            let filtered_issues = baseline.filter_issues(issues, &self.database);
+            let comparison = baseline.compare_with_issues(&filtered_issues, &self.database);
+
+            baseline_filtered_issues = original_count - filtered_issues.len();
+            baseline_has_dead_issues = comparison.removed_issues_count > 0;
+            issues = filtered_issues;
         }
-    }
-}
 
-impl FromStr for ReportingFormat {
-    type Err = ReportingError;
+        // Track reported issue stats before formatting
+        let total_reported_issues = issues.len();
+        let highest_reported_level = issues.get_highest_level();
+        let lowest_reported_level = issues.get_lowest_level();
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "rich" => Ok(Self::Rich),
-            "medium" => Ok(Self::Medium),
-            "short" => Ok(Self::Short),
-            "ariadne" => Ok(Self::Ariadne),
-            "github" => Ok(Self::Github),
-            "gitlab" => Ok(Self::Gitlab),
-            "json" => Ok(Self::Json),
-            "count" => Ok(Self::Count),
-            "codecode" | "code-count" => Ok(Self::CodeCount),
-            "checkstyle" => Ok(Self::Checkstyle),
-            "emacs" => Ok(Self::Emacs),
-            _ => Err(ReportingError::InvalidFormat(s.to_string())),
+        // Early return if no issues to report
+        if total_reported_issues == 0 {
+            return Ok(ReportStatus {
+                baseline_dead_issues: baseline_has_dead_issues,
+                baseline_filtered_issues,
+                highest_reported_level: None,
+                lowest_reported_level: None,
+                total_reported_issues: 0,
+            });
         }
+
+        // Build formatter config
+        let formatter_config = FormatterConfig {
+            color_choice: self.config.color_choice,
+            sort: self.config.sort,
+            minimum_level: self.config.minimum_report_level,
+            filter_fixable: self.config.filter_fixable,
+        };
+
+        // Dispatch to the appropriate formatter
+        dispatch_format(self.config.format, writer, &issues, &self.database, &formatter_config)?;
+
+        Ok(ReportStatus {
+            baseline_dead_issues: baseline_has_dead_issues,
+            baseline_filtered_issues,
+            highest_reported_level,
+            lowest_reported_level,
+            total_reported_issues,
+        })
     }
 }

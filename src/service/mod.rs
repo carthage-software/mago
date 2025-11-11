@@ -57,6 +57,9 @@ use std::sync::Arc;
 
 use bumpalo::Bump;
 use clap::ColorChoice;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+
 use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
@@ -67,17 +70,14 @@ use mago_fixer::FixPlan;
 use mago_fixer::SafetyClassification;
 use mago_orchestrator::Orchestrator;
 use mago_orchestrator::service::format::FileFormatStatus;
-
 use mago_reporting::ColorChoice as ReportingColorChoice;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
+use mago_reporting::ReportingFormat;
+use mago_reporting::ReportingTarget;
 use mago_reporting::baseline::Baseline;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReporterConfig;
-use mago_reporting::reporter::ReportingFormat;
-use mago_reporting::reporter::ReportingTarget;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
 
 use crate::baseline;
 use crate::baseline::unserialize_baseline;
@@ -355,7 +355,7 @@ impl IssueProcessor {
         let issues_to_report = issues;
 
         let reporter_configuration = ReporterConfig {
-            target: self.reporting_target,
+            target: self.reporting_target.clone(),
             format: self.reporting_format,
             color_choice: match self.color_choice {
                 ColorChoice::Auto => ReportingColorChoice::Auto,

@@ -32,8 +32,8 @@ use clap::ColorChoice;
 use clap::Parser;
 
 use mago_reporting::Level;
-use mago_reporting::reporter::ReportingFormat;
-use mago_reporting::reporter::ReportingTarget;
+use mago_reporting::ReportingFormat;
+use mago_reporting::ReportingTarget;
 
 use crate::enum_variants;
 use crate::service::IssueProcessor;
@@ -46,7 +46,7 @@ use crate::service::IssueProcessor;
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
-#[derive(Parser, Debug, Clone, Copy)]
+#[derive(Parser, Debug, Clone)]
 pub struct ReportingArgs {
     /// Filter the output to only show issues that can be automatically fixed.
     ///
@@ -170,7 +170,7 @@ impl ReportingArgs {
     ///
     /// An [`IssueProcessor`] configured with all the reporting and fixing options
     /// from this argument set.
-    pub fn get_processor(self, color_choice: ColorChoice) -> IssueProcessor {
+    pub fn get_processor(&self, color_choice: ColorChoice) -> IssueProcessor {
         IssueProcessor {
             fixable_only: self.fixable_only,
             sort: self.sort,
@@ -179,7 +179,7 @@ impl ReportingArgs {
             potentially_unsafe: self.potentially_unsafe,
             format_after_fix: self.format_after_fix,
             dry_run: self.dry_run,
-            reporting_target: self.reporting_target,
+            reporting_target: self.reporting_target.clone(),
             reporting_format: self.reporting_format,
             minimum_fail_level: self.minimum_fail_level,
             minimum_report_level: self.minimum_report_level,
