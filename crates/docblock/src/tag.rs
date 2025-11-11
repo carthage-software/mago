@@ -930,13 +930,30 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
             break;
         }
 
-        if char.is_whitespace() || char == '.' {
+        if char.is_whitespace() {
             if bracket_stack.is_empty() && last_char_was_significant {
                 // Found the first potential split point
                 split_point_rel = Some(i);
                 break;
             }
             last_char_was_significant = false;
+        } else if char == '.' {
+            // Only treat '.' as a split point if it's NOT part of a numeric literal
+            // Check if this is a numeric literal by looking at surrounding chars
+            let prev_is_digit = i > 0 && trimmed_content.as_bytes()[i - 1].is_ascii_digit();
+            let next_is_digit = iter.peek().is_some_and(|&(_, c)| c.is_ascii_digit());
+
+            if prev_is_digit && next_is_digit {
+                // This is part of a numeric literal like "24.0"
+                last_char_was_significant = true;
+            } else {
+                // This is a description separator like "string[]. something"
+                if bracket_stack.is_empty() && last_char_was_significant {
+                    split_point_rel = Some(i);
+                    break;
+                }
+                last_char_was_significant = false;
+            }
         } else {
             last_char_was_significant = true;
         }
@@ -1561,5 +1578,34 @@ mod tests {
         let result = parse_param_tag(content, span).unwrap();
         assert_eq!(result.variable.name, "$items");
         assert_eq!(result.description, ")more");
+    }
+
+    #[test]
+    fn test_param_with_numeric_literals_in_union() {
+        let content = "-1|-24.0|string $a";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.type_string.as_ref().unwrap().value, "-1|-24.0|string");
+        assert_eq!(result.variable.name, "$a");
+        assert_eq!(result.description, "");
+    }
+
+    #[test]
+    fn test_param_with_float_literals() {
+        let content = "1.5|2.0|3.14 $value";
+        let span = test_span_for(content);
+        let result = parse_param_tag(content, span).unwrap();
+        assert_eq!(result.type_string.as_ref().unwrap().value, "1.5|2.0|3.14");
+        assert_eq!(result.variable.name, "$value");
+    }
+
+    #[test]
+    fn test_splitter_with_dot_still_works_as_separator() {
+        // Ensure we didn't break the original use case where . separates description
+        let input = "string[]. something else";
+        let span = test_span_for(input);
+        let (ts, rest) = split_tag_content(input, span).unwrap();
+        assert_eq!(ts.value, "string[]");
+        assert_eq!(rest, ". something else");
     }
 }
