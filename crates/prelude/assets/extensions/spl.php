@@ -2186,8 +2186,8 @@ abstract class SplHeap implements Iterator, Countable
     }
 
     /**
-     * @param mixed $value1
-     * @param mixed $value2
+     * @param V $value1
+     * @param V $value2
      *
      * @return int
      */
