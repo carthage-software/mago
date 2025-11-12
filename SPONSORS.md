@@ -13,7 +13,7 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
-<a href="https://github.com/kambo-1st" title="Bohuslav Šimek"><kbd><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=160" width="80" height="80" alt="Bohuslav Šimek" /></kbd></a><a href="https://www.ticketswap.com" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=160" width="80" height="80" alt="TicketSwap" /></kbd></a>
+<a href="https://github.com/kambo-1st" title="Bohuslav Šimek"><kbd><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=160" width="80" height="80" alt="Bohuslav Šimek" /></kbd></a><a href="https://www.ticketswap.com" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=160" width="80" height="80" alt="TicketSwap" /></kbd></a><a href="https://github.com/nhedger" title="Nicolas Hedger"><kbd><img src="https://avatars.githubusercontent.com/u/649677?u=d9fcfc3a22388899200af6b7e41df1aef5f518de&v=4&s=160" width="80" height="80" alt="Nicolas Hedger" /></kbd></a>
 
 ---
 

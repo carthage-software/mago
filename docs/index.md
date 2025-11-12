@@ -46,6 +46,7 @@ features:
 <div class="sponsor-item-medium"><a href="https://ofcompute.rs/" title="Vincent Berset" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=96" alt="Vincent Berset"></a></div>
 </div><hr><div class="sponsors-list-small"><a class="sponsor-item-small" href="https://github.com/kambo-1st" title="Bohuslav Šimek" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=48" alt="Bohuslav Šimek"></a>
 <a class="sponsor-item-small" href="https://www.ticketswap.com" title="TicketSwap" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=48" alt="TicketSwap"></a>
+<a class="sponsor-item-small" href="https://github.com/nhedger" title="Nicolas Hedger" target="_blank" rel="noopener"><img src="https://avatars.githubusercontent.com/u/649677?u=d9fcfc3a22388899200af6b7e41df1aef5f518de&v=4&s=48" alt="Nicolas Hedger"></a>
 </div></div><hr /><p style="text-align: center;">Your logo here? <a href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Become a sponsor!</a></p>
 <!-- SPONSORS_END -->
 </div>
