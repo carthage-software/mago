@@ -160,7 +160,7 @@ pub(crate) fn expand_atomic(
             expand_atomic(constraint, codebase, options, &mut false, &mut atomic_return_type_parts);
 
             if !atomic_return_type_parts.is_empty() {
-                *constraint = Box::new(atomic_return_type_parts.remove(0));
+                **constraint = atomic_return_type_parts.remove(0);
             }
         }
         TAtomic::Reference(TReference::Member { class_like_name, member_selector }) => {

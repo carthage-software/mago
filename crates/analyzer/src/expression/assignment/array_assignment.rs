@@ -289,7 +289,7 @@ fn update_atomic_given_key(
         } else {
             match array {
                 TArray::List(list) => {
-                    list.element_type = Box::new(combined_value_type);
+                    *list.element_type = combined_value_type;
 
                     list.known_elements = None;
                     list.known_count = None;

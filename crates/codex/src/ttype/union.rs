@@ -1260,7 +1260,7 @@ pub fn populate_union_type(
 
                 populate_atomic_type(&mut new_constraint, codebase_symbols, reference_source, symbol_references, force);
 
-                *constraint = Box::new(new_constraint);
+                **constraint = new_constraint;
             }
             _ => {
                 populate_atomic_type(unpopulated_atomic, codebase_symbols, reference_source, symbol_references, force);

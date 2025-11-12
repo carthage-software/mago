@@ -216,12 +216,11 @@ pub fn get_type_from_var_docblock<'ctx, 'arena>(
 
     get_docblock_variables(context, block_context, artifacts, false)
         .into_iter()
-        .filter(|(var_name, _, _)| match var_name {
+        .rfind(|(var_name, _, _)| match var_name {
             None if allow_unnamed => true,
             Some(name) if Some(name.as_str()) == value_expression_variable_id => true,
             _ => false,
         })
-        .next_back()
         .map(|(_, variable_type, variable_type_span)| (variable_type, variable_type_span))
 }
 

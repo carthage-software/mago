@@ -245,17 +245,17 @@ impl TArray {
             Self::Keyed(keyed_array) => {
                 if let Some(parameters) = keyed_array.parameters.as_mut() {
                     if let TAtomic::Placeholder = parameters.0.get_single() {
-                        parameters.0 = Box::new(get_arraykey());
+                        *parameters.0 = get_arraykey();
                     }
 
                     if let TAtomic::Placeholder = parameters.1.get_single() {
-                        parameters.1 = Box::new(get_mixed());
+                        *parameters.1 = get_mixed();
                     }
                 }
             }
             Self::List(list) => {
                 if let TAtomic::Placeholder = list.element_type.get_single() {
-                    list.element_type = Box::new(get_mixed());
+                    *list.element_type = get_mixed();
                 }
             }
         }

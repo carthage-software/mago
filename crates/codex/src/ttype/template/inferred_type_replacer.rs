@@ -218,14 +218,14 @@ fn replace_template_parameter(
 fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TAtomic {
     match &mut atomic {
         TAtomic::Conditional(conditional) => {
-            conditional.subject = Box::new(replace(&conditional.subject, template_result, codebase));
-            conditional.target = Box::new(replace(&conditional.target, template_result, codebase));
-            conditional.then = Box::new(replace(&conditional.then, template_result, codebase));
-            conditional.otherwise = Box::new(replace(&conditional.otherwise, template_result, codebase));
+            *conditional.subject = replace(&conditional.subject, template_result, codebase);
+            *conditional.target = replace(&conditional.target, template_result, codebase);
+            *conditional.then = replace(&conditional.then, template_result, codebase);
+            *conditional.otherwise = replace(&conditional.otherwise, template_result, codebase);
         }
         TAtomic::Array(array_type) => match array_type {
             TArray::List(list_data) => {
-                list_data.element_type = Box::new(replace(&list_data.element_type, template_result, codebase));
+                *list_data.element_type = replace(&list_data.element_type, template_result, codebase);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -235,8 +235,8 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
             }
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    *key_parameter = Box::new(replace(key_parameter, template_result, codebase));
-                    *value_parameter = Box::new(replace(value_parameter, template_result, codebase));
+                    **key_parameter = replace(key_parameter, template_result, codebase);
+                    **value_parameter = replace(value_parameter, template_result, codebase);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {

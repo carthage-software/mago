@@ -359,7 +359,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_1_atomic = first_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_1_atomic {
-                    *constraint = Box::new(new_as);
+                    **constraint = new_as;
                 }
 
                 return Some(type_1_atomic);
@@ -372,7 +372,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_2_atomic = second_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_2_atomic {
-                    *constraint = Box::new(new_as);
+                    **constraint = new_as;
                 }
 
                 return Some(type_2_atomic);
@@ -633,7 +633,7 @@ fn intersect_contained_atomic_with_another(
         let first_type_as = intersect_union_with_atomic(context, first_type_constraint, sub_atomic);
 
         if let Some(first_type_as) = first_type_as {
-            *first_type_constraint = Box::new(first_type_as);
+            **first_type_constraint = first_type_as;
         } else {
             return None;
         }

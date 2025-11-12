@@ -294,7 +294,7 @@ fn replace_atomic(
                         let input_parameters =
                             if let Some(input) = &input_type { get_iterable_parameters(input, codebase) } else { None };
 
-                        parameters.0 = Box::new(self::replace(
+                        *parameters.0 = self::replace(
                             &parameters.0,
                             template_result,
                             codebase,
@@ -302,9 +302,9 @@ fn replace_atomic(
                             input_arg_offset,
                             input_arg_pos,
                             StandinOptions { iteration_depth: opts.iteration_depth + 1, ..opts },
-                        ));
+                        );
 
-                        parameters.1 = Box::new(self::replace(
+                        *parameters.1 = self::replace(
                             &parameters.1, // Pass &TUnion
                             template_result,
                             codebase,
@@ -312,7 +312,7 @@ fn replace_atomic(
                             input_arg_offset,
                             input_arg_pos,
                             StandinOptions { iteration_depth: opts.iteration_depth + 1, ..opts },
-                        ));
+                        );
                     }
                 }
                 TArray::List(list_data) => {
@@ -345,7 +345,7 @@ fn replace_atomic(
                             None
                         };
 
-                        list_data.element_type = Box::new(self::replace(
+                        *list_data.element_type = self::replace(
                             &list_data.element_type,
                             template_result,
                             codebase,
@@ -353,7 +353,7 @@ fn replace_atomic(
                             input_arg_offset,
                             input_arg_pos,
                             StandinOptions { iteration_depth: opts.iteration_depth + 1, ..opts },
-                        ));
+                        );
                     }
                 }
             }
@@ -464,7 +464,7 @@ fn replace_atomic(
             return atomic_type;
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
-            *constraint = Box::new(replace_atomic(
+            **constraint = replace_atomic(
                 constraint,
                 template_result,
                 codebase,
@@ -480,7 +480,7 @@ fn replace_atomic(
                 input_arg_offset,
                 input_arg_pos,
                 opts,
-            ));
+            );
 
             return atomic_type;
         }
