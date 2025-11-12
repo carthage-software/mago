@@ -40,6 +40,9 @@ pub struct Collector<'ctx, 'arena> {
     recordings: Vec<'arena, IssueCollection>,
     /// A list of issue codes that should be silently ignored.
     disabled_codes: Vec<'arena, &'static str>,
+    /// An optional list of issue codes that are currently active (e.g., from `--only` flag).
+    /// If set, unfulfilled pragmas for codes not in this list will not be reported.
+    active_codes: Option<Vec<'arena, &'arena str>>,
     /// A map of legacy issue codes to their new, canonical counterparts.
     aliases: HashMap<&'static str, &'static str>,
     /// An optional URL template for generating links to issue documentation.
@@ -72,6 +75,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             issues: IssueCollection::new(),
             recordings: Vec::new_in(arena),
             disabled_codes: Vec::new_in(arena),
+            active_codes: None,
             aliases: HashMap::default(),
             link_template: None,
         };
@@ -109,6 +113,26 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     #[inline]
     pub fn add_disabled_codes(&mut self, codes: impl IntoIterator<Item = &'static str>) {
         self.disabled_codes.extend(codes);
+    }
+
+    /// Sets the list of active issue codes.
+    ///
+    /// When set, only pragmas for codes in this list will be required to be fulfilled.
+    /// Pragmas for codes not in this list will not trigger "unfulfilled" warnings.
+    /// This is useful when using filters like `--only` to check specific rules.
+    #[inline]
+    pub fn set_active_codes(&mut self, codes: &[String]) {
+        self.active_codes = Some(
+            codes
+                .iter()
+                .map(|s| {
+                    // Allocate the string in the arena
+                    let bytes = self.arena.alloc_slice_copy(s.as_bytes());
+
+                    std::str::from_utf8(bytes).expect("String allocated in arena should always be valid UTF-8")
+                })
+                .collect_in(self.arena),
+        );
     }
 
     /// Reports an issue without checking for suppression pragmas.
@@ -316,6 +340,12 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                     );
                 }
                 PragmaKind::Expect => {
+                    if let Some(ref active_codes) = self.active_codes
+                        && !active_codes.contains(&pragma.code)
+                    {
+                        continue;
+                    }
+
                     issues.push(
                         Issue::warning("This pragma was not used and may be removed.")
                             .with_code("unfulfilled-expect")

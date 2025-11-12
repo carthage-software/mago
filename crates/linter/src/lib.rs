@@ -80,6 +80,11 @@ impl<'arena> Linter<'arena> {
         // Set legacy rule code mappings for compatibility with the old linter.
         collector.set_aliases(LEGACY_RULE_CODE_MAPPINGS);
 
+        // Set active codes if --only filter was used
+        if let Some(only_codes) = &self.registry.only {
+            collector.set_active_codes(only_codes);
+        }
+
         let mut context =
             LintContext::new(self.php_version, self.arena, &self.registry, source_file, resolved_names, collector);
 

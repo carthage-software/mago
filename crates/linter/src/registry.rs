@@ -7,6 +7,7 @@ use crate::settings::Settings;
 
 #[derive(Debug, Clone)]
 pub struct RuleRegistry {
+    pub(crate) only: Option<Vec<String>>,
     integrations: IntegrationSet,
     rules: Vec<AnyRule>,
     by_kind: Vec<&'static [usize]>,
@@ -20,8 +21,10 @@ impl RuleRegistry {
     /// * `only` - If `Some`, only builds rules whose codes are in this list.
     pub fn build(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         let integrations = settings.integrations;
-        let rules: Vec<AnyRule> = AnyRule::get_all_for(settings, only, include_disabled || only.is_some());
-        if let Some(only) = only
+        let only = only.map(|codes| codes.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+
+        let rules: Vec<AnyRule> = AnyRule::get_all_for(settings, only.as_deref(), include_disabled || only.is_some());
+        if let Some(only) = &only
             && rules.is_empty()
         {
             tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
@@ -38,7 +41,7 @@ impl RuleRegistry {
         let by_kind: Vec<&'static [usize]> =
             temp.into_iter().map(|v| Box::<[usize]>::leak(v.into_boxed_slice()) as &'static [usize]).collect();
 
-        Self { integrations, rules, by_kind }
+        Self { only, integrations, rules, by_kind }
     }
 
     /// Checks if a specific rule is enabled in the registry.
