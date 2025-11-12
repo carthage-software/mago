@@ -30,8 +30,19 @@ pub fn xml_encode(input: impl AsRef<str>) -> String {
 }
 
 /// Build a long message from an issue including notes, help, and links.
-pub fn long_message(issue: &Issue) -> String {
+pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
     let mut message = issue.message.clone();
+
+    if include_annotations {
+        for annotation in issue.annotations.iter() {
+            if let Some(annotation_msg) = annotation.message.as_ref() {
+                message.push('\n');
+                message.push('>');
+                message.push_str(annotation_msg.as_str());
+            }
+        }
+    }
+
     if !issue.notes.is_empty() {
         message.push('\n');
 

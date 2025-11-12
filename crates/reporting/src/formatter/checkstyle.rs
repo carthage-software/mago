@@ -49,7 +49,7 @@ impl Formatter for CheckstyleFormatter {
                 Level::Help | Level::Note => "info",
             };
 
-            let message = xml_encode(long_message(issue));
+            let message = xml_encode(long_message(issue, true));
             let error_tag = format!(
                 "    <error line=\"{line}\" column=\"{column}\" severity=\"{severity}\" message=\"{message}\" />"
             );

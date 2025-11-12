@@ -66,7 +66,7 @@ impl Formatter for GitlabFormatter {
                     None => ("<unknown>".to_string(), 0),
                 };
 
-                let description = long_message(issue);
+                let description = long_message(issue, true);
 
                 let check_name = issue.code.as_deref().unwrap_or("other");
 

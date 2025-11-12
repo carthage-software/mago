@@ -38,11 +38,19 @@ impl Formatter for GithubFormatter {
                     let file = database.get(&annotation.span.file_id())?;
                     let start_line = file.line_number(annotation.span.start.offset) + 1;
                     let end_line = file.line_number(annotation.span.end.offset) + 1;
+                    let start_col = file.column_number(annotation.span.start.offset) + 1;
+                    let end_col = file.column_number(annotation.span.end.offset) + 1;
 
                     if let Some(code) = issue.code.as_ref() {
-                        format!("file={},line={start_line},endLine={end_line},title={code}", file.name)
+                        format!(
+                            "file={},line={start_line},endLine={end_line},col={start_col},endColumn={end_col},title={code}",
+                            file.name
+                        )
                     } else {
-                        format!("file={},line={start_line},endLine={end_line}", file.name)
+                        format!(
+                            "file={},line={start_line},endLine={end_line},col={start_col},endColumn={end_col}",
+                            file.name
+                        )
                     }
                 }
                 None => {
@@ -57,7 +65,7 @@ impl Formatter for GithubFormatter {
             // we must use `%0A` instead of `\n`.
             //
             // see: https://github.com/actions/toolkit/issues/193
-            let message = long_message(issue).replace("\n", "%0A");
+            let message = long_message(issue, true).replace("\n", "%0A");
 
             writeln!(writer, "::{level} {properties}::{message}")?;
         }
