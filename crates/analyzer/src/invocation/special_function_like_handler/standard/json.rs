@@ -2,6 +2,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::union::TUnion;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -32,23 +33,11 @@ impl SpecialFunctionLikeHandlerTrait for JsonFunctionsHandler {
                 let int_literal = int_argument_type.get_single_literal_int_value()?;
 
                 Some(if int_literal & JSON_THROW_ON_ERROR > 0 {
-                    TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::new(
-                        None,
-                        false,
-                        false,
-                        true,
-                        false,
-                    ))))
+                    get_non_empty_string()
                 } else {
                     TUnion::from_vec(vec![
-                        TAtomic::Scalar(TScalar::String(TString::new(
-                            None,
-                            false,
-                            false,
-                            true,
-                            false,
-                        ))),
-                        TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) }))
+                        TAtomic::Scalar(TScalar::String(TString::non_empty())),
+                        TAtomic::Scalar(TScalar::Bool(TBool::r#false())),
                     ])
                 })
             }
