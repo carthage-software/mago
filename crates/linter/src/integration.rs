@@ -1,10 +1,13 @@
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, JsonSchema)]
+#[schemars(with = "Vec<Integration>")]
 pub struct IntegrationSet(u32);
 
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Serialize, JsonSchema)]
+#[schemars(with = "String")]
 #[repr(u8)]
 pub enum Integration {
     // Libraries

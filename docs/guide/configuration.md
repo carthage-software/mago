@@ -77,6 +77,16 @@ mago config --show linter
 mago config --show formatter
 ```
 
+You can also output the JSON schema for the configuration using the `--schema` flag. This is useful for generating documentation, IDE integration, or validation tooling.
+
+```sh
+# Output the JSON schema for the entire configuration
+mago config --schema
+
+# Output the JSON schema for a specific section
+mago config --schema --show linter
+```
+
 ### Command reference
 
 :::tip
@@ -90,4 +100,6 @@ Usage: mago config [OPTIONS]
 | Flag, Alias(es)    | Description                                                                                                        |
 | :----------------- | :----------------------------------------------------------------------------------------------------------------- |
 | `--show <SECTION>` | Display only a specific section of the configuration. <br/>**Values:** `source`, `linter`, `formatter`, `analyzer` |
+| `--default`        | Show the default configuration values instead of the current merged configuration.                                 |
+| `--schema`         | Output JSON schema instead of configuration values. Useful for documentation and IDE integration.                  |
 | `-h`, `--help`     | Print help information.                                                                                            |

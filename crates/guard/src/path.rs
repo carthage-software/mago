@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
@@ -14,14 +15,16 @@ const INVALID_PATH_ERROR: &str = "Invalid path: must be '*', '@all', '@self', '@
 const INVALID_SELECTOR_ERROR: &str = "Invalid symbol selector: must be a valid namespace (ending with '\\'), a valid symbol name, or a pattern containing wildcards ('*').";
 const INVALID_NAMESPACE_ERROR: &str = "Invalid namespace: must be '@global' or a valid namespace ending with '\\'.";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[schemars(with = "String")]
 pub enum NamespacePath {
     Global,
     Specific(String),
 }
 
 /// Selects a specific symbol or a group of symbols.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[schemars(with = "String")]
 pub enum SymbolSelector {
     /// A specific namespace, e.g., `App\Domain\`
     Namespace(NamespacePath),
@@ -32,7 +35,8 @@ pub enum SymbolSelector {
 }
 
 /// Represents a path, which can be a standard namespace, a layer, or a special keyword.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[schemars(with = "String")]
 pub enum Path {
     /// Represents all namespaces, often denoted as `*` or `@all`.
     All,

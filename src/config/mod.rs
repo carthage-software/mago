@@ -55,6 +55,7 @@ use config::File;
 use config::FileFormat;
 use config::Value;
 use config::ValueKind;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -74,6 +75,26 @@ pub mod guard;
 pub mod linter;
 pub mod source;
 
+/// Default value for threads configuration field.
+fn default_threads() -> usize {
+    *LOGICAL_CPUS
+}
+
+/// Default value for stack_size configuration field.
+fn default_stack_size() -> usize {
+    DEFAULT_STACK_SIZE
+}
+
+/// Default value for php_version configuration field.
+fn default_php_version() -> PHPVersion {
+    DEFAULT_PHP_VERSION
+}
+
+/// Default value for source configuration field.
+fn default_source_configuration() -> SourceConfiguration {
+    SourceConfiguration::from_workspace(CURRENT_DIR.clone())
+}
+
 /// The main configuration structure for Mago CLI.
 ///
 /// This struct aggregates all configuration settings for Mago, including global options
@@ -90,7 +111,7 @@ pub mod source;
 ///
 /// The struct uses serde for deserialization from TOML files and environment variables,
 /// with strict validation via `deny_unknown_fields` to catch configuration errors early.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Configuration {
     /// Number of worker threads for parallel processing.
@@ -98,6 +119,7 @@ pub struct Configuration {
     /// Controls the thread pool size used by Rayon for parallel operations.
     /// If set to 0, defaults to the number of logical CPUs available.
     /// Can be overridden via `MAGO_THREADS` environment variable or `--threads` CLI flag.
+    #[serde(default = "default_threads")]
     pub threads: usize,
 
     /// Stack size for each worker thread in bytes.
@@ -106,6 +128,7 @@ pub struct Configuration {
     /// Must be between `MINIMUM_STACK_SIZE` and `MAXIMUM_STACK_SIZE`.
     /// If set to 0, uses `MAXIMUM_STACK_SIZE`. Values outside the valid range are
     /// automatically clamped during normalization.
+    #[serde(default = "default_stack_size")]
     pub stack_size: usize,
 
     /// Target PHP version for parsing and analysis.
@@ -113,6 +136,7 @@ pub struct Configuration {
     /// Specifies which PHP version to assume when parsing code and performing analysis.
     /// This affects syntax parsing rules, available built-in functions, and type checking.
     /// Can be overridden via `MAGO_PHP_VERSION` environment variable or `--php-version` CLI flag.
+    #[serde(default = "default_php_version")]
     pub php_version: PHPVersion,
 
     /// Whether to allow PHP versions not officially supported by Mago.
@@ -121,6 +145,7 @@ pub struct Configuration {
     /// officially supported range. Use with caution as behavior may be unpredictable.
     /// Can be enabled via `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION` environment variable
     /// or `--allow-unsupported-php-version` CLI flag.
+    #[serde(default)]
     pub allow_unsupported_php_version: bool,
 
     /// Source discovery and workspace configuration.
@@ -128,6 +153,7 @@ pub struct Configuration {
     /// Defines the workspace root, source paths to scan, and exclusion patterns.
     /// This configuration determines which PHP files are loaded into the database
     /// for analysis, linting, or formatting.
+    #[serde(default = "default_source_configuration")]
     pub source: SourceConfiguration,
 
     /// Linter service configuration.
@@ -170,6 +196,7 @@ pub struct Configuration {
     ///
     /// This is not a user-facing configuration option and is never serialized.
     #[serde(default, skip_serializing)]
+    #[schemars(skip)]
     #[allow(dead_code)]
     log: Value,
 }

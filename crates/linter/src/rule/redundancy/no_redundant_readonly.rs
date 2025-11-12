@@ -1,5 +1,6 @@
 use indoc::indoc;
 use mago_fixer::SafetyClassification;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -25,7 +26,7 @@ pub struct NoRedundantReadonlyRule {
     cfg: NoRedundantReadonlyConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoRedundantReadonlyConfig {
     pub level: Level,

@@ -113,6 +113,7 @@ notify = "8.2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 atty = "0.2"
 serde-sarif = "0.8"
+schemars = { version = "0.8", features = ["preserve_order"] }
 
 [dependencies]
 mago-syntax = { workspace = true }
@@ -152,6 +153,7 @@ indoc = { workspace = true }
 bumpalo = { workspace = true }
 unicode-width = { workspace = true }
 dhat = { workspace = true, optional = true }
+schemars = { workspace = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"

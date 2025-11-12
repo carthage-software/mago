@@ -25,6 +25,7 @@ mago-codex = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 bumpalo = { workspace = true }
+schemars = { workspace = true }
 
 [dev-dependencies]
 mago-syntax = { workspace = true }

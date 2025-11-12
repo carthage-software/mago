@@ -1,4 +1,7 @@
+use std::collections::HashSet;
+
 use indoc::indoc;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -26,11 +29,13 @@ pub struct DisallowedFunctionsRule {
     cfg: DisallowedFunctionsConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct DisallowedFunctionsConfig {
     pub level: Level,
+    #[schemars(with = "HashSet<String>")]
     pub functions: AtomSet,
+    #[schemars(with = "HashSet<String>")]
     pub extensions: AtomSet,
 }
 

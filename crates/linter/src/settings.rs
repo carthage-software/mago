@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -7,7 +8,7 @@ use mago_php_version::PHPVersion;
 use crate::integration::IntegrationSet;
 use crate::rule::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Settings {
     pub php_version: PHPVersion,
@@ -15,8 +16,9 @@ pub struct Settings {
     pub rules: RulesSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields, bound = "C: Serialize + DeserializeOwned")]
+#[schemars(bound = "C: JsonSchema")]
 pub struct RuleSettings<C: Config> {
     pub enabled: bool,
 
@@ -24,7 +26,7 @@ pub struct RuleSettings<C: Config> {
     pub config: C,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RulesSettings {
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,

@@ -2,6 +2,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -9,7 +10,7 @@ use mago_analyzer::settings::Settings;
 use mago_php_version::PHPVersion;
 
 /// Configuration options for the static analyzer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct AnalyzerConfiguration {
     /// A list of patterns to exclude from analysis.

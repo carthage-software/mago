@@ -732,6 +732,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
+
+[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1013,12 +1019,18 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http",
- "indexmap",
+ "indexmap 2.12.0",
  "slab",
  "tokio",
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "hashbrown"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "hashbrown"
@@ -1294,6 +1306,17 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
+dependencies = [
+ "autocfg",
+ "hashbrown 0.12.3",
+ "serde",
+]
+
+[[package]]
+name = "indexmap"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
@@ -1537,6 +1560,7 @@ dependencies = [
  "openssl",
  "pretty_assertions",
  "rayon",
+ "schemars",
  "self_update",
  "serde",
  "serde_json",
@@ -1555,7 +1579,7 @@ name = "mago-algebra"
 version = "1.0.0-rc.1"
 dependencies = [
  "ahash",
- "indexmap",
+ "indexmap 2.12.0",
  "itertools",
  "mago-atom",
  "mago-codex",
@@ -1570,7 +1594,7 @@ dependencies = [
  "bumpalo",
  "diffy",
  "either",
- "indexmap",
+ "indexmap 2.12.0",
  "indoc",
  "itertools",
  "mago-algebra",
@@ -1597,6 +1621,7 @@ version = "1.0.0-rc.1"
 dependencies = [
  "itoa",
  "ryu",
+ "schemars",
  "ustr",
 ]
 
@@ -1615,7 +1640,7 @@ dependencies = [
  "bitflags 2.10.0",
  "bumpalo",
  "derivative",
- "indexmap",
+ "indexmap 2.12.0",
  "mago-atom",
  "mago-database",
  "mago-docblock",
@@ -1717,6 +1742,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "pretty_assertions",
+ "schemars",
  "serde",
  "unicode-width",
 ]
@@ -1738,6 +1764,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-syntax-core",
+ "schemars",
  "serde",
  "toml",
 ]
@@ -1761,6 +1788,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "regex",
+ "schemars",
  "serde",
  "tracing",
 ]
@@ -1805,6 +1833,7 @@ dependencies = [
 name = "mago-php-version"
 version = "1.0.0-rc.1"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
 ]
@@ -1835,6 +1864,7 @@ dependencies = [
  "mago-database",
  "mago-fixer",
  "mago-span",
+ "schemars",
  "serde",
  "serde-sarif",
  "serde_json",
@@ -2773,6 +2803,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
+dependencies = [
+ "dyn-clone",
+ "indexmap 1.9.3",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.109",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2909,6 +2964,17 @@ name = "serde_derive"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.109",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3318,7 +3384,7 @@ version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0dc8b1fb61449e27716ec0e1bdf0f6b8f3e8f6b05391e8497b8b6d7804ea6d8"
 dependencies = [
- "indexmap",
+ "indexmap 2.12.0",
  "serde_core",
  "serde_spanned",
  "toml_datetime",
@@ -4110,7 +4176,7 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "displaydoc",
- "indexmap",
+ "indexmap 2.12.0",
  "memchr",
  "thiserror",
  "time",

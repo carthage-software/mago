@@ -16,6 +16,7 @@ use std::iter::Once;
 use std::str::FromStr;
 
 use ahash::HashMap;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
@@ -59,7 +60,9 @@ pub struct Annotation {
 }
 
 /// Represents the severity level of an issue.
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, Display, VariantNames)]
+#[derive(
+    Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, Display, VariantNames, JsonSchema,
+)]
 #[strum(serialize_all = "lowercase")]
 pub enum Level {
     /// A note, providing additional information or context.

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,7 +24,7 @@ pub struct PreferEarlyContinueRule {
     cfg: PreferEarlyContinueConfig,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct PreferEarlyContinueConfig {
     pub level: Level,

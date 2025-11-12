@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -26,7 +27,8 @@ pub mod feature;
 /// assert_eq!(version.to_version_id(), 0x08_04_00);
 /// assert_eq!(version.to_string(), "8.4.0");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, JsonSchema)]
+#[schemars(with = "String")]
 #[repr(transparent)]
 pub struct PHPVersion(u32);
 
@@ -45,7 +47,7 @@ pub struct PHPVersion(u32);
 /// assert!(range.includes(PHPVersion::new(7, 2, 0))); // true
 /// assert!(!range.includes(PHPVersion::new(8, 0, 0))); // false
 /// ```
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd, Deserialize, Serialize, Default, Hash)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd, Deserialize, Serialize, Default, Hash, JsonSchema)]
 pub struct PHPVersionRange {
     pub min: Option<PHPVersion>,
     pub max: Option<PHPVersion>,

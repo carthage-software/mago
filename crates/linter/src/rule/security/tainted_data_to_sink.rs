@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use indoc::indoc;
 use mago_atom::atom;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -29,10 +32,11 @@ pub struct TaintedDataToSinkRule {
     cfg: TaintedDataToSinkConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaintedDataToSinkConfig {
     pub level: Level,
+    #[schemars(with = "HashSet<String>")]
     pub known_sink_functions: AtomSet,
 }
 

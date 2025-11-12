@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,7 +24,7 @@ pub struct TooManyEnumCasesRule {
     cfg: TooManyEnumCasesConfig,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TooManyEnumCasesConfig {
     pub level: Level,

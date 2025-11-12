@@ -50,9 +50,9 @@ Mago is organized into several tools and utility commands, each accessed via a s
 
 ### Utility Commands
 
-| Command                                                    | Description                                             |
-| :--------------------------------------------------------- | :------------------------------------------------------ |
-| [`mago config`](/guide/configuration)                      | Displays the final, merged configuration Mago is using. |
+| Command                                                    | Description                                                                |
+| :--------------------------------------------------------- | :------------------------------------------------------------------------- |
+| [`mago config`](/guide/configuration)                      | Displays the final, merged configuration or outputs JSON schema for it.   |
 | [`mago list-files`](/guide/list-files)                     | Displays a list of the files scanned by Mago.           |
 | [`mago generate-completions`](/guide/generate-completions) | Generate shell completions for Mago.                    |
 | [`mago init`](/guide/initialization)                       | Initializes a new Mago configuration file.              |

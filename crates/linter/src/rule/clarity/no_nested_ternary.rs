@@ -1,5 +1,6 @@
 use indoc::indoc;
 use mago_span::Span;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,7 +24,7 @@ pub struct NoNestedTernaryRule {
     cfg: NoNestedTernaryConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoNestedTernaryConfig {
     pub level: Level,

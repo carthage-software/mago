@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
 /// Format settings for the PHP printer.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct FormatSettings {
     /// Maximum line length that the printer will wrap on.
@@ -921,7 +922,7 @@ impl Default for FormatSettings {
 }
 
 /// Specifies the style of line endings.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum EndOfLine {
     #[default]
     #[serde(alias = "auto")]
@@ -935,7 +936,7 @@ pub enum EndOfLine {
 }
 
 /// Specifies the style of line endings.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum BraceStyle {
     #[serde(alias = "same_line")]
     SameLine,
@@ -943,7 +944,7 @@ pub enum BraceStyle {
     NextLine,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum MethodChainBreakingStyle {
     #[serde(alias = "same_line")]
     SameLine,
@@ -1000,7 +1001,7 @@ impl FromStr for EndOfLine {
 }
 
 /// Specifies null type hint style.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum NullTypeHint {
     #[default]
     #[serde(alias = "null_pipe", alias = "pipe", alias = "long", alias = "|")]

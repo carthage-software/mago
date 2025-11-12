@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
 use mago_linter::integration::Integration;
 use mago_linter::settings::RulesSettings;
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LinterConfiguration {
     /// A list of patterns to exclude from linting.

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,7 +9,7 @@ use crate::consts::PHP_EXTENSION;
 use crate::error::Error;
 
 /// Configuration options for source discovery.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SourceConfiguration {
     /// The workspace directory from which to start scanning.

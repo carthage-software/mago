@@ -1,4 +1,5 @@
 use mago_span::HasSpan;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -22,7 +23,7 @@ pub struct HalsteadRule {
     cfg: HalsteadConfig,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct HalsteadConfig {
     pub level: Level,

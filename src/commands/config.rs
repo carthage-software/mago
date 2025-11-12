@@ -30,6 +30,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use clap::ValueEnum;
+use schemars::schema_for;
 
 use crate::config::Configuration;
 use crate::config::analyzer::AnalyzerConfiguration;
@@ -88,6 +89,15 @@ pub struct ConfigCommand {
     /// configuration was provided.
     #[arg(long, default_value_t = false)]
     default: bool,
+
+    /// Output JSON schema instead of configuration values.
+    ///
+    /// When this flag is set, the command outputs the JSON schema for the
+    /// configuration structure instead of actual configuration values.
+    /// This is useful for generating documentation, IDE integration, or
+    /// validation tooling.
+    #[arg(long, default_value_t = false)]
+    schema: bool,
 }
 
 impl ConfigCommand {
@@ -117,7 +127,32 @@ impl ConfigCommand {
     /// The configuration is serialized to pretty-printed JSON and written to stdout.
     /// This format is both human-readable and machine-parseable.
     pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
-        let json = if let Some(section) = self.show {
+        let json = if self.schema {
+            // Generate JSON schema instead of actual config values
+            if let Some(section) = self.show {
+                match section {
+                    ConfigSection::Source => {
+                        let schema = schema_for!(SourceConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
+                    ConfigSection::Linter => {
+                        let schema = schema_for!(LinterConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
+                    ConfigSection::Formatter => {
+                        let schema = schema_for!(FormatterConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
+                    ConfigSection::Analyzer => {
+                        let schema = schema_for!(AnalyzerConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
+                }
+            } else {
+                let schema = schema_for!(Configuration);
+                serde_json::to_string_pretty(&schema)?
+            }
+        } else if let Some(section) = self.show {
             match section {
                 ConfigSection::Source => {
                     if self.default {

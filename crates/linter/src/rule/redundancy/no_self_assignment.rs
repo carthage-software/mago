@@ -2,6 +2,7 @@ use indoc::indoc;
 use mago_fixer::SafetyClassification;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,7 +24,7 @@ pub struct NoSelfAssignmentRule {
     cfg: NoSelfAssignmentConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoSelfAssignmentConfig {
     pub level: Level,

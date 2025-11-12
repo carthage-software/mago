@@ -1,4 +1,5 @@
 use indoc::indoc;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -28,7 +29,7 @@ pub struct ExcessiveNestingRule {
     cfg: ExcessiveNestingConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ExcessiveNestingConfig {
     pub level: Level,

@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -30,7 +31,7 @@ pub struct NoRedundantUseRule {
     cfg: NoRedundantUseConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoRedundantUseConfig {
     pub level: Level,

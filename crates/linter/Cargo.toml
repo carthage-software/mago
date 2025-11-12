@@ -30,6 +30,7 @@ regex = { workspace = true }
 indoc = { workspace = true }
 bumpalo = { workspace = true }
 tracing = { workspace = true }
+schemars = { workspace = true }
 
 [dev-dependencies]
 mago-syntax = { workspace = true }

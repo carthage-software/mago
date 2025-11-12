@@ -1,6 +1,7 @@
 use std::fmt;
 
 use ahash::HashMap;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de;
@@ -14,14 +15,14 @@ use crate::path::NamespacePath;
 use crate::path::Path;
 use crate::path::is_valid_identifier_part;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Settings {
     pub perimeter: PerimeterSettings,
     pub structural: StructuralSettings,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PerimeterSettings {
     pub layers: HashMap<String, Vec<Path>>,
@@ -29,21 +30,22 @@ pub struct PerimeterSettings {
     pub rules: Vec<PerimeterRule>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PerimeterRule {
     pub namespace: NamespacePath,
     pub permit: Vec<PermittedDependency>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[schemars(untagged)]
 pub enum PermittedDependency {
     Dependency(Path),
     DependencyOfKind { path: Path, kinds: Vec<PermittedDependencyKind> },
 }
 
 /// Represents the specific types of symbols allowed from a path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum PermittedDependencyKind {
     ClassLike,
@@ -52,7 +54,7 @@ pub enum PermittedDependencyKind {
     Attribute,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct StructuralSettings {
     /// A list of structural rules to enforce across the codebase.
@@ -60,7 +62,7 @@ pub struct StructuralSettings {
 }
 
 /// Represents a single structural enforcement rule from `[[guard.structural.rules]]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct StructuralRule {
     /// The namespace pattern this rule applies to.
@@ -91,7 +93,7 @@ pub struct StructuralRule {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum StructuralSymbolKind {
     ClassLike,
@@ -104,8 +106,9 @@ pub enum StructuralSymbolKind {
 }
 
 /// Represents a logical constraint for `implement`, `extend`, or `use_traits`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, JsonSchema)]
 #[serde(untagged)]
+#[schemars(untagged)]
 pub enum StructuralInheritanceConstraint {
     /// An OR of ANDs, e.g., `[["A", "B"], ["C"]]`
     AnyOfAllOf(Vec<Vec<String>>),
