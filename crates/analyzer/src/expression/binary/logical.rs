@@ -11,6 +11,7 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -638,7 +639,7 @@ fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
         return;
     }
 
-    context.collector.report_with_code(
+    context.collector.propose_with_code(
         IssueCode::RedundantLogicalOperation,
         Issue::help(format!(
             "Redundant `{}` operation: left operand is {} and right operand is {}.",
@@ -660,6 +661,14 @@ fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
         .with_help(format!(
             "Consider simplifying or removing this logical expression as it always evaluates to {result_value_str}."
         )),
+        |plan| {
+            // PotentiallyUnsafe because we're removing expressions that might have side effects
+            plan.replace(
+                binary.span().to_range(),
+                result_value_str.trim_matches('`'),
+                SafetyClassification::PotentiallyUnsafe,
+            );
+        },
     );
 }
 

@@ -22,6 +22,7 @@ use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::*;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -789,7 +790,7 @@ fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
     known_type: &TUnion,
     context: &mut Context<'ctx, 'arena>,
 ) {
-    context.collector.report_with_code(
+    context.collector.propose_with_code(
         IssueCode::RedundantCast,
         Issue::help(format!("Redundant cast to `{}`: the expression already has this type.", cast_operator.as_str()))
             .with_annotation(
@@ -798,6 +799,11 @@ fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
             )
             .with_note("Casting a value to a type it already possesses has no effect.")
             .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
+        |plan| {
+            // Delete the cast operator, keep only the operand
+            // For `(string)$var`, delete `(string)` and keep `$var`
+            plan.delete(expression.operator.span().to_range(), SafetyClassification::Safe);
+        },
     );
 }
 

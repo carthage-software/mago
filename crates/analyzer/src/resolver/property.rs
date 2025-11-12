@@ -594,7 +594,7 @@ fn report_redundant_nullsafe<'ctx, 'ast, 'arena>(
 ) {
     let object_type_str = object_type.get_id();
 
-    context.collector.report_with_code(
+    context.collector.propose_with_code(
         IssueCode::RedundantNullsafeOperator,
         Issue::help("Redundant nullsafe operator (`?->`) used on an expression that is never `null`.")
             .with_annotation(
@@ -606,6 +606,11 @@ fn report_redundant_nullsafe<'ctx, 'ast, 'arena>(
             )
             .with_note("The nullsafe operator (`?->`) short-circuits the access if the object is `null`. Since this expression is guaranteed not to be `null`, this check is unnecessary.")
             .with_help("Consider using the direct property access operator (`->`) for clarity."),
+        |plan| {
+            // Replace `?->` with `->`
+            // Safe because we're just changing the operator, not removing any expressions
+            plan.replace(operator_span.to_range(), "->", SafetyClassification::Safe);
+        },
     );
 }
 

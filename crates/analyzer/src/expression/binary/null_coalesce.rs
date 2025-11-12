@@ -7,6 +7,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -59,7 +60,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     let mut rhs_is_never = false;
 
     if lhs_type.is_null() {
-        context.collector.report_with_code(
+        context.collector.propose_with_code(
             IssueCode::RedundantNullCoalesce,
             Issue::help("Redundant null coalesce: left-hand side is always `null`.")
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is always `null`"))
@@ -69,12 +70,18 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
                 )
                 .with_note("The right-hand side of `??` will always be evaluated.")
                 .with_help("Consider directly using the right-hand side expression."),
+            |plan| {
+                plan.delete(
+                    binary.lhs.span().join(binary.operator.span()).to_range(),
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+            },
         );
 
         binary.rhs.analyze(context, block_context, artifacts)?;
         result_type = artifacts.get_expression_type(&binary.rhs).cloned().unwrap_or_else(get_mixed); // Fallback if RHS analysis fails
     } else if !lhs_type.has_nullish() && !lhs_type.possibly_undefined && !lhs_type.possibly_undefined_from_try {
-        context.collector.report_with_code(
+        context.collector.propose_with_code(
             IssueCode::RedundantNullCoalesce,
             Issue::help(
                 "Redundant null coalesce: left-hand side can never be `null` or undefined."
@@ -90,6 +97,12 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
                 "The null coalesce operator `??` only evaluates the right-hand side if the left-hand side is `null` or not set.",
             )
             .with_help("Consider removing the `??` operator and the right-hand side expression."),
+            |plan| {
+                plan.delete(
+                    binary.operator.span().join(binary.rhs.span()).to_range(),
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+            },
         );
 
         result_type = (**lhs_type).clone();

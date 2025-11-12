@@ -11,6 +11,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
+use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -377,7 +378,22 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                     .with_help("Consider removing the `?:` operator and the right-hand side expression.")
                 };
 
-            context.collector.report_with_code(IssueCode::RedundantCondition, issue);
+            context.collector.propose_with_code(IssueCode::RedundantCondition, issue, |plan| {
+                if let Some(then_expr) = then {
+                    // Ternary: `$a ? $b : $c` where $a is always truthy
+                    // Delete `$a ?` and `: $c`, keep `$b`
+                    let before_then = condition.span().to_end(then_expr.span().start).to_range();
+                    let after_then = r#else.span().from_start(then_expr.span().end).to_range();
+
+                    plan.delete(before_then, SafetyClassification::PotentiallyUnsafe);
+                    plan.delete(after_then, SafetyClassification::PotentiallyUnsafe);
+                } else {
+                    // Elvis: `$a ?: $c` where $a is always truthy
+                    // Delete `?: $c`, keep `$a`
+                    let to_remove = r#else.span().from_start(condition.span().end).to_range();
+                    plan.delete(to_remove, SafetyClassification::PotentiallyUnsafe);
+                }
+            });
         } else if condition_type.is_always_falsy() {
             is_condition_falsy = true;
 
@@ -417,7 +433,14 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                     .with_help("Consider replacing the entire expression with just the right-hand side.")
                 };
 
-            context.collector.report_with_code(IssueCode::ImpossibleCondition, issue);
+            context.collector.propose_with_code(IssueCode::ImpossibleCondition, issue, |plan| {
+                // For always-falsy conditions, delete everything before the else expression
+                // This works for both ternary (`$a ? $b : $c`) and elvis (`$a ?: $c`)
+                plan.delete(
+                    condition.span().to_end(r#else.span().start).to_range(),
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+            });
         }
     }
 
