@@ -12,6 +12,7 @@ use crate::invocation::special_function_like_handler::psl::type_component::TypeC
 use crate::invocation::special_function_like_handler::random::RandomFunctionsHandler;
 use crate::invocation::special_function_like_handler::spl::iterator::IteratorFunctionsHandler;
 use crate::invocation::special_function_like_handler::standard::array::ArrayFunctionsHandler;
+use crate::invocation::special_function_like_handler::standard::json::JsonFunctionsHandler;
 use crate::invocation::special_function_like_handler::standard::string::StringFunctionsHandler;
 
 mod core;
@@ -45,6 +46,7 @@ pub fn handle_special_functions<'ctx, 'ast, 'arena>(
         // Standard PHP function handlers
         &StringFunctionsHandler,
         &ArrayFunctionsHandler,
+        &JsonFunctionsHandler,
         // SPL function handlers
         &IteratorFunctionsHandler,
         // Random extension function handlers
