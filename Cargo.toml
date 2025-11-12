@@ -64,7 +64,7 @@ pretty_assertions = { version = "1.4.1" }
 either = { version = "1.13.0" }
 codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-config = { version = "0.15.4", features = ["toml"] }
+config = { version = "0.15.4", features = ["toml", "yaml", "json"] }
 toml = "0.9.2"
 num_cpus = "1.16.0"
 regex = "1.11.0"
