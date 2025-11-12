@@ -1308,7 +1308,8 @@ fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         let should_inherit_return = child_method.return_type_metadata.is_none()
-            || !child_method.return_type_metadata.as_ref().unwrap().from_docblock;
+            || (child_method.return_type_metadata.as_ref().is_some_and(|m| !m.from_docblock)
+                && parent_return_type.as_ref().is_some_and(|p| p.from_docblock));
 
         if should_inherit_return && let Some((return_type, span)) = substituted_return_type {
             child_method.return_type_metadata =
@@ -1317,8 +1318,12 @@ fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
 
         for (i, substituted_param) in substituted_param_types.iter().enumerate() {
             if let Some(child_param) = child_method.parameters.get_mut(i) {
+                let parent_param_from_docblock =
+                    parent_parameters.get(i).and_then(|p| p.type_metadata.as_ref()).is_some_and(|m| m.from_docblock);
+
                 let should_inherit_param = child_param.type_metadata.is_none()
-                    || child_param.type_metadata.as_ref().is_some_and(|m| !m.from_docblock);
+                    || (child_param.type_metadata.as_ref().is_some_and(|m| !m.from_docblock)
+                        && parent_param_from_docblock);
 
                 if should_inherit_param && let Some((param_type, span)) = substituted_param {
                     child_param.type_metadata = Some(TypeMetadata {

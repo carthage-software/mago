@@ -280,11 +280,12 @@ impl FunctionLikeMetadata {
     /// Determines if this function/method needs docblock inheritance.
     ///
     /// Returns `true` if:
-    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (INHERITS_DOCS flag set)
+    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (INHERITS_DOCS flag set), OR
+    /// - The method has NO docblock at all (implicit inheritance)
     ///
-    /// Returns `false` otherwise.
+    /// Returns `false` otherwise (method has a docblock but no @inheritDoc).
     #[inline]
     pub fn needs_docblock_inheritance(&self) -> bool {
-        self.flags.contains(MetadataFlags::INHERITS_DOCS)
+        self.flags.contains(MetadataFlags::INHERITS_DOCS) || !self.has_docblock
     }
 }
