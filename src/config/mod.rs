@@ -278,6 +278,7 @@ impl Configuration {
             builder = builder.add_source(File::from(file).required(true));
         } else {
             let formats = [FileFormat::Toml, FileFormat::Yaml, FileFormat::Json];
+            // Check workspace first, then XDG, then home (workspace has highest precedence)
             let config_roots =
                 [Some(workspace_dir), std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()];
 
@@ -564,6 +565,11 @@ mod tests {
         let home_path = temp_dir().join("home-3");
         let xdg_config_home_path = temp_dir().join("xdg-config-home-3");
         let workspace_path = temp_dir().join("workspace-3");
+
+        // Clean up any existing directories from previous test runs
+        let _ = std::fs::remove_dir_all(&home_path);
+        let _ = std::fs::remove_dir_all(&xdg_config_home_path);
+        let _ = std::fs::remove_dir_all(&workspace_path);
 
         std::fs::create_dir_all(&home_path).unwrap();
         std::fs::create_dir_all(&xdg_config_home_path).unwrap();
