@@ -17,6 +17,7 @@ pub mod no_redundant_readonly;
 pub mod no_redundant_string_concat;
 pub mod no_redundant_use;
 pub mod no_redundant_write_visibility;
+pub mod no_self_assignment;
 
 pub use constant_condition::*;
 pub use no_closing_tag::*;
@@ -37,3 +38,4 @@ pub use no_redundant_readonly::*;
 pub use no_redundant_string_concat::*;
 pub use no_redundant_use::*;
 pub use no_redundant_write_visibility::*;
+pub use no_self_assignment::*;
