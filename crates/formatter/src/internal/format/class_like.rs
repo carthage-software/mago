@@ -1,3 +1,7 @@
+use std::cmp::Ordering;
+
+use bumpalo::collections::CollectIn;
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
@@ -51,7 +55,16 @@ pub fn print_class_like_body<'arena>(
             let mut last_member_kind = None;
             let mut last_has_line_after = false;
             let mut members = vec![in f.arena; Document::Line(Line::hard())];
-            for (i, item) in class_like_members.iter().enumerate() {
+
+            // Conditionally sort members if sort_class_methods is enabled
+            let members_to_format = if f.settings.sort_class_methods {
+                sort_class_members(f.arena, class_like_members)
+            } else {
+                class_like_members.iter().collect_in::<Vec<_>>(f.arena)
+            };
+
+            for (i, item) in members_to_format.iter().enumerate() {
+                let item = *item; // Dereference to get &ClassLikeMember
                 let member_kind = match item {
                     ClassLikeMember::TraitUse(_) => ClassLikeMemberKind::TraitUse,
                     ClassLikeMember::Constant(_) => ClassLikeMemberKind::Constant,
@@ -157,5 +170,125 @@ const fn should_add_empty_line_after(
         ClassLikeMemberKind::Property => f.settings.empty_line_after_property,
         ClassLikeMemberKind::EnumCase => f.settings.empty_line_after_enum_case,
         ClassLikeMemberKind::Method => f.settings.empty_line_after_method,
+    }
+}
+
+/// Sorts class members, specifically methods, according to a consistent ordering.
+/// Non-method members (constants, properties, trait uses, enum cases) maintain their original order.
+fn sort_class_members<'arena>(
+    arena: &'arena bumpalo::Bump,
+    members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
+) -> Vec<'arena, &'arena ClassLikeMember<'arena>> {
+    let mut sorted_members = members.iter().collect_in::<Vec<_>>(arena);
+
+    // Use stable sort to preserve relative order of non-methods and equal methods
+    sorted_members.sort_by(|a, b| {
+        match (*a, *b) {
+            // Only compare and sort methods; keep all other members in their original relative order
+            (ClassLikeMember::Method(method_a), ClassLikeMember::Method(method_b)) => {
+                compare_methods(method_a, method_b)
+            }
+            // Non-methods stay in original order relative to each other
+            _ => Ordering::Equal,
+        }
+    });
+
+    sorted_members
+}
+
+/// Compares two methods for sorting purposes.
+///
+/// Sorting order:
+/// 1. Constructor (`__construct`) comes first
+/// 2. Static methods (by visibility: public, protected, private)
+/// 3. Instance methods (by visibility: public, protected, private)
+/// 4. Other magic methods (e.g., `__toString`, `__get`, etc.)
+/// 5. Destructor (`__destruct`) comes last
+fn compare_methods<'arena>(a: &Method<'arena>, b: &Method<'arena>) -> Ordering {
+    let a_name = a.name.value;
+    let b_name = b.name.value;
+
+    // 1. Constructor always comes first
+    let a_is_constructor = a_name.eq_ignore_ascii_case("__construct");
+    let b_is_constructor = b_name.eq_ignore_ascii_case("__construct");
+
+    if a_is_constructor && !b_is_constructor {
+        return Ordering::Less;
+    }
+    if b_is_constructor && !a_is_constructor {
+        return Ordering::Greater;
+    }
+
+    // 2. Destructor always comes last
+    let a_is_destructor = a_name.eq_ignore_ascii_case("__destruct");
+    let b_is_destructor = b_name.eq_ignore_ascii_case("__destruct");
+
+    if a_is_destructor && !b_is_destructor {
+        return Ordering::Greater;
+    }
+    if b_is_destructor && !a_is_destructor {
+        return Ordering::Less;
+    }
+
+    // 3. Other magic methods (excluding constructor and destructor) come before destructor but after regular methods
+    let a_is_magic = a_name.starts_with("__") && !a_is_constructor && !a_is_destructor;
+    let b_is_magic = b_name.starts_with("__") && !b_is_constructor && !b_is_destructor;
+
+    match (a_is_magic, b_is_magic) {
+        (true, false) => return Ordering::Greater,
+        (false, true) => return Ordering::Less,
+        (true, true) => {
+            // Both are magic methods, sort alphabetically
+            return a_name.to_lowercase().cmp(&b_name.to_lowercase());
+        }
+        _ => {}
+    }
+
+    // 3. Sort by static vs instance (static comes first)
+    let a_is_static = a.is_static();
+    let b_is_static = b.is_static();
+
+    match (a_is_static, b_is_static) {
+        (true, false) => return Ordering::Less,
+        (false, true) => return Ordering::Greater,
+        _ => {}
+    }
+
+    // 4. Sort by visibility (public < protected < private)
+    let a_visibility = get_visibility_order(&a.modifiers);
+    let b_visibility = get_visibility_order(&b.modifiers);
+
+    match a_visibility.cmp(&b_visibility) {
+        Ordering::Equal => {}
+        other => return other,
+    }
+
+    // 5. Sort by abstract vs concrete (abstract comes first)
+    let a_is_abstract = a.is_abstract();
+    let b_is_abstract = b.is_abstract();
+
+    match (a_is_abstract, b_is_abstract) {
+        (true, false) => return Ordering::Less,
+        (false, true) => return Ordering::Greater,
+        _ => {}
+    }
+
+    // 6. Sort alphabetically by name (case-insensitive)
+    a_name.to_lowercase().cmp(&b_name.to_lowercase())
+}
+
+/// Returns a numeric order for visibility modifiers.
+/// Public = 0, Protected = 1, Private = 2
+/// If no visibility is specified, defaults to public (0).
+fn get_visibility_order(modifiers: &Sequence<'_, Modifier<'_>>) -> u8 {
+    if modifiers.contains_public() {
+        0
+    } else if modifiers.contains_protected() {
+        1
+    } else if modifiers.contains_private() {
+        2
+    } else {
+        // Default to public if no visibility specified
+        0
     }
 }

@@ -456,6 +456,27 @@ pub struct FormatSettings {
     #[serde(default = "default_true")]
     pub sort_uses: bool,
 
+    /// Whether to sort class methods by visibility and name.
+    ///
+    /// When enabled, methods in class-like structures are automatically reordered:
+    /// 1. Constructor (`__construct`) - always first
+    /// 2. Static methods (by visibility: public, protected, private)
+    ///    - Abstract methods before concrete methods
+    ///    - Alphabetically by name within each group
+    /// 3. Instance methods (by visibility: public, protected, private)
+    ///    - Abstract methods before concrete methods
+    ///    - Alphabetically by name within each group
+    /// 4. Other magic methods (e.g., `__toString`, `__get`, `__set`)
+    ///    - Sorted alphabetically by name
+    /// 5. Destructor (`__destruct`) - always last
+    ///
+    /// This applies to all class-like structures: classes, traits, interfaces, and enums.
+    /// Other members (constants, properties, trait uses, enum cases) remain in their original positions.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub sort_class_methods: bool,
+
     /// Whether to insert a blank line between different types of use statements.
     ///
     /// When enabled:
@@ -872,6 +893,7 @@ impl Default for FormatSettings {
             method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
             line_before_binary_operator: true,
             sort_uses: true,
+            sort_class_methods: false,
             separate_use_types: true,
             expand_use_groups: true,
             remove_trailing_close_tag: true,
