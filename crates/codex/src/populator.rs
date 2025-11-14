@@ -696,17 +696,22 @@ fn populate_class_like_metadata(
                 );
             }
         } else {
-            let metadata_mut = codebase
-                .class_likes
-                .get_mut(classlike_name)
-                .expect("Class-like metadata should exist in codebase after population of parents and traits");
+            // Check if the class exists in the symbols registry
+            // If it does, it just hasn't been populated yet, so skip validation for now
+            // If it doesn't exist in symbols, it's truly not found
+            if !codebase.symbols.contains(&source_class_name) {
+                let metadata_mut = codebase
+                    .class_likes
+                    .get_mut(classlike_name)
+                    .expect("Class-like metadata should exist in codebase after population of parents and traits");
 
-            metadata_mut.issues.push(
-                Issue::error(format!("Class `{}` not found for type import", source_class_name))
-                    .with_code("unknown-class-in-import-type")
-                    .with_annotation(Annotation::primary(import_span))
-                    .with_help(format!("Ensure that class `{}` is defined and scanned", source_class_name)),
-            );
+                metadata_mut.issues.push(
+                    Issue::error(format!("Class `{}` not found for type import", source_class_name))
+                        .with_code("unknown-class-in-import-type")
+                        .with_annotation(Annotation::primary(import_span))
+                        .with_help(format!("Ensure that class `{}` is defined and scanned", source_class_name)),
+                );
+            }
         }
     }
 

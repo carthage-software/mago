@@ -44,18 +44,21 @@ impl TAlias {
     /// Returns None if the alias cannot be resolved.
     pub fn resolve<'a>(&self, codebase: &'a CodebaseMetadata) -> Option<&'a TUnion> {
         let class_like = codebase.get_class_like(&self.class_name)?;
+        if let Some(type_alias) = class_like.type_aliases.get(&self.alias_name) {
+            return Some(&type_alias.type_union);
+        }
 
-        class_like.type_aliases.get(&self.alias_name).map(|type_metadata| &type_metadata.type_union).or_else(|| {
-            class_like
-                .imported_type_aliases
-                .get(&self.alias_name)
-                .and_then(|(source_class, type_alias, _)| {
-                    codebase
-                        .get_class_like(source_class)
-                        .and_then(|source_class_like| source_class_like.type_aliases.get(type_alias))
-                })
-                .map(|type_metadata| &type_metadata.type_union)
-        })
+        let (source_class, type_alias, _) = class_like.imported_type_aliases.get(&self.alias_name)?;
+
+        let type_metadata = if source_class == &self.class_name {
+            class_like.type_aliases.get(type_alias)
+        } else {
+            codebase
+                .get_class_like(source_class)
+                .and_then(|source_class_like| source_class_like.type_aliases.get(type_alias))
+        };
+
+        Some(&type_metadata?.type_union)
     }
 }
 

@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashSet;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
@@ -26,6 +28,11 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
 use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
+
+thread_local! {
+    /// Thread-local stack to track currently expanding aliases and detect cycles
+    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom)>> = RefCell::new(HashSet::new());
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum StaticClassType {
@@ -601,11 +608,35 @@ fn expand_index_access(
 }
 
 fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> Vec<TAtomic> {
+    let alias_key = (alias.get_class_name(), alias.get_alias_name());
+
+    // Check if we're already expanding this alias (cycle detection)
+    let is_cycle = EXPANDING_ALIASES.with(|expanding| {
+        let expanding = expanding.borrow();
+        expanding.contains(&alias_key)
+    });
+
+    if is_cycle {
+        // Cycle detected - return the alias as-is without expansion
+        return vec![TAtomic::Alias(alias.clone())];
+    }
+
     let Some(mut expanded_union) = alias.resolve(codebase).cloned() else {
         return vec![TAtomic::Alias(alias.clone())];
     };
 
+    // Add this alias to the expansion stack
+    EXPANDING_ALIASES.with(|expanding| {
+        expanding.borrow_mut().insert(alias_key);
+    });
+
+    // Expand the resolved union
     expand_union(codebase, &mut expanded_union, options);
+
+    // Remove this alias from the expansion stack
+    EXPANDING_ALIASES.with(|expanding| {
+        expanding.borrow_mut().remove(&alias_key);
+    });
 
     expanded_union.types.into_owned()
 }
