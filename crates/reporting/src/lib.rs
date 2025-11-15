@@ -517,6 +517,10 @@ impl IssueCollection {
         self.issues.retain(|issue| if let Some(code) = &issue.code { !ignore.contains(code) } else { true });
     }
 
+    pub fn filter_retain_codes(&mut self, retain_codes: &[String]) {
+        self.issues.retain(|issue| if let Some(code) = &issue.code { retain_codes.contains(code) } else { false });
+    }
+
     pub fn take_suggestions(&mut self) -> impl Iterator<Item = (FileId, FixPlan)> + '_ {
         self.issues.iter_mut().flat_map(|issue| issue.take_suggestions())
     }

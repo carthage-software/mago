@@ -153,6 +153,26 @@ pub struct ReportingArgs {
         value_parser = enum_variants!(Level)
     )]
     pub minimum_report_level: Option<Level>,
+
+    /// Retain only issues with the specified code(s).
+    ///
+    /// When provided, only issues matching one of the specified codes will be displayed.
+    /// All other issues will be filtered out. This is the inverse of the ignore
+    /// configuration - it keeps only the specified codes instead of removing them.
+    ///
+    /// Can be specified multiple times to retain multiple issue codes.
+    ///
+    /// IMPORTANT: This is a reporting filter only. All rules and checks still run;
+    /// only the output is filtered. This is different from `--only` in the lint
+    /// command, which runs only specific rules. For example:
+    ///   - `mago lint --only foo`: Runs ONLY the 'foo' rule
+    ///   - `mago lint --retain-code foo`: Runs ALL rules, shows only 'foo' issues
+    ///
+    /// Examples:
+    ///   --retain-code invalid-argument
+    ///   --retain-code invalid-argument --retain-code semantics
+    #[arg(long, value_name = "CODE")]
+    pub retain_code: Vec<String>,
 }
 
 impl ReportingArgs {
@@ -183,6 +203,7 @@ impl ReportingArgs {
             reporting_format: self.reporting_format,
             minimum_fail_level: self.minimum_fail_level,
             minimum_report_level: self.minimum_report_level,
+            retain_code: self.retain_code.clone(),
             color_choice,
         }
     }

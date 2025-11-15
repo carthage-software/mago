@@ -29,6 +29,32 @@ These options customize how Mago reports the issues it finds.
 | `--reporting-target <TARGET>`        | Specify where to report results. Options: `stdout`, `stderr`. Default: `stdout`.                                                |
 | `--reporting-format <FORMAT>`        | Choose the output format. See below for options. Default: `rich`.                                                               |
 | `--minimum-fail-level <LEVEL>`, `-m` | Set the minimum issue level that will cause a failure exit code. Options: `note`, `help`, `warning`, `error`. Default: `error`. |
+| `--minimum-report-level <LEVEL>`     | Set the minimum issue severity to include in the report. Issues below this level are filtered out.                              |
+| `--retain-code <CODE>`               | Retain only issues with the specified code(s). Can be specified multiple times. **This is a reporting filter only** - all rules/checks still run. See below for details. |
+
+:::info Difference between `--only` and `--retain-code`
+The `--retain-code` option is **not the same** as the `--only` option available in `mago lint`:
+
+- **`mago lint --only <RULE>`**: Runs **only** the specified rule(s). Other rules are completely skipped, improving performance.
+- **`mago lint --retain-code <CODE>`**: Runs **all** rules, but filters the output to show only issues with the specified code(s).
+
+**Example:**
+```sh
+# Run only the 'no-unused-variable' rule
+mago lint --only no-unused-variable
+
+# Run all rules, but show only 'no-unused-variable' issues in output
+mago lint --retain-code no-unused-variable
+
+# Retain multiple issue codes (runs all rules, shows only these codes)
+mago lint --retain-code no-unused-variable --retain-code semantics
+
+# For analyze command (no --only option available)
+mago analyze --retain-code invalid-argument --retain-code type-mismatch
+```
+
+Use `--only` when you want faster execution by running fewer rules. Use `--retain-code` when you want to focus on specific issue types in the output while still getting the benefit of all checks running.
+:::
 
 ### Reporting Formats
 

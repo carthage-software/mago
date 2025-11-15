@@ -175,6 +175,13 @@ pub struct IssueProcessor {
     /// issues are reported. Only applies in report mode.
     pub minimum_report_level: Option<Level>,
 
+    /// Retain only issues with the specified code(s).
+    ///
+    /// When non-empty, only issues with codes matching one of the specified
+    /// values are reported. All other issues are filtered out. This is the
+    /// inverse of ignore filtering. Only applies in report mode.
+    pub retain_code: Vec<String>,
+
     /// Color output choice for diffs and reports.
     ///
     /// Controls whether colored output is used in diffs (fix mode) and reports
@@ -346,11 +353,32 @@ impl IssueProcessor {
     fn handle_report_mode<'d>(
         &self,
         database: &'d Database<'d>,
-        issues: IssueCollection,
+        mut issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
+
+        // Filter to only show issues with the specified codes, if provided
+        if !self.retain_code.is_empty() {
+            let total_before_filter = issues.len();
+            issues.filter_retain_codes(&self.retain_code);
+            let total_after_filter = issues.len();
+            let filtered_count = total_before_filter - total_after_filter;
+
+            let codes_list = self.retain_code.join(", ");
+
+            if total_after_filter == 0 && total_before_filter > 0 {
+                tracing::warn!("No issues found matching code(s): {}", codes_list);
+            } else if filtered_count > 0 {
+                tracing::info!(
+                    "Retaining {} of {} issues with code(s): {}",
+                    total_after_filter,
+                    total_before_filter,
+                    codes_list
+                );
+            }
+        }
 
         let issues_to_report = issues;
 
