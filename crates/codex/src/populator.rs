@@ -29,6 +29,8 @@ use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::reference::TReference;
+use crate::ttype::comparator::ComparisonResult;
+use crate::ttype::comparator::union_comparator;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
@@ -268,9 +270,6 @@ pub fn populate_codebase(
         }
     }
 
-    // Perform docblock inheritance for methods with @inheritDoc or no docblock
-    inherit_method_docblocks(codebase);
-
     let mut direct_classlike_descendants = AtomMap::default();
     let mut all_classlike_descendants = AtomMap::default();
 
@@ -301,6 +300,9 @@ pub fn populate_codebase(
             direct_classlike_descendants.entry(*parent_class).or_insert_with(AtomSet::default).insert(*class_like_name);
         }
     }
+
+    // Perform docblock inheritance for methods with @inheritDoc or no docblock
+    inherit_method_docblocks(codebase);
 
     codebase.all_class_like_descendants = all_classlike_descendants;
     codebase.direct_classlike_descendants = direct_classlike_descendants;
@@ -1298,46 +1300,122 @@ fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
                     throw_type_union = inferred_type_replacer::replace(&throw_type_union, template_result, codebase);
                 }
 
-                TypeMetadata {
-                    type_union: throw_type_union,
-                    span: throw_type.span,
-                    from_docblock: true,
-                    inferred: false,
+                TypeMetadata::from_docblock(throw_type_union, throw_type.span)
+            })
+            .collect();
+
+        // First, gather child method info without holding a mutable reference
+        // This allows us to do variance checks that require immutable access to codebase
+        let (child_return_type_metadata, child_param_type_metadata, has_explicit_inherit_doc) = {
+            let child_method = match codebase.function_likes.get(&child_method_id) {
+                Some(m) => m,
+                None => continue,
+            };
+            (
+                child_method.return_type_metadata.clone(),
+                child_method.parameters.iter().map(|p| p.type_metadata.clone()).collect::<Vec<_>>(),
+                child_method.flags.contains(MetadataFlags::INHERITS_DOCS),
+            )
+        };
+
+        let child_has_native_return = child_return_type_metadata.as_ref().is_some_and(|m| !m.from_docblock);
+        let parent_return_from_docblock = parent_return_type.as_ref().is_some_and(|p| p.from_docblock);
+
+        // Check variance when both child has native return type and parent has docblock return type
+        // Skip variance checks if child has explicit @inheritDoc (user explicitly wants to inherit)
+        let should_inherit_return =
+            if child_has_native_return && parent_return_from_docblock && !has_explicit_inherit_doc {
+                // Both types exist and no explicit @inheritDoc - check covariance (return types can be narrowed in child)
+                if let Some((ref parent_return_type, _)) = substituted_return_type
+                    && let Some(ref child_return_type) = child_return_type_metadata
+                {
+                    let mut comparison_result = ComparisonResult::new();
+
+                    // Check if child ⊆ parent (child is narrower or equal)
+                    // This means the child's return type is valid (covariance allows narrower types)
+                    let child_is_narrower_or_equal = union_comparator::is_contained_by(
+                        codebase,
+                        &child_return_type.type_union,
+                        parent_return_type,
+                        false,
+                        false,
+                        false,
+                        &mut comparison_result,
+                    );
+
+                    // Only inherit if child is NOT validly narrower (i.e., types are incompatible)
+                    !child_is_narrower_or_equal
+                } else {
+                    // Can't compare, use original logic
+                    true
+                }
+            } else {
+                // Original logic: inherit if child has no return type at all, or has explicit @inheritDoc
+                child_return_type_metadata.is_none()
+                    || (child_has_native_return && parent_return_from_docblock && has_explicit_inherit_doc)
+            };
+
+        // Pre-calculate which parameters should be inherited (all variance checks done with immutable access)
+        let params_to_inherit: Vec<bool> = substituted_param_types
+            .iter()
+            .enumerate()
+            .map(|(i, substituted_param)| {
+                let child_param_type = child_param_type_metadata.get(i).and_then(|m| m.as_ref());
+                let parent_param_from_docblock =
+                    parent_parameters.get(i).and_then(|p| p.type_metadata.as_ref()).is_some_and(|m| m.from_docblock);
+
+                let child_has_native_type = child_param_type.is_some_and(|m| !m.from_docblock);
+
+                // Check variance when both child has native type and parent has docblock type
+                // Skip variance checks if child has explicit @inheritDoc (user explicitly wants to inherit)
+                if child_has_native_type && parent_param_from_docblock && !has_explicit_inherit_doc {
+                    // Both types exist and no explicit @inheritDoc - check contravariance (parameters can be widened in child)
+                    if let Some((parent_param_type, _)) = substituted_param
+                        && let Some(child_param_type) = child_param_type
+                    {
+                        // Check if parent ⊆ child (parent is narrower or equal)
+                        // This means the child's type is valid (contravariance allows wider types)
+                        let parent_is_narrower_or_equal = union_comparator::is_contained_by(
+                            codebase,
+                            parent_param_type,
+                            &child_param_type.type_union,
+                            false,
+                            false,
+                            false,
+                            &mut ComparisonResult::new(),
+                        );
+
+                        // Only inherit if child is NOT validly wider (i.e., types are incompatible)
+                        !parent_is_narrower_or_equal
+                    } else {
+                        // Can't compare, use original logic
+                        true
+                    }
+                } else {
+                    // Original logic: inherit if child has no type at all, or has explicit @inheritDoc
+                    child_param_type.is_none()
+                        || (child_has_native_type && parent_param_from_docblock && has_explicit_inherit_doc)
                 }
             })
             .collect();
 
+        // Now get mutable reference again to apply all changes
         let child_method = match codebase.function_likes.get_mut(&child_method_id) {
             Some(m) => m,
             None => continue,
         };
 
-        let should_inherit_return = child_method.return_type_metadata.is_none()
-            || (child_method.return_type_metadata.as_ref().is_some_and(|m| !m.from_docblock)
-                && parent_return_type.as_ref().is_some_and(|p| p.from_docblock));
-
-        if should_inherit_return && let Some((return_type, span)) = substituted_return_type {
-            child_method.return_type_metadata =
-                Some(TypeMetadata { type_union: return_type, span, from_docblock: true, inferred: false });
+        if should_inherit_return && let Some((type_union, span)) = substituted_return_type {
+            child_method.return_type_metadata = Some(TypeMetadata::from_docblock(type_union, span))
         }
 
-        for (i, substituted_param) in substituted_param_types.iter().enumerate() {
-            if let Some(child_param) = child_method.parameters.get_mut(i) {
-                let parent_param_from_docblock =
-                    parent_parameters.get(i).and_then(|p| p.type_metadata.as_ref()).is_some_and(|m| m.from_docblock);
-
-                let should_inherit_param = child_param.type_metadata.is_none()
-                    || (child_param.type_metadata.as_ref().is_some_and(|m| !m.from_docblock)
-                        && parent_param_from_docblock);
-
-                if should_inherit_param && let Some((param_type, span)) = substituted_param {
-                    child_param.type_metadata = Some(TypeMetadata {
-                        type_union: param_type.clone(),
-                        span: *span,
-                        from_docblock: true,
-                        inferred: false,
-                    });
-                }
+        // Apply the parameter inheritance decisions
+        for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
+            if let Some(true) = params_to_inherit.get(i).copied()
+                && let Some(child_param) = child_method.parameters.get_mut(i)
+                && let Some((type_union, span)) = substituted_param
+            {
+                child_param.type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
             }
         }
 

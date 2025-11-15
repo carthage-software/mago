@@ -58,6 +58,23 @@ impl TypeMetadata {
         Self { span, type_union, from_docblock: false, inferred: false }
     }
 
+    /// Creates new `TypeMetadata` for a type extracted from a documentation block.
+    ///
+    /// This constructor is used when type information is sourced from
+    /// docblock comments rather than executable code.
+    ///
+    /// # Arguments
+    ///
+    /// * `type_union`: The core type information (`TUnion`).
+    /// * `span`: The source code location associated with this docblock type.
+    ///
+    /// # Returns
+    ///
+    /// A new `TypeMetadata` instance with `from_docblock` set to `true` and `inferred` set to `false`.
+    pub fn from_docblock(type_union: TUnion, span: Span) -> Self {
+        Self { span, type_union, from_docblock: true, inferred: false }
+    }
+
     /// Creates a new `TypeMetadata` by applying a function to the inner `TUnion`.
     ///
     /// This allows transforming the core type while preserving the surrounding metadata.
