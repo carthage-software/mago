@@ -33,6 +33,9 @@ pub use security::*;
 
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 pub trait Config: Default + DeserializeOwned {
     /// Whether the rule is enabled by default.
     fn default_enabled() -> bool {

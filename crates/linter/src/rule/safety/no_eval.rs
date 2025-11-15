@@ -104,3 +104,111 @@ impl LintRule for NoEvalRule {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoEvalRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = json_decode_is_safe,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            $result = json_decode($jsonString);
+            echo $result;
+        "#}
+    }
+
+    test_lint_success! {
+        name = regular_function_call_is_safe,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            function process($data) {
+                return strtoupper($data);
+            }
+
+            $output = process("hello");
+        "#}
+    }
+
+    test_lint_success! {
+        name = string_eval_variable_name_is_not_eval_construct,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            $eval = "some value";
+            echo $eval;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = direct_eval_call_fails,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            eval('echo "Hello, world!";');
+        "#}
+    }
+
+    test_lint_failure! {
+        name = eval_with_variable_fails,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            $code = '$a = 1 + 2;';
+            eval($code);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = eval_in_condition_fails,
+        rule = NoEvalRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($needsEval) {
+                eval($userInput);
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = multiple_evals_detected,
+        rule = NoEvalRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            eval($code1);
+            eval($code2);
+            eval($code3);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = nested_eval_counted,
+        rule = NoEvalRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            function dangerous() {
+                eval('$x = 1;');
+
+                if (true) {
+                    eval('$y = 2;');
+                }
+            }
+        "#}
+    }
+}
