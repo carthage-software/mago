@@ -193,7 +193,7 @@ impl LintCommand {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
         if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter());
+            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
         let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;

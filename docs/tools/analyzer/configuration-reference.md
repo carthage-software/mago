@@ -26,6 +26,19 @@ baseline = "analyzer-baseline.toml"
 | `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally.         |
 | `baseline` | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 
+:::tip Tool-Specific Excludes
+The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from analysis, and this option allows you to exclude additional files from the analyzer specifically.
+
+For example:
+```toml
+[source]
+excludes = ["cache/**"]  # Excluded from ALL tools
+
+[analyzer]
+excludes = ["tests/**/*.php"]  # Additionally excluded from analyzer only
+```
+:::
+
 ## Feature flags
 
 These flags control specific, powerful analysis capabilities.

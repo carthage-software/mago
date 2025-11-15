@@ -3,8 +3,6 @@
 //! This module defines [`OrchestratorConfiguration`], which aggregates all settings
 //! needed by the orchestrator and its various services.
 
-use std::path::Path;
-
 use mago_analyzer::settings::Settings as AnalyzerSettings;
 use mago_formatter::settings::FormatSettings;
 use mago_guard::settings::Settings as GuardSettings;
@@ -33,25 +31,32 @@ pub struct OrchestratorConfiguration<'a> {
     /// and disjunctive normal form types.
     pub php_version: PHPVersion,
 
-    /// Directories containing source files to analyze.
+    /// Paths or glob patterns for source files to analyze.
     ///
     /// These are the primary targets for linting, formatting, and analysis. If empty,
     /// the entire workspace directory will be scanned for PHP files.
     ///
+    /// Supports both directory paths and glob patterns:
+    /// - Directory paths: `"src"`, `"tests"` - recursively scans all files
+    /// - Glob patterns: `"src/**/*.php"`, `"tests/Unit/*Test.php"` - matches specific files
+    ///
     /// # Examples
     ///
-    /// - `vec![PathBuf::from("src")]` - Only analyze files in the `src` directory
-    /// - `vec![PathBuf::from("src"), PathBuf::from("tests")]` - Analyze both `src` and `tests`
+    /// - `vec!["src"]` - Only analyze files in the `src` directory
+    /// - `vec!["src", "tests"]` - Analyze both `src` and `tests`
+    /// - `vec!["src/**/*.php"]` - Only analyze PHP files in src using glob pattern
     /// - `vec![]` - Scan the entire workspace
-    pub paths: Vec<&'a Path>,
+    pub paths: Vec<String>,
 
-    /// Additional files or directories to include for context.
+    /// Paths or glob patterns for files to include for context.
     ///
     /// Files in this list provide context for analysis (e.g., vendor dependencies) but
     /// are not directly analyzed, linted, or formatted themselves. This is useful for
     /// including third-party code that provides type information without actually checking
     /// that code.
-    pub includes: Vec<&'a Path>,
+    ///
+    /// Supports both directory paths and glob patterns (same as `paths`).
+    pub includes: Vec<String>,
 
     /// Glob patterns or paths to exclude from file scanning.
     ///

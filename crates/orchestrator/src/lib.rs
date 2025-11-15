@@ -113,16 +113,12 @@ impl<'a> Orchestrator<'a> {
     ///
     /// # Arguments
     ///
-    /// * `paths` - The new source paths to analyze
-    pub fn set_source_paths<T>(&mut self, paths: impl Iterator<Item = &'a T>)
-    where
-        T: AsRef<Path> + 'a,
-    {
-        let mut paths = paths.map(|p| p.as_ref()).collect::<Vec<&'a Path>>();
+    /// * `paths` - The new source paths or glob patterns to analyze
+    pub fn set_source_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<str>>) {
+        let old_paths = std::mem::take(&mut self.config.paths);
 
-        std::mem::swap(&mut self.config.paths, &mut paths);
-
-        self.config.includes.extend(paths);
+        self.config.paths = paths.into_iter().map(|p| p.as_ref().to_string()).collect();
+        self.config.includes.extend(old_paths);
     }
 
     /// Loads the database by scanning the file system according to the configuration.
@@ -144,12 +140,15 @@ impl<'a> Orchestrator<'a> {
     ///
     /// Returns a [`Database`] containing all discovered PHP files, or an [`OrchestratorError`]
     /// if the database could not be loaded.
-    pub fn load_database(
-        &self,
+    pub fn load_database<'b>(
+        &'b self,
         workspace: &'a Path,
         include_externals: bool,
         prelude_database: Option<Database<'static>>,
-    ) -> Result<Database<'static>, OrchestratorError> {
+    ) -> Result<Database<'a>, OrchestratorError>
+    where
+        'b: 'a,
+    {
         /// Converts string patterns from the configuration into `Exclusion` types.
         fn create_excludes_from_patterns<'a>(patterns: &[&'a str], root: &Path) -> Vec<Exclusion<'a>> {
             patterns
@@ -173,41 +172,29 @@ impl<'a> Orchestrator<'a> {
                 .collect()
         }
 
-        let excludes = create_excludes_from_patterns(&self.config.excludes, workspace);
-        let excludes_static: Vec<Exclusion<'static>> = excludes
-            .into_iter()
-            .map(|e| match e {
-                Exclusion::Path(p) => Exclusion::Path(Cow::Owned(p.into_owned())),
-                Exclusion::Pattern(pat) => Exclusion::Pattern(Cow::Owned(pat.into_owned())),
-            })
-            .collect();
+        let includes = if include_externals {
+            self.config.includes.iter().map(|s| Cow::Borrowed(s.as_ref())).collect::<Vec<Cow<'a, str>>>()
+        } else {
+            Vec::new()
+        };
 
-        let includes = if include_externals { self.config.includes.clone() } else { vec![] };
+        let configuration: DatabaseConfiguration<'a> = DatabaseConfiguration {
+            workspace: Cow::Borrowed(workspace),
+            paths: self.config.paths.iter().map(|s| Cow::Borrowed(s.as_ref())).collect(),
+            includes,
+            excludes: create_excludes_from_patterns(&self.config.excludes, workspace),
+            extensions: self.config.extensions.iter().map(|s| Cow::Borrowed(s.as_ref())).collect(),
+        };
 
-        let configuration = Box::new(DatabaseConfiguration {
-            workspace: Cow::Owned(workspace.to_path_buf()),
-            paths: self
-                .config
-                .paths
-                .iter()
-                .map(|p| if p.is_absolute() { Cow::Owned(p.to_path_buf()) } else { Cow::Owned(workspace.join(p)) })
-                .collect(),
-            includes: includes
-                .iter()
-                .map(|p| if p.is_absolute() { Cow::Owned(p.to_path_buf()) } else { Cow::Owned(workspace.join(p)) })
-                .collect(),
-            excludes: excludes_static,
-            extensions: self.config.extensions.iter().map(|s| Cow::Owned(s.to_string())).collect(),
-        });
-
-        let configuration_ref: &'static _ = Box::leak(configuration);
-        let mut loader = DatabaseLoader::new(configuration_ref);
+        let mut loader = DatabaseLoader::new(configuration);
 
         if let Some(prelude_db) = prelude_database {
             loader = loader.with_database(prelude_db);
         }
 
-        loader.load().map_err(OrchestratorError::Database)
+        let result = loader.load().map_err(OrchestratorError::Database)?;
+
+        Ok(result)
     }
 
     /// Creates a linting service with the current configuration.

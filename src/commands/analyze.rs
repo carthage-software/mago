@@ -164,7 +164,7 @@ impl AnalyzeCommand {
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
         if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter());
+            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
         // Check if watch mode is enabled early, since it needs ownership of configuration

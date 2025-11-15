@@ -97,8 +97,12 @@ mod operation;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfiguration<'a> {
     pub workspace: Cow<'a, Path>,
-    pub paths: Vec<Cow<'a, Path>>,
-    pub includes: Vec<Cow<'a, Path>>,
+    /// Paths or glob patterns for source files.
+    /// Can be directory paths (e.g., "src") or glob patterns (e.g., "src/**/*.php")
+    pub paths: Vec<Cow<'a, str>>,
+    /// Paths or glob patterns for included files.
+    /// Can be directory paths (e.g., "vendor") or glob patterns (e.g., "vendor/**/*.php")
+    pub includes: Vec<Cow<'a, str>>,
     pub excludes: Vec<Exclusion<'a>>,
     pub extensions: Vec<Cow<'a, str>>,
 }
@@ -106,13 +110,13 @@ pub struct DatabaseConfiguration<'a> {
 impl<'a> DatabaseConfiguration<'a> {
     pub fn new(
         workspace: &'a Path,
-        paths: Vec<&'a Path>,
-        includes: Vec<&'a Path>,
+        paths: Vec<&'a str>,
+        includes: Vec<&'a str>,
         excludes: Vec<Exclusion<'a>>,
         extensions: Vec<&'a str>,
     ) -> Self {
-        let paths = canonicalize_paths(workspace, paths);
-        let includes = canonicalize_paths(workspace, includes);
+        let paths = paths.into_iter().map(Cow::Borrowed).collect();
+        let includes = includes.into_iter().map(Cow::Borrowed).collect();
 
         let excludes = excludes
             .into_iter()
@@ -134,8 +138,8 @@ impl<'a> DatabaseConfiguration<'a> {
     pub fn into_static(self) -> DatabaseConfiguration<'static> {
         DatabaseConfiguration {
             workspace: Cow::Owned(self.workspace.into_owned()),
-            paths: self.paths.into_iter().map(|p| Cow::Owned(p.into_owned())).collect(),
-            includes: self.includes.into_iter().map(|p| Cow::Owned(p.into_owned())).collect(),
+            paths: self.paths.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
+            includes: self.includes.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
             excludes: self
                 .excludes
                 .into_iter()
@@ -147,24 +151,6 @@ impl<'a> DatabaseConfiguration<'a> {
             extensions: self.extensions.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
         }
     }
-}
-
-fn canonicalize_paths<'a>(workspace: &'a Path, paths: Vec<&'a Path>) -> Vec<Cow<'a, Path>> {
-    paths
-        .into_iter()
-        .filter_map(|p| {
-            Some(if p.is_absolute() {
-                Cow::Borrowed(p)
-            } else {
-                workspace
-                    .join(p)
-                    .canonicalize()
-                    .inspect_err(|_| tracing::warn!("Ignoring invalid or non-existent path `{}`", p.display()))
-                    .ok()
-                    .map(Cow::Owned)?
-            })
-        })
-        .collect()
 }
 
 /// Mutable database for managing project files with add/update/delete operations.

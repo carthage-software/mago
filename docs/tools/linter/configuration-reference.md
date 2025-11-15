@@ -32,6 +32,19 @@ cyclomatic-complexity = { threshold = 20 }
 | `integrations` | `string[]` | `[]`    | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
 | `baseline`     | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the linter will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 
+:::tip Tool-Specific Excludes
+The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from linting, and this option allows you to exclude additional files from the linter specifically.
+
+For example:
+```toml
+[source]
+excludes = ["cache/**"]  # Excluded from ALL tools
+
+[linter]
+excludes = ["database/migrations/**"]  # Additionally excluded from linter only
+```
+:::
+
 ## `[linter.rules]`
 
 This table allows you to configure individual lint rules. Each key is the rule's code (in `kebab-case`).

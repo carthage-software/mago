@@ -43,11 +43,14 @@ $ mago init
 
 If no `composer.json` is found, or if you choose to configure things manually, the command will prompt you for:
 
-- Source code paths (`src`, `tests`, etc.)
-- Dependency paths (`vendor`)
-- Paths to exclude
-- PHP version
-- Linter integrations (Symfony, Laravel, etc.)
+- **Source code paths** - Your application code that Mago should analyze, lint, and format (e.g., `src`, `tests`)
+  - These will be saved to the `paths` configuration option
+- **Dependency paths** - Third-party code and vendor packages that provide context but shouldn't be processed (e.g., `vendor`)
+  - These will be saved to the `includes` configuration option
+- **Paths to exclude** - Directories or patterns to completely skip (e.g., `cache`, `build`)
+  - These will be saved to the `excludes` configuration option
+- **PHP version** - The PHP version your project targets
+- **Linter integrations** - Framework-specific rules to enable (Symfony, Laravel, etc.)
 
 Once the process is complete, you'll have a `mago.toml` file in your project root. For more details on the available options in this file, see the [Configuration Overview](/guide/configuration.md).
 

@@ -14,6 +14,8 @@ pub enum DatabaseError {
     IOError(std::io::Error),
     /// The set of user-provided glob patterns could not be compiled into a `GlobSet`.
     InvalidGlobSet(GlobSetError),
+    /// An error occurred while processing a glob pattern.
+    Glob(String),
     /// The file being loaded into the database is too large to be processed.
     FileTooLarge(PathBuf, usize, usize),
     /// An attempt was made to commit or consume a `ChangeLog` while other
@@ -39,6 +41,7 @@ impl std::fmt::Display for DatabaseError {
             Self::FileNotFound => write!(f, "file not found in database"),
             Self::IOError(err) => write!(f, "I/O error: {err}"),
             Self::InvalidGlobSet(err) => write!(f, "failed to build exclusion filter from patterns: {err}"),
+            Self::Glob(err) => write!(f, "glob pattern error: {err}"),
             Self::FileTooLarge(path, size, max_size) => {
                 write!(
                     f,

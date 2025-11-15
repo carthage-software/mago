@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
@@ -107,14 +108,16 @@ impl<'a> DatabaseWatcher<'a> {
 
         let mut watched_paths = Vec::new();
         for path in &config.paths {
-            watcher.watch(path.as_ref(), RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
-            watched_paths.push(path.as_ref().to_path_buf());
-            tracing::debug!("Watching path: {}", path.display());
+            let path_buf = Path::new(path.as_ref()).to_path_buf();
+            watcher.watch(&path_buf, RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
+            watched_paths.push(path_buf.clone());
+            tracing::debug!("Watching path: {}", path_buf.display());
         }
         for path in &config.includes {
-            watcher.watch(path.as_ref(), RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
-            watched_paths.push(path.as_ref().to_path_buf());
-            tracing::debug!("Watching include path: {}", path.display());
+            let path_buf = Path::new(path.as_ref()).to_path_buf();
+            watcher.watch(&path_buf, RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
+            watched_paths.push(path_buf.clone());
+            tracing::debug!("Watching include path: {}", path_buf.display());
         }
 
         tracing::info!("Database watcher started for workspace: {}", config.workspace.display());

@@ -15,6 +15,19 @@ This is the main table for the guard tool.
 | :--------- | :--------- | :------ | :--------------------------------------------------------- |
 | `excludes` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from analysis. |
 
+:::tip Tool-Specific Excludes
+The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from guard analysis, and this option allows you to exclude additional files from the guard specifically.
+
+For example:
+```toml
+[source]
+excludes = ["cache/**"]  # Excluded from ALL tools
+
+[guard]
+excludes = ["src/ThirdParty/**"]  # Additionally excluded from guard only
+```
+:::
+
 ## Perimeter Guard: `[guard.perimeter]`
 
 This section defines the rules for dependency validation between different parts of your application.

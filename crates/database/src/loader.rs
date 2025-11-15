@@ -22,12 +22,12 @@ use crate::utils::read_file;
 /// Builder for loading files into a Database from the filesystem and memory.
 pub struct DatabaseLoader<'a> {
     database: Option<Database<'a>>,
-    configuration: &'a DatabaseConfiguration<'a>,
+    configuration: DatabaseConfiguration<'a>,
     memory_sources: Vec<(&'static str, &'static str, FileType)>,
 }
 
 impl<'a> DatabaseLoader<'a> {
-    pub fn new(configuration: &'a DatabaseConfiguration<'a>) -> Self {
+    pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
         Self { configuration, memory_sources: vec![], database: None }
     }
 
@@ -84,15 +84,19 @@ impl<'a> DatabaseLoader<'a> {
             &path_excludes,
         )?;
 
-        let mut host_file_ids = HashSet::new();
+        let mut vendored_file_ids = HashSet::new();
 
-        for file in host_files {
-            host_file_ids.insert(file.id);
+        // Add vendored files first - 'includes' takes precedence over 'paths'
+        // This ensures that files explicitly marked as includes are treated as vendored,
+        // even if they're within a directory specified in paths
+        for file in vendored_files {
+            vendored_file_ids.insert(file.id);
             db.add(file);
         }
 
-        for file in vendored_files {
-            if !host_file_ids.contains(&file.id) {
+        // Add host files only if not already added as vendored
+        for file in host_files {
+            if !vendored_file_ids.contains(&file.id) {
                 db.add(file);
             }
         }
@@ -106,20 +110,65 @@ impl<'a> DatabaseLoader<'a> {
         Ok(db)
     }
 
-    /// Discovers and reads all files from a set of root paths in parallel.
+    /// Discovers and reads all files from a set of root paths or glob patterns in parallel.
+    ///
+    /// Supports both:
+    /// - Directory paths (e.g., "src", "tests") - recursively walks all files
+    /// - Glob patterns (e.g., "src/**/*.php", "tests/Unit/*Test.php") - matches files using glob syntax
     fn load_paths(
         &self,
-        roots: &[Cow<'a, Path>],
+        roots: &[Cow<'a, str>],
         file_type: FileType,
         extensions: &HashSet<OsString>,
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<&Cow<'a, Path>>,
     ) -> Result<Vec<File>, DatabaseError> {
         let mut paths_to_process = Vec::new();
+
         for root in roots {
-            for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
-                if entry.file_type().is_file() {
-                    paths_to_process.push(entry.into_path());
+            // Check if this is a glob pattern (contains glob metacharacters)
+            let is_glob_pattern = root.contains('*') || root.contains('?') || root.contains('[') || root.contains('{');
+
+            if is_glob_pattern {
+                // Handle as glob pattern
+                let pattern = if Path::new(root.as_ref()).is_absolute() {
+                    root.to_string()
+                } else {
+                    // Make relative patterns absolute by prepending workspace
+                    self.configuration.workspace.join(root.as_ref()).to_string_lossy().to_string()
+                };
+
+                match glob::glob(&pattern) {
+                    Ok(entries) => {
+                        for entry in entries {
+                            match entry {
+                                Ok(path) => {
+                                    if path.is_file() {
+                                        paths_to_process.push(path);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to read glob entry: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        return Err(DatabaseError::Glob(e.to_string()));
+                    }
+                }
+            } else {
+                // Handle as directory path (existing logic)
+                let dir_path = if Path::new(root.as_ref()).is_absolute() {
+                    Path::new(root.as_ref()).to_path_buf()
+                } else {
+                    self.configuration.workspace.join(root.as_ref())
+                };
+
+                for entry in WalkDir::new(&dir_path).into_iter().filter_map(Result::ok) {
+                    if entry.file_type().is_file() {
+                        paths_to_process.push(entry.into_path());
+                    }
                 }
             }
         }

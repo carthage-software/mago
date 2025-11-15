@@ -48,10 +48,10 @@ pub(crate) fn create_orchestrator<'a>(
         formatter_settings: configuration.formatter.settings,
         use_progress_bars,
         use_colors: color_choice != ColorChoice::Never,
-        paths: configuration.source.paths.iter().map(|p| p.as_ref()).collect(),
+        paths: configuration.source.paths.clone(),
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),
         extensions: configuration.source.extensions.iter().map(|e| e.as_ref()).collect(),
-        includes: configuration.source.includes.iter().map(|p| p.as_ref()).collect(),
+        includes: configuration.source.includes.clone(),
     };
 
     Orchestrator::new(orchestrator_config)

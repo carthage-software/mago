@@ -134,7 +134,7 @@ impl GuardCommand {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
         if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter());
+            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
         let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;

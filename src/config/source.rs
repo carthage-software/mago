@@ -17,19 +17,22 @@ pub struct SourceConfiguration {
     /// Defaults to the current working directory.
     pub workspace: PathBuf,
 
-    /// Paths to user defined source files.
+    /// Paths or glob patterns for user defined source files.
     ///
+    /// Supports both directory paths (e.g., "src") and glob patterns (e.g., "src/**/*.php").
     /// If empty, all files in the workspace directory are included.
     ///
     /// Defaults to `[]`.
     #[serde(default)]
-    pub paths: Vec<PathBuf>,
+    pub paths: Vec<String>,
 
-    /// Paths to non-user defined files to include in the scan.
+    /// Paths or glob patterns for non-user defined files to include in the scan.
+    ///
+    /// Supports both directory paths and glob patterns (same as `paths`).
     ///
     /// Defaults to `[]`.
     #[serde(default)]
-    pub includes: Vec<PathBuf>,
+    pub includes: Vec<String>,
 
     /// Patterns to exclude from the scan.
     ///
