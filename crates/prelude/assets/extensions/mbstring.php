@@ -45,6 +45,9 @@ function mb_language(null|string $language): string|bool
 {
 }
 
+/**
+ * @return ($encoding is null ? string : bool)
+ */
 function mb_internal_encoding(null|string $encoding = null): string|bool
 {
 }
@@ -58,21 +61,32 @@ function mb_http_input(null|string $type): array|string|false
 {
 }
 
+/**
+ * @return ($encoding is null ? string : bool)
+ */
 function mb_http_output(null|string $encoding = null): string|bool
 {
 }
 
 /**
- * @return bool|list<string>
+ * @return ($encoding is null ? list<string> : bool)
  */
 function mb_detect_order(array|string|null $encoding = null): array|true
 {
 }
 
+/**
+ * @return ($substitute_character is null ? string|int : bool)
+ */
 function mb_substitute_character(string|int|null $substitute_character = null): string|int|bool
 {
 }
 
+/**
+ * @param-out array<string, string|array<string|array<mixed>>> $result
+ *
+ * @pure
+ */
 function mb_parse_str(string $string, array &$result): bool
 {
 }
