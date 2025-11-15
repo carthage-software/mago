@@ -377,7 +377,22 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         }
 
         let method_id = (class_like_metadata.name, name);
-        let type_resolution = if method.is_static() { None } else { Some(self.get_current_type_resolution_context()) };
+        let mut type_resolution =
+            if method.is_static() { None } else { Some(self.get_current_type_resolution_context()) };
+
+        if !class_like_metadata.type_aliases.is_empty() || !class_like_metadata.imported_type_aliases.is_empty() {
+            let mut context = type_resolution.unwrap_or_default();
+
+            for alias_name in class_like_metadata.type_aliases.keys() {
+                context = context.with_type_alias(*alias_name);
+            }
+
+            for (alias_name, (source_class, original_name, _span)) in &class_like_metadata.imported_type_aliases {
+                context = context.with_imported_type_alias(*alias_name, *source_class, *original_name);
+            }
+
+            type_resolution = Some(context);
+        }
 
         let function_like_metadata =
             scan_method(method_id, method, &class_like_metadata, context, &mut self.scope, type_resolution);
