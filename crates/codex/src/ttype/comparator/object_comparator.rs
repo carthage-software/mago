@@ -152,7 +152,9 @@ pub(super) fn is_intersection_shallowly_contained_by(
         return false;
     }
 
-    if codebase.is_instance_of(&input_name, &container_name) || codebase.class_uses_trait(&input_name, &container_name)
+    if codebase.is_instance_of(&input_name, &container_name)
+        || codebase.class_uses_trait(&input_name, &container_name)
+        || codebase.class_uses_trait(&container_name, &input_name)
     {
         return true;
     }
