@@ -458,7 +458,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
             if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
                 && !class_like_metadata.template_types.is_empty()
             {
-                let mut default_params: Vec<TUnion> = class_like_metadata
+                let default_params: Vec<TUnion> = class_like_metadata
                     .template_types
                     .iter()
                     .map(|(_, template_map)| {
@@ -467,11 +467,6 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                     .collect();
 
                 if !default_params.is_empty() {
-                    // Expand the default parameters to resolve any derived types like value-of<T>
-                    for type_parameter in default_params.iter_mut() {
-                        expand_union(codebase, type_parameter, options);
-                    }
-
                     named_object.type_parameters = Some(default_params);
                 }
             }
