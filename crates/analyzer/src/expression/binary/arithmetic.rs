@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -286,11 +287,31 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 && (left_atomic.is_array() || right_atomic.is_array())
             {
                 if left_atomic.is_array() && right_atomic.is_array() {
-                    pair_result_atomics.extend(combiner::combine(
-                        vec![left_atomic.clone(), right_atomic.clone()],
-                        context.codebase,
-                        false,
-                    ));
+                    // PHP array addition: $a + $b keeps all keys from $a and adds keys from $b that don't exist in $a
+                    // If either operand is non-empty, the result is non-empty
+                    // We use the combiner for merging types but fix the non_empty flag afterwards
+                    let mut combined =
+                        combiner::combine(vec![left_atomic.clone(), right_atomic.clone()], context.codebase, false);
+
+                    // Fix the non_empty flag: if either operand is non-empty, result is non-empty
+                    if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, right_atomic) {
+                        let should_be_non_empty = left_array.is_non_empty() || right_array.is_non_empty();
+
+                        for atomic in &mut combined {
+                            if let TAtomic::Array(result_array) = atomic {
+                                match result_array {
+                                    TArray::Keyed(keyed) => {
+                                        keyed.non_empty = should_be_non_empty;
+                                    }
+                                    TArray::List(list) => {
+                                        list.non_empty = should_be_non_empty;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    pair_result_atomics.extend(combined);
 
                     has_valid_left_operand = true;
                     has_valid_right_operand = true;

@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::get_mixed;
@@ -226,6 +227,8 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                 let mut has_parameters = false;
                 let mut merged_key_type: Option<TUnion> = None;
                 let mut merged_value_type: Option<TUnion> = None;
+                let mut any_argument_non_empty = false;
+                let mut all_arguments_are_lists = true;
 
                 for invocation_argument in arguments {
                     if invocation_argument.is_unpacked() {
@@ -240,27 +243,71 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
 
                     let iterable = argument_type.get_single();
 
-                    if let TAtomic::Array(TArray::Keyed(keyed)) = iterable {
-                        if let Some(ref items) = keyed.known_items {
-                            for (key, value) in items.iter() {
-                                merged_items.insert(*key, value.clone());
-                            }
-                        }
+                    if let TAtomic::Array(array) = iterable {
+                        match array {
+                            TArray::Keyed(keyed) => {
+                                // Not a list, so result won't be a list
+                                all_arguments_are_lists = false;
 
-                        if let Some((key_type, value_type)) = &keyed.parameters {
-                            has_parameters = true;
-                            merged_key_type = Some(match merged_key_type {
-                                Some(existing) => combine_union_types(&existing, key_type, context.codebase, false),
-                                None => (**key_type).clone(),
-                            });
-                            merged_value_type = Some(match merged_value_type {
-                                Some(existing) => combine_union_types(&existing, value_type, context.codebase, false),
-                                None => (**value_type).clone(),
-                            });
+                                // Track if any argument is non-empty
+                                if keyed.non_empty {
+                                    any_argument_non_empty = true;
+                                }
+
+                                if let Some(ref items) = keyed.known_items {
+                                    for (key, value) in items.iter() {
+                                        merged_items.insert(*key, value.clone());
+                                    }
+                                }
+
+                                if let Some((key_type, value_type)) = &keyed.parameters {
+                                    has_parameters = true;
+                                    merged_key_type = Some(match merged_key_type {
+                                        Some(existing) => {
+                                            combine_union_types(&existing, key_type, context.codebase, false)
+                                        }
+                                        None => (**key_type).clone(),
+                                    });
+                                    merged_value_type = Some(match merged_value_type {
+                                        Some(existing) => {
+                                            combine_union_types(&existing, value_type, context.codebase, false)
+                                        }
+                                        None => (**value_type).clone(),
+                                    });
+                                }
+                            }
+                            TArray::List(list) => {
+                                // Track if any argument is non-empty
+                                if list.non_empty {
+                                    any_argument_non_empty = true;
+                                }
+
+                                // For list arguments, track the value type
+                                has_parameters = true;
+                                merged_value_type = Some(match merged_value_type {
+                                    Some(existing) => {
+                                        combine_union_types(&existing, &list.element_type, context.codebase, false)
+                                    }
+                                    None => (*list.element_type).clone(),
+                                });
+
+                                // Only add int key type if we're mixing with keyed arrays
+                                if !all_arguments_are_lists {
+                                    let key_type = get_int();
+                                    merged_key_type = Some(match merged_key_type {
+                                        Some(existing) => {
+                                            combine_union_types(&existing, &key_type, context.codebase, false)
+                                        }
+                                        None => key_type,
+                                    });
+                                }
+                            }
                         }
                     } else if let Some((iterable_key, iterable_value)) =
                         get_iterable_parameters(iterable, context.codebase)
                     {
+                        // Generic iterables are not lists
+                        all_arguments_are_lists = false;
                         has_parameters = true;
                         merged_key_type = Some(match merged_key_type {
                             Some(existing) => combine_union_types(&existing, &iterable_key, context.codebase, false),
@@ -275,19 +322,32 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                     }
                 }
 
-                let mut result_array = TKeyedArray::new();
+                // If all arguments are lists, return a list; otherwise return a keyed array
+                if all_arguments_are_lists {
+                    // Return a list
+                    let mut result_list = TList::new(Box::new(merged_value_type.unwrap_or_else(get_mixed)));
+                    result_list.non_empty = any_argument_non_empty;
 
-                if !merged_items.is_empty() {
-                    result_array.known_items = Some(merged_items);
-                    result_array.non_empty = true;
+                    Some(TUnion::from_atomic(TAtomic::Array(TArray::List(result_list))))
+                } else {
+                    // Return a keyed array
+                    let mut result_array = TKeyedArray::new();
+
+                    let has_merged_items = !merged_items.is_empty();
+                    if has_merged_items {
+                        result_array.known_items = Some(merged_items);
+                    }
+
+                    // Result is non-empty if any argument is non-empty OR we have known items
+                    result_array.non_empty = any_argument_non_empty || has_merged_items;
+
+                    if has_parameters {
+                        result_array.parameters =
+                            Some((Box::new(merged_key_type.unwrap()), Box::new(merged_value_type.unwrap())));
+                    }
+
+                    Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(result_array))))
                 }
-
-                if has_parameters {
-                    result_array.parameters =
-                        Some((Box::new(merged_key_type.unwrap()), Box::new(merged_value_type.unwrap())));
-                }
-
-                Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(result_array))))
             }
             _ => None,
         }

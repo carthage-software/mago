@@ -246,6 +246,7 @@ test_case!(type_alias_syntax);
 test_case!(change_private_parent_prop);
 test_case!(class_in_alias);
 test_case!(index_access);
+test_case!(merge_arrays_non_empty);
 
 // Github Issues
 test_case!(issue_265);
