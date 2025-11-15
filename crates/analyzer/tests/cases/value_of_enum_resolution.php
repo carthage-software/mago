@@ -94,29 +94,3 @@ function get_enum_value_type(string $enum): TypeInterface
 {
     return new EnumValueType($enum);
 }
-
-// -- PHP Core Stubs --
-
-interface UnitEnum
-{
-}
-
-interface BackedEnum extends UnitEnum
-{
-}
-
-interface Throwable
-{
-}
-
-class Exception implements Throwable
-{
-    public function __construct(string $message = '')
-    {
-        // Initialize the exception with a message
-    }
-}
-
-class InvalidArgumentException extends Exception
-{
-}

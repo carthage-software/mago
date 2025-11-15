@@ -2,6 +2,8 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_mixed;
@@ -394,14 +396,23 @@ fn get_current_generator_parameters<'ctx, 'arena>(
     let mut r#return = None;
     for atomic_iterable in iterable_type.types.as_ref() {
         match atomic_iterable.get_generator_parameters() {
-            Some((k, v, s, r)) => {
+            Some((mut k, mut v, mut s, mut r)) => {
+                expander::expand_union(context.codebase, &mut k, &TypeExpansionOptions::default());
+                expander::expand_union(context.codebase, &mut v, &TypeExpansionOptions::default());
+                expander::expand_union(context.codebase, &mut s, &TypeExpansionOptions::default());
+                expander::expand_union(context.codebase, &mut r, &TypeExpansionOptions::default());
+
                 key = Some(add_optional_union_type(k, key.as_ref(), context.codebase));
                 value = Some(add_optional_union_type(v, value.as_ref(), context.codebase));
                 sent = Some(add_optional_union_type(s, sent.as_ref(), context.codebase));
                 r#return = Some(add_optional_union_type(r, r#return.as_ref(), context.codebase));
             }
             None => match get_iterable_parameters(atomic_iterable, context.codebase) {
-                Some((k, v)) => {
+                Some((mut k, mut v)) => {
+                    // Expand the key and value types to resolve any references like Color::*
+                    expander::expand_union(context.codebase, &mut k, &TypeExpansionOptions::default());
+                    expander::expand_union(context.codebase, &mut v, &TypeExpansionOptions::default());
+
                     key = Some(add_optional_union_type(k, key.as_ref(), context.codebase));
                     value = Some(add_optional_union_type(v, value.as_ref(), context.codebase));
                     sent = Some(get_mixed());

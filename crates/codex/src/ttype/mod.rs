@@ -22,6 +22,7 @@ use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::shared::*;
 use crate::ttype::template::TemplateResult;
@@ -1207,11 +1208,18 @@ pub fn get_specialized_template_type(
 
         let Some(instantiated_type_parameters) = instantiated_type_parameters else {
             let type_map = instantiated_class_metadata.get_template_type(template_name)?;
+            let mut result = type_map.first().map(|(_, constraint)| constraint).cloned()?;
 
-            return type_map.first().map(|(_, constraint)| constraint).cloned();
+            expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
+
+            return Some(result);
         };
 
-        return instantiated_type_parameters.get(index).cloned();
+        let mut result = instantiated_type_parameters.get(index).cloned()?;
+
+        expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
+
+        return Some(result);
     }
 
     let defining_template_type = defining_class_metadata.get_template_type(template_name)?;
@@ -1257,6 +1265,8 @@ pub fn get_specialized_template_type(
             template_type = inferred_type_replacer::replace(&template_type, &template_result, codebase);
         }
     }
+
+    expander::expand_union(codebase, &mut template_type, &TypeExpansionOptions::default());
 
     Some(template_type)
 }

@@ -385,6 +385,10 @@ pub(crate) fn expand_atomic(
             }
             TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
         },
+        TAtomic::Iterable(iterable) => {
+            expand_union(codebase, &mut iterable.key_type, options);
+            expand_union(codebase, &mut iterable.value_type, options);
+        }
         _ => {}
     }
 }
@@ -444,20 +448,35 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
         return;
     };
 
-    if named_object.type_parameters.is_none()
-        && let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
-        && !class_like_metadata.template_types.is_empty()
-    {
-        let default_params: Vec<TUnion> = class_like_metadata
-            .template_types
-            .iter()
-            .map(|(_, template_map)| template_map.iter().map(|(_, t)| t).next().cloned().unwrap_or_else(get_mixed))
-            .collect();
-
-        if !default_params.is_empty() {
-            named_object.type_parameters = Some(default_params);
+    match &mut named_object.type_parameters {
+        Some(type_parameters) if !type_parameters.is_empty() => {
+            for type_parameter in type_parameters.iter_mut() {
+                expand_union(codebase, type_parameter, options);
+            }
         }
-    }
+        _ => {
+            if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
+                && !class_like_metadata.template_types.is_empty()
+            {
+                let mut default_params: Vec<TUnion> = class_like_metadata
+                    .template_types
+                    .iter()
+                    .map(|(_, template_map)| {
+                        template_map.iter().map(|(_, t)| t).next().cloned().unwrap_or_else(get_mixed)
+                    })
+                    .collect();
+
+                if !default_params.is_empty() {
+                    // Expand the default parameters to resolve any derived types like value-of<T>
+                    for type_parameter in default_params.iter_mut() {
+                        expand_union(codebase, type_parameter, options);
+                    }
+
+                    named_object.type_parameters = Some(default_params);
+                }
+            }
+        }
+    };
 }
 
 pub fn get_signature_of_function_like_identifier(
