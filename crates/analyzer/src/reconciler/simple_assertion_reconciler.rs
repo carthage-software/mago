@@ -1836,7 +1836,14 @@ fn reconcile_array_access(
 ) -> TUnion {
     let mut new_var_type = existing_var_type.clone();
 
-    if new_var_type.is_mixed() || new_var_type.has_template() {
+    if new_var_type.is_mixed() {
+        let mut result = get_mixed_keyed_array();
+        result.possibly_undefined = new_var_type.possibly_undefined;
+        result.possibly_undefined_from_try = new_var_type.possibly_undefined_from_try;
+        return result;
+    }
+
+    if new_var_type.has_template() {
         return new_var_type;
     }
 
@@ -2107,7 +2114,17 @@ fn reconcile_has_nonnull_entry_for_key(
                 acceptable_types.push(atomic);
             }
             TAtomic::Mixed(_) => {
-                acceptable_types.push(atomic);
+                // Narrow mixed to a keyed array with the specific key having a non-null value
+                let mut keyed_array = get_mixed_keyed_array();
+                keyed_array.types.to_mut()[0] = TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: Some(BTreeMap::from([(
+                        *key_name,
+                        (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
+                    )])),
+                    parameters: Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                    non_empty: false,
+                }));
+                acceptable_types.extend(keyed_array.types.into_owned());
             }
             TAtomic::Object(TObject::Named(_)) => {
                 acceptable_types.push(atomic);

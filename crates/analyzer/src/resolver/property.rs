@@ -120,7 +120,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         if object_atomic.is_null() || object_atomic.is_void() {
             result.encountered_null = true;
 
-            if !is_null_safe {
+            if !is_null_safe && !block_context.inside_nullsafe_chain {
                 report_access_on_null(
                     context,
                     block_context,

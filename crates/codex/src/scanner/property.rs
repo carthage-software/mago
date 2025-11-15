@@ -26,9 +26,12 @@ use crate::visibility::Visibility;
 #[inline]
 pub fn scan_promoted_property<'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
-    parameter_metadata: &FunctionLikeParameterMetadata,
-    class_metadata: &ClassLikeMetadata,
+    parameter_metadata: &mut FunctionLikeParameterMetadata,
+    class_like_metadata: &mut ClassLikeMetadata,
+    classname: Atom,
+    type_context: &TypeResolutionContext,
     context: &mut Context<'_, 'arena>,
+    scope: &NamespaceScope,
 ) -> PropertyMetadata {
     debug_assert!(parameter.is_promoted_property(), "Parameter is not a promoted property");
 
@@ -84,13 +87,48 @@ pub fn scan_promoted_property<'arena>(
     property_metadata.set_visibility(read_visibility, write_visibility);
     property_metadata.set_is_virtual(parameter.hooks.is_some());
     property_metadata.set_type_declaration_metadata(
-        parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(class_metadata.name), context)),
+        parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
     );
 
+    let mut used_parameter_type_from_docblock = false;
     if let Some(type_metadata) = parameter_metadata.type_metadata.as_ref()
         && type_metadata.from_docblock
     {
+        used_parameter_type_from_docblock = true;
         property_metadata.type_metadata = Some(type_metadata.clone());
+    }
+
+    // Check for inline @var docblock comment on the parameter
+    match PropertyDocblockComment::create(context, parameter) {
+        Ok(Some(docblock)) => {
+            update_property_metadata_from_docblock(
+                &mut property_metadata,
+                &docblock,
+                classname,
+                type_context,
+                scope,
+                class_like_metadata,
+            );
+
+            if let Some(type_metadata) = property_metadata.type_metadata.as_ref()
+                && type_metadata.from_docblock
+                && !used_parameter_type_from_docblock
+            {
+                parameter_metadata.type_metadata = Some(type_metadata.clone());
+            }
+        }
+        Ok(None) => {
+            // No docblock comment found; do nothing
+        }
+        Err(parse_error) => {
+            class_like_metadata.issues.push(
+                Issue::error("Failed to parse promoted property docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
+                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                    .with_note(parse_error.note())
+                    .with_help(parse_error.help()),
+            );
+        }
     }
 
     property_metadata
@@ -100,7 +138,7 @@ pub fn scan_promoted_property<'arena>(
 pub fn scan_properties<'arena>(
     property: &'arena Property<'arena>,
     class_like_metadata: &mut ClassLikeMetadata,
-    classname: Option<Atom>,
+    classname: Atom,
     type_context: &TypeResolutionContext,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
@@ -125,20 +163,6 @@ pub fn scan_properties<'arena>(
         flags |= MetadataFlags::USER_DEFINED;
     } else if context.file.file_type.is_builtin() {
         flags |= MetadataFlags::BUILTIN;
-    }
-
-    if let Some(docblock) = docblock.as_ref() {
-        if docblock.is_internal {
-            flags |= MetadataFlags::INTERNAL;
-        }
-
-        if docblock.is_deprecated {
-            flags |= MetadataFlags::DEPRECATED;
-        }
-
-        if docblock.is_readonly {
-            flags |= MetadataFlags::READONLY;
-        }
     }
 
     match property {
@@ -195,26 +219,14 @@ pub fn scan_properties<'arena>(
                 );
 
                 if let Some(docblock) = docblock.as_ref() {
-                    if let Some(type_string) = &docblock.type_string {
-                        match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
-                            Ok(property_type_metadata) => {
-                                let real_type = metadata.type_declaration_metadata.as_ref();
-                                let property_type_metadata =
-                                    merge_type_preserving_nullability(property_type_metadata, real_type);
-
-                                metadata.set_type_metadata(Some(property_type_metadata));
-                            }
-                            Err(typing_error) => class_like_metadata.issues.push(
-                                Issue::error("Could not resolve the type for the @var tag.")
-                                    .with_code(ScanningIssueKind::InvalidVarTag)
-                                    .with_annotation(
-                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                    )
-                                    .with_note(typing_error.note())
-                                    .with_help(typing_error.help()),
-                            ),
-                        }
-                    }
+                    update_property_metadata_from_docblock(
+                        &mut metadata,
+                        docblock,
+                        classname,
+                        type_context,
+                        scope,
+                        class_like_metadata,
+                    );
 
                     metadata
                 } else {
@@ -252,28 +264,15 @@ pub fn scan_properties<'arena>(
                     .map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
             );
 
-            if let Some(docblock) = docblock.as_ref()
-                && let Some(type_string) = &docblock.type_string
-            {
-                match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
-                    Ok(property_type) => {
-                        let real_type = metadata.type_declaration_metadata.as_ref();
-                        let property_type = merge_type_preserving_nullability(property_type, real_type);
-
-                        metadata.set_type_metadata(Some(property_type));
-                    }
-                    Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the type for the @var tag.")
-                                .with_code(ScanningIssueKind::InvalidVarTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
-                    }
-                }
+            if let Some(docblock) = docblock.as_ref() {
+                update_property_metadata_from_docblock(
+                    &mut metadata,
+                    docblock,
+                    classname,
+                    type_context,
+                    scope,
+                    class_like_metadata,
+                );
             }
 
             vec![metadata]
@@ -307,6 +306,45 @@ pub fn scan_property_item<'arena>(
             });
 
             (name, name_span, has_default, default_type)
+        }
+    }
+}
+
+fn update_property_metadata_from_docblock(
+    property_metadata: &mut PropertyMetadata,
+    docblock: &PropertyDocblockComment,
+    classname: Atom,
+    type_context: &TypeResolutionContext,
+    scope: &NamespaceScope,
+    class_like_metadata: &mut ClassLikeMetadata,
+) {
+    if docblock.is_internal {
+        property_metadata.flags |= MetadataFlags::INTERNAL;
+    }
+
+    if docblock.is_deprecated {
+        property_metadata.flags |= MetadataFlags::DEPRECATED;
+    }
+
+    if docblock.is_readonly {
+        property_metadata.flags |= MetadataFlags::READONLY;
+    }
+
+    if let Some(type_string) = &docblock.type_string {
+        match get_type_metadata_from_type_string(type_string, Some(classname), type_context, scope) {
+            Ok(property_type_metadata) => {
+                let real_type = property_metadata.type_declaration_metadata.as_ref();
+                let property_type_metadata = merge_type_preserving_nullability(property_type_metadata, real_type);
+
+                property_metadata.set_type_metadata(Some(property_type_metadata));
+            }
+            Err(typing_error) => class_like_metadata.issues.push(
+                Issue::error("Could not resolve the type for the @var tag.")
+                    .with_code(ScanningIssueKind::InvalidVarTag)
+                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
+                    .with_note(typing_error.note())
+                    .with_help(typing_error.help()),
+            ),
         }
     }
 }

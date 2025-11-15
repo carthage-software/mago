@@ -67,6 +67,13 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
 ) -> Result<(), AnalysisError> {
+    // When using nullsafe operator, mark that we're in a nullsafe chain
+    // This propagates to all subsequent accesses in the chain and persists
+    // through the entire expression evaluation
+    if is_null_safe {
+        block_context.inside_nullsafe_chain = true;
+    }
+
     let property_access_id = get_property_access_expression_id(
         object,
         property_selector,

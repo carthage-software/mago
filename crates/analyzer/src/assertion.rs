@@ -129,25 +129,6 @@ pub fn scrape_assertions(
                         } else {
                             if_types.entry(value_id).or_insert_with(|| vec![vec![Assertion::IsIsset]]);
                         }
-                    } else {
-                        let mut root_array_id = None;
-                        let mut root_array: &Expression = value;
-                        while let (None, Expression::ArrayAccess(array_access)) = (root_array_id.as_ref(), root_array) {
-                            root_array = array_access.array;
-
-                            root_array_id = get_expression_id(
-                                root_array,
-                                assertion_context.this_class_name,
-                                assertion_context.resolved_names,
-                                Some(assertion_context.codebase),
-                            );
-                        }
-
-                        if let Some(root_array_id) = root_array_id {
-                            if_types
-                                .entry(root_array_id)
-                                .or_insert_with(|| vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
-                        }
                     }
                 }
             }

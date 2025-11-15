@@ -1324,7 +1324,7 @@ fn scan_class_like<'ctx, 'arena>(
             }
             ClassLikeMember::Property(property) => {
                 let properties =
-                    scan_properties(property, &mut class_like_metadata, Some(name), &type_context, context, scope);
+                    scan_properties(property, &mut class_like_metadata, name, &type_context, context, scope);
 
                 for mut property_metadata in properties {
                     if let Some(existing_property) = class_like_metadata.properties.get_mut(&property_metadata.name.0) {

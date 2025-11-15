@@ -377,24 +377,27 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         }
 
         let method_id = (class_like_metadata.name, name);
-        let mut type_resolution =
-            if method.is_static() { None } else { Some(self.get_current_type_resolution_context()) };
+        let type_resolution = if method.is_static() {
+            if !class_like_metadata.type_aliases.is_empty() || !class_like_metadata.imported_type_aliases.is_empty() {
+                let mut context = TypeResolutionContext::new();
 
-        if !class_like_metadata.type_aliases.is_empty() || !class_like_metadata.imported_type_aliases.is_empty() {
-            let mut context = type_resolution.unwrap_or_default();
+                for alias_name in class_like_metadata.type_aliases.keys() {
+                    context = context.with_type_alias(*alias_name);
+                }
 
-            for alias_name in class_like_metadata.type_aliases.keys() {
-                context = context.with_type_alias(*alias_name);
+                for (alias_name, (source_class, original_name, _span)) in &class_like_metadata.imported_type_aliases {
+                    context = context.with_imported_type_alias(*alias_name, *source_class, *original_name);
+                }
+
+                Some(context)
+            } else {
+                None
             }
+        } else {
+            Some(self.get_current_type_resolution_context())
+        };
 
-            for (alias_name, (source_class, original_name, _span)) in &class_like_metadata.imported_type_aliases {
-                context = context.with_imported_type_alias(*alias_name, *source_class, *original_name);
-            }
-
-            type_resolution = Some(context);
-        }
-
-        let function_like_metadata =
+        let mut function_like_metadata =
             scan_method(method_id, method, &class_like_metadata, context, &mut self.scope, type_resolution);
         let Some(method_metadata) = &function_like_metadata.method_metadata else {
             unreachable!("Method info should be present for method.",);
@@ -406,16 +409,25 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             is_constructor = true;
             self.has_constructor = true;
 
+            let type_context = self.get_current_type_resolution_context();
             for (index, param) in method.parameter_list.parameters.iter().enumerate() {
                 if !param.is_promoted_property() {
                     continue;
                 }
 
-                let Some(parameter_info) = function_like_metadata.parameters.get(index) else {
+                let Some(parameter_metadata) = function_like_metadata.parameters.get_mut(index) else {
                     continue;
                 };
 
-                let property_metadata = scan_promoted_property(param, parameter_info, &class_like_metadata, context);
+                let property_metadata = scan_promoted_property(
+                    param,
+                    parameter_metadata,
+                    &mut class_like_metadata,
+                    current_class,
+                    &type_context,
+                    context,
+                    &self.scope,
+                );
 
                 class_like_metadata.add_property_metadata(property_metadata);
             }

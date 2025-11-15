@@ -183,6 +183,13 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {
+    // When using nullsafe operator, mark that we're in a nullsafe chain
+    // This propagates to all subsequent accesses in the chain and persists
+    // through the entire expression evaluation
+    if is_null_safe {
+        block_context.inside_nullsafe_chain = true;
+    }
+
     let method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
