@@ -14,13 +14,13 @@ This is the **recommended method** for most macOS and Linux users. Our script au
 #### Using `curl`
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
+curl --proto '=https' --tlsv1.2 -sSfO https://carthage.software/mago.sh && bash mago.sh
 ```
 
 #### Using `wget`
 
 ```sh
-wget -qO- https://carthage.software/mago.sh | bash
+wget -q https://carthage.software/mago.sh && bash mago.sh
 ```
 
 #### Installing a specific version
@@ -28,13 +28,13 @@ wget -qO- https://carthage.software/mago.sh | bash
 To install a specific version of Mago, use the `--version=` flag:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.0.0-rc.3
+curl --proto '=https' --tlsv1.2 -sSfO https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.3
 ```
 
 Or with `wget`:
 
 ```sh
-wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.0.0-rc.3
+wget -q https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.3
 ```
 
 ## Manual download
