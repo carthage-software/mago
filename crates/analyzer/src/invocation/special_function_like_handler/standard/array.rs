@@ -15,10 +15,12 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
@@ -224,11 +226,14 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                 }
 
                 let mut merged_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
+                let mut merged_list_elements: BTreeMap<usize, (bool, TUnion)> = BTreeMap::new();
+                let mut next_list_index: usize = 0;
                 let mut has_parameters = false;
                 let mut merged_key_type: Option<TUnion> = None;
                 let mut merged_value_type: Option<TUnion> = None;
                 let mut any_argument_non_empty = false;
                 let mut all_arguments_are_lists = true;
+                let mut all_lists_are_closed = true;
 
                 for invocation_argument in arguments {
                     if invocation_argument.is_unpacked() {
@@ -246,8 +251,13 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                     if let TAtomic::Array(array) = iterable {
                         match array {
                             TArray::Keyed(keyed) => {
-                                // Not a list, so result won't be a list
-                                all_arguments_are_lists = false;
+                                // Check if this is an empty array (no items and no parameters)
+                                let is_empty_array = keyed.known_items.is_none() && keyed.parameters.is_none();
+
+                                // Only mark as non-list if this is a non-empty keyed array
+                                if !is_empty_array {
+                                    all_arguments_are_lists = false;
+                                }
 
                                 // Track if any argument is non-empty
                                 if keyed.non_empty {
@@ -282,16 +292,34 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                                     any_argument_non_empty = true;
                                 }
 
-                                // For list arguments, track the value type
+                                let is_list_closed = list.element_type.is_never();
+                                if !is_list_closed {
+                                    all_lists_are_closed = false;
+                                }
+
+                                if let Some(ref known_elements) = list.known_elements {
+                                    for (idx, (optional, element_type)) in known_elements {
+                                        let new_idx = next_list_index + idx;
+                                        merged_list_elements.insert(new_idx, (*optional, element_type.clone()));
+                                    }
+                                    if let Some(max_idx) = known_elements.keys().max() {
+                                        next_list_index += max_idx + 1;
+                                    }
+                                } else if list.non_empty {
+                                    next_list_index += 1; // At least one element
+                                }
+
+                                let (_, list_value_type) =
+                                    get_array_parameters(&TArray::List(list.clone()), context.codebase);
+
                                 has_parameters = true;
                                 merged_value_type = Some(match merged_value_type {
                                     Some(existing) => {
-                                        combine_union_types(&existing, &list.element_type, context.codebase, false)
+                                        combine_union_types(&existing, &list_value_type, context.codebase, false)
                                     }
-                                    None => (*list.element_type).clone(),
+                                    None => list_value_type,
                                 });
 
-                                // Only add int key type if we're mixing with keyed arrays
                                 if !all_arguments_are_lists {
                                     let key_type = get_int();
                                     merged_key_type = Some(match merged_key_type {
@@ -322,11 +350,16 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                     }
                 }
 
-                // If all arguments are lists, return a list; otherwise return a keyed array
                 if all_arguments_are_lists {
-                    // Return a list
-                    let mut result_list = TList::new(Box::new(merged_value_type.unwrap_or_else(get_mixed)));
+                    let element_type =
+                        if all_lists_are_closed { get_never() } else { merged_value_type.unwrap_or_else(get_mixed) };
+
+                    let mut result_list = TList::new(Box::new(element_type));
                     result_list.non_empty = any_argument_non_empty;
+
+                    if !merged_list_elements.is_empty() {
+                        result_list.known_elements = Some(merged_list_elements);
+                    }
 
                     Some(TUnion::from_atomic(TAtomic::Array(TArray::List(result_list))))
                 } else {
@@ -338,12 +371,13 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                         result_array.known_items = Some(merged_items);
                     }
 
-                    // Result is non-empty if any argument is non-empty OR we have known items
                     result_array.non_empty = any_argument_non_empty || has_merged_items;
 
                     if has_parameters {
-                        result_array.parameters =
-                            Some((Box::new(merged_key_type.unwrap()), Box::new(merged_value_type.unwrap())));
+                        result_array.parameters = Some((
+                            Box::new(merged_key_type.unwrap_or_else(get_arraykey)),
+                            Box::new(merged_value_type.unwrap_or_else(get_mixed)),
+                        ));
                     }
 
                     Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(result_array))))
