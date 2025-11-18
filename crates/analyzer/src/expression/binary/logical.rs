@@ -134,7 +134,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 
     let result_type: TUnion;
     if lhs_type.is_always_falsy() {
-        report_redundant_logical_operation(context, binary, "always falsy", "not evaluated", "`false`");
+        report_redundant_logical_operation(context, binary, "always falsy", "not evaluated", "`false`", None);
 
         result_type = get_false();
         let mut dead_rhs_context = right_block_context.clone();
@@ -152,26 +152,31 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 
         let left_is_truthy = lhs_type.is_always_truthy();
         if left_is_truthy {
+            // true && x → x (remove left, keep right)
             report_redundant_logical_operation(
                 context,
                 binary,
                 "always truthy",
                 "evaluated",
                 "the boolean value of the right-hand side",
+                Some(false), // remove left
             );
         }
 
         if rhs_type.is_always_falsy() {
-            report_redundant_logical_operation(context, binary, "evaluated", "always falsy", "`false`");
+            // x && false → false (no fix)
+            report_redundant_logical_operation(context, binary, "evaluated", "always falsy", "`false`", None);
 
             result_type = get_false();
         } else if rhs_type.is_always_truthy() {
+            // x && true → x (remove right, keep left)
             report_redundant_logical_operation(
                 context,
                 binary,
                 "evaluated",
                 "always truthy",
                 "the boolean value of the left-hand side",
+                Some(true), // remove right
             );
 
             if left_is_truthy {
@@ -333,7 +338,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
     let result_type: TUnion;
 
     if lhs_type.is_always_truthy() {
-        report_redundant_logical_operation(context, binary, "always true", "not evaluated", "`true`");
+        // true || x → true (no fix)
+        report_redundant_logical_operation(context, binary, "always true", "not evaluated", "`true`", None);
         result_type = get_true();
         right_block_context.has_returned = true;
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
@@ -390,34 +396,41 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         if lhs_type.is_always_falsy() {
             if rhs_type.is_always_falsy() {
-                report_redundant_logical_operation(context, binary, "always falsy", "always falsy", "`false`");
+                // false || false → false (no fix)
+                report_redundant_logical_operation(context, binary, "always falsy", "always falsy", "`false`", None);
                 result_type = get_false();
             } else if rhs_type.is_always_truthy() {
-                report_redundant_logical_operation(context, binary, "always falsy", "always truthy", "`true`");
+                // false || true → true (no fix)
+                report_redundant_logical_operation(context, binary, "always falsy", "always truthy", "`true`", None);
                 result_type = get_true();
             } else {
+                // false || x → x (remove left, keep right)
                 report_redundant_logical_operation(
                     context,
                     binary,
                     "always false",
                     "evaluated",
                     "the boolean value of the right-hand side",
+                    Some(false), // remove left
                 );
 
                 result_type = get_bool();
             }
         } else if rhs_type.is_always_falsy() {
+            // x || false → x (remove right, keep left)
             report_redundant_logical_operation(
                 context,
                 binary,
                 "evaluated",
                 "always falsy",
                 "the boolean value of the left-hand side",
+                Some(true), // remove right
             );
 
             result_type = get_bool();
         } else if rhs_type.is_always_truthy() {
-            report_redundant_logical_operation(context, binary, "evaluated", "always truthy", "`true`");
+            // x || true → true (no fix)
+            report_redundant_logical_operation(context, binary, "evaluated", "always truthy", "`true`", None);
 
             result_type = get_true();
         } else {
@@ -528,25 +541,29 @@ pub fn analyze_logical_xor_operation<'ctx, 'arena>(
 
     let result_type = if lhs_type.is_always_truthy() && rhs_type.is_always_truthy() {
         if !block_context.inside_loop_expressions {
-            report_redundant_logical_operation(context, binary, "always true", "always true", "`false`");
+            // true xor true → false (no fix)
+            report_redundant_logical_operation(context, binary, "always true", "always true", "`false`", None);
         }
 
         get_false()
     } else if lhs_type.is_always_truthy() && rhs_type.is_always_falsy() {
         if !block_context.inside_loop_expressions {
-            report_redundant_logical_operation(context, binary, "always true", "always false", "`true`");
+            // true xor false → true (no fix)
+            report_redundant_logical_operation(context, binary, "always true", "always false", "`true`", None);
         }
 
         get_true()
     } else if lhs_type.is_always_falsy() && rhs_type.is_always_truthy() {
         if !block_context.inside_loop_expressions {
-            report_redundant_logical_operation(context, binary, "always false", "always true", "`true`");
+            // false xor true → true (no fix)
+            report_redundant_logical_operation(context, binary, "always false", "always true", "`true`", None);
         }
 
         get_true()
     } else if lhs_type.is_always_falsy() && rhs_type.is_always_falsy() {
         if !block_context.inside_loop_expressions {
-            report_redundant_logical_operation(context, binary, "always false", "always false", "`false`");
+            // false xor false → false (no fix)
+            report_redundant_logical_operation(context, binary, "always false", "always false", "`false`", None);
         }
 
         get_false()
@@ -626,12 +643,18 @@ fn check_logical_operand<'ctx, 'ast, 'arena>(
 }
 
 /// Helper to report redundant logical operation issues.
+///
+/// * `side_to_remove`: Controls fix generation:
+///   - `None`: No fix offered (just report the issue)
+///   - `Some(false)`: Remove left operand, keep right operand
+///   - `Some(true)`: Remove right operand, keep left operand
 fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     binary: &'ast Binary<'arena>,
     lhs_description: &str,
     rhs_description: &str,
     result_value_str: &str,
+    side_to_remove: Option<bool>,
 ) {
     let operator_span = binary.operator.span();
     if operator_span.is_zero() {
@@ -639,37 +662,41 @@ fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
         return;
     }
 
-    context.collector.propose_with_code(
-        IssueCode::RedundantLogicalOperation,
-        Issue::help(format!(
-            "Redundant `{}` operation: left operand is {} and right operand is {}.",
-            binary.operator.as_str(),
-            lhs_description,
-            rhs_description
-        ))
-        .with_annotation(
-            Annotation::primary(binary.lhs.span()).with_message(format!("Left operand is {lhs_description}")),
-        )
-        .with_annotation(
-            Annotation::secondary(binary.rhs.span()).with_message(format!("Right operand is {rhs_description}")),
-        )
-        .with_note(format!(
-            "The `{}` operator will always return {} in this case.",
-            binary.operator.as_str(),
-            result_value_str
-        ))
-        .with_help(format!(
-            "Consider simplifying or removing this logical expression as it always evaluates to {result_value_str}."
-        )),
-        |plan| {
-            // PotentiallyUnsafe because we're removing expressions that might have side effects
-            plan.replace(
-                binary.span().to_range(),
-                result_value_str.trim_matches('`'),
-                SafetyClassification::PotentiallyUnsafe,
-            );
-        },
-    );
+    let issue = Issue::help(format!(
+        "Redundant `{}` operation: left operand is {} and right operand is {}.",
+        binary.operator.as_str(),
+        lhs_description,
+        rhs_description
+    ))
+    .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("Left operand is {lhs_description}")))
+    .with_annotation(
+        Annotation::secondary(binary.rhs.span()).with_message(format!("Right operand is {rhs_description}")),
+    )
+    .with_note(format!(
+        "The `{}` operator will always return {} in this case.",
+        binary.operator.as_str(),
+        result_value_str
+    ))
+    .with_help(if side_to_remove.is_some() {
+        let kept_side = if side_to_remove == Some(true) { "left" } else { "right" };
+        format!("Consider simplifying this expression to just the {} operand.", kept_side)
+    } else {
+        format!("Consider simplifying this expression to {result_value_str}.")
+    });
+
+    if let Some(remove_right) = side_to_remove {
+        let to_remove = if remove_right {
+            binary.operator.span().join(binary.rhs.span())
+        } else {
+            binary.lhs.span().join(binary.operator.span())
+        };
+
+        context.collector.propose_with_code(IssueCode::RedundantLogicalOperation, issue, |plan| {
+            plan.delete(to_remove.to_range(), SafetyClassification::PotentiallyUnsafe);
+        });
+    } else {
+        context.collector.report_with_code(IssueCode::RedundantLogicalOperation, issue);
+    }
 }
 
 #[inline]
