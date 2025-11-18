@@ -517,8 +517,8 @@ pub(crate) fn can_be_identical<'a>(
         | (TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey), TAtomic::Scalar(TScalar::String(_)))
         | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey))
         // If one is `int`|`float`, and the other is `numeric`, they can be identical
-        | (TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_)), TAtomic::Scalar(TScalar::Numeric))
-        | (TAtomic::Scalar(TScalar::Numeric), TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_)))
+        | (TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey), TAtomic::Scalar(TScalar::Numeric))
+        | (TAtomic::Scalar(TScalar::Numeric), TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey))
     ) {
         return true;
     }
