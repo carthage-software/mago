@@ -196,6 +196,7 @@ define_rules! {
     NoRedundantContinue(no_redundant_continue @ NoRedundantContinueRule),
     NoRedundantBlock(no_redundant_block @ NoRedundantBlockRule),
     NoRedundantUse(no_redundant_use @ NoRedundantUseRule),
+    NoRedundantYieldFrom(no_redundant_yield_from @ NoRedundantYieldFromRule),
     NoSelfAssignment(no_self_assignment @ NoSelfAssignmentRule),
     NoProtectedInFinal(no_protected_in_final @ NoProtectedInFinalRule),
     NoPhpTagTerminator(no_php_tag_terminator @ NoPhpTagTerminatorRule),
