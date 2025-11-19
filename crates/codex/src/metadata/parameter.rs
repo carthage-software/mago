@@ -21,8 +21,16 @@ pub struct FunctionLikeParameterMetadata {
     /// The identifier (name) of the parameter, including the leading '$'.
     pub name: VariableIdentifier,
 
+    /// The native type declaration from the function signature.
+    ///
+    /// This is the type hint specified in the code (e.g., `string $name`), not from docblocks.
+    /// Can be `None` if no type hint is specified in the signature.
+    pub type_declaration_metadata: Option<TypeMetadata>,
+
     /// The explicit type declaration (type hint) or docblock type (`@param`).
     ///
+    /// If there's a docblock `@param` annotation, this will contain that type (with `from_docblock=true`).
+    /// Otherwise, this will be the same as `type_declaration_metadata`.
     /// Can be `None` if no type is specified.
     pub type_metadata: Option<TypeMetadata>,
 
@@ -67,6 +75,7 @@ impl FunctionLikeParameterMetadata {
             flags,
             span,
             name_span,
+            type_declaration_metadata: None,
             type_metadata: None,
             out_type: None,
             default_type: None,
@@ -91,10 +100,16 @@ impl FunctionLikeParameterMetadata {
         self.name_span
     }
 
-    /// Returns a reference to the explicit type signature, if available.
+    /// Returns a reference to the parameter's type metadata (effective type with docblock).
     #[inline]
     pub fn get_type_metadata(&self) -> Option<&TypeMetadata> {
         self.type_metadata.as_ref()
+    }
+
+    /// Returns a reference to the parameter's native type declaration metadata.
+    #[inline]
+    pub fn get_type_declaration_metadata(&self) -> Option<&TypeMetadata> {
+        self.type_declaration_metadata.as_ref()
     }
 
     /// Returns a reference to the inferred type of the default value, if known.
@@ -114,15 +129,22 @@ impl FunctionLikeParameterMetadata {
         self
     }
 
-    /// Sets the explicit type signature (type hint or `@param` type).
-    pub fn set_type_signature(&mut self, type_signature: Option<TypeMetadata>) {
-        self.type_metadata = type_signature;
+    /// Sets the parameter's type metadata (effective type with docblock).
+    #[inline]
+    pub fn set_type_metadata(&mut self, type_metadata: Option<TypeMetadata>) {
+        self.type_metadata = type_metadata;
     }
 
-    /// Returns a new instance with the explicit type signature set.
-    pub fn with_type_signature(mut self, type_signature: Option<TypeMetadata>) -> Self {
-        self.set_type_signature(type_signature);
-        self
+    /// Sets the parameter's native type declaration metadata.
+    ///
+    /// If `type_metadata` is not set, it will be initialized with the same value.
+    #[inline]
+    pub fn set_type_declaration_metadata(&mut self, type_declaration: Option<TypeMetadata>) {
+        if self.type_metadata.is_none() {
+            self.type_metadata = type_declaration.clone();
+        }
+
+        self.type_declaration_metadata = type_declaration;
     }
 }
 

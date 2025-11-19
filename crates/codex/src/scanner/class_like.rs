@@ -901,7 +901,7 @@ fn scan_class_like<'ctx, 'arena>(
                 );
 
                 if let Some(type_hint) = &argument.type_hint {
-                    function_parameter_metadata.set_type_signature(
+                    function_parameter_metadata.set_type_declaration_metadata(
                         get_type_metadata_from_type_string(type_hint, Some(name), &type_context, scope).ok(),
                     );
                 }
@@ -1394,6 +1394,10 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
             name: VariableIdentifier(atom("$value")),
+            type_declaration_metadata: Some(TypeMetadata::new(
+                TUnion::from_vec(vec![backing_type.clone()]),
+                enum_method_span,
+            )),
             type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
             out_type: None,
             default_type: None,
@@ -1440,6 +1444,10 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
             name: VariableIdentifier(atom("$value")),
+            type_declaration_metadata: Some(TypeMetadata::new(
+                TUnion::from_vec(vec![backing_type.clone()]),
+                enum_method_span,
+            )),
             type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
             out_type: None,
             default_type: None,

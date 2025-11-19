@@ -45,8 +45,11 @@ pub fn scan_function_like_parameter<'ctx, 'arena>(
         parameter.variable.span,
         flags,
     )
-    .with_attributes(scan_attribute_lists(&parameter.attribute_lists, context))
-    .with_type_signature(parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, classname, context)));
+    .with_attributes(scan_attribute_lists(&parameter.attribute_lists, context));
+
+    metadata.set_type_declaration_metadata(
+        parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, classname, context)),
+    );
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;

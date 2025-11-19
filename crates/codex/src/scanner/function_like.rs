@@ -430,7 +430,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                 let real_type = parameter_metadata.type_metadata.as_ref();
                 let resulting_type = merge_type_preserving_nullability(resulting_type, real_type);
 
-                parameter_metadata.set_type_signature(Some(resulting_type));
+                parameter_metadata.set_type_metadata(Some(resulting_type));
             }
             Err(typing_error) => {
                 metadata.issues.push(
