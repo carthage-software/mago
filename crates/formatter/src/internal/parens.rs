@@ -73,6 +73,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             || self.assignment_needs_parens(node)
             || self.literal_needs_parens(node)
             || self.pipe_node_needs_parens(node)
+            || self.class_constant_access_needs_parens(node)
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
@@ -188,6 +189,37 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             Some(Node::VariadicArrayElement(_)) => true,
             Some(Node::ArrayAppend(_)) => true,
             Some(Node::Conditional(_)) => true,
+            _ => false,
+        }
+    }
+
+    /// Check if a class constant access needs parentheses based on its parent context.
+    ///
+    /// PHP grammar does not allow class constant access directly after `new` or `instanceof`:
+    /// - `new Foo::BAR()` is a parse error - needs `new (Foo::BAR)()`
+    /// - `$x instanceof Foo::BAR` is a parse error - needs `$x instanceof (Foo::BAR)`
+    ///
+    /// However, static property access is allowed:
+    /// - `new Foo::$bar()` is valid
+    /// - `$x instanceof Foo::$bar` is valid
+    fn class_constant_access_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
+        let Node::Access(Access::ClassConstant(_)) = node else {
+            return false;
+        };
+
+        let node_span = node.span();
+
+        let grandparent = self.grandparent_node();
+
+        match grandparent {
+            Some(Node::Binary(binary)) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => {
+                let unwrapped_rhs = unwrap_parenthesized(binary.rhs);
+                unwrapped_rhs.span() == node_span
+            }
+            Some(Node::Instantiation(inst)) => {
+                let unwrapped_class = unwrap_parenthesized(inst.class);
+                unwrapped_class.span() == node_span
+            }
             _ => false,
         }
     }

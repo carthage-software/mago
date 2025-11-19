@@ -39,6 +39,7 @@ test_case!(leading_comment_with_missing_prefix);
 test_case!(dangling_block_comments);
 test_case!(opening_tag_trailing_comments);
 test_case!(callee_needs_parens);
+test_case!(issue_640);
 test_case!(php83_instantiation_with_member_access_parentheses, PHPVersion::PHP83);
 test_case!(php84_instantiation_with_member_access_parentheses, PHPVersion::PHP84);
 test_case!(php83_instantiation_with_member_access_parentheses_disabled, PHPVersion::PHP83);
