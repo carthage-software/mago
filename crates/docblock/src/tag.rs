@@ -932,11 +932,35 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
 
         if char.is_whitespace() {
             if bracket_stack.is_empty() && last_char_was_significant {
-                // Found the first potential split point
-                split_point_rel = Some(i);
-                break;
+                let mut temp_iter = iter.clone();
+                let mut found_colon = false;
+
+                while let Some(&(_, next_char)) = temp_iter.peek() {
+                    if next_char.is_whitespace() {
+                        temp_iter.next();
+                    } else {
+                        found_colon = next_char == ':';
+                        break;
+                    }
+                }
+
+                if found_colon {
+                    while let Some(&(_, next_char)) = iter.peek() {
+                        if next_char.is_whitespace() {
+                            iter.next();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    last_char_was_significant = true;
+                } else {
+                    split_point_rel = Some(i);
+                    break;
+                }
+            } else {
+                last_char_was_significant = false;
             }
-            last_char_was_significant = false;
         } else if char == '.' {
             // Only treat '.' as a split point if it's NOT part of a numeric literal
             // Check if this is a numeric literal by looking at surrounding chars
@@ -1607,5 +1631,26 @@ mod tests {
         let (ts, rest) = split_tag_content(input, span).unwrap();
         assert_eq!(ts.value, "string[]");
         assert_eq!(rest, ". something else");
+    }
+
+    #[test]
+    fn test_splitter_with_colon_after_whitespace() {
+        let input = "callable(string)    :         string     $callback";
+        let span = test_span_for(input);
+        let (ts, rest) = split_tag_content(input, span).unwrap();
+        assert_eq!(ts.value, "callable(string)    :         string");
+        assert_eq!(rest, "$callback");
+
+        let input2 = "callable(string) : string $callback";
+        let span2 = test_span_for(input2);
+        let (ts2, rest2) = split_tag_content(input2, span2).unwrap();
+        assert_eq!(ts2.value, "callable(string) : string");
+        assert_eq!(rest2, "$callback");
+
+        let input3 = "callable(string): string $callback";
+        let span3 = test_span_for(input3);
+        let (ts3, rest3) = split_tag_content(input3, span3).unwrap();
+        assert_eq!(ts3.value, "callable(string): string");
+        assert_eq!(rest3, "$callback");
     }
 }
