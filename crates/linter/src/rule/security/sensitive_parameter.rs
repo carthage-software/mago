@@ -4,6 +4,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_fixer::SafetyClassification;
+use mago_php_version::PHPVersion;
+use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -53,6 +55,8 @@ impl LintRule for SensitiveParameterRule {
             description: indoc! {r#"
                 Requires that parameters that are likely to contain sensitive information (e.g., passwords)
                 are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.
+
+                This rule only applies to PHP 8.2 and later, as the `SensitiveParameter` attribute was introduced in PHP 8.2.
             "#},
             good_example: indoc! {r#"
                 <?php
@@ -69,7 +73,7 @@ impl LintRule for SensitiveParameterRule {
                 }
             "#},
             category: Category::Security,
-            requirements: RuleRequirements::None,
+            requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP82)),
         };
 
         &META
@@ -115,5 +119,109 @@ impl LintRule for SensitiveParameterRule {
 
             plan.insert(start_position.offset, "#[\\SensitiveParameter] ", SafetyClassification::Safe);
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use mago_php_version::PHPVersion;
+
+    use super::SensitiveParameterRule;
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = password_with_sensitive_parameter_attribute,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, #[SensitiveParameter] string $password): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = password_with_fqn_sensitive_parameter_attribute,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, #[\SensitiveParameter] string $password): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = non_password_parameter_without_attribute,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, string $email): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = password_without_attribute,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, string $password): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = multiple_password_params_without_attribute,
+        rule = SensitiveParameterRule,
+        count = 2,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r#"
+            <?php
+
+            function changePassword(string $oldPassword, string $newPassword): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = password_without_attribute_on_php83,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP83,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, string $password): void {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = password_without_attribute_on_php84,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP84,
+        code = indoc! {r#"
+            <?php
+
+            function login(string $username, string $password): void {
+                // ...
+            }
+        "#}
     }
 }
