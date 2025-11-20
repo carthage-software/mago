@@ -160,7 +160,7 @@ impl PreferStaticClosureRule {
 
         ctx.collector.propose(issue, |plan| {
             // Insert "static " before the function/fn keyword
-            plan.insert(keyword_span.to_range().start, "static ", SafetyClassification::Safe);
+            plan.insert(keyword_span.start_position().offset, "static ", SafetyClassification::Safe);
         });
     }
 }
@@ -173,10 +173,12 @@ fn contains_this_reference<'ast, 'arena>(node: Node<'ast, 'arena>) -> bool {
         return true;
     }
 
-    // Don't recurse into nested closures/arrow functions/anonymous classes,
-    // or nested declarations (they have their own $this binding)
+    // Don't recurse into anonymous classes or nested declarations (they have their own $this binding)
+    // Note: Non-static closures and arrow functions inherit $this from their parent scope, so we DO recurse into them
     match node {
-        Node::Closure(_) | Node::ArrowFunction(_) | Node::AnonymousClass(_) => return false,
+        Node::Closure(closure) if closure.r#static.is_some() => return false,
+        Node::ArrowFunction(arrow_function) if arrow_function.r#static.is_some() => return false,
+        Node::AnonymousClass(_) => return false,
         node if node.is_declaration() => return false,
         _ => {}
     }
@@ -189,4 +191,267 @@ fn contains_this_reference<'ast, 'arena>(node: Node<'ast, 'arena>) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::PreferStaticClosureRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    // Success cases - code should NOT produce lint issues
+
+    test_lint_success! {
+        name = closure_uses_this_directly,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    $fn = function() {
+                        return $this->value;
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = arrow_function_uses_this_directly,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    $fn = fn() => $this->value;
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = nested_arrow_function_uses_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    $fn = fn() => fn() => $this->value;
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = nested_closure_uses_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    $fn = function() {
+                        return function() {
+                            return $this->value;
+                        };
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = mixed_nested_closures_use_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    // Arrow function containing closure that uses $this
+                    $fn1 = fn() => function() {
+                        return $this->value;
+                    };
+
+                    // Closure containing arrow function that uses $this
+                    $fn2 = function() {
+                        return fn() => $this->value;
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = deeply_nested_closures_use_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                private int $value = 42;
+
+                public function bar() {
+                    $fn = fn() => fn() => fn() => $this->value;
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = already_static_closure,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = static function($x) {
+                        return $x * 2;
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = already_static_arrow_function,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = static fn($x) => $x * 2;
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = outside_class_context,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            function foo() {
+                $fn = fn($x) => $x * 2;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = anonymous_class_has_own_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    // The outer closure should be static even though the inner
+                    // anonymous class uses $this, because they have different $this
+                    $fn = static function() {
+                        return new class {
+                            private int $value = 42;
+
+                            public function getValue() {
+                                return $this->value;
+                            }
+                        };
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_does_not_use_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = function($x) {
+                        return $x * 2;
+                    };
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = arrow_function_does_not_use_this,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = fn($x) => $x * 2;
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = nested_closures_do_not_use_this,
+        rule = PreferStaticClosureRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = fn() => fn($x) => $x * 2;
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = multiple_closures_without_this,
+        rule = PreferStaticClosureRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn1 = fn($x) => $x * 2;
+                    $fn2 = function($x) { return $x + 1; };
+                    $fn3 = fn($x) => $x - 1;
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = outer_closure_static_but_nested_not,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar() {
+                    $fn = static fn() => fn($x) => $x * 2;
+                }
+            }
+        "#}
+    }
 }
