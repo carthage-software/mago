@@ -1666,6 +1666,7 @@ dependencies = [
  "notify",
  "rayon",
  "serde",
+ "tempfile",
  "tracing",
  "walkdir",
 ]

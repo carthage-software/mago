@@ -51,7 +51,12 @@ Mago distinguishes between **your code** (what you want to check and format) and
   - Example: cache directories, build artifacts, generated files
 
 :::tip
-If a file matches both `paths` and `includes`, it will be treated as an include (dependency). This allows you to exclude specific subdirectories of your source from being processed while still making them available for symbol resolution.
+If a file matches both `paths` and `includes`, the more specific pattern takes precedence:
+- Exact file paths (e.g., `src/b.php`) are most specific
+- Deeper directory paths (e.g., `src/foo/bar/`) are more specific than shallow ones (e.g., `src/`)
+- Directory paths are more specific than glob patterns (e.g., `src/*.php`)
+
+If patterns have equal specificity, `includes` takes precedence. This allows you to explicitly override the file type for specific paths when needed.
 :::
 
 ### Basic Example

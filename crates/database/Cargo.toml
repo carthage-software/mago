@@ -22,3 +22,6 @@ globset = { workspace = true }
 serde = { workspace = true, features = ["rc"] }
 rayon = { workspace = true }
 notify = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
