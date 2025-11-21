@@ -100,4 +100,5 @@ pub enum Feature {
     DeprecatedAttribute,
     PipeOperator,
     CloneWith,
+    PartialFunctionApplication,
 }
