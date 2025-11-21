@@ -6,8 +6,10 @@ use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::settings::Settings;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
+use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::FileId;
+use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_semantics::SemanticsChecker;
@@ -74,7 +76,26 @@ impl AnalysisService {
 
     /// Updates the database for a new analysis run (for watch mode).
     /// This allows reusing the service without recreating it.
-    pub fn update_database(&mut self, database: ReadDatabase) {
+    ///
+    /// # Arguments
+    ///
+    /// * `database` - The new database snapshot to use for analysis
+    /// * `changed_file_ids` - File IDs that have been modified and need their cached signatures cleared
+    pub fn update_database(&mut self, database: ReadDatabase, changed_file_ids: &[FileId]) {
+        tracing::debug!(
+            "AnalysisService::update_database() replacing database (old file count: {}, new file count: {})",
+            self.database.len(),
+            database.len()
+        );
+
+        // Clear file_signatures and file_states for changed files to force re-analysis
+        // This prevents the incremental pipeline from using stale AST signatures or content hashes
+        for file_id in changed_file_ids {
+            self.codebase.remove_file_signature(file_id);
+            self.file_states.remove(file_id);
+            tracing::debug!("Cleared file_signature and file_state for FileId={}", file_id);
+        }
+
         self.database = database;
     }
 
@@ -133,7 +154,7 @@ impl AnalysisService {
             self.incremental = Some(inc);
         }
 
-        let (analysis_result, codebase, symbol_references) =
+        let (analysis_result, codebase, symbol_references, database) =
             pipeline.run(|settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
@@ -162,9 +183,28 @@ impl AnalysisService {
                 Ok(analysis_result)
             })?;
 
-        // Store the updated codebase and symbol_references back into self for next run
+        // Store the updated codebase, symbol_references, and database back into self for next run
         self.codebase = codebase;
         self.symbol_references = symbol_references;
+        self.database = database;
+
+        // Save state to incremental analysis manager for next run
+        // This allows the first run_incremental() after run() to use the previous state
+        if let Some(ref mut incremental) = self.incremental {
+            incremental.save_state(self.codebase.clone(), self.symbol_references.clone());
+        }
+
+        // Populate file_states so run_incremental() knows existing files and their hashes
+        // This prevents the first run_incremental() from treating all files as "new"
+        self.file_states = self
+            .database
+            .files()
+            .filter(|f| f.file_type != FileType::Builtin)
+            .map(|f| {
+                let hash = xxhash_rust::xxh3::xxh3_64(f.contents.as_bytes());
+                (f.id, FileState { content_hash: hash })
+            })
+            .collect();
 
         Ok(analysis_result)
     }
@@ -223,7 +263,7 @@ impl AnalysisService {
             self.incremental = Some(inc);
         }
 
-        let (analysis_result, codebase, symbol_references, new_file_states) =
+        let (analysis_result, codebase, symbol_references, new_file_states, database) =
             pipeline.run(|settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
@@ -256,6 +296,7 @@ impl AnalysisService {
         self.codebase = codebase.clone();
         self.symbol_references = symbol_references.clone();
         self.file_states = new_file_states;
+        self.database = database;
 
         // Save state to incremental analysis manager for next run
         if let Some(ref mut incremental) = self.incremental {
@@ -280,13 +321,16 @@ impl Reducer<AnalysisResult, AnalysisResult> for AnalysisResultReducer {
         symbol_references: SymbolReferences,
         results: Vec<AnalysisResult>,
     ) -> Result<(AnalysisResult, CodebaseMetadata, SymbolReferences), OrchestratorError> {
-        let mut aggregated_result = AnalysisResult::new(symbol_references.clone());
+        let mut aggregated_result = AnalysisResult::new(symbol_references);
         for result in results {
             aggregated_result.extend(result);
         }
 
         aggregated_result.issues.extend(codebase.take_issues(true));
 
-        Ok((aggregated_result, codebase, symbol_references))
+        // Extract the merged symbol references that include references from analyzer
+        let merged_references = std::mem::take(&mut aggregated_result.symbol_references);
+
+        Ok((aggregated_result, codebase, merged_references))
     }
 }

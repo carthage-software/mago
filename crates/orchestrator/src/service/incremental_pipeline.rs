@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
 use ahash::HashMap;
-use ahash::HashSet;
 use bumpalo::Bump;
 use rayon::prelude::*;
 
-use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
@@ -26,6 +24,10 @@ use std::fmt::Debug;
 
 /// A callback type invoked after the scanning phase completes.
 pub type PostScanCallback = Box<dyn FnOnce(&mut CodebaseMetadata, &SymbolReferences) + Send>;
+
+/// The result tuple returned by the incremental pipeline.
+pub type IncrementalPipelineResult<R> =
+    (R, CodebaseMetadata, SymbolReferences, HashMap<FileId, FileState>, ReadDatabase);
 
 /// File state tracked for incremental analysis
 #[derive(Debug, Clone, Copy)]
@@ -113,10 +115,7 @@ where
     /// 3. Only parses + scans changed files
     /// 4. Reuses cached metadata for unchanged files
     /// 5. Returns updated file states for next run
-    pub fn run<F>(
-        self,
-        map_function: F,
-    ) -> Result<(R, CodebaseMetadata, SymbolReferences, HashMap<FileId, FileState>), OrchestratorError>
+    pub fn run<F>(self, map_function: F) -> Result<IncrementalPipelineResult<R>, OrchestratorError>
     where
         F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
@@ -126,7 +125,11 @@ where
 
             let (result, codebase, symbol_references) =
                 self.reducer.reduce(self.codebase, self.symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references, HashMap::default()));
+
+            let database = Arc::try_unwrap(self.database)
+                .expect("Database Arc should have no other references at pipeline completion");
+
+            return Ok((result, codebase, symbol_references, HashMap::default(), database));
         }
 
         // Phase 1: Detect changed files by comparing content hashes
@@ -172,6 +175,9 @@ where
             if source_files.is_empty() { 0 } else { (unchanged_files.len() * 100) / source_files.len() }
         );
 
+        // Collect file IDs before consuming changed_files
+        let changed_file_ids: Vec<FileId> = changed_files.iter().map(|file| file.id).collect();
+
         let partial_codebases: Vec<CodebaseMetadata> = changed_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
@@ -198,6 +204,11 @@ where
         // Phase 3: Merge new metadata with cached metadata from unchanged files
         let mut merged_codex = self.codebase;
 
+        // Remove old metadata for changed files to prevent accumulation
+        for file_id in &changed_file_ids {
+            merged_codex.remove_file_metadata(file_id);
+        }
+
         // Add metadata from changed files
         for partial in partial_codebases {
             merged_codex.extend(partial);
@@ -209,12 +220,22 @@ where
         // The unchanged files' metadata is already present in merged_codex.
 
         let mut symbol_references = self.symbol_references;
-        populate_codebase(&mut merged_codex, &mut symbol_references, AtomSet::default(), HashSet::default());
 
-        // Invoke after_scanning callback if provided (for incremental analysis)
+        // Invoke after_scanning callback BEFORE populate_codebase so that
+        // mark_safe_symbols() can compute safe_symbols first. This ensures
+        // unchanged symbols are not unnecessarily repopulated.
         if let Some(callback) = self.after_scanning {
             callback(&mut merged_codex, &symbol_references);
         }
+
+        // Now populate_codebase will use the safe_symbols computed by the callback
+        let safe_symbols = std::mem::take(&mut merged_codex.safe_symbols);
+        let safe_symbol_members = std::mem::take(&mut merged_codex.safe_symbol_members);
+        populate_codebase(&mut merged_codex, &mut symbol_references, safe_symbols.clone(), safe_symbol_members.clone());
+
+        // Restore safe_symbols so the analyzer can check them and skip unchanged symbols
+        merged_codex.safe_symbols = safe_symbols;
+        merged_codex.safe_symbol_members = safe_symbol_members;
 
         // Phase 4: Build new file states cache for next run
         let new_file_states: HashMap<FileId, FileState> = source_files
@@ -238,7 +259,11 @@ where
 
             let (result, codebase, symbol_references) =
                 self.reducer.reduce(merged_codex, symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references, new_file_states));
+
+            let database = Arc::try_unwrap(self.database)
+                .expect("Database Arc should have no other references at pipeline completion");
+
+            return Ok((result, codebase, symbol_references, new_file_states, database));
         }
 
         let final_codebase = Arc::new(merged_codex);
@@ -259,6 +284,10 @@ where
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
 
         let (result, codebase, symbol_references) = self.reducer.reduce(final_codebase, symbol_references, results)?;
-        Ok((result, codebase, symbol_references, new_file_states))
+
+        let database = Arc::try_unwrap(self.database)
+            .expect("Database Arc should have no other references at pipeline completion");
+
+        Ok((result, codebase, symbol_references, new_file_states, database))
     }
 }

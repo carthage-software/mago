@@ -108,7 +108,7 @@ impl Symbols {
     /// `Some(SymbolKind)` if the symbol exists in the map, `None` otherwise.
     #[inline]
     pub fn get_kind(&self, name: &Atom) -> Option<SymbolKind> {
-        self.all.get(name).copied() // Use copied() since SymbolKind is Copy
+        self.all.get(name).copied()
     }
 
     /// Checks if a symbol with the given name is known.
@@ -185,6 +185,32 @@ impl Symbols {
     #[inline]
     pub fn get_all(&self) -> &AtomMap<SymbolKind> {
         &self.all
+    }
+
+    /// Removes a symbol by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: The `Atom` (likely FQCN) of the symbol to remove.
+    ///
+    /// # Returns
+    ///
+    /// The previous `SymbolKind` if the symbol existed, `None` otherwise.
+    #[inline]
+    pub fn remove(&mut self, name: &Atom) -> Option<SymbolKind> {
+        self.all.remove(name)
+    }
+
+    /// Returns the number of symbols in this map.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.all.len()
+    }
+
+    /// Returns true if this map contains no symbols.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.all.is_empty()
     }
 
     /// Extends the current `Symbols` map with another one.

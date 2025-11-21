@@ -635,10 +635,25 @@ impl SymbolReferences {
         // OR if its own signature was kept but its body might have changed (keep_signature diff).
         let mut invalid_bodies = HashSet::default();
 
+        // Debug: Log body reference map size
+        tracing::debug!(
+            "get_invalid_symbols: checking {} body references against {} invalid signatures",
+            self.symbol_references_to_symbols.len(),
+            invalid_signatures.len()
+        );
+
         // Check references from body map
         for (referencing_item, referenced_items) in &self.symbol_references_to_symbols {
             // Does this item reference *any* item with an invalid signature?
-            if referenced_items.iter().any(|r| invalid_signatures.contains(r)) {
+            // Also check if the parent class of a referenced member is invalid.
+            if referenced_items.iter().any(|r| {
+                invalid_signatures.contains(r) || (!r.1.is_empty() && invalid_signatures.contains(&(r.0, empty_atom())))
+            }) {
+                tracing::debug!(
+                    "  body invalidated: ({}, {}) references something invalid",
+                    referencing_item.0,
+                    referencing_item.1
+                );
                 invalid_bodies.insert(*referencing_item);
                 if !referencing_item.1.is_empty() {
                     // If it's a member...
@@ -651,7 +666,10 @@ impl SymbolReferences {
         // If item A's signature references item B (invalid signature), A's signature becomes invalid (handled above).
         // But A's *body* might also be considered invalid due to the signature dependency.
         for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
-            if referenced_items.iter().any(|r| invalid_signatures.contains(r)) {
+            // Also check if the parent class of a referenced member is invalid.
+            if referenced_items.iter().any(|r| {
+                invalid_signatures.contains(r) || (!r.1.is_empty() && invalid_signatures.contains(&(r.0, empty_atom())))
+            }) {
                 invalid_bodies.insert(*referencing_item);
                 if !referencing_item.1.is_empty() {
                     partially_invalid_symbols.insert(referencing_item.0);
@@ -666,7 +684,17 @@ impl SymbolReferences {
         // PLUS items whose bodies reference invalid signatures.
         // partially_invalid_symbols includes symbols containing members from either invalid_signatures or invalid_bodies.
         let mut all_invalid_symbols = invalid_signatures;
-        all_invalid_symbols.extend(invalid_bodies);
+        let sig_count = all_invalid_symbols.len();
+        all_invalid_symbols.extend(invalid_bodies.clone());
+
+        tracing::debug!(
+            "get_invalid_symbols: {} invalid signatures, {} invalid bodies, {} total invalid, {} partially invalid",
+            sig_count,
+            invalid_bodies.len(),
+            all_invalid_symbols.len(),
+            partially_invalid_symbols.len()
+        );
+
         Some((all_invalid_symbols, partially_invalid_symbols))
     }
 

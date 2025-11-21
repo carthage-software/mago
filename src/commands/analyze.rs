@@ -280,8 +280,16 @@ impl AnalyzeCommand {
 
             tracing::info!("Detected {} file change(s), re-analyzing...", changed_file_ids.len());
 
-            service.update_database(watcher.database().read_only());
+            tracing::debug!("Creating new ReadDatabase snapshot from watcher.database()");
+            let read_database = watcher.database().read_only();
 
+            tracing::debug!(
+                "Updating service database with new snapshot and clearing {} file signatures",
+                changed_file_ids.len()
+            );
+            service.update_database(read_database, &changed_file_ids);
+
+            tracing::debug!("Running incremental analysis on service");
             let analysis_result = service.run_incremental()?;
 
             let mut issues = analysis_result.issues;

@@ -67,6 +67,7 @@ pub fn populate_codebase(
             classlike_info.appearing_property_ids.clear();
             classlike_info.declaring_method_ids.clear();
             classlike_info.appearing_method_ids.clear();
+            classlike_info.issues.clear();
         }
     }
 

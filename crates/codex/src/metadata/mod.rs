@@ -149,6 +149,7 @@ impl CodebaseMetadata {
         let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
         let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
         let identifier = (lowercase_class, lowercase_method);
+
         self.function_likes.contains_key(&identifier)
     }
 
@@ -796,7 +797,30 @@ impl CodebaseMetadata {
         self.file_signatures.remove(file_id)
     }
 
-    // Utility Methods
+    /// Removes all metadata associated with a specific file.
+    ///
+    /// This includes class-likes, function-likes, constants, and the file signature.
+    /// Used during incremental analysis to clear old metadata before re-scanning changed files.
+    pub fn remove_file_metadata(&mut self, file_id: &FileId) {
+        self.file_signatures.remove(file_id);
+
+        let removed_class_fqcns: Vec<_> = self
+            .class_likes
+            .iter()
+            .filter(|(_, metadata)| metadata.span.file_id == *file_id)
+            .map(|(fqcn, _)| *fqcn)
+            .collect();
+
+        self.class_likes.retain(|_, metadata| metadata.span.file_id != *file_id);
+        self.function_likes.retain(|_, metadata| metadata.span.file_id != *file_id);
+        self.constants.retain(|_, metadata| metadata.span.file_id != *file_id);
+
+        for fqcn in removed_class_fqcns {
+            self.symbols.remove(&fqcn);
+            self.all_class_like_descendants.remove(&fqcn);
+            self.direct_classlike_descendants.remove(&fqcn);
+        }
+    }
 
     /// Merges information from another `CodebaseMetadata` into this one.
     pub fn extend(&mut self, other: CodebaseMetadata) {
@@ -876,6 +900,11 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+
+        // Merge file signatures (needed for incremental analysis)
+        for (file_id, signature) in other.file_signatures {
+            self.file_signatures.insert(file_id, signature);
+        }
     }
 
     /// Takes all issues from the codebase metadata.

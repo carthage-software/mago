@@ -32,6 +32,7 @@
 //! incremental.save_state(&new_metadata, &new_refs, save_to_filesystem);
 //! ```
 
+use mago_atom::empty_atom;
 use mago_codex::diff::CodebaseDiff;
 use mago_codex::differ::compute_file_diff;
 use mago_codex::metadata::CodebaseMetadata;
@@ -187,7 +188,11 @@ impl IncrementalAnalysis {
                     }
                 } else {
                     // Member (method, property, class constant)
-                    metadata.safe_symbol_members.insert(*keep_symbol);
+                    // Don't mark as safe if the parent class is invalid or partially invalid
+                    let parent_symbol = (keep_symbol.0, empty_atom());
+                    if !invalid_symbols.contains(&parent_symbol) && !partially_invalid.contains(&keep_symbol.0) {
+                        metadata.safe_symbol_members.insert(*keep_symbol);
+                    }
                 }
             }
         }

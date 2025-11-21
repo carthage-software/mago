@@ -165,7 +165,10 @@ where
     /// - `result`: The aggregated result from the reducer
     /// - `codebase`: The final codebase metadata after all processing
     /// - `symbol_references`: The final symbol references
-    pub fn run<F>(self, map_function: F) -> Result<(R, CodebaseMetadata, SymbolReferences), OrchestratorError>
+    pub fn run<F>(
+        self,
+        map_function: F,
+    ) -> Result<(R, CodebaseMetadata, SymbolReferences, ReadDatabase), OrchestratorError>
     where
         F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
@@ -175,7 +178,11 @@ where
 
             let (result, codebase, symbol_references) =
                 self.reducer.reduce(self.codebase, self.symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references));
+
+            let database = Arc::try_unwrap(self.database)
+                .expect("Database Arc should have no other references at pipeline completion");
+
+            return Ok((result, codebase, symbol_references, database));
         }
 
         let compiling_bar = if self.should_use_progress_bar {
@@ -238,7 +245,11 @@ where
 
             let (result, codebase, symbol_references) =
                 self.reducer.reduce(merged_codex, symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references));
+
+            let database = Arc::try_unwrap(self.database)
+                .expect("Database Arc should have no other references at pipeline completion");
+
+            return Ok((result, codebase, symbol_references, database));
         }
 
         let final_codebase = Arc::new(merged_codex);
@@ -272,7 +283,11 @@ where
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
 
         let (result, codebase, symbol_references) = self.reducer.reduce(final_codebase, symbol_references, results)?;
-        Ok((result, codebase, symbol_references))
+
+        let database = Arc::try_unwrap(self.database)
+            .expect("Database Arc should have no other references at pipeline completion");
+
+        Ok((result, codebase, symbol_references, database))
     }
 }
 
