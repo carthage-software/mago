@@ -1203,12 +1203,16 @@ fn should_inherit_docblock_type(
     has_explicit_inheritdoc: bool,
     codebase: &CodebaseMetadata,
 ) -> bool {
-    if has_explicit_inheritdoc {
-        return true;
-    }
-
     if child_docblock.is_some() {
         return false;
+    }
+
+    if parent_docblock.is_none() && parent_native.is_none() && covariant {
+        return false;
+    }
+
+    if has_explicit_inheritdoc {
+        return true;
     }
 
     if parent_docblock.is_none() {

@@ -255,6 +255,7 @@ test_case!(nullsafe_operator_chain_shortcircuit);
 test_case!(property_docblock_type_annotation);
 test_case!(array_key_access_after_existence_check);
 test_case!(mb_encoding);
+test_case!(psl_awaitable_promise);
 
 // Github Issues
 test_case!(issue_265);
