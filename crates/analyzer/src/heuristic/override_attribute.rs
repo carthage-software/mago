@@ -1,7 +1,7 @@
 use mago_atom::ascii_lowercase_atom;
-
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_fixer::SafetyClassification;
+use mago_php_version::PHPVersion;
 use mago_reporting::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -14,6 +14,11 @@ pub fn check_override_attribute<'ctx, 'arena>(
     members: &[ClassLikeMember<'arena>],
     context: &mut Context<'ctx, 'arena>,
 ) {
+    if context.settings.version < PHPVersion::PHP83 {
+        // Override attribute not supported before PHP 8.3
+        return;
+    }
+
     let class_name = metadata.original_name;
     for member in members {
         let ClassLikeMember::Method(method) = member else {
