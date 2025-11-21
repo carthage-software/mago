@@ -27,6 +27,44 @@ pub fn check_for_new_without_parenthesis(object_expr: &Expression, context: &mut
 }
 
 #[inline]
+pub fn check_for_clone_with(expr: &Expression, context: &mut Context<'_, '_, '_>) {
+    if context.version.is_supported(Feature::CloneWith) {
+        return;
+    }
+
+    let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expr else {
+        return;
+    };
+
+    let Expression::Identifier(clone_ident) = function else {
+        return;
+    };
+
+    if !clone_ident.value().eq_ignore_ascii_case("clone") {
+        return;
+    }
+
+    if argument_list.arguments.len() <= 1 {
+        return;
+    }
+
+    context.report(
+        Issue::error(format!(
+            "Cloning with properties is only available in PHP 8.5 and above."
+        ))
+        .with_annotation(
+            Annotation::primary(clone_ident.span())
+                .with_message("Clone with properties used here."),
+        )
+        .with_note(
+            "Consider using a standard clone operation without additional properties for compatibility with earlier PHP versions.",
+        ).with_help(
+            "Upgrade to PHP 8.5 or above to use cloning with properties.",
+        )
+    );
+}
+
+#[inline]
 pub fn check_unary_prefix_operator(unary_prefix_operator: &UnaryPrefixOperator, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::UnsetCast)
         && let UnaryPrefixOperator::UnsetCast(span, _) = unary_prefix_operator

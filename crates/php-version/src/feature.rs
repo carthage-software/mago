@@ -99,4 +99,5 @@ pub enum Feature {
     ClosureCreationInConstantExpressions,
     DeprecatedAttribute,
     PipeOperator,
+    CloneWith,
 }

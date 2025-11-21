@@ -307,6 +307,7 @@ impl PHPVersion {
             | Feature::ConstantAttributes
             | Feature::NoDiscardAttribute
             | Feature::VoidCast
+            | Feature::CloneWith
             | Feature::AsymmetricVisibilityForStaticProperties
             | Feature::ClosureCreationInConstantExpressions
             | Feature::PipeOperator => self.0 >= 0x08_05_00,

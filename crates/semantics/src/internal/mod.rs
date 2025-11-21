@@ -20,6 +20,8 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
     #[inline]
     fn walk_in_expression(&self, expression: &'ast Expression<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
         context.ancestors.push(expression.span());
+
+        checker::expression::check_for_clone_with(expression, context);
     }
 
     #[inline]
