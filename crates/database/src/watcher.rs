@@ -1,6 +1,7 @@
 //! Database watcher for real-time file change monitoring.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;
 use std::path::Path;
@@ -15,9 +16,11 @@ use globset::GlobSet;
 use globset::GlobSetBuilder;
 use notify::Config;
 use notify::Event;
+use notify::EventKind;
 use notify::RecommendedWatcher;
 use notify::RecursiveMode;
 use notify::Watcher as NotifyWatcher;
+use notify::event::ModifyKind;
 
 use crate::Database;
 use crate::DatabaseReader;
@@ -27,6 +30,8 @@ use crate::exclusion::Exclusion;
 use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
+
+const DEFAULT_POLL_INTERVAL_MS: u64 = 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ChangedFile {
@@ -43,7 +48,7 @@ pub struct WatchOptions {
 
 impl Default for WatchOptions {
     fn default() -> Self {
-        Self { poll_interval: Some(Duration::from_millis(500)), additional_excludes: vec![] }
+        Self { poll_interval: Some(Duration::from_millis(DEFAULT_POLL_INTERVAL_MS)), additional_excludes: vec![] }
     }
 }
 
@@ -93,31 +98,43 @@ impl<'a> DatabaseWatcher<'a> {
             .collect();
 
         let extensions: HashSet<String> = config.extensions.iter().map(|s| s.to_string()).collect();
+        let workspace = config.workspace.as_ref().to_path_buf();
 
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
                 if let Ok(event) = res
-                    && let Some(changed) = Self::handle_event(event, &glob_excludes, &path_excludes, &extensions)
+                    && let Some(changed) =
+                        Self::handle_event(event, &workspace, &glob_excludes, &path_excludes, &extensions)
                 {
                     let _ = tx.send(changed);
                 }
             },
-            Config::default().with_poll_interval(options.poll_interval.unwrap_or(Duration::from_millis(500))),
+            Config::default()
+                .with_poll_interval(options.poll_interval.unwrap_or(Duration::from_millis(DEFAULT_POLL_INTERVAL_MS))),
         )
         .map_err(DatabaseError::WatcherInit)?;
 
-        let mut watched_paths = Vec::new();
+        let mut unique_watch_paths = HashSet::new();
+
         for path in &config.paths {
-            let path_buf = Path::new(path.as_ref()).to_path_buf();
-            watcher.watch(&path_buf, RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
-            watched_paths.push(path_buf.clone());
-            tracing::debug!("Watching path: {}", path_buf.display());
+            let watch_path = Self::extract_watch_path(path.as_ref());
+            let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
+
+            unique_watch_paths.insert(absolute_path);
         }
+
         for path in &config.includes {
-            let path_buf = Path::new(path.as_ref()).to_path_buf();
-            watcher.watch(&path_buf, RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
-            watched_paths.push(path_buf.clone());
-            tracing::debug!("Watching include path: {}", path_buf.display());
+            let watch_path = Self::extract_watch_path(path.as_ref());
+            let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
+
+            unique_watch_paths.insert(absolute_path);
+        }
+
+        let mut watched_paths = Vec::new();
+        for path in unique_watch_paths {
+            watcher.watch(&path, RecursiveMode::Recursive).map_err(DatabaseError::WatcherWatch)?;
+            watched_paths.push(path.clone());
+            tracing::debug!("Watching path: {}", path.display());
         }
 
         tracing::info!("Database watcher started for workspace: {}", config.workspace.display());
@@ -146,14 +163,48 @@ impl<'a> DatabaseWatcher<'a> {
         self.watcher.is_some()
     }
 
-    /// Handles a file system event and returns changed files with their paths.
+    /// Extracts the base directory path from a potentially glob-pattern path.
+    ///
+    /// For glob patterns (containing *, ?, [, {), this returns the directory portion
+    /// before the first glob metacharacter. For regular paths, returns the path as-is.
+    ///
+    /// # Examples
+    ///
+    /// - `"src/**/*.php"` → `"src"`
+    /// - `"lib/*/foo.php"` → `"lib"`
+    /// - `"tests/fixtures"` → `"tests/fixtures"` (unchanged)
+    fn extract_watch_path(pattern: &str) -> PathBuf {
+        let is_glob = pattern.contains('*') || pattern.contains('?') || pattern.contains('[') || pattern.contains('{');
+
+        if !is_glob {
+            return PathBuf::from(pattern);
+        }
+
+        let first_glob_pos = pattern.find(['*', '?', '[', '{']).unwrap_or(pattern.len());
+
+        let base = &pattern[..first_glob_pos];
+
+        let base = base.trim_end_matches('/').trim_end_matches('\\');
+
+        if base.is_empty() { PathBuf::from(".") } else { PathBuf::from(base) }
+    }
+
     fn handle_event(
         event: Event,
+        workspace: &Path,
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<PathBuf>,
         extensions: &HashSet<String>,
     ) -> Option<Vec<ChangedFile>> {
         tracing::debug!("Watcher received event: kind={:?}, paths={:?}", event.kind, event.paths);
+
+        if let EventKind::Other | EventKind::Any | EventKind::Access(_) | EventKind::Modify(ModifyKind::Metadata(_)) =
+            event.kind
+        {
+            tracing::debug!("Ignoring non-modification event: {:?}", event.kind);
+
+            return None;
+        }
 
         let mut changed_files = Vec::new();
 
@@ -192,9 +243,8 @@ impl<'a> DatabaseWatcher<'a> {
                 continue;
             }
 
-            // Create file ID from path
-            let file_name = path.to_string_lossy();
-            let file_id = FileId::new(file_name.as_ref());
+            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).to_string_lossy();
+            let file_id = FileId::new(logical_name.as_ref());
 
             changed_files.push(ChangedFile { id: file_id, path: path.clone() });
         }
@@ -228,9 +278,11 @@ impl<'a> DatabaseWatcher<'a> {
                     all_changed.extend(more);
                 }
 
-                all_changed.sort_by_key(|f| f.id);
-                all_changed.dedup_by_key(|f| f.id);
-
+                let mut latest_changes: HashMap<FileId, ChangedFile> = HashMap::new();
+                for changed in all_changed {
+                    latest_changes.insert(changed.id, changed);
+                }
+                let all_changed: Vec<ChangedFile> = latest_changes.into_values().collect();
                 let mut changed_ids = Vec::new();
 
                 for changed_file in &all_changed {
@@ -242,7 +294,7 @@ impl<'a> DatabaseWatcher<'a> {
                                 match std::fs::read_to_string(&changed_file.path) {
                                     Ok(contents) => {
                                         self.database.update(changed_file.id, Cow::Owned(contents));
-                                        tracing::debug!("Updated file in database: {}", file.name);
+                                        tracing::trace!("Updated file in database: {}", file.name);
                                     }
                                     Err(e) => {
                                         tracing::error!("Failed to read file {}: {}", changed_file.path.display(), e);
@@ -250,7 +302,7 @@ impl<'a> DatabaseWatcher<'a> {
                                 }
                             } else {
                                 self.database.delete(changed_file.id);
-                                tracing::debug!("Deleted file from database: {}", file.name);
+                                tracing::trace!("Deleted file from database: {}", file.name);
                             }
                         }
                         Err(_) => {
