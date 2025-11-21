@@ -87,6 +87,9 @@ impl PHPVersion {
     /// The PHP 8.5 version.
     pub const PHP85: PHPVersion = PHPVersion::new(8, 5, 0);
 
+    /// The PHP 8.6 version.
+    pub const PHP86: PHPVersion = PHPVersion::new(8, 6, 0);
+
     /// Represents the latest stable PHP version actively supported or targeted by this crate.
     ///
     /// **Warning:** The specific PHP version this constant points to (e.g., `PHPVersion::PHP84`)
@@ -95,7 +98,7 @@ impl PHPVersion {
     ///
     /// **Do NOT rely on this constant having a fixed value across different crate versions.**
     /// It is intended for features that should target "the most current PHP we know of now."
-    pub const LATEST: PHPVersion = PHPVersion::PHP84;
+    pub const LATEST: PHPVersion = PHPVersion::PHP85;
 
     /// Represents an upcoming, future, or "next" PHP version that this crate is
     /// anticipating or for which experimental support might be in development.
@@ -106,7 +109,7 @@ impl PHPVersion {
     ///
     /// **Do NOT rely on this constant having a fixed value across different crate versions.**
     /// Use with caution, primarily for internal or forward-looking features.
-    pub const NEXT: PHPVersion = PHPVersion::PHP85;
+    pub const NEXT: PHPVersion = PHPVersion::PHP86;
 
     /// Creates a new `PHPVersion` from the provided `major`, `minor`, and `patch` values.
     ///
