@@ -142,6 +142,7 @@ impl<'arena> Format<'arena> for Statement<'arena> {
                 Statement::HaltCompiler(h) => h.format(f),
                 Statement::Unset(u) => u.format(f),
                 Statement::Noop(_) => Document::String(";"),
+                _ => unreachable!("A statement variant was not handled in formatter: {self:?}"),
             }
         });
 

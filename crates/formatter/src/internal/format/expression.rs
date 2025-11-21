@@ -105,6 +105,7 @@ impl<'arena> Format<'arena> for Expression<'arena> {
                 Expression::MagicConstant(c) => c.format(f),
                 Expression::Pipe(p) => p.format(f),
                 Expression::Parenthesized(_) => unreachable!("Parenthesized expressions are handled separately"),
+                _ => unreachable!("An expression variant was not handled in formatter: {self:?}"),
             }
         })
     }

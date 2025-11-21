@@ -186,6 +186,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
 
                 Ok(())
             }
+            _ => unreachable!("An expression variant was not handled in analyzer: {self:?}"),
         };
 
         result?;

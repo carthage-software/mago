@@ -47,6 +47,7 @@ impl Fingerprintable for Statement<'_> {
             Statement::Noop(_) => {
                 // Noop statements do not contribute to the fingerprint
             }
+            _ => unreachable!("A statement variant was not handled in fingerprinting: {self:?}"),
         }
     }
 }

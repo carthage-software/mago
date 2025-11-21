@@ -164,6 +164,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             Statement::Static(r#static) => r#static.analyze(context, block_context, artifacts),
             Statement::Unset(unset) => unset.analyze(context, block_context, artifacts),
             Statement::Switch(r#switch) => r#switch.analyze(context, block_context, artifacts),
+            _ => unreachable!("A statement variant was not handled in analyzer: {self:?}"),
         };
 
         result?;

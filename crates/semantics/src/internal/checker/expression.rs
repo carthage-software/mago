@@ -49,9 +49,7 @@ pub fn check_for_clone_with(expr: &Expression, context: &mut Context<'_, '_, '_>
     }
 
     context.report(
-        Issue::error(format!(
-            "Cloning with properties is only available in PHP 8.5 and above."
-        ))
+        Issue::error("Cloning with properties is only available in PHP 8.5 and above.".to_string())
         .with_annotation(
             Annotation::primary(clone_ident.span())
                 .with_message("Clone with properties used here."),

@@ -116,12 +116,8 @@ impl<'a> DatabaseLoader<'a> {
             all_files.entry(file_id).or_insert(file_with_spec.file);
 
             match file_decisions.get(&file_id) {
-                Some((FileType::Host, host_specificity)) => {
-                    if vendored_specificity > *host_specificity {
-                        file_decisions.insert(file_id, (FileType::Vendored, vendored_specificity));
-                    } else if vendored_specificity == *host_specificity {
-                        file_decisions.insert(file_id, (FileType::Vendored, vendored_specificity));
-                    }
+                Some((FileType::Host, host_specificity)) if vendored_specificity < *host_specificity => {
+                    // Keep Host
                 }
                 _ => {
                     file_decisions.insert(file_id, (FileType::Vendored, vendored_specificity));
