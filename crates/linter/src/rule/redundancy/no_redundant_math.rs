@@ -412,8 +412,20 @@ fn get_expression_value<'ast, 'arena>(expression: &'ast Expression<'arena>) -> O
                 BinaryOperator::Addition(_) => Some(lhs_value + rhs_value),
                 BinaryOperator::Subtraction(_) => Some(lhs_value - rhs_value),
                 BinaryOperator::Multiplication(_) => Some(lhs_value * rhs_value),
-                BinaryOperator::Division(_) => Some(lhs_value / rhs_value),
-                BinaryOperator::Modulo(_) => Some(lhs_value % rhs_value),
+                BinaryOperator::Division(_) => {
+                    if rhs_value == 0 || lhs_value % rhs_value != 0 {
+                        None
+                    } else {
+                        Some(lhs_value / rhs_value)
+                    }
+                }
+                BinaryOperator::Modulo(_) => {
+                    if rhs_value == 0 {
+                        None
+                    } else {
+                        Some(lhs_value % rhs_value)
+                    }
+                }
                 BinaryOperator::Exponentiation(_) => Some(lhs_value.pow(rhs_value as u32)),
                 BinaryOperator::BitwiseAnd(_) => Some(lhs_value & rhs_value),
                 BinaryOperator::BitwiseOr(_) => Some(lhs_value | rhs_value),
@@ -424,5 +436,117 @@ fn get_expression_value<'ast, 'arena>(expression: &'ast Expression<'arena>) -> O
             }
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoRedundantMathRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = float_division_is_not_redundant,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            function fraction(int $x): float {
+                return (4 / 3) * $x;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = complex_float_division,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            $val = 10 / 4; // 2.5
+            $val2 = 5 / 2; // 2.5
+        "#}
+    }
+
+    test_lint_success! {
+        name = valid_arithmetic,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x * 2;
+            $b = $x + 1;
+            $c = $x - 5;
+            $d = $x / 2;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_division_by_one,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x / 1;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_multiplication_by_one,
+        rule = NoRedundantMathRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x * 1;
+            $b = 1 * $x;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_addition_of_zero,
+        rule = NoRedundantMathRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x + 0;
+            $b = 0 + $x;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_subtraction_of_zero,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x - 0;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_modulo_one,
+        rule = NoRedundantMathRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x % 1;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = redundant_negation_operations,
+        rule = NoRedundantMathRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            $a = $x * -1;
+            $b = $x / -1;
+            $c = $x % -1;
+        "#}
     }
 }
