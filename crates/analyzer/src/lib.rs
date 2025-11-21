@@ -75,7 +75,10 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         let statements = program.statements.as_slice();
 
-        let collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
+        let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
+        if self.settings.diff {
+            collector.set_skip_unfulfilled_expect(true);
+        }
 
         let mut context = Context::new(
             self.arena,

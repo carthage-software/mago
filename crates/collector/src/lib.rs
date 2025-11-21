@@ -47,6 +47,9 @@ pub struct Collector<'ctx, 'arena> {
     aliases: HashMap<&'static str, &'static str>,
     /// An optional URL template for generating links to issue documentation.
     link_template: Option<&'static str>,
+    /// If true, skip reporting unfulfilled-expect warnings.
+    /// Used during incremental/diff analysis where some symbols are skipped.
+    skip_unfulfilled_expect: bool,
 }
 
 impl<'ctx, 'arena> Collector<'ctx, 'arena> {
@@ -78,6 +81,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             active_codes: None,
             aliases: HashMap::default(),
             link_template: None,
+            skip_unfulfilled_expect: false,
         };
 
         attach_pragma_scopes(&mut collector, program);
@@ -101,6 +105,15 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     #[inline]
     pub fn set_link_template(&mut self, template: &'static str) {
         self.link_template = Some(template);
+    }
+
+    /// Disables unfulfilled-expect warnings.
+    ///
+    /// Use this during incremental/diff analysis where some symbols may be
+    /// skipped, causing their expected pragmas to appear unfulfilled.
+    #[inline]
+    pub fn set_skip_unfulfilled_expect(&mut self, skip: bool) {
+        self.skip_unfulfilled_expect = skip;
     }
 
     /// Overwrites the list of disabled issue codes.
@@ -319,6 +332,12 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     #[inline]
     pub fn finish(mut self) -> IssueCollection {
         let mut issues = self.issues;
+
+        if self.skip_unfulfilled_expect {
+            self.pragmas.clear();
+
+            return issues;
+        }
 
         for pragma in self.pragmas.drain(..) {
             if pragma.used {
