@@ -294,7 +294,7 @@ mod tests {
     }
 
     test_lint_failure! {
-        name = multiple_single_element_yield_froms,
+        name = multiple_single_element_yield_from,
         rule = NoRedundantYieldFromRule,
         count = 3,
         code = indoc! {r#"
