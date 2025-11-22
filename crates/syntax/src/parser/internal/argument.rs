@@ -94,14 +94,14 @@ pub fn parse_partial_argument<'arena>(
     let current = utils::peek(stream)?;
 
     if current.kind == T!["?"] {
-        return Ok(PartialArgument::Placeholder(Placeholder { span: utils::expect_any(stream)?.span }));
+        return Ok(PartialArgument::Placeholder(PlaceholderArgument { span: utils::expect_any(stream)?.span }));
     }
 
     if current.kind == T!["..."] {
         let next = utils::maybe_peek_nth(stream, 1)?;
         match next.map(|t| t.kind) {
             Some(T![","]) | Some(T![")"]) | None => {
-                return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholder {
+                return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholderArgument {
                     span: utils::expect_any(stream)?.span,
                 }));
             }
@@ -116,7 +116,7 @@ pub fn parse_partial_argument<'arena>(
         let colon = utils::expect_any(stream)?.span;
 
         if utils::peek(stream)?.kind == T!["?"] {
-            return Ok(PartialArgument::NamedPlaceholder(NamedPlaceholder {
+            return Ok(PartialArgument::NamedPlaceholder(NamedPlaceholderArgument {
                 name,
                 colon,
                 question_mark: utils::expect_any(stream)?.span,

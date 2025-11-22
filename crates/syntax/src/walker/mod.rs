@@ -386,14 +386,14 @@ generate_ast_walker! {
             PartialArgument::Named(named_argument) => {
                 walker.walk_named_argument(named_argument, context);
             }
-            PartialArgument::NamedPlaceholder(named_placeholder) => {
-                walker.walk_named_placeholder(named_placeholder, context);
+            PartialArgument::NamedPlaceholder(named_placeholder_argument) => {
+                walker.walk_named_placeholder_argument(named_placeholder_argument, context);
             }
-            PartialArgument::Placeholder(placeholder) => {
-                walker.walk_placeholder(placeholder, context);
+            PartialArgument::Placeholder(placeholder_argument) => {
+                walker.walk_placeholder_argument(placeholder_argument, context);
             }
-            PartialArgument::VariadicPlaceholder(varadic_placeholder) => {
-                walker.walk_variadic_placeholder(varadic_placeholder, context);
+            PartialArgument::VariadicPlaceholder(variadic_placeholder_argument) => {
+                walker.walk_variadic_placeholder_argument(variadic_placeholder_argument, context);
             }
         }
     }
@@ -407,15 +407,15 @@ generate_ast_walker! {
         walker.walk_expression(&named_argument.value, context);
     }
 
-    _ Placeholder as placeholder => {
+    _ PlaceholderArgument as placeholder_argument => {
         // Do nothing by default
     }
 
-    'arena NamedPlaceholder as named_placeholder => {
-        walker.walk_local_identifier(&named_placeholder.name, context);
+    'arena NamedPlaceholderArgument as named_placeholder_argument => {
+        walker.walk_local_identifier(&named_placeholder_argument.name, context);
     }
 
-    _ VariadicPlaceholder as variadic_placeholder => {
+    _ VariadicPlaceholderArgument as variadic_placeholder_argument => {
         // Do nothing by default
     }
 

@@ -48,9 +48,9 @@ pub enum Argument<'arena> {
 pub enum PartialArgument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),
-    NamedPlaceholder(NamedPlaceholder<'arena>),
-    Placeholder(Placeholder),
-    VariadicPlaceholder(VariadicPlaceholder),
+    NamedPlaceholder(NamedPlaceholderArgument<'arena>),
+    Placeholder(PlaceholderArgument),
+    VariadicPlaceholder(VariadicPlaceholderArgument),
 }
 
 /// Represents a positional argument.
@@ -78,7 +78,7 @@ pub struct NamedArgument<'arena> {
 ///
 /// Reference: https://wiki.php.net/rfc/partial_function_application_v2
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct NamedPlaceholder<'arena> {
+pub struct NamedPlaceholderArgument<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub colon: Span,
     pub question_mark: Span,
@@ -90,7 +90,7 @@ pub struct NamedPlaceholder<'arena> {
 ///
 /// Reference: https://wiki.php.net/rfc/partial_function_application_v2
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Placeholder {
+pub struct PlaceholderArgument {
     pub span: Span,
 }
 
@@ -100,7 +100,7 @@ pub struct Placeholder {
 ///
 /// Reference: https://wiki.php.net/rfc/partial_function_application_v2
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct VariadicPlaceholder {
+pub struct VariadicPlaceholderArgument {
     pub span: Span,
 }
 
@@ -242,19 +242,19 @@ impl HasSpan for NamedArgument<'_> {
     }
 }
 
-impl HasSpan for NamedPlaceholder<'_> {
+impl HasSpan for NamedPlaceholderArgument<'_> {
     fn span(&self) -> Span {
         Span::between(self.name.span(), self.question_mark)
     }
 }
 
-impl HasSpan for Placeholder {
+impl HasSpan for PlaceholderArgument {
     fn span(&self) -> Span {
         self.span
     }
 }
 
-impl HasSpan for VariadicPlaceholder {
+impl HasSpan for VariadicPlaceholderArgument {
     fn span(&self) -> Span {
         self.span
     }

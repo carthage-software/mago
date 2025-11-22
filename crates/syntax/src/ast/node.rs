@@ -26,10 +26,10 @@ pub enum NodeKind {
     PartialArgument,
     PartialArgumentList,
     NamedArgument,
-    NamedPlaceholder,
-    Placeholder,
+    NamedPlaceholderArgument,
+    PlaceholderArgument,
     PositionalArgument,
-    VariadicPlaceholder,
+    VariadicPlaceholderArgument,
     Array,
     ArrayAccess,
     ArrayAppend,
@@ -256,10 +256,10 @@ pub enum Node<'ast, 'arena> {
     PartialArgument(&'ast PartialArgument<'arena>),
     PartialArgumentList(&'ast PartialArgumentList<'arena>),
     NamedArgument(&'ast NamedArgument<'arena>),
-    NamedPlaceholder(&'ast NamedPlaceholder<'arena>),
-    Placeholder(&'ast Placeholder),
+    NamedPlaceholderArgument(&'ast NamedPlaceholderArgument<'arena>),
+    PlaceholderArgument(&'ast PlaceholderArgument),
     PositionalArgument(&'ast PositionalArgument<'arena>),
-    VariadicPlaceholder(&'ast VariadicPlaceholder),
+    VariadicPlaceholderArgument(&'ast VariadicPlaceholderArgument),
     Array(&'ast Array<'arena>),
     ArrayAccess(&'ast ArrayAccess<'arena>),
     ArrayAppend(&'ast ArrayAppend<'arena>),
@@ -560,10 +560,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::PartialArgument(_) => NodeKind::PartialArgument,
             Self::PartialArgumentList(_) => NodeKind::PartialArgumentList,
             Self::NamedArgument(_) => NodeKind::NamedArgument,
-            Self::NamedPlaceholder(_) => NodeKind::NamedPlaceholder,
-            Self::Placeholder(_) => NodeKind::Placeholder,
+            Self::NamedPlaceholderArgument(_) => NodeKind::NamedPlaceholderArgument,
+            Self::PlaceholderArgument(_) => NodeKind::PlaceholderArgument,
             Self::PositionalArgument(_) => NodeKind::PositionalArgument,
-            Self::VariadicPlaceholder(_) => NodeKind::VariadicPlaceholder,
+            Self::VariadicPlaceholderArgument(_) => NodeKind::VariadicPlaceholderArgument,
             Self::Array(_) => NodeKind::Array,
             Self::ArrayAccess(_) => NodeKind::ArrayAccess,
             Self::ArrayAppend(_) => NodeKind::ArrayAppend,
@@ -820,10 +820,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             }
             Node::PartialArgument(node) => match &node {
                 PartialArgument::Named(node) => vec![Node::NamedArgument(node)],
-                PartialArgument::NamedPlaceholder(node) => vec![Node::NamedPlaceholder(node)],
-                PartialArgument::Placeholder(node) => vec![Node::Placeholder(node)],
+                PartialArgument::NamedPlaceholder(node) => vec![Node::NamedPlaceholderArgument(node)],
+                PartialArgument::Placeholder(node) => vec![Node::PlaceholderArgument(node)],
                 PartialArgument::Positional(node) => vec![Node::PositionalArgument(node)],
-                PartialArgument::VariadicPlaceholder(node) => vec![Node::VariadicPlaceholder(node)],
+                PartialArgument::VariadicPlaceholder(node) => vec![Node::VariadicPlaceholderArgument(node)],
             },
             Node::PartialArgumentList(node) => {
                 let mut children = vec![];
@@ -836,12 +836,12 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::NamedArgument(node) => {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
-            Node::NamedPlaceholder(node) => {
+            Node::NamedPlaceholderArgument(node) => {
                 vec![Node::LocalIdentifier(&node.name)]
             }
-            Node::Placeholder(_) => vec![],
+            Node::PlaceholderArgument(_) => vec![],
             Node::PositionalArgument(node) => vec![Node::Expression(&node.value)],
-            Node::VariadicPlaceholder(_) => vec![],
+            Node::VariadicPlaceholderArgument(_) => vec![],
             Node::Array(node) => {
                 let mut children = vec![];
                 for node in node.elements.as_slice() {
@@ -2120,10 +2120,10 @@ impl HasSpan for Node<'_, '_> {
             Self::PartialArgument(node) => node.span(),
             Self::PartialArgumentList(node) => node.span(),
             Self::NamedArgument(node) => node.span(),
-            Self::NamedPlaceholder(node) => node.span(),
-            Self::Placeholder(node) => node.span(),
+            Self::NamedPlaceholderArgument(node) => node.span(),
+            Self::PlaceholderArgument(node) => node.span(),
             Self::PositionalArgument(node) => node.span(),
-            Self::VariadicPlaceholder(node) => node.span(),
+            Self::VariadicPlaceholderArgument(node) => node.span(),
             Self::Array(node) => node.span(),
             Self::ArrayAccess(node) => node.span(),
             Self::ArrayAppend(node) => node.span(),

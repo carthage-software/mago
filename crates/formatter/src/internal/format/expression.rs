@@ -575,21 +575,21 @@ impl<'arena> Format<'arena> for PartialArgument<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for Placeholder {
+impl<'arena> Format<'arena> for PlaceholderArgument {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, Placeholder, { Document::String("?") })
+        wrap!(f, self, PlaceholderArgument, { Document::String("?") })
     }
 }
 
-impl<'arena> Format<'arena> for VariadicPlaceholder {
+impl<'arena> Format<'arena> for VariadicPlaceholderArgument {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, VariadicPlaceholder, { Document::String("...") })
+        wrap!(f, self, VariadicPlaceholderArgument, { Document::String("...") })
     }
 }
 
-impl<'arena> Format<'arena> for NamedPlaceholder<'arena> {
+impl<'arena> Format<'arena> for NamedPlaceholderArgument<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, NamedPlaceholder, {
+        wrap!(f, self, NamedPlaceholderArgument, {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.name.format(f),

@@ -105,7 +105,7 @@ impl Fingerprintable for PartialArgument<'_> {
     }
 }
 
-impl Fingerprintable for Placeholder {
+impl Fingerprintable for PlaceholderArgument {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -116,7 +116,7 @@ impl Fingerprintable for Placeholder {
     }
 }
 
-impl Fingerprintable for VariadicPlaceholder {
+impl Fingerprintable for VariadicPlaceholderArgument {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -127,7 +127,7 @@ impl Fingerprintable for VariadicPlaceholder {
     }
 }
 
-impl Fingerprintable for NamedPlaceholder<'_> {
+impl Fingerprintable for NamedPlaceholderArgument<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
