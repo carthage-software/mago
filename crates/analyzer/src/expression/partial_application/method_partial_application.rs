@@ -14,28 +14,42 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::method::resolve_method_targets;
 
-impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodClosureCreation<'arena> {
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena> {
     fn analyze<'ctx>(
         &'ast self,
         context: &mut Context<'ctx, 'arena>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let method_resolution =
-            resolve_method_targets(context, block_context, artifacts, self.object, &self.method, false, self.span())?;
+        let resulting_type = if !self.argument_list.is_first_class_callable() {
+            tracing::warn!("Partial function application (PFA) is not yet supported in the analyzer.");
 
-        let mut callables = vec![];
-        for resolved_method in method_resolution.resolved_methods {
-            callables.push(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
-                *resolved_method.method_identifier.get_method_name(),
-            ))));
-        }
-
-        let resulting_type = if callables.is_empty() {
-            if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
+            // TODO(azjezz): implement proper PFA analysis.
+            get_mixed_closure()
         } else {
-            TUnion::from_vec(callables)
+            let method_resolution = resolve_method_targets(
+                context,
+                block_context,
+                artifacts,
+                self.object,
+                &self.method,
+                false,
+                self.span(),
+            )?;
+
+            let mut callables = vec![];
+            for resolved_method in method_resolution.resolved_methods {
+                callables.push(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
+                    *resolved_method.method_identifier.get_class_name(),
+                    *resolved_method.method_identifier.get_method_name(),
+                ))));
+            }
+
+            if callables.is_empty() {
+                if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
+            } else {
+                TUnion::from_vec(callables)
+            }
         };
 
         artifacts.set_expression_type(self, resulting_type);

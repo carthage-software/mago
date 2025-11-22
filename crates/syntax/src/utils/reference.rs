@@ -6,8 +6,8 @@ use crate::ast::*;
 pub enum MethodReference<'ast, 'arena> {
     MethodCall(&'ast MethodCall<'arena>),
     StaticMethodCall(&'ast StaticMethodCall<'arena>),
-    MethodClosureCreation(&'ast MethodClosureCreation<'arena>),
-    StaticMethodClosureCreation(&'ast StaticMethodClosureCreation<'arena>),
+    MethodPartialApplication(&'ast MethodPartialApplication<'arena>),
+    StaticMethodPartialApplication(&'ast StaticMethodPartialApplication<'arena>),
 }
 
 impl<'ast, 'arena> MethodReference<'ast, 'arena> {
@@ -15,8 +15,8 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
         match self {
             MethodReference::MethodCall(call) => call.object,
             MethodReference::StaticMethodCall(call) => call.class,
-            MethodReference::MethodClosureCreation(closure) => closure.object,
-            MethodReference::StaticMethodClosureCreation(closure) => closure.class,
+            MethodReference::MethodPartialApplication(partial_app) => partial_app.object,
+            MethodReference::StaticMethodPartialApplication(partial_app) => partial_app.class,
         }
     }
 
@@ -24,8 +24,8 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
         match self {
             MethodReference::MethodCall(call) => &call.method,
             MethodReference::StaticMethodCall(call) => &call.method,
-            MethodReference::MethodClosureCreation(closure) => &closure.method,
-            MethodReference::StaticMethodClosureCreation(closure) => &closure.method,
+            MethodReference::MethodPartialApplication(partial_app) => &partial_app.method,
+            MethodReference::StaticMethodPartialApplication(partial_app) => &partial_app.method,
         }
     }
 }
@@ -35,8 +35,8 @@ impl HasSpan for MethodReference<'_, '_> {
         match self {
             MethodReference::MethodCall(call) => call.span(),
             MethodReference::StaticMethodCall(call) => call.span(),
-            MethodReference::MethodClosureCreation(closure) => closure.span(),
-            MethodReference::StaticMethodClosureCreation(closure) => closure.span(),
+            MethodReference::MethodPartialApplication(partial_app) => partial_app.span(),
+            MethodReference::StaticMethodPartialApplication(partial_app) => partial_app.span(),
         }
     }
 }
@@ -405,23 +405,23 @@ where
                 references
             }
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation {
-            ClosureCreation::Method(method_closure_creation) => {
-                let reference = MethodReference::MethodClosureCreation(method_closure_creation);
+        Expression::PartialApplication(partial_application) => match partial_application {
+            PartialApplication::Method(method_partial_application) => {
+                let reference = MethodReference::MethodPartialApplication(method_partial_application);
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
-                references.extend(find_method_references_in_expression(method_closure_creation.object, predicate));
+                references.extend(find_method_references_in_expression(method_partial_application.object, predicate));
                 references
             }
-            ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                let reference = MethodReference::StaticMethodClosureCreation(static_method_closure_creation);
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                let reference = MethodReference::StaticMethodPartialApplication(static_method_partial_application);
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
                 references
-                    .extend(find_method_references_in_expression(static_method_closure_creation.class, predicate));
+                    .extend(find_method_references_in_expression(static_method_partial_application.class, predicate));
                 references
             }
-            ClosureCreation::Function(_) => vec![],
+            PartialApplication::Function(_) => vec![],
         },
         Expression::Instantiation(instantiation) => {
             if let Some(argument_list) = &instantiation.argument_list {

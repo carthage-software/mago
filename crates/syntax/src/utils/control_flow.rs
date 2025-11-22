@@ -496,13 +496,13 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         Expression::Variable(variable) => {
             controls.extend(find_control_flows_in_variable(variable));
         }
-        Expression::ClosureCreation(closure_creation) => match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => {
-                controls.extend(find_control_flows_in_expression(function_closure_creation.function));
+        Expression::PartialApplication(partial_application) => match partial_application {
+            PartialApplication::Function(function_partial_application) => {
+                controls.extend(find_control_flows_in_expression(function_partial_application.function));
             }
-            ClosureCreation::Method(method_closure_creation) => {
-                controls.extend(find_control_flows_in_expression(method_closure_creation.object));
-                match &method_closure_creation.method {
+            PartialApplication::Method(method_partial_application) => {
+                controls.extend(find_control_flows_in_expression(method_partial_application.object));
+                match &method_partial_application.method {
                     ClassLikeMemberSelector::Variable(variable) => {
                         controls.extend(find_control_flows_in_variable(variable));
                     }
@@ -513,9 +513,9 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     _ => {}
                 }
             }
-            ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                controls.extend(find_control_flows_in_expression(static_method_closure_creation.class));
-                match &static_method_closure_creation.method {
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                controls.extend(find_control_flows_in_expression(static_method_partial_application.class));
+                match &static_method_partial_application.method {
                     ClassLikeMemberSelector::Variable(variable) => {
                         controls.extend(find_control_flows_in_variable(variable));
                     }

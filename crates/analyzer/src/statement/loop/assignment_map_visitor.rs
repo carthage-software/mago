@@ -100,12 +100,12 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
         }
     }
 
-    fn walk_out_method_closure_creation(
+    fn walk_out_method_partial_application(
         &mut self,
-        method_closure_creation: &'ast MethodClosureCreation<'arena>,
+        method_partial_application: &'ast MethodPartialApplication<'arena>,
         _context: &mut (),
     ) {
-        let root_expression_id = get_root_expression_id(method_closure_creation.object);
+        let root_expression_id = get_root_expression_id(method_partial_application.object);
 
         if let Some(root_expression_id) = &root_expression_id {
             self.assignment_map.entry(root_expression_id.clone()).or_default().insert("isset".to_string());

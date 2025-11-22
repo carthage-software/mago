@@ -211,13 +211,13 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         }
     }
 
-    // Check static method closure creations
-    fn walk_in_static_method_closure_creation(
+    // Check static method partial applications
+    fn walk_in_static_method_partial_application(
         &mut self,
-        static_method_closure_creation: &'ast StaticMethodClosureCreation<'arena>,
+        static_method_partial_application: &'ast StaticMethodPartialApplication<'arena>,
         context: &mut GuardContext<'ctx, 'arena>,
     ) {
-        if let Expression::Identifier(class_name) = static_method_closure_creation.class {
+        if let Expression::Identifier(class_name) = &static_method_partial_application.class {
             let fqn = context.lookup_name(class_name);
 
             check_usage(
@@ -268,13 +268,13 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         }
     }
 
-    // Check function closure creations
-    fn walk_in_function_closure_creation(
+    // Check function partial applications
+    fn walk_in_function_partial_application(
         &mut self,
-        function_closure_creation: &'ast FunctionClosureCreation<'arena>,
+        function_partial_application: &'ast FunctionPartialApplication<'arena>,
         context: &mut GuardContext<'ctx, 'arena>,
     ) {
-        if let Expression::Identifier(function_name) = function_closure_creation.function
+        if let Expression::Identifier(function_name) = &function_partial_application.function
             && let Some(fqn) = context.try_lookup_name(function_name)
         {
             check_usage(

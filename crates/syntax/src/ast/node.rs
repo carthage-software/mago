@@ -23,8 +23,13 @@ pub enum NodeKind {
     StaticPropertyAccess,
     Argument,
     ArgumentList,
+    PartialArgument,
+    PartialArgumentList,
     NamedArgument,
+    NamedPlaceholder,
+    Placeholder,
     PositionalArgument,
+    VariadicPlaceholder,
     Array,
     ArrayAccess,
     ArrayAppend,
@@ -43,6 +48,10 @@ pub enum NodeKind {
     MethodCall,
     NullSafeMethodCall,
     StaticMethodCall,
+    PartialApplication,
+    FunctionPartialApplication,
+    MethodPartialApplication,
+    StaticMethodPartialApplication,
     ClassLikeConstant,
     ClassLikeConstantItem,
     EnumCase,
@@ -86,10 +95,6 @@ pub enum NodeKind {
     Interface,
     Trait,
     Clone,
-    ClosureCreation,
-    FunctionClosureCreation,
-    MethodClosureCreation,
-    StaticMethodClosureCreation,
     Constant,
     ConstantItem,
     Construct,
@@ -248,8 +253,13 @@ pub enum Node<'ast, 'arena> {
     StaticPropertyAccess(&'ast StaticPropertyAccess<'arena>),
     Argument(&'ast Argument<'arena>),
     ArgumentList(&'ast ArgumentList<'arena>),
+    PartialArgument(&'ast PartialArgument<'arena>),
+    PartialArgumentList(&'ast PartialArgumentList<'arena>),
     NamedArgument(&'ast NamedArgument<'arena>),
+    NamedPlaceholder(&'ast NamedPlaceholder<'arena>),
+    Placeholder(&'ast Placeholder),
     PositionalArgument(&'ast PositionalArgument<'arena>),
+    VariadicPlaceholder(&'ast VariadicPlaceholder),
     Array(&'ast Array<'arena>),
     ArrayAccess(&'ast ArrayAccess<'arena>),
     ArrayAppend(&'ast ArrayAppend<'arena>),
@@ -268,6 +278,10 @@ pub enum Node<'ast, 'arena> {
     MethodCall(&'ast MethodCall<'arena>),
     NullSafeMethodCall(&'ast NullSafeMethodCall<'arena>),
     StaticMethodCall(&'ast StaticMethodCall<'arena>),
+    PartialApplication(&'ast PartialApplication<'arena>),
+    FunctionPartialApplication(&'ast FunctionPartialApplication<'arena>),
+    MethodPartialApplication(&'ast MethodPartialApplication<'arena>),
+    StaticMethodPartialApplication(&'ast StaticMethodPartialApplication<'arena>),
     ClassLikeConstant(&'ast ClassLikeConstant<'arena>),
     ClassLikeConstantItem(&'ast ClassLikeConstantItem<'arena>),
     EnumCase(&'ast EnumCase<'arena>),
@@ -311,10 +325,6 @@ pub enum Node<'ast, 'arena> {
     Interface(&'ast Interface<'arena>),
     Trait(&'ast Trait<'arena>),
     Clone(&'ast Clone<'arena>),
-    ClosureCreation(&'ast ClosureCreation<'arena>),
-    FunctionClosureCreation(&'ast FunctionClosureCreation<'arena>),
-    MethodClosureCreation(&'ast MethodClosureCreation<'arena>),
-    StaticMethodClosureCreation(&'ast StaticMethodClosureCreation<'arena>),
     Constant(&'ast Constant<'arena>),
     ConstantItem(&'ast ConstantItem<'arena>),
     Construct(&'ast Construct<'arena>),
@@ -547,8 +557,13 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::StaticPropertyAccess(_) => NodeKind::StaticPropertyAccess,
             Self::Argument(_) => NodeKind::Argument,
             Self::ArgumentList(_) => NodeKind::ArgumentList,
+            Self::PartialArgument(_) => NodeKind::PartialArgument,
+            Self::PartialArgumentList(_) => NodeKind::PartialArgumentList,
             Self::NamedArgument(_) => NodeKind::NamedArgument,
+            Self::NamedPlaceholder(_) => NodeKind::NamedPlaceholder,
+            Self::Placeholder(_) => NodeKind::Placeholder,
             Self::PositionalArgument(_) => NodeKind::PositionalArgument,
+            Self::VariadicPlaceholder(_) => NodeKind::VariadicPlaceholder,
             Self::Array(_) => NodeKind::Array,
             Self::ArrayAccess(_) => NodeKind::ArrayAccess,
             Self::ArrayAppend(_) => NodeKind::ArrayAppend,
@@ -567,6 +582,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::MethodCall(_) => NodeKind::MethodCall,
             Self::NullSafeMethodCall(_) => NodeKind::NullSafeMethodCall,
             Self::StaticMethodCall(_) => NodeKind::StaticMethodCall,
+            Self::PartialApplication(_) => NodeKind::PartialApplication,
+            Self::FunctionPartialApplication(_) => NodeKind::FunctionPartialApplication,
+            Self::MethodPartialApplication(_) => NodeKind::MethodPartialApplication,
+            Self::StaticMethodPartialApplication(_) => NodeKind::StaticMethodPartialApplication,
             Self::ClassLikeConstant(_) => NodeKind::ClassLikeConstant,
             Self::ClassLikeConstantItem(_) => NodeKind::ClassLikeConstantItem,
             Self::EnumCase(_) => NodeKind::EnumCase,
@@ -610,10 +629,6 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::Interface(_) => NodeKind::Interface,
             Self::Trait(_) => NodeKind::Trait,
             Self::Clone(_) => NodeKind::Clone,
-            Self::ClosureCreation(_) => NodeKind::ClosureCreation,
-            Self::FunctionClosureCreation(_) => NodeKind::FunctionClosureCreation,
-            Self::MethodClosureCreation(_) => NodeKind::MethodClosureCreation,
-            Self::StaticMethodClosureCreation(_) => NodeKind::StaticMethodClosureCreation,
             Self::Constant(_) => NodeKind::Constant,
             Self::ConstantItem(_) => NodeKind::ConstantItem,
             Self::Construct(_) => NodeKind::Construct,
@@ -803,10 +818,30 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
 
                 children
             }
+            Node::PartialArgument(node) => match &node {
+                PartialArgument::Named(node) => vec![Node::NamedArgument(node)],
+                PartialArgument::NamedPlaceholder(node) => vec![Node::NamedPlaceholder(node)],
+                PartialArgument::Placeholder(node) => vec![Node::Placeholder(node)],
+                PartialArgument::Positional(node) => vec![Node::PositionalArgument(node)],
+                PartialArgument::VariadicPlaceholder(node) => vec![Node::VariadicPlaceholder(node)],
+            },
+            Node::PartialArgumentList(node) => {
+                let mut children = vec![];
+                for node in node.arguments.as_slice() {
+                    children.push(Node::PartialArgument(node));
+                }
+
+                children
+            }
             Node::NamedArgument(node) => {
                 vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
             }
+            Node::NamedPlaceholder(node) => {
+                vec![Node::LocalIdentifier(&node.name)]
+            }
+            Node::Placeholder(_) => vec![],
             Node::PositionalArgument(node) => vec![Node::Expression(&node.value)],
+            Node::VariadicPlaceholder(_) => vec![],
             Node::Array(node) => {
                 let mut children = vec![];
                 for node in node.elements.as_slice() {
@@ -873,6 +908,28 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                     Node::Expression(node.class),
                     Node::ClassLikeMemberSelector(&node.method),
                     Node::ArgumentList(&node.argument_list),
+                ]
+            }
+            Node::PartialApplication(node) => match node {
+                PartialApplication::Function(node) => vec![Node::FunctionPartialApplication(node)],
+                PartialApplication::Method(node) => vec![Node::MethodPartialApplication(node)],
+                PartialApplication::StaticMethod(node) => vec![Node::StaticMethodPartialApplication(node)],
+            },
+            Node::FunctionPartialApplication(node) => {
+                vec![Node::Expression(node.function), Node::PartialArgumentList(&node.argument_list)]
+            }
+            Node::MethodPartialApplication(node) => {
+                vec![
+                    Node::Expression(node.object),
+                    Node::ClassLikeMemberSelector(&node.method),
+                    Node::PartialArgumentList(&node.argument_list),
+                ]
+            }
+            Node::StaticMethodPartialApplication(node) => {
+                vec![
+                    Node::Expression(node.class),
+                    Node::ClassLikeMemberSelector(&node.method),
+                    Node::PartialArgumentList(&node.argument_list),
                 ]
             }
             Node::ClassLikeConstant(node) => {
@@ -1184,18 +1241,6 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Clone(node) => {
                 vec![Node::Keyword(&node.clone), Node::Expression(node.object)]
             }
-            Node::ClosureCreation(node) => vec![match node {
-                ClosureCreation::Function(node) => Node::FunctionClosureCreation(node),
-                ClosureCreation::Method(node) => Node::MethodClosureCreation(node),
-                ClosureCreation::StaticMethod(node) => Node::StaticMethodClosureCreation(node),
-            }],
-            Node::FunctionClosureCreation(node) => vec![Node::Expression(node.function)],
-            Node::MethodClosureCreation(node) => {
-                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.method)]
-            }
-            Node::StaticMethodClosureCreation(node) => {
-                vec![Node::Expression(node.class), Node::ClassLikeMemberSelector(&node.method)]
-            }
             Node::Constant(node) => {
                 let mut children = vec![];
                 children.extend(node.attribute_lists.iter().map(Node::AttributeList));
@@ -1454,8 +1499,8 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Expression::Throw(node) => Node::Throw(node),
                 Expression::Clone(node) => Node::Clone(node),
                 Expression::Call(node) => Node::Call(node),
+                Expression::PartialApplication(node) => Node::PartialApplication(node),
                 Expression::Access(node) => Node::Access(node),
-                Expression::ClosureCreation(node) => Node::ClosureCreation(node),
                 Expression::Parent(node) => Node::Keyword(node),
                 Expression::Static(node) => Node::Keyword(node),
                 Expression::Self_(node) => Node::Keyword(node),
@@ -2072,8 +2117,13 @@ impl HasSpan for Node<'_, '_> {
             Self::StaticPropertyAccess(node) => node.span(),
             Self::Argument(node) => node.span(),
             Self::ArgumentList(node) => node.span(),
+            Self::PartialArgument(node) => node.span(),
+            Self::PartialArgumentList(node) => node.span(),
             Self::NamedArgument(node) => node.span(),
+            Self::NamedPlaceholder(node) => node.span(),
+            Self::Placeholder(node) => node.span(),
             Self::PositionalArgument(node) => node.span(),
+            Self::VariadicPlaceholder(node) => node.span(),
             Self::Array(node) => node.span(),
             Self::ArrayAccess(node) => node.span(),
             Self::ArrayAppend(node) => node.span(),
@@ -2092,6 +2142,10 @@ impl HasSpan for Node<'_, '_> {
             Self::MethodCall(node) => node.span(),
             Self::NullSafeMethodCall(node) => node.span(),
             Self::StaticMethodCall(node) => node.span(),
+            Self::PartialApplication(node) => node.span(),
+            Self::FunctionPartialApplication(node) => node.span(),
+            Self::MethodPartialApplication(node) => node.span(),
+            Self::StaticMethodPartialApplication(node) => node.span(),
             Self::ClassLikeConstant(node) => node.span(),
             Self::ClassLikeConstantItem(node) => node.span(),
             Self::EnumCase(node) => node.span(),
@@ -2135,10 +2189,6 @@ impl HasSpan for Node<'_, '_> {
             Self::Interface(node) => node.span(),
             Self::Trait(node) => node.span(),
             Self::Clone(node) => node.span(),
-            Self::ClosureCreation(node) => node.span(),
-            Self::FunctionClosureCreation(node) => node.span(),
-            Self::MethodClosureCreation(node) => node.span(),
-            Self::StaticMethodClosureCreation(node) => node.span(),
             Self::Constant(node) => node.span(),
             Self::ConstantItem(node) => node.span(),
             Self::Construct(node) => node.span(),

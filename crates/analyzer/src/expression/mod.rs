@@ -39,7 +39,6 @@ pub mod binary;
 pub mod call;
 pub mod clone;
 pub mod closure;
-pub mod closure_creation;
 pub mod composite_string;
 pub mod conditional;
 pub mod constant_access;
@@ -48,6 +47,7 @@ pub mod instantiation;
 pub mod literal;
 pub mod magic_constant;
 pub mod r#match;
+pub mod partial_application;
 pub mod throw;
 pub mod unary;
 pub mod variable;
@@ -126,7 +126,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
             Expression::Clone(expr) => expr.analyze(context, block_context, artifacts),
             Expression::Call(expr) => expr.analyze(context, block_context, artifacts),
             Expression::Access(expr) => expr.analyze(context, block_context, artifacts),
-            Expression::ClosureCreation(expr) => expr.analyze(context, block_context, artifacts),
+            Expression::PartialApplication(expr) => expr.analyze(context, block_context, artifacts),
             Expression::Instantiation(expr) => expr.analyze(context, block_context, artifacts),
             Expression::MagicConstant(expr) => expr.analyze(context, block_context, artifacts),
             Expression::Pipe(expr) => expr.analyze(context, block_context, artifacts),

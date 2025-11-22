@@ -194,22 +194,23 @@ pub fn get_assignment_from_expression<'a, 'arena>(
                     _ => None,
                 }),
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => {
-                get_assignment_from_expression(function_closure_creation.function)
+        Expression::PartialApplication(partial_application) => match partial_application {
+            PartialApplication::Function(function_partial_application) => {
+                get_assignment_from_expression(function_partial_application.function)
             }
-            ClosureCreation::Method(method_closure_creation) => get_assignment_from_expression(
-                method_closure_creation.object,
-            )
-            .or_else(|| match &method_closure_creation.method {
-                ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
-                    get_assignment_from_expression(class_like_member_expression_selector.expression)
-                }
-                _ => None,
-            }),
-            ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                get_assignment_from_expression(static_method_closure_creation.class).or_else(|| {
-                    match &static_method_closure_creation.method {
+            PartialApplication::Method(method_partial_application) => {
+                get_assignment_from_expression(method_partial_application.object).or_else(|| {
+                    match &method_partial_application.method {
+                        ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
+                            get_assignment_from_expression(class_like_member_expression_selector.expression)
+                        }
+                        _ => None,
+                    }
+                })
+            }
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                get_assignment_from_expression(static_method_partial_application.class).or_else(|| {
+                    match &static_method_partial_application.method {
                         ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
                             get_assignment_from_expression(class_like_member_expression_selector.expression)
                         }

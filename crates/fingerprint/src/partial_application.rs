@@ -5,7 +5,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use std::hash::Hash;
 
-impl Fingerprintable for ClosureCreation<'_> {
+impl Fingerprintable for PartialApplication<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -13,47 +13,52 @@ impl Fingerprintable for ClosureCreation<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         match self {
-            ClosureCreation::Function(closure) => closure.fingerprint_with_hasher(hasher, resolved_names, options),
-            ClosureCreation::Method(closure) => closure.fingerprint_with_hasher(hasher, resolved_names, options),
-            ClosureCreation::StaticMethod(closure) => closure.fingerprint_with_hasher(hasher, resolved_names, options),
+            PartialApplication::Function(partial) => partial.fingerprint_with_hasher(hasher, resolved_names, options),
+            PartialApplication::Method(partial) => partial.fingerprint_with_hasher(hasher, resolved_names, options),
+            PartialApplication::StaticMethod(partial) => {
+                partial.fingerprint_with_hasher(hasher, resolved_names, options)
+            }
         }
     }
 }
 
-impl Fingerprintable for FunctionClosureCreation<'_> {
+impl Fingerprintable for FunctionPartialApplication<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        "fn_closure".hash(hasher);
+        "fn_partial".hash(hasher);
         self.function.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
 
-impl Fingerprintable for MethodClosureCreation<'_> {
+impl Fingerprintable for MethodPartialApplication<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        "method_closure".hash(hasher);
+        "method_partial".hash(hasher);
         self.object.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
 
-impl Fingerprintable for StaticMethodClosureCreation<'_> {
+impl Fingerprintable for StaticMethodPartialApplication<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        "static_method_closure".hash(hasher);
+        "static_method_partial".hash(hasher);
         self.class.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

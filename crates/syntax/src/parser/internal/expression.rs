@@ -189,20 +189,17 @@ fn parse_postfix_expression<'arena>(
 
     Ok(match operator.kind {
         T!["("] => {
-            if matches!(
-                (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)),
-                (Some(T!["..."]), Some(T![")"])),
-            ) {
-                Expression::ClosureCreation(ClosureCreation::Function(FunctionClosureCreation {
+            let partial_args = argument::parse_partial_argument_list(stream)?;
+
+            if partial_args.has_placeholders() {
+                Expression::PartialApplication(PartialApplication::Function(FunctionPartialApplication {
                     function: stream.alloc(lhs),
-                    left_parenthesis: utils::expect_any(stream)?.span,
-                    ellipsis: utils::expect_any(stream)?.span,
-                    right_parenthesis: utils::expect_any(stream)?.span,
+                    argument_list: partial_args,
                 }))
             } else {
                 Expression::Call(Call::Function(FunctionCall {
                     function: stream.alloc(lhs),
-                    argument_list: argument::parse_argument_list(stream)?,
+                    argument_list: partial_args.into_argument_list(stream.arena()),
                 }))
             }
         }
@@ -242,29 +239,21 @@ fn parse_postfix_expression<'arena>(
                     Either::Right(variable) => ClassLikeMemberSelector::Variable(variable),
                 };
 
-                if matches!(
-                    (
-                        utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind),
-                        utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)
-                    ),
-                    (Some(T!["..."]), Some(T![")"]))
-                ) {
-                    Expression::ClosureCreation(ClosureCreation::StaticMethod(StaticMethodClosureCreation {
+                let partial_args = argument::parse_partial_argument_list(stream)?;
+
+                if partial_args.has_placeholders() {
+                    Expression::PartialApplication(PartialApplication::StaticMethod(StaticMethodPartialApplication {
                         class: stream.alloc(lhs),
                         double_colon,
                         method,
-                        left_parenthesis: utils::expect_any(stream)?.span,
-                        ellipsis: utils::expect_any(stream)?.span,
-                        right_parenthesis: utils::expect_any(stream)?.span,
+                        argument_list: partial_args,
                     }))
                 } else {
-                    let arguments = argument::parse_argument_list(stream)?;
-
                     Expression::Call(Call::StaticMethod(StaticMethodCall {
                         class: stream.alloc(lhs),
                         double_colon,
                         method,
-                        argument_list: arguments,
+                        argument_list: partial_args.into_argument_list(stream.arena()),
                     }))
                 }
             } else {
@@ -287,27 +276,21 @@ fn parse_postfix_expression<'arena>(
             let selector = member::parse_classlike_member_selector(stream)?;
 
             if Precedence::CallDim > precedence && matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["("])) {
-                if matches!(
-                    (
-                        utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind),
-                        utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)
-                    ),
-                    (Some(T!["..."]), Some(T![")"]))
-                ) {
-                    Expression::ClosureCreation(ClosureCreation::Method(MethodClosureCreation {
+                let partial_args = argument::parse_partial_argument_list(stream)?;
+
+                if partial_args.has_placeholders() {
+                    Expression::PartialApplication(PartialApplication::Method(MethodPartialApplication {
                         object: stream.alloc(lhs),
                         arrow,
                         method: selector,
-                        left_parenthesis: utils::expect_any(stream)?.span,
-                        ellipsis: utils::expect_any(stream)?.span,
-                        right_parenthesis: utils::expect_any(stream)?.span,
+                        argument_list: partial_args,
                     }))
                 } else {
                     Expression::Call(Call::Method(MethodCall {
                         object: stream.alloc(lhs),
                         arrow,
                         method: selector,
-                        argument_list: argument::parse_argument_list(stream)?,
+                        argument_list: partial_args.into_argument_list(stream.arena()),
                     }))
                 }
             } else {

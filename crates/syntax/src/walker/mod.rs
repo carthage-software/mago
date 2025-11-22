@@ -361,6 +361,12 @@ generate_ast_walker! {
         }
     }
 
+    'arena PartialArgumentList as partial_argument_list => {
+        for partial_argument in partial_argument_list.arguments.iter() {
+            walker.walk_partial_argument(partial_argument, context);
+        }
+    }
+
     'arena Argument as argument => {
         match &argument {
             Argument::Positional(positional_argument) => {
@@ -372,6 +378,26 @@ generate_ast_walker! {
         }
     }
 
+    'arena PartialArgument as partial_argument => {
+        match &partial_argument {
+            PartialArgument::Positional(positional_argument) => {
+                walker.walk_positional_argument(positional_argument, context);
+            }
+            PartialArgument::Named(named_argument) => {
+                walker.walk_named_argument(named_argument, context);
+            }
+            PartialArgument::NamedPlaceholder(named_placeholder) => {
+                walker.walk_named_placeholder(named_placeholder, context);
+            }
+            PartialArgument::Placeholder(placeholder) => {
+                walker.walk_placeholder(placeholder, context);
+            }
+            PartialArgument::VariadicPlaceholder(varadic_placeholder) => {
+                walker.walk_variadic_placeholder(varadic_placeholder, context);
+            }
+        }
+    }
+
     'arena PositionalArgument as positional_argument => {
         walker.walk_expression(&positional_argument.value, context);
     }
@@ -379,6 +405,18 @@ generate_ast_walker! {
     'arena NamedArgument as named_argument => {
         walker.walk_local_identifier(&named_argument.name, context);
         walker.walk_expression(&named_argument.value, context);
+    }
+
+    _ Placeholder as placeholder => {
+        // Do nothing by default
+    }
+
+    'arena NamedPlaceholder as named_placeholder => {
+        walker.walk_local_identifier(&named_placeholder.name, context);
+    }
+
+    _ VariadicPlaceholder as variadic_placeholder => {
+        // Do nothing by default
     }
 
     'arena Modifier as modifier => {
@@ -1360,11 +1398,9 @@ generate_ast_walker! {
             Expression::Throw(throw) => walker.walk_throw(throw, context),
             Expression::Clone(clone) => walker.walk_clone(clone, context),
             Expression::Call(call) => walker.walk_call(call, context),
+            Expression::PartialApplication(partial_application) => walker.walk_partial_application(partial_application, context),
             Expression::Access(access) => walker.walk_access(access, context),
             Expression::ConstantAccess(expr) => walker.walk_constant_access(expr, context),
-            Expression::ClosureCreation(closure_creation) => {
-                walker.walk_closure_creation(closure_creation, context)
-            }
             Expression::Parent(keyword) => walker.walk_parent_keyword(keyword, context),
             Expression::Static(keyword) => walker.walk_static_keyword(keyword, context),
             Expression::Self_(keyword) => walker.walk_self_keyword(keyword, context),
@@ -1908,6 +1944,38 @@ generate_ast_walker! {
         walker.walk_argument_list(&static_method_call.argument_list, context);
     }
 
+
+    'arena PartialApplication as partial_application => {
+        match partial_application {
+            PartialApplication::Function(function_partial_application) => {
+                walker.walk_function_partial_application(function_partial_application, context);
+            }
+            PartialApplication::Method(method_partial_application) => {
+                walker.walk_method_partial_application(method_partial_application, context);
+            }
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                walker.walk_static_method_partial_application(static_method_partial_application, context);
+            }
+        }
+    }
+
+    'arena FunctionPartialApplication as function_partial_application => {
+        walker.walk_expression(function_partial_application.function, context);
+        walker.walk_partial_argument_list(&function_partial_application.argument_list, context);
+    }
+
+    'arena MethodPartialApplication as method_partial_application => {
+        walker.walk_expression(method_partial_application.object, context);
+        walker.walk_class_like_member_selector(&method_partial_application.method, context);
+        walker.walk_partial_argument_list(&method_partial_application.argument_list, context);
+    }
+
+    'arena StaticMethodPartialApplication as static_method_partial_application => {
+        walker.walk_expression(static_method_partial_application.class, context);
+        walker.walk_class_like_member_selector(&static_method_partial_application.method, context);
+        walker.walk_partial_argument_list(&static_method_partial_application.argument_list, context);
+    }
+
     'arena ClassLikeMemberSelector as class_like_member_selector => {
         match class_like_member_selector {
             ClassLikeMemberSelector::Identifier(local_identifier) => {
@@ -1984,34 +2052,6 @@ generate_ast_walker! {
                 );
             }
         }
-    }
-
-    'arena ClosureCreation as closure_creation => {
-        match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => {
-                walker.walk_function_closure_creation(function_closure_creation, context);
-            }
-            ClosureCreation::Method(method_closure_creation) => {
-                walker.walk_method_closure_creation(method_closure_creation, context);
-            }
-            ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                walker.walk_static_method_closure_creation(static_method_closure_creation, context);
-            }
-        }
-    }
-
-    'arena FunctionClosureCreation as function_closure_creation => {
-        walker.walk_expression(function_closure_creation.function, context);
-    }
-
-    'arena MethodClosureCreation as method_closure_creation => {
-        walker.walk_expression(method_closure_creation.object, context);
-        walker.walk_class_like_member_selector(&method_closure_creation.method, context);
-    }
-
-    'arena StaticMethodClosureCreation as static_method_closure_creation => {
-        walker.walk_expression(static_method_closure_creation.class, context);
-        walker.walk_class_like_member_selector(&static_method_closure_creation.method, context);
     }
 
     'arena Keyword as parent_keyword => {

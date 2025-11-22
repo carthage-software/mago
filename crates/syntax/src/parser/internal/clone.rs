@@ -1,8 +1,8 @@
 use crate::T;
 use crate::ast::ast::*;
+use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::argument::parse_argument;
-use crate::parser::internal::argument::parse_remaining_argument_list;
+use crate::parser::internal::argument::parse_partial_argument;
 use crate::parser::internal::expression::parse_expression_with_precedence;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
@@ -35,46 +35,71 @@ pub fn parse_ambiguous_clone_expression<'arena>(
     }
 
     let left_parenthesis = utils::expect_span(stream, T!["("])?;
-    if let TokenKind::DotDotDot = utils::peek(stream)?.kind {
-        let ellipsis = utils::expect_any(stream)?.span;
-        let right_parenthesis = utils::expect_span(stream, T![")"])?;
 
-        return Ok(Expression::ClosureCreation(ClosureCreation::Function(FunctionClosureCreation {
+    let mut arguments = stream.new_vec();
+    let mut commas = stream.new_vec();
+    loop {
+        let next = utils::peek(stream)?;
+        if next.kind == T![")"] {
+            break;
+        }
+
+        arguments.push(parse_partial_argument(stream)?);
+
+        let next = utils::peek(stream)?;
+        if next.kind == T![","] {
+            commas.push(utils::expect_any(stream)?);
+        } else {
+            break;
+        }
+    }
+
+    let partial_args = PartialArgumentList {
+        left_parenthesis,
+        arguments: TokenSeparatedSequence::new(arguments, commas),
+        right_parenthesis: utils::expect_span(stream, T![")"])?,
+    };
+
+    if partial_args.has_placeholders() {
+        return Ok(Expression::PartialApplication(PartialApplication::Function(FunctionPartialApplication {
             function: stream.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier {
                 span: clone.span,
                 value: clone.value,
             }))),
-            left_parenthesis,
-            ellipsis,
-            right_parenthesis,
+            argument_list: partial_args,
         })));
     }
 
-    let argument = parse_argument(stream)?;
-    let is_next_comma = utils::peek(stream)?.kind.is_comma();
+    let is_function_call = partial_args.arguments.len() > 1 || {
+        matches!(
+            partial_args.arguments.first(),
+            Some(PartialArgument::Positional(arg)) if arg.ellipsis.is_some()
+        )
+    };
 
-    let cloned_expression = match argument {
-        Argument::Positional(argument) if !is_next_comma && argument.ellipsis.is_none() => argument.value,
-        _ => {
-            let argument_list = parse_remaining_argument_list(stream, left_parenthesis, argument)?;
+    if is_function_call {
+        return Ok(Expression::Call(Call::Function(FunctionCall {
+            function: stream.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier {
+                span: clone.span,
+                value: clone.value,
+            }))),
+            argument_list: partial_args.into_argument_list(stream.arena()),
+        })));
+    }
 
-            return Ok(Expression::Call(Call::Function(FunctionCall {
-                function: stream.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier {
-                    span: clone.span,
-                    value: clone.value,
-                }))),
-                argument_list,
-            })));
-        }
+    let cloned_expression = match partial_args.arguments.into_iter().next() {
+        Some(PartialArgument::Positional(arg)) => arg.value,
+        Some(PartialArgument::Named(arg)) => arg.value,
+        _ => unreachable!("Should have at least one argument"),
     };
 
     Ok(Expression::Clone(Clone {
         clone,
         object: {
             let object = Expression::Parenthesized(Parenthesized {
-                left_parenthesis,
+                left_parenthesis: partial_args.left_parenthesis,
                 expression: stream.alloc(cloned_expression),
-                right_parenthesis: utils::expect_span(stream, T![")"])?,
+                right_parenthesis: partial_args.right_parenthesis,
             });
 
             stream.alloc(object)

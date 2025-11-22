@@ -335,17 +335,17 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
                     || matches!(&class_constant_access.constant, ClassLikeConstantSelector::Expression(selector) if expression_has_yield(selector.expression))
             }
         },
-        Expression::ClosureCreation(closure_creation) => match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => {
-                expression_has_yield(function_closure_creation.function)
+        Expression::PartialApplication(partial_application) => match partial_application {
+            PartialApplication::Function(function_partial_application) => {
+                expression_has_yield(function_partial_application.function)
             }
-            ClosureCreation::Method(method_closure_creation) => {
-                expression_has_yield(method_closure_creation.object)
-                    || matches!(&method_closure_creation.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
+            PartialApplication::Method(method_partial_application) => {
+                expression_has_yield(method_partial_application.object)
+                    || matches!(&method_partial_application.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
             }
-            ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                expression_has_yield(static_method_closure_creation.class)
-                    || matches!(&static_method_closure_creation.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                expression_has_yield(static_method_partial_application.class)
+                    || matches!(&static_method_partial_application.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
             }
         },
         Expression::Instantiation(instantiation) => {

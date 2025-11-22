@@ -1,5 +1,3 @@
-use mago_span::Span;
-
 use crate::T;
 use crate::ast::ast::*;
 use crate::ast::sequence::TokenSeparatedSequence;
@@ -43,46 +41,6 @@ pub fn parse_argument_list<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Resu
     })
 }
 
-/// Parses the remaining arguments in a list after the opening parenthesis and the first argument
-/// have already been consumed.
-///
-/// This is a helper for parsing constructs where an argument list follows an initial expression,
-/// allowing the parser to reuse the standard argument list parsing logic without backtracking.
-pub fn parse_remaining_argument_list<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    left_parenthesis: Span,
-    initial_argument: Argument<'arena>,
-) -> Result<ArgumentList<'arena>, ParseError> {
-    let mut arguments = stream.new_vec_of(initial_argument);
-    let mut commas = stream.new_vec();
-
-    // Loop to parse the rest of the arguments
-    loop {
-        let next = utils::peek(stream)?;
-        if next.kind == T![")"] {
-            break;
-        }
-
-        if next.kind == T![","] {
-            commas.push(utils::expect_any(stream)?);
-            // After a comma, another argument might follow, or a closing parenthesis (for trailing commas).
-            if utils::peek(stream)?.kind == T![")"] {
-                break;
-            }
-            arguments.push(parse_argument(stream)?);
-        } else {
-            // If there's no comma, we expect the list to end.
-            break;
-        }
-    }
-
-    Ok(ArgumentList {
-        left_parenthesis,
-        arguments: TokenSeparatedSequence::new(arguments, commas),
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
 pub fn parse_argument<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Argument<'arena>, ParseError> {
     if utils::peek(stream)?.kind.is_identifier_maybe_reserved()
         && matches!(utils::maybe_peek_nth(stream, 1)?.map(|token| token.kind), Some(T![":"]))
@@ -95,6 +53,80 @@ pub fn parse_argument<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Ar
     }
 
     Ok(Argument::Positional(PositionalArgument {
+        ellipsis: utils::maybe_expect(stream, T!["..."])?.map(|token| token.span),
+        value: expression::parse_expression(stream)?,
+    }))
+}
+
+pub fn parse_partial_argument_list<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<PartialArgumentList<'arena>, ParseError> {
+    Ok(PartialArgumentList {
+        left_parenthesis: utils::expect_span(stream, T!["("])?,
+        arguments: {
+            let mut arguments = stream.new_vec();
+            let mut commas = stream.new_vec();
+            loop {
+                let next = utils::peek(stream)?;
+                if next.kind == T![")"] {
+                    break;
+                }
+
+                arguments.push(parse_partial_argument(stream)?);
+
+                let next = utils::peek(stream)?;
+                if next.kind == T![","] {
+                    commas.push(utils::expect_any(stream)?);
+                } else {
+                    break;
+                }
+            }
+
+            TokenSeparatedSequence::new(arguments, commas)
+        },
+        right_parenthesis: utils::expect_span(stream, T![")"])?,
+    })
+}
+
+pub fn parse_partial_argument<'arena>(
+    stream: &mut TokenStream<'_, 'arena>,
+) -> Result<PartialArgument<'arena>, ParseError> {
+    let current = utils::peek(stream)?;
+
+    if current.kind == T!["?"] {
+        return Ok(PartialArgument::Placeholder(Placeholder { span: utils::expect_any(stream)?.span }));
+    }
+
+    if current.kind == T!["..."] {
+        let next = utils::maybe_peek_nth(stream, 1)?;
+        match next.map(|t| t.kind) {
+            Some(T![","]) | Some(T![")"]) | None => {
+                return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholder {
+                    span: utils::expect_any(stream)?.span,
+                }));
+            }
+            _ => {}
+        }
+    }
+
+    if current.kind.is_identifier_maybe_reserved()
+        && matches!(utils::maybe_peek_nth(stream, 1)?.map(|token| token.kind), Some(T![":"]))
+    {
+        let name = identifier::parse_local_identifier(stream)?;
+        let colon = utils::expect_any(stream)?.span;
+
+        if utils::peek(stream)?.kind == T!["?"] {
+            return Ok(PartialArgument::NamedPlaceholder(NamedPlaceholder {
+                name,
+                colon,
+                question_mark: utils::expect_any(stream)?.span,
+            }));
+        }
+
+        return Ok(PartialArgument::Named(NamedArgument { name, colon, value: expression::parse_expression(stream)? }));
+    }
+
+    Ok(PartialArgument::Positional(PositionalArgument {
         ellipsis: utils::maybe_expect(stream, T!["..."])?.map(|token| token.span),
         value: expression::parse_expression(stream)?,
     }))

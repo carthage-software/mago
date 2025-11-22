@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
 use mago_atom::atom;
-
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::get_mixed_closure;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -21,32 +21,40 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionClosureCreation<'arena> {
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'arena> {
     fn analyze<'ctx>(
         &'ast self,
         context: &mut Context<'ctx, 'arena>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let callables = resolve_function_callable_types(context, block_context, artifacts, self.function)?;
-        if callables.is_empty() {
-            return Ok(());
-        }
+        let resulting_type = if !self.argument_list.is_first_class_callable() {
+            tracing::warn!("Partial function application (PFA) is not yet supported in the analyzer.");
 
-        let resulting_type = TUnion::new(
-            callables
-                .into_iter()
-                .map(|c| {
-                    let mut callable = c.into_owned();
+            // TODO(azjezz): implement proper PFA analysis.
+            get_mixed_closure()
+        } else {
+            let callables = resolve_function_callable_types(context, block_context, artifacts, self.function)?;
+            if callables.is_empty() {
+                return Ok(());
+            }
 
-                    if let TCallable::Signature(TCallableSignature { is_closure, .. }) = &mut callable {
-                        *is_closure = true;
-                    }
+            TUnion::new(
+                callables
+                    .into_iter()
+                    .map(|c| {
+                        let mut callable = c.into_owned();
 
-                    TAtomic::Callable(callable)
-                })
-                .collect(),
-        );
+                        if let TCallable::Signature(TCallableSignature { is_closure, .. }) = &mut callable {
+                            *is_closure = true;
+                        }
+
+                        TAtomic::Callable(callable)
+                    })
+                    .collect(),
+            )
+        };
+
         artifacts.set_expression_type(self, resulting_type);
 
         Ok(())

@@ -127,14 +127,12 @@ impl LintRule for AssertionStyleRule {
         for reference in find_testing_or_assertion_references_in_method(method) {
             let (to_replace, current_style) = match reference {
                 MethodReference::MethodCall(c) => (c.object.span().join(c.arrow), AssertionStyle::This),
-                MethodReference::MethodClosureCreation(c) => (c.object.span().join(c.arrow), AssertionStyle::This),
-                MethodReference::StaticMethodClosureCreation(StaticMethodClosureCreation {
-                    class,
-                    double_colon,
-                    ..
-                }) => match class {
-                    Expression::Static(_) => (class.span().join(*double_colon), AssertionStyle::Static),
-                    Expression::Self_(_) => (class.span().join(*double_colon), AssertionStyle::Self_),
+                MethodReference::MethodPartialApplication(pa) => {
+                    (pa.object.span().join(pa.arrow), AssertionStyle::This)
+                }
+                MethodReference::StaticMethodPartialApplication(spa) => match spa.class {
+                    Expression::Static(_) => (spa.class.span().join(spa.double_colon), AssertionStyle::Static),
+                    Expression::Self_(_) => (spa.class.span().join(spa.double_colon), AssertionStyle::Self_),
                     _ => continue,
                 },
                 MethodReference::StaticMethodCall(StaticMethodCall { class, double_colon, .. }) => match class {

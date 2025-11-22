@@ -1188,4 +1188,47 @@ mod parser {
     smoke_test!(keyword_public_in_string_array_access, "<?php echo \"$arr[public]\";");
     smoke_test!(keyword_private_in_string_array_access, "<?php echo \"$arr[private]\";");
     smoke_test!(keyword_protected_in_string_array_access, "<?php echo \"$arr[protected]\";");
+
+    smoke_test!(fcc_function, "<?php foo(...);");
+    smoke_test!(fcc_method, "<?php $obj->method(...);");
+    smoke_test!(fcc_static_method, "<?php Foo::method(...);");
+    smoke_test!(fcc_clone, "<?php clone(...);");
+
+    smoke_test!(pfa_single_placeholder, "<?php foo(?);");
+    smoke_test!(pfa_single_variadic, "<?php bar(...);");
+    smoke_test!(pfa_two_placeholders, "<?php foo(?, ?);");
+    smoke_test!(pfa_three_placeholders, "<?php foo(?, ?, ?);");
+    smoke_test!(pfa_mixed_value_placeholder, "<?php foo(1, ?);");
+    smoke_test!(pfa_mixed_placeholder_value, "<?php foo(?, 2);");
+    smoke_test!(pfa_mixed_complex, "<?php foo(1, ?, 3, ?);");
+    smoke_test!(pfa_mixed_with_vars, "<?php foo($x, ?, $y, ?);");
+    smoke_test!(pfa_named_args_only, "<?php foo(a: 1, b: 2);");
+    smoke_test!(pfa_positional_then_named, "<?php foo(?, a: 2);");
+    smoke_test!(pfa_positional_multiple_named, "<?php foo(1, ?, a: 3, b: 4);");
+    smoke_test!(pfa_named_placeholder_single, "<?php foo(a: ?);");
+    smoke_test!(pfa_named_placeholder_multiple, "<?php foo(a: ?, b: ?);");
+    smoke_test!(pfa_named_mixed, "<?php foo(a: 1, b: ?);");
+    smoke_test!(pfa_named_mixed_reverse, "<?php foo(a: ?, b: 2);");
+    smoke_test!(pfa_positional_named_placeholder, "<?php foo(?, a: ?, b: 2);");
+    smoke_test!(pfa_trailing_variadic_simple, "<?php foo(1, ...);");
+    smoke_test!(pfa_placeholder_variadic, "<?php foo(?, ...);");
+    smoke_test!(pfa_mixed_variadic, "<?php foo(1, ?, ...);");
+    smoke_test!(pfa_named_variadic, "<?php foo(a: 1, ...);");
+    smoke_test!(pfa_full_mix, "<?php foo(1, ?, a: 2, b: ?, ...);");
+    smoke_test!(pfa_method_placeholder, "<?php $obj->method(?);");
+    smoke_test!(pfa_method_mixed, "<?php $obj->method(1, ?);");
+    smoke_test!(pfa_method_named, "<?php $obj->method(a: ?);");
+    smoke_test!(pfa_method_variadic, "<?php $obj->method(?, ...);");
+    smoke_test!(pfa_static_placeholder, "<?php Foo::bar(?);");
+    smoke_test!(pfa_static_mixed, "<?php Foo::bar(?, 2, ?);");
+    smoke_test!(pfa_static_named, "<?php Foo::bar(a: ?, b: 2);");
+    smoke_test!(pfa_static_variadic, "<?php Foo::bar(1, ...);");
+    smoke_test!(pfa_unpacking_positional, "<?php foo(...$args);");
+    smoke_test!(pfa_unpacking_mixed, "<?php foo(?, ...$args);");
+    smoke_test!(pfa_unpacking_named, "<?php foo(a: 1, ...$args);");
+    smoke_test!(pfa_clone_placeholder, "<?php clone(?);");
+    smoke_test!(pfa_clone_mixed, "<?php clone(?, ...);");
+    smoke_test!(pfa_nested_call, "<?php foo(bar(?))(?);");
+    smoke_test!(pfa_chained, "<?php $obj->method(?)->bindTo(?);");
+    smoke_test!(pfa_array_element, "<?php $arr[0](?);");
 }

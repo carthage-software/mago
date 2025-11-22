@@ -16,7 +16,7 @@ pub fn is_truthy(expression: &Expression<'_>) -> bool {
         Expression::ArrowFunction(_) => true,
         Expression::Array(array) => !array.elements.is_empty(),
         Expression::LegacyArray(array) => !array.elements.is_empty(),
-        Expression::ClosureCreation(_) => true,
+        Expression::PartialApplication(_) => true,
         Expression::Binary(operation) => match operation.operator {
             BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_truthy(operation.lhs) || is_truthy(operation.rhs),
             BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => is_truthy(operation.lhs) && is_truthy(operation.rhs),

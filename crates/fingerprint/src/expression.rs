@@ -37,7 +37,7 @@ impl Fingerprintable for Expression<'_> {
             Expression::Clone(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Call(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Access(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
-            Expression::ClosureCreation(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
+            Expression::PartialApplication(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Parent(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Static(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Self_(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),

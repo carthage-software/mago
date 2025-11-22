@@ -267,7 +267,7 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
             "Accessing a property or constant as a statement might have no effect (unless it's meant to trigger a magic method call)."
         }
         Expression::AnonymousClass(_) => "Defining an anonymous class without assigning it has no effect.",
-        Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::ClosureCreation(_) => {
+        Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::PartialApplication(_) => {
             "Defining a closure or arrow function without assigning or calling it has no effect."
         }
         Expression::Parent(_) | Expression::Static(_) | Expression::Self_(_) => {

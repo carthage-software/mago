@@ -358,6 +358,62 @@ fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) ->
         || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
 }
 
+pub(super) fn print_partial_argument_list<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
+    _for_attribute: bool,
+    _can_expand_first_or_last: bool,
+) -> Document<'arena> {
+    let left_parenthesis = Document::String("(");
+    let mut contents = vec![in f.arena; left_parenthesis];
+
+    let arguments_count = argument_list.arguments.len();
+    let mut formatted_arguments: Vec<'arena, Document<'arena>> = Vec::with_capacity_in(arguments_count, f.arena);
+    for arg in argument_list.arguments.iter() {
+        formatted_arguments.push(arg.format(f));
+    }
+
+    let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
+    let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
+
+    if arguments_count == 0 {
+        // Technically, this is impossible, but just in case..
+        contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)));
+        return Document::Array(contents);
+    }
+
+    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena>, should_break: bool| {
+        let mut printed_arguments = vec![in f.arena];
+
+        for (i, arg_idx) in (0..arguments_count).enumerate() {
+            let element = &argument_list.arguments.as_slice()[arg_idx];
+            let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
+            if i < (arguments_count - 1) {
+                argument.push(Document::String(","));
+
+                if f.is_next_line_empty(element.span()) {
+                    argument.push(Document::Line(Line::hard()));
+                    argument.push(Document::Line(Line::hard()));
+                } else if should_break {
+                    argument.push(Document::Line(Line::hard()));
+                } else {
+                    argument.push(Document::Line(Line::default()));
+                }
+            }
+
+            printed_arguments.push(Document::Array(argument));
+        }
+
+        printed_arguments
+    };
+
+    let printed_args = get_printed_arguments(f, false);
+    contents.push(Document::Group(Group::new(printed_args)));
+    contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
+
+    Document::Group(Group::new(contents))
+}
+
 #[inline]
 pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
     if f.settings.always_break_named_arguments_list

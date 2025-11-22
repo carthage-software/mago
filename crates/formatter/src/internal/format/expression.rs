@@ -97,7 +97,7 @@ impl<'arena> Format<'arena> for Expression<'arena> {
                     }
                 }
                 Expression::ConstantAccess(a) => a.format(f),
-                Expression::ClosureCreation(c) => c.format(f),
+                Expression::PartialApplication(p) => p.format(f),
                 Expression::Parent(k) => k.format(f),
                 Expression::Static(k) => k.format(f),
                 Expression::Self_(k) => k.format(f),
@@ -547,6 +547,55 @@ impl<'arena> Format<'arena> for NamedArgument<'arena> {
                 Document::String(":"),
                 Document::space(),
                 self.value.format(f),
+            ]))
+        })
+    }
+}
+
+impl<'arena> Format<'arena> for PartialArgumentList<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, PartialArgumentList, {
+            use crate::internal::format::call_arguments::print_partial_argument_list;
+            print_partial_argument_list(f, self, false, false)
+        })
+    }
+}
+
+impl<'arena> Format<'arena> for PartialArgument<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, PartialArgument, {
+            match self {
+                PartialArgument::Positional(a) => a.format(f),
+                PartialArgument::Named(a) => a.format(f),
+                PartialArgument::NamedPlaceholder(p) => p.format(f),
+                PartialArgument::Placeholder(p) => p.format(f),
+                PartialArgument::VariadicPlaceholder(p) => p.format(f),
+            }
+        })
+    }
+}
+
+impl<'arena> Format<'arena> for Placeholder {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, Placeholder, { Document::String("?") })
+    }
+}
+
+impl<'arena> Format<'arena> for VariadicPlaceholder {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, VariadicPlaceholder, { Document::String("...") })
+    }
+}
+
+impl<'arena> Format<'arena> for NamedPlaceholder<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, NamedPlaceholder, {
+            Document::Group(Group::new(vec![
+                in f.arena;
+                self.name.format(f),
+                Document::String(":"),
+                Document::space(),
+                Document::String("?"),
             ]))
         })
     }
@@ -1326,49 +1375,49 @@ impl<'arena> Format<'arena> for MagicConstant<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for ClosureCreation<'arena> {
+impl<'arena> Format<'arena> for PartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, ClosureCreation, {
+        wrap!(f, self, PartialApplication, {
             match &self {
-                ClosureCreation::Function(c) => c.format(f),
-                ClosureCreation::Method(c) => c.format(f),
-                ClosureCreation::StaticMethod(c) => c.format(f),
+                PartialApplication::Function(p) => p.format(f),
+                PartialApplication::Method(p) => p.format(f),
+                PartialApplication::StaticMethod(p) => p.format(f),
             }
         })
     }
 }
 
-impl<'arena> Format<'arena> for FunctionClosureCreation<'arena> {
+impl<'arena> Format<'arena> for FunctionPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, FunctionClosureCreation, {
-            Document::Group(Group::new(vec![in f.arena; self.function.format(f), Document::String("(...)")]))
+        wrap!(f, self, FunctionPartialApplication, {
+            Document::Group(Group::new(vec![in f.arena; self.function.format(f), self.argument_list.format(f)]))
         })
     }
 }
 
-impl<'arena> Format<'arena> for MethodClosureCreation<'arena> {
+impl<'arena> Format<'arena> for MethodPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, MethodClosureCreation, {
+        wrap!(f, self, MethodPartialApplication, {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.object.format(f),
                 Document::String("->"),
                 self.method.format(f),
-                Document::String("(...)"),
+                self.argument_list.format(f),
             ]))
         })
     }
 }
 
-impl<'arena> Format<'arena> for StaticMethodClosureCreation<'arena> {
+impl<'arena> Format<'arena> for StaticMethodPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, StaticMethodClosureCreation, {
+        wrap!(f, self, StaticMethodPartialApplication, {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.class.format(f),
                 Document::String("::"),
                 self.method.format(f),
-                Document::String("(...)"),
+                self.argument_list.format(f),
             ]))
         })
     }

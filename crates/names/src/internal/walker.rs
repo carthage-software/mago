@@ -122,12 +122,12 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_function_closure_creation(
+    fn walk_in_function_partial_application(
         &mut self,
-        function_closure_creation: &'ast FunctionClosureCreation<'arena>,
+        function_partial_application: &'ast FunctionPartialApplication<'arena>,
         context: &mut NameResolutionContext<'arena>,
     ) {
-        if let Expression::Identifier(identifier) = function_closure_creation.function {
+        if let Expression::Identifier(identifier) = function_partial_application.function {
             let (name, imported) = context.resolve(NameKind::Function, identifier.value());
 
             self.resolved_names.insert_at(&identifier.span().start, name, imported);
@@ -158,12 +158,12 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_static_method_closure_creation(
+    fn walk_in_static_method_partial_application(
         &mut self,
-        static_method_closure_creation: &'ast StaticMethodClosureCreation<'arena>,
+        static_method_partial_application: &'ast StaticMethodPartialApplication<'arena>,
         context: &mut NameResolutionContext<'arena>,
     ) {
-        if let Expression::Identifier(identifier) = static_method_closure_creation.class {
+        if let Expression::Identifier(identifier) = static_method_partial_application.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
 
             self.resolved_names.insert_at(&identifier.span().start, name, imported);

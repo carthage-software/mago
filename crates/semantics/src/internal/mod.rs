@@ -170,12 +170,12 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
     }
 
     #[inline]
-    fn walk_in_closure_creation(
+    fn walk_in_partial_application(
         &self,
-        closure_creation: &'ast ClosureCreation<'arena>,
+        partial_application: &'ast PartialApplication<'arena>,
         context: &mut Context<'_, 'ast, 'arena>,
     ) {
-        checker::closure_creation::check_closure_creation(closure_creation, context);
+        checker::partial_application::check_partial_application(partial_application, context);
     }
 
     #[inline]

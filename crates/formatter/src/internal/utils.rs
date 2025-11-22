@@ -28,7 +28,7 @@ pub const fn has_naked_left_side(expression: &Expression) -> bool {
             | Expression::ArrayAppend(_)
             | Expression::Call(_)
             | Expression::Access(_)
-            | Expression::ClosureCreation(_)
+            | Expression::PartialApplication(_)
     )
 }
 
@@ -53,10 +53,12 @@ pub fn get_left_side<'arena>(expression: &'arena Expression<'arena>) -> Option<&
             Access::StaticProperty(static_property_access) => static_property_access.class,
             Access::ClassConstant(class_constant_access) => class_constant_access.class,
         }),
-        Expression::ClosureCreation(closure_creation) => Some(match closure_creation {
-            ClosureCreation::Function(function_closure_creation) => function_closure_creation.function,
-            ClosureCreation::Method(method_closure_creation) => method_closure_creation.object,
-            ClosureCreation::StaticMethod(static_method_closure_creation) => static_method_closure_creation.class,
+        Expression::PartialApplication(partial_application) => Some(match partial_application {
+            PartialApplication::Function(function_partial_application) => function_partial_application.function,
+            PartialApplication::Method(method_partial_application) => method_partial_application.object,
+            PartialApplication::StaticMethod(static_method_partial_application) => {
+                static_method_partial_application.class
+            }
         }),
         _ => None,
     }
@@ -74,9 +76,9 @@ pub fn is_at_call_like_expression(f: &FormatterState<'_, '_>) -> bool {
             | Node::MethodCall(_)
             | Node::StaticMethodCall(_)
             | Node::NullSafeMethodCall(_)
-            | Node::FunctionClosureCreation(_)
-            | Node::MethodClosureCreation(_)
-            | Node::StaticMethodClosureCreation(_)
+            | Node::FunctionPartialApplication(_)
+            | Node::MethodPartialApplication(_)
+            | Node::StaticMethodPartialApplication(_)
     )
 }
 
@@ -104,9 +106,9 @@ pub fn is_at_callee(f: &FormatterState<'_, '_>) -> bool {
         Node::MethodCall(call) => call.object == expression,
         Node::StaticMethodCall(call) => call.class == expression,
         Node::NullSafeMethodCall(call) => call.object == expression,
-        Node::FunctionClosureCreation(closure) => closure.function == expression,
-        Node::MethodClosureCreation(closure) => closure.object == expression,
-        Node::StaticMethodClosureCreation(closure) => closure.class == expression,
+        Node::FunctionPartialApplication(partial_application) => partial_application.function == expression,
+        Node::MethodPartialApplication(partial_application) => partial_application.object == expression,
+        Node::StaticMethodPartialApplication(partial_application) => partial_application.class == expression,
         _ => false,
     }
 }

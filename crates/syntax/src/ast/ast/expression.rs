@@ -26,7 +26,6 @@ use crate::ast::ast::class_like::AnonymousClass;
 use crate::ast::ast::class_like::member::ClassLikeConstantSelector;
 use crate::ast::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::ast::clone::Clone;
-use crate::ast::ast::closure_creation::ClosureCreation;
 use crate::ast::ast::conditional::Conditional;
 use crate::ast::ast::construct::Construct;
 use crate::ast::ast::control_flow::r#match::Match;
@@ -37,6 +36,7 @@ use crate::ast::ast::instantiation::Instantiation;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::literal::Literal;
 use crate::ast::ast::magic_constant::MagicConstant;
+use crate::ast::ast::partial_application::PartialApplication;
 use crate::ast::ast::pipe::Pipe;
 use crate::ast::ast::string::CompositeString;
 use crate::ast::ast::string::StringPart;
@@ -84,8 +84,8 @@ pub enum Expression<'arena> {
     Throw(Throw<'arena>),
     Clone(Clone<'arena>),
     Call(Call<'arena>),
+    PartialApplication(PartialApplication<'arena>),
     Access(Access<'arena>),
-    ClosureCreation(ClosureCreation<'arena>),
     Parent(Keyword<'arena>),
     Static(Keyword<'arena>),
     Self_(Keyword<'arena>),
@@ -203,22 +203,28 @@ impl<'arena> Expression<'arena> {
             Self::Closure(closure) => {
                 closure.r#static.is_some() && version.is_supported(Feature::ClosureInConstantExpressions)
             }
-            Self::ClosureCreation(closure_creation) => {
+            Self::PartialApplication(partial_application) => {
+                // Only FCC (First-Class Callables) can be constant expressions
+                // PFA with placeholders is not a constant expression
+                if !partial_application.is_first_class_callable() {
+                    return false;
+                }
+
                 if !version.is_supported(Feature::ClosureCreationInConstantExpressions) {
                     return false;
                 }
 
-                match closure_creation {
-                    ClosureCreation::Function(function_closure_creation) => {
-                        function_closure_creation.function.is_constant(version, initialization)
+                match partial_application {
+                    PartialApplication::Function(function_pa) => {
+                        function_pa.function.is_constant(version, initialization)
                     }
-                    ClosureCreation::Method(method_closure_creation) => {
-                        method_closure_creation.object.is_constant(version, initialization)
-                            && matches!(method_closure_creation.method, ClassLikeMemberSelector::Identifier(_))
+                    PartialApplication::Method(method_pa) => {
+                        method_pa.object.is_constant(version, initialization)
+                            && matches!(method_pa.method, ClassLikeMemberSelector::Identifier(_))
                     }
-                    ClosureCreation::StaticMethod(static_method_closure_creation) => {
-                        static_method_closure_creation.class.is_constant(version, initialization)
-                            && matches!(static_method_closure_creation.method, ClassLikeMemberSelector::Identifier(_))
+                    PartialApplication::StaticMethod(static_method_pa) => {
+                        static_method_pa.class.is_constant(version, initialization)
+                            && matches!(static_method_pa.method, ClassLikeMemberSelector::Identifier(_))
                     }
                 }
             }
@@ -410,8 +416,8 @@ impl<'arena> Expression<'arena> {
             Expression::Throw(_) => NodeKind::Throw,
             Expression::Clone(_) => NodeKind::Clone,
             Expression::Call(_) => NodeKind::Call,
+            Expression::PartialApplication(_) => NodeKind::PartialApplication,
             Expression::Access(_) => NodeKind::Access,
-            Expression::ClosureCreation(_) => NodeKind::ClosureCreation,
             Expression::Instantiation(_) => NodeKind::Instantiation,
             Expression::MagicConstant(_) => NodeKind::MagicConstant,
             Expression::Parent(_) => NodeKind::Keyword,
@@ -456,8 +462,8 @@ impl HasSpan for Expression<'_> {
             Expression::Throw(expression) => expression.span(),
             Expression::Clone(expression) => expression.span(),
             Expression::Call(expression) => expression.span(),
+            Expression::PartialApplication(expression) => expression.span(),
             Expression::Access(expression) => expression.span(),
-            Expression::ClosureCreation(expression) => expression.span(),
             Expression::Parent(expression) => expression.span(),
             Expression::Static(expression) => expression.span(),
             Expression::Self_(expression) => expression.span(),

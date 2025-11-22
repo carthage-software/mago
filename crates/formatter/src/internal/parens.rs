@@ -379,8 +379,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             return false;
         };
 
-        if let Some(Node::ClosureCreation(closure)) = self.grandparent_node() {
-            if let ClosureCreation::Function(_) = closure {
+        if let Some(Node::PartialApplication(partial_application)) = self.grandparent_node() {
+            if let PartialApplication::Function(_) = partial_application {
                 return self.function_callee_expression_need_parenthesis(expression);
             }
 
@@ -455,7 +455,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
                 | Expression::ConstantAccess(_)
                 | Expression::Call(_)
                 | Expression::Access(_)
-                | Expression::ClosureCreation(_)
+                | Expression::PartialApplication(_)
                 | Expression::Static(_)
                 | Expression::Self_(_)
                 | Expression::Parent(_)
@@ -473,7 +473,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
                 | Expression::Identifier(_)
                 | Expression::Construct(_)
                 | Expression::Call(_)
-                | Expression::ClosureCreation(_)
+                | Expression::PartialApplication(_)
                 | Expression::Static(_)
                 | Expression::Self_(_)
                 | Expression::Parent(_)
