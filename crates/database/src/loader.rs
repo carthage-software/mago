@@ -276,10 +276,13 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_config(temp_dir: &TempDir, paths: Vec<&str>, includes: Vec<&str>) -> DatabaseConfiguration<'static> {
+        // Normalize path separators to platform-specific separators
+        let normalize = |s: &str| s.replace('/', std::path::MAIN_SEPARATOR_STR);
+
         DatabaseConfiguration {
             workspace: Cow::Owned(temp_dir.path().to_path_buf()),
-            paths: paths.into_iter().map(|s| Cow::Owned(s.to_string())).collect(),
-            includes: includes.into_iter().map(|s| Cow::Owned(s.to_string())).collect(),
+            paths: paths.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
+            includes: includes.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
             excludes: vec![],
             extensions: vec![Cow::Borrowed("php")],
         }
