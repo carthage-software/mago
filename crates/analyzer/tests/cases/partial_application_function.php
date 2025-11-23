@@ -51,4 +51,6 @@ strlen(?)(); // @mago-expect analysis:too-few-arguments
 add(?)(1); // @mago-expect analysis:too-few-arguments
 add(?, ?)(1); // @mago-expect analysis:too-few-arguments
 concat(?, ?, ?)("a"); // @mago-expect analysis:too-few-arguments
-strtoupper(?, ?, ?, ?); // @mago-expect analysis:too-many-arguments
+// @mago-expect analysis:too-many-arguments
+// @mago-expect analysis:unused-statement
+strtoupper(?, ?, ?, ?);
