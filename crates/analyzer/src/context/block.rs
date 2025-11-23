@@ -326,7 +326,7 @@ impl<'ctx> BlockContext<'ctx> {
         'outer: for clause in clauses {
             for var_id in clause.possibilities.keys() {
                 if var_has_root(var_id, remove_var_id) {
-                    break 'outer;
+                    continue 'outer;
                 }
             }
 

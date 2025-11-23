@@ -281,6 +281,10 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
             new_type.by_reference = true;
 
             if constraint_type && let Some(argument_id) = argument_id {
+                if let Some(existing_type) = block_context.locals.get(&argument_id).cloned() {
+                    block_context.remove_descendants(context, &argument_id, &existing_type, Some(&new_type));
+                }
+
                 assign_to_expression(
                     context,
                     block_context,
@@ -297,6 +301,12 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
                     ReferenceConstraint::new(argument.span(), ReferenceConstraintSource::Argument, Some(new_type)),
                 );
             } else {
+                if let Some(argument_id) = &argument_id
+                    && let Some(existing_type) = block_context.locals.get(argument_id).cloned()
+                {
+                    block_context.remove_descendants(context, argument_id, &existing_type, Some(&new_type));
+                }
+
                 assign_to_expression(
                     context,
                     block_context,
