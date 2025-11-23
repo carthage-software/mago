@@ -1,8 +1,10 @@
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_mixed_closure;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_syntax::ast::*;
@@ -12,6 +14,11 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::partial_application::create_closure_from_partial_application;
+use crate::invocation::Invocation;
+use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::InvocationTarget;
+use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::static_method::resolve_static_method_targets;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'arena> {
@@ -21,33 +28,82 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let resulting_type = if !self.argument_list.is_first_class_callable() {
-            tracing::warn!("Partial function application (PFA) is not yet supported in the analyzer.");
+        let method_resolution =
+            resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
 
-            // TODO(azjezz): implement proper PFA analysis.
-            get_mixed_closure()
-        } else {
-            let method_resolution = resolve_static_method_targets(
-                context,
-                block_context,
-                artifacts,
-                self.class,
-                &self.method,
-                self.span(),
-            )?;
+        let resulting_type = if self.argument_list.is_first_class_callable() {
+            let callable_types: Vec<TAtomic> = method_resolution
+                .resolved_methods
+                .into_iter()
+                .map(|resolved_method| {
+                    TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
+                        resolved_method.classname,
+                        *resolved_method.method_identifier.get_method_name(),
+                    )))
+                })
+                .collect();
 
-            let mut callables = vec![];
-            for resolved_method in method_resolution.resolved_methods {
-                callables.push(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
-                    resolved_method.classname,
-                    *resolved_method.method_identifier.get_method_name(),
-                ))));
-            }
-
-            if callables.is_empty() {
+            if callable_types.is_empty() {
                 if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
             } else {
-                TUnion::from_vec(callables)
+                TUnion::from_vec(callable_types)
+            }
+        } else {
+            let mut closure_types = Vec::new();
+            for resolved_method in method_resolution.resolved_methods {
+                let identifier = FunctionLikeIdentifier::Method(
+                    resolved_method.classname,
+                    *resolved_method.method_identifier.get_method_name(),
+                );
+
+                let Some(signature) = get_signature_of_function_like_identifier(&identifier, context.codebase) else {
+                    continue;
+                };
+
+                let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                    continue;
+                };
+
+                let invocation_target = InvocationTarget::FunctionLike {
+                    identifier,
+                    metadata,
+                    inferred_return_type: None,
+                    method_context: None,
+                    span: self.method.span(),
+                };
+
+                let invocation = Invocation::new(
+                    invocation_target,
+                    InvocationArgumentsSource::PartialArgumentList(&self.argument_list),
+                    self.span(),
+                );
+
+                let mut template_result =
+                    TemplateResult::new(indexmap::IndexMap::default(), indexmap::IndexMap::default());
+                let mut parameter_types = mago_atom::AtomMap::default();
+
+                let _ = analyze_invocation(
+                    context,
+                    block_context,
+                    artifacts,
+                    &invocation,
+                    Some((resolved_method.classname, None)),
+                    &mut template_result,
+                    &mut parameter_types,
+                );
+
+                closure_types.push(create_closure_from_partial_application(
+                    signature,
+                    &self.argument_list,
+                    &template_result,
+                    context.codebase,
+                ));
+            }
+
+            if closure_types.is_empty() {
+                if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
+            } else {
+                TUnion::from_vec(closure_types)
             }
         };
 

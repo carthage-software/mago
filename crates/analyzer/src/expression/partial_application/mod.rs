@@ -1,3 +1,10 @@
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::callable::TCallableSignature;
+use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_syntax::ast::*;
 
 use crate::analyzable::Analyzable;
@@ -29,4 +36,129 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialApplication<'arena> {
             }
         }
     }
+}
+
+/// Creates a closure type for partial function application by filtering parameters
+/// based on placeholders in the argument list and applying template substitutions.
+///
+/// This function examines the partial argument list and the callable's signature to build
+/// a new closure signature that only includes parameters corresponding to placeholders.
+/// It also applies any template type substitutions from the template result.
+///
+/// # Parameters
+///
+/// - `callable_signature`: The resolved signature of the function being partially applied
+/// - `argument_list`: The partial argument list containing placeholders and bound arguments
+/// - `template_result`: Template inference results containing concrete types for template parameters
+/// - `codebase`: The codebase for looking up type information during substitution
+///
+/// # Returns
+///
+/// A TAtomic::Callable containing the new closure signature with only placeholder parameters
+/// and all template types replaced with their inferred concrete types
+fn create_closure_from_partial_application(
+    callable_signature: TCallableSignature,
+    argument_list: &PartialArgumentList<'_>,
+    template_result: &TemplateResult,
+    codebase: &CodebaseMetadata,
+) -> TAtomic {
+    let parameters = callable_signature.get_parameters();
+    let arguments = &argument_list.arguments;
+
+    let mut parameter_offset = 0;
+    let mut new_parameters = Vec::new();
+
+    for argument in arguments.iter() {
+        match argument {
+            PartialArgument::Placeholder(_) => {
+                if let Some(param) = parameters.get(parameter_offset) {
+                    let mut new_param = param.clone();
+
+                    if let Some(type_sig) = new_param.get_type_signature() {
+                        if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                            let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
+                            new_param = TCallableParameter::new(
+                                Some(Box::new(substituted_type)),
+                                new_param.is_by_reference(),
+                                new_param.is_variadic(),
+                                new_param.has_default(),
+                            );
+                        }
+                    }
+
+                    new_parameters.push(new_param);
+                    parameter_offset += 1;
+                }
+            }
+            PartialArgument::NamedPlaceholder(_) => {
+                if let Some(param) = parameters.get(parameter_offset) {
+                    let mut new_param = param.clone();
+
+                    if let Some(type_sig) = new_param.get_type_signature() {
+                        if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                            let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
+                            new_param = TCallableParameter::new(
+                                Some(Box::new(substituted_type)),
+                                new_param.is_by_reference(),
+                                new_param.is_variadic(),
+                                new_param.has_default(),
+                            );
+                        }
+                    }
+
+                    new_parameters.push(new_param);
+                    parameter_offset += 1;
+                }
+            }
+            PartialArgument::VariadicPlaceholder(_) => {
+                if let Some(last_param) = parameters.get(parameter_offset) {
+                    let mut new_param = if last_param.is_variadic() {
+                        last_param.clone()
+                    } else {
+                        TCallableParameter::new(
+                            last_param.get_type_signature().map(|t| Box::new(t.clone())),
+                            false,
+                            true,
+                            false,
+                        )
+                    };
+
+                    if let Some(type_sig) = new_param.get_type_signature() {
+                        if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+                            let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
+                            new_param = TCallableParameter::new(
+                                Some(Box::new(substituted_type)),
+                                new_param.is_by_reference(),
+                                new_param.is_variadic(),
+                                new_param.has_default(),
+                            );
+                        }
+                    }
+
+                    new_parameters.push(new_param);
+                }
+
+                break;
+            }
+            PartialArgument::Positional(_) | PartialArgument::Named(_) => {
+                parameter_offset += 1;
+            }
+        }
+    }
+
+    let return_type = if let Some(ret_type) = &callable_signature.return_type {
+        if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
+            Some(Box::new(inferred_type_replacer::replace(ret_type, template_result, codebase)))
+        } else {
+            Some(ret_type.clone())
+        }
+    } else {
+        None
+    };
+
+    let new_signature = TCallableSignature::new(callable_signature.is_pure(), true)
+        .with_parameters(new_parameters)
+        .with_return_type(return_type);
+
+    TAtomic::Callable(TCallable::Signature(new_signature))
 }

@@ -46,8 +46,9 @@ fn get_parameter_of_argument<'invocation, 'ast, 'arena>(
     argument: &InvocationArgument<'ast, 'arena>,
     mut argument_offset: usize,
 ) -> Option<(usize, InvocationTargetParameter<'invocation>)> {
-    if let Some(named_argument) = argument.get_named_argument() {
-        argument_offset = find_named_parameter_offset(parameters, named_argument.name.value.into())?;
+    // Handle both named arguments and named placeholders
+    if let Some(parameter_name) = argument.get_parameter_name() {
+        argument_offset = find_named_parameter_offset(parameters, parameter_name.into())?;
     }
 
     argument_offset = adjust_offset_for_variadic(parameters, argument_offset);
@@ -98,7 +99,9 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
     for (offset, argument) in arguments.into_iter().enumerate() {
         if argument.is_unpacked() {
             unpacked_arguments.push(argument);
-        } else if matches!(argument.value(), Expression::Closure(_) | Expression::ArrowFunction(_)) {
+        } else if argument.is_placeholder() {
+            non_closure_arguments.push((offset, argument));
+        } else if matches!(argument.value(), Some(Expression::Closure(_)) | Some(Expression::ArrowFunction(_))) {
             closure_arguments.push((offset, argument));
         } else {
             non_closure_arguments.push((offset, argument));
@@ -111,7 +114,10 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
 
     for (argument_offset, argument) in &non_closure_arguments {
-        let argument_expression = argument.value();
+        let Some(argument_expression) = argument.value() else {
+            continue;
+        };
+
         let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
 
         analyze_and_store_argument_type(
@@ -152,7 +158,10 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
     }
 
     for (argument_offset, argument) in &closure_arguments {
-        let argument_expression = argument.value();
+        let Some(argument_expression) = argument.value() else {
+            continue;
+        };
+
         let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
         let mut parameter_type_had_template_types = false;
         let parameter_type = if let Some((_, parameter_ref)) = parameter {
@@ -239,7 +248,10 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         non_closure_arguments.iter().chain(closure_arguments.iter()).sorted_by(|(a, _), (b, _)| a.cmp(b));
 
     for (argument_offset, argument) in all_arguments {
-        let argument_expression = argument.value();
+        let Some(argument_expression) = argument.value() else {
+            continue;
+        };
+
         let (argument_value_type, _) = analyzed_argument_types
             .get(argument_offset)
             .cloned()
@@ -477,7 +489,10 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                     };
 
                 for unpacked_argument in unpacked_arguments {
-                    let argument_expression = unpacked_argument.value();
+                    let Some(argument_expression) = unpacked_argument.value() else {
+                        continue;
+                    };
+
                     if artifacts.get_expression_type(argument_expression).is_none() {
                         analyze_and_store_argument_type(
                             context,
@@ -543,7 +558,10 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 
                 for argument in all_arguments.into_iter() {
                     if argument.is_unpacked() {
-                        let argument_expression = argument.value();
+                        let Some(argument_expression) = argument.value() else {
+                            continue;
+                        };
+
                         if artifacts.get_expression_type(argument_expression).is_none() {
                             analyze_and_store_argument_type(
                                 context,
@@ -611,7 +629,14 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         }
     }
 
-    if number_of_provided_parameters < number_of_required_parameters {
+    let should_check_argument_count = match invocation.arguments_source {
+        InvocationArgumentsSource::PartialArgumentList(_) => {
+            (non_closure_arguments.len() + closure_arguments.len()) < number_of_required_parameters
+        }
+        _ => number_of_provided_parameters < number_of_required_parameters,
+    };
+
+    if should_check_argument_count {
         let primary_annotation_span = invocation.arguments_source.span();
 
         let main_message = match invocation.arguments_source {
@@ -621,17 +646,24 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             _ => format!("Too few arguments provided for {target_kind_str} `{target_name_str}`."),
         };
 
+        let total_positions = non_closure_arguments.len() + closure_arguments.len();
         let mut issue = Issue::error(main_message)
             .with_annotation(Annotation::primary(primary_annotation_span).with_message("More arguments expected here"))
             .with_note(format!(
-                "Expected at least {number_of_required_parameters} argument(s) for non-optional parameters, but received {number_of_provided_parameters}.",
+                "Expected at least {number_of_required_parameters} argument(s) for non-optional parameters, but received {}.",
+                if matches!(invocation.arguments_source, InvocationArgumentsSource::PartialArgumentList(_)) {
+                    total_positions
+                } else {
+                    number_of_provided_parameters
+                }
             ));
 
         issue = match invocation.arguments_source {
-            InvocationArgumentsSource::ArgumentList(_) => issue.with_annotation(
-                Annotation::secondary(invocation.target.span())
-                    .with_message(format!("For this {target_kind_str} call")),
-            ),
+            InvocationArgumentsSource::ArgumentList(_) | InvocationArgumentsSource::PartialArgumentList(_) => issue
+                .with_annotation(
+                    Annotation::secondary(invocation.target.span())
+                        .with_message(format!("For this {target_kind_str} call")),
+                ),
             InvocationArgumentsSource::PipeInput(pipe) => issue
                 .with_annotation(Annotation::secondary(pipe.callable.span()).with_message(format!(
                     "This {target_kind_str} requires at least {number_of_required_parameters} argument(s)",

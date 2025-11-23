@@ -1,5 +1,4 @@
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::Expression;
+use mago_syntax::ast::*;
 
 use crate::invocation::InvocationArgumentsSource;
 
@@ -23,6 +22,23 @@ pub(super) fn get_argument<'ast, 'arena>(
 
             for argument in argument_list.arguments.iter() {
                 let Argument::Named(named_argument) = argument else {
+                    continue;
+                };
+
+                if names.contains(&named_argument.name.value) {
+                    return Some(&named_argument.value);
+                }
+            }
+
+            None
+        }
+        InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+            if let Some(PartialArgument::Positional(argument)) = partial_argument_list.arguments.get(index) {
+                return Some(&argument.value);
+            }
+
+            for argument in partial_argument_list.arguments.iter() {
+                let PartialArgument::Named(named_argument) = argument else {
                     continue;
                 };
 

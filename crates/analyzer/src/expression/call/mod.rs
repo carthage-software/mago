@@ -330,7 +330,10 @@ fn inspect_arguments<'ctx, 'ast, 'arena>(
 
     let mut argument_annotations = vec![];
     for (idx, argument) in invocation_arguments.get_arguments().iter().enumerate() {
-        let argument_expression = argument.value();
+        let Some(argument_expression) = argument.value() else {
+            continue;
+        };
+
         let argument_span = argument_expression.span();
         let argument_type_string =
             artifacts.get_expression_type(argument_expression).map_or("<unknown type>", |t| t.get_id().as_str());
@@ -409,8 +412,14 @@ fn confirm_argument_type<'ctx, 'ast, 'arena>(
     let value_to_check_argument = &arguments[0];
     let expected_type_string_argument = &arguments[1];
 
-    let value_expression = value_to_check_argument.value();
-    let expected_type_expression = expected_type_string_argument.value();
+    let Some(value_expression) = value_to_check_argument.value() else {
+        return Ok(());
+    };
+
+    let Some(expected_type_expression) = expected_type_string_argument.value() else {
+        return Ok(());
+    };
+
     let Some(actual_argument_type) = artifacts.get_expression_type(value_expression) else {
         context.collector.report_with_code(
             IssueCode::TypeConfirmation,

@@ -1,13 +1,15 @@
 use std::borrow::Cow;
 
+use mago_atom::AtomMap;
 use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
-use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_mixed_closure;
+use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -20,6 +22,11 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::partial_application::create_closure_from_partial_application;
+use crate::invocation::Invocation;
+use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::InvocationTarget;
+use crate::invocation::analyzer::analyze_invocation;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'arena> {
     fn analyze<'ctx>(
@@ -28,31 +35,85 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let resulting_type = if !self.argument_list.is_first_class_callable() {
-            tracing::warn!("Partial function application (PFA) is not yet supported in the analyzer.");
+        let callables: Vec<TCallable> =
+            resolve_function_callable_types(context, block_context, artifacts, self.function)?
+                .into_iter()
+                .map(|c| c.into_owned())
+                .collect();
 
-            // TODO(azjezz): implement proper PFA analysis.
-            get_mixed_closure()
+        let resulting_type = if self.argument_list.is_first_class_callable() {
+            let callable_types: Vec<TAtomic> = callables
+                .into_iter()
+                .map(|mut callable| {
+                    if let TCallable::Signature(ref mut sig) = callable {
+                        sig.is_closure = true;
+                    }
+
+                    TAtomic::Callable(callable)
+                })
+                .collect();
+
+            if callable_types.is_empty() { get_mixed_closure() } else { TUnion::from_vec(callable_types) }
         } else {
-            let callables = resolve_function_callable_types(context, block_context, artifacts, self.function)?;
-            if callables.is_empty() {
-                return Ok(());
+            let mut closure_types = Vec::new();
+            for callable in callables {
+                let (identifier, signature) = match &callable {
+                    TCallable::Alias(id) => {
+                        let Some(sig) = get_signature_of_function_like_identifier(id, context.codebase) else {
+                            continue;
+                        };
+
+                        (*id, sig)
+                    }
+                    TCallable::Signature(sig) => {
+                        if let Some(source_id) = sig.get_source() {
+                            (source_id, sig.clone())
+                        } else {
+                            continue;
+                        }
+                    }
+                };
+
+                let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                    continue;
+                };
+
+                let invocation_target = InvocationTarget::FunctionLike {
+                    identifier,
+                    metadata,
+                    inferred_return_type: None,
+                    method_context: None,
+                    span: self.function.span(),
+                };
+
+                let invocation = Invocation::new(
+                    invocation_target,
+                    InvocationArgumentsSource::PartialArgumentList(&self.argument_list),
+                    self.span(),
+                );
+
+                let mut template_result = TemplateResult::default();
+                let mut parameter_types = AtomMap::default();
+
+                let _ = analyze_invocation(
+                    context,
+                    block_context,
+                    artifacts,
+                    &invocation,
+                    None,
+                    &mut template_result,
+                    &mut parameter_types,
+                );
+
+                closure_types.push(create_closure_from_partial_application(
+                    signature,
+                    &self.argument_list,
+                    &template_result,
+                    context.codebase,
+                ));
             }
 
-            TUnion::new(
-                callables
-                    .into_iter()
-                    .map(|c| {
-                        let mut callable = c.into_owned();
-
-                        if let TCallable::Signature(TCallableSignature { is_closure, .. }) = &mut callable {
-                            *is_closure = true;
-                        }
-
-                        TAtomic::Callable(callable)
-                    })
-                    .collect(),
-            )
+            if closure_types.is_empty() { get_mixed_closure() } else { TUnion::from_vec(closure_types) }
         };
 
         artifacts.set_expression_type(self, resulting_type);

@@ -256,6 +256,12 @@ test_case!(property_docblock_type_annotation);
 test_case!(array_key_access_after_existence_check);
 test_case!(mb_encoding);
 test_case!(psl_awaitable_promise);
+test_case!(partial_application_function);
+test_case!(partial_application_method);
+test_case!(partial_application_static_method);
+test_case!(partial_application_templates);
+test_case!(partial_application_type_inference);
+test_case!(partial_application_simple);
 
 // Github Issues
 test_case!(issue_265);

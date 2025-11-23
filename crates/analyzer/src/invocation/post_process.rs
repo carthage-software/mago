@@ -620,8 +620,13 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
 
     let argument = find_by_name().or_else(find_by_position);
 
-    let Some(argument_expression) = argument.map(|argument| argument.value()) else {
+    let Some(argument) = argument else {
         // The corresponding argument could not be found.
+        return (None, None);
+    };
+
+    let Some(argument_expression) = argument.value() else {
+        // The argument is a placeholder, no expression to analyze
         return (None, None);
     };
 

@@ -139,7 +139,10 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                         continue;
                     }
 
-                    let argument_expr = invocation_argument.value();
+                    let Some(argument_expr) = invocation_argument.value() else {
+                        // Skip placeholders
+                        continue;
+                    };
                     let argument_type = artifacts.get_expression_type(argument_expr)?;
 
                     // Get the literal string value (variable name)
@@ -240,7 +243,10 @@ impl SpecialFunctionLikeHandlerTrait for ArrayFunctionsHandler {
                         return None;
                     }
 
-                    let argument_expr = invocation_argument.value();
+                    let Some(argument_expr) = invocation_argument.value() else {
+                        // Placeholders make merge result unknown
+                        return None;
+                    };
                     let argument_type = artifacts.get_expression_type(argument_expr)?;
                     if !argument_type.is_single() {
                         return None;

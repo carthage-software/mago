@@ -14,10 +14,11 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
 
-mod arguments;
 mod resolver;
 mod special_function_like_handler;
 mod template_inference;
+
+pub(crate) mod arguments;
 
 pub mod analyzer;
 pub mod post_process;
@@ -100,6 +101,8 @@ pub enum InvocationArgumentsSource<'ast, 'arena> {
     ArgumentList(&'ast ArgumentList<'arena>),
     /// The single argument is the input from a pipe operator, like `$input` in `$input |> foo(...)`.
     PipeInput(&'ast Pipe<'arena>),
+    /// Arguments from a partial application, which may include placeholders.
+    PartialArgumentList(&'ast PartialArgumentList<'arena>),
 }
 
 /// Represents a single argument passed during an invocation, abstracting whether
@@ -108,10 +111,18 @@ pub enum InvocationArgumentsSource<'ast, 'arena> {
 /// This allows iteration over "effective arguments" regardless of how they were supplied.
 #[derive(Debug, Clone, Copy)]
 pub enum InvocationArgument<'ast, 'arena> {
-    /// A standard argument from an `ArgumentList`.
-    Argument(&'ast Argument<'arena>),
     /// The value provided as input via the pipe operator. This is treated as the first positional argument.
     PipedValue(&'ast Expression<'arena>),
+    /// A positional argument.
+    Positional(&'ast PositionalArgument<'arena>),
+    /// A named argument.
+    Named(&'ast NamedArgument<'arena>),
+    /// A positional placeholder (`?`) in partial application.
+    Placeholder(&'ast PlaceholderArgument),
+    /// A named placeholder (`name: ?`) in partial application.
+    NamedPlaceholder(&'ast NamedPlaceholderArgument<'arena>),
+    /// A variadic placeholder (`...`) in partial application.
+    VariadicPlaceholder(&'ast VariadicPlaceholderArgument),
 }
 
 impl<'ctx, 'ast, 'arena> Invocation<'ctx, 'ast, 'arena> {
@@ -349,58 +360,98 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
     #[inline]
     pub fn get_arguments(&self) -> Vec<InvocationArgument<'ast, 'arena>> {
         match self {
-            InvocationArgumentsSource::ArgumentList(arg_list) => {
-                arg_list.arguments.iter().map(InvocationArgument::Argument).collect()
-            }
+            InvocationArgumentsSource::ArgumentList(arg_list) => arg_list
+                .arguments
+                .iter()
+                .map(|arg| match arg {
+                    Argument::Positional(pos_arg) => InvocationArgument::Positional(pos_arg),
+                    Argument::Named(named_arg) => InvocationArgument::Named(named_arg),
+                })
+                .collect(),
             InvocationArgumentsSource::PipeInput(pipe) => {
                 vec![InvocationArgument::PipedValue(pipe.input)]
             }
             InvocationArgumentsSource::None(_) => {
                 vec![]
             }
+            InvocationArgumentsSource::PartialArgumentList(partial_arg_list) => partial_arg_list
+                .arguments
+                .iter()
+                .map(|partial_arg| match partial_arg {
+                    PartialArgument::Positional(pos_arg) => InvocationArgument::Positional(pos_arg),
+                    PartialArgument::Named(named_arg) => InvocationArgument::Named(named_arg),
+                    PartialArgument::Placeholder(placeholder) => InvocationArgument::Placeholder(placeholder),
+                    PartialArgument::NamedPlaceholder(named_placeholder) => {
+                        InvocationArgument::NamedPlaceholder(named_placeholder)
+                    }
+                    PartialArgument::VariadicPlaceholder(variadic_placeholder) => {
+                        InvocationArgument::VariadicPlaceholder(variadic_placeholder)
+                    }
+                })
+                .collect(),
         }
     }
 }
 
 impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
+    /// Checks if this argument is a placeholder (any placeholder variant).
+    #[inline]
+    pub const fn is_placeholder(&self) -> bool {
+        matches!(
+            self,
+            InvocationArgument::Placeholder(_)
+                | InvocationArgument::NamedPlaceholder(_)
+                | InvocationArgument::VariadicPlaceholder(_)
+        )
+    }
+
     /// Checks if this argument is positional (not named).
-    /// Piped values are considered positional.
+    /// Piped values and positional placeholders are considered positional.
     #[inline]
     pub const fn is_positional(&self) -> bool {
-        match self {
-            InvocationArgument::Argument(arg) => arg.is_positional(),
-            _ => true,
-        }
+        !matches!(self, InvocationArgument::NamedPlaceholder(_) | InvocationArgument::Named(_))
     }
 
     /// Checks if this argument is an unpacked argument (`...$args`).
-    /// Piped values cannot be unpacked in this way.
+    /// Variadic placeholders are considered unpacked.
     #[inline]
     pub const fn is_unpacked(&self) -> bool {
         match self {
-            InvocationArgument::Argument(arg) => arg.is_unpacked(),
+            InvocationArgument::Positional(pos_arg) => pos_arg.ellipsis.is_some(),
+            InvocationArgument::VariadicPlaceholder(_) => true,
             _ => false,
         }
     }
 
     /// Returns a reference to the underlying `Expression` of the argument's value.
+    /// Returns `None` for placeholders which have no value expression.
     #[inline]
-    pub const fn value(&self) -> &'ast Expression<'arena> {
+    pub const fn value(&self) -> Option<&'ast Expression<'arena>> {
         match self {
-            InvocationArgument::Argument(arg) => arg.value(),
-            InvocationArgument::PipedValue(expr) => expr,
+            InvocationArgument::PipedValue(expr) => Some(expr),
+            InvocationArgument::Positional(pos_arg) => Some(&pos_arg.value),
+            InvocationArgument::Named(named_arg) => Some(&named_arg.value),
+            _ => None,
         }
     }
 
     /// If this argument is a standard named argument, returns a reference to it.
-    /// Returns `None` for positional arguments or piped values.
+    /// Returns `None` for positional arguments, piped values, or placeholders.
     #[inline]
     pub const fn get_named_argument(&self) -> Option<&'ast NamedArgument<'arena>> {
         match self {
-            InvocationArgument::Argument(arg) => match arg {
-                Argument::Named(named_arg) => Some(named_arg),
-                Argument::Positional(_) => None,
-            },
+            InvocationArgument::Named(named_arg) => Some(named_arg),
+            _ => None,
+        }
+    }
+
+    /// Returns the parameter name if this argument specifies one (named arguments and named placeholders).
+    /// Returns `None` for positional arguments and positional placeholders.
+    #[inline]
+    pub const fn get_parameter_name(&self) -> Option<&'arena str> {
+        match self {
+            InvocationArgument::Named(named_arg) => Some(named_arg.name.value),
+            InvocationArgument::NamedPlaceholder(named_ph) => Some(named_ph.name.value),
             _ => None,
         }
     }
@@ -427,6 +478,7 @@ impl HasSpan for InvocationArgumentsSource<'_, '_> {
             InvocationArgumentsSource::ArgumentList(arg_list) => arg_list.span(),
             InvocationArgumentsSource::PipeInput(pipe) => pipe.span(),
             InvocationArgumentsSource::None(span) => *span,
+            InvocationArgumentsSource::PartialArgumentList(partial_arg_list) => partial_arg_list.span(),
         }
     }
 }
@@ -434,8 +486,12 @@ impl HasSpan for InvocationArgumentsSource<'_, '_> {
 impl HasSpan for InvocationArgument<'_, '_> {
     fn span(&self) -> Span {
         match self {
-            InvocationArgument::Argument(arg) => arg.span(),
             InvocationArgument::PipedValue(expr) => expr.span(),
+            InvocationArgument::Positional(pos_arg) => pos_arg.span(),
+            InvocationArgument::Named(named_arg) => named_arg.span(),
+            InvocationArgument::Placeholder(placeholder) => placeholder.span(),
+            InvocationArgument::NamedPlaceholder(named_placeholder) => named_placeholder.span(),
+            InvocationArgument::VariadicPlaceholder(variadic_placeholder) => variadic_placeholder.span(),
         }
     }
 }
