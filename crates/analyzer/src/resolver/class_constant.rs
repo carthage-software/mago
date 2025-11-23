@@ -129,9 +129,14 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
                 false,
             );
 
-            if let Some(resolved_const) =
-                find_constant_in_class(context, metadata, const_name, class_expr.span(), constant_selector.span())
-            {
+            if let Some(resolved_const) = find_constant_in_class(
+                context,
+                metadata,
+                const_name,
+                class_expr.span(),
+                constant_selector.span(),
+                &class_resolution.origin,
+            ) {
                 result.constants.push(resolved_const);
             } else {
                 result.has_invalid_path = true;
@@ -187,6 +192,21 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
     Some(TUnion::from_atomic(TAtomic::Scalar(class_string)))
 }
 
+/// Checks if a trait constant access is valid based on how the trait is referenced.
+/// Valid accesses are via self, static, or $this (which resolve the trait in context).
+/// Direct trait name access (e.g., `TraitName::CONSTANT`) is invalid.
+fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
+    matches!(
+        origin,
+        // self::CONSTANT
+        ResolutionOrigin::Named { is_self: true, .. }
+        // static::CONSTANT
+        | ResolutionOrigin::Static { .. }
+        // $this::CONSTANT
+        | ResolutionOrigin::Object { is_this: true }
+    )
+}
+
 /// Finds a constant or enum case by name within a class.
 fn find_constant_in_class<'ctx>(
     context: &mut Context<'ctx, '_>,
@@ -194,8 +214,9 @@ fn find_constant_in_class<'ctx>(
     const_name: Atom,
     class_span: Span,
     const_span: Span,
+    resolution_origin: &ResolutionOrigin,
 ) -> Option<ResolvedConstant> {
-    if metadata.kind.is_trait() {
+    if metadata.kind.is_trait() && !is_valid_trait_constant_access(resolution_origin) {
         context.collector.report_with_code(
             IssueCode::DirectTraitConstantAccess,
             Issue::error(format!(
@@ -206,8 +227,8 @@ fn find_constant_in_class<'ctx>(
                 Annotation::primary(class_span).with_message(format!("`{}` is a trait", metadata.original_name)),
             )
             .with_annotation(Annotation::secondary(const_span).with_message("Constant accessed here"))
-            .with_note("Trait constants can only be accessed through classes that use the trait.")
-            .with_help(format!("Access this constant through a class that uses `{}` instead.", metadata.original_name)),
+            .with_note("Trait constants can only be accessed through classes that use the trait, or via self, static, or $this within the trait.")
+            .with_help(format!("Access this constant through a class that uses `{}`, or use `self::{}`, `static::{}`, or `$this::{}` instead.", metadata.original_name, const_name, const_name, const_name)),
         );
     }
 
