@@ -1224,10 +1224,38 @@ fn should_inherit_docblock_type(
     };
 
     let Some(parent_native) = parent_native else {
-        return true;
-    };
+        let Some(parent_docblock) = parent_docblock else {
+            return false;
+        };
 
-    let mut comparison_result = ComparisonResult::new();
+        let parent_docblock_type = &parent_docblock.type_union;
+
+        if covariant {
+            let child_contained_in_parent_docblock = union_comparator::is_contained_by(
+                codebase,
+                child_native,
+                parent_docblock_type,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            return !child_contained_in_parent_docblock;
+        } else {
+            let parent_docblock_contained_in_child = union_comparator::is_contained_by(
+                codebase,
+                parent_docblock_type,
+                child_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            return !parent_docblock_contained_in_child;
+        }
+    };
 
     if covariant {
         let child_contained_in_parent = union_comparator::is_contained_by(
@@ -1237,7 +1265,7 @@ fn should_inherit_docblock_type(
             false,
             false,
             false,
-            &mut comparison_result,
+            &mut ComparisonResult::new(),
         );
 
         let types_equal = union_comparator::is_contained_by(
@@ -1259,7 +1287,7 @@ fn should_inherit_docblock_type(
             false,
             false,
             false,
-            &mut comparison_result,
+            &mut ComparisonResult::new(),
         );
 
         let types_equal = union_comparator::is_contained_by(
