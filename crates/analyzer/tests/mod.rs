@@ -174,6 +174,7 @@ test_case!(array_key_exists);
 test_case!(magic_methods);
 test_case!(magic_properties);
 test_case!(magic_methods_args);
+test_case!(method_annotation_with_inheritance);
 test_case!(array_shape_access);
 test_case!(closure_wrap);
 test_case!(arguments_unpacking);

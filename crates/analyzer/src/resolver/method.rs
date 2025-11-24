@@ -331,6 +331,23 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         }
 
         if function_like_metadata.flags.is_magic_method() {
+            let lowercase_method = ascii_lowercase_atom(&method_name);
+            let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method);
+            let mut is_inherited = false;
+
+            if is_pseudo {
+                for parent_class_name in &class_metadata.all_parent_classes {
+                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name) {
+                        if parent_metadata.methods.contains(&lowercase_method)
+                            && !parent_metadata.pseudo_methods.contains(&lowercase_method)
+                        {
+                            is_inherited = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
             if function_like_metadata.flags.is_static() {
                 result.has_invalid_target = true;
 
@@ -342,7 +359,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                     &method_name,
                     has_magic_call,
                 );
-            } else if !has_magic_call {
+            } else if !has_magic_call && !is_inherited {
                 report_magic_call_without_call_method(
                     context,
                     object.span(),
