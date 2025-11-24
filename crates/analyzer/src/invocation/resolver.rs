@@ -10,6 +10,7 @@ use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
@@ -197,23 +198,36 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
     let target = inferred_type_replacer::replace(&target, template_result, context.codebase);
 
     if !subject.is_never() {
-        if union_comparator::is_contained_by(
+        let mut comparison_result = ComparisonResult::new();
+        let subject_is_contained = union_comparator::is_contained_by(
             context.codebase,
             &subject,
             &target,
             false,
             false,
             false,
-            &mut ComparisonResult::new(),
-        ) {
-            return if negated { Either::Right(otherwise_type) } else { Either::Right(then_type) };
-        }
+            &mut comparison_result,
+        );
 
-        let are_disjoint =
-            !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
+        let are_int_float_disjoint = if target.is_single() && subject.is_single() {
+            matches!(
+                (target.get_single(), subject.get_single()),
+                (TAtomic::Scalar(TScalar::Float(_)), TAtomic::Scalar(TScalar::Integer(_)))
+                    | (TAtomic::Scalar(TScalar::Integer(_)), TAtomic::Scalar(TScalar::Float(_)))
+            )
+        } else {
+            false
+        };
+
+        let are_disjoint = are_int_float_disjoint
+            || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
 
         if are_disjoint {
             return if negated { Either::Right(then_type) } else { Either::Right(otherwise_type) };
+        }
+
+        if subject_is_contained {
+            return if negated { Either::Right(otherwise_type) } else { Either::Right(then_type) };
         }
     }
 

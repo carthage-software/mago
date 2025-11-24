@@ -201,6 +201,7 @@ test_case!(method_signature_parameter_count);
 test_case!(method_signature_param_types);
 test_case!(method_signature_return_types);
 test_case!(return_type_override_native_vs_docblock);
+test_case!(conditional_return_with_default_parameters);
 test_case!(method_signature_visibility);
 test_case!(method_signature_static);
 test_case!(trait_method_conflicts);
