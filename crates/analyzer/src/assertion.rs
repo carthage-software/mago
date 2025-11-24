@@ -5,6 +5,7 @@ use mago_algebra::assertion_set::negate_assertion_set;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
@@ -12,6 +13,8 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::get_array_value_parameter;
+use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -251,7 +254,7 @@ fn scrape_special_function_call_assertions(
     let resolved_function_name = ascii_lowercase_atom(assertion_context.resolved_names.get(function_identifier));
     let should_check_against_unresolved = { function_identifier.is_local() };
 
-    let (argument_variable_id_position, function_assertion) = if resolved_function_name.starts_with("psl\\") {
+    let (argument_variable_id_position, function_assertions) = if resolved_function_name.starts_with("psl\\") {
         match resolved_function_name.as_str() {
             "psl\\iter\\contains_key" => {
                 if let Some(array_key) = function_call
@@ -261,10 +264,42 @@ fn scrape_special_function_call_assertions(
                     .map(|argument| argument.value())
                     .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 {
-                    (0, Assertion::HasArrayKey(array_key))
+                    (0, vec![Assertion::HasArrayKey(array_key)])
                 } else {
                     return if_types;
                 }
+            }
+            "psl\\iter\\contains" => {
+                let Some(checked_iterable) = function_call
+                    .argument_list
+                    .arguments
+                    .get(0)
+                    .map(|argument| argument.value())
+                    .and_then(|expr| artifacts.get_expression_type(expr))
+                else {
+                    return if_types;
+                };
+
+                let mut iterable_values = None;
+                for atomic in checked_iterable.types.as_ref() {
+                    let Some(value_type) = get_iterable_value_parameter(atomic, assertion_context.codebase) else {
+                        return if_types;
+                    };
+
+                    iterable_values =
+                        Some(add_optional_union_type(value_type, iterable_values.as_ref(), assertion_context.codebase));
+                }
+
+                let Some(value_type) = iterable_values else {
+                    return if_types;
+                };
+
+                let mut value_assertions = vec![];
+                for atomic in value_type.types.into_owned() {
+                    value_assertions.push(Assertion::IsType(atomic));
+                }
+
+                (1, value_assertions)
             }
             _ => return if_types,
         }
@@ -276,21 +311,60 @@ fn scrape_special_function_call_assertions(
                 .first()
                 .map(|argument| argument.value())
                 .and_then(|array_key| get_expression_array_key(artifacts, array_key))
-                .map(|key| (1, Assertion::HasArrayKey(key))),
-            "is_countable" => Some((0, Assertion::Countable)),
+                .map(|key| (1, vec![Assertion::HasArrayKey(key)])),
+            "is_countable" => Some((0, vec![Assertion::Countable])),
             "ctype_digit" => Some((
                 0,
-                Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
+                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                     true, false, false, false,
-                )))),
+                ))))],
             )),
             "ctype_lower" => Some((
                 0,
-                Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
+                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                     false, false, true, true,
-                )))),
+                ))))],
             )),
-            "count" => Some((0, Assertion::HasAtLeastCount(1))),
+            "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
+            "in_array" => {
+                let should_strict_check = function_call
+                    .argument_list
+                    .arguments
+                    .get(2)
+                    .and_then(|argument| artifacts.get_expression_type(argument.value()))
+                    .is_some_and(|ty| ty.is_true());
+
+                if !should_strict_check {
+                    return None;
+                }
+
+                let checked_array = function_call
+                    .argument_list
+                    .arguments
+                    .get(1)
+                    .map(|argument| argument.value())
+                    .and_then(|expr| artifacts.get_expression_type(expr))?;
+
+                let mut value_types = None;
+                for atomic in checked_array.types.as_ref() {
+                    let TAtomic::Array(array) = atomic else {
+                        return None;
+                    };
+
+                    value_types = Some(add_optional_union_type(
+                        get_array_value_parameter(array, assertion_context.codebase),
+                        value_types.as_ref(),
+                        assertion_context.codebase,
+                    ));
+                }
+
+                let mut value_assertions = vec![];
+                for atomic in value_types?.types.into_owned() {
+                    value_assertions.push(Assertion::IsType(atomic));
+                }
+
+                Some((0, value_assertions))
+            }
             _ => None,
         };
 
@@ -303,11 +377,11 @@ fn scrape_special_function_call_assertions(
             result = get_builtin_assertion(&resolved_function_name);
         }
 
-        if let Some(found_assertion) = result {
-            found_assertion
-        } else {
+        let Some(found_assertions) = result else {
             return if_types;
-        }
+        };
+
+        found_assertions
     };
 
     let extract_expression_id = |argument_expression| {
@@ -326,7 +400,7 @@ fn scrape_special_function_call_assertions(
         .map(|argument| argument.value())
         .and_then(extract_expression_id)
     {
-        if_types.insert(first_argument_variable_id, vec![vec![function_assertion]]);
+        if_types.insert(first_argument_variable_id, vec![function_assertions]);
     }
 
     if_types

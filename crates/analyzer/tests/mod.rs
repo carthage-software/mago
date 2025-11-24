@@ -350,6 +350,7 @@ test_case!(issue_626);
 test_case!(issue_633);
 test_case!(issue_637);
 test_case!(issue_639);
+test_case!(issue_658);
 
 #[test]
 fn test_all_test_cases_are_ran() {
