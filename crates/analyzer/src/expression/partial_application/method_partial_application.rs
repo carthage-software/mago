@@ -19,6 +19,7 @@ use crate::expression::partial_application::create_closure_from_partial_applicat
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::InvocationTargetParameter;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::method::resolve_method_targets;
@@ -77,6 +78,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     class_type: resolved_method.static_class_type,
                 };
 
+                let original_parameters: Vec<_> =
+                    method_metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
+
                 let invocation_target = InvocationTarget::FunctionLike {
                     identifier,
                     metadata: method_metadata,
@@ -94,7 +98,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 let mut template_result = TemplateResult::default();
                 let mut parameter_types = AtomMap::default();
 
-                // We only care about template inference and argument validation here
                 analyze_invocation(
                     context,
                     block_context,
@@ -108,6 +111,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 closure_types.push(create_closure_from_partial_application(
                     signature,
                     &self.argument_list,
+                    &original_parameters,
                     &template_result,
                     context.codebase,
                 ));

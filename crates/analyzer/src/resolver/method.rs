@@ -337,13 +337,12 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
 
             if is_pseudo {
                 for parent_class_name in &class_metadata.all_parent_classes {
-                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name) {
-                        if parent_metadata.methods.contains(&lowercase_method)
-                            && !parent_metadata.pseudo_methods.contains(&lowercase_method)
-                        {
-                            is_inherited = true;
-                            break;
-                        }
+                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name)
+                        && parent_metadata.methods.contains(&lowercase_method)
+                        && !parent_metadata.pseudo_methods.contains(&lowercase_method)
+                    {
+                        is_inherited = true;
+                        break;
                     }
                 }
             }

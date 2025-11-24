@@ -1,3 +1,4 @@
+use mago_atom::AtomMap;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -18,6 +19,7 @@ use crate::expression::partial_application::create_closure_from_partial_applicat
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::InvocationTargetParameter;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::static_method::resolve_static_method_targets;
 
@@ -64,6 +66,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     continue;
                 };
 
+                let original_parameters: Vec<_> =
+                    metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
+
                 let invocation_target = InvocationTarget::FunctionLike {
                     identifier,
                     metadata,
@@ -78,11 +83,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     self.span(),
                 );
 
-                let mut template_result =
-                    TemplateResult::new(indexmap::IndexMap::default(), indexmap::IndexMap::default());
-                let mut parameter_types = mago_atom::AtomMap::default();
+                let mut template_result = TemplateResult::default();
+                let mut parameter_types = AtomMap::default();
 
-                let _ = analyze_invocation(
+                analyze_invocation(
                     context,
                     block_context,
                     artifacts,
@@ -90,11 +94,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     Some((resolved_method.classname, None)),
                     &mut template_result,
                     &mut parameter_types,
-                );
+                )?;
 
                 closure_types.push(create_closure_from_partial_application(
                     signature,
                     &self.argument_list,
+                    &original_parameters,
                     &template_result,
                     context.codebase,
                 ));

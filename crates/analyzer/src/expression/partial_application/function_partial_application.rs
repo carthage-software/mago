@@ -26,6 +26,7 @@ use crate::expression::partial_application::create_closure_from_partial_applicat
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::InvocationTargetParameter;
 use crate::invocation::analyzer::analyze_invocation;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'arena> {
@@ -78,6 +79,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     continue;
                 };
 
+                // Get parameters from metadata before creating InvocationTarget
+                let original_parameters: Vec<_> =
+                    metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
+
                 let invocation_target = InvocationTarget::FunctionLike {
                     identifier,
                     metadata,
@@ -95,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                 let mut template_result = TemplateResult::default();
                 let mut parameter_types = AtomMap::default();
 
-                let _ = analyze_invocation(
+                analyze_invocation(
                     context,
                     block_context,
                     artifacts,
@@ -103,11 +108,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     None,
                     &mut template_result,
                     &mut parameter_types,
-                );
+                )?;
 
                 closure_types.push(create_closure_from_partial_application(
                     signature,
                     &self.argument_list,
+                    &original_parameters,
                     &template_result,
                     context.codebase,
                 ));

@@ -265,6 +265,7 @@ test_case!(partial_application_static_method);
 test_case!(partial_application_templates);
 test_case!(partial_application_type_inference);
 test_case!(partial_application_simple);
+test_case!(partial_application_named_argument_reordering);
 
 // Github Issues
 test_case!(issue_265);
