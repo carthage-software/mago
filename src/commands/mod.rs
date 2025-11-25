@@ -257,7 +257,7 @@ pub enum MagoCommand {
 ///
 /// # Color Output
 ///
-/// The CLI supports multiple color modes via `--colors` or the deprecated `--no-color`.
+/// The CLI supports multiple color modes via `--colors`.
 /// Colors are automatically disabled when output is piped or when the terminal doesn't
 /// support ANSI escape codes.
 #[derive(Parser, Debug)]
@@ -315,19 +315,12 @@ pub struct CliArguments {
     #[arg(long, default_value_t = false)]
     pub allow_unsupported_php_version: bool,
 
-    /// Do not use colors in the output.
-    ///
-    /// This flag has been deprecated in favor of `--colors=never`.
-    /// It will be removed in a future release.
-    #[arg(long, default_value_t = false, alias = "no-colors")]
-    pub no_color: bool,
-
     /// When to use colored output. Can be "auto", "always", or "never".
     ///
     /// - "auto": Use colors if the output is a terminal (default).
     /// - "always": Always use colors, even if the output is not a terminal.
     /// - "never": Never use colors.
-    #[arg(long, default_value_t = ColorChoice::Auto, conflicts_with = "no_color")]
+    #[arg(long, default_value_t = ColorChoice::Auto)]
     pub colors: ColorChoice,
 
     /// The subcommand to execute.

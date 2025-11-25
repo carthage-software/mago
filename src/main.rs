@@ -24,6 +24,7 @@
 //! - `mago ast`: Display the abstract syntax tree
 //! - `mago list-files`: List all files that would be processed
 //! - `mago self-update`: Update Mago to the latest version
+//! - `mago generate-completions`: Generate shell completion scripts
 //!
 //! # Configuration
 //!
@@ -42,7 +43,6 @@
 
 use std::process::ExitCode;
 
-use clap::ColorChoice;
 use clap::Parser;
 use tracing::level_filters::LevelFilter;
 
@@ -129,19 +129,11 @@ pub fn main() -> ExitCode {
 pub fn run() -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
 
-    let color_choice = if arguments.no_color { ColorChoice::Never } else { arguments.colors };
-
     initialize_logger(
         if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },
         "MAGO_LOG",
-        color_choice,
+        arguments.colors,
     );
-
-    if arguments.no_color {
-        tracing::warn!(
-            "The `--no-color` option is deprecated and will be removed in a future release. Please use `--colors never` instead."
-        );
-    }
 
     if let MagoCommand::SelfUpdate(cmd) = arguments.command {
         return commands::self_update::execute(cmd);
@@ -172,15 +164,15 @@ pub fn run() -> Result<ExitCode, Error> {
     match command {
         MagoCommand::Init(cmd) => cmd.execute(configuration, None),
         MagoCommand::Config(cmd) => cmd.execute(configuration),
-        MagoCommand::ListFiles(cmd) => cmd.execute(configuration, color_choice),
-        MagoCommand::Lint(cmd) => cmd.execute(configuration, color_choice),
-        MagoCommand::Format(cmd) => cmd.execute(configuration, color_choice),
-        MagoCommand::Ast(cmd) => cmd.execute(configuration, color_choice),
-        MagoCommand::Analyze(cmd) => cmd.execute(configuration, color_choice),
-        MagoCommand::Guard(cmd) => cmd.execute(configuration, color_choice),
+        MagoCommand::ListFiles(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Lint(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Format(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Ast(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Analyze(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }
-        MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
     }
 }
