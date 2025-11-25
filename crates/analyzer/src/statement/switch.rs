@@ -12,6 +12,7 @@ use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
+use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -20,6 +21,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Switch;
 use mago_syntax::ast::SwitchCase;
+use mago_syntax::ast::SwitchCaseSeparator;
 use mago_syntax::ast::SwitchExpressionCase;
 
 use crate::analyzable::Analyzable;
@@ -245,6 +247,21 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         case_index: usize,
         previously_matching_case: Option<(bool, Span)>,
     ) -> Result<Option<bool>, AnalysisError> {
+        if self.context.settings.version.is_deprecated(Feature::SwitchSemicolonSeparators)
+            && matches!(switch_case.separator(), SwitchCaseSeparator::SemiColon(_))
+        {
+            self.context.collector.report_with_code(
+                IssueCode::DeprecatedFeature,
+                Issue::warning("Deprecated switch case separator")
+                    .with_annotation(
+                        Annotation::primary(switch_case.separator().span())
+                            .with_message("semicolon separators in switch cases are deprecated"),
+                    )
+                    .with_note("Using semicolon separators in switch cases is deprecated as of PHP 8.5.")
+                    .with_help("Use colon separators (`:`) instead of semicolons (`;`) in switch cases."),
+            );
+        }
+
         if let Some((_, previously_matching_case_span)) = previously_matching_case {
             if switch_case.is_default() {
                 self.context.collector.report_with_code(

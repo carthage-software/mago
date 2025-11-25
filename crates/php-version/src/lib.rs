@@ -349,6 +349,7 @@ impl PHPVersion {
             Feature::RequiredParameterAfterOptionalUnionOrMixed => self.0 >= 0x08_03_00,
             Feature::RequiredParameterAfterOptionalNullableAndDefaultNull => self.0 >= 0x08_01_00,
             Feature::RequiredParameterAfterOptional => self.0 >= 0x08_00_00,
+            Feature::SwitchSemicolonSeparators => self.0 >= 0x08_05_00,
             _ => false,
         }
     }

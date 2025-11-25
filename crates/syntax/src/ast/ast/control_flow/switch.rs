@@ -133,6 +133,14 @@ impl<'arena> SwitchCase<'arena> {
         }
     }
 
+    /// Returns the separator of the case.
+    pub fn separator(&self) -> &SwitchCaseSeparator {
+        match self {
+            SwitchCase::Expression(case) => &case.separator,
+            SwitchCase::Default(case) => &case.separator,
+        }
+    }
+
     /// Returns the case is fall-through.
     ///
     /// A case is considered fall-through if it is not empty and

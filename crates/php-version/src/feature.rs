@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Feature {
     ShortOpenTag,
     NullCoalesceAssign,
@@ -101,4 +102,5 @@ pub enum Feature {
     PipeOperator,
     CloneWith,
     PartialFunctionApplication,
+    SwitchSemicolonSeparators,
 }

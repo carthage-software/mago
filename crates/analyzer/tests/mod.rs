@@ -269,6 +269,7 @@ test_case!(partial_application_type_inference);
 test_case!(partial_application_simple);
 test_case!(partial_application_named_argument_reordering);
 test_case!(octal_zero_prefix);
+test_case!(switch_semicolon);
 
 // Github Issues
 test_case!(issue_265);
