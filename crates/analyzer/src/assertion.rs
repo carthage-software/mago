@@ -296,7 +296,7 @@ fn scrape_special_function_call_assertions(
 
                 let mut value_assertions = vec![];
                 for atomic in value_type.types.into_owned() {
-                    value_assertions.push(Assertion::IsType(atomic));
+                    value_assertions.push(Assertion::IsEqual(atomic));
                 }
 
                 (1, value_assertions)
@@ -360,7 +360,7 @@ fn scrape_special_function_call_assertions(
 
                 let mut value_assertions = vec![];
                 for atomic in value_types?.types.into_owned() {
-                    value_assertions.push(Assertion::IsType(atomic));
+                    value_assertions.push(Assertion::IsEqual(atomic));
                 }
 
                 Some((0, value_assertions))
