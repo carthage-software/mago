@@ -300,6 +300,9 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
     } else if s.starts_with("0b") || s.starts_with("0B") {
         s = &s[2..];
         2
+    } else if s.starts_with('0') && s.len() > 1 {
+        s = &s[1..];
+        8
     } else {
         10
     };
@@ -406,4 +409,33 @@ fn read_digits_with<F: Fn(&u8) -> bool>(input: &Input, offset: usize, is_digit: 
 
     // Return the relative length from the start of the current position.
     pos - start
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! parse_int {
+        ($input:expr, $expected:expr) => {
+            assert_eq!(parse_literal_integer($input), $expected);
+        };
+    }
+
+    #[test]
+    fn test_parse_literal_integer() {
+        parse_int!("123", Some(123));
+        parse_int!("0", Some(0));
+        parse_int!("0b1010", Some(10));
+        parse_int!("0o17", Some(15));
+        parse_int!("0x1A3F", Some(6719));
+        parse_int!("0XFF", Some(255));
+        parse_int!("0_1_2_3", Some(83));
+        parse_int!("0b1_0_1_0", Some(10));
+        parse_int!("0o1_7", Some(15));
+        parse_int!("0x1_A_3_F", Some(6719));
+        parse_int!("", None);
+        parse_int!("0xGHI", None);
+        parse_int!("0b102", None);
+        parse_int!("0o89", None);
+    }
 }
