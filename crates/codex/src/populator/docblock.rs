@@ -1,6 +1,10 @@
+use std::collections::BTreeMap;
+
+use mago_atom::Atom;
 use mago_atom::Atom;
 use mago_span::Span;
 
+use crate::assertion::Assertion;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::ttype::TypeMetadata;
@@ -334,11 +338,31 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         let parent_templates_to_apply =
             if should_inherit_templates { Some(parent_template_types.clone()) } else { None };
         let parent_thrown_to_apply = if should_inherit_thrown { Some(substituted_thrown_types) } else { None };
-        let parent_assertions_to_apply = if should_inherit_assertions { Some(parent_assertions.clone()) } else { None };
+
+        let resolve_assertions = |assertions: &BTreeMap<Atom, Vec<Assertion>>| {
+            assertions
+                .iter()
+                .map(|(name, assertions)| {
+                    let resolved = if let Some(ref template_result) = template_result {
+                        assertions.iter().flat_map(|a| a.resolve_templates(codebase, template_result)).collect()
+                    } else {
+                        assertions.clone()
+                    };
+
+                    (*name, resolved)
+                })
+                .collect()
+        };
+
+        let parent_assertions_to_apply =
+            if should_inherit_assertions { Some(resolve_assertions(&parent_assertions)) } else { None };
         let parent_if_true_assertions_to_apply =
-            if should_inherit_if_true_assertions { Some(parent_if_true_assertions.clone()) } else { None };
-        let parent_if_false_assertions_to_apply =
-            if should_inherit_if_false_assertions { Some(parent_if_false_assertions.clone()) } else { None };
+            if should_inherit_if_true_assertions { Some(resolve_assertions(&parent_if_true_assertions)) } else { None };
+        let parent_if_false_assertions_to_apply = if should_inherit_if_false_assertions {
+            Some(resolve_assertions(&parent_if_false_assertions))
+        } else {
+            None
+        };
 
         let child_method = match codebase.function_likes.get_mut(&child_method_id) {
             Some(m) => m,
