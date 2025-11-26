@@ -332,7 +332,14 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
 
         if function_like_metadata.flags.is_magic_method() {
             let lowercase_method = ascii_lowercase_atom(&method_name);
-            let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method);
+            let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method)
+                || class_metadata.all_parent_classes.iter().any(|parent_name| {
+                    context
+                        .codebase
+                        .get_class_like(parent_name)
+                        .is_some_and(|parent| parent.pseudo_methods.contains(&lowercase_method))
+                });
+
             let mut is_inherited = false;
 
             if is_pseudo {
