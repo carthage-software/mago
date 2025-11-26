@@ -145,25 +145,6 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
                 contents.push(Document::Line(Line::default()));
                 contents.push(Document::String("|> "));
 
-                if let Expression::ArrowFunction(arrow_fn) = callable
-                    && let Expression::Pipe(inner_pipe) = unwrap_parenthesized(arrow_fn.expression)
-                {
-                    should_break = true;
-
-                    let was_in_pipe_chain_arrow_segment = f.in_pipe_chain_arrow_segment;
-                    f.in_pipe_chain_arrow_segment = true;
-                    contents.push(arrow_fn.format(f));
-                    f.in_pipe_chain_arrow_segment = was_in_pipe_chain_arrow_segment;
-                    callable_queue.push_front(inner_pipe.callable);
-                    let mut nested_input = inner_pipe.input;
-                    while let Expression::Pipe(nested_pipe) = unwrap_parenthesized(nested_input) {
-                        callable_queue.push_front(nested_pipe.callable);
-                        nested_input = nested_pipe.input;
-                    }
-
-                    continue;
-                }
-
                 let callable_has_trailing_comments = f.has_comment(callable.span(), CommentFlags::Trailing);
                 contents.push(callable.format(f));
                 if callable_has_trailing_comments {

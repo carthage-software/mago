@@ -23,12 +23,7 @@ pub fn format_return_value<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     value: &'arena Expression<'arena>,
 ) -> Document<'arena> {
-    let mut value = unwrap_parenthesized(value);
-    if f.in_pipe_chain_arrow_segment {
-        while let Expression::Pipe(pipe) = value {
-            value = unwrap_parenthesized(pipe.input);
-        }
-    }
+    let value = unwrap_parenthesized(value);
 
     if return_argument_has_leading_comment(f, value) {
         let was_inside_parens = f.is_wrapped_in_parens;

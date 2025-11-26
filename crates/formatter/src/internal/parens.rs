@@ -74,6 +74,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             || self.literal_needs_parens(node)
             || self.pipe_node_needs_parens(node)
             || self.class_constant_access_needs_parens(node)
+            || self.arrow_function_needs_parens(node)
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
@@ -142,10 +143,6 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             return true;
         }
 
-        if let Node::ArrowFunction(_) = parent_node {
-            return matches!(self.nth_parent_kind(3), Some(Node::Pipe(_)));
-        }
-
         self.is_unary_or_binary_or_ternary(parent_node)
             || matches!(
                 parent_node,
@@ -161,10 +158,6 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let Some(parent_node) = self.nth_parent_kind(2) else {
             return false;
         };
-
-        if let Node::ArrowFunction(_) = parent_node {
-            return matches!(self.nth_parent_kind(3), Some(Node::Pipe(_)));
-        }
 
         self.is_unary_or_binary_or_ternary(parent_node) || matches!(parent_node, Node::VariadicArrayElement(_))
     }
@@ -191,6 +184,18 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             Some(Node::Conditional(_)) => true,
             _ => false,
         }
+    }
+
+    /// Arrow functions on the RHS of a pipe operator must be parenthesized in PHP 8.5+.
+    ///
+    /// Example:
+    /// - `$x |> fn($y) => $y + 1` is invalid - needs `$x |> (fn($y) => $y + 1)`
+    fn arrow_function_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
+        let Node::ArrowFunction(_) = node else {
+            return false;
+        };
+
+        matches!(self.nth_parent_kind(2), Some(Node::Pipe(_)))
     }
 
     /// Check if a class constant access needs parentheses based on its parent context.
@@ -264,14 +269,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
                 parent_precedence
             }
             Some(Node::Pipe(_)) => Precedence::Pipe,
-            Some(Node::ArrowFunction(_)) => {
-                let grand_parent_node = self.nth_parent_kind(3);
-                if let Some(Node::Pipe(_)) = grand_parent_node {
-                    return true;
-                }
-
-                return false;
-            }
+            Some(Node::ArrowFunction(_)) => return false,
             Some(Node::Conditional(_)) => Precedence::ElvisOrConditional,
             Some(Node::ArrayAccess(access)) => {
                 // we add parentheses if the parent is an array access and the child is a binaryish node
@@ -404,7 +402,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         }
 
         if let Node::ArrayAccess(access) = self.parent_node() {
-            return if expression.span().end.offset < access.left_bracket.start.offset {
+            return if expression.end_offset() < access.left_bracket.start_offset() {
                 self.callee_expression_need_parenthesis(expression, false)
             } else {
                 false
@@ -413,15 +411,15 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
 
         if let Some(Node::Access(access)) = self.grandparent_node() {
             let offset = match access {
-                Access::Property(property_access) => property_access.arrow.start.offset,
+                Access::Property(property_access) => property_access.arrow.start_offset(),
                 Access::NullSafeProperty(null_safe_property_access) => {
-                    null_safe_property_access.question_mark_arrow.start.offset
+                    null_safe_property_access.question_mark_arrow.start_offset()
                 }
-                Access::StaticProperty(static_property_access) => static_property_access.double_colon.start.offset,
-                Access::ClassConstant(class_constant_access) => class_constant_access.double_colon.start.offset,
+                Access::StaticProperty(static_property_access) => static_property_access.double_colon.start_offset(),
+                Access::ClassConstant(class_constant_access) => class_constant_access.double_colon.start_offset(),
             };
 
-            return if expression.span().end.offset < offset {
+            return if expression.end_offset() < offset {
                 self.callee_expression_need_parenthesis(expression, false)
             } else {
                 false

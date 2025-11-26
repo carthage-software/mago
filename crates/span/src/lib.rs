@@ -56,9 +56,19 @@ pub trait HasSpan {
         self.span().start
     }
 
+    /// A convenience method to get the starting byte offset of the span.
+    fn start_offset(&self) -> u32 {
+        self.start_position().offset
+    }
+
     /// A convenience method to get the ending position of the span.
     fn end_position(&self) -> Position {
         self.span().end
+    }
+
+    /// A convenience method to get the ending byte offset of the span.
+    fn end_offset(&self) -> u32 {
+        self.end_position().offset
     }
 }
 
