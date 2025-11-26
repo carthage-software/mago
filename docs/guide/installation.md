@@ -28,13 +28,13 @@ wget -q https://carthage.software/mago.sh && bash mago.sh
 To install a specific version of Mago, use the `--version=` flag:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSfO https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.5
+curl --proto '=https' --tlsv1.2 -sSfO https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.6
 ```
 
 Or with `wget`:
 
 ```sh
-wget -q https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.5
+wget -q https://carthage.software/mago.sh && bash mago.sh --version=1.0.0-rc.6
 ```
 
 ## Manual download
@@ -55,7 +55,7 @@ These methods are convenient but may be managed by the community or experience s
 To add Mago as a development dependency to your PHP project via Composer:
 
 ```sh
-composer require --dev "carthage-software/mago:^1.0.0-rc.5"
+composer require --dev "carthage-software/mago:^1.0.0-rc.6"
 ```
 
 ### Homebrew (macOS)

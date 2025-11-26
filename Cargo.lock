@@ -1505,7 +1505,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "mago"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "bumpalo",
  "clap",
@@ -1553,7 +1553,7 @@ dependencies = [
 
 [[package]]
 name = "mago-algebra"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "indexmap",
@@ -1565,7 +1565,7 @@ dependencies = [
 
 [[package]]
 name = "mago-analyzer"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1594,7 +1594,7 @@ dependencies = [
 
 [[package]]
 name = "mago-atom"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "itoa",
  "ryu",
@@ -1604,14 +1604,14 @@ dependencies = [
 
 [[package]]
 name = "mago-casing"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "cruet",
 ]
 
 [[package]]
 name = "mago-codex"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bitflags 2.10.0",
@@ -1635,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "mago-collector"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1648,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "mago-composer"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "serde",
@@ -1657,7 +1657,7 @@ dependencies = [
 
 [[package]]
 name = "mago-database"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "glob",
@@ -1673,7 +1673,7 @@ dependencies = [
 
 [[package]]
 name = "mago-docblock"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "mago-fingerprint"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1699,7 +1699,7 @@ dependencies = [
 
 [[package]]
 name = "mago-fixer"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -1709,7 +1709,7 @@ dependencies = [
 
 [[package]]
 name = "mago-formatter"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bitflags 2.10.0",
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "mago-guard"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1749,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "mago-linter"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1773,7 +1773,7 @@ dependencies = [
 
 [[package]]
 name = "mago-names"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1785,7 +1785,7 @@ dependencies = [
 
 [[package]]
 name = "mago-orchestrator"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "bumpalo",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "mago-php-version"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "schemars",
  "serde",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "mago-prelude"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "bincode",
  "bumpalo",
@@ -1832,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "mago-reporting"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "ahash",
  "ariadne",
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "mago-semantics"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "mago-database",
  "mago-names",
@@ -1864,7 +1864,7 @@ dependencies = [
 
 [[package]]
 name = "mago-span"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "mago-database",
  "serde",
@@ -1872,7 +1872,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "bumpalo",
  "either",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax-core"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1900,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "mago-type-syntax"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "mago-database",
  "mago-span",
@@ -1912,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "mago-wasm"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 dependencies = [
  "mago-analyzer",
  "mago-codex",
