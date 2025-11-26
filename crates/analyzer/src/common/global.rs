@@ -93,7 +93,11 @@ std::thread_local! {
         map.insert("$_REQUEST", user_input_type_union);
 
         map.insert("$_SERVER", Rc::new({
-            let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+            // Use a fixed timestamp to ensure deterministic type representations.
+            // This value (1764191486) was chosen at the time of implementation and has no special meaning.
+            // Using a dynamic timestamp would cause baseline matching to fail since error messages
+            // include the type, and the type would change on every run.
+            const REQUEST_TIME_MIN: i64 = 1764191486;
 
             let mut known_items = BTreeMap::new();
             // Standard CGI/1.1 and PHP variables
@@ -104,7 +108,7 @@ std::thread_local! {
             known_items.insert(ArrayKey::String(atom("SERVER_SOFTWARE")), (true, get_non_empty_string()));
             known_items.insert(ArrayKey::String(atom("SERVER_PROTOCOL")), (true, get_non_empty_string()));
             known_items.insert(ArrayKey::String(atom("REQUEST_METHOD")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REQUEST_TIME")), (true, get_int_range(Some(time), None)));
+            known_items.insert(ArrayKey::String(atom("REQUEST_TIME")), (true, get_int_range(Some(REQUEST_TIME_MIN), None)));
             known_items.insert(ArrayKey::String(atom("REQUEST_TIME_FLOAT")), (true, get_float()));
             known_items.insert(ArrayKey::String(atom("QUERY_STRING")), (true, get_string()));
             known_items.insert(ArrayKey::String(atom("DOCUMENT_ROOT")), (true, get_non_empty_string()));
