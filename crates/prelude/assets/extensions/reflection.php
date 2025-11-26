@@ -231,7 +231,7 @@ class ReflectionNamedType extends ReflectionType
     /**
      * @pure
      */
-    public function getName()
+    public function getName(): string
     {
     }
 
