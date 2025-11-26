@@ -436,6 +436,28 @@ impl TUnion {
         self.types.iter().all(|t| t.is_int_or_float()) && !self.types.is_empty()
     }
 
+    /// Returns `Some(true)` if all types are effectively int, `Some(false)` if all are effectively float,
+    /// or `None` if mixed or neither. Handles unions like `1|2` (all int) or `3.4|4.5` (all float).
+    pub fn effective_int_or_float(&self) -> Option<bool> {
+        let mut result: Option<bool> = None;
+        for atomic in self.types.as_ref() {
+            match atomic.effective_int_or_float() {
+                Some(is_int) => {
+                    if let Some(prev) = result {
+                        if prev != is_int {
+                            return None;
+                        }
+                    } else {
+                        result = Some(is_int);
+                    }
+                }
+                None => return None,
+            }
+        }
+
+        result
+    }
+
     pub fn is_mixed(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
     }

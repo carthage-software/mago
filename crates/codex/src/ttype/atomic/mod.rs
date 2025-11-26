@@ -88,6 +88,17 @@ impl TAtomic {
         }
     }
 
+    /// Returns `Some(true)` if this type is effectively an int, `Some(false)` if effectively a float,
+    /// or `None` if neither. Considers generic parameter constraints (e.g., `T of int` is treated as int).
+    pub fn effective_int_or_float(&self) -> Option<bool> {
+        match self {
+            TAtomic::Scalar(TScalar::Integer(_)) => Some(true),
+            TAtomic::Scalar(TScalar::Float(_)) => Some(false),
+            TAtomic::GenericParameter(parameter) => parameter.constraint.effective_int_or_float(),
+            _ => None,
+        }
+    }
+
     pub const fn is_mixed(&self) -> bool {
         matches!(self, TAtomic::Mixed(_))
     }

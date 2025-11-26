@@ -272,6 +272,7 @@ test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
 
 // Github Issues
+test_case!(issue_659);
 test_case!(issue_660);
 test_case!(issue_663);
 test_case!(issue_265);

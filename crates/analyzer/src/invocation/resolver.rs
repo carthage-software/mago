@@ -10,7 +10,6 @@ use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
-use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
@@ -211,9 +210,8 @@ fn resolve_atomic<'ctx, 'ast, 'arena>(
 
         let are_int_float_disjoint = if target.is_single() && subject.is_single() {
             matches!(
-                (target.get_single(), subject.get_single()),
-                (TAtomic::Scalar(TScalar::Float(_)), TAtomic::Scalar(TScalar::Integer(_)))
-                    | (TAtomic::Scalar(TScalar::Integer(_)), TAtomic::Scalar(TScalar::Float(_)))
+                (subject.effective_int_or_float(), target.effective_int_or_float()),
+                (Some(true), Some(false)) | (Some(false), Some(true))
             )
         } else {
             false
