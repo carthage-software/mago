@@ -54,9 +54,68 @@ When you run a command with a baseline, Mago will:
 3. Filter out any issues that match the baseline, so they are not reported.
 4. Display only the new, unreported issues.
 
-## How it Works
+## Baseline Variants
 
-For each issue, Mago generates a unique signature based on the issue's code, message, and location (a hash of the file path and line number). This allows the baseline to be resilient to code changes that do not affect the issue itself.
+Mago supports two baseline variants, each with different trade-offs between precision and resilience to code changes:
+
+### Loose Variant (Default)
+
+The **loose** variant groups issues by `(file, code, message)` and stores a count of occurrences. This makes it resilient to line number changes - if you add or remove lines in a file, the baseline remains valid as long as the same issues exist.
+
+```toml
+variant = "loose"
+
+[[issues]]
+file = "src/Service/PaymentProcessor.php"
+code = "possibly-null-argument"
+message = "Argument #1 of `process` expects `Order`, but `?Order` was given."
+count = 2
+```
+
+### Strict Variant
+
+The **strict** variant stores exact line numbers for each issue. This provides precise tracking but requires regenerating the baseline when line numbers shift due to code changes.
+
+```toml
+variant = "strict"
+
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "possibly-null-argument"
+start_line = 42
+end_line = 42
+
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "possibly-null-argument"
+start_line = 87
+end_line = 90
+```
+
+### Choosing a Variant
+
+| Variant | Best For                         | Trade-off                                   |
+| ------- | -------------------------------- | ------------------------------------------- |
+| Loose   | Most projects, CI pipelines      | More resilient to refactoring, less precise |
+| Strict  | When exact line tracking matters | Precise, but requires frequent regeneration |
+
+### Configuring the Variant
+
+You can configure which variant to use when generating new baselines in your `mago.toml`:
+
+```toml
+[linter]
+baseline = "lint-baseline.toml"
+baseline-variant = "loose"  # or "strict"
+
+[analyzer]
+baseline = "analysis-baseline.toml"
+baseline-variant = "loose"  # or "strict"
+```
+
+The variant setting only affects **generation** of new baselines. When **reading** an existing baseline, Mago automatically detects the variant from the file's `variant` header.
+
+### Backward Compatibility
+
+Baseline files created with older versions of Mago (before variant support) don't have a `variant` header. When Mago encounters such a file, it assumes the **strict** variant and displays a warning recommending you regenerate the baseline to add the header.
 
 ## Maintaining the Baseline
 

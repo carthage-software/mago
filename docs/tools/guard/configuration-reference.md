@@ -11,9 +11,11 @@ outline: deep
 
 This is the main table for the guard tool.
 
-| Option     | Type       | Default | Description                                                |
-| :--------- | :--------- | :------ | :--------------------------------------------------------- |
-| `excludes` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from analysis. |
+| Option             | Type       | Default   | Description                                                |
+| :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
+| `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
+| `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the guard will use this file as the default baseline. |
+| `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from guard analysis, and this option allows you to exclude additional files from the guard specifically.

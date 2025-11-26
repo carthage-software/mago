@@ -20,11 +20,12 @@ baseline = "analyzer-baseline.toml"
 
 ## General options
 
-| Option     | Type       | Default | Description                                                |
-| :--------- | :--------- | :------ | :--------------------------------------------------------- |
-| `excludes` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from analysis. |
-| `ignore`   | `string[]` | `[]`    | A list of specific issue codes to ignore globally.         |
-| `baseline` | `string`   | `null`  | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
+| Option             | Type       | Default   | Description                                                |
+| :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
+| `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
+| `ignore`           | `string[]` | `[]`      | A list of specific issue codes to ignore globally.         |
+| `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
+| `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from analysis, and this option allows you to exclude additional files from the analyzer specifically.

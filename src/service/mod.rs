@@ -76,6 +76,7 @@ use mago_reporting::Level;
 use mago_reporting::ReportingFormat;
 use mago_reporting::ReportingTarget;
 use mago_reporting::baseline::Baseline;
+use mago_reporting::baseline::BaselineVariant;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReporterConfig;
 
@@ -259,6 +260,16 @@ pub struct BaselineIssueProcessor {
     /// command fails whenever the baseline is out of sync, ensuring baselines
     /// stay clean and up-to-date.
     pub fail_on_out_of_sync_baseline: bool,
+
+    /// The baseline variant to use when generating new baselines.
+    ///
+    /// This determines the format of generated baseline files:
+    /// - `Strict`: Exact line matching with start/end line numbers
+    /// - `Loose`: Count-based matching by (file, code, message) tuple
+    ///
+    /// When loading existing baselines, the variant is determined by the file's
+    /// `variant` header, not this setting.
+    pub baseline_variant: BaselineVariant,
 
     /// Wrapped issue processor for actual issue processing.
     ///
@@ -647,7 +658,15 @@ impl BaselineIssueProcessor {
         }
 
         match unserialize_baseline(path) {
-            Ok(baseline) => Some(baseline),
+            Ok((baseline, needs_warning)) => {
+                if needs_warning {
+                    tracing::warn!(
+                        "Baseline file does not specify a variant, assuming 'strict'. \
+                         Regenerate the baseline with `--generate-baseline` to update the format."
+                    );
+                }
+                Some(baseline)
+            }
             Err(err) => {
                 tracing::error!("Failed to read baseline file at `{}`: {}", path.display(), err);
 
@@ -685,8 +704,8 @@ impl BaselineIssueProcessor {
         read_database: &ReadDatabase,
         issues: IssueCollection,
     ) -> Result<(), Error> {
-        tracing::info!("Generating baseline file...");
-        let baseline = Baseline::generate_from_issues(&issues, read_database);
+        tracing::info!("Generating {:?} baseline file...", self.baseline_variant);
+        let baseline = Baseline::generate_from_issues(&issues, read_database, self.baseline_variant);
         baseline::serialize_baseline(baseline_path, &baseline, self.backup_baseline)?;
         tracing::info!("Baseline file successfully generated at `{}`.", baseline_path.display());
 
@@ -730,7 +749,13 @@ impl BaselineIssueProcessor {
 
         tracing::info!("Verifying baseline file at `{}`...", baseline_path.display());
 
-        let baseline = unserialize_baseline(baseline_path)?;
+        let (baseline, needs_warning) = unserialize_baseline(baseline_path)?;
+        if needs_warning {
+            tracing::warn!(
+                "Baseline file does not specify a variant, assuming 'strict'. \
+                 Regenerate the baseline with `--generate-baseline` to update the format."
+            );
+        }
         let comparison = baseline.compare_with_issues(&issues, read_database);
 
         if comparison.is_up_to_date {

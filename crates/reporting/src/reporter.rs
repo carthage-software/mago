@@ -108,8 +108,8 @@ impl Reporter {
         let mut baseline_filtered_issues = 0;
         if let Some(baseline) = baseline {
             let original_count = issues.len();
+            let comparison = baseline.compare_with_issues(&issues, &self.database);
             let filtered_issues = baseline.filter_issues(issues, &self.database);
-            let comparison = baseline.compare_with_issues(&filtered_issues, &self.database);
 
             baseline_filtered_issues = original_count - filtered_issues.len();
             baseline_has_dead_issues = comparison.removed_issues_count > 0;
@@ -183,8 +183,8 @@ impl Reporter {
         let mut baseline_filtered_issues = 0;
         if let Some(baseline) = baseline {
             let original_count = issues.len();
+            let comparison = baseline.compare_with_issues(&issues, &self.database);
             let filtered_issues = baseline.filter_issues(issues, &self.database);
-            let comparison = baseline.compare_with_issues(&filtered_issues, &self.database);
 
             baseline_filtered_issues = original_count - filtered_issues.len();
             baseline_has_dead_issues = comparison.removed_issues_count > 0;

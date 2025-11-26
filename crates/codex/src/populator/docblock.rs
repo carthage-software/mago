@@ -358,11 +358,11 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         let parent_assertions_to_apply =
-            if should_inherit_assertions { Some(resolve_assertions(&parent_assertions)) } else { None };
+            if should_inherit_assertions { Some(resolve_assertions(parent_assertions)) } else { None };
         let parent_if_true_assertions_to_apply =
-            if should_inherit_if_true_assertions { Some(resolve_assertions(&parent_if_true_assertions)) } else { None };
+            if should_inherit_if_true_assertions { Some(resolve_assertions(parent_if_true_assertions)) } else { None };
         let parent_if_false_assertions_to_apply = if should_inherit_if_false_assertions {
-            Some(resolve_assertions(&parent_if_false_assertions))
+            Some(resolve_assertions(parent_if_false_assertions))
         } else {
             None
         };

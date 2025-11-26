@@ -229,7 +229,8 @@ impl LintCommand {
         )?;
 
         let baseline = configuration.linter.baseline.as_deref();
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
+        let baseline_variant = configuration.linter.baseline_variant;
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
         processor.process_issues(&orchestrator, &mut database, issues)
     }

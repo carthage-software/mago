@@ -1,10 +1,22 @@
 use std::fs;
 use std::path::Path;
 
+use serde::Deserialize;
+
 use crate::error::Error;
 
 // Re-export baseline types from the reporting crate
 pub use mago_reporting::baseline::Baseline;
+pub use mago_reporting::baseline::BaselineVariant;
+pub use mago_reporting::baseline::LooseBaseline;
+pub use mago_reporting::baseline::StrictBaseline;
+
+/// Intermediate struct for detecting variant from file header.
+#[derive(Deserialize)]
+struct BaselineHeader {
+    #[serde(default)]
+    variant: Option<BaselineVariant>,
+}
 
 /// Serializes a `Baseline` to a TOML file.
 ///
@@ -25,34 +37,70 @@ pub fn serialize_baseline(path: &Path, baseline: &Baseline, backup: bool) -> Res
         }
     }
 
-    let toml_string = toml::to_string_pretty(baseline).map_err(Error::SerializingToml)?;
+    let toml_string = match baseline {
+        Baseline::Strict(strict) => toml::to_string_pretty(strict).map_err(Error::SerializingToml)?,
+        Baseline::Loose(loose) => toml::to_string_pretty(loose).map_err(Error::SerializingToml)?,
+    };
+
     fs::write(path, toml_string).map_err(Error::CreatingBaselineFile)?;
     Ok(())
 }
 
 /// Deserializes a `Baseline` from a TOML file.
-pub fn unserialize_baseline(path: &Path) -> Result<Baseline, Error> {
+///
+/// Returns a tuple of `(Baseline, bool)` where the boolean indicates if a warning should be shown.
+/// The warning is shown when the baseline file does not have a `variant` header, indicating it was
+/// created with an older version of mago. In this case, the baseline is assumed to be strict.
+///
+/// # Arguments
+///
+/// * `path` - The path to read the baseline file from.
+///
+/// # Returns
+///
+/// * `Ok((baseline, needs_warning))` - The deserialized baseline and whether a warning is needed.
+/// * `Err(_)` - If reading or parsing the file fails.
+pub fn unserialize_baseline(path: &Path) -> Result<(Baseline, bool), Error> {
     let toml_string = fs::read_to_string(path).map_err(Error::ReadingBaselineFile)?;
-    toml::from_str(&toml_string).map_err(Error::DeserializingToml)
+
+    // First pass: detect variant from header
+    let header: BaselineHeader = toml::from_str(&toml_string).map_err(Error::DeserializingToml)?;
+
+    match header.variant {
+        Some(BaselineVariant::Loose) => {
+            let loose: LooseBaseline = toml::from_str(&toml_string).map_err(Error::DeserializingToml)?;
+            Ok((Baseline::Loose(loose), false))
+        }
+        Some(BaselineVariant::Strict) => {
+            let strict: StrictBaseline = toml::from_str(&toml_string).map_err(Error::DeserializingToml)?;
+            Ok((Baseline::Strict(strict), false))
+        }
+        None => {
+            // No variant header - assume strict for backward compatibility
+            let strict: StrictBaseline = toml::from_str(&toml_string).map_err(Error::DeserializingToml)?;
+            Ok((Baseline::Strict(strict), true)) // needs_warning = true
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mago_reporting::baseline::BaselineEntry;
-    use mago_reporting::baseline::BaselineSourceIssue;
+    use mago_reporting::baseline::LooseBaselineIssue;
+    use mago_reporting::baseline::StrictBaselineEntry;
+    use mago_reporting::baseline::StrictBaselineIssue;
     use std::borrow::Cow;
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_serialize_baseline_creates_backup() {
+    fn test_serialize_strict_baseline_creates_backup() {
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
         let temp_path = temp_file.path();
 
         // Create initial content
         std::fs::write(temp_path, "initial content").expect("Failed to write initial content");
 
-        let baseline = Baseline::default();
+        let baseline = Baseline::Strict(StrictBaseline::new());
 
         // Serialize with backup
         serialize_baseline(temp_path, &baseline, true).expect("Failed to serialize baseline");
@@ -64,107 +112,164 @@ mod tests {
         let backup_content = std::fs::read_to_string(&backup_path).expect("Failed to read backup");
         assert_eq!(backup_content, "initial content");
 
-        // Check that new file contains the baseline
+        // Check that new file contains the baseline with variant header
         let new_content = std::fs::read_to_string(temp_path).expect("Failed to read new content");
-        assert!(new_content.contains("[entries]") || new_content.contains("entries = {}"));
+        assert!(new_content.contains("variant = \"strict\""));
     }
 
     #[test]
-    fn test_serialize_baseline_without_backup() {
-        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        let temp_path = temp_file.path();
+    fn test_serialize_loose_baseline() {
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let temp_path = temp_dir.path().join("loose_baseline.toml");
 
-        // Create initial content
-        std::fs::write(temp_path, "initial content").expect("Failed to write initial content");
+        let baseline = Baseline::Loose(LooseBaseline {
+            variant: BaselineVariant::Loose,
+            issues: vec![LooseBaselineIssue {
+                file: "src/Service/PaymentProcessor.php".to_string(),
+                code: "null-argument".to_string(),
+                message: "Argument #1 of `process` cannot be `null`.".to_string(),
+                count: 2,
+            }],
+        });
 
-        let baseline = Baseline::default();
+        serialize_baseline(&temp_path, &baseline, false).expect("Failed to serialize baseline");
 
-        // Serialize without backup
-        serialize_baseline(temp_path, &baseline, false).expect("Failed to serialize baseline");
-
-        // Check that backup file was NOT created
-        let backup_path = temp_path.with_extension("toml.bkp");
-        assert!(!backup_path.exists(), "Backup file should not be created");
-
-        // Check that new file contains the baseline
-        let new_content = std::fs::read_to_string(temp_path).expect("Failed to read new content");
-        assert!(new_content.contains("[entries]") || new_content.contains("entries = {}"));
+        let content = std::fs::read_to_string(&temp_path).expect("Failed to read content");
+        assert!(content.contains("variant = \"loose\""));
+        assert!(content.contains("src/Service/PaymentProcessor.php"));
+        assert!(content.contains("null-argument"));
+        assert!(content.contains("count = 2"));
     }
 
     #[test]
-    fn test_serialize_baseline_new_file() {
+    fn test_serialize_strict_baseline_new_file() {
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
         let temp_path = temp_dir.path().join("new_baseline.toml");
 
-        let mut baseline = Baseline::default();
-        baseline.entries.insert(
-            Cow::Borrowed("test.php"),
-            BaselineEntry {
-                issues: vec![BaselineSourceIssue { code: "error.test".to_string(), start_line: 1, end_line: 1 }],
+        let mut strict = StrictBaseline::new();
+        strict.entries.insert(
+            Cow::Borrowed("src/Controller/UserController.php"),
+            StrictBaselineEntry {
+                issues: vec![StrictBaselineIssue {
+                    code: "redundant-docblock-type".to_string(),
+                    start_line: 29,
+                    end_line: 29,
+                }],
             },
         );
+        let baseline = Baseline::Strict(strict);
 
         serialize_baseline(&temp_path, &baseline, true).expect("Failed to serialize baseline");
 
         assert!(temp_path.exists(), "New file should be created");
 
         let content = std::fs::read_to_string(&temp_path).expect("Failed to read content");
-        assert!(content.contains("test.php"));
-        assert!(content.contains("error.test"));
+        assert!(content.contains("variant = \"strict\""));
+        assert!(content.contains("src/Controller/UserController.php"));
+        assert!(content.contains("redundant-docblock-type"));
     }
 
     #[test]
-    fn test_unserialize_baseline_valid_file() {
+    fn test_unserialize_strict_baseline_with_header() {
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
         let temp_path = temp_file.path();
 
         let toml_content = r#"
-[entries."src/test.php"]
-issues = [
-    { code = "error.syntax", start_line = 10, end_line = 10 },
-    { code = "error.type", start_line = 20, end_line = 22 },
-]
+variant = "strict"
 
-[entries."src/helper.php"]
-issues = [
-    { code = "warning.unused", start_line = 5, end_line = 5 },
-]
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "possibly-null-argument"
+start_line = 42
+end_line = 42
 "#;
 
         std::fs::write(temp_path, toml_content).expect("Failed to write TOML content");
 
-        let baseline = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
+        let (baseline, needs_warning) = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
 
-        assert_eq!(baseline.entries.len(), 2);
+        assert!(!needs_warning, "Should not need warning with variant header");
+        assert!(matches!(baseline, Baseline::Strict(_)));
 
-        let test_entry = baseline.entries.get("src/test.php").expect("test.php entry not found");
-        assert_eq!(test_entry.issues.len(), 2);
-        assert_eq!(test_entry.issues[0].code, "error.syntax");
-        assert_eq!(test_entry.issues[0].start_line, 10);
-        assert_eq!(test_entry.issues[1].code, "error.type");
-        assert_eq!(test_entry.issues[1].start_line, 20);
-        assert_eq!(test_entry.issues[1].end_line, 22);
-
-        let helper_entry = baseline.entries.get("src/helper.php").expect("helper.php entry not found");
-        assert_eq!(helper_entry.issues.len(), 1);
-        assert_eq!(helper_entry.issues[0].code, "warning.unused");
-        assert_eq!(helper_entry.issues[0].start_line, 5);
+        if let Baseline::Strict(strict) = baseline {
+            assert_eq!(strict.entries.len(), 1);
+            let entry = strict.entries.get("src/Service/PaymentProcessor.php").expect("entry not found");
+            assert_eq!(entry.issues[0].code, "possibly-null-argument");
+        }
     }
 
     #[test]
-    fn test_unserialize_baseline_empty_file() {
+    fn test_unserialize_loose_baseline() {
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
         let temp_path = temp_file.path();
 
         let toml_content = r#"
+variant = "loose"
+
+[[issues]]
+file = "src/Service/PaymentProcessor.php"
+code = "possibly-null-argument"
+message = "Argument #1 of `process` expects `Order`, but `?Order` was given."
+count = 3
+"#;
+
+        std::fs::write(temp_path, toml_content).expect("Failed to write TOML content");
+
+        let (baseline, needs_warning) = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
+
+        assert!(!needs_warning, "Should not need warning with variant header");
+        assert!(matches!(baseline, Baseline::Loose(_)));
+
+        if let Baseline::Loose(loose) = baseline {
+            assert_eq!(loose.issues.len(), 1);
+            assert_eq!(loose.issues[0].file, "src/Service/PaymentProcessor.php");
+            assert_eq!(loose.issues[0].code, "possibly-null-argument");
+            assert_eq!(loose.issues[0].count, 3);
+        }
+    }
+
+    #[test]
+    fn test_unserialize_baseline_without_header_assumes_strict() {
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        let toml_content = r#"
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "invalid-argument"
+start_line = 68
+end_line = 71
+"#;
+
+        std::fs::write(temp_path, toml_content).expect("Failed to write TOML content");
+
+        let (baseline, needs_warning) = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
+
+        assert!(needs_warning, "Should need warning without variant header");
+        assert!(matches!(baseline, Baseline::Strict(_)));
+
+        if let Baseline::Strict(strict) = baseline {
+            assert_eq!(strict.entries.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_unserialize_baseline_empty_strict() {
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path();
+
+        let toml_content = r#"
+variant = "strict"
+
 [entries]
 "#;
 
         std::fs::write(temp_path, toml_content).expect("Failed to write TOML content");
 
-        let baseline = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
+        let (baseline, needs_warning) = unserialize_baseline(temp_path).expect("Failed to deserialize baseline");
 
-        assert_eq!(baseline.entries.len(), 0);
+        assert!(!needs_warning);
+        if let Baseline::Strict(strict) = baseline {
+            assert_eq!(strict.entries.len(), 0);
+        }
     }
 
     #[test]
@@ -197,6 +302,59 @@ issues = [
             // Expected error type
         } else {
             panic!("Expected DeserializingToml error");
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_strict_baseline() {
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let temp_path = temp_dir.path().join("roundtrip_strict.toml");
+
+        let mut strict = StrictBaseline::new();
+        strict.entries.insert(
+            Cow::Owned("src/Repository/UserRepository.php".to_string()),
+            StrictBaselineEntry {
+                issues: vec![StrictBaselineIssue {
+                    code: "invalid-argument".to_string(),
+                    start_line: 68,
+                    end_line: 71,
+                }],
+            },
+        );
+        let original = Baseline::Strict(strict);
+
+        serialize_baseline(&temp_path, &original, false).expect("Failed to serialize");
+        let (loaded, needs_warning) = unserialize_baseline(&temp_path).expect("Failed to deserialize");
+
+        assert!(!needs_warning);
+        assert!(matches!(loaded, Baseline::Strict(_)));
+    }
+
+    #[test]
+    fn test_roundtrip_loose_baseline() {
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let temp_path = temp_dir.path().join("roundtrip_loose.toml");
+
+        let loose = LooseBaseline {
+            variant: BaselineVariant::Loose,
+            issues: vec![LooseBaselineIssue {
+                file: "src/Repository/UserRepository.php".to_string(),
+                code: "possibly-invalid-argument".to_string(),
+                message: "Argument #2 of `findBy` expects `array<string, mixed>`, but `mixed` was given.".to_string(),
+                count: 5,
+            }],
+        };
+        let original = Baseline::Loose(loose);
+
+        serialize_baseline(&temp_path, &original, false).expect("Failed to serialize");
+        let (loaded, needs_warning) = unserialize_baseline(&temp_path).expect("Failed to deserialize");
+
+        assert!(!needs_warning);
+        assert!(matches!(loaded, Baseline::Loose(_)));
+
+        if let Baseline::Loose(loose) = loaded {
+            assert_eq!(loose.issues.len(), 1);
+            assert_eq!(loose.issues[0].count, 5);
         }
     }
 }

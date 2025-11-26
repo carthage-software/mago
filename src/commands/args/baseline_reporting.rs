@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 use clap::ColorChoice;
 use clap::Parser;
+use mago_reporting::baseline::BaselineVariant;
 
 use crate::commands::args::reporting::ReportingArgs;
 use crate::service::BaselineIssueProcessor;
@@ -83,12 +84,18 @@ impl BaselineReportingArgs {
     ///
     /// * `color_choice` - Whether to use colored output
     /// * `baseline` - Optional baseline path from configuration (overridden by CLI arg)
+    /// * `baseline_variant` - The variant to use when generating new baselines
     ///
     /// # Returns
     ///
     /// A [`BaselineIssueProcessor`] configured with all the baseline and reporting
     /// options from this argument set.
-    pub fn get_processor(&self, color_choice: ColorChoice, baseline: Option<&Path>) -> BaselineIssueProcessor {
+    pub fn get_processor(
+        &self,
+        color_choice: ColorChoice,
+        baseline: Option<&Path>,
+        baseline_variant: BaselineVariant,
+    ) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
             baseline_path: match &self.baseline {
                 Some(path) => Some(Cow::Owned(path.to_path_buf())),
@@ -98,6 +105,7 @@ impl BaselineReportingArgs {
             backup_baseline: self.backup_baseline,
             verify_baseline: self.verify_baseline,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
+            baseline_variant,
             issue_processor: self.reporting.get_processor(color_choice),
         }
     }

@@ -149,7 +149,8 @@ impl GuardCommand {
         let issues = service.run()?;
 
         let baseline = configuration.guard.baseline.as_deref();
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline);
+        let baseline_variant = configuration.guard.baseline_variant;
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
         processor.process_issues(&orchestrator, &mut database, issues)
     }
