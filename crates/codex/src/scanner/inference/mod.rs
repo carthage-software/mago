@@ -236,6 +236,36 @@ pub fn infer<'arena>(
                 },
             ))
         }
+        Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_arithmetic() => {
+            let lhs = infer(context, scope, lhs);
+            let rhs = infer(context, scope, rhs);
+
+            match (
+                lhs.and_then(|v| v.get_single_literal_int_value()),
+                rhs.and_then(|v| v.get_single_literal_int_value()),
+            ) {
+                (Some(lhs_val), Some(rhs_val)) => {
+                    let result = match operator {
+                        BinaryOperator::Addition(_) => lhs_val.checked_add(rhs_val),
+                        BinaryOperator::Subtraction(_) => lhs_val.checked_sub(rhs_val),
+                        BinaryOperator::Multiplication(_) => lhs_val.checked_mul(rhs_val),
+                        BinaryOperator::Modulo(_) if rhs_val != 0 => Some(lhs_val % rhs_val),
+                        BinaryOperator::Exponentiation(_) if rhs_val >= 0 => lhs_val.checked_pow(rhs_val as u32),
+                        BinaryOperator::Division(_) if rhs_val != 0 && lhs_val % rhs_val == 0 => {
+                            Some(lhs_val / rhs_val)
+                        }
+                        _ => None,
+                    };
+
+                    match result {
+                        Some(v) => Some(get_literal_int(v)),
+                        None => Some(get_int_or_float()),
+                    }
+                }
+                // Can't compute - return int|float
+                _ => Some(get_int_or_float()),
+            }
+        }
         Expression::Construct(construct) => match construct {
             Construct::Isset(_) => Some(get_bool()),
             Construct::Empty(_) => Some(get_bool()),
