@@ -804,9 +804,20 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             }
         }
 
-        for (_, known_item) in known_items.values() {
-            value_parameter =
-                Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+        let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(|atomic| atomic.to_array_key()).collect();
+
+        if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
+            for key in &possible_keys {
+                if let Some((_, known_item)) = known_items.get(key) {
+                    value_parameter =
+                        Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+                }
+            }
+        } else {
+            for (_, known_item) in known_items.values() {
+                value_parameter =
+                    Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+            }
         }
 
         let array_key = get_arraykey();
