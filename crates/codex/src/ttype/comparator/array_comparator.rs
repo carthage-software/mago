@@ -37,7 +37,20 @@ pub(crate) fn is_array_contained_by_array(
     }
 
     if container_array.is_non_empty() && !input_array.is_non_empty() {
-        return false;
+        let input_has_required_key = match input_array {
+            TArray::List(list) => list
+                .known_elements
+                .as_ref()
+                .is_some_and(|elements| elements.values().any(|(is_optional, _)| !*is_optional)),
+            TArray::Keyed(keyed_array) => keyed_array
+                .known_items
+                .as_ref()
+                .is_some_and(|items| items.values().any(|(is_optional, _)| !*is_optional)),
+        };
+
+        if !input_has_required_key {
+            return false;
+        }
     }
 
     if input_array.is_empty() {
