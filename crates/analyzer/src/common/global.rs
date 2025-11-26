@@ -327,10 +327,15 @@ std::thread_local! {
             non_empty: true,
         })))));
 
-        map.insert("$_SESSION", Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-            Box::new(get_non_empty_string()),
-            Box::new(get_mixed()),
-        ))))));
+        map.insert("$_SESSION", Rc::new({
+            let mut type_union = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                Box::new(get_non_empty_string()),
+                Box::new(get_mixed()),
+            ))));
+
+            type_union.possibly_undefined = true;
+            type_union
+        }));
 
         map
     });
