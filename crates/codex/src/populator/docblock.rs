@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use mago_atom::Atom;
-use mago_atom::Atom;
 use mago_span::Span;
 
 use crate::assertion::Assertion;
@@ -197,6 +196,10 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             }
         }
     }
+
+    inheritance_work.sort_by_key(|(class_name, _, _, _)| {
+        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
+    });
 
     for (class_name, method_name, parent_class, parent_method) in inheritance_work {
         let child_method_id = (class_name, method_name);

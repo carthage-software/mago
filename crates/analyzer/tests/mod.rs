@@ -273,6 +273,7 @@ test_case!(switch_semicolon);
 
 // Github Issues
 test_case!(issue_660);
+test_case!(issue_663);
 test_case!(issue_265);
 test_case!(issue_275);
 test_case!(issue_306);
