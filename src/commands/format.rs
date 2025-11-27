@@ -50,6 +50,7 @@ use mago_database::error::DatabaseError;
 use mago_database::file::File;
 use mago_orchestrator::service::format::FileFormatStatus;
 
+use crate::EXIT_CODE_ERROR;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils;
@@ -160,7 +161,8 @@ impl FormatCommand {
                 }
                 FileFormatStatus::FailedToParse(parse_error) => {
                     tracing::error!("Failed to parse input: {}", parse_error);
-                    ExitCode::FAILURE
+
+                    ExitCode::from(EXIT_CODE_ERROR)
                 }
             };
 

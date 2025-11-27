@@ -56,3 +56,11 @@ Mago is organized into several tools and utility commands, each accessed via a s
 | [`mago generate-completions`](/guide/generate-completions) | Generate shell completions for Mago.                    |
 | [`mago init`](/guide/initialization)                       | Initializes a new Mago configuration file.              |
 | [`mago self-update`](/guide/upgrading)                     | Updates Mago to the latest version.                     |
+
+## Exit Codes
+
+| Code | Meaning |
+| :--- | :------ |
+| `0`  | Success — no issues found |
+| `1`  | Issues found that need attention |
+| `2`  | Tool error (configuration, I/O, parse failure, etc.) |

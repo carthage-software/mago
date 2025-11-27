@@ -71,31 +71,36 @@ static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+/// Exit code for tool errors (configuration errors, parse errors, etc.)
+///
+/// This is distinct from `ExitCode::FAILURE` (1) which indicates issues were found.
+/// Exit code 2 indicates the tool itself failed to complete its operation.
+const EXIT_CODE_ERROR: u8 = 2;
+
 /// Entry point for the Mago CLI application.
 ///
 /// This function initializes the heap profiler (if enabled), runs the main application logic,
 /// and handles any errors by logging them and returning an appropriate exit code.
 ///
-/// # Returns
+/// # Exit Codes
 ///
-/// - [`ExitCode::SUCCESS`] if the command completed successfully
-/// - [`ExitCode::FAILURE`] if an error occurred during execution
+/// - `0` ([`ExitCode::SUCCESS`]): Command completed successfully with no issues found
+/// - `1` ([`ExitCode::FAILURE`]): Issues were found at or above the minimum fail level
+/// - `2` ([`EXIT_CODE_ERROR`]): Tool error occurred (configuration, parsing, I/O, etc.)
 ///
 /// # Error Handling
 ///
 /// All errors are logged using the [`tracing`] framework with full error context before
-/// exiting with a failure code.
+/// exiting with exit code 2.
 pub fn main() -> ExitCode {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    let result = run();
-
-    result.unwrap_or_else(|error| {
+    run().unwrap_or_else(|error| {
         tracing::error!("{}", error);
         tracing::trace!("Exiting with error code due to: {:#?}", error);
 
-        ExitCode::FAILURE
+        ExitCode::from(EXIT_CODE_ERROR)
     })
 }
 
