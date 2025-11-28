@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
+use bumpalo::Bump;
+
 use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_linter::Linter;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::settings::Settings;
@@ -65,6 +68,44 @@ impl LintService {
     /// A configured `RuleRegistry` instance.
     pub fn create_registry(&self, only: Option<&[String]>, include_disabled: bool) -> RuleRegistry {
         RuleRegistry::build(&self.settings, only, include_disabled)
+    }
+
+    /// Lints a single file synchronously without using parallel processing.
+    ///
+    /// This method is designed for environments where threading is not available,
+    /// such as WebAssembly. It performs the same checks as the parallel `lint` method
+    /// but operates on a single file at a time.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to lint.
+    /// * `mode` - The operational mode for linting (semantics only or full).
+    /// * `only` - An optional list of specific rules to include.
+    ///
+    /// # Returns
+    ///
+    /// An `IssueCollection` containing all issues found in the file.
+    pub fn lint_file(&self, file: &File, mode: LintMode, only: Option<&[String]>) -> IssueCollection {
+        let arena = Bump::new();
+        let (program, parsing_error) = parse_file(&arena, file);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+
+        let mut issues = IssueCollection::new();
+        if let Some(error) = parsing_error {
+            issues.push(Issue::from(&error));
+        }
+
+        let semantics_checker = SemanticsChecker::new(self.settings.php_version);
+        issues.extend(semantics_checker.check(file, program, &resolved_names));
+
+        if mode == LintMode::Full {
+            let registry = Arc::new(self.create_registry(only, false));
+            let linter = Linter::from_registry(&arena, registry, self.settings.php_version);
+
+            issues.extend(linter.lint(file, program, &resolved_names));
+        }
+
+        issues
     }
 
     /// Runs the linting pipeline in the specified mode.

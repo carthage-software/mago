@@ -1,15 +1,23 @@
 use std::time::Duration;
 
 use ahash::HashMap;
+use ahash::HashSet;
+use bumpalo::Bump;
+
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::settings::Settings;
+use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
+use mago_codex::scanner::scan_program;
+use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::FileId;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file;
 
@@ -70,6 +78,65 @@ impl AnalysisService {
     pub fn with_incremental(mut self, incremental: IncrementalAnalysis) -> Self {
         self.incremental = Some(incremental);
         self
+    }
+
+    /// Analyzes a single file synchronously without using parallel processing.
+    ///
+    /// This method is designed for environments where threading is not available,
+    /// such as WebAssembly. It performs static analysis on a single file by:
+    /// 1. Parsing the file
+    /// 2. Resolving names
+    /// 3. Scanning symbols and extending the provided codebase
+    /// 4. Populating the codebase (resolving inheritance, traits, etc.)
+    /// 5. Running the analyzer
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to analyze.
+    /// * `settings` - The analyzer settings.
+    /// * `codebase` - The base codebase metadata (e.g., from prelude with PHP built-in symbols).
+    /// * `symbol_references` - The base symbol references (e.g., from prelude).
+    ///
+    /// # Returns
+    ///
+    /// An `IssueCollection` containing all issues found in the file.
+    pub fn oneshot(mut self, file_id: FileId) -> IssueCollection {
+        let Ok(file) = self.database.get_ref(&file_id) else {
+            tracing::error!("File with ID {:?} not found in database", file_id);
+
+            return IssueCollection::default();
+        };
+
+        let arena = Bump::new();
+
+        let (program, parsing_error) = parse_file(&arena, file);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+
+        let mut issues = IssueCollection::new();
+        if let Some(error) = parsing_error {
+            issues.push(Issue::from(&error));
+            return issues;
+        }
+
+        let semantics_checker = SemanticsChecker::new(self.settings.version);
+        issues.extend(semantics_checker.check(file, program, &resolved_names));
+
+        let user_codebase = scan_program(&arena, file, program, &resolved_names);
+        self.codebase.extend(user_codebase);
+
+        populate_codebase(&mut self.codebase, &mut self.symbol_references, AtomSet::default(), HashSet::default());
+
+        // Run the analyzer
+        let mut analysis_result = AnalysisResult::new(self.symbol_references);
+        let analyzer = Analyzer::new(&arena, file, &resolved_names, &self.codebase, self.settings);
+
+        if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
+            issues.push(Issue::error(format!("Analysis error: {}", err)));
+        }
+
+        issues.extend(analysis_result.issues);
+        issues.extend(self.codebase.take_issues(true));
+        issues
     }
 
     /// Updates the database for a new analysis run (for watch mode).
@@ -150,6 +217,7 @@ impl AnalysisService {
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;
 
+                #[cfg(not(target_arch = "wasm32"))]
                 if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
                     tracing::warn!(
                         "Analysis of source file '{}' took longer than {}s: {}s",
@@ -240,6 +308,7 @@ impl AnalysisService {
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;
 
+                #[cfg(not(target_arch = "wasm32"))]
                 if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
                     tracing::warn!(
                         "Analysis of source file '{}' took longer than {}s: {}s",
