@@ -1914,16 +1914,16 @@ dependencies = [
 name = "mago-wasm"
 version = "1.0.0-rc.6"
 dependencies = [
+ "bumpalo",
  "mago-analyzer",
- "mago-codex",
  "mago-database",
  "mago-formatter",
- "mago-guard",
  "mago-linter",
  "mago-orchestrator",
  "mago-php-version",
  "mago-prelude",
  "mago-reporting",
+ "mago-syntax",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

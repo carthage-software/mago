@@ -26,12 +26,15 @@ mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-php-version = { workspace = true }
 mago-linter = { workspace = true }
-mago-codex = { workspace = true }
-mago-formatter = { workspace = true }
 mago-analyzer = { workspace = true }
-mago-guard = { workspace = true }
+mago-formatter = { workspace = true }
 mago-orchestrator = { workspace = true }
-mago-prelude = { workspace = true, features = ["build"] }
+mago-syntax = { workspace = true }
+mago-prelude = { workspace = true }
+bumpalo = { workspace = true }
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 serde = { workspace = true }
+
+[build-dependencies]
+mago-prelude = { workspace = true, features = ["build"] }
