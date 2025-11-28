@@ -156,6 +156,7 @@ impl AnalysisService {
     }
 
     pub fn run(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        #[cfg(not(target_arch = "wasm32"))]
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_millis(5000);
         const ANALYSIS_PROGRESS_PREFIX: &str = "🕵️  Analyzing";
 
@@ -246,6 +247,7 @@ impl AnalysisService {
     ///
     /// Returns the analysis result for the current run.
     pub fn run_incremental(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        #[cfg(not(target_arch = "wasm32"))]
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_millis(5000);
         const ANALYSIS_PROGRESS_PREFIX: &str = "🕵️  Analyzing";
 
