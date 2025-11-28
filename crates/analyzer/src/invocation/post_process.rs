@@ -278,7 +278,7 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
                 .map(|new_type| resolve_invocation_type(context, invocation, template_result, parameters, new_type))
                 .unwrap_or_else(get_mixed);
 
-            new_type.by_reference = true;
+            new_type.set_by_reference(true);
 
             if constraint_type && let Some(argument_id) = argument_id {
                 if let Some(existing_type) = block_context.locals.get(&argument_id).cloned() {

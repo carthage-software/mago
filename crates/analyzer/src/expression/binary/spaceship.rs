@@ -162,7 +162,7 @@ fn check_spaceship_operand<'ctx, 'ast, 'arena>(
             .with_note("PHP compares `false` with other types according to specific rules (e.g., `false == 0` is true, `false < 1` is true).")
             .with_help("Ensure this comparison with `false` is intended, or provide a non-false operand."),
         );
-    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues {
+    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(

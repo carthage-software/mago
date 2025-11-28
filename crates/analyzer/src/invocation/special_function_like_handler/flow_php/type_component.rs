@@ -87,7 +87,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                         .and_then(|type_parameters| type_parameters.first())
                         .cloned()?;
 
-                    let possibly_undefined = *possibly_undefined || inner_type.possibly_undefined;
+                    let possibly_undefined = *possibly_undefined || inner_type.possibly_undefined();
 
                     known_items.insert(*key, (possibly_undefined, inner_type));
                 }

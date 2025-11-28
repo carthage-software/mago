@@ -25,14 +25,14 @@ std::thread_local! {
                 TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))),
             ]);
 
-            type_union.ignore_nullable_issues = true;
+            type_union.set_ignore_nullable_issues(true);
             type_union
         }));
 
         map.insert("$argc", Rc::new({
             let mut type_union = get_one_int();
 
-            type_union.ignore_nullable_issues = true;
+            type_union.set_ignore_nullable_issues(true);
             type_union
         }));
 
@@ -40,7 +40,7 @@ std::thread_local! {
             let mut type_union =
                 TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_truthy_string())))));
 
-            type_union.possibly_undefined = true;
+            type_union.set_possibly_undefined(true, None);
             type_union
         }));
 
@@ -337,7 +337,7 @@ std::thread_local! {
                 Box::new(get_mixed()),
             ))));
 
-            type_union.possibly_undefined = true;
+            type_union.set_possibly_undefined(true, None);
             type_union
         }));
 

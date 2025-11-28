@@ -161,7 +161,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     }
                     None => {
                         let mut possibly_undefined_type = (**variable_type).clone();
-                        possibly_undefined_type.set_possibly_undefined(variable_type.possibly_undefined, Some(true));
+                        possibly_undefined_type.set_possibly_undefined(variable_type.possibly_undefined(), Some(true));
 
                         *variable_type = Rc::new(possibly_undefined_type);
                     }
@@ -315,8 +315,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 if let Some(finally_variable_type) = finally_variable_type {
                     let resulting_type = match block_context.locals.remove(&variable_id) {
                         Some(existing_type) => {
-                            let possibly_undefined =
-                                finally_variable_type.possibly_undefined_from_try && existing_type.possibly_undefined;
+                            let possibly_undefined = finally_variable_type.possibly_undefined_from_try()
+                                && existing_type.possibly_undefined();
 
                             let mut combined_type = ttype::combine_union_types(
                                 existing_type.as_ref(),
@@ -326,8 +326,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                             );
 
                             if possibly_undefined {
-                                combined_type.possibly_undefined = false;
-                                combined_type.possibly_undefined_from_try = false;
+                                combined_type.set_possibly_undefined(false, Some(false));
                             }
 
                             Rc::new(combined_type)
@@ -345,7 +344,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 continue;
             };
 
-            if !variable_type.possibly_undefined_from_try {
+            if !variable_type.possibly_undefined_from_try() {
                 continue;
             }
 

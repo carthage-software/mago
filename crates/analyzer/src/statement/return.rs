@@ -145,7 +145,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         && function_like_metadata.flags.is_by_reference()
     {
         let is_referenceable = return_value.is_referenceable(false)
-            || (return_value.is_referenceable(true) && inferred_return_type.by_reference);
+            || (return_value.is_referenceable(true) && inferred_return_type.by_reference());
 
         if !is_referenceable {
             context.collector.report_with_code(
@@ -312,8 +312,8 @@ pub fn handle_return_value<'ctx, 'arena>(
             context.codebase,
             &inferred_return_type,
             &expected_return_type,
-            inferred_return_type.ignore_nullable_issues,
-            inferred_return_type.ignore_falsable_issues,
+            inferred_return_type.ignore_nullable_issues(),
+            inferred_return_type.ignore_falsable_issues(),
             false,
             &mut union_comparison_result,
         );
@@ -326,7 +326,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         let inferred_return_type_str = inferred_return_type.get_id();
 
         if inferred_return_type.is_nullable()
-            && !inferred_return_type.ignore_nullable_issues
+            && !inferred_return_type.ignore_nullable_issues()
             && !expected_return_type.is_nullable()
             && !expected_return_type.has_template()
         {
@@ -354,7 +354,7 @@ pub fn handle_return_value<'ctx, 'arena>(
         }
 
         if inferred_return_type.is_falsable()
-            && !inferred_return_type.ignore_falsable_issues
+            && !inferred_return_type.ignore_falsable_issues()
             && !expected_return_type.is_falsable()
             && !expected_return_type.has_template()
         {

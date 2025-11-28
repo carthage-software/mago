@@ -40,7 +40,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
                     }
                     None => {
                         let mut resulting_type = (**previous_type).clone();
-                        resulting_type.possibly_undefined_from_try = true;
+                        resulting_type.set_possibly_undefined_from_try(true);
 
                         finally_scope.locals.insert(variable.clone(), Rc::new(resulting_type));
                     }

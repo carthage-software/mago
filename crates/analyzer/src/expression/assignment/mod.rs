@@ -275,7 +275,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     destructuring: bool,
 ) -> Result<bool, AnalysisError> {
     if let Some(source_expression) = source_expression {
-        source_type.by_reference = source_expression.is_reference();
+        source_type.set_by_reference(source_expression.is_reference());
 
         analyze_reference_assignment(context, block_context, target_expression, source_expression)?;
     }
@@ -414,8 +414,8 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
                 context.codebase,
                 &assigned_type,
                 constraint_type,
-                assigned_type.ignore_nullable_issues,
-                assigned_type.ignore_falsable_issues,
+                assigned_type.ignore_nullable_issues(),
+                assigned_type.ignore_falsable_issues(),
                 false,
                 &mut ComparisonResult::default(),
             )
@@ -498,7 +498,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
             context.collector.report_with_code(IssueCode::ReferenceConstraintViolation, issue);
         }
 
-        assigned_type.by_reference = true;
+        assigned_type.set_by_reference(true);
     }
 
     if block_context.references_possibly_from_confusing_scope.contains(variable_id) {

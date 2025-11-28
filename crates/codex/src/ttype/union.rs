@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use bitflags::bitflags;
 use derivative::Derivative;
 use mago_atom::atom;
 use mago_atom::concat_atom;
@@ -36,18 +37,38 @@ use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_mixed;
 
+bitflags! {
+    /// Flags representing various properties of a type union.
+    ///
+    /// This replaces 9 individual boolean fields with a compact 16-bit representation,
+    /// reducing memory usage from 9 bytes to 2 bytes per TUnion instance.
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+    pub struct UnionFlags: u16 {
+        /// Indicates the union had a template type at some point.
+        const HAD_TEMPLATE = 1 << 0;
+        /// Indicates the value is passed by reference.
+        const BY_REFERENCE = 1 << 1;
+        /// Indicates no references exist to this type.
+        const REFERENCE_FREE = 1 << 2;
+        /// Indicates the type may be undefined due to a try block.
+        const POSSIBLY_UNDEFINED_FROM_TRY = 1 << 3;
+        /// Indicates the type may be undefined.
+        const POSSIBLY_UNDEFINED = 1 << 4;
+        /// Indicates nullable issues should be ignored for this type.
+        const IGNORE_NULLABLE_ISSUES = 1 << 5;
+        /// Indicates falsable issues should be ignored for this type.
+        const IGNORE_FALSABLE_ISSUES = 1 << 6;
+        /// Indicates the type came from a template default value.
+        const FROM_TEMPLATE_DEFAULT = 1 << 7;
+        /// Indicates the type has been populated with codebase information.
+        const POPULATED = 1 << 8;
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Derivative, PartialOrd, Ord)]
 pub struct TUnion {
     pub types: Cow<'static, [TAtomic]>,
-    pub had_template: bool,
-    pub by_reference: bool,
-    pub reference_free: bool,
-    pub possibly_undefined_from_try: bool,
-    pub possibly_undefined: bool,
-    pub ignore_nullable_issues: bool,
-    pub ignore_falsable_issues: bool,
-    pub from_template_default: bool,
-    pub populated: bool,
+    pub flags: UnionFlags,
 }
 
 impl Hash for TUnion {
@@ -64,18 +85,7 @@ impl TUnion {
     /// This is the most basic way to create a TUnion and is used by both the
     /// zero-allocation static helpers and the `from_vec` constructor.
     pub fn new(types: Cow<'static, [TAtomic]>) -> TUnion {
-        TUnion {
-            types,
-            had_template: false,
-            by_reference: false,
-            reference_free: false,
-            possibly_undefined_from_try: false,
-            possibly_undefined: false,
-            ignore_nullable_issues: false,
-            ignore_falsable_issues: false,
-            from_template_default: false,
-            populated: false,
-        }
+        TUnion { types, flags: UnionFlags::empty() }
     }
 
     /// Creates a TUnion from an owned Vec, performing necessary cleanup.
@@ -135,57 +145,110 @@ impl TUnion {
         TUnion::new(Cow::Owned(vec![atomic]))
     }
 
+    #[inline]
     pub fn set_possibly_undefined(&mut self, possibly_undefined: bool, from_try: Option<bool>) {
-        let from_try = from_try.unwrap_or(self.possibly_undefined_from_try);
+        let from_try = from_try.unwrap_or(self.flags.contains(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY));
 
-        self.possibly_undefined = possibly_undefined;
-        self.possibly_undefined_from_try = from_try;
+        self.flags.set(UnionFlags::POSSIBLY_UNDEFINED, possibly_undefined);
+        self.flags.set(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY, from_try);
+    }
+
+    #[inline]
+    pub const fn had_template(&self) -> bool {
+        self.flags.contains(UnionFlags::HAD_TEMPLATE)
+    }
+
+    #[inline]
+    pub const fn by_reference(&self) -> bool {
+        self.flags.contains(UnionFlags::BY_REFERENCE)
+    }
+
+    #[inline]
+    pub const fn reference_free(&self) -> bool {
+        self.flags.contains(UnionFlags::REFERENCE_FREE)
+    }
+
+    #[inline]
+    pub const fn possibly_undefined_from_try(&self) -> bool {
+        self.flags.contains(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY)
+    }
+
+    #[inline]
+    pub const fn possibly_undefined(&self) -> bool {
+        self.flags.contains(UnionFlags::POSSIBLY_UNDEFINED)
+    }
+
+    #[inline]
+    pub const fn ignore_nullable_issues(&self) -> bool {
+        self.flags.contains(UnionFlags::IGNORE_NULLABLE_ISSUES)
+    }
+
+    #[inline]
+    pub const fn ignore_falsable_issues(&self) -> bool {
+        self.flags.contains(UnionFlags::IGNORE_FALSABLE_ISSUES)
+    }
+
+    #[inline]
+    pub const fn from_template_default(&self) -> bool {
+        self.flags.contains(UnionFlags::FROM_TEMPLATE_DEFAULT)
+    }
+
+    #[inline]
+    pub const fn populated(&self) -> bool {
+        self.flags.contains(UnionFlags::POPULATED)
+    }
+
+    #[inline]
+    pub fn set_had_template(&mut self, value: bool) {
+        self.flags.set(UnionFlags::HAD_TEMPLATE, value);
+    }
+
+    #[inline]
+    pub fn set_by_reference(&mut self, value: bool) {
+        self.flags.set(UnionFlags::BY_REFERENCE, value);
+    }
+
+    #[inline]
+    pub fn set_reference_free(&mut self, value: bool) {
+        self.flags.set(UnionFlags::REFERENCE_FREE, value);
+    }
+
+    #[inline]
+    pub fn set_possibly_undefined_from_try(&mut self, value: bool) {
+        self.flags.set(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY, value);
+    }
+
+    #[inline]
+    pub fn set_ignore_nullable_issues(&mut self, value: bool) {
+        self.flags.set(UnionFlags::IGNORE_NULLABLE_ISSUES, value);
+    }
+
+    #[inline]
+    pub fn set_ignore_falsable_issues(&mut self, value: bool) {
+        self.flags.set(UnionFlags::IGNORE_FALSABLE_ISSUES, value);
+    }
+
+    #[inline]
+    pub fn set_from_template_default(&mut self, value: bool) {
+        self.flags.set(UnionFlags::FROM_TEMPLATE_DEFAULT, value);
+    }
+
+    #[inline]
+    pub fn set_populated(&mut self, value: bool) {
+        self.flags.set(UnionFlags::POPULATED, value);
     }
 
     /// Creates a new TUnion with the same properties as the original, but with a new set of types.
     pub fn clone_with_types(&self, types: Vec<TAtomic>) -> TUnion {
-        TUnion {
-            types: Cow::Owned(types),
-            had_template: self.had_template,
-            by_reference: self.by_reference,
-            reference_free: self.reference_free,
-            possibly_undefined_from_try: self.possibly_undefined_from_try,
-            possibly_undefined: self.possibly_undefined,
-            ignore_falsable_issues: self.ignore_falsable_issues,
-            ignore_nullable_issues: self.ignore_nullable_issues,
-            from_template_default: self.from_template_default,
-            populated: self.populated,
-        }
+        TUnion { types: Cow::Owned(types), flags: self.flags }
     }
 
     pub fn to_non_nullable(&self) -> TUnion {
-        TUnion {
-            types: Cow::Owned(self.get_non_nullable_types()),
-            had_template: self.had_template,
-            by_reference: self.by_reference,
-            reference_free: self.reference_free,
-            possibly_undefined_from_try: self.possibly_undefined_from_try,
-            possibly_undefined: self.possibly_undefined,
-            ignore_falsable_issues: self.ignore_falsable_issues,
-            ignore_nullable_issues: self.ignore_nullable_issues,
-            from_template_default: self.from_template_default,
-            populated: self.populated,
-        }
+        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags }
     }
 
     pub fn to_truthy(&self) -> TUnion {
-        TUnion {
-            types: Cow::Owned(self.get_truthy_types()),
-            had_template: self.had_template,
-            by_reference: self.by_reference,
-            reference_free: self.reference_free,
-            possibly_undefined_from_try: self.possibly_undefined_from_try,
-            possibly_undefined: self.possibly_undefined,
-            ignore_falsable_issues: self.ignore_falsable_issues,
-            ignore_nullable_issues: self.ignore_nullable_issues,
-            from_template_default: self.from_template_default,
-            populated: self.populated,
-        }
+        TUnion { types: Cow::Owned(self.get_truthy_types()), flags: self.flags }
     }
 
     pub fn get_non_nullable_types(&self) -> Vec<TAtomic> {
@@ -1116,7 +1179,7 @@ impl TType for TUnion {
     }
 
     fn needs_population(&self) -> bool {
-        !self.populated && self.types.iter().any(|v| v.needs_population())
+        !self.flags.contains(UnionFlags::POPULATED) && self.types.iter().any(|v| v.needs_population())
     }
 
     fn is_expandable(&self) -> bool {
@@ -1221,15 +1284,16 @@ impl TType for TUnion {
 
 impl PartialEq for TUnion {
     fn eq(&self, other: &TUnion) -> bool {
-        if self.reference_free != other.reference_free
-            || self.by_reference != other.by_reference
-            || self.had_template != other.had_template
-            || self.possibly_undefined_from_try != other.possibly_undefined_from_try
-            || self.possibly_undefined != other.possibly_undefined
-            || self.ignore_falsable_issues != other.ignore_falsable_issues
-            || self.ignore_nullable_issues != other.ignore_nullable_issues
-            || self.from_template_default != other.from_template_default
-        {
+        const SEMANTIC_FLAGS: UnionFlags = UnionFlags::HAD_TEMPLATE
+            .union(UnionFlags::BY_REFERENCE)
+            .union(UnionFlags::REFERENCE_FREE)
+            .union(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY)
+            .union(UnionFlags::POSSIBLY_UNDEFINED)
+            .union(UnionFlags::IGNORE_NULLABLE_ISSUES)
+            .union(UnionFlags::IGNORE_FALSABLE_ISSUES)
+            .union(UnionFlags::FROM_TEMPLATE_DEFAULT);
+
+        if self.flags.intersection(SEMANTIC_FLAGS) != other.flags.intersection(SEMANTIC_FLAGS) {
             return false;
         }
 
@@ -1263,7 +1327,7 @@ pub fn populate_union_type(
     symbol_references: &mut SymbolReferences,
     force: bool,
 ) {
-    if unpopulated_union.populated && !force {
+    if unpopulated_union.flags.contains(UnionFlags::POPULATED) && !force {
         return;
     }
 
@@ -1271,7 +1335,7 @@ pub fn populate_union_type(
         return;
     }
 
-    unpopulated_union.populated = true;
+    unpopulated_union.flags.insert(UnionFlags::POPULATED);
     let unpopulated_atomics = unpopulated_union.types.to_mut();
     for unpopulated_atomic in unpopulated_atomics {
         match unpopulated_atomic {

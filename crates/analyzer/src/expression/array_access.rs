@@ -51,7 +51,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         if let Some(keyed_array_var_id) = &keyed_array_var_id
             && block_context.has_variable(keyed_array_var_id)
             && let Some(array_access_type) = block_context.locals.get(keyed_array_var_id).cloned()
-            && !array_access_type.possibly_undefined
+            && !array_access_type.possibly_undefined()
         {
             artifacts.set_rc_expression_type(self, array_access_type.clone());
 

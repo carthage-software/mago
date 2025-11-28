@@ -614,7 +614,7 @@ fn get_shape_from_ast(
 
                 let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
                 if field_is_optional {
-                    field_value_type.possibly_undefined = true;
+                    field_value_type.set_possibly_undefined(true, None);
                 }
 
                 tree.insert(offset, (field_is_optional, field_value_type));
@@ -681,7 +681,7 @@ fn get_shape_from_ast(
 
                 let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
                 if field_is_optional {
-                    field_value_type.possibly_undefined = true;
+                    field_value_type.set_possibly_undefined(true, None);
                 }
 
                 tree.insert(array_key, (field_is_optional, field_value_type));

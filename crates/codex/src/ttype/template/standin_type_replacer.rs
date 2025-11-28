@@ -144,10 +144,10 @@ pub fn replace(
         new_parameter_atomics
     });
 
-    new_union_type.ignore_falsable_issues = parameter_type.ignore_falsable_issues;
+    new_union_type.set_ignore_falsable_issues(parameter_type.ignore_falsable_issues());
 
     if had_template {
-        new_union_type.had_template = true;
+        new_union_type.set_had_template(true);
     }
 
     new_union_type
@@ -1203,7 +1203,7 @@ pub fn get_mapped_generic_type_parameters(
                 let mut candidate_parameter_type =
                     candidate_parameter_type.unwrap_or(wrap_atomic(extended_input_parameter_type.clone()));
 
-                candidate_parameter_type.from_template_default = true;
+                candidate_parameter_type.set_from_template_default(true);
 
                 new_input_parameter = if let Some(new_input_param) = new_input_parameter {
                     Some(add_union_type(new_input_param, &candidate_parameter_type, codebase, true))

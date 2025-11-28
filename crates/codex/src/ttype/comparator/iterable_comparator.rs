@@ -28,7 +28,7 @@ pub fn is_contained_by(
         &input_k,
         &container_k,
         false,
-        input_k.ignore_falsable_issues,
+        input_k.ignore_falsable_issues(),
         inside_assertion,
         &mut nested_comparison_result,
     ) {
@@ -44,7 +44,7 @@ pub fn is_contained_by(
         &input_v,
         &container_v,
         false,
-        input_v.ignore_falsable_issues,
+        input_v.ignore_falsable_issues(),
         inside_assertion,
         &mut nested_comparison_result,
     ) {

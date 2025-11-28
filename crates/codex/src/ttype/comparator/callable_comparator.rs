@@ -121,7 +121,7 @@ pub(crate) fn is_contained_by(
         input_return_type,
         container_return_type,
         false,
-        input_return_type.ignore_falsable_issues,
+        input_return_type.ignore_falsable_issues(),
         false,
         atomic_comparison_result,
     )

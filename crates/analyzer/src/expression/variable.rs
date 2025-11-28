@@ -209,7 +209,7 @@ fn read_variable<'ctx, 'arena>(
         }
     };
 
-    if variable_type.possibly_undefined_from_try && !block_context.inside_isset {
+    if variable_type.possibly_undefined_from_try() && !block_context.inside_isset {
         context.collector.report_with_code(
             IssueCode::PossiblyUndefinedVariable,
             Issue::warning(format!(

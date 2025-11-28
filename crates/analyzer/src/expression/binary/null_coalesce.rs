@@ -80,7 +80,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
         binary.rhs.analyze(context, block_context, artifacts)?;
         result_type = artifacts.get_expression_type(&binary.rhs).cloned().unwrap_or_else(get_mixed); // Fallback if RHS analysis fails
-    } else if !lhs_type.has_nullish() && !lhs_type.possibly_undefined && !lhs_type.possibly_undefined_from_try {
+    } else if !lhs_type.has_nullish() && !lhs_type.possibly_undefined() && !lhs_type.possibly_undefined_from_try() {
         context.collector.propose_with_code(
             IssueCode::RedundantNullCoalesce,
             Issue::help(

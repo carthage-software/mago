@@ -87,7 +87,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         return Ok(result);
     };
 
-    let is_nullable = object_type.is_nullable() || object_type.is_voidable() || object_type.possibly_undefined;
+    let is_nullable = object_type.is_nullable() || object_type.is_voidable() || object_type.possibly_undefined();
     let is_all_null = object_type.is_null() || object_type.is_void();
 
     if is_null_safe && !is_nullable {

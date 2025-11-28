@@ -114,7 +114,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
                 if is_by_reference {
                     let inner_variable_type = Rc::make_mut(&mut variable_type);
-                    inner_variable_type.by_reference = true;
+                    inner_variable_type.set_by_reference(true);
 
                     inner_block_context.references_to_external_scope.insert(variable.to_string());
                 }

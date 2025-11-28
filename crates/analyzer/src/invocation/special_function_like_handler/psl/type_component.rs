@@ -67,7 +67,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                                 .and_then(|type_parameters| type_parameters.first())
                                 .cloned()?;
 
-                            let possibly_undefined = *possibly_undefined || element.possibly_undefined;
+                            let possibly_undefined = *possibly_undefined || element.possibly_undefined();
 
                             known_elements.insert(*index, (possibly_undefined, inner_type));
                         }
@@ -98,7 +98,7 @@ impl SpecialFunctionLikeHandlerTrait for TypeComponentFunctionsHandler {
                                 .and_then(|type_parameters| type_parameters.first())
                                 .cloned()?;
 
-                            let possibly_undefined = *possibly_undefined || inner_type.possibly_undefined;
+                            let possibly_undefined = *possibly_undefined || inner_type.possibly_undefined();
 
                             known_items.insert(*key, (possibly_undefined, inner_type));
                         }

@@ -90,7 +90,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
         return Ok(());
     }
 
-    if operand_type.is_nullable() && !operand_type.ignore_nullable_issues {
+    if operand_type.is_nullable() && !operand_type.ignore_nullable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
@@ -104,7 +104,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
         );
     }
 
-    if operand_type.is_falsable() && !operand_type.ignore_falsable_issues {
+    if operand_type.is_falsable() && !operand_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(

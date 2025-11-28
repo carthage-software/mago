@@ -31,7 +31,7 @@ pub fn fetch_invocation_return_type<'ctx, 'ast, 'arena>(
     if let Some(function_like_metadata) = invocation.target.get_function_like_metadata()
         && function_like_metadata.flags.is_by_reference()
     {
-        resulting_type.by_reference = true;
+        resulting_type.set_by_reference(true);
     }
 
     resulting_type

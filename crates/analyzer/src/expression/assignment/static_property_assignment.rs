@@ -48,8 +48,8 @@ pub(crate) fn analyze<'ctx, 'arena>(
             context.codebase,
             assigned_value_type,
             &resolved_property.property_type,
-            assigned_value_type.ignore_nullable_issues,
-            assigned_value_type.ignore_falsable_issues,
+            assigned_value_type.ignore_nullable_issues(),
+            assigned_value_type.ignore_falsable_issues(),
             false,
             &mut union_comparison_result,
         );

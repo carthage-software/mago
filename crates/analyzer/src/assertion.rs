@@ -107,7 +107,7 @@ pub fn scrape_assertions(
                 if let Expression::Variable(variable) = empty_construct.value
                     && let Some(expression_type) = artifacts.get_expression_type(variable)
                     && !expression_type.is_mixed()
-                    && !expression_type.possibly_undefined
+                    && !expression_type.possibly_undefined()
                 {
                     if_types.insert(value_id, vec![vec![Assertion::Falsy]]);
                 } else {
@@ -125,8 +125,8 @@ pub fn scrape_assertions(
                         if let Expression::Variable(variable) = value
                             && let Some(expression_type) = artifacts.get_expression_type(variable)
                             && !expression_type.is_mixed()
-                            && !expression_type.possibly_undefined
-                            && !expression_type.possibly_undefined_from_try
+                            && !expression_type.possibly_undefined()
+                            && !expression_type.possibly_undefined_from_try()
                         {
                             if_types.entry(value_id).or_insert_with(|| vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
                         } else {

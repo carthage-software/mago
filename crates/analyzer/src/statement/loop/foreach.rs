@@ -104,7 +104,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             Some(context.codebase),
         );
 
-        value_type.by_reference = is_by_reference;
+        value_type.set_by_reference(is_by_reference);
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
             loop_block_context.references_to_external_scope.remove(direct_variable.name);

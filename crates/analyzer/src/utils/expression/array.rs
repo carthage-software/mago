@@ -124,7 +124,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     }
 
     if !block_context.inside_isset {
-        if index_type.is_nullable() && !index_type.ignore_nullable_issues && !array_like_type.is_keyed_array() {
+        if index_type.is_nullable() && !index_type.ignore_nullable_issues() && !array_like_type.is_keyed_array() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
                 Issue::warning(format!(
@@ -141,7 +141,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             );
         }
 
-        if array_like_type.is_nullable() && !array_like_type.ignore_nullable_issues && !in_assignment {
+        if array_like_type.is_nullable() && !array_like_type.ignore_nullable_issues() && !in_assignment {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayAccess,
                 Issue::warning("Cannot perform array access on possibly `null` value.")
@@ -259,7 +259,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 has_valid_expected_index = true;
             }
             TAtomic::Null => {
-                if !array_like_type.ignore_nullable_issues && !in_assignment {
+                if !array_like_type.ignore_nullable_issues() && !in_assignment {
                     value_type = Some(add_optional_union_type(get_null(), value_type.as_ref(), context.codebase));
                 }
 
@@ -378,10 +378,15 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
 
     match value_type {
         Some(mut value_type) => {
-            value_type.possibly_undefined |= array_like_type.possibly_undefined;
-            value_type.possibly_undefined_from_try |= array_like_type.possibly_undefined_from_try;
-            value_type.ignore_falsable_issues |= array_like_type.ignore_falsable_issues;
-            value_type.ignore_falsable_issues |= array_like_type.ignore_falsable_issues;
+            if array_like_type.possibly_undefined() {
+                value_type.set_possibly_undefined(true, None);
+            }
+            if array_like_type.possibly_undefined_from_try() {
+                value_type.set_possibly_undefined_from_try(true);
+            }
+            if array_like_type.ignore_falsable_issues() {
+                value_type.set_ignore_falsable_issues(true);
+            }
 
             // Report warning for possibly undefined array keys when accessing union types
             // Only report if we detected that some variants have the key while others don't
@@ -826,7 +831,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             &key_parameter,
             if index_type.is_mixed() { &array_key } else { index_type },
             true,
-            value_parameter.ignore_falsable_issues,
+            value_parameter.ignore_falsable_issues(),
             false,
             &mut ComparisonResult::new(),
         );
@@ -1014,7 +1019,7 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
         expected_index_types.push(expected_key_type);
     }
 
-    resulting_value_type.possibly_undefined = true;
+    resulting_value_type.set_possibly_undefined(true, None);
     resulting_value_type
 }
 

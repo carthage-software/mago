@@ -251,7 +251,7 @@ pub(crate) fn is_array_contained_by_array(
             &input_key_type,
             &container_key_type,
             false,
-            input_key_type.ignore_falsable_issues,
+            input_key_type.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         )
@@ -265,7 +265,7 @@ pub(crate) fn is_array_contained_by_array(
             &input_value_type,
             &container_value_type,
             false,
-            input_value_type.ignore_falsable_issues,
+            input_value_type.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         )

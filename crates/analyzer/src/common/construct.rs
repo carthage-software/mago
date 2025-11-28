@@ -210,7 +210,7 @@ fn verify_construct_input_type<'ctx, 'ast, 'arena>(
                 is_argument,
             );
         }
-        if input_type.is_nullable() && !input_type.ignore_nullable_issues {
+        if input_type.is_nullable() && !input_type.ignore_nullable_issues() {
             report_possibly_null_input(
                 context,
                 construct_kind,
@@ -236,7 +236,7 @@ fn verify_construct_input_type<'ctx, 'ast, 'arena>(
                 is_argument,
             );
         }
-        if input_type.is_falsable() && !input_type.ignore_falsable_issues {
+        if input_type.is_falsable() && !input_type.ignore_falsable_issues() {
             report_possibly_false_input(
                 context,
                 construct_kind,

@@ -379,7 +379,7 @@ pub fn is_contained_by(
             input_constraint,
             container_constraint,
             false,
-            input_constraint.ignore_falsable_issues,
+            input_constraint.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         );

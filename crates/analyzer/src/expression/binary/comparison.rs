@@ -390,7 +390,7 @@ fn check_comparison_operand<'ctx, 'ast, 'arena>(
             .with_note(format!("PHP compares `false` with other types according to specific rules (e.g., `false == 0` is true using `{op_str}`). This can hide bugs."))
             .with_help("Ensure this operand is not `false` or explicitly handle the `false` case if it represents a distinct state (e.g., an error from a function)."),
         );
-    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues {
+    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(

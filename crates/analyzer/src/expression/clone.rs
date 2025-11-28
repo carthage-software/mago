@@ -68,10 +68,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                 TAtomic::Mixed(_) => {
                     has_mixed_type = true;
                 }
-                TAtomic::Scalar(scalar) if scalar.is_false() && object_type.ignore_falsable_issues => {
+                TAtomic::Scalar(scalar) if scalar.is_false() && object_type.ignore_falsable_issues() => {
                     continue;
                 }
-                TAtomic::Null | TAtomic::Void if object_type.ignore_nullable_issues => {
+                TAtomic::Null | TAtomic::Void if object_type.ignore_nullable_issues() => {
                     continue;
                 }
                 TAtomic::Callable(callable) if callable.get_signature().is_none_or(|s| s.is_closure()) => {

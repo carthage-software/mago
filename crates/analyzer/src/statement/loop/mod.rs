@@ -953,7 +953,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         return Ok((false, get_arraykey(), get_never()));
     }
 
-    if iterator_type.is_nullable() && !iterator_type.ignore_nullable_issues {
+    if iterator_type.is_nullable() && !iterator_type.ignore_nullable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullIterator,
             Issue::warning(format!("Expression being iterated (type `{}`) might be `null` at runtime.", iterator_type.get_id()))
@@ -964,7 +964,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         );
     }
 
-    if iterator_type.is_falsable() && !iterator_type.ignore_falsable_issues {
+    if iterator_type.is_falsable() && !iterator_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseIterator,
             Issue::warning(format!("Expression being iterated (type `{}`) might be `false` at runtime.", iterator_type.get_id()))

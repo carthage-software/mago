@@ -623,13 +623,13 @@ fn scan_function_like_docblock<'ctx, 'arena>(
 
     if docblock.ignore_nullable_return || docblock.ignore_falsable_return {
         if let Some(return_type) = &mut metadata.return_type_metadata {
-            return_type.type_union.ignore_nullable_issues = docblock.ignore_nullable_return;
-            return_type.type_union.ignore_falsable_issues = docblock.ignore_falsable_return;
+            return_type.type_union.set_ignore_nullable_issues(docblock.ignore_nullable_return);
+            return_type.type_union.set_ignore_falsable_issues(docblock.ignore_falsable_return);
         }
 
         if let Some(return_type) = &mut metadata.return_type_declaration_metadata {
-            return_type.type_union.ignore_nullable_issues = docblock.ignore_nullable_return;
-            return_type.type_union.ignore_falsable_issues = docblock.ignore_falsable_return;
+            return_type.type_union.set_ignore_nullable_issues(docblock.ignore_nullable_return);
+            return_type.type_union.set_ignore_falsable_issues(docblock.ignore_falsable_return);
         }
     }
 }

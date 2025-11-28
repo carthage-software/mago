@@ -1119,14 +1119,15 @@ fn reconcile_falsy_or_empty(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
     let is_empty_assertion = matches!(assertion, Assertion::Empty);
+    let possibly_undefined_from_try = new_var_type.possibly_undefined_from_try();
 
     for atomic in new_var_type.types.to_mut().drain(..) {
-        if atomic.is_truthy() && !new_var_type.possibly_undefined_from_try {
+        if atomic.is_truthy() && !possibly_undefined_from_try {
             did_remove_type = true;
         } else if !atomic.is_falsy() {
             did_remove_type = true;
@@ -1181,7 +1182,7 @@ fn reconcile_falsy_or_empty(
         }
     }
 
-    new_var_type.possibly_undefined_from_try = false;
+    new_var_type.set_possibly_undefined_from_try(false);
 
     get_acceptable_type(
         context,
@@ -1206,7 +1207,7 @@ fn reconcile_not_isset(
     // When !isset is true, the value is definitely not set (either null or undefined)
     // For array accesses, this means the key doesn't exist or the value is null
     // In both cases, the resulting type should be null
-    if existing_var_type.possibly_undefined {
+    if existing_var_type.possibly_undefined() {
         return get_undefined_null();
     }
 
@@ -1233,7 +1234,7 @@ fn reconcile_empty_countable(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
@@ -1255,7 +1256,7 @@ fn reconcile_empty_countable(
         }
     }
 
-    new_var_type.possibly_undefined_from_try = false;
+    new_var_type.set_possibly_undefined_from_try(false);
 
     get_acceptable_type(
         context,
@@ -1280,7 +1281,7 @@ fn reconcile_not_exactly_countable(
     span: Option<&Span>,
     count: &usize,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
@@ -1301,7 +1302,7 @@ fn reconcile_not_exactly_countable(
         acceptable_types.push(atomic);
     }
 
-    new_var_type.possibly_undefined_from_try = false;
+    new_var_type.set_possibly_undefined_from_try(false);
 
     get_acceptable_type(
         context,
@@ -1350,7 +1351,7 @@ fn reconcile_no_array_key(
     key_name: &ArrayKey,
     negated: bool,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 

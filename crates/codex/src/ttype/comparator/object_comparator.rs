@@ -125,7 +125,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
             input_constraint,
             &wrap_atomic(intersection_container_type),
             false,
-            input_constraint.ignore_falsable_issues,
+            input_constraint.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         );

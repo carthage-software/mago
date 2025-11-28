@@ -26,7 +26,7 @@ use crate::utils::get_type_diff;
 /// Checks if an argument can be passed by reference.
 fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
     argument_expression.is_referenceable(false)
-        || (argument_expression.is_referenceable(true) && argument_type.by_reference)
+        || (argument_expression.is_referenceable(true) && argument_type.by_reference())
 }
 
 fn is_empty_container_construction(expression: &Expression) -> bool {
@@ -203,7 +203,7 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
             return;
         }
 
-        if input_type.is_nullable() && !input_type.ignore_nullable_issues {
+        if input_type.is_nullable() && !input_type.ignore_nullable_issues() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArgument,
                 Issue::error(format!(
@@ -244,7 +244,7 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
             return;
         }
 
-        if input_type.is_falsable() && !input_type.ignore_falsable_issues {
+        if input_type.is_falsable() && !input_type.ignore_falsable_issues() {
             context.collector.report_with_code(
                 IssueCode::PossiblyFalseArgument,
                 Issue::error(format!(

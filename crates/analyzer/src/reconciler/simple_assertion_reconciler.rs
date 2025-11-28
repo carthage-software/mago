@@ -1258,16 +1258,17 @@ fn reconcile_truthy_or_non_empty(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
     let is_non_empty_assertion = matches!(assertion, Assertion::NonEmpty);
+    let possibly_undefined_from_try = new_var_type.possibly_undefined_from_try();
 
     for atomic in new_var_type.types.to_mut().drain(..) {
         if atomic.is_falsy() {
             did_remove_type = true;
-        } else if !atomic.is_truthy() || new_var_type.possibly_undefined_from_try {
+        } else if !atomic.is_truthy() || possibly_undefined_from_try {
             did_remove_type = true;
 
             match atomic {
@@ -1313,7 +1314,7 @@ fn reconcile_truthy_or_non_empty(
         }
     }
 
-    new_var_type.possibly_undefined_from_try = false;
+    new_var_type.set_possibly_undefined_from_try(false);
 
     get_acceptable_type(
         context,
@@ -1338,9 +1339,9 @@ fn reconcile_isset(
     span: Option<&Span>,
     inside_loop: bool,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined || existing_var_type.possibly_undefined_from_try;
+    let mut did_remove_type = existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try();
 
-    if existing_var_type.possibly_undefined {
+    if existing_var_type.possibly_undefined() {
         did_remove_type = true;
     }
 
@@ -1379,7 +1380,7 @@ fn reconcile_isset(
         return get_mixed_maybe_from_loop(inside_loop);
     }
 
-    new_var_type.possibly_undefined_from_try = false;
+    new_var_type.set_possibly_undefined_from_try(false);
     new_var_type.types = Cow::Owned(acceptable_types);
 
     if new_var_type.is_never() {
@@ -1838,8 +1839,10 @@ fn reconcile_array_access(
 
     if new_var_type.is_mixed() {
         let mut result = get_mixed_keyed_array();
-        result.possibly_undefined = new_var_type.possibly_undefined;
-        result.possibly_undefined_from_try = new_var_type.possibly_undefined_from_try;
+        result.set_possibly_undefined(
+            new_var_type.possibly_undefined(),
+            Some(new_var_type.possibly_undefined_from_try()),
+        );
         return result;
     }
 
@@ -1903,7 +1906,7 @@ fn reconcile_has_array_key(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined;
+    let mut did_remove_type = existing_var_type.possibly_undefined();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
     let existing_var_types = new_var_type.types.to_mut().drain(..).collect::<Vec<_>>();

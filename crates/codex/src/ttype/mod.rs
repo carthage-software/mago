@@ -521,7 +521,7 @@ pub fn get_null() -> TUnion {
 #[inline]
 pub fn get_undefined_null() -> TUnion {
     let mut null = TUnion::from_single(Cow::Borrowed(NULL_ATOMIC));
-    null.possibly_undefined = true;
+    null.set_possibly_undefined(true, None);
     null
 }
 
@@ -716,27 +716,27 @@ pub fn combine_union_types(
 
         let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, overwrite_empty_array));
 
-        if type_1.had_template && type_2.had_template {
-            result.had_template = true;
+        if type_1.had_template() && type_2.had_template() {
+            result.set_had_template(true);
         }
 
-        if type_1.reference_free && type_2.reference_free {
-            result.reference_free = true;
+        if type_1.reference_free() && type_2.reference_free() {
+            result.set_reference_free(true);
         }
 
         result
     };
 
-    if type_1.possibly_undefined || type_2.possibly_undefined {
-        combined_type.possibly_undefined = true;
+    if type_1.possibly_undefined() || type_2.possibly_undefined() {
+        combined_type.set_possibly_undefined(true, None);
     }
 
-    if type_1.possibly_undefined_from_try || type_2.possibly_undefined_from_try {
-        combined_type.possibly_undefined_from_try = true;
+    if type_1.possibly_undefined_from_try() || type_2.possibly_undefined_from_try() {
+        combined_type.set_possibly_undefined_from_try(true);
     }
 
-    if type_1.ignore_falsable_issues || type_2.ignore_falsable_issues {
-        combined_type.ignore_falsable_issues = true;
+    if type_1.ignore_falsable_issues() || type_2.ignore_falsable_issues() {
+        combined_type.set_ignore_falsable_issues(true);
     }
 
     combined_type
@@ -756,19 +756,27 @@ pub fn add_union_type(
             combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
         };
 
-        if !other_type.had_template {
-            base_type.had_template = false;
+        if !other_type.had_template() {
+            base_type.set_had_template(false);
         }
 
-        if !other_type.reference_free {
-            base_type.reference_free = false;
+        if !other_type.reference_free() {
+            base_type.set_reference_free(false);
         }
     }
 
-    base_type.possibly_undefined |= other_type.possibly_undefined;
-    base_type.possibly_undefined_from_try |= other_type.possibly_undefined_from_try;
-    base_type.ignore_falsable_issues |= other_type.ignore_falsable_issues;
-    base_type.ignore_nullable_issues |= other_type.ignore_nullable_issues;
+    if other_type.possibly_undefined() {
+        base_type.set_possibly_undefined(true, None);
+    }
+    if other_type.possibly_undefined_from_try() {
+        base_type.set_possibly_undefined_from_try(true);
+    }
+    if other_type.ignore_falsable_issues() {
+        base_type.set_ignore_falsable_issues(true);
+    }
+    if other_type.ignore_nullable_issues() {
+        base_type.set_ignore_nullable_issues(true);
+    }
 
     base_type
 }
@@ -841,11 +849,12 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
     }
 
     if let Some(mut final_type) = combined_type {
-        final_type.possibly_undefined = type_1.possibly_undefined && type_2.possibly_undefined;
-        final_type.possibly_undefined_from_try =
-            type_1.possibly_undefined_from_try && type_2.possibly_undefined_from_try;
-        final_type.ignore_falsable_issues = type_1.ignore_falsable_issues && type_2.ignore_falsable_issues;
-        final_type.ignore_nullable_issues = type_1.ignore_nullable_issues && type_2.ignore_nullable_issues;
+        final_type.set_possibly_undefined(
+            type_1.possibly_undefined() && type_2.possibly_undefined(),
+            Some(type_1.possibly_undefined_from_try() && type_2.possibly_undefined_from_try()),
+        );
+        final_type.set_ignore_falsable_issues(type_1.ignore_falsable_issues() && type_2.ignore_falsable_issues());
+        final_type.set_ignore_nullable_issues(type_1.ignore_nullable_issues() && type_2.ignore_nullable_issues());
 
         return Some(final_type);
     }

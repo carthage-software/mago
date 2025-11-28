@@ -735,7 +735,7 @@ fn get_value_for_key<'ctx>(
                             new_base_type_candidate = known_item.1.clone();
 
                             if known_item.0 {
-                                new_base_type_candidate.possibly_undefined = true;
+                                new_base_type_candidate.set_possibly_undefined(true, None);
                             }
                         } else {
                             if has_empty {
@@ -761,7 +761,7 @@ fn get_value_for_key<'ctx>(
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
-                                new_base_type_candidate.possibly_undefined = true;
+                                new_base_type_candidate.set_possibly_undefined(true, None);
                             }
                         }
                     } else if let TAtomic::Array(TArray::List(TList { known_elements, .. })) = &existing_key_type_part {
@@ -781,7 +781,7 @@ fn get_value_for_key<'ctx>(
                             new_base_type_candidate = known_item.1.clone();
 
                             if known_item.0 {
-                                new_base_type_candidate.possibly_undefined = true;
+                                new_base_type_candidate.set_possibly_undefined(true, None);
                             }
                         } else {
                             new_base_type_candidate =
@@ -795,7 +795,7 @@ fn get_value_for_key<'ctx>(
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
 
-                                new_base_type_candidate.possibly_undefined = true;
+                                new_base_type_candidate.set_possibly_undefined(true, None);
                             }
                         }
                     } else if matches!(existing_key_type_part, TAtomic::Scalar(TScalar::String(_))) {

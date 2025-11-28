@@ -181,7 +181,7 @@ pub fn is_contained_by(
             );
 
             if (input_type_part.is_mixed() || matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)))
-                && input_type.from_template_default
+                && input_type.from_template_default()
                 && atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
             {
                 atomic_comparison_result.type_coerced_from_as_mixed = Some(true);
@@ -246,7 +246,7 @@ pub fn is_contained_by(
         if all_type_coerced_from_nested_mixed.unwrap_or(false) {
             union_comparison_result.type_coerced_from_nested_mixed = Some(true);
 
-            if input_type.from_template_default || all_type_coerced_from_as_mixed.unwrap_or(false) {
+            if input_type.from_template_default() || all_type_coerced_from_as_mixed.unwrap_or(false) {
                 union_comparison_result.type_coerced_from_as_mixed = Some(true);
             }
         }
@@ -259,7 +259,7 @@ pub fn is_contained_by(
             if some_type_coerced_from_nested_mixed {
                 union_comparison_result.type_coerced_from_nested_mixed = Some(true);
 
-                if input_type.from_template_default || all_type_coerced_from_as_mixed.unwrap_or(false) {
+                if input_type.from_template_default() || all_type_coerced_from_as_mixed.unwrap_or(false) {
                     union_comparison_result.type_coerced_from_as_mixed = Some(true);
                 }
             }

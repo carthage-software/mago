@@ -214,7 +214,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         };
 
         if parameter_metadata.flags.is_by_reference() {
-            final_parameter_type.by_reference = parameter_metadata.flags.is_by_reference();
+            final_parameter_type.set_by_reference(parameter_metadata.flags.is_by_reference());
 
             let constraint_type = parameter_metadata
                 .out_type

@@ -56,7 +56,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         // In Psalm, null operand often leads to mixed result or halts analysis for this path.
         // Let's set result to mixed and return, similar to Psalm's behavior.
         final_result_type = Some(get_mixed());
-    } else if left_type.is_nullable() && !left_type.ignore_nullable_issues {
+    } else if left_type.is_nullable() && !left_type.ignore_nullable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
@@ -81,7 +81,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         );
 
         final_result_type = Some(get_mixed());
-    } else if right_type.is_nullable() && !right_type.ignore_nullable_issues {
+    } else if right_type.is_nullable() && !right_type.ignore_nullable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
@@ -122,7 +122,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         );
         // We'll treat it as 0 in the loop below, but the warning is issued.
         // If *only* false, Psalm might bail; let's continue for now
-    } else if left_type.is_falsable() && !left_type.ignore_falsable_issues {
+    } else if left_type.is_falsable() && !left_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
@@ -159,7 +159,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the right operand is a number (int/float). Using `false` directly in arithmetic is discouraged."
             ),
         );
-    } else if right_type.is_falsable() && !right_type.ignore_falsable_issues {
+    } else if right_type.is_falsable() && !right_type.ignore_falsable_issues() {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(

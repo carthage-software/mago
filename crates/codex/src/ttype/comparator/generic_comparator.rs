@@ -62,7 +62,7 @@ pub(crate) fn is_contained_by(
             &specialized_template_type,
             container_type_parameter,
             false,
-            specialized_template_type.ignore_falsable_issues,
+            specialized_template_type.ignore_falsable_issues(),
             false,
             &mut parameter_comparison_result,
         ) {
@@ -72,7 +72,7 @@ pub(crate) fn is_contained_by(
                     container_type_parameter,
                     &specialized_template_type,
                     false,
-                    container_type_parameter.ignore_falsable_issues,
+                    container_type_parameter.ignore_falsable_issues(),
                     inside_assertion,
                     &mut parameter_comparison_result,
                 )
