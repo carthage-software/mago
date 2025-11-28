@@ -1,0 +1,709 @@
+<script setup>
+import { computed, ref } from 'vue';
+
+const props = defineProps({
+  settings: {
+    type: Object,
+    required: true,
+  },
+  availableRules: {
+    type: Array,
+    default: () => [],
+  },
+});
+
+const emit = defineEmits(['update:settings', 'toggle-rule', 'close']);
+
+const phpVersions = [
+  { value: '8.0', label: 'PHP 8.0' },
+  { value: '8.1', label: 'PHP 8.1' },
+  { value: '8.2', label: 'PHP 8.2' },
+  { value: '8.3', label: 'PHP 8.3' },
+  { value: '8.4', label: 'PHP 8.4' },
+  { value: '8.5', label: 'PHP 8.5' },
+  { value: '8.6', label: 'PHP 8.6 (dev)' },
+];
+
+const analyzerOptions = [
+  {
+    key: 'findUnusedExpressions',
+    label: 'Find unused expressions',
+    description: 'Report expressions whose results are not used (e.g., $a + $b;)',
+  },
+  {
+    key: 'findUnusedDefinitions',
+    label: 'Find unused definitions',
+    description: 'Report unused definitions like private methods never called',
+  },
+  {
+    key: 'analyzeDeadCode',
+    label: 'Analyze dead code',
+    description: 'Analyze code that appears to be unreachable',
+  },
+  {
+    key: 'memoizeProperties',
+    label: 'Memoize properties',
+    description: 'Track literal values of class properties for better type inference',
+  },
+  {
+    key: 'allowPossiblyUndefinedArrayKeys',
+    label: 'Allow possibly undefined array keys',
+    description: 'Allow accessing array keys that may not be defined without error',
+  },
+  {
+    key: 'checkThrows',
+    label: 'Check @throws annotations',
+    description: 'Report unhandled thrown exceptions not caught or documented',
+  },
+  {
+    key: 'performHeuristicChecks',
+    label: 'Perform heuristic checks',
+    description: 'Identify potential issues that are not strictly type-related',
+  },
+  {
+    key: 'strictListIndexChecks',
+    label: 'Strict list index checks',
+    description: 'Require list indices to be provably non-negative',
+  },
+  {
+    key: 'noBooleanLiteralComparison',
+    label: 'Allow boolean literal comparison',
+    description: 'Disable warnings for comparisons to true/false literals',
+  },
+  {
+    key: 'checkMissingTypeHints',
+    label: 'Check missing type hints',
+    description: 'Report missing type hints on parameters, properties, and returns',
+  },
+  {
+    key: 'checkClosureMissingTypeHints',
+    label: 'Check closure type hints',
+    description: 'Also check closures for missing type hints (requires above)',
+  },
+  {
+    key: 'checkArrowFunctionMissingTypeHints',
+    label: 'Check arrow function type hints',
+    description: 'Also check arrow functions for missing type hints (requires above)',
+  },
+  {
+    key: 'registerSuperGlobals',
+    label: 'Register superglobals',
+    description: 'Make $_GET, $_POST, $_SERVER etc. available without global keyword',
+  },
+];
+
+const rulesByCategory = computed(() => {
+  const grouped = {};
+  for (const rule of props.availableRules) {
+    if (!grouped[rule.category]) {
+      grouped[rule.category] = [];
+    }
+    grouped[rule.category].push(rule);
+  }
+  for (const cat of Object.keys(grouped)) {
+    grouped[cat].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return grouped;
+});
+
+const categories = computed(() => Object.keys(rulesByCategory.value).sort());
+
+const ruleSearch = ref('');
+const filteredRulesByCategory = computed(() => {
+  const search = ruleSearch.value.toLowerCase().trim();
+  if (!search) return rulesByCategory.value;
+
+  const filtered = {};
+  for (const [cat, rules] of Object.entries(rulesByCategory.value)) {
+    const matching = rules.filter(
+      (r) =>
+        r.name.toLowerCase().includes(search) ||
+        r.code.toLowerCase().includes(search) ||
+        r.description.toLowerCase().includes(search)
+    );
+    if (matching.length > 0) {
+      filtered[cat] = matching;
+    }
+  }
+  return filtered;
+});
+
+const filteredCategories = computed(() => Object.keys(filteredRulesByCategory.value).sort());
+
+function updatePhpVersion(event) {
+  emit('update:settings', {
+    ...props.settings,
+    phpVersion: event.target.value,
+  });
+}
+
+function updateAnalyzerSetting(key, event) {
+  emit('update:settings', {
+    ...props.settings,
+    analyzer: {
+      ...props.settings.analyzer,
+      [key]: event.target.checked,
+    },
+  });
+}
+
+function isRuleDisabled(ruleCode) {
+  return props.settings.linter?.disabledRules?.includes(ruleCode) ?? false;
+}
+
+function toggleRule(ruleCode) {
+  emit('toggle-rule', ruleCode);
+}
+
+function enableAllRules() {
+  emit('update:settings', {
+    ...props.settings,
+    linter: {
+      ...props.settings.linter,
+      disabledRules: [],
+    },
+  });
+}
+
+function disableAllRules() {
+  const allCodes = props.availableRules.map((r) => r.code);
+  emit('update:settings', {
+    ...props.settings,
+    linter: {
+      ...props.settings.linter,
+      disabledRules: allCodes,
+    },
+  });
+}
+</script>
+
+<template>
+  <div class="settings-overlay">
+    <div class="settings-container">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-btn" @click="emit('close')" title="Close settings">
+          <span>×</span>
+        </button>
+      </div>
+
+      <div class="settings-content">
+        <!-- PHP Version -->
+        <section class="settings-section">
+          <h3>PHP Version</h3>
+          <div class="php-version-selector">
+            <label
+              v-for="version in phpVersions"
+              :key="version.value"
+              :class="['version-option', { selected: settings.phpVersion === version.value }]"
+            >
+              <input
+                type="radio"
+                name="phpVersion"
+                :value="version.value"
+                :checked="settings.phpVersion === version.value"
+                @change="updatePhpVersion"
+              />
+              <span class="version-label">{{ version.label }}</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Analyzer Options -->
+        <section class="settings-section">
+          <h3>Analyzer Options</h3>
+          <div class="options-grid">
+            <label
+              v-for="option in analyzerOptions"
+              :key="option.key"
+              class="option-item"
+            >
+              <div class="option-checkbox">
+                <input
+                  type="checkbox"
+                  :checked="settings.analyzer[option.key]"
+                  @change="updateAnalyzerSetting(option.key, $event)"
+                />
+                <span class="checkmark"></span>
+              </div>
+              <div class="option-content">
+                <span class="option-label">{{ option.label }}</span>
+                <span class="option-description">{{ option.description }}</span>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <!-- Linter Rules -->
+        <section class="settings-section linter-section">
+          <div class="section-header">
+            <h3>Linter Rules</h3>
+            <div class="bulk-actions">
+              <button class="action-btn" @click="enableAllRules">Enable All</button>
+              <button class="action-btn" @click="disableAllRules">Disable All</button>
+            </div>
+          </div>
+
+          <div class="rule-search">
+            <input
+              v-model="ruleSearch"
+              type="text"
+              placeholder="Search rules..."
+              class="search-input"
+            />
+          </div>
+
+          <div class="rules-container">
+            <div v-if="filteredCategories.length === 0" class="no-rules">
+              No rules match your search.
+            </div>
+
+            <div
+              v-for="category in filteredCategories"
+              :key="category"
+              class="rule-category"
+            >
+              <h4 class="category-title">{{ category }}</h4>
+              <div class="rules-list">
+                <label
+                  v-for="rule in filteredRulesByCategory[category]"
+                  :key="rule.code"
+                  :class="['rule-item', { disabled: isRuleDisabled(rule.code) }]"
+                >
+                  <div class="rule-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="!isRuleDisabled(rule.code)"
+                      @change="toggleRule(rule.code)"
+                    />
+                    <span class="checkmark"></span>
+                  </div>
+                  <div class="rule-content">
+                    <div class="rule-header">
+                      <span class="rule-name">{{ rule.name }}</span>
+                      <code class="rule-code">{{ rule.code }}</code>
+                    </div>
+                    <span class="rule-description">{{ rule.description }}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.settings-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--vp-c-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  flex-shrink: 0;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.close-btn:hover {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.settings-section {
+  margin-bottom: 32px;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* PHP Version Selector */
+.php-version-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.version-option {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.version-option input {
+  display: none;
+}
+
+.version-label {
+  padding: 8px 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg);
+  transition: all 0.15s;
+}
+
+.version-option:hover .version-label {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-text-1);
+}
+
+.version-option.selected .version-label {
+  background: var(--vp-c-brand-soft);
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}
+
+/* Analyzer Options Grid */
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.option-item:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.option-checkbox {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.option-checkbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.option-checkbox .checkmark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--vp-c-divider);
+  border-radius: 4px;
+  background: var(--vp-c-bg);
+  transition: all 0.15s;
+}
+
+.option-checkbox input:checked + .checkmark {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.option-checkbox input:checked + .checkmark::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+}
+
+.option-description {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+  line-height: 1.4;
+}
+
+/* Linter Section */
+.linter-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-header h3 {
+  margin: 0;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-text-1);
+}
+
+.rule-search {
+  margin-bottom: 16px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus {
+  border-color: var(--vp-c-brand-1);
+}
+
+.search-input::placeholder {
+  color: var(--vp-c-text-3);
+}
+
+.rules-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.no-rules {
+  text-align: center;
+  padding: 32px;
+  color: var(--vp-c-text-3);
+}
+
+.rule-category {
+  margin-bottom: 24px;
+}
+
+.rule-category:last-child {
+  margin-bottom: 0;
+}
+
+.category-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rule-item:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.rule-item.disabled {
+  opacity: 0.6;
+}
+
+.rule-checkbox {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.rule-checkbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rule-checkbox .checkmark {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--vp-c-divider);
+  border-radius: 3px;
+  background: var(--vp-c-bg);
+  transition: all 0.15s;
+}
+
+.rule-checkbox input:checked + .checkmark {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.rule-checkbox input:checked + .checkmark::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.rule-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  flex-wrap: wrap;
+}
+
+.rule-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+}
+
+.rule-code {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--vp-c-bg);
+  border-radius: 4px;
+  color: var(--vp-c-text-3);
+  font-family: 'Fira Code', monospace;
+}
+
+.rule-description {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .settings-content {
+    padding: 16px;
+  }
+
+  .options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .php-version-selector {
+    flex-direction: column;
+  }
+
+  .version-label {
+    width: 100%;
+    text-align: center;
+  }
+}
+</style>

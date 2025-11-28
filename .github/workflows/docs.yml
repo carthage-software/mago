@@ -23,6 +23,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wasm-build
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Build WASM module
+        run: |
+          cd crates/wasm
+          wasm-pack build --target web --out-dir pkg-web
+
+      - name: Copy WASM to docs
+        run: |
+          cp crates/wasm/pkg-web/mago_wasm.js docs/public/wasm/
+          cp crates/wasm/pkg-web/mago_wasm_bg.wasm docs/public/wasm/
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

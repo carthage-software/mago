@@ -5,6 +5,8 @@
     "preview": "vitepress preview"
   },
   "devDependencies": {
+    "codejar": "^4.2.0",
+    "prismjs": "^1.29.0",
     "vitepress": "^2.0.0-alpha.12"
   }
 }

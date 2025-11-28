@@ -4,6 +4,15 @@ const hostname = "https://mago.carthage.software";
 
 export default defineConfig({
   srcDir: ".",
+  vite: {
+    assetsInclude: ["**/*.wasm"],
+    build: {
+      target: "esnext",
+    },
+    optimizeDeps: {
+      exclude: ["mago-wasm"],
+    },
+  },
   title: "Mago",
   description:
     "The Oxidized PHP Toolchain: Blazing fast linter, formatter, and static analyzer for PHP, written in Rust.",
@@ -58,6 +67,7 @@ export default defineConfig({
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Tools", link: "/tools/overview" },
+      { text: "Playground", link: "/playground" },
       { text: "Benchmarks", link: "/benchmarks" },
       { text: "FAQ", link: "/faq" },
       { text: "Sponsor", link: "https://github.com/sponsors/azjezz" },
