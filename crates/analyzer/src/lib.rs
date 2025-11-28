@@ -65,10 +65,14 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         program: &'ast Program<'arena>,
         analysis_result: &mut AnalysisResult,
     ) -> Result<(), AnalysisError> {
+        #[cfg(not(target_arch = "wasm32"))]
         let start_time = std::time::Instant::now();
 
         if !program.has_script() {
-            analysis_result.time_in_analysis = start_time.elapsed();
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                analysis_result.time_in_analysis = start_time.elapsed();
+            }
 
             return Ok(());
         }
@@ -98,7 +102,10 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         context.finish(artifacts, analysis_result);
 
-        analysis_result.time_in_analysis = start_time.elapsed();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            analysis_result.time_in_analysis = start_time.elapsed();
+        }
 
         Ok(())
     }
