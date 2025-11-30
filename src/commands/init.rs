@@ -704,6 +704,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn generate_config_content(
         php_version: &str,
         paths: &[String],

@@ -9,6 +9,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Argument;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
@@ -19,6 +20,8 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::consts::VARIADIC_FUNCTIONS;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -82,7 +85,7 @@ impl LintRule for LiteralNamedArgumentRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::PositionalArgument];
+        const TARGETS: &[NodeKind] = &[NodeKind::FunctionCall];
 
         TARGETS
     }
@@ -92,36 +95,46 @@ impl LintRule for LiteralNamedArgumentRule {
     }
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
-        let Node::PositionalArgument(positional_argument) = node else {
+        let Node::FunctionCall(function_call) = node else {
             return;
         };
 
-        let Expression::Literal(literal) = &positional_argument.value else {
+        if function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some() {
             return;
-        };
+        }
 
-        let literal_value = match literal {
-            Literal::String(lit_str) => lit_str.raw,
-            Literal::Integer(lit_int) => lit_int.raw,
-            Literal::Float(lit_float) => lit_float.raw,
-            Literal::True(_) => "true",
-            Literal::False(_) => "false",
-            Literal::Null(_) => "null",
-        };
+        for argument in function_call.argument_list.arguments.iter() {
+            let Argument::Positional(positional_argument) = argument else {
+                continue;
+            };
 
-        ctx.collector.report(
-            Issue::new(
-                self.cfg.level,
-                format!("Literal argument `{literal_value}` should be passed as a named argument for clarity."),
-            )
-            .with_code(self.meta.code)
-            .with_annotation(
-                Annotation::primary(literal.span()).with_message("This literal is being passed positionally."),
-            )
-            .with_note(
-                "Passing literals positionally can make code less clear, especially with booleans, numbers, or `null`.",
-            )
-            .with_help(format!("Consider using a named argument instead: `function_name(param: {literal_value})`.")),
-        );
+            let Expression::Literal(literal) = &positional_argument.value else {
+                continue;
+            };
+
+            let literal_value = match literal {
+                Literal::String(lit_str) => lit_str.raw,
+                Literal::Integer(lit_int) => lit_int.raw,
+                Literal::Float(lit_float) => lit_float.raw,
+                Literal::True(_) => "true",
+                Literal::False(_) => "false",
+                Literal::Null(_) => "null",
+            };
+
+            ctx.collector.report(
+                Issue::new(
+                    self.cfg.level,
+                    format!("Literal argument `{literal_value}` should be passed as a named argument for clarity."),
+                )
+                .with_code(self.meta.code)
+                .with_annotation(
+                    Annotation::primary(literal.span()).with_message("This literal is being passed positionally."),
+                )
+                .with_note(
+                    "Passing literals positionally can make code less clear, especially with booleans, numbers, or `null`.",
+                )
+                .with_help(format!("Consider using a named argument instead: `function_name(param: {literal_value})`.")),
+            );
+        }
     }
 }
