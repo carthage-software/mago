@@ -4,6 +4,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  isSharing: {
+    type: Boolean,
+    default: false,
+  },
   wasmReady: {
     type: Boolean,
     default: false,
@@ -20,6 +24,10 @@ defineProps({
     type: String,
     default: null,
   },
+  shareUrl: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['format', 'share', 'toggle-settings']);
@@ -33,9 +41,18 @@ const emit = defineEmits(['format', 'share', 'toggle-settings']);
         :disabled="isLoading || !wasmReady"
         @click="emit('format')"
       >
-        <span class="btn-icon">⎘</span>
         Format
       </button>
+    </div>
+
+    <div v-if="shareUrl" class="toolbar-center">
+      <input
+        type="text"
+        class="share-url-input"
+        :value="shareUrl"
+        readonly
+        @click="$event.target.select()"
+      />
     </div>
 
     <div class="toolbar-right">
@@ -47,20 +64,18 @@ const emit = defineEmits(['format', 'share', 'toggle-settings']);
       </div>
 
       <button
-        class="btn btn-icon-only"
-        title="Share"
-        :disabled="isLoading"
+        class="btn btn-secondary"
+        :disabled="isLoading || isSharing"
         @click="emit('share')"
       >
-        <span class="btn-icon">🔗</span>
+        Share
       </button>
 
       <button
-        :class="['btn', 'btn-icon-only', { active: settingsOpen }]"
-        title="Settings"
+        :class="['btn', 'btn-secondary', { active: settingsOpen }]"
         @click="emit('toggle-settings')"
       >
-        <span class="btn-icon">⚙</span>
+        Settings
       </button>
     </div>
   </div>
@@ -82,13 +97,22 @@ const emit = defineEmits(['format', 'share', 'toggle-settings']);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  min-width: 0;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 6px 16px;
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -113,26 +137,10 @@ const emit = defineEmits(['format', 'share', 'toggle-settings']);
   border-color: var(--vp-c-brand-1);
 }
 
-.btn-icon-only {
-  padding: 8px;
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-2);
-  border: 1px solid var(--vp-c-divider);
-}
-
-.btn-icon-only:hover:not(:disabled) {
-  color: var(--vp-c-text-1);
-  border-color: var(--vp-c-brand-1);
-}
-
-.btn-icon-only.active {
+.btn-secondary.active {
   background: var(--vp-c-brand-soft);
   color: var(--vp-c-brand-1);
   border-color: var(--vp-c-brand-1);
-}
-
-.btn-icon {
-  font-size: 14px;
 }
 
 .share-feedback {
@@ -150,6 +158,26 @@ const emit = defineEmits(['format', 'share', 'toggle-settings']);
 .share-feedback.error {
   background: #e5393520;
   color: #e53935;
+}
+
+.share-url-input {
+  width: 100%;
+  min-width: 600px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: 'Fira Code', monospace;
+  text-align: center;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  outline: none;
+  animation: fadeIn 0.2s ease;
+}
+
+.share-url-input:focus {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-text-1);
 }
 
 @keyframes fadeIn {

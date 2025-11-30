@@ -1,19 +1,8 @@
 import { ref } from 'vue';
 
-const MAX_URL_LENGTH = 2000;
+const API_BASE_URL = 'https://carthage.software/api/playground';
 
-async function compressState(state) {
-  const json = JSON.stringify(state);
-  const stream = new Blob([json])
-    .stream()
-    .pipeThrough(new CompressionStream('gzip'));
-  const compressed = await new Response(stream).arrayBuffer();
-
-  return btoa(String.fromCharCode(...new Uint8Array(compressed)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function decompressState(encoded) {
   let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
@@ -33,27 +22,53 @@ async function decompressState(encoded) {
 export function useUrlState() {
   const shareError = ref(null);
   const shareSuccess = ref(false);
+  const isSharing = ref(false);
+  const shareUrl = ref(null);
+
+  let lastStateHash = null;
 
   async function generateShareUrl(state) {
+    const stateHash = JSON.stringify(state);
+
+    if (shareUrl.value && lastStateHash === stateHash) {
+      return shareUrl.value;
+    }
+
     shareError.value = null;
     shareSuccess.value = false;
+    isSharing.value = true;
 
     try {
-      const encoded = await compressState(state);
-      const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
+      const [response] = await Promise.all([
+        fetch(`${API_BASE_URL}/share`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        }),
+        new Promise((r) => setTimeout(r, 500)),
+      ]);
 
-      if (url.length > MAX_URL_LENGTH) {
-        throw new Error(
-          `Code is too long to share (${url.length} characters). ` +
-          `Please reduce the code size to share via URL.`
-        );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create share link');
       }
 
-      return url;
+      const { uuid } = await response.json();
+      shareUrl.value = `${window.location.origin}${window.location.pathname}#${uuid}`;
+      lastStateHash = stateHash;
+
+      return shareUrl.value;
     } catch (e) {
       shareError.value = e.message || 'Failed to generate share URL';
       throw e;
+    } finally {
+      isSharing.value = false;
     }
+  }
+
+  function clearShareUrl() {
+    shareUrl.value = null;
+    lastStateHash = null;
   }
 
   async function loadFromUrl() {
@@ -61,6 +76,16 @@ export function useUrlState() {
     if (!hash) return null;
 
     try {
+      if (UUID_REGEX.test(hash)) {
+        const response = await fetch(`${API_BASE_URL}/share/${hash}`);
+        if (!response.ok) {
+          console.warn('Failed to load shared state:', response.status);
+          return null;
+        }
+        const { state } = await response.json();
+        return state;
+      }
+
       return await decompressState(hash);
     } catch (e) {
       console.warn('Failed to load state from URL:', e);
@@ -85,8 +110,11 @@ export function useUrlState() {
   return {
     shareError,
     shareSuccess,
+    isSharing,
+    shareUrl,
     generateShareUrl,
     loadFromUrl,
     copyToClipboard,
+    clearShareUrl,
   };
 }

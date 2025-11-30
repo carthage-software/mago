@@ -28,11 +28,16 @@ const allIssues = computed(() => {
   return props.results.issues || [];
 });
 
+function matchesSource(issueSource, filterSource) {
+  if (issueSource === 'both') return true;
+  return issueSource === filterSource;
+}
+
 const displayedIssues = computed(() => {
   let issues = allIssues.value;
 
   if (activeFilter.value) {
-    issues = issues.filter((i) => i.source === activeFilter.value);
+    issues = issues.filter((i) => matchesSource(i.source, activeFilter.value));
   }
 
   return [...issues].sort((a, b) => {
@@ -43,11 +48,11 @@ const displayedIssues = computed(() => {
 });
 
 const linterCount = computed(() => {
-  return allIssues.value.filter((i) => i.source === 'linter').length;
+  return allIssues.value.filter((i) => i.source === 'linter' || i.source === 'both').length;
 });
 
 const analyzerCount = computed(() => {
-  return allIssues.value.filter((i) => i.source === 'analyzer').length;
+  return allIssues.value.filter((i) => i.source === 'analyzer' || i.source === 'both').length;
 });
 
 const analysisTime = computed(() => {
@@ -87,12 +92,13 @@ function getLevelIcon(level) {
   }
 }
 
-function getSourceLabel(source) {
-  return source === 'analyzer' ? 'Analyzer' : 'Linter';
-}
-
-function getSourceClass(source) {
-  return source === 'analyzer' ? 'source-analyzer' : 'source-linter';
+function getDisplaySource(source) {
+  if (source === 'both') {
+    if (activeFilter.value === 'linter') return 'linter';
+    if (activeFilter.value === 'analyzer') return 'analyzer';
+    return 'both';
+  }
+  return source;
 }
 
 function formatCode(code) {
@@ -181,9 +187,15 @@ function handleIssueLeave() {
             <span :class="['issue-icon', getLevelClass(issue.level)]">
               {{ getLevelIcon(issue.level) }}
             </span>
-            <span :class="['issue-source', getSourceClass(issue.source)]">
-              {{ getSourceLabel(issue.source) }}
-            </span>
+            <template v-if="getDisplaySource(issue.source) === 'both'">
+              <span class="issue-source source-linter">Linter</span>
+              <span class="issue-source source-analyzer">Analyzer</span>
+            </template>
+            <template v-else>
+              <span :class="['issue-source', getDisplaySource(issue.source) === 'analyzer' ? 'source-analyzer' : 'source-linter']">
+                {{ getDisplaySource(issue.source) === 'analyzer' ? 'Analyzer' : 'Linter' }}
+              </span>
+            </template>
             <span v-if="issue.code" class="issue-code">{{ formatCode(issue.code) }}</span>
             <span class="issue-level">{{ issue.level }}</span>
           </div>
@@ -415,9 +427,17 @@ function handleIssueLeave() {
   text-transform: uppercase;
   padding: 2px 6px;
   border-radius: 3px;
-  background: var(--vp-c-bg-soft);
-  color: var(--vp-c-text-2);
   letter-spacing: 0.3px;
+}
+
+.issue-source.source-linter {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.issue-source.source-analyzer {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
 }
 
 .issue-code {

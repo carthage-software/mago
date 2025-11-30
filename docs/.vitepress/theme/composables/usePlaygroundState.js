@@ -7,12 +7,12 @@ const DEFAULT_CODE = `<?php
 /**
  * @return list<string>
  */
-function takesAnInt(int $i) {
+function take_int(int $i) {
     return [$i, "hello"];
 }
 
 $data = ["some text", 5];
-takesAnInt($data[0]);
+take_int($data[0]);
 
 $condition = rand(0, 5);
 if ($condition) {
@@ -119,9 +119,12 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
       if (data.a) {
         Object.assign(state.settings.analyzer, data.a);
       }
+
       if (data.l && data.l.d) {
         state.settings.linter.disabledRules = data.l.d;
       }
+
+      if (data.t) state.activeTab = data.t;
     },
 
     getShareableState() {
@@ -130,6 +133,7 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         v: state.settings.phpVersion,
         a: state.settings.analyzer,
         l: { d: state.settings.linter.disabledRules },
+        t: state.activeTab,
       };
     },
   };

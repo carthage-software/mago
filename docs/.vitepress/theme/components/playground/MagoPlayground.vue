@@ -12,7 +12,7 @@ const store = createPlaygroundState();
 const { state } = store;
 
 const { isLoading: wasmLoading, isReady: wasmReady, analyze, format, loadWasm, getRules } = useMagoWasm();
-const { shareError, shareSuccess, generateShareUrl, loadFromUrl, copyToClipboard } = useUrlState();
+const { shareError, shareSuccess, isSharing, shareUrl, generateShareUrl, loadFromUrl, copyToClipboard, clearShareUrl } = useUrlState();
 
 const hasRunOnce = ref(false);
 const highlightedRange = ref(null);
@@ -74,6 +74,14 @@ watch(
   () => {
     if (!wasmReady.value || !hasRunOnce.value) return;
     runAnalysis();
+  },
+  { deep: true }
+);
+
+watch(
+  () => store.getShareableState(),
+  () => {
+    clearShareUrl();
   },
   { deep: true }
 );
@@ -179,7 +187,6 @@ onUnmounted(() => {
 
 <template>
   <div class="mago-playground">
-    <!-- WASM Loading Overlay -->
     <div v-if="wasmLoading" class="loading-overlay">
       <div class="loading-content">
         <div class="loading-spinner"></div>
@@ -188,12 +195,22 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <div v-if="isSharing" class="loading-overlay sharing-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <h3>Generating Share Link</h3>
+        <p>Please wait...</p>
+      </div>
+    </div>
+
     <PlaygroundToolbar
       :is-loading="state.isLoading || wasmLoading"
+      :is-sharing="isSharing"
       :wasm-ready="wasmReady"
       :settings-open="state.settingsOpen"
       :share-success="shareSuccess"
       :share-error="shareError"
+      :share-url="shareUrl"
       @format="handleFormat"
       @share="handleShare"
       @toggle-settings="handleToggleSettings"
@@ -294,6 +311,42 @@ onUnmounted(() => {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.sharing-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.15s ease;
+}
+
+.sharing-overlay .loading-content {
+  background: var(--vp-c-bg);
+  padding: 32px 48px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.sharing-overlay .loading-spinner {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.sharing-overlay .loading-content h3 {
+  font-size: 16px;
+}
+
+.sharing-overlay .loading-content p {
+  font-size: 13px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
