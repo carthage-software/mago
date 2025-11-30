@@ -63,7 +63,7 @@ use crate::utils::version::extract_minimum_php_version;
 ///
 /// - PHP version targeting
 /// - Source path configuration
-/// - Formatter style settings (PSR-12 compatible by default)
+/// - Formatter style settings (PER-CS compatible by default)
 /// - Linter rules and integrations
 /// - Analyzer features and options
 const CONFIGURATION_TEMPLATE: &str = r#"# Welcome to Mago!
@@ -71,6 +71,7 @@ const CONFIGURATION_TEMPLATE: &str = r#"# Welcome to Mago!
 php-version = "{php_version}"
 
 [source]
+workspace = "."
 paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
@@ -240,14 +241,10 @@ struct InitializationProjectSettings {
 /// Analyzer configuration settings collected during initialization.
 ///
 /// This struct holds all analyzer-specific settings gathered from user prompts,
-/// including feature toggles and issue category selections. These settings
-/// determine the depth and scope of static analysis.
+/// including feature toggles. These settings determine the depth and scope of
+/// static analysis.
 #[derive(Debug)]
 struct InitializationAnalyzerSettings {
-    /// Issue codes to ignore globally
-    ignore: Vec<String>,
-    /// Issue categories to disable (e.g., "nullable", "mixed")
-    disabled_categories: Vec<String>,
     /// Whether to find unused definitions (classes, functions, methods)
     find_unused_definitions: bool,
     /// Whether to find unused expressions (statements with no effect)
@@ -260,6 +257,16 @@ struct InitializationAnalyzerSettings {
     allow_possibly_undefined_array_keys: bool,
     /// Whether to enable heuristic-based code quality checks
     perform_heuristic_checks: bool,
+    /// Whether to track literal values of class properties
+    memoize_properties: bool,
+    /// Whether to enforce strict checks when accessing list elements by index
+    strict_list_index_checks: bool,
+    /// Whether to disallow comparisons with boolean literals
+    no_boolean_literal_comparison: bool,
+    /// Whether to check for missing type hints
+    check_missing_type_hints: bool,
+    /// Whether to register superglobals in analysis context
+    register_super_globals: bool,
 }
 
 fn print_welcome_banner() {
@@ -401,6 +408,7 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         .interact()?
     {
         println!("  │");
+        println!("  │  {}", "Detection Settings:".underline());
         let find_unused_definitions = Confirm::with_theme(theme)
             .with_prompt(" │  Find unused definitions (e.g., private methods)?")
             .default(true)
@@ -410,36 +418,62 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .default(false)
             .interact()?;
         let analyze_dead_code = Confirm::with_theme(theme)
-            .with_prompt(" │ Analyze code that appears to be unreachable?")
+            .with_prompt(" │  Analyze code that appears to be unreachable?")
             .default(false)
             .interact()?;
+
+        println!("  │");
+        println!("  │  {}", "Type Checking:".underline());
         let check_throws = Confirm::with_theme(theme)
             .with_prompt(" │  Check for unhandled thrown exceptions?")
-            .default(true)
+            .default(false)
             .interact()?;
+        let check_missing_type_hints =
+            Confirm::with_theme(theme).with_prompt(" │  Check for missing type hints?").default(false).interact()?;
+        let no_boolean_literal_comparison = Confirm::with_theme(theme)
+            .with_prompt(" │  Disallow comparisons with boolean literals?")
+            .default(false)
+            .interact()?;
+
+        println!("  │");
+        println!("  │  {}", "Array Handling:".underline());
         let allow_possibly_undefined_array_keys = Confirm::with_theme(theme)
             .with_prompt(" │  Allow accessing possibly undefined array keys?")
             .default(true)
             .interact()?;
+        let strict_list_index_checks = Confirm::with_theme(theme)
+            .with_prompt(" │  Enforce strict checks for list index access?")
+            .default(false)
+            .interact()?;
+
+        println!("  │");
+        println!("  │  {}", "Other Settings:".underline());
         let perform_heuristic_checks = Confirm::with_theme(theme)
             .with_prompt(" │  Enable extra heuristic checks for code quality?")
             .default(true)
             .interact()?;
-
-        println!("  │");
-        let ignore = prompt_for_paths(theme, "Issue codes to ignore globally (comma-separated)", None)?;
-        let disabled_categories = prompt_for_disabled_categories(theme)?;
+        let memoize_properties = Confirm::with_theme(theme)
+            .with_prompt(" │  Track literal values of class properties?")
+            .default(true)
+            .interact()?;
+        let register_super_globals = Confirm::with_theme(theme)
+            .with_prompt(" │  Register superglobals ($_GET, $_POST, etc.)?")
+            .default(true)
+            .interact()?;
 
         println!("  ╰─");
         Ok(InitializationAnalyzerSettings {
-            ignore,
-            disabled_categories,
             find_unused_definitions,
             find_unused_expressions,
             analyze_dead_code,
             check_throws,
             allow_possibly_undefined_array_keys,
             perform_heuristic_checks,
+            memoize_properties,
+            strict_list_index_checks,
+            no_boolean_literal_comparison,
+            check_missing_type_hints,
+            register_super_globals,
         })
     } else {
         println!("  │");
@@ -449,7 +483,7 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             Confirm::with_theme(theme).with_prompt(" │  Find unused definitions?").default(true).interact()?;
         let check_throws = Confirm::with_theme(theme)
             .with_prompt(" │  Check for unhandled thrown exceptions?")
-            .default(true)
+            .default(false)
             .interact()?;
         let perform_heuristic_checks = Confirm::with_theme(theme)
             .with_prompt(" │  Enable extra heuristic checks for code quality?")
@@ -457,14 +491,17 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .interact()?;
         println!("  ╰─");
         Ok(InitializationAnalyzerSettings {
-            ignore: Vec::new(),
-            disabled_categories: Vec::new(),
             find_unused_definitions,
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws,
             allow_possibly_undefined_array_keys: true,
             perform_heuristic_checks,
+            memoize_properties: true,
+            strict_list_index_checks: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            register_super_globals: true,
         })
     }
 }
@@ -623,37 +660,6 @@ fn prompt_for_integrations(theme: &ColorfulTheme) -> Result<Vec<Integration>, Er
     Ok(selections.into_iter().map(|i| items[i]).collect())
 }
 
-fn prompt_for_disabled_categories(theme: &ColorfulTheme) -> Result<Vec<String>, Error> {
-    const CATEGORIES: [&str; 19] = [
-        "falsable",
-        "nullable",
-        "mixed",
-        "redundancy",
-        "reference",
-        "unreachable",
-        "deprecation",
-        "impossibility",
-        "ambiguity",
-        "existence",
-        "template",
-        "argument",
-        "operand",
-        "property",
-        "generator",
-        "array",
-        "return",
-        "method",
-        "iterator",
-    ];
-
-    let selections = MultiSelect::with_theme(theme)
-        .with_prompt(" │  Select issue categories to disable (all are enabled by default)")
-        .items(CATEGORIES)
-        .interact()?;
-
-    Ok(selections.into_iter().map(|i| CATEGORIES[i].to_string()).collect())
-}
-
 fn quote_format_strings(items: &[String]) -> String {
     items.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(", ")
 }
@@ -661,29 +667,152 @@ fn quote_format_strings(items: &[String]) -> String {
 fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> String {
     let mut lines = Vec::new();
 
-    if !settings.ignore.is_empty() {
-        lines.push("# Ignored Issues".to_string());
-        lines.push(format!("ignore = [{}]", quote_format_strings(&settings.ignore)));
-        lines.push("".to_string());
-    }
-
-    if !settings.disabled_categories.is_empty() {
-        lines.push("# Disabled Issue Categories".to_string());
-        for category in &settings.disabled_categories {
-            lines.push(format!("{}-issues = false", category));
-        }
-        lines.push("".to_string());
-    }
-
-    if !lines.is_empty() {
-        lines.push("# Analyzer Settings".to_string());
-    }
     lines.push(format!("find-unused-definitions = {}", settings.find_unused_definitions));
     lines.push(format!("find-unused-expressions = {}", settings.find_unused_expressions));
     lines.push(format!("analyze-dead-code = {}", settings.analyze_dead_code));
-    lines.push(format!("check-throws = {}", settings.check_throws));
+    lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
+    lines.push(format!("check-throws = {}", settings.check_throws));
     lines.push(format!("perform-heuristic-checks = {}", settings.perform_heuristic_checks));
+    lines.push(format!("strict-list-index-checks = {}", settings.strict_list_index_checks));
+    lines.push(format!("no-boolean-literal-comparison = {}", settings.no_boolean_literal_comparison));
+    lines.push(format!("check-missing-type-hints = {}", settings.check_missing_type_hints));
+    lines.push(format!("register-super-globals = {}", settings.register_super_globals));
 
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::config::Configuration;
+
+    fn create_default_analyzer_settings() -> InitializationAnalyzerSettings {
+        InitializationAnalyzerSettings {
+            find_unused_definitions: true,
+            find_unused_expressions: false,
+            analyze_dead_code: false,
+            check_throws: false,
+            allow_possibly_undefined_array_keys: true,
+            perform_heuristic_checks: true,
+            memoize_properties: true,
+            strict_list_index_checks: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            register_super_globals: true,
+        }
+    }
+
+    fn generate_config_content(
+        php_version: &str,
+        paths: &[String],
+        includes: &[String],
+        excludes: &[String],
+        integrations: &[Integration],
+        print_width: u16,
+        tab_width: u8,
+        use_tabs: bool,
+        analyzer_settings: &InitializationAnalyzerSettings,
+    ) -> String {
+        CONFIGURATION_TEMPLATE
+            .replace("{php_version}", php_version)
+            .replace("{paths}", &quote_format_strings(paths))
+            .replace("{includes}", &quote_format_strings(includes))
+            .replace("{excludes}", &quote_format_strings(excludes))
+            .replace(
+                "{integrations}",
+                &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
+            )
+            .replace("{print_width}", &print_width.to_string())
+            .replace("{tab_width}", &tab_width.to_string())
+            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{analyzer_settings}", &build_analyzer_settings_string(analyzer_settings))
+    }
+
+    #[test]
+    fn test_generated_config_parses_with_defaults() {
+        let content = generate_config_content(
+            "8.2",
+            &["src".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[],
+            120,
+            4,
+            false,
+            &create_default_analyzer_settings(),
+        );
+
+        let result: Result<Configuration, _> = toml::from_str(&content);
+        assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+    }
+
+    #[test]
+    fn test_generated_config_parses_with_all_options() {
+        let settings = InitializationAnalyzerSettings {
+            find_unused_definitions: true,
+            find_unused_expressions: true,
+            analyze_dead_code: true,
+            check_throws: true,
+            allow_possibly_undefined_array_keys: false,
+            perform_heuristic_checks: true,
+            memoize_properties: true,
+            strict_list_index_checks: true,
+            no_boolean_literal_comparison: true,
+            check_missing_type_hints: true,
+            register_super_globals: false,
+        };
+
+        let content = generate_config_content(
+            "8.4",
+            &["src".to_string(), "app".to_string()],
+            &["vendor".to_string()],
+            &["tests".to_string()],
+            &[Integration::Symfony, Integration::PHPUnit],
+            100,
+            2,
+            true,
+            &settings,
+        );
+
+        let result: Result<Configuration, _> = toml::from_str(&content);
+        assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+    }
+
+    #[test]
+    fn test_generated_config_parses_with_integrations() {
+        let content = generate_config_content(
+            "8.3",
+            &["src".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[Integration::Psl, Integration::Laravel, Integration::PHPUnit, Integration::Symfony],
+            120,
+            4,
+            false,
+            &create_default_analyzer_settings(),
+        );
+
+        let result: Result<Configuration, _> = toml::from_str(&content);
+        assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+    }
+
+    #[test]
+    fn test_analyzer_settings_string_generation() {
+        let settings = create_default_analyzer_settings();
+        let output = build_analyzer_settings_string(&settings);
+
+        assert!(output.contains("find-unused-definitions = true"));
+        assert!(output.contains("find-unused-expressions = false"));
+        assert!(output.contains("analyze-dead-code = false"));
+        assert!(output.contains("memoize-properties = true"));
+        assert!(output.contains("allow-possibly-undefined-array-keys = true"));
+        assert!(output.contains("check-throws = false"));
+        assert!(output.contains("perform-heuristic-checks = true"));
+        assert!(output.contains("strict-list-index-checks = false"));
+        assert!(output.contains("no-boolean-literal-comparison = false"));
+        assert!(output.contains("check-missing-type-hints = false"));
+        assert!(output.contains("register-super-globals = true"));
+    }
 }
