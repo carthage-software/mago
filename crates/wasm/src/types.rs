@@ -12,6 +12,7 @@ use mago_reporting::Level;
 pub enum IssueSource {
     Linter,
     Analyzer,
+    Both,
 }
 
 /// WASM-safe issue representation that uses line/column positions instead of byte offsets.

@@ -4,6 +4,7 @@
 //! and formatting functionality, designed to work in browser environments.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
@@ -56,6 +57,12 @@ fn load_prelude() -> Prelude {
     Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
 }
 
+fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
+    let code = issue.code.as_ref()?;
+    let ann = issue.annotations.first()?;
+    Some((code.clone(), ann.start_line, ann.start_column))
+}
+
 #[wasm_bindgen]
 pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let settings: WasmSettings = serde_wasm_bindgen::from_value(settings_js).unwrap_or_default();
@@ -64,8 +71,6 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
     let file_id = file.id;
 
-    let mut all_issues: Vec<WasmIssue> = Vec::new();
-
     let disabled_rules: HashSet<String> = settings.linter.disabled_rules.into_iter().collect();
 
     let linter_settings = LinterSettings { php_version: version, ..Default::default() };
@@ -73,13 +78,22 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let service = LintService::new(database, linter_settings, false);
     let linter_issues = service.lint_file(&file, LintMode::Full, None);
 
+    let mut issue_map: HashMap<(String, u32, u32), WasmIssue> = HashMap::new();
+    let mut issues_without_key: Vec<WasmIssue> = Vec::new();
+
     for issue in linter_issues.iter() {
         if let Some(code) = &issue.code
             && disabled_rules.contains(code)
         {
             continue;
         }
-        all_issues.push(WasmIssue::from_issue(issue, &file, IssueSource::Linter));
+
+        let wasm_issue = WasmIssue::from_issue(issue, &file, IssueSource::Linter);
+        if let Some(key) = issue_key(&wasm_issue) {
+            issue_map.insert(key, wasm_issue);
+        } else {
+            issues_without_key.push(wasm_issue);
+        }
     }
 
     let mut prelude = load_prelude();
@@ -119,7 +133,21 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         .get_ref(&file_id)
         .expect("File should exist in prelude database after being added prior to analysis");
 
-    all_issues.extend(analyzer_issues.iter().map(|i| WasmIssue::from_issue(i, file, IssueSource::Analyzer)));
+    for issue in analyzer_issues.iter() {
+        let wasm_issue = WasmIssue::from_issue(issue, file, IssueSource::Analyzer);
+        if let Some(key) = issue_key(&wasm_issue) {
+            if let Some(existing) = issue_map.get_mut(&key) {
+                existing.source = IssueSource::Both;
+            } else {
+                issue_map.insert(key, wasm_issue);
+            }
+        } else {
+            issues_without_key.push(wasm_issue);
+        }
+    }
+
+    let mut all_issues: Vec<WasmIssue> = issue_map.into_values().collect();
+    all_issues.extend(issues_without_key);
 
     serde_wasm_bindgen::to_value(&all_issues).map_err(|e| JsValue::from_str(&e.to_string()))
 }

@@ -45,6 +45,7 @@ jobs:
 
       - name: Copy WASM to docs
         run: |
+          mkdir -p docs/public/wasm
           cp crates/wasm/pkg-web/mago_wasm.js docs/public/wasm/
           cp crates/wasm/pkg-web/mago_wasm_bg.wasm docs/public/wasm/
 
