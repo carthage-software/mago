@@ -1,8 +1,10 @@
 mod docblock;
 mod hierarchy;
+mod merge;
 mod methods;
 mod properties;
 mod signatures;
+mod sorter;
 mod templates;
 
 use ahash::HashSet;
@@ -49,17 +51,9 @@ pub fn populate_codebase(
         }
     }
 
-    // Use recursive version with HashSet optimization
-    for class_name in &class_likes_to_repopulate {
-        let mut population_stack = AtomSet::default();
-        hierarchy::populate_class_like_metadata(
-            class_name,
-            codebase,
-            symbol_references,
-            &safe_symbols,
-            &safe_symbol_members,
-            &mut population_stack,
-        );
+    let sorted_classes = sorter::sort_class_likes(codebase, &class_likes_to_repopulate);
+    for class_name in sorted_classes {
+        hierarchy::populate_class_like_metadata_iterative(&class_name, codebase, symbol_references);
     }
 
     for (name, function_like_metadata) in codebase.function_likes.iter_mut() {
