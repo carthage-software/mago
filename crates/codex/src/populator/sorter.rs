@@ -34,10 +34,10 @@ fn visit(
     visiting.insert(*class_like);
 
     if let Some(metadata) = codebase.class_likes.get(class_like) {
-        if let Some(parent) = metadata.direct_parent_class {
-            if class_likes_to_repopulate.contains(&parent) {
-                visit(&parent, codebase, class_likes_to_repopulate, visited, visiting, sorted);
-            }
+        if let Some(parent) = metadata.direct_parent_class
+            && class_likes_to_repopulate.contains(&parent)
+        {
+            visit(&parent, codebase, class_likes_to_repopulate, visited, visiting, sorted);
         }
 
         for trait_name in &metadata.used_traits {

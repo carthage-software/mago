@@ -745,16 +745,16 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0] {
-            if let Some((key, _)) = &keyed.parameters {
-                assert!(key.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0]
+            && let Some((key, _)) = &keyed.parameters
+        {
+            assert!(key.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -771,16 +771,16 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0] {
-            if let Some((_, value)) = &keyed.parameters {
-                assert!(value.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0]
+            && let Some((_, value)) = &keyed.parameters
+        {
+            assert!(value.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -802,17 +802,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0] {
-            if let Some(items) = &keyed.known_items {
-                let (_, item_type) = items.get(&ArrayKey::String(atom("key"))).unwrap();
-                assert!(item_type.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0]
+            && let Some(items) = &keyed.known_items
+        {
+            let (_, item_type) = items.get(&ArrayKey::String(atom("key"))).unwrap();
+            assert!(item_type.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -856,17 +856,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::List(list)) = &actual.types[0] {
-            if let Some(elements) = &list.known_elements {
-                let (_, element_type) = elements.get(&0).unwrap();
-                assert!(element_type.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Array(TArray::List(list)) = &actual.types[0]
+            && let Some(elements) = &list.known_elements
+        {
+            let (_, element_type) = elements.get(&0).unwrap();
+            assert!(element_type.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -886,24 +886,24 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0] {
-            if let Some((key, value)) = &keyed.parameters {
-                assert!(key.types.iter().any(|t| {
+        if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0]
+            && let Some((key, value)) = &keyed.parameters
+        {
+            assert!(key.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
+            if let TAtomic::Array(TArray::List(inner)) = &value.types[0] {
+                assert!(inner.element_type.types.iter().any(|t| {
                     if let TAtomic::Object(TObject::Named(named)) = t {
                         named.name == ascii_lowercase_atom("foo")
                     } else {
                         false
                     }
                 }));
-                if let TAtomic::Array(TArray::List(inner)) = &value.types[0] {
-                    assert!(inner.element_type.types.iter().any(|t| {
-                        if let TAtomic::Object(TObject::Named(named)) = t {
-                            named.name == ascii_lowercase_atom("foo")
-                        } else {
-                            false
-                        }
-                    }));
-                }
             }
         }
     }
@@ -1107,16 +1107,16 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Object(TObject::Named(named)) = &actual.types[0] {
-            if let Some(params) = &named.type_parameters {
-                assert!(params[0].types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Object(TObject::Named(named)) = &actual.types[0]
+            && let Some(params) = &named.type_parameters
+        {
+            assert!(params[0].types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -1188,16 +1188,16 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0] {
-            if let Some(ret) = sig.get_return_type() {
-                assert!(ret.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0]
+            && let Some(ret) = sig.get_return_type()
+        {
+            assert!(ret.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -1214,18 +1214,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0] {
-            if let Some(param) = sig.get_parameters().first() {
-                if let Some(param_type) = param.get_type_signature() {
-                    assert!(param_type.types.iter().any(|t| {
-                        if let TAtomic::Object(TObject::Named(named)) = t {
-                            named.name == ascii_lowercase_atom("foo")
-                        } else {
-                            false
-                        }
-                    }));
+        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0]
+            && let Some(param) = sig.get_parameters().first()
+            && let Some(param_type) = param.get_type_signature()
+        {
+            assert!(param_type.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
                 }
-            }
+            }));
         }
     }
 
@@ -1289,16 +1288,16 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0] {
-            if let Some(ret) = sig.get_return_type() {
-                assert!(ret.types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Callable(TCallable::Signature(sig)) = &actual.types[0]
+            && let Some(ret) = sig.get_return_type()
+        {
+            assert!(ret.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
         }
     }
 
@@ -1349,18 +1348,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::GenericParameter(param) = &actual.types[0] {
-            if let TAtomic::Object(TObject::Named(named)) = &param.constraint.types[0] {
-                if let Some(params) = &named.type_parameters {
-                    assert!(params[0].types.iter().any(|t| {
-                        if let TAtomic::Object(TObject::Named(named)) = t {
-                            named.name == ascii_lowercase_atom("foo")
-                        } else {
-                            false
-                        }
-                    }));
+        if let TAtomic::GenericParameter(param) = &actual.types[0]
+            && let TAtomic::Object(TObject::Named(named)) = &param.constraint.types[0]
+            && let Some(params) = &named.type_parameters
+        {
+            assert!(params[0].types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
                 }
-            }
+            }));
         }
     }
 
@@ -1411,10 +1409,9 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) = &actual.types[0]
+            && let TAtomic::Object(TObject::Named(named)) = constraint.as_ref()
         {
-            if let TAtomic::Object(TObject::Named(named)) = constraint.as_ref() {
-                assert_eq!(named.name, ascii_lowercase_atom("foo"));
-            }
+            assert_eq!(named.name, ascii_lowercase_atom("foo"));
         }
     }
 
@@ -1432,10 +1429,9 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) = &actual.types[0]
+            && let TAtomic::Object(TObject::Named(named)) = constraint.as_ref()
         {
-            if let TAtomic::Object(TObject::Named(named)) = constraint.as_ref() {
-                assert_eq!(named.name, ascii_lowercase_atom("foo"));
-            }
+            assert_eq!(named.name, ascii_lowercase_atom("foo"));
         }
     }
 
@@ -1478,7 +1474,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1519,7 +1515,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1540,7 +1536,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1698,7 +1694,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1719,7 +1715,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1737,7 +1733,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1756,7 +1752,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1801,7 +1797,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1837,7 +1833,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1875,7 +1871,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1900,7 +1896,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -1927,7 +1923,7 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        assert!(actual.types.len() >= 1);
+        assert!(!actual.types.is_empty());
     }
 
     #[test]
@@ -2115,18 +2111,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Array(TArray::List(outer)) = &actual.types[0] {
-            if let TAtomic::Array(TArray::List(middle)) = &outer.element_type.types[0] {
-                if let TAtomic::Array(TArray::List(inner)) = &middle.element_type.types[0] {
-                    assert!(inner.element_type.types.iter().any(|t| {
-                        if let TAtomic::Object(TObject::Named(named)) = t {
-                            named.name == ascii_lowercase_atom("foo")
-                        } else {
-                            false
-                        }
-                    }));
+        if let TAtomic::Array(TArray::List(outer)) = &actual.types[0]
+            && let TAtomic::Array(TArray::List(middle)) = &outer.element_type.types[0]
+            && let TAtomic::Array(TArray::List(inner)) = &middle.element_type.types[0]
+        {
+            assert!(inner.element_type.types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
                 }
-            }
+            }));
         }
     }
 
@@ -2198,23 +2193,23 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &options);
 
-        if let TAtomic::Object(TObject::Named(named)) = &actual.types[0] {
-            if let Some(params) = &named.type_parameters {
-                assert!(params[0].types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
-                    } else {
-                        false
-                    }
-                }));
-                assert!(params[1].types.iter().any(|t| {
-                    if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("bar")
-                    } else {
-                        false
-                    }
-                }));
-            }
+        if let TAtomic::Object(TObject::Named(named)) = &actual.types[0]
+            && let Some(params) = &named.type_parameters
+        {
+            assert!(params[0].types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("foo")
+                } else {
+                    false
+                }
+            }));
+            assert!(params[1].types.iter().any(|t| {
+                if let TAtomic::Object(TObject::Named(named)) = t {
+                    named.name == ascii_lowercase_atom("bar")
+                } else {
+                    false
+                }
+            }));
         }
     }
 }

@@ -93,9 +93,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         return combination.value_types.into_values().collect();
     }
 
-    if combination.value_types.remove(&*ATOM_VOID).is_some()
-        && combination.value_types.contains_key(&*ATOM_NULL)
-    {
+    if combination.value_types.remove(&*ATOM_VOID).is_some() && combination.value_types.contains_key(&*ATOM_NULL) {
         combination.value_types.insert(*ATOM_NULL, TAtomic::Null);
     }
 
@@ -871,8 +869,7 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key(&*ATOM_NUMERIC)
-            || combination.value_types.contains_key(&*ATOM_SCALAR))
+        && (combination.value_types.contains_key(&*ATOM_NUMERIC) || combination.value_types.contains_key(&*ATOM_SCALAR))
     {
         return;
     }

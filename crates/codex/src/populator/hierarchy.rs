@@ -178,15 +178,13 @@ pub fn populate_class_like_metadata_iterative(
                         )),
                 );
             }
-        } else {
-            if !codebase.symbols.contains(&source_class_name) {
-                metadata.issues.push(
-                    Issue::error(format!("Class `{}` not found for type import", source_class_name))
-                        .with_code("unknown-class-in-import-type")
-                        .with_annotation(Annotation::primary(import_span))
-                        .with_help(format!("Ensure that class `{}` is defined and scanned", source_class_name)),
-                );
-            }
+        } else if !codebase.symbols.contains(&source_class_name) {
+            metadata.issues.push(
+                Issue::error(format!("Class `{}` not found for type import", source_class_name))
+                    .with_code("unknown-class-in-import-type")
+                    .with_annotation(Annotation::primary(import_span))
+                    .with_help(format!("Ensure that class `{}` is defined and scanned", source_class_name)),
+            );
         }
     }
 
