@@ -21,6 +21,19 @@ pub enum TReferenceMemberSelector {
     EndsWith(Atom),
 }
 
+impl TReferenceMemberSelector {
+    /// Returns true if this selector matches the given member name.
+    #[inline]
+    pub fn matches(&self, name: &Atom) -> bool {
+        match self {
+            Self::Wildcard => true,
+            Self::Identifier(n) => n == name,
+            Self::StartsWith(prefix) => name.starts_with(prefix.as_str()),
+            Self::EndsWith(suffix) => name.ends_with(suffix.as_str()),
+        }
+    }
+}
+
 /// Represents an unresolved reference to a symbol or a class-like member.
 /// These require context (e.g., symbol tables, codebase analysis) to be resolved
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).

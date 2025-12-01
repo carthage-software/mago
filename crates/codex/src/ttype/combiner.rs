@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use ahash::HashSet;
 
@@ -6,6 +6,20 @@ use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
+
+static ATOM_FALSE: LazyLock<Atom> = LazyLock::new(|| atom("false"));
+static ATOM_TRUE: LazyLock<Atom> = LazyLock::new(|| atom("true"));
+static ATOM_BOOL: LazyLock<Atom> = LazyLock::new(|| atom("bool"));
+static ATOM_VOID: LazyLock<Atom> = LazyLock::new(|| atom("void"));
+static ATOM_NULL: LazyLock<Atom> = LazyLock::new(|| atom("null"));
+static ATOM_STRING: LazyLock<Atom> = LazyLock::new(|| atom("string"));
+static ATOM_FLOAT: LazyLock<Atom> = LazyLock::new(|| atom("float"));
+static ATOM_INT: LazyLock<Atom> = LazyLock::new(|| atom("int"));
+static ATOM_MIXED: LazyLock<Atom> = LazyLock::new(|| atom("mixed"));
+static ATOM_SCALAR: LazyLock<Atom> = LazyLock::new(|| atom("scalar"));
+static ATOM_ARRAY_KEY: LazyLock<Atom> = LazyLock::new(|| atom("array-key"));
+static ATOM_NUMERIC: LazyLock<Atom> = LazyLock::new(|| atom("numeric"));
+static ATOM_NEVER: LazyLock<Atom> = LazyLock::new(|| atom("never"));
 
 use crate::metadata::CodebaseMetadata;
 use crate::symbol::SymbolKind;
@@ -68,29 +82,27 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     }
 
     if combination.is_simple() {
-        if combination.value_types.contains_key(&atom("false")) {
+        if combination.value_types.contains_key(&*ATOM_FALSE) {
             return vec![TAtomic::Scalar(TScalar::r#false())];
         }
 
-        if combination.value_types.contains_key(&atom("true")) {
+        if combination.value_types.contains_key(&*ATOM_TRUE) {
             return vec![TAtomic::Scalar(TScalar::r#true())];
         }
 
         return combination.value_types.into_values().collect();
     }
 
-    if combination.value_types.contains_key(&atom("void")) {
-        combination.value_types.remove(&atom("void"));
-
-        if combination.value_types.contains_key(&atom("null")) {
-            combination.value_types.insert(atom("null"), TAtomic::Null);
-        }
+    if combination.value_types.remove(&*ATOM_VOID).is_some()
+        && combination.value_types.contains_key(&*ATOM_NULL)
+    {
+        combination.value_types.insert(*ATOM_NULL, TAtomic::Null);
     }
 
-    if combination.value_types.contains_key(&atom("false")) && combination.value_types.contains_key(&atom("true")) {
-        combination.value_types.remove(&atom("false"));
-        combination.value_types.remove(&atom("true"));
-        combination.value_types.insert(atom("bool"), TAtomic::Scalar(TScalar::bool()));
+    if combination.value_types.contains_key(&*ATOM_FALSE) && combination.value_types.contains_key(&*ATOM_TRUE) {
+        combination.value_types.remove(&*ATOM_FALSE);
+        combination.value_types.remove(&*ATOM_TRUE);
+        combination.value_types.insert(*ATOM_BOOL, TAtomic::Scalar(TScalar::bool()));
     }
 
     let mut new_types = Vec::new();
@@ -176,15 +188,15 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
             .collect::<Vec<_>>(),
     );
 
-    if combination.value_types.contains_key(&atom("string"))
-        && combination.value_types.contains_key(&atom("float"))
-        && combination.value_types.contains_key(&atom("bool"))
+    if combination.value_types.contains_key(&*ATOM_STRING)
+        && combination.value_types.contains_key(&*ATOM_FLOAT)
+        && combination.value_types.contains_key(&*ATOM_BOOL)
         && combination.integers.iter().any(|integer| integer.is_unspecified())
     {
         combination.integers.clear();
-        combination.value_types.remove(&atom("string"));
-        combination.value_types.remove(&atom("float"));
-        combination.value_types.remove(&atom("bool"));
+        combination.value_types.remove(&*ATOM_STRING);
+        combination.value_types.remove(&*ATOM_FLOAT);
+        combination.value_types.remove(&*ATOM_BOOL);
 
         new_types.push(TAtomic::Scalar(TScalar::Generic));
     }
@@ -212,7 +224,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         combination.value_types.insert(enum_object.get_id(), enum_object);
     }
 
-    let mut has_never = combination.value_types.contains_key(&atom("never"));
+    let mut has_never = combination.value_types.contains_key(&*ATOM_NEVER);
 
     let combination_value_type_count = combination.value_types.len();
 
@@ -264,7 +276,7 @@ fn scrape_type_properties(
                 combination.mixed_from_loop_isset = Some(true);
             }
 
-            combination.value_types.insert(atom("mixed"), atomic);
+            combination.value_types.insert(*ATOM_MIXED, atomic);
 
             return;
         }
@@ -345,7 +357,7 @@ fn scrape_type_properties(
 
             combination.mixed_from_loop_isset = Some(false);
 
-            if combination.value_types.contains_key(&atom("null")) {
+            if combination.value_types.contains_key(&*ATOM_NULL) {
                 combination.generic_mixed = true;
                 return;
             }
@@ -396,7 +408,7 @@ fn scrape_type_properties(
 
     // bool|false = bool
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if !bool.is_general())
-        && combination.value_types.contains_key(&atom("bool"))
+        && combination.value_types.contains_key(&*ATOM_BOOL)
     {
         return;
     }
@@ -421,8 +433,8 @@ fn scrape_type_properties(
 
     // false|bool = bool
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general()) {
-        combination.value_types.remove(&atom("false"));
-        combination.value_types.remove(&atom("true"));
+        combination.value_types.remove(&*ATOM_FALSE);
+        combination.value_types.remove(&*ATOM_TRUE);
     }
 
     if let TAtomic::Array(array) = atomic {
@@ -536,7 +548,7 @@ fn scrape_type_properties(
                                 }
                             }
 
-                            combination.list_array_entries = BTreeMap::new();
+                            combination.list_array_entries.clear();
                         }
                     }
 
@@ -645,7 +657,7 @@ fn scrape_type_properties(
                                 }
                             }
 
-                            combination.keyed_array_entries = BTreeMap::new();
+                            combination.keyed_array_entries.clear();
                         }
                     }
 
@@ -694,10 +706,12 @@ fn scrape_type_properties(
                 let mut new_type_parameters = Vec::with_capacity(type_parameters.len());
                 for (i, type_param) in type_parameters.iter().enumerate() {
                     if let Some(existing_type_param) = existing_type_params.get(i) {
-                        new_type_parameters.insert(
-                            i,
-                            combine_union_types(existing_type_param, type_param, codebase, overwrite_empty_array),
-                        );
+                        new_type_parameters.push(combine_union_types(
+                            existing_type_param,
+                            type_param,
+                            codebase,
+                            overwrite_empty_array,
+                        ));
                     }
                 }
 
@@ -837,34 +851,34 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
-        if combination.value_types.contains_key(&atom("scalar")) {
+        if combination.value_types.contains_key(&*ATOM_SCALAR) {
             return;
         }
 
         combination.literal_strings = AtomSet::default();
         combination.integers = HashSet::default();
-        combination.value_types.retain(|k, _| k != "string" && k != "int");
+        combination.value_types.retain(|k, _| k != &*ATOM_STRING && k != &*ATOM_INT);
         combination.value_types.insert(atomic.get_id(), atomic);
 
         return;
     }
 
     if let TAtomic::Scalar(TScalar::String(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key(&atom("scalar"))
-            || combination.value_types.contains_key(&atom("array-key")))
+        && (combination.value_types.contains_key(&*ATOM_SCALAR)
+            || combination.value_types.contains_key(&*ATOM_ARRAY_KEY))
     {
         return;
     }
 
     if let TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_)) = atomic
-        && (combination.value_types.contains_key(&atom("numeric"))
-            || combination.value_types.contains_key(&atom("scalar")))
+        && (combination.value_types.contains_key(&*ATOM_NUMERIC)
+            || combination.value_types.contains_key(&*ATOM_SCALAR))
     {
         return;
     }
 
     if let TAtomic::Scalar(TScalar::String(mut string_scalar)) = atomic {
-        if let Some(existing_string_type) = combination.value_types.get_mut(&atom("string")) {
+        if let Some(existing_string_type) = combination.value_types.get_mut(&*ATOM_STRING) {
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
                 *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
             };
@@ -886,7 +900,7 @@ fn scrape_type_properties(
                 }
             }
 
-            combination.value_types.insert(atom("string"), TAtomic::Scalar(TScalar::String(string_scalar)));
+            combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::String(string_scalar)));
             combination.literal_strings = AtomSet::default();
         }
 
@@ -900,7 +914,7 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Float(float_scalar)) = &atomic {
-        if combination.value_types.contains_key(&atom("float")) {
+        if combination.value_types.contains_key(&*ATOM_FLOAT) {
             return;
         }
 
@@ -910,7 +924,7 @@ fn scrape_type_properties(
             }
             _ => {
                 combination.literal_floats = HashSet::default();
-                combination.value_types.insert(atom("float"), atomic);
+                combination.value_types.insert(*ATOM_FLOAT, atomic);
             }
         }
 

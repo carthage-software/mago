@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use mago_atom::Atom;
 
 use crate::metadata::CodebaseMetadata;
@@ -31,15 +33,12 @@ pub fn is_contained_by(
 
     let container_has_template = container_type.has_template_or_static();
 
-    let mut container_atomic_types = container_type.types.iter().collect::<Vec<_>>();
-    container_atomic_types.reverse();
-
-    let mut input_atomic_types = input_type.types.iter().collect::<Vec<_>>();
-    input_atomic_types.reverse();
+    let container_atomic_types = container_type.types.as_ref();
+    let mut input_atomic_types: VecDeque<&TAtomic> = input_type.types.iter().collect();
 
     let mut all_matched = true;
 
-    'outer: while let Some(input_type_part) = input_atomic_types.pop() {
+    'outer: while let Some(input_type_part) = input_atomic_types.pop_front() {
         match input_type_part {
             TAtomic::Null => {
                 if ignore_null {
@@ -67,7 +66,7 @@ pub fn is_contained_by(
             }
             TAtomic::GenericParameter(TGenericParameter { intersection_types: None, constraint, .. }) => {
                 if !container_has_template {
-                    input_atomic_types.extend(constraint.types.iter().collect::<Vec<_>>());
+                    input_atomic_types.extend(constraint.types.iter());
                     continue;
                 }
             }
@@ -88,7 +87,7 @@ pub fn is_contained_by(
             let mut has_int = false;
             let mut has_string = false;
 
-            for container_atomic_type in &container_atomic_types {
+            for container_atomic_type in container_atomic_types {
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type {
                     if constraint.has_int_and_string() {
                         continue 'outer;
@@ -122,7 +121,7 @@ pub fn is_contained_by(
             && container_type.has_traversable(codebase)
         {
             let mut matched_all = true;
-            for container_atomic_type in &container_atomic_types {
+            for container_atomic_type in container_atomic_types {
                 if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase) {
                     continue;
                 }
@@ -148,7 +147,7 @@ pub fn is_contained_by(
             continue;
         }
 
-        for container_type_part in &container_atomic_types {
+        for container_type_part in container_atomic_types {
             if ignore_null && matches!(container_type_part, TAtomic::Null) && !matches!(input_type_part, TAtomic::Null)
             {
                 continue;
