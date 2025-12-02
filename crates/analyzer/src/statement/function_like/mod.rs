@@ -9,6 +9,7 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::ttype::TypeMetadata;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
@@ -20,6 +21,8 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::reference::TReference;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -631,4 +634,126 @@ fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Atom) -> bo
     }
 
     false
+}
+
+/// Checks if a type union contains a reference to a specific function-level template parameter.
+fn type_contains_function_template_param(
+    type_union: &TUnion,
+    param_name: Atom,
+    function_identifier: (Atom, Atom),
+) -> bool {
+    type_union.types.iter().any(|atomic| {
+        if let TAtomic::GenericParameter(gp) = atomic
+            && gp.parameter_name == param_name
+            && let GenericParent::FunctionLike(fn_id) = gp.defining_entity
+            && fn_id == function_identifier
+        {
+            return true;
+        }
+
+        if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+            parameter_name: name,
+            defining_entity: GenericParent::FunctionLike(fn_id),
+            ..
+        })) = atomic
+            && *name == param_name
+            && *fn_id == function_identifier
+        {
+            return true;
+        }
+
+        atomic.get_all_child_nodes().iter().any(|node| match node {
+            TypeRef::Atomic(TAtomic::GenericParameter(gp)) => {
+                gp.parameter_name == param_name
+                    && matches!(gp.defining_entity, GenericParent::FunctionLike(fn_id) if fn_id == function_identifier)
+            }
+            TypeRef::Atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                parameter_name: name,
+                defining_entity: GenericParent::FunctionLike(fn_id),
+                ..
+            }))) => *name == param_name && *fn_id == function_identifier,
+            TypeRef::Union(u) => type_contains_function_template_param(u, param_name, function_identifier),
+            _ => false,
+        })
+    })
+}
+
+/// Checks for unused template parameters in a function-like declaration.
+///
+/// A template parameter is considered "used" if it appears in:
+/// - A parameter type
+/// - The return type
+pub fn check_unused_function_template_parameters<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    name_span: Span,
+    kind_str: &str,
+    display_name: Atom,
+) {
+    if !context.settings.find_unused_definitions {
+        return;
+    }
+
+    if function_like_metadata.template_types.is_empty() {
+        return;
+    }
+
+    let Some((_, constraints)) = function_like_metadata.template_types.first() else {
+        return;
+    };
+
+    let Some((GenericParent::FunctionLike(function_identifier), _)) = constraints.first() else {
+        return;
+    };
+
+    let function_identifier = *function_identifier;
+
+    for (template_name, _) in &function_like_metadata.template_types {
+        if template_name.as_str().starts_with('_') {
+            continue;
+        }
+
+        let mut is_used = false;
+
+        for param in &function_like_metadata.parameters {
+            if let Some(type_metadata) = &param.type_metadata
+                && type_contains_function_template_param(&type_metadata.type_union, *template_name, function_identifier)
+            {
+                is_used = true;
+                break;
+            }
+        }
+
+        if is_used {
+            continue;
+        }
+
+        if let Some(return_type_metadata) = &function_like_metadata.return_type_metadata
+            && type_contains_function_template_param(
+                &return_type_metadata.type_union,
+                *template_name,
+                function_identifier,
+            )
+        {
+            is_used = true;
+        }
+
+        if is_used {
+            continue;
+        }
+
+        context.collector.report_with_code(
+            IssueCode::UnusedTemplateParameter,
+            Issue::warning(format!(
+                "Template parameter `{template_name}` is never used in {kind_str} `{display_name}`."
+            ))
+            .with_annotation(
+                Annotation::primary(name_span)
+                    .with_message(format!("Template `{template_name}` is defined on this {kind_str} but never referenced")),
+            )
+            .with_help(format!(
+                "Remove the unused `@template {template_name}` from the docblock, or use it in a parameter or return type."
+            )),
+        );
+    }
 }

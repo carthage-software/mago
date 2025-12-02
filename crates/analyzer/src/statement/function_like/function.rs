@@ -14,6 +14,7 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
+use crate::statement::function_like::check_unused_function_template_parameters;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
     fn analyze<'ctx>(
@@ -56,6 +57,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             None,
         )?;
+
+        check_unused_function_template_parameters(
+            context,
+            function_metadata,
+            self.name.span(),
+            "function",
+            function_name,
+        );
 
         heuristic::check_function_like(
             function_metadata,
