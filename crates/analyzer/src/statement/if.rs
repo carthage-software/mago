@@ -11,6 +11,7 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -115,6 +116,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             'outer: for key in keys {
                 for mixed_var_id in &mixed_variables {
                     if is_derived_access_path(&key, mixed_var_id) {
+                        let has_explicit_type_assertion = clause
+                            .possibilities
+                            .get(&key)
+                            .is_some_and(|assertions| assertions.values().any(|a| !matches!(a, Assertion::Truthy)));
+
+                        if has_explicit_type_assertion {
+                            continue;
+                        }
+
                         *clause = Clause::new(
                             Default::default(),
                             self.condition.span(),
