@@ -514,7 +514,7 @@ fn handle_template_param_standin(
         {
             (parameter_name, defining_entity, intersection_types, constraint)
         } else {
-            panic!()
+            unreachable!("handle_template_param_standin called with non-GenericParameter atomic type: {atomic_type:?}",)
         };
 
     if let Some(calling_class) = options.calling_class
@@ -605,8 +605,11 @@ fn handle_template_param_standin(
                         replacement_defining_entity != &GenericParent::FunctionLike((*calling_function, empty_atom()))
                     }
                     Some(FunctionLikeIdentifier::Method(_, _)) => true,
-                    Some(_) => {
-                        panic!()
+                    Some(FunctionLikeIdentifier::Closure(_, _)) => {
+                        // Closures don't define named template parameters like functions/methods do.
+                        // If we reach this point with a closure, the defining entity comparison
+                        // is irrelevant, so we return true to continue processing.
+                        true
                     }
                     None => true,
                 }
@@ -807,150 +810,150 @@ fn handle_template_param_class_standin(
     options: StandinOptions<'_>,
     was_single: bool,
 ) -> Vec<TAtomic> {
-    if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+    let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
         kind,
         parameter_name,
         defining_entity,
         constraint,
     })) = atomic_type
+    else {
+        // This function is only called when the caller has already verified
+        // that atomic_type is a TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {...})).
+        // See the pattern match in replace_atomic() that calls this function.
+        unreachable!(
+            "handle_template_param_class_standin called with non-ClassLikeString::Generic atomic type: {atomic_type:?}",
+        )
+    };
+
+    let mut atomic_type_as = *constraint.clone();
+    if let Some(calling_class) = options.calling_class
+        && defining_entity == &GenericParent::ClassLike(calling_class)
     {
-        let mut atomic_type_as = *constraint.clone();
-        if let Some(calling_class) = options.calling_class
-            && defining_entity == &GenericParent::ClassLike(calling_class)
-        {
-            return vec![atomic_type.clone()];
+        return vec![atomic_type.clone()];
+    }
+
+    let mut atomic_types = vec![];
+
+    if let Some(input_type) = if let Some(input_type) = input_type {
+        if !template_result.readonly { Some(input_type) } else { None }
+    } else {
+        None
+    } {
+        let mut valid_input_atomic_types = vec![];
+
+        for input_atomic_type in input_type.types.as_ref() {
+            if let TAtomic::Scalar(TScalar::ClassLikeString(input_class_string)) = input_atomic_type {
+                let valid_input_type = match input_class_string {
+                    TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
+                        TAtomic::GenericParameter(TGenericParameter {
+                            parameter_name: *parameter_name,
+                            constraint: Box::new(wrap_atomic(*constraint.clone())),
+                            defining_entity: *defining_entity,
+                            intersection_types: None,
+                        })
+                    }
+                    TClassLikeString::Literal { value } => TAtomic::Object(TObject::Named(TNamedObject::new(*value))),
+                    TClassLikeString::OfType { constraint, .. } => (**constraint).clone(),
+                    _ => {
+                        continue;
+                    }
+                };
+
+                valid_input_atomic_types.push(valid_input_type);
+            }
         }
 
-        let mut atomic_types = vec![];
-
-        if let Some(input_type) = if let Some(input_type) = input_type {
-            if !template_result.readonly { Some(input_type) } else { None }
+        let generic_param = if !valid_input_atomic_types.is_empty() {
+            Some(TUnion::from_vec(valid_input_atomic_types))
+        } else if was_single {
+            Some(get_mixed())
         } else {
             None
-        } {
-            let mut valid_input_atomic_types = vec![];
+        };
 
-            for input_atomic_type in input_type.types.as_ref() {
-                if let TAtomic::Scalar(TScalar::ClassLikeString(input_class_string)) = input_atomic_type {
-                    let valid_input_type = match input_class_string {
-                        TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
-                            TAtomic::GenericParameter(TGenericParameter {
-                                parameter_name: *parameter_name,
-                                constraint: Box::new(wrap_atomic(*constraint.clone())),
-                                defining_entity: *defining_entity,
-                                intersection_types: None,
-                            })
-                        }
-                        TClassLikeString::Literal { value } => {
-                            TAtomic::Object(TObject::Named(TNamedObject::new(*value)))
-                        }
-                        TClassLikeString::OfType { constraint, .. } => (**constraint).clone(),
-                        _ => {
-                            continue;
-                        }
-                    };
+        let as_type_union = self::replace(
+            &TUnion::from_vec(vec![atomic_type_as.clone()]),
+            template_result,
+            codebase,
+            &generic_param.as_ref(),
+            input_argument_offset,
+            input_argument_span,
+            options.next_iteration(),
+        );
 
-                    valid_input_atomic_types.push(valid_input_type);
-                }
-            }
+        atomic_type_as =
+            if as_type_union.is_single() { as_type_union.get_single().clone() } else { TAtomic::Object(TObject::Any) };
 
-            let generic_param = if !valid_input_atomic_types.is_empty() {
-                Some(TUnion::from_vec(valid_input_atomic_types))
-            } else if was_single {
-                Some(get_mixed())
+        if let Some(generic_param) = generic_param {
+            if let Some(template_bounds) = template_result
+                .lower_bounds
+                .get_mut(parameter_name)
+                .unwrap_or(&mut HashMap::default())
+                .get_mut(defining_entity)
+            {
+                *template_bounds = vec![TemplateBound {
+                    bound_type: add_union_type(
+                        generic_param,
+                        &get_most_specific_type_from_bounds(template_bounds, codebase),
+                        codebase,
+                        false,
+                    ),
+                    appearance_depth: options.appearance_depth,
+                    argument_offset: input_argument_offset,
+                    span: input_argument_span,
+                    equality_bound_classlike: None,
+                }]
             } else {
-                None
-            };
-
-            let as_type_union = self::replace(
-                &TUnion::from_vec(vec![atomic_type_as.clone()]),
-                template_result,
-                codebase,
-                &generic_param.as_ref(),
-                input_argument_offset,
-                input_argument_span,
-                options.next_iteration(),
-            );
-
-            atomic_type_as = if as_type_union.is_single() {
-                as_type_union.get_single().clone()
-            } else {
-                TAtomic::Object(TObject::Any)
-            };
-
-            if let Some(generic_param) = generic_param {
-                if let Some(template_bounds) = template_result
-                    .lower_bounds
-                    .get_mut(parameter_name)
-                    .unwrap_or(&mut HashMap::default())
-                    .get_mut(defining_entity)
-                {
-                    *template_bounds = vec![TemplateBound {
-                        bound_type: add_union_type(
-                            generic_param,
-                            &get_most_specific_type_from_bounds(template_bounds, codebase),
-                            codebase,
-                            false,
-                        ),
+                template_result.lower_bounds.entry(*parameter_name).or_default().insert(
+                    *defining_entity,
+                    vec![TemplateBound {
+                        bound_type: generic_param,
                         appearance_depth: options.appearance_depth,
                         argument_offset: input_argument_offset,
                         span: input_argument_span,
                         equality_bound_classlike: None,
-                    }]
-                } else {
-                    template_result.lower_bounds.entry(*parameter_name).or_default().insert(
-                        *defining_entity,
-                        vec![TemplateBound {
-                            bound_type: generic_param,
-                            appearance_depth: options.appearance_depth,
-                            argument_offset: input_argument_offset,
-                            span: input_argument_span,
-                            equality_bound_classlike: None,
-                        }],
-                    );
-                }
-            }
-        } else {
-            let template_type = template_result
-                .template_types
-                .get(parameter_name)
-                .unwrap()
-                .iter()
-                .filter(|(e, _)| e == defining_entity)
-                .map(|(_, v)| v)
-                .next()
-                .unwrap();
-
-            for template_atomic_type in template_type.types.as_ref() {
-                if let TAtomic::Object(_) = &template_atomic_type {
-                    atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
-                        kind: *kind,
-                        constraint: Box::new(template_atomic_type.clone()),
-                    })));
-                }
+                    }],
+                );
             }
         }
+    } else {
+        let template_type = template_result
+            .template_types
+            .get(parameter_name)
+            .unwrap()
+            .iter()
+            .filter(|(e, _)| e == defining_entity)
+            .map(|(_, v)| v)
+            .next()
+            .unwrap();
 
-        if atomic_types.is_empty() {
-            if let TAtomic::GenericParameter(parameter) = &atomic_type_as {
-                atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
-                    kind: *kind,
-                    parameter_name: parameter.parameter_name,
-                    defining_entity: parameter.defining_entity,
-                    constraint: Box::new(atomic_type_as.clone()),
-                })));
-            } else {
+        for template_atomic_type in template_type.types.as_ref() {
+            if let TAtomic::Object(_) = &template_atomic_type {
                 atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                     kind: *kind,
-                    constraint: Box::new(atomic_type_as.clone()),
+                    constraint: Box::new(template_atomic_type.clone()),
                 })));
             }
         }
-
-        atomic_types
-    } else {
-        panic!();
     }
+
+    if atomic_types.is_empty() {
+        if let TAtomic::GenericParameter(parameter) = &atomic_type_as {
+            atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                kind: *kind,
+                parameter_name: parameter.parameter_name,
+                defining_entity: parameter.defining_entity,
+                constraint: Box::new(atomic_type_as.clone()),
+            })));
+        } else {
+            atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
+                kind: *kind,
+                constraint: Box::new(atomic_type_as.clone()),
+            })));
+        }
+    }
+
+    atomic_types
 }
 
 pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {

@@ -666,8 +666,8 @@ fn keyed_arrays_can_be_identical(
                             return false;
                         }
                     }
-                    _ => {
-                        panic!("impossible");
+                    (None, None) => {
+                        unreachable!("key {key:?} should exist in at least one map, but found in neither");
                     }
                 }
             }

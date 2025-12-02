@@ -20,6 +20,7 @@ use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
+use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
@@ -250,7 +251,10 @@ pub(crate) fn expand_atomic(
                 *skip_key = true;
                 new_return_type_parts.extend(expand_int_mask_of(int_mask_of, codebase, options));
             }
-            TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
+            TDerived::PropertiesOf(properties_of) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_properties_of(properties_of, codebase, options));
+            }
         },
         TAtomic::Iterable(iterable) => {
             expand_union(codebase, &mut iterable.key_type, options);
@@ -581,6 +585,24 @@ fn expand_int_mask_of(
 
     let combinations = TIntMask::calculate_mask_combinations(&literal_values);
     combinations.into_iter().map(|v| TAtomic::Scalar(TScalar::literal_int(v))).collect()
+}
+
+#[cold]
+fn expand_properties_of(
+    properties_of: &TPropertiesOf,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Vec<TAtomic> {
+    let mut target_type = properties_of.get_target_type().clone();
+    expand_union(codebase, &mut target_type, options);
+
+    let Some(keyed_array) =
+        TPropertiesOf::get_properties_of_targets(&target_type.types, codebase, properties_of.visibility(), false)
+    else {
+        return vec![TAtomic::Derived(TDerived::PropertiesOf(properties_of.clone()))];
+    };
+
+    vec![keyed_array]
 }
 
 #[cold]

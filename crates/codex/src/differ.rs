@@ -102,7 +102,11 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
     let mut file_diffs: Vec<DiffHunk> = vec![];
     let mut deletion_ranges: Vec<DeletionRange> = vec![];
 
-    let (trace, x, y) = calculate_trace(&old_signature.ast_nodes, &new_signature.ast_nodes);
+    let Ok((trace, x, y)) = calculate_trace(&old_signature.ast_nodes, &new_signature.ast_nodes) else {
+        tracing::warn!("Myers diff algorithm failed to converge for file {file_id:?}, marking all symbols as changed");
+
+        return mark_all_as_changed(new_signature);
+    };
 
     let diff = extract_diff(trace, x, y, &old_signature.ast_nodes, &new_signature.ast_nodes);
 
@@ -111,8 +115,18 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
             AstDiffElem::Keep(a, b) => {
                 let mut has_child_change = false;
 
-                // Compare children (methods, properties within classes)
-                let (class_trace, class_x, class_y) = calculate_trace(&a.children, &b.children);
+                let Ok((class_trace, class_x, class_y)) = calculate_trace(&a.children, &b.children) else {
+                    changed.insert((a.name, empty_atom()));
+                    for child in &a.children {
+                        changed.insert((a.name, child.name));
+                    }
+
+                    for child in &b.children {
+                        changed.insert((b.name, child.name));
+                    }
+
+                    continue;
+                };
 
                 let class_diff = extract_diff(class_trace, class_x, class_y, &a.children, &b.children);
 
@@ -200,25 +214,29 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
     diff
 }
 
-/**
- * Implements the Myers diff algorithm.
- *
- * Borrows from:
- * - https://github.com/nikic/PHP-Parser/blob/master/lib/PhpParser/Internal/Differ.php
- * - https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L151-L159
- *
- * Myers, Eugene W. "An O(ND) difference algorithm and its variations."
- * Algorithmica 1.1 (1986): 251-266.
- *
- * Returns a tuple of (trace, x, y) where:
- * - trace: A vector of hash maps representing the search path
- * - x: Final position in the old sequence
- * - y: Final position in the new sequence
- */
-fn calculate_trace(
-    a_nodes: &[DefSignatureNode],
-    b_nodes: &[DefSignatureNode],
-) -> (Vec<HashMap<isize, usize>>, usize, usize) {
+/// Type alias for the Myers diff trace structure.
+///
+/// - Vec<HashMap<isize, usize>>: The trace of the search path
+/// - usize: Final position in the old sequence
+/// - usize: Final position in the new sequence
+type DiffTrace = (Vec<HashMap<isize, usize>>, usize, usize);
+
+/// Implements the Myers diff algorithm.
+///
+/// Borrows from:
+/// - https://github.com/nikic/PHP-Parser/blob/master/lib/PhpParser/Internal/Differ.php
+/// - https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L151-L159
+///
+/// Myers, Eugene W. "An O(ND) difference algorithm and its variations."
+/// Algorithmica 1.1 (1986): 251-266.
+///
+/// Returns a Result containing a tuple of (trace, x, y) where:
+/// - trace: A vector of hash maps representing the search path
+/// - x: Final position in the old sequence
+/// - y: Final position in the new sequence
+///
+/// Returns Err if the algorithm fails to converge (theoretically impossible but handled gracefully).
+fn calculate_trace(a_nodes: &[DefSignatureNode], b_nodes: &[DefSignatureNode]) -> Result<DiffTrace, &'static str> {
     let n = a_nodes.len();
     let m = b_nodes.len();
     let max = n + m;
@@ -244,13 +262,14 @@ fn calculate_trace(
 
             // Found the end
             if x >= n && y >= m {
-                return (trace, x, y);
+                return Ok((trace, x, y));
             }
+
             k += 2;
         }
     }
 
-    panic!("Myers diff algorithm failed to converge");
+    Err("Myers diff algorithm failed to converge")
 }
 
 /// Checks if two DefSignatureNode instances can be matched for diffing.

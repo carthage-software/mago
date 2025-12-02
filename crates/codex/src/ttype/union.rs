@@ -95,7 +95,11 @@ impl TUnion {
     pub fn from_vec(mut types: Vec<TAtomic>) -> TUnion {
         if cfg!(debug_assertions) {
             if types.is_empty() {
-                panic!("TUnion::new() should not be called with an empty Vec.");
+                panic!(
+                    "TUnion::from_vec() received an empty Vec. This indicates a logic error \
+                     in type construction - unions must contain at least one type. \
+                     Consider using TAtomic::Never for empty/impossible types."
+                );
             }
 
             if types.len() > 1
@@ -104,7 +108,11 @@ impl TUnion {
                         || atomic.map_generic_parameter_constraint(|constraint| constraint.is_never()).unwrap_or(false)
                 })
             {
-                panic!("TUnion::new() was called with a mix of 'never' and other types: {types:#?}")
+                panic!(
+                    "TUnion::from_vec() received a mix of 'never' and other types. \
+                     This indicates a logic error - 'never' should be filtered out before \
+                     creating unions since (A | never) = A. Types received: {types:#?}"
+                )
             }
         } else {
             // If we have more than one type, 'never' is redundant and can be removed,
