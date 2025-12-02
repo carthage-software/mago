@@ -198,8 +198,9 @@ pub fn could_expand_value<'arena>(
         Expression::Closure(_) => true,
         Expression::Match(m) => !m.arms.is_empty(),
         Expression::Binary(operation) => could_expand_value(f, operation.lhs, nested_args),
-        Expression::ArrowFunction(arrow_function) => match arrow_function.expression {
-            Expression::Call(_) | Expression::Conditional(_) => true,
+        Expression::ArrowFunction(arrow_function) => match unwrap_parenthesized(arrow_function.expression) {
+            Expression::Call(_) => true,
+            Expression::Conditional(c) => c.then.is_some(),
             other => is_breaking_expression(f, other, true),
         },
         Expression::Instantiation(instantiation) => {
