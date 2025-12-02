@@ -35,6 +35,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::resource::TResource;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
@@ -915,8 +916,8 @@ fn scrape_type_properties(
             return;
         }
 
-        match float_scalar.value.as_ref() {
-            Some(literal_value) => {
+        match float_scalar {
+            TFloat::Literal(literal_value) => {
                 combination.literal_floats.insert(*literal_value);
             }
             _ => {

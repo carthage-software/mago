@@ -29,16 +29,15 @@ pub fn is_contained_by(
             return true;
         }
         (
-            TAtomic::Scalar(TScalar::Float(TFloat { value: None })),
+            TAtomic::Scalar(TScalar::Float(TFloat::Float)),
             // Special case: In PHP, an integer can be passed as a float, but not the other way around.
             TAtomic::Scalar(TScalar::Float(_)) | TAtomic::Scalar(TScalar::Integer(_)),
         ) => {
             return true;
         }
-        (
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(c) })),
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(i) })),
-        ) if c == i => {
+        (TAtomic::Scalar(TScalar::Float(container_float)), TAtomic::Scalar(TScalar::Float(input_float)))
+            if container_float.contains(*input_float) =>
+        {
             return true;
         }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)))

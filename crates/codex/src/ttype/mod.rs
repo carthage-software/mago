@@ -272,6 +272,11 @@ pub fn get_unspecified_literal_int() -> TUnion {
 }
 
 #[inline]
+pub fn get_unspecified_literal_float() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(UNSPECIFIED_LITERAL_FLOAT_ATOMIC))
+}
+
+#[inline]
 pub fn get_int_range(from: Option<i64>, to: Option<i64>) -> TUnion {
     let atomic = match (from, to) {
         (Some(from), Some(to)) => TAtomic::Scalar(TScalar::Integer(TInteger::Range(from, to))),

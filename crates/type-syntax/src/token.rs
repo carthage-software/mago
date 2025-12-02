@@ -38,6 +38,7 @@ pub enum TypeTokenKind {
     PureClosure,
     UnspecifiedLiteralString,
     UnspecifiedLiteralInt,
+    UnspecifiedLiteralFloat,
     NonEmptyUnspecifiedLiteralString,
     Resource,
     Void,
@@ -159,6 +160,7 @@ impl TypeTokenKind {
                 | Self::PureCallable
                 | Self::PureClosure
                 | Self::UnspecifiedLiteralString
+                | Self::UnspecifiedLiteralFloat
                 | Self::NonEmptyUnspecifiedLiteralString
                 | Self::Resource
                 | Self::Void

@@ -102,7 +102,7 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Scalar(TScalar::Float(TFloat { value: None })) => {
+            TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                 return Some(subtract_float(
                     context,
                     assertion,

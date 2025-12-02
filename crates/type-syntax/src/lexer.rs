@@ -178,6 +178,8 @@ impl<'input> TypeLexer<'input> {
                     (TypeTokenKind::UnspecifiedLiteralString, 14)
                 } else if self.input.is_at(b"literal-int", true) {
                     (TypeTokenKind::UnspecifiedLiteralInt, 11)
+                } else if self.input.is_at(b"literal-float", true) {
+                    (TypeTokenKind::UnspecifiedLiteralFloat, 13)
                 } else {
                     self.read_identifier()
                 }

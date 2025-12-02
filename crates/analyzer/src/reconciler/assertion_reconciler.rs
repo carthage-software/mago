@@ -691,7 +691,7 @@ fn handle_literal_equality(
                 negated,
             )
         }
-        TAtomic::Scalar(TScalar::Float(TFloat { value: Some(assertion_float) })) => handle_literal_equality_with_float(
+        TAtomic::Scalar(TScalar::Float(TFloat::Literal(assertion_float))) => handle_literal_equality_with_float(
             context,
             assertion,
             (*assertion_float).into(),
@@ -765,7 +765,7 @@ fn handle_literal_equality_with_int(
                 return TUnion::from_atomic(literal_asserted_type);
             }
             TAtomic::Scalar(TScalar::Integer(_)) => return TUnion::from_atomic(literal_asserted_type),
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(float_value) }))
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
                 if is_loose_equality && (*float_value == assertion_integer as f64) =>
             {
                 return TUnion::from_atomic(existing_var_atomic_type.clone());
@@ -792,7 +792,7 @@ fn handle_literal_equality_with_int(
     if is_loose_equality {
         for existing_var_atomic_type in existing_var_type.types.as_ref() {
             match existing_var_atomic_type {
-                TAtomic::Scalar(TScalar::Float(TFloat { value: None })) => {
+                TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                     return TUnion::from_atomic(existing_var_atomic_type.clone());
                 }
                 TAtomic::Scalar(TScalar::String(TString { literal: None, .. })) => {
@@ -849,7 +849,7 @@ fn handle_literal_equality_with_str(
 
                 return TUnion::from_atomic(literal_asserted_type);
             }
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(float_value) }))
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
                 if is_loose_equality && float_value.to_string() == assertion_str_val =>
             {
                 return TUnion::from_atomic(existing_var_atomic_type.clone());
@@ -876,7 +876,7 @@ fn handle_literal_equality_with_str(
     if is_loose_equality {
         for existing_var_atomic_type in existing_var_type.types.as_ref() {
             match existing_var_atomic_type {
-                TAtomic::Scalar(TScalar::Float(TFloat { value: None })) => {
+                TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                     return TUnion::from_atomic(existing_var_atomic_type.clone());
                 }
                 TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) => {
@@ -1010,10 +1010,10 @@ fn handle_literal_equality_with_float(
 
     for existing_var_atomic_type in existing_var_type.types.as_ref() {
         match existing_var_atomic_type {
-            TAtomic::Scalar(TScalar::Float(TFloat { value: None, .. })) => {
+            TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                 return TUnion::from_atomic(literal_asserted_type);
             }
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(existing_float), .. })) => {
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float))) => {
                 if (existing_float.0 - assertion_float_val).abs() < f64::EPSILON {
                     if existing_var_type.is_single()
                         && let Some(k_str) = &key
@@ -1130,7 +1130,7 @@ fn handle_literal_equality_with_bool(
                     return TUnion::from_atomic(existing_var_atomic_type.clone());
                 }
             }
-            TAtomic::Scalar(TScalar::Float(TFloat { value: Some(existing_float), .. })) if is_loose_equality => {
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float))) if is_loose_equality => {
                 let float_as_bool = (existing_float.0).abs() > f64::EPSILON;
                 if float_as_bool == assertion_bool_val {
                     return TUnion::from_atomic(existing_var_atomic_type.clone());
@@ -1158,7 +1158,7 @@ fn handle_literal_equality_with_bool(
         for existing_var_atomic_type in existing_var_type.types.as_ref() {
             match existing_var_atomic_type {
                 TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified))
-                | TAtomic::Scalar(TScalar::Float(TFloat { value: None, .. }))
+                | TAtomic::Scalar(TScalar::Float(TFloat::Float))
                 | TAtomic::Scalar(TScalar::String(TString { literal: None, .. })) => {
                     return TUnion::from_atomic(existing_var_atomic_type.clone());
                 }

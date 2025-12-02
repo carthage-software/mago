@@ -74,6 +74,8 @@ pub const ENUM_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::enum_string()
 pub const TRAIT_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::trait_string());
 /// A static `TAtomic` representing the `float` type.
 pub const FLOAT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::float());
+/// A static `TAtomic` representing the `literal-float` type (unspecified literal).
+pub const UNSPECIFIED_LITERAL_FLOAT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::unspecified_literal_float());
 /// A static `TAtomic` representing the `mixed` type.
 pub const MIXED_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::new());
 /// A static `TAtomic` representing a `mixed` type that originates from an `isset()` check inside a loop.

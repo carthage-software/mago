@@ -22,7 +22,7 @@ This parser covers a wide range of standard PHPDoc, PHPStan, and Psalm type synt
   - Strings: `'string-literal'`, `"another one"`
   - Integers: `123`, `-45`, `0x1A`, `0o77`, `0b10`, `123_456`
   - Floats: `1.23`, `-0.5`, `.5`, `1.2e3`, `7E-10`
-- **Unspecified Literals:** `literal-int`, `literal-string`, `non-empty-literal-string`
+- **Unspecified Literals:** `literal-int`, `literal-string`, `literal-float`, `non-empty-literal-string`
 - **Operators:** `|` (Union), `&` (Intersection), `?` (Nullable)
 - **Structure:**
   - Parentheses: `(int|string)`

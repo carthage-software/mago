@@ -17,6 +17,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner::combine;
@@ -121,11 +122,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             TScalar::Integer(integer) => {
                                 resulting_types.push(TAtomic::Scalar(TScalar::Integer(integer.negated())));
                             }
-                            TScalar::Float(float) => match float.value {
-                                Some(value) => {
+                            TScalar::Float(float) => match float {
+                                TFloat::Literal(value) => {
                                     resulting_types.push(TAtomic::Scalar(TScalar::literal_float(-value.0)));
                                 }
-                                None => {
+                                _ => {
                                     resulting_types.push(TAtomic::Scalar(TScalar::float()));
                                 }
                             },
@@ -373,7 +374,7 @@ fn increment_operand<'ctx, 'arena>(
                     if block_context.inside_loop {
                         // Do not set literal value in loop context.
                         possibilities.push(TAtomic::Scalar(TScalar::float()));
-                    } else if let Some(value) = float_scalar.value {
+                    } else if let TFloat::Literal(value) = float_scalar {
                         possibilities.push(TAtomic::Scalar(TScalar::literal_float(value.0 + 1.0)));
                     } else {
                         possibilities.push(TAtomic::Scalar(TScalar::float()));
@@ -597,7 +598,7 @@ fn decrement_operand<'ctx, 'arena>(
                         }
                     }
                     TScalar::Float(float_scalar) => {
-                        if let Some(value) = float_scalar.value
+                        if let TFloat::Literal(value) = float_scalar
                             && !block_context.inside_loop
                         {
                             possibilities.push(TAtomic::Scalar(TScalar::literal_float(value.0 - 1.0)));
@@ -1186,15 +1187,15 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUn
                         return get_int();
                     }
                 },
-                TScalar::Float(float_scalar) => match float_scalar.value {
-                    Some(f) => {
+                TScalar::Float(float_scalar) => match float_scalar {
+                    TFloat::Literal(f) => {
                         if f.is_nan() {
                             return get_int();
                         }
 
                         TAtomic::Scalar(TScalar::literal_int(f.0 as i64))
                     }
-                    None => {
+                    _ => {
                         return get_int();
                     }
                 },

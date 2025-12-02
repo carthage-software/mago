@@ -132,6 +132,7 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         TypeTokenKind::StringableObject => Type::StringableObject(Keyword::from(stream.consume()?)),
         TypeTokenKind::UnspecifiedLiteralInt => Type::UnspecifiedLiteralInt(Keyword::from(stream.consume()?)),
         TypeTokenKind::UnspecifiedLiteralString => Type::UnspecifiedLiteralString(Keyword::from(stream.consume()?)),
+        TypeTokenKind::UnspecifiedLiteralFloat => Type::UnspecifiedLiteralFloat(Keyword::from(stream.consume()?)),
         TypeTokenKind::NonEmptyUnspecifiedLiteralString => {
             Type::NonEmptyUnspecifiedLiteralString(Keyword::from(stream.consume()?))
         }

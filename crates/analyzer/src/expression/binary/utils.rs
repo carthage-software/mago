@@ -1,6 +1,7 @@
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::union::TUnion;
@@ -50,8 +51,8 @@ pub fn is_always_less_than(lhs: &TUnion, rhs: &TUnion) -> bool {
             (TInteger::Literal(l_val), TInteger::Literal(r_val)) => return l_val < r_val,
             _ => return false,
         },
-        (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l.value, r.value) {
-            (Some(l_val), Some(r_val)) => return l_val < r_val,
+        (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l, r) {
+            (TFloat::Literal(l_val), TFloat::Literal(r_val)) => return l_val < r_val,
             _ => return false,
         },
         _ => {}
@@ -87,8 +88,8 @@ pub fn is_always_greater_than(lhs: &TUnion, rhs: &TUnion) -> bool {
             (TInteger::Literal(l_val), TInteger::Literal(r_val)) => return l_val > r_val,
             _ => return false,
         },
-        (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l.value, r.value) {
-            (Some(l_val), Some(r_val)) => return l_val > r_val,
+        (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l, r) {
+            (TFloat::Literal(l_val), TFloat::Literal(r_val)) => return l_val > r_val,
             _ => return false,
         },
         _ => {}

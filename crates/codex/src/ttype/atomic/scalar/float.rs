@@ -9,49 +9,93 @@ use mago_atom::f64_atom;
 
 use crate::ttype::TType;
 
-/// Represents PHP float types: general `float` or a specific literal like `12.3`.
+/// Represents PHP float types: general `float`, an unspecified literal `literal-float`,
+/// or a specific literal like `12.3`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct TFloat {
-    /// `None` for general `float`, `Some(value)` for a literal float.
-    pub value: Option<OrderedFloat<f64>>,
+pub enum TFloat {
+    /// General `float` type.
+    Float,
+    /// A literal float where the value is unknown (`literal-float`).
+    UnspecifiedLiteral,
+    /// A specific literal float (e.g., `12.3`).
+    Literal(OrderedFloat<f64>),
 }
 
 impl TFloat {
     /// Creates a new FloatScalar from an optional float value.
     #[inline]
     pub fn new(value: Option<f64>) -> Self {
-        Self { value: value.map(OrderedFloat::from) }
+        match value {
+            Some(v) => Self::Literal(OrderedFloat::from(v)),
+            None => Self::Float,
+        }
     }
 
     /// Creates an instance representing the general `float` type.
     #[inline]
     pub const fn general() -> Self {
-        Self { value: None }
+        Self::Float
+    }
+
+    /// Creates an instance representing the `literal-float` type (unspecified literal).
+    #[inline]
+    pub const fn unspecified_literal() -> Self {
+        Self::UnspecifiedLiteral
     }
 
     /// Creates an instance representing a literal float type (e.g., `12.3`).
     #[inline]
     pub fn literal(value: f64) -> Self {
-        Self { value: Some(OrderedFloat::from(value)) }
+        Self::Literal(OrderedFloat::from(value))
     }
 
     /// Checks if this represents the general `float` type.
     #[inline]
     pub const fn is_general(&self) -> bool {
-        self.value.is_none()
+        matches!(self, Self::Float)
     }
 
-    /// Checks if this represents a literal float type.
+    /// Checks if this represents an unspecified literal (`literal-float`).
+    #[inline]
+    pub const fn is_unspecified_literal(&self) -> bool {
+        matches!(self, Self::UnspecifiedLiteral)
+    }
+
+    /// Checks if this represents a specific literal float type.
     #[inline]
     pub const fn is_literal(&self) -> bool {
-        self.value.is_some()
+        matches!(self, Self::Literal(_))
     }
 
-    /// Returns the literal float value if this represents one.
+    /// Checks if this originates from any kind of literal (specific or unspecified).
+    #[inline]
+    pub const fn is_literal_origin(&self) -> bool {
+        matches!(self, Self::Literal(_) | Self::UnspecifiedLiteral)
+    }
+
+    /// Returns the literal float value if this represents a specific literal.
     #[inline]
     pub fn get_literal_value(&self) -> Option<f64> {
-        self.value.map(|v| v.into_inner())
+        match self {
+            Self::Literal(v) => Some(v.into_inner()),
+            _ => None,
+        }
+    }
+
+    /// Checks if this float type is contained by another float type.
+    ///
+    /// Type hierarchy: Literal(v) ⊂ UnspecifiedLiteral ⊂ Float
+    #[inline]
+    pub fn contains(&self, other: TFloat) -> bool {
+        match (self, other) {
+            // Float contains everything
+            (Self::Float, _) => true,
+            // UnspecifiedLiteral contains itself and specific literals
+            (Self::UnspecifiedLiteral, Self::UnspecifiedLiteral | Self::Literal(_)) => true,
+            // Literal only contains itself with the same value
+            (Self::Literal(v1), Self::Literal(v2)) => *v1 == v2,
+            _ => false,
+        }
     }
 }
 
@@ -83,9 +127,10 @@ impl TType for TFloat {
     }
 
     fn get_id(&self) -> Atom {
-        match self.value {
-            Some(value) => concat_atom!("float(", f64_atom(*value), ")"),
-            None => atom("float"),
+        match self {
+            Self::Float => atom("float"),
+            Self::UnspecifiedLiteral => atom("literal-float"),
+            Self::Literal(value) => concat_atom!("float(", f64_atom(**value), ")"),
         }
     }
 
