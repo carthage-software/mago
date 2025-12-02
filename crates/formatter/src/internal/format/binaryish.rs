@@ -171,9 +171,7 @@ pub(super) fn print_binaryish_expression<'arena>(
         return Document::Group(Group::new(parts));
     }
 
-    let first_group_index = parts.iter().position(|part| matches!(part, Document::Group(_)));
-
-    let split_index = first_group_index.unwrap_or(0);
+    let split_index = 1.min(parts.len());
     let mut head_parts = parts;
     let tail_parts = head_parts.split_off(split_index);
 
