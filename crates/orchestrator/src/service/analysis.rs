@@ -171,7 +171,7 @@ impl AnalysisService {
             database,
             codebase,
             symbol_references,
-            self.settings,
+            self.settings.clone(),
             Box::new(AnalysisResultReducer),
             self.use_progress_bars,
         );
@@ -263,7 +263,7 @@ impl AnalysisService {
             database,
             codebase,
             symbol_references,
-            self.settings,
+            self.settings.clone(),
             Box::new(AnalysisResultReducer),
             file_states,
         );

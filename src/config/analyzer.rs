@@ -2,6 +2,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
+use mago_atom::atom;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -51,6 +52,21 @@ pub struct AnalyzerConfiguration {
 
     /// Whether to check for thrown exceptions.
     pub check_throws: bool,
+
+    /// Exceptions to ignore including all subclasses (hierarchy-aware).
+    ///
+    /// When an exception class is listed here, any exception of that class or any of its
+    /// subclasses will be ignored during `check_throws` analysis.
+    ///
+    /// For example, adding `LogicException` will ignore `LogicException`, `InvalidArgumentException`,
+    /// `OutOfBoundsException`, and all other subclasses.
+    pub unchecked_exceptions: Vec<String>,
+
+    /// Exceptions to ignore (exact class match only, not subclasses).
+    ///
+    /// When an exception class is listed here, only that exact class will be ignored
+    /// during `check_throws` analysis. Parent classes and subclasses are not affected.
+    pub unchecked_exception_classes: Vec<String>,
 
     /// Enforce strict checks when accessing list elements by index.
     ///
@@ -115,6 +131,8 @@ impl AnalyzerConfiguration {
             memoize_properties: self.memoize_properties,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
+            unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| atom(s.as_str())).collect(),
+            unchecked_exception_classes: self.unchecked_exception_classes.iter().map(|s| atom(s.as_str())).collect(),
             perform_heuristic_checks: self.perform_heuristic_checks,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
@@ -147,6 +165,8 @@ impl Default for AnalyzerConfiguration {
             memoize_properties: defaults.memoize_properties,
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
+            unchecked_exceptions: vec![],
+            unchecked_exception_classes: vec![],
             perform_heuristic_checks: defaults.perform_heuristic_checks,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,

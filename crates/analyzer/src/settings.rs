@@ -1,10 +1,11 @@
+use mago_atom::AtomSet;
 use mago_php_version::PHPVersion;
 
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
 /// This struct allows you to enable/disable specific checks, suppress categories of issues,
 /// and tune the analyzer's performance and strictness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     /// The target PHP version for the analysis.
     pub version: PHPVersion,
@@ -32,6 +33,21 @@ pub struct Settings {
     ///
     /// This check is disabled by default (`false`) as it can be computationally expensive.
     pub check_throws: bool,
+
+    /// Exceptions to ignore including all subclasses (hierarchy-aware).
+    ///
+    /// When an exception class is in this set, any exception of that class or any of its
+    /// subclasses will be ignored during `check_throws` analysis.
+    ///
+    /// For example, adding `LogicException` will ignore `LogicException`, `InvalidArgumentException`,
+    /// `OutOfBoundsException`, and all other subclasses.
+    pub unchecked_exceptions: AtomSet,
+
+    /// Exceptions to ignore (exact class match only, not subclasses).
+    ///
+    /// When an exception class is in this set, only that exact class will be ignored
+    /// during `check_throws` analysis. Parent classes and subclasses are not affected.
+    pub unchecked_exception_classes: AtomSet,
 
     /// Perform heuristic checks to identify potential issues in the code.
     ///
@@ -121,6 +137,8 @@ impl Settings {
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
+            unchecked_exceptions: AtomSet::default(),
+            unchecked_exception_classes: AtomSet::default(),
             use_colors: true,
             // TODO(azjezz): enable heuristic checks in the future,
             // need optimizations first

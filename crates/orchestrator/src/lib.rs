@@ -256,7 +256,7 @@ impl<'a> Orchestrator<'a> {
             database,
             codebase,
             symbol_references,
-            self.config.analyzer_settings,
+            self.config.analyzer_settings.clone(),
             self.config.use_progress_bars,
         );
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
   settings: {
@@ -13,6 +13,22 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:settings', 'toggle-rule', 'close']);
+
+// Local state for exception inputs
+const uncheckedExceptionsInput = ref(
+  (props.settings.analyzer?.uncheckedExceptions || []).join(', ')
+);
+const uncheckedExceptionClassesInput = ref(
+  (props.settings.analyzer?.uncheckedExceptionClasses || []).join(', ')
+);
+
+// Watch for external changes to settings
+watch(() => props.settings.analyzer?.uncheckedExceptions, (newVal) => {
+  uncheckedExceptionsInput.value = (newVal || []).join(', ');
+});
+watch(() => props.settings.analyzer?.uncheckedExceptionClasses, (newVal) => {
+  uncheckedExceptionClassesInput.value = (newVal || []).join(', ');
+});
 
 const phpVersions = [
   { value: '8.0', label: 'PHP 8.0' },
@@ -175,6 +191,34 @@ function disableAllRules() {
     },
   });
 }
+
+function updateUncheckedExceptions() {
+  const exceptions = uncheckedExceptionsInput.value
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  emit('update:settings', {
+    ...props.settings,
+    analyzer: {
+      ...props.settings.analyzer,
+      uncheckedExceptions: exceptions,
+    },
+  });
+}
+
+function updateUncheckedExceptionClasses() {
+  const exceptions = uncheckedExceptionClassesInput.value
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  emit('update:settings', {
+    ...props.settings,
+    analyzer: {
+      ...props.settings.analyzer,
+      uncheckedExceptionClasses: exceptions,
+    },
+  });
+}
 </script>
 
 <template>
@@ -231,6 +275,39 @@ function disableAllRules() {
                 <span class="option-description">{{ option.description }}</span>
               </div>
             </label>
+          </div>
+
+          <!-- Exception filters (only visible when checkThrows is enabled) -->
+          <div v-if="settings.analyzer?.checkThrows" class="exception-filters">
+            <div class="exception-input-group">
+              <label class="exception-label">
+                <span class="label-text">Unchecked Exceptions</span>
+                <span class="label-hint">Ignore these exceptions and all their subclasses (comma-separated)</span>
+              </label>
+              <input
+                v-model="uncheckedExceptionsInput"
+                type="text"
+                class="exception-input"
+                placeholder="e.g., LogicException, Psl\Type\Exception\ExceptionInterface"
+                @blur="updateUncheckedExceptions"
+                @keyup.enter="updateUncheckedExceptions"
+              />
+            </div>
+
+            <div class="exception-input-group">
+              <label class="exception-label">
+                <span class="label-text">Unchecked Exception Classes</span>
+                <span class="label-hint">Ignore only these exact classes, not their subclasses (comma-separated)</span>
+              </label>
+              <input
+                v-model="uncheckedExceptionClassesInput"
+                type="text"
+                class="exception-input"
+                placeholder="e.g., Psl\File\Exception\FileNotFoundException"
+                @blur="updateUncheckedExceptionClasses"
+                @keyup.enter="updateUncheckedExceptionClasses"
+              />
+            </div>
           </div>
         </section>
 
@@ -489,6 +566,61 @@ function disableAllRules() {
   font-size: 12px;
   color: var(--vp-c-text-3);
   line-height: 1.4;
+}
+
+/* Exception Filters */
+.exception-filters {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--vp-c-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exception-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exception-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exception-label .label-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+}
+
+.exception-label .label-hint {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+.exception-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: 'Fira Code', monospace;
+}
+
+.exception-input:focus {
+  border-color: var(--vp-c-brand-1);
+}
+
+.exception-input::placeholder {
+  color: var(--vp-c-text-3);
+  font-family: inherit;
 }
 
 /* Linter Section */

@@ -126,6 +126,8 @@ pub struct WasmAnalyzerSettings {
     pub memoize_properties: bool,
     pub allow_possibly_undefined_array_keys: bool,
     pub check_throws: bool,
+    pub unchecked_exceptions: Vec<String>,
+    pub unchecked_exception_classes: Vec<String>,
     pub perform_heuristic_checks: bool,
     pub strict_list_index_checks: bool,
     pub no_boolean_literal_comparison: bool,

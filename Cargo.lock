@@ -1610,6 +1610,7 @@ dependencies = [
  "indicatif 0.18.3",
  "indoc",
  "mago-analyzer",
+ "mago-atom",
  "mago-codex",
  "mago-composer",
  "mago-database",
@@ -2009,6 +2010,7 @@ version = "1.0.0-rc.6"
 dependencies = [
  "bumpalo",
  "mago-analyzer",
+ "mago-atom",
  "mago-database",
  "mago-formatter",
  "mago-linter",

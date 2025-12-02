@@ -59,3 +59,51 @@ These flags control specific, powerful analysis capabilities.
 | `check-closure-missing-type-hints`    | `false` | When `true`, checks closures for missing type hints when `check-missing-type-hints` is enabled.      |
 | `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled. |
 | `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
+
+## Exception filtering
+
+When `check-throws` is enabled, you can fine-tune which exceptions should be ignored using these options:
+
+| Option                       | Type       | Default | Description                                                                                      |
+| :--------------------------- | :--------- | :------ | :----------------------------------------------------------------------------------------------- |
+| `unchecked-exceptions`       | `string[]` | `[]`    | Exceptions to ignore **including all their subclasses** (hierarchy-aware).                       |
+| `unchecked-exception-classes`| `string[]` | `[]`    | Exceptions to ignore **only as exact class matches** (not subclasses or parent classes).         |
+
+### How it works
+
+- **`unchecked-exceptions`**: When you add an exception class here, that exception and all classes that extend it will be ignored. This is useful for ignoring entire exception hierarchies, like all logic exceptions.
+
+- **`unchecked-exception-classes`**: When you add an exception class here, only that exact class is ignored. Subclasses and parent classes are still checked. This is useful when you want to ignore a specific exception without affecting related exceptions.
+
+### Example
+
+```toml
+[analyzer]
+check-throws = true
+
+# Ignore LogicException and ALL its subclasses:
+# - InvalidArgumentException
+# - OutOfRangeException
+# - DomainException
+# - etc.
+unchecked-exceptions = [
+    "LogicException",
+    "Psl\\Type\\Exception\\ExceptionInterface",
+]
+
+# Ignore ONLY this specific exception class (not its parent or child classes)
+unchecked-exception-classes = [
+    "Psl\\File\\Exception\\FileNotFoundException",
+]
+```
+
+In this example:
+- Any unhandled `LogicException` or its subclasses (like `InvalidArgumentException`) won't be reported
+- Any class implementing `Psl\Type\Exception\ExceptionInterface` won't be reported
+- Only the exact `Psl\File\Exception\FileNotFoundException` is ignored, but other file exceptions would still be reported
+
+:::tip When to use which option
+Use `unchecked-exceptions` when you want to ignore an entire category of exceptions, such as logic errors that indicate programming mistakes rather than runtime issues.
+
+Use `unchecked-exception-classes` when you want to ignore a specific exception but still want to track its parent or sibling exceptions.
+:::

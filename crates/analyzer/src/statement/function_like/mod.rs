@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 
+use mago_atom::Atom;
 use mago_atom::concat_atom;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -553,6 +554,11 @@ fn check_thrown_types<'ctx, 'arena>(
         .collect::<Vec<_>>();
 
     for (thrown_type, thrown_spans) in &block_context.possibly_thrown_exceptions {
+        // Skip if exception is in unchecked lists
+        if is_exception_unchecked(context, *thrown_type) {
+            continue;
+        }
+
         let thrown_type_union = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));
 
         let mut is_expected = false;
@@ -599,4 +605,30 @@ fn check_thrown_types<'ctx, 'arena>(
     }
 
     Ok(())
+}
+
+/// Checks if an exception should be ignored based on the unchecked exception settings.
+///
+/// Returns `true` if the exception is:
+/// - In `unchecked_exception_classes` (exact match only)
+/// - In `unchecked_exceptions` or is a subclass of any exception in that set (hierarchy-aware)
+fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Atom) -> bool {
+    // Check exact match in unchecked_exception_classes
+    if context
+        .settings
+        .unchecked_exception_classes
+        .iter()
+        .any(|unchecked| exception_name.eq_ignore_ascii_case(unchecked))
+    {
+        return true;
+    }
+
+    // Check hierarchy match in unchecked_exceptions (includes subclasses)
+    if context.settings.unchecked_exceptions.iter().any(|unchecked| {
+        exception_name.eq_ignore_ascii_case(unchecked) || context.codebase.is_instance_of(&exception_name, unchecked)
+    }) {
+        return true;
+    }
+
+    false
 }

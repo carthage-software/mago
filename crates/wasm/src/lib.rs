@@ -10,6 +10,7 @@ use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 use mago_analyzer::settings::Settings as AnalyzerSettings;
+use mago_atom::atom;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -108,6 +109,8 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         memoize_properties: s.memoize_properties,
         allow_possibly_undefined_array_keys: s.allow_possibly_undefined_array_keys,
         check_throws: s.check_throws,
+        unchecked_exceptions: s.unchecked_exceptions.iter().map(|e| atom(e.as_str())).collect(),
+        unchecked_exception_classes: s.unchecked_exception_classes.iter().map(|e| atom(e.as_str())).collect(),
         perform_heuristic_checks: s.perform_heuristic_checks,
         strict_list_index_checks: s.strict_list_index_checks,
         no_boolean_literal_comparison: s.no_boolean_literal_comparison,

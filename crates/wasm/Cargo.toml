@@ -22,6 +22,7 @@ wasm-opt = false
 wasm-opt = false
 
 [dependencies]
+mago-atom = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-php-version = { workspace = true }
