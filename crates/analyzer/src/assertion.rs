@@ -1454,6 +1454,18 @@ pub fn has_typed_value_comparison(
         Some(assertion_context.codebase),
     );
 
+    let left_is_class_constant = left_var_id.as_ref().is_some_and(|id| id.contains("::"));
+    let right_is_simple_var = right_var_id.as_ref().is_some_and(|id| id.starts_with('$'));
+
+    if left_is_class_constant
+        && right_is_simple_var
+        && let Some(left_type) = artifacts.get_expression_type(&left.span())
+        && left_type.is_single()
+        && !left_type.is_mixed()
+    {
+        return Some(OtherValuePosition::Left);
+    }
+
     if let Some(right_type) = artifacts.get_expression_type(&right.span())
         && (left_var_id.is_some() || right_var_id.is_none())
         && right_type.is_single()
@@ -1469,6 +1481,7 @@ pub fn has_typed_value_comparison(
     {
         return Some(OtherValuePosition::Left);
     }
+
     None
 }
 
