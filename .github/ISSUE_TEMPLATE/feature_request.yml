@@ -1,67 +1,26 @@
-name: "✨ Feature Request"
+name: "Feature Request"
 description: "Suggest a new feature or improvement for Mago."
 labels: ["Type: Enhancement"]
 assignees: []
 body:
-  - type: markdown
-    attributes:
-      value: |
-        **Thank you for your suggestion!**
-        Please fill in the details below to help us understand your idea.
-        Feature requests are evaluated based on their impact and feasibility.
-
   - type: textarea
     id: feature-description
     attributes:
-      label: "🚀 Describe the Feature"
-      description: "What problem does this feature solve? How would it improve Mago?"
-      placeholder: "Mago should support formatting PHP files differently..."
+      label: "Feature"
+      description: "What feature would you like? What problem does it solve?"
+      placeholder: "I'd like Mago to support..."
     validations:
       required: true
 
   - type: textarea
-    id: use-case
+    id: example
     attributes:
-      label: "✅ Use Case / Example"
-      description: |
-        Provide an **example scenario** where this feature would be useful.
+      label: "Example"
+      description: "Show an example of how this feature would work (code, config, CLI usage, etc.)."
+      render: php
       placeholder: |
-        **Example:**
-        - I work in a team where some projects use PSR-12 and others use Symfony CS.
-        - I'd like Mago to support multiple formatter presets so I can switch between them easily.
-    validations:
-      required: true
+        <?php
 
-  - type: textarea
-    id: proposed-solution
-    attributes:
-      label: "💡 Proposed Solution"
-      description: |
-        If you have an idea of how this could be implemented, describe it here.
-        If unsure, just leave this blank.
-      placeholder: |
-        - Introduce a `--preset` flag for `mago fmt`, e.g., `mago fmt --preset=symfony`
-        - Allow defining multiple presets in `mago.toml`
-    validations:
-      required: false
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: "📌 Priority"
-      description: "How important is this feature?"
-      options:
-        - "Must have"
-        - "Nice to have"
-        - "Not urgent, just an idea"
-    validations:
-      required: true
-
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: "📝 Additional Context"
-      description: "Any other details or related discussions?"
-      placeholder: "This feature would align with similar behavior in PHP_CodeSniffer and PHP CS Fixer..."
+        // Example code showing the desired behavior
     validations:
       required: false
