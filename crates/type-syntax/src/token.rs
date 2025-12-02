@@ -57,6 +57,8 @@ pub enum TypeTokenKind {
     AssociativeArray,
     KeyOf,
     ValueOf,
+    IntMask,
+    IntMaskOf,
     Min,
     Max,
     PropertiesOf,
@@ -182,6 +184,8 @@ impl TypeTokenKind {
                 | Self::Not
                 | Self::KeyOf
                 | Self::ValueOf
+                | Self::IntMask
+                | Self::IntMaskOf
                 | Self::Min
                 | Self::Max
                 | Self::UnspecifiedLiteralInt

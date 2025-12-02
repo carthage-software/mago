@@ -12,6 +12,7 @@ pub use crate::ast::conditional::*;
 pub use crate::ast::generics::*;
 pub use crate::ast::identifier::*;
 pub use crate::ast::index_access::*;
+pub use crate::ast::int_mask::*;
 pub use crate::ast::int_range::*;
 pub use crate::ast::iterable::*;
 pub use crate::ast::key_of::*;
@@ -35,6 +36,7 @@ pub mod conditional;
 pub mod generics;
 pub mod identifier;
 pub mod index_access;
+pub mod int_mask;
 pub mod int_range;
 pub mod iterable;
 pub mod key_of;
@@ -111,6 +113,8 @@ pub enum Type<'input> {
     Conditional(ConditionalType<'input>),
     KeyOf(KeyOfType<'input>),
     ValueOf(ValueOfType<'input>),
+    IntMask(IntMaskType<'input>),
+    IntMaskOf(IntMaskOfType<'input>),
     IndexAccess(IndexAccessType<'input>),
     Negated(NegatedType<'input>),
     Posited(PositedType<'input>),
@@ -180,6 +184,8 @@ impl HasSpan for Type<'_> {
             Type::Variable(ty) => ty.span(),
             Type::KeyOf(ty) => ty.span(),
             Type::ValueOf(ty) => ty.span(),
+            Type::IntMask(ty) => ty.span(),
+            Type::IntMaskOf(ty) => ty.span(),
             Type::IndexAccess(ty) => ty.span(),
             Type::Negated(ty) => ty.span(),
             Type::Posited(ty) => ty.span(),
@@ -251,6 +257,8 @@ impl std::fmt::Display for Type<'_> {
             Type::Variable(ty) => write!(f, "{ty}"),
             Type::KeyOf(ty) => write!(f, "{ty}"),
             Type::ValueOf(ty) => write!(f, "{ty}"),
+            Type::IntMask(ty) => write!(f, "{ty}"),
+            Type::IntMaskOf(ty) => write!(f, "{ty}"),
             Type::IndexAccess(ty) => write!(f, "{ty}"),
             Type::Negated(ty) => write!(f, "{ty}"),
             Type::Posited(ty) => write!(f, "{ty}"),

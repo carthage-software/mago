@@ -52,6 +52,7 @@ test_case!(empty_switch);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
 test_case!(literal_float);
+test_case!(int_mask);
 test_case!(integer_range_reconciliation);
 test_case!(integer_reconciliation);
 test_case!(isset_and_nullable_access_assertions);

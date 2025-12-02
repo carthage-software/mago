@@ -17,6 +17,8 @@ use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
+use crate::ttype::atomic::derived::int_mask::TIntMask;
+use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
@@ -239,6 +241,14 @@ pub(crate) fn expand_atomic(
             TDerived::IndexAccess(index_access) => {
                 *skip_key = true;
                 new_return_type_parts.extend(expand_index_access(index_access, codebase, options));
+            }
+            TDerived::IntMask(int_mask) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_int_mask(int_mask, codebase, options));
+            }
+            TDerived::IntMaskOf(int_mask_of) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_int_mask_of(int_mask_of, codebase, options));
             }
             TDerived::PropertiesOf(_) => todo!("expand_properties_of"),
         },
@@ -526,6 +536,51 @@ fn expand_index_access(
     };
 
     new_return_types.types.into_owned()
+}
+
+#[cold]
+fn expand_int_mask(int_mask: &TIntMask, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> Vec<TAtomic> {
+    let mut literal_values = Vec::new();
+
+    for value in int_mask.get_values() {
+        let mut expanded = value.clone();
+        expand_union(codebase, &mut expanded, options);
+
+        if let Some(int_val) = expanded.get_single_literal_int_value() {
+            literal_values.push(int_val);
+        }
+    }
+
+    if literal_values.is_empty() {
+        return vec![TAtomic::Scalar(TScalar::int())];
+    }
+
+    let combinations = TIntMask::calculate_mask_combinations(&literal_values);
+    combinations.into_iter().map(|v| TAtomic::Scalar(TScalar::literal_int(v))).collect()
+}
+
+#[cold]
+fn expand_int_mask_of(
+    int_mask_of: &TIntMaskOf,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Vec<TAtomic> {
+    let mut target = int_mask_of.get_target_type().clone();
+    expand_union(codebase, &mut target, options);
+
+    let mut literal_values = Vec::new();
+    for atomic in target.types.iter() {
+        if let Some(int_val) = atomic.get_literal_int_value() {
+            literal_values.push(int_val);
+        }
+    }
+
+    if literal_values.is_empty() {
+        return vec![TAtomic::Scalar(TScalar::int())];
+    }
+
+    let combinations = TIntMask::calculate_mask_combinations(&literal_values);
+    combinations.into_iter().map(|v| TAtomic::Scalar(TScalar::literal_int(v))).collect()
 }
 
 #[cold]

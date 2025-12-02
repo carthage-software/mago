@@ -27,6 +27,8 @@ use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::atomic::conditional::TConditional;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
+use crate::ttype::atomic::derived::int_mask::TIntMask;
+use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
@@ -479,6 +481,18 @@ pub fn get_union_from_type_ast<'i>(
         Type::ValueOf(value_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(
             Box::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
         )))),
+        Type::IntMask(int_mask_type) => {
+            let mut values = Vec::new();
+            for entry in &int_mask_type.parameters.entries {
+                values.push(get_union_from_type_ast(&entry.inner, scope, type_context, classname)?);
+            }
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMask(TIntMask::new(values))))
+        }
+        Type::IntMaskOf(int_mask_of_type) => {
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Box::new(
+                get_union_from_type_ast(&int_mask_of_type.parameter.entry.inner, scope, type_context, classname)?,
+            )))))
+        }
         Type::PropertiesOf(properties_of_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
                 PropertiesOfFilter::All => TPropertiesOf::new(Box::new(get_union_from_type_ast(

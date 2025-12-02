@@ -306,6 +306,15 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
                 let replaced_index_type = replace(index_access.get_index_type(), template_result, codebase);
                 *index_access.get_index_type_mut() = replaced_index_type;
             }
+            TDerived::IntMask(int_mask) => {
+                for value in int_mask.get_values_mut() {
+                    *value = replace(value, template_result, codebase);
+                }
+            }
+            TDerived::IntMaskOf(int_mask_of) => {
+                let replaced_target_type = replace(int_mask_of.get_target_type(), template_result, codebase);
+                *int_mask_of.get_target_type_mut() = replaced_target_type;
+            }
         },
         _ => (),
     }

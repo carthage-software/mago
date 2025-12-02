@@ -56,14 +56,9 @@ This parser covers a wide range of standard PHPDoc, PHPStan, and Psalm type synt
 - **KeyOf / ValueOf:** `key-of<T>`, `value-of<T>`
 - **Indexed Access:** `T[K]`
 - **Int Ranges:** `int<0, 100>`, `int<min, 0>`, `int<1, max>`
+- **Int Masks:** `int-mask<1, 2, 4>`, `int-mask-of<Permissions::*>`
 - **Properties Of:** `properties-of<T>`, `public-properties-of<T>`, `protected-properties-of<T>`, `private-properties-of<T>`
 - **Unary `+`/`-` Types:** `+1`, `-2.0` (parsed as `Type::Posited`, `Type::Negated`)
-
-## Unsupported Syntax (Currently)
-
-This crate does not yet support parsing the following syntax:
-
-- `int-mask<T>`, `int-mask-of<T>`
 
 ## Usage
 

@@ -8,6 +8,7 @@ use crate::error::ParseError;
 use crate::parser::internal::array_like::parse_array_like_type;
 use crate::parser::internal::callable::parse_callable_type_specifications;
 use crate::parser::internal::callable::parse_optional_callable_type_specifications;
+use crate::parser::internal::generic::parse_generic_parameters;
 use crate::parser::internal::generic::parse_generic_parameters_or_none;
 use crate::parser::internal::generic::parse_single_generic_parameter;
 use crate::parser::internal::generic::parse_single_generic_parameter_or_none;
@@ -123,6 +124,14 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::ValueOf => Type::ValueOf(ValueOfType {
+            keyword: Keyword::from(stream.consume()?),
+            parameter: parse_single_generic_parameter(stream)?,
+        }),
+        TypeTokenKind::IntMask => Type::IntMask(IntMaskType {
+            keyword: Keyword::from(stream.consume()?),
+            parameters: parse_generic_parameters(stream)?,
+        }),
+        TypeTokenKind::IntMaskOf => Type::IntMaskOf(IntMaskOfType {
             keyword: Keyword::from(stream.consume()?),
             parameter: parse_single_generic_parameter(stream)?,
         }),

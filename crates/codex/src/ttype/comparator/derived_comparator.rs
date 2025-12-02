@@ -108,7 +108,7 @@ pub fn is_contained_by(
             &index_access.get_index_type().types,
             false,
         ),
-        TDerived::PropertiesOf(_) => {
+        TDerived::PropertiesOf(_) | TDerived::IntMask(_) | TDerived::IntMaskOf(_) => {
             return false;
         }
     };

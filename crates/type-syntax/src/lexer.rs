@@ -148,6 +148,10 @@ impl<'input> TypeLexer<'input> {
             [b'i' | b'I', b'n' | b'N', b't' | b'T'] => {
                 if self.input.is_at(b"interface-string", true) {
                     (TypeTokenKind::InterfaceString, 16)
+                } else if self.input.is_at(b"int-mask-of", true) {
+                    (TypeTokenKind::IntMaskOf, 11)
+                } else if self.input.is_at(b"int-mask", true) {
+                    (TypeTokenKind::IntMask, 8)
                 } else {
                     self.read_identifier()
                 }

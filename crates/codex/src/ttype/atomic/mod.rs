@@ -1258,16 +1258,20 @@ pub fn populate_atomic_type(
                 force,
             );
         }
-        TAtomic::Derived(derived) => {
-            populate_union_type(
-                derived.get_target_type_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
-
-            if let TDerived::IndexAccess(index_access) = derived {
+        TAtomic::Derived(derived) => match derived {
+            TDerived::IntMask(int_mask) => {
+                for value in int_mask.get_values_mut() {
+                    populate_union_type(value, codebase_symbols, reference_source, symbol_references, force);
+                }
+            }
+            TDerived::IndexAccess(index_access) => {
+                populate_union_type(
+                    index_access.get_target_type_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
                 populate_union_type(
                     index_access.get_index_type_mut(),
                     codebase_symbols,
@@ -1276,7 +1280,12 @@ pub fn populate_atomic_type(
                     force,
                 );
             }
-        }
+            _ => {
+                if let Some(target) = derived.get_target_type_mut() {
+                    populate_union_type(target, codebase_symbols, reference_source, symbol_references, force);
+                }
+            }
+        },
         _ => {}
     }
 }
