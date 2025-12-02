@@ -1,6 +1,7 @@
 use std::borrow::Cow;
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 
+use ahash::HashSet;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 
@@ -28,46 +29,39 @@ use crate::ttype::combiner;
 use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 
-/// Bit-based cycle detection for alias expansion.
-/// Uses 256 bits (4 x u64) for probabilistic hash-based tracking.
-/// This is much faster than HashSet for the common case of few expansions.
-struct AliasExpansionBits([u64; 4]);
+thread_local! {
+    /// Thread-local set for tracking currently expanding aliases (cycle detection).
+    /// Uses a HashSet for accurate tracking without false positives from hash collisions.
+    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom)>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+}
 
-impl AliasExpansionBits {
-    #[inline(always)]
-    const fn new() -> Self {
-        Self([0; 4])
-    }
+/// Resets the thread-local alias expansion state.
+///
+/// This is primarily useful for testing to ensure a clean state between tests.
+/// In normal usage, the RAII guards handle cleanup automatically.
+#[inline]
+pub fn reset_expansion_state() {
+    EXPANDING_ALIASES.with(|set| set.borrow_mut().clear());
+}
 
-    #[inline(always)]
-    fn hash(class_name: Atom, alias_name: Atom) -> (usize, u64) {
-        let hash = (class_name.as_ptr() as usize).wrapping_add(alias_name.as_ptr() as usize);
-        let bit_index = hash & 0xFF;
-        (bit_index >> 6, 1u64 << (bit_index & 63))
-    }
+/// RAII guard to ensure alias expansion state is properly cleaned up.
+/// This guarantees the alias is removed from the set even if the expansion panics.
+struct AliasExpansionGuard {
+    class_name: Atom,
+    alias_name: Atom,
+}
 
-    #[inline(always)]
-    fn is_expanding(&self, class_name: Atom, alias_name: Atom) -> bool {
-        let (idx, bit) = Self::hash(class_name, alias_name);
-        (self.0[idx] & bit) != 0
-    }
-
-    #[inline(always)]
-    fn start(&mut self, class_name: Atom, alias_name: Atom) {
-        let (idx, bit) = Self::hash(class_name, alias_name);
-        self.0[idx] |= bit;
-    }
-
-    #[inline(always)]
-    fn stop(&mut self, class_name: Atom, alias_name: Atom) {
-        let (idx, bit) = Self::hash(class_name, alias_name);
-        self.0[idx] &= !bit;
+impl AliasExpansionGuard {
+    fn new(class_name: Atom, alias_name: Atom) -> Self {
+        EXPANDING_ALIASES.with(|set| set.borrow_mut().insert((class_name, alias_name)));
+        Self { class_name, alias_name }
     }
 }
 
-thread_local! {
-    /// Thread-local bitset for tracking currently expanding aliases (cycle detection)
-    static EXPANDING_ALIASES: UnsafeCell<AliasExpansionBits> = const { UnsafeCell::new(AliasExpansionBits::new()) };
+impl Drop for AliasExpansionGuard {
+    fn drop(&mut self) {
+        EXPANDING_ALIASES.with(|set| set.borrow_mut().remove(&(self.class_name, self.alias_name)));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
@@ -539,11 +533,8 @@ fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpan
     let class_name = alias.get_class_name();
     let alias_name = alias.get_alias_name();
 
-    // SAFETY: Thread-local, single-threaded access
-    let is_cycle = unsafe {
-        let bits = &*EXPANDING_ALIASES.with(|b| b.get());
-        bits.is_expanding(class_name, alias_name)
-    };
+    // Check for cycle using the HashSet
+    let is_cycle = EXPANDING_ALIASES.with(|set| set.borrow().contains(&(class_name, alias_name)));
 
     if is_cycle {
         return vec![TAtomic::Alias(alias.clone())];
@@ -553,19 +544,9 @@ fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpan
         return vec![TAtomic::Alias(alias.clone())];
     };
 
-    // SAFETY: Thread-local, single-threaded access
-    unsafe {
-        let bits = &mut *EXPANDING_ALIASES.with(|b| b.get());
-        bits.start(class_name, alias_name);
-    }
+    let _ = AliasExpansionGuard::new(class_name, alias_name);
 
     expand_union(codebase, &mut expanded_union, options);
-
-    // SAFETY: Thread-local, single-threaded access
-    unsafe {
-        let bits = &mut *EXPANDING_ALIASES.with(|b| b.get());
-        bits.stop(class_name, alias_name);
-    }
 
     expanded_union.types.into_owned()
 }
