@@ -57,6 +57,8 @@ export function useUrlState() {
       shareUrl.value = `${window.location.origin}${window.location.pathname}#${uuid}`;
       lastStateHash = stateHash;
 
+      window.history.replaceState(null, '', `#${uuid}`);
+
       return shareUrl.value;
     } catch (e) {
       shareError.value = e.message || 'Failed to generate share URL';
@@ -69,6 +71,10 @@ export function useUrlState() {
   function clearShareUrl() {
     shareUrl.value = null;
     lastStateHash = null;
+
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }
 
   async function loadFromUrl() {

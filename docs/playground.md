@@ -11,10 +11,6 @@ import MagoPlayground from './.vitepress/theme/components/playground/MagoPlaygro
 <MagoPlayground />
 
 <style>
-.VPSidebar {
-  display: none !important;
-}
-
 .VPDoc .content {
   max-width: 100% !important;
   padding: 0 24px !important;
