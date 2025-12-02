@@ -792,7 +792,7 @@ namespace {
          *   'name': string,
          *   'len': int,
          *   'precision': int,
-         *   'oci:decl_type': intstring',
+         *   'oci:decl_type': int|string,
          *   'native_type': string,
          *   'scale': int,
          *   'flags': array,

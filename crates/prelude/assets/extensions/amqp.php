@@ -737,7 +737,7 @@ class AMQPConnection
     }
 
     /**
-     * @param int $saslMethod
+     * @param int $method
      *
      * @return void
      */

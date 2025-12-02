@@ -480,12 +480,12 @@ class ReflectionClassConstant implements Reflector
     }
 
     /**
-     * @template T
+     * @template A
      *
-     * @param class-string<T>|null $name
+     * @param class-string<A>|null $name
      * @param int $flags
      *
-     * @return list<ReflectionAttribute<T>>
+     * @return list<ReflectionAttribute<A>>
      *
      * @pure
      */
@@ -711,12 +711,12 @@ class ReflectionProperty implements Reflector
     }
 
     /**
-     * @template T
+     * @template A
      *
-     * @param class-string<T>|null $name
+     * @param class-string<A>|null $name
      * @param int $flags
      *
-     * @return list<ReflectionAttribute<T>>
+     * @return list<ReflectionAttribute<A>>
      *
      * @pure
      */
@@ -992,12 +992,12 @@ class ReflectionParameter implements Reflector
     }
 
     /**
-     * @template T
+     * @template A
      *
-     * @param class-string<T>|null $name
+     * @param class-string<A>|null $name
      * @param int $flags
      *
-     * @return list<ReflectionAttribute<T>>
+     * @return list<ReflectionAttribute<A>>
      *
      * @pure
      */
@@ -1203,11 +1203,11 @@ abstract class ReflectionFunctionAbstract implements Reflector
     }
 
     /**
-     * @template T
+     * @template A
      *
-     * @param class-string<T>|null $name
+     * @param class-string<A>|null $name
      *
-     * @return list<ReflectionAttribute<T>>
+     * @return list<ReflectionAttribute<A>>
      *
      * @pure
      */
@@ -1869,11 +1869,11 @@ class ReflectionClass implements Reflector
     }
 
     /**
-     * @template T
+     * @template A
      *
-     * @param class-string<T>|null $name
+     * @param class-string<A>|null $name
      *
-     * @return list<ReflectionAttribute<T>>
+     * @return list<ReflectionAttribute<A>>
      *
      * @pure
      */

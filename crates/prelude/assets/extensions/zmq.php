@@ -109,7 +109,7 @@ class ZMQ
     const EVENT_ALL = 65535;
 
     /**
-     * @return integer
+     * @return int
      */
     public function clock()
     {
@@ -131,12 +131,10 @@ class ZMQ
 class ZMQContext
 {
     /**
-     * @param integer $io_threads
-     * @param boolean $is_persistent
-     *
-     * @return ZMQContext
+     * @param int $io_threads
+     * @param bool $is_persistent
      */
-    public function __construct($io_threads = '', $persistent = '') {}
+    public function __construct($io_threads = 1, $is_persistent = true) {}
 
     /**
      * @return ZMQContext
@@ -181,16 +179,16 @@ class ZMQSocket
 {
     /**
      * @param ZMQContext $context
-     * @param integer $type
-     * @param string $persistent_id
-     * @param callback $on_new_socket
-     * @return ZMQSocket
+     * @param int $type
+     * @param null|string $persistent_id
+     * @param null|callable $on_new_socket
+     * @throws ZMQSocketException
      */
-    public function __construct(ZMQContext $ZMQContext, $type, $persistent_id = '', $on_new_socket = '') {}
+    public function __construct(ZMQContext $context, $type, $persistent_id = null, $on_new_socket = null) {}
 
     /**
      * @param string $message
-     * @param integer $flags
+     * @param int $mode
      *
      * @return ZMQSocket
      */
@@ -198,13 +196,18 @@ class ZMQSocket
     {
     }
 
+    /**
+     * @param int $mode
+     *
+     * @return string|false
+     */
     public function recv($mode = '')
     {
     }
 
     /**
-     * @param arrays $messages
-     * @param integer $flags
+     * @param array $message
+     * @param int $mode
      *
      * @return ZMQSocket
      */
@@ -212,13 +215,18 @@ class ZMQSocket
     {
     }
 
+    /**
+     * @param int $mode
+     *
+     * @return string[]
+     */
     public function recvmulti($mode = '')
     {
     }
 
     /**
      * @param string $dsn
-     * @param boolean $force
+     * @param bool $force
      *
      * @return ZMQSocket
      */
@@ -228,7 +236,7 @@ class ZMQSocket
 
     /**
      * @param string $dsn
-     * @param boolean $force
+     * @param bool $force
      *
      * @return ZMQSocket
      */
@@ -298,41 +306,11 @@ class ZMQSocket
 class ZMQPoll
 {
     /**
-     * @param ZMQSocket $object
-     * @param integer $events
-     *
-     * @return integer
+     * @param int $type
+     * @return int
+     * @throws ZMQPollException
      */
-    public function add($entry, $type)
-    {
-    }
-
-    /**
-     * @param array $readable
-     * @param array $writable
-     * @param integer $timeout
-     *
-     * @return integer
-     */
-    public function poll(&$readable, &$writable, $timeout = '')
-    {
-    }
-
-    public function getlasterrors()
-    {
-    }
-
-    /**
-     * @return boolean
-     */
-    public function remove($remove)
-    {
-    }
-
-    /**
-     * @return integer
-     */
-    public function count()
+    public function add(ZMQSocket $entry, $type)
     {
     }
 
@@ -344,9 +322,35 @@ class ZMQPoll
     }
 
     /**
-     * @return array
+     * @return int
      */
-    public function items()
+    public function count()
+    {
+    }
+
+    /**
+     * @return int[]
+     */
+    public function getLastErrors()
+    {
+    }
+
+    /**
+     * @param-out array $readable
+     * @param-out array $writable
+     * @param int $timeout
+     * @throws ZMQPollException
+     * @return int
+     */
+    public function poll(array &$readable, array &$writable, $timeout = -1)
+    {
+    }
+
+    /**
+     * @param ZMQSocket|string|mixed $item
+     * @return bool
+     */
+    public function remove($item)
     {
     }
 }

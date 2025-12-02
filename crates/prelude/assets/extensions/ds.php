@@ -418,11 +418,7 @@ final class Map implements Collection, ArrayAccess
      * @template TDefault
      * @param TKey $key
      * @param TDefault $default
-     * @return (
-     *     func_num_args() is 1
-     *     ? TValue
-     *     : TValue|TDefault
-     * )
+     * @return ($default is null ? TValue : TValue|TDefault)
      * @throws OutOfBoundsException
      * @mutation-free
      */
@@ -486,11 +482,7 @@ final class Map implements Collection, ArrayAccess
      * @template TDefault
      * @param TKey $key
      * @param TDefault $default
-     * @return (
-     *     func_num_args() is 1
-     *     ? TValue
-     *     : TValue|TDefault
-     * )
+     * @return ($default is null ? TValue : TValue|TDefault)
      * @throws \OutOfBoundsException
      */
     public function remove($key, $default = null)

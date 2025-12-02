@@ -617,7 +617,7 @@ function zend_send_buffer($buffer, $mime_type, $custom_headers)
 }
 
 /**
- * @param string
+ * @param string $error_string
  */
 function set_job_failed($error_string)
 {
