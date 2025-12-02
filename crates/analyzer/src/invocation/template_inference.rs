@@ -28,6 +28,7 @@ use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
 use mago_codex::ttype::template::standin_type_replacer::insert_bound_type;
 use mago_codex::ttype::union::TUnion;
@@ -722,12 +723,15 @@ fn infer_templates_from_input_and_container_types(
 
         let mut has_violation = false;
 
-        if let Some(template_types) = template_result.template_types.get_mut(template_parameter_name) {
+        if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
             for (_, template_type) in template_types {
+                let resolved_template_type =
+                    inferred_type_replacer::replace(template_type, template_result, context.codebase);
+
                 if !union_comparator::is_contained_by(
                     context.codebase,
                     &residual_input_type,
-                    template_type,
+                    &resolved_template_type,
                     false,
                     false,
                     false,
@@ -736,7 +740,7 @@ fn infer_templates_from_input_and_container_types(
                     potential_template_violations
                         .entry((*template_parameter_name, container_generic.defining_entity))
                         .or_insert_with(|| {
-                            (residual_input_type.clone(), template_type.clone(), container_generic.clone())
+                            (residual_input_type.clone(), resolved_template_type.clone(), container_generic.clone())
                         });
 
                     has_violation = true;
