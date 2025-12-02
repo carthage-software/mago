@@ -847,6 +847,10 @@ mod tests {
                 ));
             }
         "#},
+        issues = [
+            // TypeInterface: T is not used in interface body
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 
     test_analysis! {
@@ -913,6 +917,11 @@ mod tests {
                 return as_array($input);
             }
         "#},
+        issues = [
+            // Traversable: K and V not used in interface body
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 
     test_analysis! {

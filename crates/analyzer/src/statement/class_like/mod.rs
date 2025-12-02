@@ -110,6 +110,142 @@ impl PropertyConflict {
     }
 }
 
+/// Checks if a type union contains a reference to a specific template parameter.
+fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_class: Atom) -> bool {
+    use mago_codex::ttype::TypeRef;
+
+    type_union.types.iter().any(|atomic| {
+        if let TAtomic::GenericParameter(gp) = atomic
+            && gp.parameter_name == param_name
+            && let GenericParent::ClassLike(class_name) = gp.defining_entity
+            && class_name == defining_class
+        {
+            return true;
+        }
+
+        atomic.get_all_child_nodes().iter().any(|node| match node {
+            TypeRef::Atomic(TAtomic::GenericParameter(gp)) => {
+                gp.parameter_name == param_name
+                    && matches!(gp.defining_entity, GenericParent::ClassLike(c) if c == defining_class)
+            }
+            TypeRef::Union(u) => type_contains_template_param(u, param_name, defining_class),
+            _ => false,
+        })
+    })
+}
+
+/// Checks for unused template parameters in a class-like declaration.
+///
+/// A template parameter is considered "used" if it appears in:
+/// - A property type
+/// - A method parameter type
+/// - A method return type
+/// - An `@extends`, `@implements`, or `@use` annotation
+fn check_unused_template_parameters<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) {
+    if !context.settings.find_unused_definitions {
+        return;
+    }
+
+    if class_like_metadata.template_types.is_empty() {
+        return;
+    }
+
+    let class_name = class_like_metadata.name;
+    let class_original_name = class_like_metadata.original_name;
+    let class_kind_str = class_like_metadata.kind.as_str();
+    let class_name_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
+
+    for (template_name, _) in &class_like_metadata.template_types {
+        if template_name.as_str().starts_with('_') {
+            continue;
+        }
+
+        let mut is_used = false;
+
+        for extended_params in class_like_metadata.template_extended_parameters.values() {
+            for (_param_name, param_type) in extended_params {
+                if type_contains_template_param(param_type, *template_name, class_name) {
+                    is_used = true;
+                    break;
+                }
+            }
+
+            if is_used {
+                break;
+            }
+        }
+
+        if is_used {
+            continue;
+        }
+
+        for property_metadata in class_like_metadata.properties.values() {
+            if let Some(type_metadata) = &property_metadata.type_metadata
+                && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
+            {
+                is_used = true;
+                break;
+            }
+        }
+
+        if is_used {
+            continue;
+        }
+
+        for method_id in class_like_metadata.declaring_method_ids.values() {
+            let Some(function_like) =
+                context.codebase.get_method(method_id.get_class_name(), method_id.get_method_name())
+            else {
+                continue;
+            };
+
+            // Check parameters
+            for param in &function_like.parameters {
+                if let Some(type_metadata) = &param.type_metadata
+                    && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
+                {
+                    is_used = true;
+                    break;
+                }
+            }
+
+            if is_used {
+                break;
+            }
+
+            // Check return type
+            if let Some(return_type_metadata) = &function_like.return_type_metadata
+                && type_contains_template_param(&return_type_metadata.type_union, *template_name, class_name)
+            {
+                is_used = true;
+                break;
+            }
+        }
+
+        if is_used {
+            continue;
+        }
+
+        // Report warning if template parameter is unused
+        context.collector.report_with_code(
+            IssueCode::UnusedTemplateParameter,
+            Issue::warning(format!(
+                "Template parameter `{template_name}` is never used in {class_kind_str} `{class_original_name}`."
+            ))
+            .with_annotation(
+                Annotation::primary(class_name_span)
+                    .with_message(format!("Template `{template_name}` is defined on this {class_kind_str} but never referenced")),
+            )
+            .with_help(format!(
+                "Remove the unused `@template {template_name}` from the docblock, or use it in a property, method signature, or inherited type."
+            )),
+        );
+    }
+}
+
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
     fn analyze<'ctx>(
         &'ast self,
@@ -403,6 +539,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
         }
     }
 
+    check_unused_template_parameters(context, class_like_metadata);
     check_class_like_properties(context, class_like_metadata);
 
     let mut scope = ScopeContext::new();

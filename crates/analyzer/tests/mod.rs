@@ -372,6 +372,7 @@ test_case!(issue_676);
 test_case!(issue_684);
 test_case!(issue_689);
 test_case!(issue_690);
+test_case!(unused_template_parameter);
 
 #[test]
 fn test_all_test_cases_are_ran() {

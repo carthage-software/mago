@@ -619,6 +619,10 @@ mod tests {
                 }
             }
         "#},
+        issues = [
+            // ReadableCollection: TKey not used in interface body
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 
     test_analysis! {

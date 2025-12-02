@@ -23,7 +23,11 @@ namespace Fixture {
     {
     }
 
-    /** @template T */
+    /**
+     * @template T
+     *
+     * @mago-expect analysis:unused-template-parameter
+     */
     interface GenericInterface
     {
     }

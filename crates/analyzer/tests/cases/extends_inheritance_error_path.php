@@ -44,12 +44,20 @@ namespace Fixture {
     {
     }
 
-    /** @template T */
+    /**
+     * @template T
+     *
+     * @mago-expect analysis:unused-template-parameter
+     */
     class GenericParent
     {
     }
 
-    /** @template T of ValidBaseClass */
+    /**
+     * @template T of ValidBaseClass
+     *
+     * @mago-expect analysis:unused-template-parameter
+     */
     class ConstrainedGenericParent
     {
     }

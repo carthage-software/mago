@@ -11,6 +11,8 @@ class Document
 
 /**
  * @template T
+ *
+ * @mago-expect analysis:unused-template-parameter
  */
 trait HasOwner
 {

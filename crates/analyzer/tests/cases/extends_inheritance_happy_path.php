@@ -18,6 +18,8 @@ interface Steerable extends Drivable
 
 /**
  * @template T
+ *
+ * @mago-expect analysis:unused-template-parameter
  */
 class GenericContainer
 {
@@ -42,6 +44,8 @@ class StringBox extends GenericContainer
 /**
  * @template TKey
  * @template TValue
+ *
+ * @mago-expect analysis:unused-template-parameter
  */
 class GenericPair
 {
@@ -66,6 +70,8 @@ class FlippedPair extends GenericPair
 
 /**
  * @template T
+ *
+ * @mago-expect analysis:unused-template-parameter
  */
 interface Loader
 {

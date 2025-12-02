@@ -47,7 +47,11 @@ namespace Fixture {
         use RestrictedTrait;
     }
 
-    /** @template T */
+    /**
+     * @template T
+     *
+     * @mago-expect analysis:unused-template-parameter
+     */
     trait GenericTrait
     {
     }

@@ -145,7 +145,11 @@ mod tests {
             Self {
                 name,
                 content,
-                settings: Settings { find_unused_expressions: true, ..Default::default() },
+                settings: Settings {
+                    find_unused_expressions: true,
+                    find_unused_definitions: true,
+                    ..Default::default()
+                },
                 expected_issues: vec![],
             }
         }

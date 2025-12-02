@@ -8,7 +8,11 @@ class User implements Loggable
 {
 }
 
-/** @template T */
+/**
+ * @template T
+ *
+ * @mago-expect analysis:unused-template-parameter
+ */
 interface Repository
 {
 }

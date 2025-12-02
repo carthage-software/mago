@@ -605,6 +605,14 @@ mod tests {
                 return 'final value';
             }
         "#},
+        issues = [
+            // Traversable: K and V not used in interface body
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+            // Generator: S and R not used
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 
     test_analysis! {
@@ -635,6 +643,11 @@ mod tests {
         "#},
         issues = [
             IssueCode::InvalidReturnStatement,
+            // Generator stub: all 4 template params unused
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
         ]
     }
 
@@ -1075,5 +1088,9 @@ mod tests {
                 return new ScalarType();
             }
         "#},
+        issues = [
+            // TypeInterface: T is only used in @assert annotation, not in property/param/return
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 }

@@ -173,6 +173,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
 mod tests {
     use indoc::indoc;
 
+    use crate::code::IssueCode;
     use crate::test_analysis;
 
     test_analysis! {
@@ -374,6 +375,11 @@ mod tests {
             foreach (y() as $item) {
                 echo $item . "\n";
             }
-        "#}
+        "#},
+        issues = [
+            // Traversable: K and V not used in interface body
+            IssueCode::UnusedTemplateParameter,
+            IssueCode::UnusedTemplateParameter,
+        ]
     }
 }

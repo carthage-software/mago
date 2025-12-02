@@ -806,10 +806,6 @@ mod tests {
                 }
             }
         "#},
-        issues = [
-            // TODO(azjezz): we want to trigger an issue here in the future about
-            // the type parameter not being used at all in the class `Example`
-        ]
     }
 
     test_analysis! {
