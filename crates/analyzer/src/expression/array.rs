@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use ahash::HashSet;
 
@@ -42,6 +43,8 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::utils::expression::get_expression_id;
+use crate::utils::misc::unwrap_expression;
 
 /// Analyzes array literals and their elements.
 ///
@@ -300,8 +303,23 @@ fn analyze_array_elements<'ctx, 'arena>(
             }
         }
 
-        if value.is_unary() {
-            // TODO(azjezz): handle by ref values: https://github.com/vimeo/psalm/blob/d74446a78f0e8431fb85ef37889927b862aee09c/src/Psalm/Internal/Analyzer/Statements/Expression/ArrayAnalyzer.php#L509-L528
+        if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) =
+            unwrap_expression(value)
+        {
+            let variable_id = get_expression_id(
+                operand,
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            );
+
+            if let Some(variable_id) = variable_id {
+                if let Some(existing_type) = block_context.locals.remove(&variable_id) {
+                    block_context.remove_descendants(context, &variable_id, &existing_type, None);
+                }
+
+                block_context.locals.insert(variable_id, Rc::new(get_mixed()));
+            }
         }
 
         match artifacts.get_expression_type(value) {
