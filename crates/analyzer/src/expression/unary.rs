@@ -982,9 +982,6 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
                     reported_object_warning = true;
                 }
 
-                // TODO(azjezz): we can do better here
-                // we can lookup the object and get the properties, and return
-                // a keyed array with the properties
                 let mut obj_array = TKeyedArray::new();
                 obj_array.parameters = Some((Box::new(get_string()), Box::new(get_mixed())));
 
