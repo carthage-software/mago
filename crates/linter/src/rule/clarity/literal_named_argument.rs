@@ -103,7 +103,11 @@ impl LintRule for LiteralNamedArgumentRule {
             return;
         }
 
-        for argument in function_call.argument_list.arguments.iter() {
+        for (index, argument) in function_call.argument_list.arguments.iter().enumerate() {
+            if index == 0 {
+                continue;
+            }
+
             let Argument::Positional(positional_argument) = argument else {
                 continue;
             };
