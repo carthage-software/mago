@@ -2897,9 +2897,13 @@ function is_array(mixed $value): bool
 }
 
 /**
- * @assert-if-true list<mixed> $array
+ * @template V
  *
- * @return ($array is list ? true : ($array is array ? bool : false))
+ * @param array<V> $array
+ *
+ * @assert-if-true list<V> $array
+ *
+ * @return ($array is list<V> ? true : false)
  *
  * @pure
  */

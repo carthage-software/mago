@@ -16,6 +16,7 @@ use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -348,6 +349,10 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                 let mut new_variable_possibilities: AssertionSet = vec![];
                 let mut resolved_or_clause: Disjunction<Assertion> = Vec::new();
 
+                let asserted_type = block_context.locals.get(&assertion_variable);
+                let mut any_possible = false;
+                let mut has_resolved_types = false;
+
                 for variable_assertion in variable_assertions {
                     let Some(assertion_atomic) = variable_assertion.get_type() else {
                         add_and_assertion(&mut new_variable_possibilities, variable_assertion.clone());
@@ -364,10 +369,25 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                     );
 
                     if !resolved_assertion_type.is_never() {
+                        has_resolved_types = true;
+
+                        if !any_possible
+                            && let Some(asserted_type) = &asserted_type
+                            && can_expression_types_be_identical(
+                                context.codebase,
+                                asserted_type,
+                                &resolved_assertion_type,
+                                false,
+                                false,
+                            )
+                        {
+                            any_possible = true;
+                        }
+
                         for resolved_atomic in resolved_assertion_type.types.into_owned() {
                             resolved_or_clause.push(variable_assertion.with_type(resolved_atomic));
                         }
-                    } else if let Some(asserted_type) = block_context.locals.get(&assertion_variable) {
+                    } else if let Some(asserted_type) = &asserted_type {
                         match variable_assertion {
                             Assertion::IsType(_) => {
                                 if !can_expression_types_be_identical(
@@ -377,13 +397,23 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                                     false,
                                     false,
                                 ) {
-                                    // TODO(azejzz): report this as an issue.
-                                    //
-                                    // e.g:
-                                    //
-                                    // $foo = new Foo;
-                                    // assert_is_bar_or_baz($foo);
-                                    //                      ^- impossible
+                                    let asserted_type_id = asserted_type.get_id();
+                                    let expected_type_id = resolved_assertion_type.get_id();
+
+                                    context.collector.report_with_code(
+                                        IssueCode::ImpossibleTypeComparison,
+                                        Issue::error(format!(
+                                            "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
+                                        ))
+                                        .with_annotation(
+                                            Annotation::primary(invocation.span)
+                                                .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                                        )
+                                        .with_note(format!(
+                                            "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                                        ))
+                                        .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                                    );
                                 }
                             }
                             Assertion::IsIdentical(_) => {
@@ -394,7 +424,24 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                                 ) {
                                     Some(intersection) => intersection,
                                     None => {
-                                        // TODO: impossible assertion
+                                        let asserted_type_id = asserted_type.get_id();
+                                        let expected_type_id = resolved_assertion_type.get_id();
+
+                                        context.collector.report_with_code(
+                                            IssueCode::ImpossibleTypeComparison,
+                                            Issue::error(format!(
+                                                "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be identical to `{expected_type_id}`."
+                                            ))
+                                            .with_annotation(
+                                                Annotation::primary(invocation.span)
+                                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                                            )
+                                            .with_note(format!(
+                                                "The assertion expects `{assertion_variable}` to be identical to `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                                            ))
+                                            .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                                        );
+
                                         get_never()
                                     }
                                 };
@@ -411,6 +458,33 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                             }
                         }
                     }
+                }
+
+                if has_resolved_types
+                    && !any_possible
+                    && let Some(asserted_type) = &asserted_type
+                {
+                    let asserted_type_id = asserted_type.get_id();
+                    let expected_type_id = resolved_or_clause
+                        .iter()
+                        .filter_map(|a| a.get_type().map(|t| t.get_id().to_string()))
+                        .collect::<Vec<_>>()
+                        .join("|");
+
+                    context.collector.report_with_code(
+                            IssueCode::ImpossibleTypeComparison,
+                            Issue::error(format!(
+                                "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(invocation.span)
+                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                            )
+                            .with_note(format!(
+                                "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                            ))
+                            .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                        );
                 }
 
                 if !resolved_or_clause.is_empty() {
