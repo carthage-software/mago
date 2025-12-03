@@ -100,6 +100,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::Negation(_) => {
                 let mut resulting_types = vec![];
+                let mut invalid_operand_messages: Vec<(String, Span)> = vec![];
+                let operand_span = self.operand.span();
+
                 for operand_part in operand_type.as_ref().map(|o| o.types.as_ref()).unwrap_or_default() {
                     match operand_part {
                         TAtomic::Null | TAtomic::Void => {
@@ -130,7 +133,35 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                                     resulting_types.push(TAtomic::Scalar(TScalar::float()));
                                 }
                             },
+                            TScalar::String(string) => {
+                                if string.is_numeric {
+                                    // numeric-string → valid, produces int|float
+                                    resulting_types.push(TAtomic::Scalar(TScalar::int()));
+                                    resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                                } else if let Some(TStringLiteral::Value(value)) = &string.literal {
+                                    // literal string with known value → check if numeric
+                                    if str_is_numeric(value.as_str()) {
+                                        resulting_types.push(TAtomic::Scalar(TScalar::int()));
+                                        resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                                    } else {
+                                        // non-numeric literal string → FATAL in PHP
+                                        invalid_operand_messages.push((
+                                            format!("Cannot negate non-numeric string literal `\"{}\"`", value),
+                                            operand_span,
+                                        ));
+                                    }
+                                } else {
+                                    // general string (could be numeric at runtime) → possibly invalid
+                                    invalid_operand_messages.push((
+                                        "Cannot reliably negate `string`; it may not be numeric".to_string(),
+                                        operand_span,
+                                    ));
+                                    resulting_types.push(TAtomic::Scalar(TScalar::int()));
+                                    resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                                }
+                            }
                             _ => {
+                                // Other scalars (ClassLikeString, etc.) - treat as possibly valid
                                 resulting_types.push(TAtomic::Scalar(TScalar::int()));
                                 resulting_types.push(TAtomic::Scalar(TScalar::float()));
                             }
@@ -138,22 +169,85 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                         TAtomic::GenericParameter(parameter) => {
                             if parameter.constraint.is_int_or_float() {
                                 resulting_types.push(TAtomic::GenericParameter(parameter.clone()));
+                            } else if parameter.constraint.is_numeric() {
+                                // numeric constraint includes numeric-string
+                                resulting_types.push(TAtomic::Scalar(TScalar::int()));
+                                resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                            } else {
+                                invalid_operand_messages.push((
+                                    format!(
+                                        "Cannot negate template parameter `{}` with constraint `{}`",
+                                        parameter.parameter_name,
+                                        parameter.constraint.get_id()
+                                    ),
+                                    operand_span,
+                                ));
                             }
                         }
+                        TAtomic::Array(_) => {
+                            invalid_operand_messages.push(("Cannot negate `array`".to_string(), operand_span));
+                        }
+                        TAtomic::Object(_) => {
+                            let type_id = operand_part.get_id();
+                            invalid_operand_messages
+                                .push((format!("Cannot negate object of type `{type_id}`"), operand_span));
+                        }
+                        TAtomic::Resource(_) => {
+                            invalid_operand_messages.push(("Cannot negate `resource`".to_string(), operand_span));
+                        }
+                        TAtomic::Mixed(_) => {
+                            // Could be anything - possibly invalid
+                            invalid_operand_messages.push((
+                                "Cannot reliably negate `mixed`; it may contain non-numeric types".to_string(),
+                                operand_span,
+                            ));
+                            resulting_types.push(TAtomic::Scalar(TScalar::int()));
+                            resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                        }
                         _ => {
-                            // TODO(azjezz): we should handle more types here.
+                            // Other types - don't add to resulting_types, don't report
                         }
                     }
                 }
 
-                if resulting_types.is_empty() {
-                    resulting_types.push(TAtomic::Scalar(TScalar::int()));
-                    resulting_types.push(TAtomic::Scalar(TScalar::float()));
+                if !invalid_operand_messages.is_empty() {
+                    let is_definitely_invalid = resulting_types.is_empty();
+                    let issue_code = if is_definitely_invalid {
+                        IssueCode::InvalidOperand
+                    } else {
+                        IssueCode::PossiblyInvalidOperand
+                    };
+
+                    let mut issue = if is_definitely_invalid {
+                        Issue::error("Invalid operand for negation.".to_string())
+                    } else {
+                        Issue::warning("Possibly invalid operand for negation.".to_string())
+                    };
+
+                    let mut is_first = true;
+                    for (msg, span) in invalid_operand_messages {
+                        issue = issue.with_annotation(if is_first {
+                            Annotation::primary(span).with_message(msg)
+                        } else {
+                            Annotation::secondary(span).with_message(msg)
+                        });
+
+                        is_first = false;
+                    }
+
+                    issue = issue
+                        .with_note("Negation requires a numeric operand (int, float, bool, null, or numeric-string).")
+                        .with_help("Ensure the operand is a numeric type.");
+
+                    context.collector.report_with_code(issue_code, issue);
                 }
 
-                let resulting_type = TUnion::from_vec(combine(resulting_types, context.codebase, false));
-
-                artifacts.set_expression_type(self, resulting_type);
+                if resulting_types.is_empty() {
+                    artifacts.set_expression_type(self, get_never());
+                } else {
+                    let resulting_type = TUnion::from_vec(combine(resulting_types, context.codebase, false));
+                    artifacts.set_expression_type(self, resulting_type);
+                }
             }
             UnaryPrefixOperator::PreIncrement(_) => {
                 let resulting_type = increment_operand(context, block_context, artifacts, self.operand, self.span())?;
