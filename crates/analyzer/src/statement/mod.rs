@@ -17,7 +17,6 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::heuristic;
 use crate::utils::docblock::populate_docblock_variables;
 use crate::utils::expression::get_function_like_id_from_call;
 
@@ -177,8 +176,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         context.statement_span = last_statement_span;
         block_context.conditionally_referenced_variable_ids = HashSet::default();
-
-        heuristic::check_statement(self, context);
 
         Ok(())
     }

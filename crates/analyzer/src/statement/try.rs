@@ -169,6 +169,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let caught_classes = get_caught_classes(context, &catch_clause.hint);
+
+            for caught in caught_classes.iter() {
+                if context.codebase.is_instance_of(caught, &atom("Error")) {
+                    context.collector.report_with_code(
+                        IssueCode::AvoidCatchingError,
+                        Issue::warning("Avoid catching 'Error' class instances.")
+                            .with_annotation(Annotation::primary(catch_clause.hint.span()).with_message(
+                                "This throwable is an instance of the `Error` class or one of its sub-classes.",
+                            ))
+                            .with_annotation(
+                                Annotation::secondary(catch_clause.block.span())
+                                    .with_message("This catch clause intercepts a critical error."),
+                            )
+                            .with_note("Catching these errors hides issues that should crash your app.")
+                            .with_help("Remove or adjust this catch clause so errors propagate naturally."),
+                    );
+                }
+            }
+
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
             for caught_class in caught_classes.iter() {
                 for (possibly_thrown_exception, _) in possibly_thrown_exceptions.iter() {
@@ -365,10 +384,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     }
 }
 
-pub(crate) fn get_caught_classes<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    hint: &'ast Hint<'arena>,
-) -> AtomSet {
+fn get_caught_classes<'ctx, 'ast, 'arena>(context: &mut Context<'ctx, 'arena>, hint: &'ast Hint<'arena>) -> AtomSet {
     let mut caught_identifiers: AtomMap<Span> = AtomMap::default();
 
     fn walk<'ctx, 'ast, 'arena>(
