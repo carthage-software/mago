@@ -82,21 +82,35 @@ export function useUrlState() {
     if (!hash) return null;
 
     try {
+      let state;
       if (UUID_REGEX.test(hash)) {
         const response = await fetch(`${API_BASE_URL}/share/${hash}`);
         if (!response.ok) {
           console.warn('Failed to load shared state:', response.status);
           return null;
         }
-        const { state } = await response.json();
-        return state;
+        const data = await response.json();
+        state = data.state;
+      } else {
+        state = await decompressState(hash);
       }
 
-      return await decompressState(hash);
+      if (state) {
+        shareUrl.value = window.location.href;
+        lastStateHash = JSON.stringify(state);
+      }
+
+      return state;
     } catch (e) {
       console.warn('Failed to load state from URL:', e);
       return null;
     }
+  }
+
+  function shouldClearShareUrl(currentState) {
+    if (!shareUrl.value) return false;
+    const currentHash = JSON.stringify(currentState);
+    return currentHash !== lastStateHash;
   }
 
   async function copyToClipboard(url) {
@@ -122,5 +136,6 @@ export function useUrlState() {
     loadFromUrl,
     copyToClipboard,
     clearShareUrl,
+    shouldClearShareUrl,
   };
 }

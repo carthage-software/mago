@@ -12,7 +12,7 @@ const store = createPlaygroundState();
 const { state } = store;
 
 const { isLoading: wasmLoading, isReady: wasmReady, analyze, format, loadWasm, getRules } = useMagoWasm();
-const { shareError, shareSuccess, isSharing, shareUrl, generateShareUrl, loadFromUrl, copyToClipboard, clearShareUrl } = useUrlState();
+const { shareError, shareSuccess, isSharing, shareUrl, generateShareUrl, loadFromUrl, copyToClipboard, clearShareUrl, shouldClearShareUrl } = useUrlState();
 
 const hasRunOnce = ref(false);
 const highlightedRange = ref(null);
@@ -80,8 +80,10 @@ watch(
 
 watch(
   () => store.getShareableState(),
-  () => {
-    clearShareUrl();
+  (newState) => {
+    if (shouldClearShareUrl(newState)) {
+      clearShareUrl();
+    }
   },
   { deep: true }
 );
