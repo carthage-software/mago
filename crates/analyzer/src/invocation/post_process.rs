@@ -472,19 +472,19 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                         .join("|");
 
                     context.collector.report_with_code(
-                            IssueCode::ImpossibleTypeComparison,
-                            Issue::error(format!(
-                                "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
-                            ))
-                            .with_annotation(
-                                Annotation::primary(invocation.span)
-                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
-                            )
-                            .with_note(format!(
-                                "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
-                            ))
-                            .with_help("Check that the correct variable is being passed, or update the assertion type."),
-                        );
+                        IssueCode::ImpossibleTypeComparison,
+                        Issue::error(format!(
+                            "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(invocation.span)
+                                .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                        )
+                        .with_note(format!(
+                            "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                        ))
+                        .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                    );
                 }
 
                 if !resolved_or_clause.is_empty() {

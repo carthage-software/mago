@@ -3008,8 +3008,6 @@ function umask(null|int $mask): int
 
 /**
  * @param resource $stream
- *
- * @assert-if-true closed-resource $stream
  */
 function fclose($stream): bool
 {
