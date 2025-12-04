@@ -11,6 +11,8 @@ function create_some_instance(): SomeClass
 
 /**
  * @psalm-assert !null $value
+ *
+ * @throws InvalidArgumentException
  */
 function assert_not_null(mixed $value): void
 {
@@ -19,12 +21,18 @@ function assert_not_null(mixed $value): void
     }
 }
 
+/**
+ * @throws InvalidArgumentException
+ */
 function process_value(null|int $value): int
 {
     assert_not_null($value);
     return $value * 2;
 }
 
+/**
+ * @throws InvalidArgumentException
+ */
 function other(): void
 {
     $instance = create_some_instance();
