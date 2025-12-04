@@ -35,11 +35,12 @@ pub struct LiteralNamedArgumentRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiteralNamedArgumentConfig {
     pub level: Level,
+    pub check_first_argument: bool,
 }
 
 impl Default for LiteralNamedArgumentConfig {
     fn default() -> Self {
-        Self { level: Level::Warning }
+        Self { level: Level::Warning, check_first_argument: false }
     }
 }
 
@@ -104,7 +105,7 @@ impl LintRule for LiteralNamedArgumentRule {
         }
 
         for (index, argument) in function_call.argument_list.arguments.iter().enumerate() {
-            if index == 0 {
+            if index == 0 && !self.cfg.check_first_argument {
                 continue;
             }
 
@@ -140,5 +141,54 @@ impl LintRule for LiteralNamedArgumentRule {
                 .with_help(format!("Consider using a named argument instead: `function_name(param: {literal_value})`.")),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_lint_failure, test_lint_success};
+    use indoc::indoc;
+
+    test_lint_success! {
+        name = first_argument_skipped_by_default,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r#"
+            <?php
+
+            config('app.name');
+        "#}
+    }
+
+    test_lint_failure! {
+        name = second_argument_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            data_set($array, 'key');
+        "#}
+    }
+
+    test_lint_failure! {
+        name = first_argument_checked_when_enabled,
+        rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_first_argument = true,
+        code = indoc! {r#"
+            <?php
+
+            config('app.name');
+        "#}
+    }
+
+    test_lint_success! {
+        name = named_arguments_are_fine,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r#"
+            <?php
+
+            set_option(key: 'foo', value: true);
+        "#}
     }
 }
