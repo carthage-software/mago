@@ -1960,7 +1960,7 @@ function strchr(string $haystack, string $needle, bool $before_needle = false): 
 }
 
 /**
- * @param string|int|float ...$values
+ * @param string|int|float|Stringable ...$values
  *
  * @pure
  */
@@ -1969,7 +1969,7 @@ function sprintf(string $format, mixed ...$values): string
 }
 
 /**
- * @param string|int|float ...$values
+ * @param string|int|float|Stringable ...$values
  *
  * @return int<0, max>
  */
@@ -1978,6 +1978,8 @@ function printf(string $format, mixed ...$values): int
 }
 
 /**
+ * @param array<string|int|float|Stringable> $values
+ *
  * @pure
  */
 function vprintf(string $format, array $values): int
@@ -1985,6 +1987,8 @@ function vprintf(string $format, array $values): int
 }
 
 /**
+ * @param array<string|int|float|Stringable> $values
+ *
  * @pure
  */
 function vsprintf(string $format, array $values): string
@@ -1993,6 +1997,7 @@ function vsprintf(string $format, array $values): string
 
 /**
  * @param resource $stream
+ * @param string|int|float|Stringable ...$values
  *
  * @pure
  */
@@ -2002,6 +2007,7 @@ function fprintf($stream, string $format, mixed ...$values): int
 
 /**
  * @param resource $stream
+ * @param array<string|int|float|Stringable> $values
  *
  * @pure
  */
@@ -3216,58 +3222,54 @@ function error_get_last(): null|array
 }
 
 /**
- * @tempalte I
+ * @template I
  * @template R
  *
- * @template (callble(I...): R) $callback
- *
+ * @param callable(I...): R|callable-string|string $callback
  * @param I ...$args
  *
  * @return R
  */
-function call_user_func(callable $callback, mixed ...$args): mixed
+function call_user_func(callable|string $callback, mixed ...$args): mixed
 {
 }
 
 /**
- * @tempalte I
+ * @template I
  * @template R
  *
- * @template (callble(I...): R) $callback
- *
+ * @param callable(I...): R|callable-string|string $callback
  * @param array<I> $args
  *
  * @return R
  */
-function call_user_func_array(callable $callback, array $args): mixed
+function call_user_func_array(callable|string $callback, array $args): mixed
 {
 }
 
 /**
- * @tempalte I
+ * @template I
  * @template R
  *
- * @template (callble(I...): R) $callback
- *
+ * @param callable(I...): R|callable-string|string $callback
  * @param I ...$args
  *
  * @return R
  */
-function forward_static_call(callable $callback, mixed ...$args): mixed
+function forward_static_call(callable|string $callback, mixed ...$args): mixed
 {
 }
 
 /**
- * @tempalte I
+ * @template I
  * @template R
  *
- * @template (callble(I...): R) $callback
- *
+ * @param callable(I...): R|callable-string|string $callback
  * @param array<I> $args
  *
  * @return R
  */
-function forward_static_call_array(callable $callback, array $args): mixed
+function forward_static_call_array(callable|string $callback, array $args): mixed
 {
 }
 

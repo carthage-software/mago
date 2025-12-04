@@ -391,7 +391,6 @@ final class Closure
      * @return Closure|null
      *
      * @pure
-     * @no-named-arguments
      */
     public static function bind(
         Closure $closure,
@@ -926,9 +925,6 @@ function error_reporting(null|int $error_level = null): int
 {
 }
 
-/**
- * @no-named-arguments
- */
 function define(string $constant_name, mixed $value, bool $case_insensitive = false): bool
 {
 }

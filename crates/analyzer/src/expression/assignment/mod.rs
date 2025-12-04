@@ -757,7 +757,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                     artifacts.get_expression_type(key_value_element.key).cloned().unwrap_or_else(get_mixed);
 
                 let access_type = if impossible {
-                    get_never()
+                    get_mixed()
                 } else {
                     get_array_target_type_given_index(
                         context,
@@ -791,7 +791,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                 let index_type = get_literal_int(last_index as i64);
 
                 let access_type = if impossible {
-                    get_never()
+                    get_mixed()
                 } else {
                     get_array_target_type_given_index(
                         context,

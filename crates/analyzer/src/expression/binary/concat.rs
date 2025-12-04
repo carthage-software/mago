@@ -5,7 +5,6 @@ use mago_atom::concat_atom;
 use mago_atom::f64_atom;
 use mago_atom::i64_atom;
 
-use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -127,6 +126,8 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
     for operand_atomic_type in operand_type.types.as_ref() {
         if operand_atomic_type.is_any_string()
             || operand_atomic_type.is_int()
+            || operand_atomic_type.is_float()
+            || operand_atomic_type.is_array_key()
             || operand_atomic_type.is_null()
             || operand_atomic_type.is_false()
         {
@@ -140,6 +141,8 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             TAtomic::GenericParameter(parameter) => {
                 if parameter.constraint.is_any_string()
                     || parameter.constraint.is_int()
+                    || parameter.constraint.is_float()
+                    || parameter.constraint.is_array_key()
                     || parameter.constraint.is_mixed()
                 {
                     current_atomic_is_valid = true;
@@ -187,20 +190,18 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     continue;
                 };
 
-                let method_identifier = MethodIdentifier::new(atom(class_like_name), atom("__toString"));
-
-                if context.codebase.method_identifier_exists(&method_identifier) {
+                if context.codebase.method_exists(class_like_name, "__toString") {
                     current_atomic_is_valid = true;
 
                     context.collector.report_with_code(
                         IssueCode::ImplicitToStringCast,
                         Issue::warning(format!(
-                            "Implicit conversion to `string` for {} operand via `{}`.",
+                            "Implicit conversion to `string` for {} operand via `{}::__toString()`.",
                             side.to_ascii_lowercase(),
-                            method_identifier.as_string()
+                            class_like_name
                         ))
                         .with_annotation(Annotation::primary(operand.span())
-                            .with_message(format!("Object implicitly converted using `{}`", method_identifier.as_string()))
+                            .with_message(format!("Object implicitly converted using `{}::__toString()`", class_like_name))
                         )
                         .with_note("Objects implementing `__toString` are automatically converted when used in string context.")
                         .with_help("For clarity, consider explicit casting `(string) $object` or calling the `__toString` method directly."),

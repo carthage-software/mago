@@ -163,7 +163,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     };
 
     let classname_str = &metadata.original_name;
-    if metadata.kind.is_interface() {
+    if metadata.kind.is_interface() && !classname.is_from_class_string() {
         context.collector.report_with_code(
              IssueCode::InterfaceInstantiation,
              Issue::error(format!("Interface `{classname_str}` cannot be instantiated with `new`."))
@@ -178,7 +178,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         argument_list.analyze(context, block_context, artifacts)?;
 
         return Ok(get_never());
-    } else if metadata.kind.is_trait() {
+    } else if metadata.kind.is_trait() && !classname.is_static() && !classname.is_self() {
         context.collector.report_with_code(
             IssueCode::TraitInstantiation,
             Issue::error(format!("Trait `{classname_str}` cannot be instantiated with `new`."))

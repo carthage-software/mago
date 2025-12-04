@@ -278,6 +278,11 @@ test_case!(partial_application_named_argument_reordering);
 test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
 test_case!(redundant_assert);
+test_case!(union_template_constraint);
+test_case!(class_string_union_constraint);
+test_case!(float_string_concat);
+test_case!(array_key_concat);
+test_case!(iterator_type_inference);
 
 // Github Issues
 test_case!(issue_659);

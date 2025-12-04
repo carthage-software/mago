@@ -32,6 +32,7 @@ use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
 use mago_codex::ttype::template::standin_type_replacer::insert_bound_type;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -86,8 +87,8 @@ fn infer_templates_from_input_and_container_types(
                 && !concrete_container_parts.iter().any(|container_atomic| {
                     atomic_comparator::is_contained_by(
                         context.codebase,
-                        container_atomic,
                         argument_atomic,
+                        container_atomic,
                         false,
                         &mut ComparisonResult::default(),
                     )
@@ -644,6 +645,7 @@ fn infer_templates_from_input_and_container_types(
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
                 parameter_name,
                 defining_entity,
+                constraint: class_string_constraint,
                 ..
             })) => {
                 let should_add_bound = !options.infer_only_if_new
@@ -666,8 +668,22 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 }
 
-                let mut lower_bound_type = TUnion::from_vec(input_objects);
-                if let Some(template_types) = template_result.template_types.get_mut(parameter_name) {
+                let lower_bound_type = TUnion::from_vec(input_objects);
+
+                let constraint_union = wrap_atomic(class_string_constraint.as_ref().clone());
+                if !union_comparator::is_contained_by(
+                    context.codebase,
+                    &lower_bound_type,
+                    &constraint_union,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                ) {
+                    continue;
+                }
+
+                if let Some(template_types) = template_result.template_types.get(parameter_name) {
                     for (_, template_type) in template_types {
                         if !union_comparator::is_contained_by(
                             context.codebase,
@@ -678,8 +694,6 @@ fn infer_templates_from_input_and_container_types(
                             false,
                             &mut ComparisonResult::default(),
                         ) {
-                            lower_bound_type = template_type.clone();
-
                             violations.push(TemplateInferenceViolation {
                                 template_name: *parameter_name,
                                 inferred_bound: lower_bound_type.clone(),

@@ -1044,10 +1044,32 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
             TAtomic::Object(object) => {
                 let name = object.get_name()?;
                 let traversable = atom("traversable");
+                let iterator = atom("iterator");
+                let iterator_aggregate = atom("iteratoraggregate");
 
                 let class_metadata = codebase.get_class_like(name)?;
                 if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                     break 'parameters None;
+                }
+
+                let is_iterator_interface = name == &iterator || name == &traversable || name == &iterator_aggregate;
+                if !is_iterator_interface
+                    && codebase.is_instance_of(&class_metadata.name, &iterator)
+                    && let (Some(key_type), Some(value_type)) = (
+                        get_iterator_method_return_type(codebase, name, "key"),
+                        get_iterator_method_return_type(codebase, name, "current"),
+                    )
+                {
+                    let contains_generic_param =
+                        |t: &TUnion| t.types.iter().any(|atomic| atomic.is_generic_parameter());
+
+                    if !key_type.is_mixed()
+                        && !value_type.is_mixed()
+                        && !contains_generic_param(&key_type)
+                        && !contains_generic_param(&value_type)
+                    {
+                        return Some((key_type, value_type));
+                    }
                 }
 
                 let traversable_metadata = codebase.get_class_like(&traversable)?;
@@ -1304,4 +1326,16 @@ pub fn get_specialized_template_type(
     expander::expand_union(codebase, &mut template_type, &TypeExpansionOptions::default());
 
     Some(template_type)
+}
+
+fn get_iterator_method_return_type(
+    codebase: &CodebaseMetadata,
+    class_name: &Atom,
+    method_name: &str,
+) -> Option<TUnion> {
+    let method = codebase.get_declaring_method(class_name, method_name)?;
+    let return_type_meta = method.return_type_metadata.as_ref()?;
+    let mut return_type = return_type_meta.type_union.clone();
+    expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());
+    Some(return_type)
 }

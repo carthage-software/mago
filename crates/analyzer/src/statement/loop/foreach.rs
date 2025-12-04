@@ -1,5 +1,6 @@
 use ahash::HashSet;
 
+use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -46,11 +47,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             Some(context.codebase),
         );
 
-        let (always_enters_loop, key_type, mut value_type) =
+        let (always_enters_loop, mut key_type, mut value_type) =
             r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id.as_ref(), self)?;
 
-        if key_type.is_never() || value_type.is_never() {
-            return Ok(());
+        if key_type.is_never() {
+            key_type = get_mixed();
+        }
+
+        if value_type.is_never() {
+            value_type = get_mixed();
         }
 
         let mut loop_block_context = block_context.clone();

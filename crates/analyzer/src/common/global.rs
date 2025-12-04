@@ -90,7 +90,8 @@ std::thread_local! {
 
         map.insert("$_GET", user_input_type_union.clone());
         map.insert("$_POST", user_input_type_union.clone());
-        map.insert("$_REQUEST", user_input_type_union);
+        map.insert("$_REQUEST", user_input_type_union.clone());
+        map.insert("$_COOKIE", user_input_type_union);
 
         map.insert("$_SERVER", Rc::new({
             // Use a fixed timestamp to ensure deterministic type representations.

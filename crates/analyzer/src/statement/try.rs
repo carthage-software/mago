@@ -497,8 +497,8 @@ fn get_caught_classes<'ctx, 'ast, 'arena>(context: &mut Context<'ctx, 'arena>, h
             continue;
         }
 
-        let is_throwable = context.codebase.is_instance_of(&caught_type, &throwable);
-
+        let is_interface = class_like_metadata.kind.is_interface();
+        let is_throwable = is_interface || context.codebase.is_instance_of(&caught_type, &throwable);
         if !is_throwable {
             context.collector.report_with_code(
                 IssueCode::CatchTypeNotThrowable,

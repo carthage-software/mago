@@ -32,6 +32,7 @@ use mago_codex::ttype::get_mixed_keyed_array;
 use mago_codex::ttype::get_mixed_list;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_numeric;
 use mago_codex::ttype::get_object;
@@ -634,6 +635,24 @@ fn intersect_array_list(
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
             }
+            TAtomic::Callable(_) => {
+                did_remove_type = true;
+
+                let mut known_items = BTreeMap::new();
+
+                known_items.insert(
+                    ArrayKey::Integer(0),
+                    (
+                        false,
+                        TUnion::from_vec(vec![TAtomic::Object(TObject::Any), TAtomic::Scalar(TScalar::class_string())]),
+                    ),
+                );
+                known_items.insert(ArrayKey::Integer(1), (false, get_non_empty_string()));
+
+                acceptable_types.push(TAtomic::Array(TArray::Keyed(
+                    TKeyedArray::new().with_known_items(known_items).with_non_empty(true),
+                )));
+            }
             _ => {
                 did_remove_type = true;
             }
@@ -726,6 +745,24 @@ fn intersect_keyed_array(
             }
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
+            }
+            TAtomic::Callable(_) => {
+                did_remove_type = true;
+
+                let mut known_items = BTreeMap::new();
+
+                known_items.insert(
+                    ArrayKey::Integer(0),
+                    (
+                        false,
+                        TUnion::from_vec(vec![TAtomic::Object(TObject::Any), TAtomic::Scalar(TScalar::class_string())]),
+                    ),
+                );
+                known_items.insert(ArrayKey::Integer(1), (false, get_non_empty_string()));
+
+                acceptable_types.push(TAtomic::Array(TArray::Keyed(
+                    TKeyedArray::new().with_known_items(known_items).with_non_empty(true),
+                )));
             }
             _ => {
                 did_remove_type = true;
