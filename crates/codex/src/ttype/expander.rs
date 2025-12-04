@@ -24,6 +24,7 @@ use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -399,6 +400,16 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
         Some(guard) => guard,
         None => return,
     };
+
+    if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name) {
+        for required_parent in &class_like_metadata.require_extends {
+            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_parent))));
+        }
+
+        for required_interface in &class_like_metadata.require_implements {
+            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_interface))));
+        }
+    }
 
     match &mut named_object.type_parameters {
         Some(type_parameters) if !type_parameters.is_empty() => {

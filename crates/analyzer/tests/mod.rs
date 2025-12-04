@@ -379,6 +379,9 @@ test_case!(unused_template_parameter);
 test_case!(unused_function_template_parameter);
 test_case!(property_hooks);
 test_case!(interface_property_hook);
+test_case!(trait_require_implements_self_return);
+test_case!(trait_require_extends_self_return);
+test_case!(trait_require_combined);
 
 #[test]
 fn test_all_test_cases_are_ran() {
