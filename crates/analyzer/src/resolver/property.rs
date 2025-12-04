@@ -28,6 +28,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -280,6 +281,20 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
     Ok(result)
 }
 
+/// Checks if this is a direct backing store access: `$this->prop` inside the set hook for that property.
+fn is_backing_store_access(object_expr: &Expression, prop_name: &Atom, block_context: &BlockContext) -> bool {
+    let is_this = matches!(object_expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
+    if !is_this {
+        return false;
+    }
+
+    block_context
+        .scope
+        .get_property_hook()
+        .map(|(hook_prop_name, hook_meta)| hook_prop_name == *prop_name && hook_meta.is_set())
+        .unwrap_or(false)
+}
+
 /// Finds a property in a class, gets its type, and handles template localization.
 fn find_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
@@ -335,12 +350,30 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         return Ok(None);
     };
 
-    let mut property_type = property_metadata
-        .type_metadata
-        .as_ref()
-        .map(|type_metadata| &type_metadata.type_union)
-        .cloned()
-        .unwrap_or_else(get_mixed);
+    // For assignment, use set hook parameter type when not accessing backing store directly
+    let mut property_type = if for_assignment {
+        if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
+            && let Some(param) = &set_hook.parameter
+            && let Some(param_type) = param.get_type_metadata()
+            && !is_backing_store_access(object_expr, prop_name, block_context)
+        {
+            param_type.type_union.clone()
+        } else {
+            property_metadata
+                .type_metadata
+                .as_ref()
+                .map(|type_metadata| &type_metadata.type_union)
+                .cloned()
+                .unwrap_or_else(get_mixed)
+        }
+    } else {
+        property_metadata
+            .type_metadata
+            .as_ref()
+            .map(|type_metadata| &type_metadata.type_union)
+            .cloned()
+            .unwrap_or_else(get_mixed)
+    };
 
     expander::expand_union(
         context.codebase,

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use ahash::HashMap;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_atom::concat_atom;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -98,7 +99,11 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     {
         block_context.locals.insert(
             "$this".to_string(),
-            Rc::new(wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, function_like_metadata)))),
+            Rc::new(wrap_atomic(TAtomic::Object(get_this_type(
+                context,
+                class_like_metadata,
+                Some(function_like_metadata),
+            )))),
         );
     }
 
@@ -340,6 +345,15 @@ fn add_properties_to_context<'ctx, 'arena>(
             ));
         };
 
+        // Skip write-only properties (only have set hook, no get hook) since they can't be read.
+        // This ensures the visibility check runs when accessing them.
+        if !property_metadata.hooks.is_empty()
+            && property_metadata.hooks.contains_key(&atom("set"))
+            && !property_metadata.hooks.contains_key(&atom("get"))
+        {
+            continue;
+        }
+
         let mut property_type = property_metadata
             .type_metadata
             .as_ref()
@@ -352,7 +366,7 @@ fn add_properties_to_context<'ctx, 'arena>(
         let expression_id = if property_metadata.flags.is_static() {
             format!("{}::${raw_property_name}", class_like_metadata.name)
         } else {
-            let this_type = get_this_type(context, class_like_metadata, function_like_metadata);
+            let this_type = get_this_type(context, class_like_metadata, Some(function_like_metadata));
 
             property_type = localize_property_type(
                 context,
@@ -387,10 +401,17 @@ fn add_properties_to_context<'ctx, 'arena>(
     Ok(())
 }
 
-fn get_this_type(
+/// Constructs the `$this` type for instance methods/hooks.
+///
+/// This handles:
+/// - Enum types (returns TEnum)
+/// - Class template parameters (preserves generics)
+/// - Required interfaces and parent classes (intersection types)
+/// - Method-level where constraints (when function_like_metadata is provided)
+pub fn get_this_type(
     context: &Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
-    function_like_metadata: &FunctionLikeMetadata,
+    function_like_metadata: Option<&FunctionLikeMetadata>,
 ) -> TObject {
     if class_like_metadata.kind.is_enum() {
         return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });
@@ -437,9 +458,9 @@ fn get_this_type(
 
     let mut type_parameters = vec![];
     for (template_name, template_map) in &class_like_metadata.template_types {
+        // Check for method-level where constraints if function_like_metadata is provided
         if let Some(constraint) = function_like_metadata
-            .method_metadata
-            .as_ref()
+            .and_then(|flm| flm.method_metadata.as_ref())
             .and_then(|method_metadata| method_metadata.where_constraints.get(template_name))
         {
             type_parameters.push(constraint.type_union.clone());

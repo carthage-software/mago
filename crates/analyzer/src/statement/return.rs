@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -117,6 +120,19 @@ pub fn handle_return_value<'ctx, 'arena>(
 
     block_context.has_returned = true;
     block_context.control_actions.insert(ControlAction::Return);
+
+    // Check if we're in a property hook context
+    if let Some((property_name, hook_metadata)) = block_context.scope.get_property_hook() {
+        return handle_property_hook_return(
+            context,
+            block_context,
+            return_value,
+            inferred_return_type,
+            return_span,
+            property_name,
+            hook_metadata,
+        );
+    }
 
     let (function_like_metadata, function_like_identifier) = if let (Some(s), Some(i)) =
         (block_context.scope.get_function_like(), block_context.scope.get_function_like_identifier())
@@ -488,6 +504,141 @@ pub fn handle_return_value<'ctx, 'arena>(
             ),
         );
     }
+
+    Ok(())
+}
+
+fn handle_property_hook_return<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+    return_value: Option<&Expression>,
+    mut inferred_return_type: Rc<TUnion>,
+    _return_span: Span,
+    property_name: Atom,
+    hook_metadata: &PropertyHookMetadata,
+) -> Result<(), AnalysisError> {
+    if !hook_metadata.is_get() {
+        return Ok(());
+    }
+
+    let Some(class_like) = block_context.scope.get_class_like() else { return Ok(()) };
+    let Some(property) = class_like.properties.get(&property_name) else { return Ok(()) };
+    let Some(type_metadata) = &property.type_metadata else { return Ok(()) };
+
+    let mut expected_return_type = type_metadata.type_union.clone();
+    expand_union(
+        context.codebase,
+        &mut expected_return_type,
+        &TypeExpansionOptions {
+            self_class: block_context.scope.get_class_like_name(),
+            static_class_type: block_context
+                .scope
+                .get_class_like_name()
+                .map(StaticClassType::Name)
+                .unwrap_or(StaticClassType::None),
+            ..Default::default()
+        },
+    );
+
+    if inferred_return_type.is_expandable() {
+        let mut inner = (*inferred_return_type).clone();
+        expand_union(
+            context.codebase,
+            &mut inner,
+            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
+        );
+        inferred_return_type = Rc::new(inner);
+    }
+
+    if expected_return_type.is_mixed() {
+        return Ok(());
+    }
+
+    let Some(return_value) = return_value else { return Ok(()) };
+
+    if expected_return_type.is_void() {
+        return Ok(());
+    }
+
+    let hook_name = concat_atom!(class_like.name, "::", property_name, "::get");
+
+    if inferred_return_type.is_mixed() {
+        context.collector.report_with_code(
+            IssueCode::MixedReturnStatement,
+            Issue::error(format!(
+                "Could not infer a precise return type for property hook `{hook_name}`. Saw type `{}`.",
+                inferred_return_type.get_id()
+            ))
+            .with_annotation(Annotation::primary(return_value.span()).with_message("Type inferred as `mixed` here."))
+            .with_note("The analysis could not determine a specific type for the value returned here.")
+            .with_help("Add specific type hints to variables or properties involved in calculating the return value."),
+        );
+        return Ok(());
+    }
+
+    let mut comparison_result = ComparisonResult::new();
+    if is_contained_by(
+        context.codebase,
+        &inferred_return_type,
+        &expected_return_type,
+        inferred_return_type.ignore_nullable_issues(),
+        inferred_return_type.ignore_falsable_issues(),
+        false,
+        &mut comparison_result,
+    ) {
+        return Ok(());
+    }
+
+    let expected_str = expected_return_type.get_id();
+    let inferred_str = inferred_return_type.get_id();
+
+    if inferred_return_type.is_nullable()
+        && !inferred_return_type.ignore_nullable_issues()
+        && !expected_return_type.is_nullable()
+        && !expected_return_type.has_template()
+    {
+        context.collector.report_with_code(
+            IssueCode::NullableReturnStatement,
+            Issue::error(format!(
+                "Property hook `{hook_name}` returns nullable value `{inferred_str}` but property type is `{expected_str}`.",
+            ))
+            .with_annotation(Annotation::primary(return_value.span()).with_message("Nullable value returned here."))
+            .with_note("The property type does not permit null, but this expression could return null.")
+            .with_help(format!(
+                "Ensure the hook always returns a non-null value, or change the property type to `?{expected_str}`."
+            )),
+        );
+        return Ok(());
+    }
+
+    if inferred_return_type.is_falsable()
+        && !inferred_return_type.ignore_falsable_issues()
+        && !expected_return_type.is_falsable()
+        && !expected_return_type.has_template()
+    {
+        context.collector.report_with_code(
+            IssueCode::FalsableReturnStatement,
+            Issue::error(format!(
+                "Property hook `{hook_name}` returns falsable value `{inferred_str}` but property type is `{expected_str}`.",
+            ))
+            .with_annotation(Annotation::primary(return_value.span()).with_message("Potentially 'false' returned here."))
+            .with_note("The property type does not permit false, but this expression could return false.")
+            .with_help(format!("Ensure the hook never returns false, or change the property type to `{expected_str}|false`.")),
+        );
+        return Ok(());
+    }
+
+    context.collector.report_with_code(
+        IssueCode::InvalidReturnStatement,
+        Issue::error(format!(
+            "Property hook `{hook_name}` returns `{inferred_str}` but property is typed as `{expected_str}`.",
+        ))
+        .with_annotation(
+            Annotation::primary(return_value.span()).with_message(format!("Expression has type `{inferred_str}`.")),
+        )
+        .with_note(format!("The get hook must return a value compatible with the property type `{expected_str}`."))
+        .with_help("Change the returned expression to match the property type."),
+    );
 
     Ok(())
 }

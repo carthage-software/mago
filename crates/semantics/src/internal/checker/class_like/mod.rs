@@ -222,10 +222,49 @@ pub fn check_class<'ctx, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut
                     );
                 }
 
+                // Check for hooked promoted properties in readonly classes (inline check)
+                if last_readonly.is_some() && method_name.eq_ignore_ascii_case("__construct") {
+                    for parameter in method.parameter_list.parameters.iter() {
+                        if let Some(hooks) = &parameter.hooks {
+                            let param_name = parameter.variable.name;
+                            context.report(
+                                Issue::error(format!(
+                                    "Hooked property `{class_name}::{param_name}` cannot be readonly."
+                                ))
+                                .with_annotation(
+                                    Annotation::primary(hooks.span())
+                                        .with_message("Property hooks are defined here."),
+                                )
+                                .with_annotation(
+                                    Annotation::secondary(parameter.variable.span())
+                                        .with_message(format!("Promoted property `{param_name}` is declared here.")),
+                                )
+                                .with_annotation(
+                                    Annotation::secondary(class.span())
+                                        .with_message(format!(
+                                            "class `{class_fqcn}` is readonly, making all properties implicitly readonly."
+                                        )),
+                                )
+                                .with_note("Hooked properties cannot be readonly, but properties in readonly classes are implicitly readonly."),
+                            );
+                        }
+                    }
+                }
+
                 check_method(method, method_name, class.span(), class_name, class_fqcn, "class", false, context);
             }
             ClassLikeMember::Property(property) => {
-                check_property(property, class.span(), "class", class_name, class_fqcn, false, context);
+                check_property(
+                    property,
+                    class.span(),
+                    "class",
+                    class_name,
+                    class_fqcn,
+                    false,
+                    class.modifiers.contains_abstract(),
+                    last_readonly.is_some(),
+                    context,
+                );
             }
             ClassLikeMember::Constant(constant) => {
                 check_class_like_constant(constant, class.span(), "class", class_name, class_fqcn, context);
@@ -541,7 +580,17 @@ pub fn check_interface<'ctx, 'ast, 'arena>(
                     }
                 };
 
-                check_property(property, interface.span(), "interface", interface_name, interface_fqcn, true, context);
+                check_property(
+                    property,
+                    interface.span(),
+                    "interface",
+                    interface_name,
+                    interface_fqcn,
+                    true,
+                    false,
+                    false,
+                    context,
+                );
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 let mut non_public_read_visibility = vec![];
@@ -636,7 +685,17 @@ pub fn check_trait<'ctx, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &m
                 );
             }
             ClassLikeMember::Property(property) => {
-                check_property(property, r#trait.span(), "trait", class_like_name, class_like_fqcn, false, context);
+                check_property(
+                    property,
+                    r#trait.span(),
+                    "trait",
+                    class_like_name,
+                    class_like_fqcn,
+                    false,
+                    false,
+                    false,
+                    context,
+                );
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 if !context.version.is_supported(Feature::ConstantsInTraits) {
@@ -825,7 +884,7 @@ pub fn check_enum<'ctx, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut 
                         .with_help(format!("Remove the property from the enum `{enum_name}`.")),
                 );
 
-                check_property(property, r#enum.span(), "enum", enum_name, enum_fqcn, false, context);
+                check_property(property, r#enum.span(), "enum", enum_name, enum_fqcn, false, false, false, context);
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 check_class_like_constant(class_like_constant, r#enum.span(), "enum", enum_name, enum_fqcn, context);
@@ -1013,6 +1072,8 @@ pub fn check_anonymous_class<'ctx, 'ast, 'arena>(
                     ANONYMOUS_CLASS_NAME,
                     ANONYMOUS_CLASS_NAME,
                     false,
+                    false,
+                    last_readonly.is_some(),
                     context,
                 );
             }

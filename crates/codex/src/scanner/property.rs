@@ -12,10 +12,13 @@ use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::property::PropertyMetadata;
+use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
 use crate::scanner::Context;
+use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::PropertyDocblockComment;
+use crate::scanner::docblock::PropertyHookDocblockComment;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
@@ -89,6 +92,14 @@ pub fn scan_promoted_property<'arena>(
     property_metadata.set_type_declaration_metadata(
         parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
     );
+
+    if let Some(hook_list) = &parameter.hooks {
+        for hook in hook_list.hooks.iter() {
+            let mut hook_metadata = scan_property_hook(hook, &property_metadata, context, scope);
+            class_like_metadata.issues.extend(hook_metadata.take_issues());
+            property_metadata.hooks.insert(hook_metadata.name, hook_metadata);
+        }
+    }
 
     let mut used_parameter_type_from_docblock = false;
     if let Some(type_metadata) = parameter_metadata.type_metadata.as_ref()
@@ -190,6 +201,10 @@ pub fn scan_properties<'arena>(
                     flags |= MetadataFlags::STATIC;
                 }
 
+                if plain_property.modifiers.contains_final() {
+                    flags |= MetadataFlags::FINAL;
+                }
+
                 let read_visibility = match plain_property.modifiers.get_first_read_visibility() {
                     Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
                     None => Visibility::Public,
@@ -251,6 +266,10 @@ pub fn scan_properties<'arena>(
                 flags |= MetadataFlags::ABSTRACT;
             }
 
+            if hooked_property.modifiers.contains_final() {
+                flags |= MetadataFlags::FINAL;
+            }
+
             let mut metadata = PropertyMetadata::new(name, flags);
 
             metadata.set_name_span(Some(name_span));
@@ -275,9 +294,175 @@ pub fn scan_properties<'arena>(
                 );
             }
 
+            for hook in hooked_property.hook_list.hooks.iter() {
+                let mut hook_metadata = scan_property_hook(hook, &metadata, context, scope);
+                // Collect hook docblock issues into class-like metadata
+                class_like_metadata.issues.extend(hook_metadata.take_issues());
+                metadata.hooks.insert(hook_metadata.name, hook_metadata);
+            }
+
+            metadata.set_is_virtual(true);
+
             vec![metadata]
         }
     }
+}
+
+fn scan_property_hook<'arena>(
+    hook: &'arena PropertyHook<'arena>,
+    property_metadata: &PropertyMetadata,
+    context: &mut Context<'_, 'arena>,
+    scope: &NamespaceScope,
+) -> PropertyHookMetadata {
+    let name = atom(hook.name.value);
+    let is_get = hook.name.value == "get";
+    let is_set = hook.name.value == "set";
+    let is_abstract = matches!(hook.body, PropertyHookBody::Abstract(_));
+    let has_explicit_parameter = hook.parameter_list.is_some();
+
+    let mut flags = MetadataFlags::empty();
+    if hook.modifiers.contains_final() {
+        flags |= MetadataFlags::FINAL;
+    }
+
+    let mut parameter = if is_set {
+        if let Some(param_list) = &hook.parameter_list {
+            param_list.parameters.first().map(|p| scan_hook_parameter(p, property_metadata, context))
+        } else {
+            Some(create_implicit_value_parameter(property_metadata, hook.span()))
+        }
+    } else {
+        None
+    };
+
+    let attributes = scan_attribute_lists(&hook.attribute_lists, context);
+
+    let mut has_docblock = false;
+    let mut return_type_metadata = None;
+    let mut issues = Vec::new();
+
+    match PropertyHookDocblockComment::create(context, hook) {
+        Ok(None) => {
+            // No docblock, nothing to do
+        }
+        Ok(Some(docblock)) => {
+            has_docblock = true;
+
+            if let Some(param_tag) = &docblock.param_type_string {
+                if !has_explicit_parameter {
+                    issues.push(
+                        Issue::error("The `@param` tag cannot be used on a set hook without an explicit parameter.")
+                            .with_code(ScanningIssueKind::InvalidParamTag)
+                            .with_annotation(
+                                Annotation::primary(param_tag.span)
+                                    .with_message("This @param cannot be applied to implicit `$value` parameter"),
+                            )
+                            .with_note("Set hooks without an explicit parameter use an implicit `$value` parameter that inherits the property type.")
+                            .with_help("Either add an explicit parameter `set(Type $value) {}` or remove the @param tag."),
+                    );
+                } else if let Some(ref mut param) = parameter
+                    && let Some(type_string) = &param_tag.type_string
+                {
+                    let type_context = TypeResolutionContext::new();
+                    match get_type_metadata_from_type_string(type_string, None, &type_context, scope) {
+                        Ok(docblock_type) => {
+                            let native_type = param.type_declaration_metadata.as_ref();
+                            let merged = merge_type_preserving_nullability(docblock_type, native_type);
+                            param.set_type_metadata(Some(merged));
+                        }
+                        Err(typing_error) => {
+                            issues.push(
+                                Issue::error("Could not resolve the type for the @param tag.")
+                                    .with_code(ScanningIssueKind::InvalidParamTag)
+                                    .with_annotation(
+                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                    )
+                                    .with_note(typing_error.note())
+                                    .with_help(typing_error.help()),
+                            );
+                        }
+                    }
+                }
+            }
+
+            if let Some(return_type_string) = &docblock.return_type_string
+                && is_get
+            {
+                let type_context = TypeResolutionContext::new();
+                match get_type_metadata_from_type_string(return_type_string, None, &type_context, scope) {
+                    Ok(docblock_type) => {
+                        return_type_metadata = Some(docblock_type);
+                    }
+                    Err(typing_error) => {
+                        issues.push(
+                            Issue::error("Could not resolve the type for the @return tag.")
+                                .with_code(ScanningIssueKind::InvalidReturnTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        );
+                    }
+                }
+            }
+        }
+        Err(parse_error) => {
+            issues.push(
+                Issue::error("Failed to parse property hook docblock comment.")
+                    .with_code(ScanningIssueKind::MalformedDocblockComment)
+                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                    .with_note(parse_error.note())
+                    .with_help(parse_error.help()),
+            );
+        }
+    }
+
+    PropertyHookMetadata::new(name, hook.span())
+        .with_flags(flags)
+        .with_parameter(parameter)
+        .with_returns_by_ref(hook.ampersand.is_some())
+        .with_is_abstract(is_abstract)
+        .with_attributes(attributes)
+        .with_return_type_metadata(return_type_metadata)
+        .with_has_docblock(has_docblock)
+        .with_issues(issues)
+}
+
+fn scan_hook_parameter<'arena>(
+    param: &'arena FunctionLikeParameter<'arena>,
+    property_metadata: &PropertyMetadata,
+    context: &mut Context<'_, 'arena>,
+) -> FunctionLikeParameterMetadata {
+    let name = VariableIdentifier(atom(param.variable.name));
+    let name_span = param.variable.span;
+
+    let mut flags = MetadataFlags::empty();
+    if param.ampersand.is_some() {
+        flags |= MetadataFlags::BY_REFERENCE;
+    }
+
+    let mut param_metadata = FunctionLikeParameterMetadata::new(name, param.span(), name_span, flags);
+
+    if let Some(hint) = &param.hint {
+        let type_meta = get_type_metadata_from_hint(hint, None, context);
+        param_metadata.set_type_declaration_metadata(Some(type_meta));
+    } else if let Some(prop_type) = &property_metadata.type_metadata {
+        param_metadata.set_type_declaration_metadata(Some(prop_type.clone()));
+    }
+
+    param_metadata
+}
+
+fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: Span) -> FunctionLikeParameterMetadata {
+    let name = VariableIdentifier(atom("$value"));
+    let mut param = FunctionLikeParameterMetadata::new(name, span, span, MetadataFlags::empty());
+
+    if let Some(type_meta) = &property_metadata.type_metadata {
+        param.set_type_declaration_metadata(Some(type_meta.clone()));
+    }
+
+    param
 }
 
 #[inline]

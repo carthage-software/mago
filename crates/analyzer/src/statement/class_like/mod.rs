@@ -64,6 +64,7 @@ enum PropertyConflict {
     Readonly(bool, bool),
     Type(Option<String>, Option<String>),
     Default(Option<String>, Option<String>),
+    HookedProperty,
 }
 
 impl PropertyConflict {
@@ -96,6 +97,9 @@ impl PropertyConflict {
                 (None, Some(def2)) => format!("default value differs (no default vs {})", def2),
                 (None, None) => unreachable!(),
             },
+            PropertyConflict::HookedProperty => {
+                "conflict resolution between hooked properties is not supported".to_string()
+            }
         }
     }
 
@@ -106,6 +110,7 @@ impl PropertyConflict {
             PropertyConflict::Readonly(_, _) => IssueCode::IncompatiblePropertyReadonly,
             PropertyConflict::Type(_, _) => IssueCode::IncompatiblePropertyType,
             PropertyConflict::Default(_, _) => IssueCode::IncompatiblePropertyDefault,
+            PropertyConflict::HookedProperty => IssueCode::IncompatiblePropertyOverride,
         }
     }
 }
@@ -499,6 +504,59 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                         "You can either implement the `{method_name}` method in `{name}`, or declare `{name}` as an abstract class.",
                     )),
                 );
+            }
+        }
+
+        for property_name in class_like_metadata.declaring_property_ids.keys() {
+            let current_property = class_like_metadata.properties.get(property_name);
+
+            for parent_fqcn in class_like_metadata
+                .all_parent_classes
+                .iter()
+                .chain(class_like_metadata.all_parent_interfaces.iter())
+                .chain(class_like_metadata.used_traits.iter())
+            {
+                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn) else {
+                    continue;
+                };
+
+                let Some(parent_property) = parent_metadata.properties.get(property_name) else {
+                    continue;
+                };
+
+                for (hook_name, hook_metadata) in &parent_property.hooks {
+                    if !hook_metadata.is_abstract {
+                        continue;
+                    }
+
+                    let is_implemented =
+                        current_property.and_then(|p| p.hooks.get(hook_name)).map(|h| !h.is_abstract).unwrap_or(false);
+
+                    if !is_implemented {
+                        let fqcn = parent_metadata.original_name;
+                        let hook_span = hook_metadata.span;
+
+                        context.collector.report_with_code(
+                            IssueCode::UnimplementedAbstractPropertyHook,
+                            Issue::error(format!(
+                                "Class `{name}` does not implement the abstract property hook `{property_name}::{hook_name}()`.",
+                            ))
+                            .with_annotation(
+                                Annotation::primary(name_span.unwrap_or(declaration_span))
+                                    .with_message(format!("`{name}` is not abstract and must implement this hook")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(hook_span).with_message(
+                                    format!("`{fqcn}::{property_name}::{hook_name}()` is defined as abstract here")
+                                ),
+                            )
+                            .with_note("When a concrete class extends an abstract class or implements an interface, it must provide an implementation for all inherited abstract property hooks.".to_string())
+                            .with_help(format!(
+                                "You can either implement the `{hook_name}` hook for property `{property_name}` in `{name}`, or declare `{name}` as an abstract class.",
+                            )),
+                        );
+                    }
+                }
             }
         }
     }
@@ -1680,6 +1738,11 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
 }
 
 fn properties_are_compatible(prop1: &PropertyMetadata, prop2: &PropertyMetadata) -> bool {
+    // PHP 8.4: Conflict resolution between hooked properties is not supported
+    if !prop1.hooks.is_empty() || !prop2.hooks.is_empty() {
+        return false;
+    }
+
     if prop1.read_visibility != prop2.read_visibility {
         return false;
     }
@@ -1720,6 +1783,11 @@ fn properties_are_compatible(prop1: &PropertyMetadata, prop2: &PropertyMetadata)
 
 /// Check if two properties are compatible, returns Err with specific conflict type if not
 fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetadata) -> Result<(), PropertyConflict> {
+    // PHP 8.4: Conflict resolution between hooked properties is not supported
+    if !prop1.hooks.is_empty() || !prop2.hooks.is_empty() {
+        return Err(PropertyConflict::HookedProperty);
+    }
+
     if prop1.read_visibility != prop2.read_visibility || prop1.write_visibility != prop2.write_visibility {
         return Err(PropertyConflict::Visibility(
             prop1.read_visibility,
@@ -2136,6 +2204,68 @@ fn check_class_like_properties<'ctx, 'arena>(
             continue;
         }
 
+        // Validate set hook parameter type is supertype of property type
+        // Use type_declaration_metadata (native type) not get_type_metadata() (merged with docblock)
+        if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
+            && let Some(param) = &set_hook.parameter
+            && let Some(param_type) = param.type_declaration_metadata.as_ref()
+            && let Some(property_type) = property_metadata.type_declaration_metadata.as_ref()
+        {
+            // The set hook parameter type must contain the property type (contravariance)
+            // i.e., any value assignable to the property type should be accepted by the hook
+            if !is_type_compatible(context.codebase, &property_type.type_union, &param_type.type_union) {
+                let property_type_id = property_type.type_union.get_id();
+                let param_type_id = param_type.type_union.get_id();
+                let class_name = class_like_metadata.original_name;
+
+                context.collector.report_with_code(
+                    IssueCode::IncompatiblePropertyHookParameterType,
+                    Issue::error(format!(
+                        "Set hook parameter type `{param_type_id}` for property `{class_name}::{property_name}` is incompatible with property type `{property_type_id}`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(param_type.span)
+                            .with_message(format!("This type `{param_type_id}` does not accept all values of type `{property_type_id}`")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(property_type.span)
+                            .with_message(format!("Property is declared with type `{property_type_id}`")),
+                    )
+                    .with_note("The set hook parameter type must be equal to or wider than the property type (contravariance).")
+                    .with_help(format!("Change the set hook parameter type to `{property_type_id}` or a wider type that contains `{property_type_id}`.")),
+                );
+            }
+        }
+
+        // Validate docblock param type >= native param type
+        if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
+            && let Some(param) = &set_hook.parameter
+            && let Some(native_type) = param.type_declaration_metadata.as_ref()
+            && let Some(effective_type) = param.type_metadata.as_ref()
+            && effective_type.from_docblock
+            && !is_type_compatible(context.codebase, &native_type.type_union, &effective_type.type_union)
+        {
+            let native_type_str = native_type.type_union.get_id();
+            let docblock_type_str = effective_type.type_union.get_id();
+
+            context.collector.report_with_code(
+                    IssueCode::DocblockTypeMismatch,
+                    Issue::error(format!(
+                        "Docblock type `{docblock_type_str}` is narrower than native parameter type `{native_type_str}`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(effective_type.span)
+                            .with_message(format!("Docblock type `{docblock_type_str}` cannot narrow native type `{native_type_str}`")),
+                    )
+                    .with_note(
+                        "The @param docblock type must be a supertype of the native type. It can widen the type (e.g., int to int|string) but not narrow it.",
+                    )
+                    .with_help(format!(
+                        "Change the docblock type to `{native_type_str}` or a wider type.",
+                    )),
+                );
+        }
+
         // Check each parent class for this property
         for parent_fqcn in &class_like_metadata.all_parent_classes {
             let parent_fqcn_str = parent_fqcn.as_ref();
@@ -2148,8 +2278,82 @@ fn check_class_like_properties<'ctx, 'arena>(
             };
 
             if parent_property.read_visibility.is_private() && parent_property.write_visibility.is_private() {
-                // Parent property is private, so not visible to child class - skip checks
                 continue;
+            }
+
+            let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
+            let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
+            let declaring_class_name = class_like_metadata.original_name;
+            let parent_class_name = parent_metadata.original_name;
+
+            if parent_property.flags.is_final() {
+                context.collector.report_with_code(
+                    IssueCode::OverrideFinalProperty,
+                    Issue::error(format!(
+                        "Cannot override final property `{parent_class_name}::{property_name}`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(property_span)
+                            .with_message("Attempting to override final property here"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parent_property_span)
+                            .with_message(format!("Property `{parent_class_name}::{property_name}` is declared as final")),
+                    )
+                    .with_note("Final properties cannot be overridden in child classes.")
+                    .with_help(format!(
+                        "Remove the property `{property_name}` from `{declaring_class_name}`, or remove the final modifier from the parent property.",
+                    )),
+                );
+            }
+
+            for (hook_name, child_hook) in &property_metadata.hooks {
+                if let Some(parent_hook) = parent_property.hooks.get(hook_name)
+                    && parent_hook.flags.is_final()
+                {
+                    context.collector.report_with_code(
+                            IssueCode::OverrideFinalPropertyHook,
+                            Issue::error(format!(
+                                "Cannot override final property hook `{parent_class_name}::{property_name}::{hook_name}()`."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(child_hook.span)
+                                    .with_message("Attempting to override final hook here"),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(parent_hook.span)
+                                    .with_message(format!("Hook `{parent_class_name}::{property_name}::{hook_name}()` is declared as final")),
+                            )
+                            .with_note("Final property hooks cannot be overridden in child classes.")
+                            .with_help(format!(
+                                "Remove the `{hook_name}` hook from `{declaring_class_name}::{property_name}`, or remove the final modifier from the parent hook.",
+                            )),
+                        );
+                }
+            }
+
+            // Backed property with by-ref get + set hook is invalid
+            if parent_property.hooks.is_empty()
+                && let Some(get_hook) = property_metadata.hooks.get(&atom("get"))
+                && get_hook.returns_by_ref
+                && property_metadata.hooks.contains_key(&atom("set"))
+            {
+                context.collector.report_with_code(
+                    IssueCode::InvalidByRefGetHookOnBackedProperty,
+                    Issue::error(format!(
+                        "Get hook of backed property `{declaring_class_name}::{property_name}` with set hook may not return by reference."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(get_hook.span)
+                            .with_message("This get hook returns by reference"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parent_property_span)
+                            .with_message(format!("Property `{parent_class_name}::{property_name}` creates a backing store")),
+                    )
+                    .with_note("A backed property (with backing store) that has a set hook cannot have a by-reference get hook.")
+                    .with_help("Remove the `&` from the get hook declaration, or remove the set hook."),
+                );
             }
 
             if property_metadata.read_visibility > parent_property.read_visibility {
@@ -2391,6 +2595,51 @@ fn check_class_like_properties<'ctx, 'arena>(
                         .with_note("PHP requires property types to be invariant, meaning the type declaration in a child class must be exactly the same as in the parent class.")
                         .with_help(format!("Change the type of `{property_name}` to `{parent_type_id}` to match the parent property.")),
                     );
+            }
+        }
+
+        // Check interface hook by-ref signature compatibility
+        for interface_fqcn in &class_like_metadata.all_parent_interfaces {
+            let Some(interface_metadata) = context.codebase.get_class_like(interface_fqcn) else {
+                continue;
+            };
+
+            let Some(interface_property) = interface_metadata.properties.get(property_name) else {
+                continue;
+            };
+
+            for (hook_name, interface_hook) in &interface_property.hooks {
+                if !interface_hook.returns_by_ref {
+                    continue;
+                }
+
+                let Some(impl_hook) = property_metadata.hooks.get(hook_name) else {
+                    continue;
+                };
+
+                if impl_hook.returns_by_ref {
+                    continue;
+                }
+
+                let declaring_class_name = class_like_metadata.original_name;
+                let interface_name = interface_metadata.original_name;
+
+                context.collector.report_with_code(
+                    IssueCode::IncompatiblePropertyHookSignature,
+                    Issue::error(format!(
+                        "Declaration of `{declaring_class_name}::{property_name}::{hook_name}()` must be compatible with `& {interface_name}::{property_name}::{hook_name}()`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(impl_hook.span)
+                            .with_message("This hook does not return by reference"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(interface_hook.span)
+                            .with_message(format!("Interface `{interface_name}` requires this hook to return by reference")),
+                    )
+                    .with_note("When an interface declares a by-reference hook (`&get`), the implementing class must also return by reference.")
+                    .with_help(format!("Add `&` to the `{hook_name}` hook declaration: `&{hook_name} => ...`")),
+                );
             }
         }
     }

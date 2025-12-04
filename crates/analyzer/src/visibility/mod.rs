@@ -134,6 +134,29 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
         return false;
     }
 
+    if !property_metadata.hooks.is_empty()
+        && property_metadata.hooks.contains_key(&atom("set"))
+        && !property_metadata.hooks.contains_key(&atom("get"))
+    {
+        let class_name = &declaring_class_metadata.original_name;
+
+        context.collector.report_with_code(
+            IssueCode::InvalidPropertyRead,
+            Issue::error(format!(
+                "Cannot read from write-only property `{}::{}` - property only has a set hook.",
+                class_name, property_name
+            ))
+            .with_annotation(Annotation::primary(member_span.unwrap_or(access_span)).with_message("Read access here"))
+            .with_annotation(
+                Annotation::secondary(property_metadata.span.or(property_metadata.name_span).unwrap_or(access_span))
+                    .with_message("Property defined here with only a set hook"),
+            )
+            .with_help("Add a get hook to make this property readable."),
+        );
+
+        return false;
+    }
+
     let visibility = property_metadata.read_visibility;
     let is_visible =
         is_visible_from_scope(context, visibility, declaring_class_id, block_context.scope.get_class_like_name());
@@ -190,6 +213,29 @@ pub fn check_property_write_visibility<'ctx, 'arena>(
     let Some(property_metadata) = declaring_class_metadata.properties.get(&property_name) else {
         return true;
     };
+
+    if !property_metadata.hooks.is_empty()
+        && property_metadata.hooks.contains_key(&atom("get"))
+        && !property_metadata.hooks.contains_key(&atom("set"))
+    {
+        let class_name = &declaring_class_metadata.original_name;
+
+        context.collector.report_with_code(
+            IssueCode::InvalidPropertyWrite,
+            Issue::error(format!(
+                "Cannot write to read-only property `{}::{}` - property only has a get hook.",
+                class_name, property_name
+            ))
+            .with_annotation(Annotation::primary(member_span.unwrap_or(access_span)).with_message("Write access here"))
+            .with_annotation(
+                Annotation::secondary(property_metadata.span.or(property_metadata.name_span).unwrap_or(access_span))
+                    .with_message("Property defined here with only a get hook"),
+            )
+            .with_help("Add a set hook to make this property writable."),
+        );
+
+        return false;
+    }
 
     let visibility = property_metadata.write_visibility;
     let is_visible =

@@ -1,9 +1,11 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_atom::AtomMap;
 use mago_span::Span;
 
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
 use crate::visibility::Visibility;
@@ -12,7 +14,7 @@ use crate::visibility::Visibility;
 ///
 /// This includes information about its name, location, visibility (potentially asymmetric),
 /// type hints, default values, and various modifiers (`static`, `readonly`, `abstract`, etc.).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PropertyMetadata {
     /// The identifier (name) of the property, including the leading '$'.
     pub name: VariableIdentifier,
@@ -62,6 +64,12 @@ pub struct PropertyMetadata {
 
     /// Flags indicating various properties of the property.
     pub flags: MetadataFlags,
+
+    /// Metadata for property hooks (get/set).
+    ///
+    /// Key is the hook name atom ("get" or "set").
+    /// Only present for PHP 8.4+ hooked properties.
+    pub hooks: AtomMap<PropertyHookMetadata>,
 }
 
 impl PropertyMetadata {
@@ -79,6 +87,7 @@ impl PropertyMetadata {
             type_metadata: None,
             default_type_metadata: None,
             flags,
+            hooks: AtomMap::default(),
         }
     }
 

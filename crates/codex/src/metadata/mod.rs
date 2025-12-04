@@ -44,6 +44,7 @@ pub mod flags;
 pub mod function_like;
 pub mod parameter;
 pub mod property;
+pub mod property_hook;
 pub mod ttype;
 
 /// Holds all analyzed information about the symbols, structures, and relationships within a codebase.

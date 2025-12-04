@@ -3,12 +3,14 @@ use mago_atom::Atom;
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::reference::ReferenceSource;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScopeContext<'ctx> {
     pub(crate) function_like: Option<&'ctx FunctionLikeMetadata>,
     pub(crate) class_like: Option<&'ctx ClassLikeMetadata>,
+    pub(crate) property_hook: Option<(Atom, &'ctx PropertyHookMetadata)>,
     pub(crate) is_static: bool,
 }
 
@@ -22,7 +24,7 @@ impl<'ctx> ScopeContext<'ctx> {
     /// Creates a new `ScopeContext` representing a default global, static scope.
     #[inline]
     pub fn new() -> Self {
-        Self { function_like: None, class_like: None, is_static: true }
+        Self { function_like: None, class_like: None, property_hook: None, is_static: true }
     }
 
     /// Returns whether the current scope is a global scope.
@@ -112,6 +114,22 @@ impl<'ctx> ScopeContext<'ctx> {
     #[inline]
     pub fn set_static(&mut self, is_static: bool) {
         self.is_static = is_static;
+    }
+
+    /// Returns the property hook context, if available.
+    ///
+    /// Returns a tuple of (property_name, hook_metadata) when analyzing a property hook body.
+    #[inline]
+    pub fn get_property_hook(&self) -> Option<(Atom, &'ctx PropertyHookMetadata)> {
+        self.property_hook
+    }
+
+    /// Sets the property hook context for the current scope.
+    ///
+    /// Used when analyzing property hook bodies to enable proper return type validation.
+    #[inline]
+    pub fn set_property_hook(&mut self, property_hook: Option<(Atom, &'ctx PropertyHookMetadata)>) {
+        self.property_hook = property_hook;
     }
 
     /// Determines the `ReferenceSource` (symbol or member) based on the current function context.

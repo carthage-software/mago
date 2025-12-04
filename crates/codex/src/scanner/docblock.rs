@@ -83,6 +83,15 @@ pub struct TraitUseDocblockComment {
     pub template_use: Vec<TypeString>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct PropertyHookDocblockComment {
+    pub span: Span,
+    pub param_type_string: Option<ParameterTag>,
+    pub return_type_string: Option<TypeString>,
+    pub is_deprecated: bool,
+    pub is_internal: bool,
+}
+
 impl ClassLikeDocblockComment {
     pub fn create(
         context: &Context<'_, '_>,
@@ -628,5 +637,68 @@ impl TraitUseDocblockComment {
         }
 
         Ok(Some(TraitUseDocblockComment { template_extends, template_implements, template_use }))
+    }
+}
+
+impl PropertyHookDocblockComment {
+    pub fn create(
+        context: &Context<'_, '_>,
+        hook: impl HasSpan,
+    ) -> Result<Option<PropertyHookDocblockComment>, ParseError> {
+        let Some(docblock) = context.get_docblock(hook) else {
+            return Ok(None);
+        };
+
+        let mut is_deprecated = false;
+        let mut is_internal = false;
+        let mut generic_return_type: Option<TypeString> = None;
+        let mut psalm_return_type: Option<TypeString> = None;
+        let mut phpstan_return_type: Option<TypeString> = None;
+        let mut param: Option<ParameterTag> = None;
+
+        let parsed_docblock = parse_trivia(context.arena, docblock)?;
+
+        for element in parsed_docblock.elements {
+            let Element::Tag(tag) = element else {
+                continue;
+            };
+
+            match tag.kind {
+                TagKind::Deprecated => {
+                    is_deprecated = true;
+                }
+                TagKind::Internal | TagKind::PsalmInternal => {
+                    is_internal = true;
+                }
+                TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
+                    let p = parse_param_tag(tag.description, tag.description_span)?;
+                    param = Some(p);
+                }
+                TagKind::Return => {
+                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
+                        generic_return_type = Some(type_string);
+                    }
+                }
+                TagKind::PsalmReturn => {
+                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
+                        psalm_return_type = Some(type_string);
+                    }
+                }
+                TagKind::PhpstanReturn => {
+                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
+                        phpstan_return_type = Some(type_string);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Some(PropertyHookDocblockComment {
+            span: docblock.span,
+            param_type_string: param,
+            return_type_string: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
+            is_deprecated,
+            is_internal,
+        }))
     }
 }

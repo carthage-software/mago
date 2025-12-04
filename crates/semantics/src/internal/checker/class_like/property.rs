@@ -7,6 +7,7 @@ use crate::internal::checker::function_like::check_for_promoted_properties_outsi
 use crate::internal::context::Context;
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn check_property(
     property: &Property,
     class_like_span: Span,
@@ -14,6 +15,8 @@ pub fn check_property(
     class_like_name: &str,
     class_like_fqcn: &str,
     class_like_is_interface: bool,
+    class_like_is_abstract: bool,
+    class_like_is_readonly: bool,
     context: &mut Context<'_, '_, '_>,
 ) {
     let first_variable = property.first_variable();
@@ -23,29 +26,39 @@ pub fn check_property(
     let mut last_final: Option<Span> = None;
     let mut last_static: Option<Span> = None;
     let mut last_readonly: Option<Span> = None;
+    let mut last_abstract: Option<Span> = None;
+    let mut last_private: Option<Span> = None;
     let mut last_read_visibility: Option<Span> = None;
     let mut last_write_visibility: Option<Span> = None;
 
     for modifier in modifiers.iter() {
         match modifier {
             Modifier::Abstract(_) => {
-                context.report(
-                    Issue::error(format!(
-                        "Property `{class_like_name}::{first_variable_name}` cannot be declared abstract"
-                    ))
-                    .with_annotation(
-                        Annotation::primary(modifier.span())
-                            .with_message("`abstract` modifier cannot be used on properties"),
-                    )
-                    .with_annotation(
-                        Annotation::secondary(first_variable.span())
-                            .with_message(format!("Property `{first_variable_name}` declared here.")),
-                    )
-                    .with_annotation(
-                        Annotation::secondary(class_like_span)
-                            .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
-                    ),
-                );
+                let is_hooked_property = matches!(property, Property::Hooked(_));
+                let class_like_is_trait = class_like_kind == "trait";
+                let class_allows_abstract = class_like_is_abstract || class_like_is_interface || class_like_is_trait;
+
+                if !is_hooked_property || !class_allows_abstract {
+                    context.report(
+                        Issue::error(format!(
+                            "Property `{class_like_name}::{first_variable_name}` cannot be declared abstract"
+                        ))
+                        .with_annotation(
+                            Annotation::primary(modifier.span())
+                                .with_message("`abstract` modifier cannot be used on properties"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(first_variable.span())
+                                .with_message(format!("Property `{first_variable_name}` declared here.")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                        ),
+                    );
+                }
+
+                last_abstract = Some(modifier.span());
             }
             Modifier::Static(_) => {
                 if let Some(last_readonly) = last_readonly {
@@ -220,6 +233,10 @@ pub fn check_property(
                     );
                 }
 
+                if matches!(modifier, Modifier::Private(_)) {
+                    last_private = Some(modifier.span());
+                }
+
                 last_read_visibility = Some(modifier.span());
             }
             Modifier::PrivateSet(_) | Modifier::ProtectedSet(_) | Modifier::PublicSet(_) => {
@@ -286,6 +303,77 @@ pub fn check_property(
         }
     }
 
+    if let (Some(abstract_span), Some(private_span)) = (last_abstract, last_private) {
+        context.report(
+            Issue::error(format!(
+                "Property `{class_like_name}::{first_variable_name}` cannot be both abstract and private."
+            ))
+            .with_annotation(Annotation::primary(abstract_span).with_message("`abstract` modifier used here."))
+            .with_annotation(Annotation::primary(private_span).with_message("`private` modifier used here."))
+            .with_annotation(
+                Annotation::secondary(first_variable.span())
+                    .with_message(format!("Property `{first_variable_name}` declared here.")),
+            )
+            .with_annotation(
+                Annotation::secondary(class_like_span)
+                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+            )
+            .with_help("Abstract properties must be visible to subclasses. Use `protected` or `public` instead."),
+        );
+    }
+
+    if let (Some(abstract_span), Some(final_span)) = (last_abstract, last_final) {
+        context.report(
+            Issue::error(format!(
+                "Property `{class_like_name}::{first_variable_name}` cannot be both abstract and final."
+            ))
+            .with_annotation(Annotation::primary(abstract_span).with_message("`abstract` modifier used here."))
+            .with_annotation(Annotation::primary(final_span).with_message("`final` modifier used here."))
+            .with_annotation(
+                Annotation::secondary(first_variable.span())
+                    .with_message(format!("Property `{first_variable_name}` declared here.")),
+            )
+            .with_annotation(
+                Annotation::secondary(class_like_span)
+                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+            ),
+        );
+    }
+
+    if let (Some(final_span), Some(private_span)) = (last_final, last_private) {
+        context.report(
+            Issue::error(format!(
+                "Property `{class_like_name}::{first_variable_name}` cannot be both final and private."
+            ))
+            .with_annotation(Annotation::primary(final_span).with_message("`final` modifier used here."))
+            .with_annotation(Annotation::primary(private_span).with_message("`private` modifier used here."))
+            .with_annotation(
+                Annotation::secondary(first_variable.span())
+                    .with_message(format!("Property `{first_variable_name}` declared here.")),
+            )
+            .with_annotation(
+                Annotation::secondary(class_like_span)
+                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+            )
+            .with_help("Private properties cannot be overridden, so `final` is meaningless."),
+        );
+    }
+
+    if class_like_is_interface && let Some(final_span) = last_final {
+        context.report(
+            Issue::error(format!("Property `{class_like_name}::{first_variable_name}` in interface cannot be final."))
+                .with_annotation(Annotation::primary(final_span).with_message("`final` modifier used here."))
+                .with_annotation(
+                    Annotation::secondary(first_variable.span())
+                        .with_message(format!("Property `{first_variable_name}` declared here.")),
+                )
+                .with_annotation(
+                    Annotation::secondary(class_like_span)
+                        .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                ),
+        );
+    }
+
     if let Some(var) = property.var()
         && !modifiers.is_empty()
     {
@@ -333,7 +421,6 @@ pub fn check_property(
 
         if hint.is_bottom() {
             let hint_name = context.get_code_snippet(hint);
-            // cant be used on properties
             context.report(
                 Issue::error(format!(
                     "Property `{class_like_name}::{first_variable_name}` cannot have type `{hint_name}`."
@@ -353,7 +440,6 @@ pub fn check_property(
             );
         }
     } else if let Some(readonly) = last_readonly {
-        // readonly properties must have a type hint
         context.report(
             Issue::error(format!(
                 "Readonly property `{class_like_name}::{first_variable_name}` must have a type hint."
@@ -461,6 +547,23 @@ pub fn check_property(
                                 .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
                         ),
                 );
+            } else if class_like_is_readonly {
+                context.report(
+                    Issue::error(format!("Hooked property `{class_like_name}::{item_name}` cannot be readonly."))
+                        .with_annotation(
+                            Annotation::primary(hooked_property.hook_list.span())
+                                .with_message("Property hooks are defined here."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(hooked_property.item.variable().span())
+                                .with_message(format!("Property `{item_name}` is declared here.")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` is readonly, making all properties implicitly readonly.")),
+                        )
+                        .with_note("Hooked properties cannot be readonly, but properties in readonly classes are implicitly readonly."),
+                );
             }
 
             if let Some(r#static) = last_static {
@@ -484,21 +587,114 @@ pub fn check_property(
                 );
             }
 
+            if let Some(abstract_span) = last_abstract {
+                let has_abstract_hook = hooked_property
+                    .hook_list
+                    .hooks
+                    .iter()
+                    .any(|hook| matches!(hook.body, PropertyHookBody::Abstract(_)));
+
+                if !has_abstract_hook {
+                    context.report(
+                        Issue::error(format!(
+                            "Abstract property `{class_like_name}::{item_name}` must specify at least one abstract hook."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(abstract_span).with_message("`abstract` modifier used here."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(hooked_property.hook_list.span())
+                                .with_message("All hooks have concrete bodies."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(hooked_property.item.variable().span())
+                                .with_message(format!("Property `{item_name}` is declared here.")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                        )
+                        .with_help("Remove the `abstract` modifier or replace hook bodies with semicolons."),
+                    );
+                }
+            }
+
+            // Check: empty hook list is not allowed
+            if hooked_property.hook_list.hooks.is_empty() {
+                context.report(
+                    Issue::error(format!("Property `{class_like_name}::{item_name}` hook list must not be empty."))
+                        .with_annotation(
+                            Annotation::primary(hooked_property.hook_list.span()).with_message("Empty hook list here."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(hooked_property.item.variable().span())
+                                .with_message(format!("Property `{item_name}` is declared here.")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                        )
+                        .with_help(
+                            "Add at least one hook (`get` or `set`) to the property, or remove the hook braces.",
+                        ),
+                );
+            }
+
+            if hooked_property.hint.is_none()
+                && let PropertyItem::Concrete(concrete_item) = &hooked_property.item
+            {
+                let has_concrete_get = hooked_property.hook_list.hooks.iter().any(|hook| {
+                    hook.name.value.eq_ignore_ascii_case("get") && !matches!(hook.body, PropertyHookBody::Abstract(_))
+                });
+                let has_concrete_set = hooked_property.hook_list.hooks.iter().any(|hook| {
+                    hook.name.value.eq_ignore_ascii_case("set") && !matches!(hook.body, PropertyHookBody::Abstract(_))
+                });
+
+                if has_concrete_get && has_concrete_set {
+                    context.report(
+                        Issue::error(format!(
+                            "Cannot specify default value for virtual hooked property `{class_like_name}::{item_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(concrete_item.value.span())
+                                .with_message("Default value specified here."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(hooked_property.hook_list.span())
+                                .with_message("Property has both get and set hooks with concrete implementations."),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(concrete_item.variable.span())
+                                .with_message(format!("Property `{item_name}` has no type hint, making it virtual.")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                        )
+                        .with_note("A virtual property has no backing store, so a default value cannot be stored.")
+                        .with_help("Remove the default value, or add a type hint to make the property backed."),
+                    );
+                }
+            }
+
             let mut hook_names: Vec<(std::string::String, Span)> = vec![];
             for hook in hooked_property.hook_list.hooks.iter() {
                 let name = hook.name.value;
                 let lowered_name = name.to_ascii_lowercase();
 
-                if !hook.modifiers.is_empty() {
-                    let first = hook.modifiers.first().unwrap();
-                    let last = hook.modifiers.last().unwrap();
+                let invalid_modifiers: Vec<_> =
+                    hook.modifiers.iter().filter(|m| !matches!(m, Modifier::Final(_))).collect();
+
+                if !invalid_modifiers.is_empty() {
+                    let first = invalid_modifiers.first().unwrap();
+                    let last = invalid_modifiers.last().unwrap();
 
                     context.report(
                         Issue::error(format!(
-                            "Hook `{name}` for property `{class_like_name}::{item_name}` cannot have modifiers."
+                            "Hook `{name}` for property `{class_like_name}::{item_name}` can only have `final` modifier."
                         ))
                         .with_annotation(
-                            Annotation::primary(first.span().join(last.span())).with_message("Hook modifiers here."),
+                            Annotation::primary(first.span().join(last.span())).with_message("Invalid hook modifier here."),
                         )
                         .with_annotation(
                             Annotation::secondary(hooked_property.item.variable().span())
@@ -511,7 +707,36 @@ pub fn check_property(
                     );
                 }
 
-                if !class_like_is_interface && let PropertyHookBody::Abstract(property_hook_abstract_body) = &hook.body
+                if class_like_is_interface
+                    && let Some(final_modifier) = hook.modifiers.iter().find(|m| matches!(m, Modifier::Final(_)))
+                {
+                    context.report(
+                            Issue::error(format!(
+                                "Hook `{name}` for property `{class_like_name}::{item_name}` cannot be both abstract and final."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(final_modifier.span()).with_message("`final` modifier used here."),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(hook.name.span())
+                                    .with_message(format!("Hook `{name}` is declared here.")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(hooked_property.item.variable().span())
+                                    .with_message(format!("Property `{item_name}` is declared here.")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(class_like_span)
+                                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                            )
+                            .with_note("Interface property hooks are implicitly abstract."),
+                        );
+                }
+
+                let property_is_abstract = modifiers.contains_abstract();
+                if !class_like_is_interface
+                    && !property_is_abstract
+                    && let PropertyHookBody::Abstract(property_hook_abstract_body) = &hook.body
                 {
                     context.report(
                         Issue::error(format!("Non-abstract property hook `{name}` must have a body."))
@@ -570,29 +795,60 @@ pub fn check_property(
                                 let first_parameter = parameter_list.parameters.first().unwrap();
                                 let first_parameter_name = first_parameter.variable.name;
 
-                                if first_parameter.hint.is_none() {
+                                let property_has_type = hooked_property.hint.is_some();
+                                let param_has_type = first_parameter.hint.is_some();
+
+                                if !property_has_type && param_has_type {
+                                    let param_hint = first_parameter.hint.as_ref().unwrap();
                                     context.report(
                                         Issue::error(format!(
-                                            "Parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must contain a type hint."
+                                            "Type of parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must be compatible with property type."
                                         ))
                                         .with_annotation(
-                                            Annotation::primary(first_parameter.variable.span()).with_message(format!(
-                                                "Parameter `{first_parameter_name}` declared here."
-                                            )),
+                                            Annotation::primary(param_hint.span()).with_message(
+                                                "Parameter has a type hint, but property has no type.",
+                                            ),
+                                        )
+                                        .with_annotation(
+                                            Annotation::secondary(hooked_property.item.variable().span())
+                                                .with_message(format!("Property `{item_name}` has no type hint.")),
                                         )
                                         .with_annotation(
                                             Annotation::secondary(hook.name.span())
                                                 .with_message(format!("Hook `{name}` is declared here.")),
                                         )
                                         .with_annotation(
-                                            Annotation::secondary(hooked_property.item.variable().span())
-                                                .with_message(format!("Property `{item_name}` is declared here.")),
+                                            Annotation::secondary(class_like_span).with_message(format!(
+                                                "{class_like_kind} `{class_like_fqcn}` defined here."
+                                            )),
+                                        )
+                                        .with_help("Remove the type hint from the set hook parameter, or add a type to the property."),
+                                    );
+                                } else if property_has_type && !param_has_type {
+                                    let property_hint = hooked_property.hint.as_ref().unwrap();
+                                    context.report(
+                                        Issue::error(format!(
+                                            "Type of parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must be compatible with property type."
+                                        ))
+                                        .with_annotation(
+                                            Annotation::primary(first_parameter.variable.span()).with_message(
+                                                "Parameter has no type hint.",
+                                            ),
+                                        )
+                                        .with_annotation(
+                                            Annotation::secondary(property_hint.span())
+                                                .with_message(format!("Property `{item_name}` has type.")),
+                                        )
+                                        .with_annotation(
+                                            Annotation::secondary(hook.name.span())
+                                                .with_message(format!("Hook `{name}` is declared here.")),
                                         )
                                         .with_annotation(
                                             Annotation::secondary(class_like_span).with_message(format!(
                                                 "{class_like_kind} `{class_like_fqcn}` defined here."
                                             )),
-                                        ),
+                                        )
+                                        .with_help("Add a type hint to the set hook parameter that is compatible with the property type."),
                                     );
                                 }
 
