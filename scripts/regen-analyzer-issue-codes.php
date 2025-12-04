@@ -285,6 +285,8 @@ final class AnalyzerCodeModuleGenerator
         'incompatible-property-readonly',
         'incompatible-property-default',
         'incompatible-property-hook-parameter-type',
+        'incompatible-property-hook-signature',
+        'backed-property-reference-hook',
         'override-final-method',
         'override-final-property',
         'override-final-property-hook',

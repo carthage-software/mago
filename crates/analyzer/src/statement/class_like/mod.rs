@@ -2339,7 +2339,7 @@ fn check_class_like_properties<'ctx, 'arena>(
                 && property_metadata.hooks.contains_key(&atom("set"))
             {
                 context.collector.report_with_code(
-                    IssueCode::InvalidByRefGetHookOnBackedProperty,
+                    IssueCode::BackedPropertyReferenceHook,
                     Issue::error(format!(
                         "Get hook of backed property `{declaring_class_name}::{property_name}` with set hook may not return by reference."
                     ))
