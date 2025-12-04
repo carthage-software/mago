@@ -277,6 +277,7 @@ test_case!(partial_application_simple);
 test_case!(partial_application_named_argument_reordering);
 test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
+test_case!(redudnant_assert);
 
 // Github Issues
 test_case!(issue_659);

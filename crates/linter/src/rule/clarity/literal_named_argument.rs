@@ -147,7 +147,8 @@ impl LintRule for LiteralNamedArgumentRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_lint_failure, test_lint_success};
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
     use indoc::indoc;
 
     test_lint_success! {

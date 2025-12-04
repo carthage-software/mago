@@ -352,8 +352,11 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                 let asserted_type = block_context.locals.get(&assertion_variable);
                 let mut any_possible = false;
                 let mut has_resolved_types = false;
+                let mut all_negated = true;
 
                 for variable_assertion in variable_assertions {
+                    all_negated = all_negated && variable_assertion.is_negation();
+
                     let Some(assertion_atomic) = variable_assertion.get_type() else {
                         add_and_assertion(&mut new_variable_possibilities, variable_assertion.clone());
 
@@ -471,20 +474,37 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                         .collect::<Vec<_>>()
                         .join("|");
 
-                    context.collector.report_with_code(
-                        IssueCode::ImpossibleTypeComparison,
-                        Issue::error(format!(
-                            "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(invocation.span)
-                                .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
-                        )
-                        .with_note(format!(
-                            "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
-                        ))
-                        .with_help("Check that the correct variable is being passed, or update the assertion type."),
-                    );
+                    if all_negated {
+                        context.collector.report_with_code(
+                            IssueCode::RedundantTypeComparison,
+                            Issue::warning(format!(
+                                "Redundant type assertion: `{assertion_variable}` of type `{asserted_type_id}` is always not `{expected_type_id}`."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(invocation.span)
+                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                            )
+                            .with_note(format!(
+                                "The assertion expects `{assertion_variable}` to not be `{expected_type_id}`, which is always true."
+                            ))
+                            .with_help("Consider removing this assertion as it has no effect."),
+                        );
+                    } else {
+                        context.collector.report_with_code(
+                            IssueCode::ImpossibleTypeComparison,
+                            Issue::error(format!(
+                                "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(invocation.span)
+                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                            )
+                            .with_note(format!(
+                                "The assertion expects `{assertion_variable}` to be `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                            ))
+                            .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                        );
+                    }
                 }
 
                 if !resolved_or_clause.is_empty() {
