@@ -27,7 +27,7 @@
 //!
 //! The generated configuration file is based on a TOML template with placeholder values
 //! that are replaced based on user selections. The template includes sensible defaults
-//! and common customizations for PSR-12 compliance.
+//! and common customizations for PER-CS compliance.
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -375,7 +375,7 @@ fn setup_formatter(theme: &ColorfulTheme) -> Result<(u16, u8, bool), Error> {
     let defaults = (120, 4, false);
 
     if Confirm::with_theme(theme)
-        .with_prompt(" │  The default settings are PSR-12 compatible. Do you want to customize them?")
+        .with_prompt(" │  The default settings are PER-CS compatible. Do you want to customize them?")
         .default(false)
         .interact()?
     {

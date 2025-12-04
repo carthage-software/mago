@@ -14,7 +14,7 @@ Mago takes a "parse-and-reprint" approach, inspired by modern formatters like Pr
 
 1.  It first parses your PHP code into a detailed Abstract Syntax Tree (AST).
 2.  It then **throws away your original formatting**, including all newlines, spacing, and indentation.
-3.  Finally, it **reprints the AST from scratch** according to its own set of consistent, PSR-12-compliant rules.
+3.  Finally, it **reprints the AST from scratch** according to its own set of consistent, [PER-CS](https://www.php-fig.org/per/coding-style/)-compliant rules.
 
 This process guarantees that the output is always 100% consistent, regardless of the input style. Most importantly, it does this without ever changing the behavior of your code.
 
@@ -22,7 +22,7 @@ This process guarantees that the output is always 100% consistent, regardless of
 
 - **Blazing fast** — Written in Rust for maximum performance, making it one of the fastest PHP formatters available.
 - **Opinionated & consistent** — Ends style debates by enforcing a single, unified coding style across your entire project.
-- **PSR-12 compliant** — Follows the widely accepted PSR-12 coding standard.
+- **PER-CS compliant** — Follows the widely accepted [PER-CS](https://www.php-fig.org/per/coding-style/) coding standard.
 - **Safe** — The formatter is designed to never alter the runtime behavior of your code.
 
 ## Dive in

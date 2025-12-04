@@ -11,7 +11,7 @@ This section provides a detailed guide for each tool.
 
 ### [Formatter](/tools/formatter/overview.md)
 
-The **formatter** is an opinionated code formatter that ensures your entire codebase adheres to a single, consistent style based on PSR-12. It's designed to end debates over code style forever.
+The **formatter** is an opinionated code formatter that ensures your entire codebase adheres to a single, consistent style based on [PER-CS](https://www.php-fig.org/per/coding-style/). It's designed to end debates over code style forever.
 
 ### [Linter](/tools/linter/overview.md)
 

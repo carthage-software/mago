@@ -4,7 +4,7 @@ title: Formatter configuration reference
 
 # Configuration reference
 
-While **Mago**'s formatter is opinionated and works great out-of-the-box with its PSR-12 compliant defaults, you can customize its behavior in your `mago.toml` file.
+While **Mago**'s formatter is opinionated and works great out-of-the-box with its [PER-CS](https://www.php-fig.org/per/coding-style/) compliant defaults, you can customize its behavior in your `mago.toml` file.
 
 All settings go under the `[formatter]` table.
 
