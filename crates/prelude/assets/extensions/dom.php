@@ -1,7 +1,5 @@
 <?php
 
-/** @generate-class-entries */
-
 namespace {
     /**
      * @var int
@@ -625,7 +623,9 @@ namespace {
     }
 
     /**
-     * @implements IteratorAggregate<int, DOMElement|DOMNode|DOMNameSpaceNode>
+     * @template-covariant TNode of DOMNode|DOMNameSpaceNode
+     *
+     * @implements IteratorAggregate<int, TNode>
      */
     class DOMNodeList implements IteratorAggregate, Countable
     {
@@ -638,11 +638,16 @@ namespace {
         {
         }
 
+        /**
+         * @return Iterator<int, TNode>
+         */
         public function getIterator(): Iterator
         {
         }
 
-        /** @return DOMElement|DOMNode|DOMNameSpaceNode|null */
+        /**
+         * @return TNode|null
+         */
         public function item(int $index)
         {
         }
@@ -810,10 +815,16 @@ namespace {
         {
         }
 
+        /**
+         * @return DOMNodeList<DOMElement>
+         */
         public function getElementsByTagName(string $qualifiedName): DOMNodeList
         {
         }
 
+        /**
+         * @return DOMNodeList<DOMElement>
+         */
         public function getElementsByTagNameNS(null|string $namespace, string $localName): DOMNodeList
         {
         }
@@ -1045,10 +1056,16 @@ namespace {
         {
         }
 
+        /**
+         * @return DOMNodeList<DOMElement>
+         */
         public function getElementsByTagName(string $qualifiedName): DOMNodeList
         {
         }
 
+        /**
+         * @return DOMNodeList<DOMElement>
+         */
         public function getElementsByTagNameNS(null|string $namespace, string $localName): DOMNodeList
         {
         }
@@ -1198,6 +1215,7 @@ namespace {
         {
         }
 
+        /** @return null|TNode */
         public function item(int $index): null|DOMNode
         {
         }
@@ -1206,6 +1224,9 @@ namespace {
         {
         }
 
+        /**
+         * @return Iterator<string, TNode>
+         */
         public function getIterator(): Iterator
         {
         }

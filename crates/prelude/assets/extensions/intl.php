@@ -197,6 +197,12 @@ class NumberFormatter
     public const ROUND_TOWARD_ZERO = 2;
     public const ROUND_AWAY_FROM_ZERO = 3;
     public const ROUND_HALFODD = 8;
+    public const DECIMAL_COMPACT_SHORT = 14;
+    public const DECIMAL_COMPACT_LONG = 15;
+    public const CURRENCY_ISO = 10;
+    public const CURRENCY_PLURAL = 11;
+    public const CASH_CURRENCY = 13;
+    public const CURRENCY_STANDARD = 16;
 
     /**
      * @pure
@@ -418,6 +424,14 @@ class Locale
     }
 
     public static function isRightToLeft(string $locale): bool
+    {
+    }
+
+    public static function addLikelySubtags(string $locale): string|false
+    {
+    }
+
+    public static function minimizeSubtags(string $locale): string|false
     {
     }
 }
@@ -836,7 +850,7 @@ class Spoofchecker
     public function __construct() {}
 
     /**
-     * @param-out string $errorCode
+     * @param-out int $errorCode
      */
     public function isSuspicious(string $string, &$errorCode = null): bool
     {

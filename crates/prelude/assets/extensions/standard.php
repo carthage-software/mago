@@ -3221,7 +3221,7 @@ function error_get_last(): null|array
  * @tempalte I
  * @template R
  *
- * @template (callble(...I): R) $callback
+ * @template (callble(I...): R) $callback
  *
  * @param I ...$args
  *
@@ -3235,7 +3235,7 @@ function call_user_func(callable $callback, mixed ...$args): mixed
  * @tempalte I
  * @template R
  *
- * @template (callble(...I): R) $callback
+ * @template (callble(I...): R) $callback
  *
  * @param array<I> $args
  *
@@ -3249,7 +3249,7 @@ function call_user_func_array(callable $callback, array $args): mixed
  * @tempalte I
  * @template R
  *
- * @template (callble(...I): R) $callback
+ * @template (callble(I...): R) $callback
  *
  * @param I ...$args
  *
@@ -3263,7 +3263,7 @@ function forward_static_call(callable $callback, mixed ...$args): mixed
  * @tempalte I
  * @template R
  *
- * @template (callble(...I): R) $callback
+ * @template (callble(I...): R) $callback
  *
  * @param array<I> $args
  *
@@ -3321,7 +3321,7 @@ function memory_reset_peak_usage(): void
 /**
  * @template I
  *
- * @param callable(...I) $callback
+ * @param (callable(I...)) $callback
  * @param I ...$args
  *
  * @return bool|null
@@ -3333,7 +3333,7 @@ function register_shutdown_function(callable $callback, mixed ...$args): void
 /**
  * @template I
  *
- * @param callable(I...) $callback
+ * @param (callable(I...)) $callback
  * @param I ...$args
  */
 function register_tick_function(callable $callback, mixed ...$args): bool

@@ -660,6 +660,8 @@ class ReflectionProperty implements Reflector
     }
 
     /**
+     * @deprecated
+     *
      * @pure
      */
     public function setAccessible(bool $accessible): void
@@ -1434,6 +1436,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     }
 
     /**
+     * @deprecated
+     *
      * @pure
      */
     public function setAccessible(bool $accessible): void
