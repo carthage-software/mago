@@ -254,6 +254,7 @@ define_rules! {
     TooManyProperties(too_many_properties @ TooManyPropertiesRule),
     TraitName(trait_name @ TraitNameRule),
     ValidDocblock(valid_docblock @ ValidDocblockRule),
+    VariableName(variable_name @ VariableNameRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
     NoIniSet(no_ini_set @ NoIniSetRule),
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),

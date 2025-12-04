@@ -15,6 +15,7 @@ pub mod no_hash_comment;
 pub mod no_php_tag_terminator;
 pub mod no_trailing_space;
 pub mod trait_name;
+pub mod variable_name;
 
 pub use ambiguous_function_call::*;
 pub use array_style::*;
@@ -33,3 +34,4 @@ pub use no_hash_comment::*;
 pub use no_php_tag_terminator::*;
 pub use no_trailing_space::*;
 pub use trait_name::*;
+pub use variable_name::*;

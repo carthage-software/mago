@@ -134,6 +134,7 @@ pub struct RulesSettings {
     pub too_many_properties: RuleSettings<TooManyPropertiesConfig>,
     pub trait_name: RuleSettings<TraitNameConfig>,
     pub valid_docblock: RuleSettings<ValidDocblockConfig>,
+    pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
