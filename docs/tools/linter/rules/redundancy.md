@@ -28,6 +28,8 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant String Concat | [`no-redundant-string-concat`](#no-redundant-string-concat) |
 | No Redundant Use | [`no-redundant-use`](#no-redundant-use) |
 | No Redundant Write Visibility | [`no-redundant-write-visibility`](#no-redundant-write-visibility) |
+| No Redundant Yield From | [`no-redundant-yield-from`](#no-redundant-yield-from) |
+| No Self Assignment | [`no-self-assignment`](#no-self-assignment) |
 
 
 ## <a id="constant-condition"></a>`constant-condition`
@@ -130,6 +132,8 @@ to keep the codebase clean and maintainable.
 <?php
 
 // This is a useful comment.
+//
+// And so is this whole single line comment block, including the enclosed empty line.
 # This is also a useful comment.
 /**
  * This is a docblock.
@@ -226,7 +230,7 @@ Detects `protected` items in final classes or enums.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
 
 ### Examples
@@ -638,7 +642,7 @@ Detects redundant readonly modifiers on properties.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
 
 ### Examples
@@ -708,7 +712,7 @@ Detects `use` statements that import items that are never used.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -772,5 +776,86 @@ final class User
 {
     public public(set) $name;
 }
+```
+
+
+## <a id="no-redundant-yield-from"></a>`no-redundant-yield-from`
+
+Detects redundant use of `yield from` with single-element array literals.
+
+Using `yield from` with a single-element array literal creates unnecessary
+overhead in the generated opcodes. Direct `yield` is simpler and more efficient.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function gen(): Generator {
+    yield 1;
+    yield 'foo' => new stdClass();
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function gen(): Generator {
+    yield from [1];
+    yield from ['foo' => new stdClass()];
+}
+```
+
+
+## <a id="no-self-assignment"></a>`no-self-assignment`
+
+Detects and removes self-assignments where a variable or property is assigned to itself.
+
+Self-assignments have no effect and are typically mistakes or leftover from refactoring.
+For object properties, the fix is marked as potentially unsafe because reading or writing
+properties may have side effects through magic methods (__get, __set) or property hooks (PHP 8.4+).
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$a = $b;
+$this->x = $other->x;
+$foo->bar = $baz->bar;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$a = $a;
+$this->x = $this->x;
+$foo->bar = $foo->bar;
 ```
 

@@ -304,7 +304,7 @@ Variable variables can make code harder to read and maintain, as they introduce 
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -333,8 +333,9 @@ echo $$varName; // Outputs 'bar'
 
 ## <a id="str-contains"></a>`str-contains`
 
-Detects `strpos($a, $b) !== false` comparisons and suggests replacing them with `str_contains($a, $b)`
-for improved readability and intent clarity.
+Detects `strpos($a, $b) !== false` and `strpos($a, $b) === false` comparisons and suggests
+replacing them with `str_contains($a, $b)` or `!str_contains($a, $b)` for improved readability
+and intent clarity.
 
 
 ### Requirements

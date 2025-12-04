@@ -381,13 +381,18 @@ $pattern = '/' . preg_quote( $user_input ) . '/';
 Requires that parameters that are likely to contain sensitive information (e.g., passwords)
 are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.
 
+This rule only applies to PHP 8.2 and later, as the `SensitiveParameter` attribute was introduced in PHP 8.2.
 
+
+### Requirements
+
+- **PHP version:** >= `8.2.0`
 
 ### Configuration
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
 
 ### Examples

@@ -71,7 +71,7 @@ Detects class constants that are missing a type hint.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -328,7 +328,7 @@ Detects parameters that are missing a type hint.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 | `ignore-closure` | `boolean` | `false` |
 | `ignore-arrow-function` | `boolean` | `false` |
@@ -371,7 +371,7 @@ Detects class-like properties that are missing a type hint.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -412,7 +412,7 @@ Detects functions, methods, closures, and arrow functions that are missing a ret
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 | `ignore-closure` | `boolean` | `false` |
 | `ignore-arrow-function` | `boolean` | `false` |

@@ -18,8 +18,10 @@ This document details the rules available in the `BestPractices` category.
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
+| Prefer Early Continue | [`prefer-early-continue`](#prefer-early-continue) |
 | Prefer First Class Callable | [`prefer-first-class-callable`](#prefer-first-class-callable) |
 | Prefer Interface | [`prefer-interface`](#prefer-interface) |
+| Prefer Static Closure | [`prefer-static-closure`](#prefer-static-closure) |
 | Prefer View Array | [`prefer-view-array`](#prefer-view-array) |
 | Prefer While Loop | [`prefer-while-loop`](#prefer-while-loop) |
 | Psl Array Functions | [`psl-array-functions`](#psl-array-functions) |
@@ -454,6 +456,49 @@ $a = function($x) {
 ```
 
 
+## <a id="prefer-early-continue"></a>`prefer-early-continue`
+
+Suggests using early continue pattern when a loop body contains only a single if statement.
+
+This improves code readability by reducing nesting and making the control flow more explicit.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+for ($i = 0; $i < 10; $i++) {
+    if (!$condition) {
+        continue;
+    }
+    doSomething();
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+for ($i = 0; $i < 10; $i++) {
+    if ($condition) {
+        doSomething();
+    }
+}
+```
+
+
 ## <a id="prefer-first-class-callable"></a>`prefer-first-class-callable`
 
 Promotes the use of first-class callable syntax (`...`) for creating closures.
@@ -541,6 +586,63 @@ class UserController
     public function __construct(Serializer $serializer)
     {
         $this->serializer = $serializer;
+    }
+}
+```
+
+
+## <a id="prefer-static-closure"></a>`prefer-static-closure`
+
+Suggests adding the `static` keyword to closures and arrow functions that don't use `$this`.
+
+Static closures don't bind `$this`, making them more memory-efficient and their intent clearer.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+class Foo {
+    public function bar() {
+        // Static closure - doesn't use $this
+        $fn = static fn($x) => $x * 2;
+
+        // Non-static - uses $this
+        $fn2 = fn() => $this->doSomething();
+
+        // Static function - doesn't use $this
+        $closure = static function($x) {
+            return $x * 2;
+        };
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+class Foo {
+    public function bar() {
+        // Missing static - doesn't use $this
+        $fn = fn($x) => $x * 2;
+
+        // Missing static - doesn't use $this
+        $closure = function($x) {
+            return $x * 2;
+        };
     }
 }
 ```

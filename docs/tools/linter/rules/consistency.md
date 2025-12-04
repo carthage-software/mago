@@ -26,6 +26,7 @@ This document details the rules available in the `Consistency` category.
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
 | Trait Name | [`trait-name`](#trait-name) |
+| Variable Name | [`variable-name`](#variable-name) |
 
 
 ## <a id="ambiguous-function-call"></a>`ambiguous-function-call`
@@ -701,5 +702,48 @@ trait MyTrait {}
 trait myTrait {}
 trait my_trait {}
 trait MY_TRAIT {}
+```
+
+
+## <a id="variable-name"></a>`variable-name`
+
+Detects variable declarations that do not follow camel or snake naming convention.
+
+Variable names should be in camel case or snake case, depending on the configuration.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+| `camel` | `boolean` | `false` |
+| `either` | `boolean` | `false` |
+| `check-parameters` | `boolean` | `true` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$my_variable = 1;
+
+function foo($my_param) {}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$MyVariable = 1;
+
+$My_Variable = 2;
+
+function foo($MyParam) {}
 ```
 
