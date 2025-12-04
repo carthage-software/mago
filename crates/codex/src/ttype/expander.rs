@@ -36,6 +36,9 @@ thread_local! {
     /// Thread-local set for tracking currently expanding aliases (cycle detection).
     /// Uses a HashSet for accurate tracking without false positives from hash collisions.
     static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom)>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+
+    /// Thread-local set for tracking objects whose type parameters are being expanded (cycle detection).
+    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
 }
 
 /// Resets the thread-local alias expansion state.
@@ -45,6 +48,7 @@ thread_local! {
 #[inline]
 pub fn reset_expansion_state() {
     EXPANDING_ALIASES.with(|set| set.borrow_mut().clear());
+    EXPANDING_OBJECT_PARAMS.with(|set| set.borrow_mut().clear());
 }
 
 /// RAII guard to ensure alias expansion state is properly cleaned up.
@@ -64,6 +68,31 @@ impl AliasExpansionGuard {
 impl Drop for AliasExpansionGuard {
     fn drop(&mut self) {
         EXPANDING_ALIASES.with(|set| set.borrow_mut().remove(&(self.class_name, self.alias_name)));
+    }
+}
+
+/// RAII guard for object type parameter expansion cycle detection.
+struct ObjectParamsExpansionGuard {
+    object_name: Atom,
+}
+
+impl ObjectParamsExpansionGuard {
+    fn try_new(object_name: Atom) -> Option<Self> {
+        EXPANDING_OBJECT_PARAMS.with(|set| {
+            let mut set = set.borrow_mut();
+            if set.contains(&object_name) {
+                None
+            } else {
+                set.insert(object_name);
+                Some(Self { object_name })
+            }
+        })
+    }
+}
+
+impl Drop for ObjectParamsExpansionGuard {
+    fn drop(&mut self) {
+        EXPANDING_OBJECT_PARAMS.with(|set| set.borrow_mut().remove(&self.object_name));
     }
 }
 
@@ -366,6 +395,11 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
         return;
     };
 
+    let _guard = match ObjectParamsExpansionGuard::try_new(named_object.name) {
+        Some(guard) => guard,
+        None => return,
+    };
+
     match &mut named_object.type_parameters {
         Some(type_parameters) if !type_parameters.is_empty() => {
             for type_parameter in type_parameters.iter_mut() {
@@ -389,7 +423,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                 }
             }
         }
-    };
+    }
 }
 
 pub fn get_signature_of_function_like_identifier(

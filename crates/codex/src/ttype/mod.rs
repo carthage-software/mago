@@ -22,6 +22,7 @@ use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::shared::*;
 use crate::ttype::template::TemplateResult;
@@ -1012,13 +1013,34 @@ fn intersect_atomic_types(
 
 pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<(TUnion, TUnion)> {
     if let Some(generator_parameters) = atomic.get_generator_parameters() {
-        return Some((generator_parameters.0, generator_parameters.1));
+        let mut key_type = generator_parameters.0;
+        let mut value_type = generator_parameters.1;
+
+        expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
+        expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
+
+        return Some((key_type, value_type));
     }
 
     let parameters = 'parameters: {
         match atomic {
-            TAtomic::Iterable(iterable) => Some((iterable.get_key_type().clone(), iterable.get_value_type().clone())),
-            TAtomic::Array(array_type) => Some(get_array_parameters(array_type, codebase)),
+            TAtomic::Iterable(iterable) => {
+                let mut key_type = iterable.get_key_type().clone();
+                let mut value_type = iterable.get_value_type().clone();
+
+                expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
+                expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
+
+                Some((key_type, value_type))
+            }
+            TAtomic::Array(array_type) => {
+                let (mut key_type, mut value_type) = get_array_parameters(array_type, codebase);
+
+                expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
+                expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
+
+                Some((key_type, value_type))
+            }
             TAtomic::Object(object) => {
                 let name = object.get_name()?;
                 let traversable = atom("traversable");
@@ -1221,11 +1243,18 @@ pub fn get_specialized_template_type(
 
         let Some(instantiated_type_parameters) = instantiated_type_parameters else {
             let type_map = instantiated_class_metadata.get_template_type(template_name)?;
+            let mut result = type_map.first().map(|(_, constraint)| constraint).cloned()?;
 
-            return type_map.first().map(|(_, constraint)| constraint).cloned();
+            expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
+
+            return Some(result);
         };
 
-        return instantiated_type_parameters.get(index).cloned();
+        let mut result = instantiated_type_parameters.get(index).cloned()?;
+
+        expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
+
+        return Some(result);
     }
 
     let defining_template_type = defining_class_metadata.get_template_type(template_name)?;
@@ -1271,6 +1300,8 @@ pub fn get_specialized_template_type(
             template_type = inferred_type_replacer::replace(&template_type, &template_result, codebase);
         }
     }
+
+    expander::expand_union(codebase, &mut template_type, &TypeExpansionOptions::default());
 
     Some(template_type)
 }

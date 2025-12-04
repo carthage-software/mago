@@ -3,7 +3,6 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
-use crate::ttype::expander;
 use crate::ttype::get_specialized_template_type;
 use crate::ttype::template::variance::Variance;
 
@@ -43,7 +42,7 @@ pub(crate) fn is_contained_by(
             continue;
         };
 
-        let Some(mut specialized_template_type) = get_specialized_template_type(
+        let Some(specialized_template_type) = get_specialized_template_type(
             codebase,
             template_name,
             &container_metadata.name,
@@ -52,8 +51,6 @@ pub(crate) fn is_contained_by(
         ) else {
             return false;
         };
-
-        expander::expand_union(codebase, &mut specialized_template_type, &expander::TypeExpansionOptions::default());
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
