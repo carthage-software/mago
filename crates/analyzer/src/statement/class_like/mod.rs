@@ -529,8 +529,15 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                         continue;
                     }
 
-                    let is_implemented =
-                        current_property.and_then(|p| p.hooks.get(hook_name)).map(|h| !h.is_abstract).unwrap_or(false);
+                    let is_implemented = current_property
+                        .map(|p| {
+                            if p.hooks.is_empty() {
+                                true
+                            } else {
+                                p.hooks.get(hook_name).map(|h| !h.is_abstract).unwrap_or(false)
+                            }
+                        })
+                        .unwrap_or(false);
 
                     if !is_implemented {
                         let fqcn = parent_metadata.original_name;

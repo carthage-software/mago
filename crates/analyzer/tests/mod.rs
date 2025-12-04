@@ -378,6 +378,7 @@ test_case!(issue_690);
 test_case!(unused_template_parameter);
 test_case!(unused_function_template_parameter);
 test_case!(property_hooks);
+test_case!(interface_property_hook);
 
 #[test]
 fn test_all_test_cases_are_ran() {
