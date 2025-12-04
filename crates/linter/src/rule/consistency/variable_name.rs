@@ -35,11 +35,20 @@ pub struct VariableNameConfig {
     pub camel: bool,
     pub either: bool,
     pub check_parameters: bool,
+    pub check_properties: bool,
+    pub check_promoted_properties: bool,
 }
 
 impl Default for VariableNameConfig {
     fn default() -> Self {
-        Self { level: Level::Help, camel: false, either: false, check_parameters: true }
+        Self {
+            level: Level::Help,
+            camel: false,
+            either: false,
+            check_parameters: true,
+            check_properties: true,
+            check_promoted_properties: true,
+        }
     }
 }
 
@@ -61,7 +70,7 @@ impl LintRule for VariableNameRule {
             name: "Variable Name",
             code: "variable-name",
             description: indoc! {"
-                Detects variable declarations that do not follow camel or snake naming convention.
+                Detects variable declarations, method parameters and class properties that do not follow camel or snake naming convention.
 
                 Variable names should be in camel case or snake case, depending on the configuration.
             "},
@@ -69,6 +78,14 @@ impl LintRule for VariableNameRule {
                 <?php
 
                 $my_variable = 1;
+
+                final class Foo {
+                    public string $my_property;
+
+                    public function __construct(
+                        public int $my_promoted_property,
+                    ) {}
+                }
 
                 function foo($my_param) {}
             "#},
@@ -78,6 +95,14 @@ impl LintRule for VariableNameRule {
                 $MyVariable = 1;
 
                 $My_Variable = 2;
+
+                final class Foo {
+                    public string $MyProperty;
+
+                    public function __construct(
+                        public int $MyPromotedProperty,
+                    ) {}
+                }
 
                 function foo($MyParam) {}
             "#},
@@ -89,7 +114,7 @@ impl LintRule for VariableNameRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Assignment, NodeKind::FunctionLikeParameter];
+        const TARGETS: &[NodeKind] = &[NodeKind::Assignment, NodeKind::FunctionLikeParameter, NodeKind::PropertyItem];
 
         TARGETS
     }
@@ -105,6 +130,9 @@ impl LintRule for VariableNameRule {
             }
             Node::FunctionLikeParameter(parameter) => {
                 self.check_parameter(ctx, parameter);
+            }
+            Node::PropertyItem(property_item) => {
+                self.check_property_item(ctx, property_item);
             }
             _ => {}
         }
@@ -131,17 +159,25 @@ impl VariableNameRule {
     }
 
     fn check_parameter<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, parameter: &FunctionLikeParameter<'arena>) {
-        if !self.cfg.check_parameters {
+        if parameter.is_promoted_property() && !self.cfg.check_promoted_properties {
             return;
         }
 
-        if parameter.is_promoted_property() {
+        if !parameter.is_promoted_property() && !self.cfg.check_parameters {
             return;
         }
 
-        let name = parameter.variable.name;
+        self.check_variable_name(ctx, parameter.variable.name, parameter.variable.span());
+    }
 
-        self.check_variable_name(ctx, name, parameter.variable.span());
+    fn check_property_item<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, property_item: &PropertyItem<'arena>) {
+        if !self.cfg.check_properties {
+            return;
+        }
+
+        let variable = property_item.variable();
+
+        self.check_variable_name(ctx, variable.name, variable.span());
     }
 
     fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
