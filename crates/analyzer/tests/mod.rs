@@ -389,6 +389,7 @@ test_case!(issue_689);
 test_case!(issue_690);
 test_case!(issue_701);
 test_case!(issue_706);
+test_case!(interface_assertion);
 
 #[test]
 fn test_all_test_cases_are_ran() {

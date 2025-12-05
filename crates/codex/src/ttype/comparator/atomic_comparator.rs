@@ -591,6 +591,14 @@ pub(crate) fn can_be_identical<'a>(
         }
     }
 
+    if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
+        && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
+        && let (Some(c1), Some(c2)) = (codebase.get_class_like(&first_name), codebase.get_class_like(&second_name))
+        && (c1.kind.is_interface() || c2.kind.is_interface())
+    {
+        return true;
+    }
+
     false
 }
 
