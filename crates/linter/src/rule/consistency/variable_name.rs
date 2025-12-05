@@ -249,6 +249,7 @@ fn is_special_variable(name: &str) -> bool {
     matches!(
         name,
         "$this"
+            | "$_"
             | "$_GET"
             | "$_POST"
             | "$_SERVER"
