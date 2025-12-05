@@ -1573,7 +1573,11 @@ fn reconcile_at_least_countable(
 
     for atomic in existing_var_types {
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
-            let min_under_count = if let Some(known_count) = known_count { known_count < count } else { false };
+            let min_under_count = match known_count {
+                Some(kc) => kc < count,
+                None => *non_empty && *count > 1,
+            };
+
             if !non_empty || min_under_count {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {

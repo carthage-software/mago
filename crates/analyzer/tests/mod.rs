@@ -290,6 +290,29 @@ test_case!(interface_property_hook);
 test_case!(trait_require_implements_self_return);
 test_case!(trait_require_extends_self_return);
 test_case!(trait_require_combined);
+test_case!(interface_assertion);
+test_case!(class_string_instantiation);
+test_case!(class_string_comparison);
+test_case!(static_var_lazy_init);
+test_case!(static_var_coalesce);
+test_case!(array_coalesce_assign_check);
+test_case!(factory_null_params);
+test_case!(clone_dynamic_class);
+test_case!(nullable_method_coalesce);
+test_case!(property_coalesce_init);
+test_case!(ctype_digit_check);
+test_case!(mutually_exclusive_null);
+test_case!(nullable_getter_check);
+test_case!(abstract_factory_pattern);
+test_case!(array_key_coalesce);
+test_case!(defensive_type_check);
+test_case!(enum_empty_check);
+test_case!(optional_chain_method);
+test_case!(compound_condition);
+test_case!(instanceof_assertion);
+test_case!(type_narrowing_external);
+test_case!(post_narrowing_check);
+test_case!(data_transformer_type);
 
 // Github Issues
 test_case!(issue_659);
@@ -389,31 +412,7 @@ test_case!(issue_689);
 test_case!(issue_690);
 test_case!(issue_701);
 test_case!(issue_706);
-test_case!(interface_assertion);
-
-// False positive test cases from bindhq-webapp analysis
-test_case!(class_string_instantiation);
-test_case!(class_string_comparison);
-test_case!(static_var_lazy_init);
-test_case!(static_var_coalesce);
-test_case!(array_coalesce_assign_check);
-test_case!(factory_null_params);
-test_case!(clone_dynamic_class);
-test_case!(nullable_method_coalesce);
-test_case!(property_coalesce_init);
-test_case!(ctype_digit_check);
-test_case!(mutually_exclusive_null);
-test_case!(nullable_getter_check);
-test_case!(abstract_factory_pattern);
-test_case!(array_key_coalesce);
-test_case!(defensive_type_check);
-test_case!(enum_empty_check);
-test_case!(optional_chain_method);
-test_case!(compound_condition);
-test_case!(instanceof_assertion);
-test_case!(type_narrowing_external);
-test_case!(post_narrowing_check);
-test_case!(data_transformer_type);
+test_case!(issue_710);
 
 #[test]
 fn test_all_test_cases_are_ran() {
