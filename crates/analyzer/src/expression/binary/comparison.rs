@@ -25,6 +25,7 @@ use crate::expression::binary::utils::is_always_greater_than_or_equal;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
 use crate::expression::binary::utils::is_always_less_than_or_equal;
+use crate::utils::misc::unwrap_expression;
 
 /// Analyzes standard comparison operations (e.g., `==`, `===`, `<`, `<=`, `>`, `>=`).
 ///
@@ -242,8 +243,11 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Equal(_) | BinaryOperator::AngledNotEqual(_) => {
+                let involves_static = involves_static_variable(binary.lhs, block_context)
+                    || involves_static_variable(binary.rhs, block_context);
+
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         let (message_verb, result_value_str) = if matches!(binary.operator, BinaryOperator::Equal(_)) {
                             ("always equal to", "`true`")
                         } else {
@@ -253,14 +257,23 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         report_redundant_comparison(context, artifacts, binary, message_verb, result_value_str);
                     }
 
-                    if matches!(binary.operator, BinaryOperator::Equal(_)) { get_true() } else { get_false() }
+                    if involves_static {
+                        get_bool()
+                    } else if matches!(binary.operator, BinaryOperator::Equal(_)) {
+                        get_true()
+                    } else {
+                        get_false()
+                    }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotEqual(_) => {
+                let involves_static = involves_static_variable(binary.lhs, block_context)
+                    || involves_static_variable(binary.rhs, block_context);
+
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -270,31 +283,37 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    get_false()
+                    if involves_static { get_bool() } else { get_false() }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::Identical(_) => {
+                let involves_static = involves_static_variable(binary.lhs, block_context)
+                    || involves_static_variable(binary.rhs, block_context);
+
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always identical to", "`true`");
                     }
 
-                    get_true()
+                    if involves_static { get_bool() } else { get_true() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
 
-                    get_false()
+                    if involves_static { get_bool() } else { get_false() }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotIdentical(_) => {
+                let involves_static = involves_static_variable(binary.lhs, block_context)
+                    || involves_static_variable(binary.rhs, block_context);
+
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -304,12 +323,12 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    get_false()
+                    if involves_static { get_bool() } else { get_false() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.inside_loop_expressions && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
-                    get_true()
+                    if involves_static { get_bool() } else { get_true() }
                 } else {
                     get_bool()
                 }
@@ -333,6 +352,14 @@ fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<b
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_boolean_literal(expression),
         _ => None,
     }
+}
+
+/// Checks if an expression involves a static variable.
+fn involves_static_variable<'ctx, 'ast, 'arena>(
+    expr: &'ast Expression<'arena>,
+    block_context: &BlockContext<'ctx>,
+) -> bool {
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(var.name))
 }
 
 /// Checks a single operand of a comparison operation for problematic types.

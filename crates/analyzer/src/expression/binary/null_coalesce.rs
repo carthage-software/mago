@@ -24,6 +24,7 @@ use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::conditional;
+use crate::utils::misc::unwrap_expression;
 
 /// Analyzes the null coalescing operator (`??`).
 ///
@@ -59,7 +60,12 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     let result_type: TUnion;
     let mut rhs_is_never = false;
 
-    if lhs_type.is_null() {
+    let is_static_var = matches!(
+        unwrap_expression(binary.lhs),
+        Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(var.name)
+    );
+
+    if lhs_type.is_null() && !is_static_var {
         context.collector.propose_with_code(
             IssueCode::RedundantNullCoalesce,
             Issue::help("Redundant null coalesce: left-hand side is always `null`.")

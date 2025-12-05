@@ -290,6 +290,12 @@ fn handle_literal_negated_equality(
                 let existing_literal_string = existing_atomic_type.get_literal_string_value();
                 let assertion_literal_string = assertion_type.get_literal_string_value();
 
+                if existing_literal_string.is_none() && assertion_type.is_literal_class_string() {
+                    did_remove_type = true;
+                    acceptable_types.push(existing_atomic_type);
+                    continue;
+                }
+
                 match (existing_literal_string, assertion_literal_string) {
                     (Some(existing_value), Some(assertion_value)) => {
                         if existing_value == assertion_value {

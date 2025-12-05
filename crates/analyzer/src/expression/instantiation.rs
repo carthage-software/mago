@@ -214,7 +214,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     }
 
     let mut is_impossible = false;
-    if metadata.flags.is_abstract() && !classname.can_extend_static() {
+    if metadata.flags.is_abstract() && !classname.can_extend_static() && !classname.is_from_class_string() {
         context.collector.report_with_code(
             IssueCode::AbstractInstantiation,
             Issue::error(format!("Cannot instantiate abstract class `{classname_str}`."))
