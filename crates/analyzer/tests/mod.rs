@@ -380,6 +380,7 @@ test_case!(issue_676);
 test_case!(issue_684);
 test_case!(issue_689);
 test_case!(issue_690);
+test_case!(issue_701);
 test_case!(unused_template_parameter);
 test_case!(unused_function_template_parameter);
 test_case!(property_hooks);

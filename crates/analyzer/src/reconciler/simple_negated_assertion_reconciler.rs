@@ -1251,6 +1251,12 @@ fn reconcile_empty_countable(
             if !atomic.is_truthy() {
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
             }
+        } else if let TAtomic::Mixed(mixed) = atomic {
+            did_remove_type = true;
+
+            if !mixed.is_truthy() {
+                acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
+            }
         } else {
             acceptable_types.push(atomic);
         }

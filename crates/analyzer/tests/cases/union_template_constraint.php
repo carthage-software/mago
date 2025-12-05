@@ -3,7 +3,7 @@
 /**
  * @template TModel of object
  *
- * @param class-string<TModel>|string|TModel $model
+ * @param class-string<TModel>|string|TModel $_model
  */
 function process_model(object|string $_model): void
 {
