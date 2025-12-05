@@ -670,16 +670,21 @@ fn infer_templates_from_input_and_container_types(
 
                 let lower_bound_type = TUnion::from_vec(input_objects);
 
+                let has_generic_parameter =
+                    lower_bound_type.types.iter().any(|t| matches!(t, TAtomic::GenericParameter(_)));
+
                 let constraint_union = wrap_atomic(class_string_constraint.as_ref().clone());
-                if !union_comparator::is_contained_by(
-                    context.codebase,
-                    &lower_bound_type,
-                    &constraint_union,
-                    false,
-                    false,
-                    false,
-                    &mut ComparisonResult::default(),
-                ) {
+                if !has_generic_parameter
+                    && !union_comparator::is_contained_by(
+                        context.codebase,
+                        &lower_bound_type,
+                        &constraint_union,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::default(),
+                    )
+                {
                     continue;
                 }
 
