@@ -1,12 +1,5 @@
 <?php
 
-/**
- * Tests that checking `$value === []` on a nonnull type doesn't produce
- * a false positive "redundant condition" error.
- *
- * @see https://github.com/carthage-software/mago/issues/701
- */
-
 function validate(mixed $value): void
 {
     if ($value === null || $value === []) {

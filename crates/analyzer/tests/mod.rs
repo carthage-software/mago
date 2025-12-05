@@ -283,6 +283,13 @@ test_case!(class_string_union_constraint);
 test_case!(float_string_concat);
 test_case!(array_key_concat);
 test_case!(iterator_type_inference);
+test_case!(unused_template_parameter);
+test_case!(unused_function_template_parameter);
+test_case!(property_hooks);
+test_case!(interface_property_hook);
+test_case!(trait_require_implements_self_return);
+test_case!(trait_require_extends_self_return);
+test_case!(trait_require_combined);
 
 // Github Issues
 test_case!(issue_659);
@@ -381,13 +388,7 @@ test_case!(issue_684);
 test_case!(issue_689);
 test_case!(issue_690);
 test_case!(issue_701);
-test_case!(unused_template_parameter);
-test_case!(unused_function_template_parameter);
-test_case!(property_hooks);
-test_case!(interface_property_hook);
-test_case!(trait_require_implements_self_return);
-test_case!(trait_require_extends_self_return);
-test_case!(trait_require_combined);
+test_case!(issue_706);
 
 #[test]
 fn test_all_test_cases_are_ran() {

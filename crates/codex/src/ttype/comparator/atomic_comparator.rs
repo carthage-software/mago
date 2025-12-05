@@ -554,6 +554,15 @@ pub(crate) fn can_be_identical<'a>(
         return keyed_arrays_can_be_identical(first_array, second_array, codebase, inside_assertion);
     }
 
+    if let (TAtomic::Scalar(TScalar::Integer(first_integer)), TAtomic::Scalar(TScalar::Integer(second_integer))) =
+        (first_part, second_part)
+        && !first_integer.is_of_literal_origin()
+        && !second_integer.is_of_literal_origin()
+        && first_integer.overlaps(*second_integer)
+    {
+        return true;
+    }
+
     let mut first_comparison_result = ComparisonResult::new();
     let mut second_comparison_result = ComparisonResult::new();
 

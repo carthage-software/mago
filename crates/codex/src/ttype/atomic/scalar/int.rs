@@ -132,6 +132,12 @@ impl TInteger {
         matches!(self, TInteger::Literal(_))
     }
 
+    /// Returns `true` if the type is of literal origin (`Literal` or `UnspecifiedLiteral`).
+    #[inline]
+    pub const fn is_of_literal_origin(&self) -> bool {
+        matches!(self, TInteger::Literal(_) | TInteger::UnspecifiedLiteral)
+    }
+
     /// Returns `true` if the type is a `Range`.
     #[inline]
     pub const fn is_range(&self) -> bool {
@@ -298,6 +304,32 @@ impl TInteger {
             (Range(c_from, c_to), Range(i_from, i_to)) => i_from >= c_from && i_to <= c_to,
             _ => false,
         }
+    }
+
+    /// Checks if there is any overlap between the integer ranges represented by `self` and `other`.
+    ///
+    /// This method returns `true` if there exists at least one integer value that is included
+    /// in both `self` and `other`. If either type is `Unspecified`, it is considered to overlap with any other type.
+    #[inline]
+    pub const fn overlaps(&self, other: TInteger) -> bool {
+        if self.is_unspecified() || other.is_unspecified() {
+            return true;
+        }
+
+        let (self_min, self_max) = self.get_bounds();
+        let (other_min, other_max) = other.get_bounds();
+
+        let min_overlap = match (self_min, other_max) {
+            (Some(s_min), Some(o_max)) => s_min <= o_max,
+            _ => true,
+        };
+
+        let max_overlap = match (self_max, other_min) {
+            (Some(s_max), Some(o_min)) => s_max >= o_min,
+            _ => true,
+        };
+
+        min_overlap && max_overlap
     }
 
     /// Checks if this `TInteger` type is completely covered by a union of other `TInteger` types.
