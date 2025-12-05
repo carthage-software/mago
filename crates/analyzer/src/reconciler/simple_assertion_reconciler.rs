@@ -127,19 +127,17 @@ pub(crate) fn reconcile(
                     ));
                 }
             }
-            TAtomic::Array(TArray::List(TList { known_elements: None, element_type, non_empty, .. })) => {
-                if element_type.is_mixed() {
-                    return Some(intersect_array_list(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                        *non_empty,
-                    ));
-                }
+            TAtomic::Array(TArray::List(TList { known_elements: None, non_empty, .. })) => {
+                return Some(intersect_array_list(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                    *non_empty,
+                ));
             }
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. })) => {
                 if (parameters.0.is_placeholder() || parameters.0.is_array_key())
@@ -718,6 +716,9 @@ fn intersect_keyed_array(
             }
             TAtomic::Array(TArray::Keyed(keyed_array)) => {
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(keyed_array.clone())));
+            }
+            TAtomic::Array(TArray::List(list)) => {
+                acceptable_types.push(TAtomic::Array(TArray::List(list.clone())));
             }
             TAtomic::Iterable(iterable) => {
                 let key_type = refine_array_key(iterable.get_key_type());
