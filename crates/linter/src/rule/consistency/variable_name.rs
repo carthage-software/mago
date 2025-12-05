@@ -34,6 +34,7 @@ pub struct VariableNameConfig {
     pub level: Level,
     pub camel: bool,
     pub either: bool,
+    pub check_variables: bool,
     pub check_parameters: bool,
     pub check_properties: bool,
     pub check_promoted_properties: bool,
@@ -45,6 +46,7 @@ impl Default for VariableNameConfig {
             level: Level::Help,
             camel: false,
             either: false,
+            check_variables: true,
             check_parameters: true,
             check_properties: true,
             check_promoted_properties: true,
@@ -141,6 +143,10 @@ impl LintRule for VariableNameRule {
 
 impl VariableNameRule {
     fn check_assignment<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, assignment: &Assignment<'arena>) {
+        if !self.cfg.check_variables {
+            return;
+        }
+
         if !assignment.operator.is_assign() {
             return;
         }
