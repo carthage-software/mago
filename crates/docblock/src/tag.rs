@@ -1033,6 +1033,10 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Result<MethodTag, Pars
 
     let mut acc_len = 0;
 
+    // Track the position and length of the static modifier, in case we need to treat it as return type
+    let mut static_modifier_start = 0u32;
+    let mut static_modifier_len = 0u32;
+
     loop {
         if let Some((new_content, char_count)) = try_consume(content, "static ") {
             if is_static {
@@ -1040,6 +1044,8 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Result<MethodTag, Pars
             }
 
             is_static = true;
+            static_modifier_start = acc_len as u32;
+            static_modifier_len = 6; // "static" without the space
             acc_len += char_count;
             content = new_content;
         } else if let Some((new_content, char_count)) = try_consume(content, "public ") {
@@ -1073,11 +1079,22 @@ pub fn parse_method_tag(mut content: &str, span: Span) -> Result<MethodTag, Pars
 
     let rest_span = span.subspan(acc_len as u32, span.length());
 
-    let (type_string, _) = split_tag_content(content, rest_span)
-        .ok_or_else(|| ParseError::InvalidMethodTag(span, "Failed to parse return type".to_string()))?;
-
-    let (rest_slice, whitespace_count) = consume_whitespace(&content[type_string.span.length() as usize..]);
-    let rest_slice_span = rest_span.subspan(type_string.span.length() + whitespace_count as u32, rest_span.length());
+    let (type_string, rest_slice, rest_slice_span) = if is_static && looks_like_method_signature_only(content) {
+        is_static = false;
+        let static_span = span.subspan(static_modifier_start, static_modifier_start + static_modifier_len);
+        let type_string = TypeString { value: "static".into(), span: static_span };
+        let (rest_slice, whitespace_count) = consume_whitespace(content);
+        let rest_slice_span = rest_span.subspan(whitespace_count as u32, rest_span.length());
+        (type_string, rest_slice, rest_slice_span)
+    } else {
+        let type_string = split_tag_content(content, rest_span)
+            .ok_or_else(|| ParseError::InvalidMethodTag(span, "Failed to parse return type".to_string()))?
+            .0;
+        let (rest_slice, whitespace_count) = consume_whitespace(&content[type_string.span.length() as usize..]);
+        let rest_slice_span =
+            rest_span.subspan(type_string.span.length() + whitespace_count as u32, rest_span.length());
+        (type_string, rest_slice, rest_slice_span)
+    };
 
     // Type must exist and be valid
     if type_string.value.is_empty()
@@ -1179,6 +1196,19 @@ fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
     let (input, whitespace_count) = consume_whitespace(input);
 
     Some((input, len + whitespace_count))
+}
+
+/// Checks if the given content looks like only a method signature (no return type).
+/// e.g., "foo()" or "foo($arg)" returns true
+/// e.g., "Money foo()" or "int bar($x)" returns false
+fn looks_like_method_signature_only(content: &str) -> bool {
+    let trimmed = content.trim();
+    if let Some(paren_pos) = trimmed.find('(') {
+        let before_paren = trimmed[..paren_pos].trim();
+        !before_paren.is_empty() && !before_paren.contains(' ')
+    } else {
+        false
+    }
 }
 
 fn split_args(args_str: &str, span: Span) -> Vec<(&str, Span)> {
