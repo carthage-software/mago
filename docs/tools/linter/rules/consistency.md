@@ -25,6 +25,7 @@ This document details the rules available in the `Consistency` category.
 | No Hash Comment | [`no-hash-comment`](#no-hash-comment) |
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
+| Property Name | [`property-name`](#property-name) |
 | Trait Name | [`trait-name`](#trait-name) |
 | Variable Name | [`variable-name`](#variable-name) |
 
@@ -669,6 +670,54 @@ diffs and formatting issues, so it is recommended to remove it.
 ```
 
 
+## <a id="property-name"></a>`property-name`
+
+Detects class property declarations that do not follow camel or snake naming convention.
+
+Property names should be in camel case or snake case, depending on the configuration.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+| `camel` | `boolean` | `true` |
+| `either` | `boolean` | `false` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+final class Foo {
+    public string $myProperty;
+
+    public function __construct(
+        public int $myPromotedProperty,
+    ) {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+final class Foo {
+    public string $My_Property;
+
+    public function __construct(
+        public int $My_Promoted_Property,
+    ) {}
+}
+```
+
+
 ## <a id="trait-name"></a>`trait-name`
 
 Detects trait declarations that do not follow class naming convention.
@@ -720,7 +769,7 @@ Variable names should be in camel case or snake case, depending on the configura
 | `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
 | `camel` | `boolean` | `false` |
-| `either` | `boolean` | `false` |
+| `either` | `boolean` | `true` |
 | `check-parameters` | `boolean` | `true` |
 
 ### Examples
