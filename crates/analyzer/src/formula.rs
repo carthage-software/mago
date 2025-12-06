@@ -21,7 +21,7 @@ use crate::context::scope::var_has_root;
 use crate::utils::expression::get_expression_id;
 use crate::utils::misc::unwrap_expression;
 
-const FORMULA_SIZE_THRESHOLD: usize = 1000;
+const FORMULA_SIZE_THRESHOLD: usize = 512;
 
 /// Recursively traverses a conditional expression to generate a corresponding logical formula.
 ///
