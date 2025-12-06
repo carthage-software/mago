@@ -23,27 +23,26 @@ use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
 #[derive(Debug, Clone)]
-pub struct VariableNameRule {
+pub struct PropertyNameRule {
     meta: &'static RuleMeta,
-    cfg: VariableNameConfig,
+    cfg: PropertyNameConfig,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-pub struct VariableNameConfig {
+pub struct PropertyNameConfig {
     pub level: Level,
     pub camel: bool,
     pub either: bool,
-    pub check_parameters: bool,
 }
 
-impl Default for VariableNameConfig {
+impl Default for PropertyNameConfig {
     fn default() -> Self {
-        Self { level: Level::Help, camel: false, either: true, check_parameters: true }
+        Self { level: Level::Help, camel: true, either: false }
     }
 }
 
-impl Config for VariableNameConfig {
+impl Config for PropertyNameConfig {
     fn default_enabled() -> bool {
         false
     }
@@ -53,33 +52,39 @@ impl Config for VariableNameConfig {
     }
 }
 
-impl LintRule for VariableNameRule {
-    type Config = VariableNameConfig;
+impl LintRule for PropertyNameRule {
+    type Config = PropertyNameConfig;
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {
-            name: "Variable Name",
-            code: "variable-name",
+            name: "Property Name",
+            code: "property-name",
             description: indoc! {"
-                Detects variable declarations that do not follow camel or snake naming convention.
+                Detects class property declarations that do not follow camel or snake naming convention.
 
-                Variable names should be in camel case or snake case, depending on the configuration.
+                Property names should be in camel case or snake case, depending on the configuration.
             "},
             good_example: indoc! {r#"
                 <?php
 
-                $my_variable = 1;
+                final class Foo {
+                    public string $myProperty;
 
-                function foo($my_param) {}
+                    public function __construct(
+                        public int $myPromotedProperty,
+                    ) {}
+                }
             "#},
             bad_example: indoc! {r#"
                 <?php
 
-                $MyVariable = 1;
+                final class Foo {
+                    public string $My_Property;
 
-                $My_Variable = 2;
-
-                function foo($MyParam) {}
+                    public function __construct(
+                        public int $My_Promoted_Property,
+                    ) {}
+                }
             "#},
             category: Category::Consistency,
             requirements: RuleRequirements::None,
@@ -89,7 +94,7 @@ impl LintRule for VariableNameRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Assignment, NodeKind::FunctionLikeParameter];
+        const TARGETS: &[NodeKind] = &[NodeKind::PropertyItem, NodeKind::FunctionLikeParameter];
 
         TARGETS
     }
@@ -100,51 +105,37 @@ impl LintRule for VariableNameRule {
 
     fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
         match node {
-            Node::Assignment(assignment) => {
-                self.check_assignment(ctx, assignment);
+            Node::PropertyItem(property_item) => {
+                self.check_property_item(ctx, property_item);
             }
             Node::FunctionLikeParameter(parameter) => {
-                self.check_parameter(ctx, parameter);
+                self.check_promoted_property(ctx, parameter);
             }
             _ => {}
         }
     }
 }
 
-impl VariableNameRule {
-    fn check_assignment<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, assignment: &Assignment<'arena>) {
-        if !assignment.operator.is_assign() {
-            return;
-        }
+impl PropertyNameRule {
+    fn check_property_item<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, property_item: &PropertyItem<'arena>) {
+        let variable = property_item.variable();
 
-        let Expression::Variable(Variable::Direct(variable)) = assignment.lhs else {
-            return;
-        };
-
-        let name = variable.name;
-
-        if is_special_variable(name) {
-            return;
-        }
-
-        self.check_variable_name(ctx, name, variable.span());
+        self.check_property_name(ctx, variable.name, variable.span());
     }
 
-    fn check_parameter<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, parameter: &FunctionLikeParameter<'arena>) {
-        if !self.cfg.check_parameters {
+    fn check_promoted_property<'arena>(
+        &self,
+        ctx: &mut LintContext<'_, 'arena>,
+        parameter: &FunctionLikeParameter<'arena>,
+    ) {
+        if !parameter.is_promoted_property() {
             return;
         }
 
-        if parameter.is_promoted_property() {
-            return;
-        }
-
-        let name = parameter.variable.name;
-
-        self.check_variable_name(ctx, name, parameter.variable.span());
+        self.check_property_name(ctx, parameter.variable.name, parameter.variable.span());
     }
 
-    fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
+    fn check_property_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
         let name_without_dollar = name.strip_prefix('$').unwrap_or(name);
 
         if self.cfg.either {
@@ -152,14 +143,14 @@ impl VariableNameRule {
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
-                        format!("Variable name `{}` should be in either camel case or snake case.", name),
+                        format!("Property name `{}` should be in either camel case or snake case.", name),
                     )
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
                     )
                     .with_note(format!(
-                        "The variable name `{}` does not follow either camel case or snake naming convention.",
+                        "The property name `{}` does not follow either camel case or snake naming convention.",
                         name
                     ))
                     .with_help(format!(
@@ -175,12 +166,12 @@ impl VariableNameRule {
 
         if self.cfg.camel && !is_camel_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Variable name `{}` should be in camel case.", name))
+                Issue::new(self.cfg.level(), format!("Property name `{}` should be in camel case.", name))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
                     )
-                    .with_note(format!("The variable name `{}` does not follow camel naming convention.", name))
+                    .with_note(format!("The property name `{}` does not follow camel naming convention.", name))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_camel_case(name_without_dollar)
@@ -188,12 +179,12 @@ impl VariableNameRule {
             );
         } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Variable name `{}` should be in snake case.", name))
+                Issue::new(self.cfg.level(), format!("Property name `{}` should be in snake case.", name))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
                     )
-                    .with_note(format!("The variable name `{}` does not follow snake naming convention.", name))
+                    .with_note(format!("The property name `{}` does not follow snake naming convention.", name))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_snake_case(name_without_dollar)
@@ -201,23 +192,4 @@ impl VariableNameRule {
             );
         }
     }
-}
-
-fn is_special_variable(name: &str) -> bool {
-    matches!(
-        name,
-        "$this"
-            | "$_"
-            | "$_GET"
-            | "$_POST"
-            | "$_SERVER"
-            | "$_REQUEST"
-            | "$_SESSION"
-            | "$_COOKIE"
-            | "$_FILES"
-            | "$_ENV"
-            | "$GLOBALS"
-            | "$argc"
-            | "$argv"
-    )
 }
