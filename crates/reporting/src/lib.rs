@@ -457,10 +457,6 @@ impl IssueCollection {
     }
 
     pub fn push(&mut self, issue: Issue) {
-        if self.issues.contains(&issue) {
-            return; // Avoid duplicates
-        }
-
         self.issues.push(issue);
     }
 
