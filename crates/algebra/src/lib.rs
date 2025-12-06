@@ -46,7 +46,7 @@ pub type ActiveTruths = IndexMap<String, HashSet<usize>>;
 /// A new `Vec<Clause>` containing the simplified, owned clauses.
 #[inline]
 pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Vec<Clause> {
-    const COMPLEXITY_THRESHOLD: usize = 65_536;
+    const COMPLEXITY_THRESHOLD: usize = 8192;
 
     fn saturate_clauses_inner(unique_clauses: Vec<&Clause>) -> Vec<Clause> {
         let unique_clauses_len = unique_clauses.len();
@@ -376,7 +376,7 @@ pub fn disjoin_clauses(
     right_clauses: Vec<Clause>,
     conditional_object_id: Span,
 ) -> Vec<Clause> {
-    const COMPLEXITY_THRESHOLD: usize = 60_000;
+    const COMPLEXITY_THRESHOLD: usize = 4096;
 
     let left_clauses_len = left_clauses.len();
     let right_clauses_len = right_clauses.len();
@@ -513,7 +513,7 @@ pub fn negate_formula(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
 
 #[inline]
 fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
-    const MAX_COMPLEXITY: usize = 20_000;
+    const MAX_COMPLEXITY: usize = 4096;
 
     let mut seed_clauses = Vec::new();
     let mut complexity = 1usize;
