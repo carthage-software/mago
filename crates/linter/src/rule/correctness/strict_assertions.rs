@@ -88,7 +88,6 @@ impl LintRule for StrictAssertionsRule {
                 }
             "#},
             category: Category::Correctness,
-
             requirements: RuleRequirements::Integration(Integration::PHPUnit),
         };
 
@@ -121,28 +120,273 @@ impl LintRule for StrictAssertionsRule {
                 continue;
             };
 
-            if NON_STRICT_ASSERTIONS.contains(&identifier.value) {
-                let strict_name = identifier.value.replacen("Equals", "Same", 1);
-
-                let issue = Issue::new(self.cfg.level(), "Use strict assertions in PHPUnit tests.")
-                    .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(reference.span())
-                            .with_message(format!("Non-strict assertion `{}` is used here.", identifier.value)),
-                    )
-                    .with_help(format!(
-                        "Replace `{}` with `{}` to enforce strict comparisons in your tests.",
-                        identifier.value, strict_name
-                    ));
-
-                ctx.collector.propose(issue, |plan| {
-                    plan.replace(
-                        reference.get_selector().span().to_range(),
-                        strict_name,
-                        SafetyClassification::PotentiallyUnsafe,
-                    );
-                });
+            if !NON_STRICT_ASSERTIONS.contains(&identifier.value) {
+                continue;
             }
+
+            let Some(argument_list) = reference.get_argument_list() else {
+                continue;
+            };
+
+            let is_attribute_assertion =
+                identifier.value == "assertAttributeEquals" || identifier.value == "assertAttributeNotEquals";
+
+            let should_flag = if is_attribute_assertion {
+                argument_list.arguments.get(1).is_some_and(|arg| is_non_bool_or_null_scalar(arg.value()))
+            } else {
+                argument_list.arguments.first().is_some_and(|arg| is_non_bool_or_null_scalar(arg.value()))
+                    || argument_list.arguments.get(1).is_some_and(|arg| is_non_bool_or_null_scalar(arg.value()))
+            };
+
+            if !should_flag {
+                continue;
+            }
+
+            let strict_name = identifier.value.replacen("Equals", "Same", 1);
+
+            let issue = Issue::new(self.cfg.level(), "Use strict assertions in PHPUnit tests.")
+                .with_code(self.meta.code)
+                .with_annotation(
+                    Annotation::primary(reference.span())
+                        .with_message(format!("Non-strict assertion `{}` is used here.", identifier.value)),
+                )
+                .with_help(format!(
+                    "Replace `{}` with `{}` to enforce strict comparisons in your tests.",
+                    identifier.value, strict_name
+                ));
+
+            ctx.collector.propose(issue, |plan| {
+                plan.replace(
+                    reference.get_selector().span().to_range(),
+                    strict_name,
+                    SafetyClassification::PotentiallyUnsafe,
+                );
+            });
         }
+    }
+}
+
+/// Checks if an expression is a scalar literal (null, bool, int, float, or string).
+const fn is_non_bool_or_null_scalar(expr: &Expression<'_>) -> bool {
+    matches!(
+        expr,
+        Expression::Literal(Literal::Integer(_))
+            | Expression::Literal(Literal::Float(_))
+            | Expression::Literal(Literal::String(_))
+            | Expression::CompositeString(_)
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = variable_comparison_not_flagged,
+        rule = StrictAssertionsRule,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals($expected, $actual);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = method_call_not_flagged,
+        rule = StrictAssertionsRule,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    self::assertEquals(Money::EUR('100'), $result);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = static_variable_comparison_not_flagged,
+        rule = StrictAssertionsRule,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    static::assertNotEquals($obj1, $obj2);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = null_comparison_not_flagged,
+        rule = StrictAssertionsRule,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals(null, $value);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = bool_comparison_not_flagged,
+        rule = StrictAssertionsRule,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals(true, $flag);
+                    self::assertEquals(false, $other);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = integer_literal_flagged,
+        rule = StrictAssertionsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals(42, $result);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = string_literal_flagged,
+        rule = StrictAssertionsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    self::assertEquals('foo', $bar);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = float_literal_flagged,
+        rule = StrictAssertionsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    static::assertEquals(3.14, $value);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = literal_in_second_position_flagged,
+        rule = StrictAssertionsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals($result, 42);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = assert_not_equals_with_literal_flagged,
+        rule = StrictAssertionsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertNotEquals(42, $value);
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = multiple_literal_assertions_flagged,
+        rule = StrictAssertionsRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            use PHPUnit\Framework\TestCase;
+
+            final class Test extends TestCase
+            {
+                public function testFoo(): void
+                {
+                    $this->assertEquals(42, $a);
+                    self::assertEquals('bar', $b);
+                    static::assertNotEquals(1.5, $c);
+                }
+            }
+        "#}
     }
 }

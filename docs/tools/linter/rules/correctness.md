@@ -22,6 +22,7 @@ This document details the rules available in the `Correctness` category.
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
+| Use Specific Assertions | [`use-specific-assertions`](#use-specific-assertions) |
 
 
 ## <a id="assert-description"></a>`assert-description`
@@ -569,5 +570,68 @@ echo "Hello, World!";
 <?php
 
 echo "Hello, World!";
+```
+
+
+## <a id="use-specific-assertions"></a>`use-specific-assertions`
+
+Suggests using specific PHPUnit assertions instead of generic equality assertions
+when comparing with `null`, `true`, or `false`.
+
+Using specific assertions like `assertNull`, `assertTrue`, and `assertFalse`
+provides clearer error messages and makes test intent more explicit.
+
+
+### Requirements
+
+- **Integration:** `PHPUnit`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use PHPUnit\Framework\TestCase;
+
+final class SomeTest extends TestCase
+{
+    public function testSomething(): void
+    {
+        $this->assertNull($value);
+        $this->assertTrue($flag);
+        $this->assertFalse($condition);
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use PHPUnit\Framework\TestCase;
+
+final class SomeTest extends TestCase
+{
+    public function testSomething(): void
+    {
+        $this->assertEquals(null, $value);
+        $this->assertSame(true, $flag);
+        $this->assertEquals(false, $condition);
+    }
+}
 ```
 

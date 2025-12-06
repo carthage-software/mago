@@ -145,6 +145,7 @@ pub struct RulesSettings {
     pub property_type: RuleSettings<PropertyTypeConfig>,
     pub no_unsafe_finally: RuleSettings<NoUnsafeFinallyConfig>,
     pub strict_assertions: RuleSettings<StrictAssertionsConfig>,
+    pub use_specific_assertions: RuleSettings<UseSpecificAssertionsConfig>,
     pub no_request_all: RuleSettings<NoRequestAllConfig>,
     pub middleware_in_routes: RuleSettings<MiddlewareInRoutesConfig>,
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,

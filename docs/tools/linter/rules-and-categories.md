@@ -38,6 +38,7 @@ title: Rules & categories
 
 - [`assertion-style`](./rules/consistency#assertion-style)
 - [`strict-assertions`](./rules/correctness#strict-assertions)
+- [`use-specific-assertions`](./rules/correctness#use-specific-assertions)
 
 ### Psl
 

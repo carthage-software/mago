@@ -11,6 +11,7 @@ pub mod return_type;
 pub mod strict_assertions;
 pub mod strict_behavior;
 pub mod strict_types;
+pub mod use_specific_assertions;
 
 pub use assert_description::*;
 pub use constant_type::*;
@@ -25,3 +26,4 @@ pub use return_type::*;
 pub use strict_assertions::*;
 pub use strict_behavior::*;
 pub use strict_types::*;
+pub use use_specific_assertions::*;

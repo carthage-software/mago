@@ -28,6 +28,15 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
             MethodReference::StaticMethodPartialApplication(partial_app) => &partial_app.method,
         }
     }
+
+    pub fn get_argument_list(&self) -> Option<&'ast ArgumentList<'arena>> {
+        match self {
+            MethodReference::MethodCall(call) => Some(&call.argument_list),
+            MethodReference::StaticMethodCall(call) => Some(&call.argument_list),
+            MethodReference::MethodPartialApplication(_) => None,
+            MethodReference::StaticMethodPartialApplication(_) => None,
+        }
+    }
 }
 
 impl HasSpan for MethodReference<'_, '_> {

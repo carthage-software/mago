@@ -265,6 +265,7 @@ define_rules! {
     PropertyType(property_type @ PropertyTypeRule),
     NoUnsafeFinally(no_unsafe_finally @ NoUnsafeFinallyRule),
     StrictAssertions(strict_assertions @ StrictAssertionsRule),
+    UseSpecificAssertions(use_specific_assertions @ UseSpecificAssertionsRule),
     NoRequestAll(no_request_all @ NoRequestAllRule),
     MiddlewareInRoutes(middleware_in_routes @ MiddlewareInRoutesRule),
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
